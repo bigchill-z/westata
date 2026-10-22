@@ -31,6 +31,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from westata.errors import ConsistencyError, ConvergenceError
 from westata.results.base import StataResults
@@ -137,6 +138,23 @@ class ARIMA:
         names = list(result.param_names)
         cov = np.asarray(result.cov_params(), dtype=float)
         nobs = int(result.nobs)
+        # Stata's arima reports a Wald chi2 for the null that all ARMA
+        # coefficients are zero. Recompute it from the coefficient vector and
+        # its covariance, excluding the variance parameter.
+        arma_positions = [
+            index for index, name in enumerate(names) if name != "sigma2"
+        ]
+        if arma_positions:
+            sub_params = params[arma_positions]
+            sub_cov = cov[np.ix_(arma_positions, arma_positions)]
+            try:
+                chi2 = float(sub_params @ np.linalg.solve(sub_cov, sub_params))
+            except np.linalg.LinAlgError:
+                chi2 = float(sub_params @ np.linalg.pinv(sub_cov) @ sub_params)
+            df_m = len(arma_positions)
+            p_chi2 = float(stats.chi2.sf(chi2, df_m))
+        else:
+            chi2, df_m, p_chi2 = float("nan"), 0, float("nan")
 
         e: dict[str, Any] = {
             "N": nobs,
@@ -147,10 +165,10 @@ class ARIMA:
                 float(params[names.index("sigma2")]) if "sigma2" in names else float("nan")
             ),
             "chi2type": "Wald",
-            "chi2": float("nan"),
-            "p": float("nan"),
+            "chi2": chi2,
+            "p": p_chi2,
             "rank": params.size,
-            "df_m": max(params.size - 1, 0),
+            "df_m": df_m,
             "converged": int(converged),
             "order": self._order,
             "seasonal_order": self._seasonal_order,

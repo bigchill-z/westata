@@ -52,6 +52,20 @@ SUPPORTED_TYPES: dict[str, tuple[str, ...]] = {
     "ologit": ("xb", "stdp", "pr", "residuals"),
     "oprobit": ("xb", "stdp", "pr", "residuals"),
     "tobit": ("xb", "stdp", "stdf", "e", "ystar", "residuals"),
+    # --- P6 limited dependent variables ---
+    # Stata: truncreg/intreg are continuous models, so they offer xb, stdp, stdf.
+    "truncreg": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "intreg": ("xb", "stdp", "stdf", "fitted"),
+    # heckman/etregress predict from the outcome equation.
+    "heckman": ("xb", "stdp", "stdf", "fitted"),
+    "etregress": ("xb", "stdp", "stdf", "fitted"),
+    # --- P7 count models ---
+    # Verified on StataNow 19.5: zip offers xb/n/stdp but rejects stdf with
+    # r(198), the same split as poisson/nbreg.
+    "zip": ("xb", "n", "stdp", "residuals"),
+    "zinb": ("xb", "n", "stdp", "residuals"),
+    "ztp": ("xb", "n", "stdp", "residuals"),
+    "tnbreg": ("xb", "n", "stdp", "residuals"),
 }
 
 

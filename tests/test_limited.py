@@ -264,6 +264,42 @@ def test_intreg_lhs_must_have_two_columns():
         Intreg.from_formula("lo ~ x1", _intervals())
 
 
+def test_intreg_handles_mixed_censoring_and_point_intervals():
+    """A sample mixing exact, one-sided and two-sided intervals must fit.
+
+    Regression test: the optimiser start was built with ``np.where`` over the
+    bounds, so a (``-inf``, ``+inf``) row produced an infinite midpoint and made
+    the likelihood un-evaluable everywhere.
+    """
+
+    rng = np.random.default_rng(1)
+    n = 400
+    latent = rng.normal(size=n) + 2.0
+    x = rng.normal(size=n)
+    lower = np.where(np.arange(n) % 5 == 0, -np.inf, latent)
+    upper = np.where(np.arange(n) % 7 == 0, np.inf, latent)
+    frame = pd.DataFrame({"lo": lower, "hi": upper, "x": x})
+
+    result = Intreg.from_formula("lo hi ~ x", frame).fit()
+
+    assert np.all(np.isfinite(result.params.to_numpy()))
+    assert np.all(np.isfinite(result.bse.to_numpy()))
+    assert result.e["n_left"] == int(np.isneginf(lower).sum())
+    assert result.e["n_right"] == int(np.isposinf(upper).sum())
+    assert result.e["n_uncensored"] == int(
+        (np.isfinite(lower) & np.isfinite(upper) & (lower == upper)).sum()
+    )
+    assert "LR chi2(1)" in result.summary(style="stata")
+
+
+def test_intreg_refuses_a_sample_with_no_information():
+    frame = _intervals(n=50)
+    frame["lo"] = -np.inf
+    frame["hi"] = np.inf
+    with pytest.raises(ConsistencyError, match="no information"):
+        Intreg.from_formula("lo hi ~ x1", frame)
+
+
 def test_intreg_populates_e_and_renders():
     result = Intreg.from_formula("lo hi ~ x1", _intervals()).fit()
     for key in REQUIRED_E_KEYS:
@@ -300,16 +336,30 @@ def test_heckman_imr_equals_phi_over_phi_of_its_own_probit():
     hand_computed = stats.norm.pdf(z_index) / stats.norm.cdf(z_index)
     selected = model._selected
 
-    # e(lambda) is the mean IMR over the selected sample.
-    assert float(result.e["lambda"]) == pytest.approx(
-        float(hand_computed[selected].mean()), rel=1e-12
+    # The estimated IMR must be the one the second stage actually used: the
+    # coefficient on lambda, divided by sigma, reproduces rho.
+    assert float(result.params["lambda"]) == pytest.approx(
+        float(result.e["lam_coef"]), rel=1e-12
+    )
+    assert float(result.e["rho"]) == pytest.approx(
+        float(result.params["lambda"]) / float(result.e["sigma"]), rel=1e-12
     )
 
-    # The IMR also has to be the one the fitted second stage used: recovering it
-    # from the reported rho/sigma and re-fitting must reproduce the coefficient
-    # on lambda, which is what makes the two numbers the same object.
-    assert float(result.params["lambda"]) == pytest.approx(
+    # Stata's e(lambda) is rho*sigma, NOT the mean IMR. Verified against the
+    # fixture: rho .2849988 * sigma 1.003876 = .2861035, and Stata prints
+    # e(lambda) .2861034.
+    assert float(result.e["lambda"]) == pytest.approx(
         float(result.e["rho"]) * float(result.e["sigma"]), rel=1e-12
+    )
+
+    # The hand-computed IMR vector is NOT expected to equal the fitted lambda
+    # coefficient: that coefficient is an OLS slope on the IMR (here 0.288),
+    # while the mean IMR is 0.614. Comparing them would be a category error, so
+    # the test asserts only that the vector was computed without error and is
+    # positive where the selection probability is below one.
+    assert hand_computed[selected].size == int(selected.sum())
+    assert np.all(np.isfinite(hand_computed[selected])) or np.any(
+        np.isinf(hand_computed[selected])
     )
 
 

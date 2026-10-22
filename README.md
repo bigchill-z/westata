@@ -18,10 +18,10 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **424 passing** |
-| Source | ~7,500 lines across 9 subsystems |
+| Tests | **430 passing** |
+| Source | ~7,600 lines across 9 subsystems |
 | Commands covered | 31 registry entries |
-| Evidence | **22 × E3**, 5 × E2, 4 × E1 |
+| Evidence | **24 × E3**, 6 × E2, 1 × E1 |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
@@ -111,9 +111,9 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 22 |
-| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 5 |
-| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 4 |
+| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 24 |
+| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 6 |
+| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 1 |
 
 Measured relative agreement with StataNow 19.5:
 
@@ -142,6 +142,10 @@ Measured relative agreement with StataNow 19.5:
 | `ologit` / `oprobit` | ~2e-5 | — |
 | `nbreg` | 1.7e-5 | 9.1e-7 |
 | `arima` | 4.8e-5 | 8.2e-5 |
+| `predict` (OLS xb) | 1.6e-15 | — |
+| `predict` (logit pr) | 3.1e-11 | — |
+| `predict` (tobit e/ystar) | 5.8e-10 | — |
+| `etable` vs `esttab` | 0.0 | — |
 | `dfuller` | 2.3e-4 | — |
 | `ivregress gmm` | 4.9e-16 | **2.9e-2** |
 | `arch` | **3.6e-2** | — |
@@ -158,6 +162,14 @@ Two gaps are larger and are left visible rather than tuned away:
   differently from Stata's.
 - **`arch`**: alpha differs by 6.9e-3, the mean constant by 3.6e-2. Stata uses
   OPG standard errors by default and the optimisers differ.
+- **`vec` / `vecrank`**: the only E1 entry. Stata reports a trace statistic of
+  288.3450 where statsmodels gives 195.9673 (eigenvalue 0.50992 vs 0.382398).
+  The data round-trip through pystata is exact to 4e-16, so this is a real
+  Johansen/lag-convention difference, left unresolved and marked unverified
+  rather than tuned.
+- Two commands could not be compared at all because StataNow 19 removed them:
+  `xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are
+  validated by other means.
 
 ## Design notes worth knowing
 

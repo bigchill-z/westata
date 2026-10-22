@@ -1,0 +1,254 @@
+=== truncreg ===
+(0 obs truncated)
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -605.83489  
+Iteration 1:  Log likelihood = -587.37962  
+Iteration 2:  Log likelihood = -586.52302  
+Iteration 3:  Log likelihood = -586.52239  
+Iteration 4:  Log likelihood = -586.52239  
+
+Truncated regression
+Limit: Lower =    0                             Number of obs     =        582
+       Upper = +inf                             Wald chi2(2)      =     803.04
+Log likelihood = -586.52239                     Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.568894    .056469    27.78   0.000     1.458217    1.679571
+          x2 |  -.5033393   .0389962   -12.91   0.000    -.5797705   -.4269082
+       _cons |   .9280214   .0592608    15.66   0.000     .8118723     1.04417
+-------------+----------------------------------------------------------------
+      /sigma |   .8153158   .0291048    28.01   0.000     .7582714    .8723601
+------------------------------------------------------------------------------
+
+
+=== intreg ===
+
+Fitting constant-only model:
+
+Iteration 0:  Log likelihood = -1001.3103  
+Iteration 1:  Log likelihood = -953.08347  
+Iteration 2:  Log likelihood = -950.43428  
+Iteration 3:  Log likelihood = -950.42563  
+Iteration 4:  Log likelihood = -950.42563  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -759.87153  
+Iteration 1:  Log likelihood = -695.96254  
+Iteration 2:  Log likelihood = -694.61596  
+Iteration 3:  Log likelihood = -694.61304  
+Iteration 4:  Log likelihood = -694.61304  
+
+Interval regression                                 Number of obs     =    600
+                                                           Uncensored =      0
+                                                        Left-censored =    108
+                                                       Right-censored =     87
+                                                       Interval-cens. =    405
+
+                                                    LR chi2(1)        = 511.63
+Log likelihood = -694.61304                         Prob > chi2       = 0.0000
+
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.197311   .0504247    23.74   0.000      1.09848    1.296142
+       _cons |    1.94128   .0417158    46.54   0.000     1.859519    2.023042
+-------------+----------------------------------------------------------------
+    /lnsigma |  -.0827015   .0396502    -2.09   0.037    -.1604144   -.0049886
+-------------+----------------------------------------------------------------
+       sigma |   .9206259    .036503                      .8517907    .9950238
+------------------------------------------------------------------------------
+
+
+=== heckman ===
+
+Iteration 0:  Log likelihood = -1876.3469  
+Iteration 1:  Log likelihood = -1876.3462  
+Iteration 2:  Log likelihood = -1876.3462  
+
+Heckman selection model                         Number of obs     =      1,500
+(regression model with sample selection)              Selected    =        755
+                                                      Nonselected =        745
+
+                                                Wald chi2(1)      =    2866.23
+Log likelihood = -1876.346                      Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+y            |
+           x |   1.965111   .0367055    53.54   0.000     1.893169    2.037052
+       _cons |   1.026726   .0706062    14.54   0.000     .8883402    1.165111
+-------------+----------------------------------------------------------------
+selected     |
+           z |   .8021853   .0433423    18.51   0.000     .7172359    .8871347
+       _cons |   .0134192   .0358017     0.37   0.708    -.0567509    .0835894
+-------------+----------------------------------------------------------------
+     /athrho |   .2931144   .1020222     2.87   0.004     .0931545    .4930743
+    /lnsigma |   .0038684   .0286238     0.14   0.892    -.0522332    .0599701
+-------------+----------------------------------------------------------------
+         rho |   .2849988   .0937355                      .0928859     .456653
+       sigma |   1.003876   .0287348                      .9491075    1.061805
+      lambda |   .2861034   .0979967                      .0940333    .4781735
+------------------------------------------------------------------------------
+LR test of indep. eqns. (rho = 0): chi2(1) = 8.42         Prob > chi2 = 0.0037
+
+
+=== zip ===
+
+Fitting constant-only model:
+
+Iteration 0:  Log likelihood = -2043.6237  
+Iteration 1:  Log likelihood = -1838.0613  
+Iteration 2:  Log likelihood = -1824.7932  
+Iteration 3:  Log likelihood = -1824.7258  
+Iteration 4:  Log likelihood = -1824.7258  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -1824.7258  
+Iteration 1:  Log likelihood = -1716.8219  
+Iteration 2:  Log likelihood = -1701.1275  
+Iteration 3:  Log likelihood = -1700.7058  
+Iteration 4:  Log likelihood =  -1700.705  
+Iteration 5:  Log likelihood =  -1700.705  
+
+Zero-inflated Poisson regression                        Number of obs =  1,200
+Inflation model: logit                                  Nonzero obs   =    660
+                                                        Zero obs      =    540
+                                                        LR chi2(1)    = 248.04
+Log likelihood = -1700.705                              Prob > chi2   = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+y            |
+          x1 |    .559456   .0345129    16.21   0.000     .4918119       .6271
+       _cons |   .4039659   .0416958     9.69   0.000     .3222436    .4856881
+-------------+----------------------------------------------------------------
+inflate      |
+          x1 |   .0033665   .1244997     0.03   0.978    -.2406485    .2473815
+       _cons |  -1.016455   .1338984    -7.59   0.000    -1.278891   -.7540193
+------------------------------------------------------------------------------
+
+
+=== zinb ===
+
+Fitting constant-only model:
+
+Iteration 0:  Log likelihood = -2479.6454  
+Iteration 1:  Log likelihood = -2217.4284  
+Iteration 2:  Log likelihood =  -2186.942  
+Iteration 3:  Log likelihood = -2177.8802  
+Iteration 4:  Log likelihood = -2176.3403  
+Iteration 5:  Log likelihood = -2175.8608  
+Iteration 6:  Log likelihood = -2175.7166  
+Iteration 7:  Log likelihood =  -2175.684  
+Iteration 8:  Log likelihood = -2175.6765  
+Iteration 9:  Log likelihood = -2175.6747  
+Iteration 10: Log likelihood = -2175.6743  
+Iteration 11: Log likelihood = -2175.6742  
+Iteration 12: Log likelihood = -2175.6742  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -2175.6742  
+Iteration 1:  Log likelihood = -2033.6689  (not concave)
+Iteration 2:  Log likelihood = -2028.7611  
+Iteration 3:  Log likelihood = -2028.7296  
+Iteration 4:  Log likelihood = -2028.7287  
+Iteration 5:  Log likelihood = -2028.7285  
+Iteration 6:  Log likelihood = -2028.7285  
+Iteration 7:  Log likelihood = -2028.7285  
+
+Zero-inflated negative binomial regression              Number of obs =  1,200
+Inflation model: logit                                  Nonzero obs   =    802
+                                                        Zero obs      =    398
+                                                        LR chi2(1)    = 293.89
+Log likelihood = -2028.728                              Prob > chi2   = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+y            |
+          x1 |   .5829196   .0332579    17.53   0.000     .5177352     .648104
+       _cons |   .4350183   .0321287    13.54   0.000     .3720471    .4979894
+-------------+----------------------------------------------------------------
+inflate      |
+       _cons |  -14.06926   594.9603    -0.02   0.981     -1180.17    1152.032
+-------------+----------------------------------------------------------------
+    /lnalpha |  -.6779927   .0978362    -6.93   0.000    -.8697482   -.4862373
+-------------+----------------------------------------------------------------
+       alpha |   .5076349   .0496651                      .4190571    .6149359
+------------------------------------------------------------------------------
+
+
+=== ztp ===
+
+Iteration 0:  Log likelihood = -944.17019  
+Iteration 1:  Log likelihood = -916.77366  
+Iteration 2:  Log likelihood =  -916.6042  
+Iteration 3:  Log likelihood = -916.60416  
+
+Zero-truncated Poisson regression                       Number of obs =    660
+                                                        LR chi2(1)    = 270.42
+                                                        Prob > chi2   = 0.0000
+Log likelihood = -916.60416                             Pseudo R2     = 0.1286
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .5415945   .0350626    15.45   0.000     .4728731    .6103159
+       _cons |   .4189287     .04102    10.21   0.000      .338531    .4993264
+------------------------------------------------------------------------------
+
+
+=== tnbreg ===
+
+Fitting truncated Poisson model:
+
+Iteration 0:  Log likelihood = -1430.2795  
+Iteration 1:  Log likelihood = -1408.1549  
+Iteration 2:  Log likelihood = -1408.1428  
+Iteration 3:  Log likelihood = -1408.1428  
+
+Fitting constant-only model:
+
+Iteration 0:  Log likelihood = -1464.0372  
+Iteration 1:  Log likelihood = -1424.2582  
+Iteration 2:  Log likelihood = -1410.9536  
+Iteration 3:  Log likelihood = -1407.6357  
+Iteration 4:  Log likelihood = -1407.5984  
+Iteration 5:  Log likelihood =  -1407.598  
+Iteration 6:  Log likelihood =  -1407.598  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood =  -1342.201  
+Iteration 1:  Log likelihood = -1325.3834  
+Iteration 2:  Log likelihood = -1321.7846  
+Iteration 3:  Log likelihood = -1321.6973  
+Iteration 4:  Log likelihood = -1321.6972  
+
+Truncated negative binomial regression                  Number of obs =    802
+Truncation point = 0                                    LR chi2(1)    = 171.80
+Dispersion: mean                                        Prob > chi2   = 0.0000
+Log likelihood = -1321.6972                             Pseudo R2     = 0.0610
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .6035713   .0455912    13.24   0.000     .5142141    .6929284
+       _cons |   .3967922   .0618737     6.41   0.000     .2755219    .5180625
+-------------+----------------------------------------------------------------
+    /lnalpha |  -.5884602   .1851893                     -.9514245    -.225496
+-------------+----------------------------------------------------------------
+       alpha |   .5551815   .1028136                      .3861905    .7981203
+------------------------------------------------------------------------------
+LR test of alpha=0: chibar2(01) = 172.89               Prob >= chibar2 = 0.000
+
+

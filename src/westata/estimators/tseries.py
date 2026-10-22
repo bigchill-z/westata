@@ -114,13 +114,20 @@ class ARIMA:
             order=self._order,
             seasonal_order=self._seasonal_order,
             trend=self._trend,
-            enforce_stationarity=False,
-            enforce_invertibility=False,
         )
-        # The state-space representation of a differenced model reports
-        # parameters that are already in the reported (differenced) scale, so
-        # ``trend="n"`` must not add a constant for d>0.
         result = model.fit(method_kwargs={"maxiter": maxiter})
+
+        # ``enforce_stationarity``/``enforce_invertibility`` must stay at their
+        # defaults: forcing them off changes the optimiser's parameterisation and
+        # shifted the AR(1) coefficient by 1.9e-3 relative, 40x worse than the
+        # residual optimiser difference.
+        #
+        # The remaining gap against Stata is a stopping-point difference, not a
+        # formula difference: evaluating statsmodels' own log-likelihood at
+        # Stata's reported parameters gives a *lower* value than at statsmodels'
+        # optimum, so both maximise the same likelihood and statsmodels stops
+        # marginally closer to the true maximum. Verified empirically against
+        # StataNow 19.5 (see scripts/diagnose_arima.py).
 
         converged = bool(getattr(result, "mle_retvals", {}).get("converged", True))
         if not converged:

@@ -134,13 +134,15 @@
 
 - command: arima
   level: E3
-  tolerance: 5.0e-3
+  tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
-      ref: "Live comparison: arima y, arima(1,0,0) against westata.ARIMA(trend='c')"
+      ref: "Live comparison: arima y, arima(1,0,0) against westata.ARIMA(trend='c') on a 500-observation AR(1)"
+    - type: invariant
+      ref: "Same likelihood: statsmodels loglike evaluated at Stata's parameters (-708.1566933126) is LOWER than at statsmodels' optimum (-708.1566922756), so both maximise the same function"
   verified_by: lead
   date: 2026-10-22
-  notes: "Measured 1.9e-3 on the AR coefficient. This is a genuine, larger gap: Stata maximises the conditional likelihood while statsmodels uses the Kalman-filtered exact likelihood, and the two differ slightly for finite samples. Documented rather than tightened away."
+  notes: "Measured 4.8e-5 on the AR coefficient, 9.8e-5 on the constant, 4.0e-5 on sigma. An earlier version used enforce_stationarity=False/enforce_invertibility=False, which changed the optimiser parameterisation and produced a 1.9e-3 gap (40x worse); removing them is the fix. The residual difference is a stopping-point difference, proven by the likelihood comparison above: statsmodels stops marginally closer to the maximum than Stata. scripts/diagnose_arima.py reproduces this."
 
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 

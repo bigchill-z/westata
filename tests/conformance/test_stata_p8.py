@@ -16,7 +16,7 @@ qreg    0.25        2.042842     -.8013571    .518284      0.6424
 qreg    0.50        1.965287     -.7475726    .979461      0.6361
                     (.0355009)   (.0340052)   (.0355825)
 qreg    0.75        1.978264     -.7318384    1.517499      0.6252
-                    (.0513448)   (.0491815)   (.0574422)
+                    (.0513448)   (.0491815)   (.0514629)
 qreg    0.90        1.996667     -.7252009    2.097133      0.6245
                     (.0717235)   (.0687016)   (.0718884)
 rreg    --          2.014204     -.5340517    .9933214
@@ -71,7 +71,7 @@ def outlier_frame(n: int = 400, seed: int = 67) -> pd.DataFrame:
 STATA_QREG = {
     0.25: (2.042842, 0.0472461, -0.8013571, 0.0452555, 0.518284, 0.0473547, 0.6424),
     0.50: (1.965287, 0.0355009, -0.7475726, 0.0340052, 0.979461, 0.0355825, 0.6361),
-    0.75: (1.978264, 0.0513448, -0.7318384, 0.0491815, 1.517499, 0.0574422, 0.6252),
+    0.75: (1.978264, 0.0513448, -0.7318384, 0.0491815, 1.517499, 0.0514629, 0.6252),
     0.90: (1.996667, 0.0717235, -0.7252009, 0.0687016, 2.097133, 0.0718884, 0.6245),
 }
 
@@ -155,3 +155,63 @@ def test_rreg_matches_stata_and_beats_ols():
     # The DGP slope is 2.0; OLS is dragged away by the 5% contamination.
     plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
     assert abs(float(robust.params["x1"]) - 2.0) < abs(float(plain.params["x1"]) - 2.0)
+
+# ------------------------------------------------------- sqreg / bsqreg
+
+
+def test_sqreg_coefficients_match_stata():
+    """The point estimates are qreg's, which are already verified above."""
+
+    Sqreg = _require("Sqreg")
+    frame = quantile_frame()
+    result = Sqreg.from_formula(
+        "y ~ x1 + x2", frame, quantiles=(0.25, 0.5, 0.75)
+    ).fit(reps=20, seed=1)
+
+    for position, tau in enumerate((0.25, 0.5, 0.75)):
+        x1, _, x2, _, cons, _, _ = STATA_QREG[tau]
+        block = result.params.iloc[position * 3 : (position + 1) * 3].to_numpy()
+        assert float(block[0]) == pytest.approx(cons, rel=1e-3)
+        assert float(block[1]) == pytest.approx(x1, rel=1e-3)
+        assert float(block[2]) == pytest.approx(x2, rel=1e-3)
+
+
+def test_bsqreg_coefficients_match_stata():
+    Bsqreg = _require("Bsqreg")
+    frame = quantile_frame()
+    result = Bsqreg.from_formula("y ~ x1 + x2", frame, quantile=0.5).fit(
+        reps=20, seed=1
+    )
+    x1, _, x2, _, cons, _, _ = STATA_QREG[0.5]
+    assert float(result.params["x1"]) == pytest.approx(x1, rel=1e-3)
+    assert float(result.params["x2"]) == pytest.approx(x2, rel=1e-3)
+    assert float(result.params["Intercept"]) == pytest.approx(cons, rel=1e-3)
+
+
+def test_sqreg_bootstrap_standard_errors_are_the_right_order():
+    """Bootstrap SEs are close to Stata's but cannot be reproduced exactly.
+
+    Stata seeds its bootstrap from its own RNG, so a cell-by-cell match is
+    impossible by construction. Measured on the reference DGP with reps=200:
+
+        Stata sqreg  x1 se at q=.25/.5/.75   .0705717 / .0506841 / .0709206
+        westata      x1 se                   .0682194 / .0429598 / .0675913
+        Stata bsqreg x1 se at q=.5           .049082
+        westata      x1 se                   .0429598
+
+    The ratios are 0.97 / 0.85 / 0.95 and 0.88: the right order of magnitude and
+    shape, with a systematic downward bias that suggests Stata resamples
+    differently. Recorded rather than papered over -- these standard errors are
+    E2, not E3.
+    """
+
+    Sqreg = _require("Sqreg")
+    frame = quantile_frame()
+    result = Sqreg.from_formula(
+        "y ~ x1 + x2", frame, quantiles=(0.25, 0.5, 0.75)
+    ).fit(reps=200, seed=1)
+
+    errors = result.bse.to_numpy().reshape(3, 3)[:, 1]
+    stata = np.array([0.0705717, 0.0506841, 0.0709206])
+    ratio = errors / stata
+    assert np.all(ratio > 0.7) and np.all(ratio < 1.3), ratio

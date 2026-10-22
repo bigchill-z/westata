@@ -40,6 +40,8 @@ from westata.estimators.limited import (
     Truncreg,
 )
 from westata.estimators.linear import OLS
+from westata.estimators.quantile import QuantileRegression, RobustRegression
+from westata.estimators.quantile_boot import Bsqreg, Sqreg
 from westata.estimators.panel import (
     BetweenOLS,
     FirstDifferenceOLS,
@@ -57,6 +59,10 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "Bsqreg",
+    "Sqreg",
+    "RobustRegression",
+    "QuantileRegression",
     "TruncatedNegativeBinomial",
     "TruncatedPoisson",
     "ZeroInflatedNegativeBinomial",

@@ -310,6 +310,61 @@
   date: 2026-10-23
   notes: "Stata requires ll() strictly below the minimum observed y; ll(1) on data whose minimum is 1 returns r(459), which westata replicates as a ConsistencyError."
 
+
+# --- P8: quantile and robust regression ------------------------------------
+
+- command: qreg
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "qreg y x1 x2, quantile(.25/.5/.75/.9) on 600 heteroskedastic observations: Stata coefficients 2.042842/-.8013571/.518284, 1.965287/-.7475726/.979461, 1.978264/-.7318384/1.517499, 1.996667/-.7252009/2.097133"
+    - type: r_crosscheck
+      ref: "Standard errors at quantile(.5): Stata .0355009/.0340052/.0355825 vs westata .0355009/.0340052/.0355825 (identical)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Coefficients, standard errors and Pseudo R2 all reproduce Stata to the printed precision at all four quantiles. The covariance uses Stata's DEFAULT sparsity estimator, which [R] qreg documents as 'fitted': re-estimate the regression at tau+h and tau-h, form xbar'b at each, and difference over 2h, with the Hall-Sheather bandwidth. Using a kernel density of the residuals instead is the vce(iid, kernel()) option and shifts x1's standard error by 29% (.0457925 vs .0355009) -- that was the trap this batch was written to avoid. e(sum_adev) and e(sum_rdev) are values of the CHECK function sum (tau - 1{u<0})u, not sums of absolute deviations; at tau=.25 Stata prints 156.7522 and the check function gives 156.7522 while the absolute sum gives 465.2928."
+
+- command: qreg, vce(robust)
+  level: E2
+  tolerance: 2.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "qreg y x1 x2, quantile(.5) vce(robust): Stata x1 .0352211, westata .0355900 (1.05% high)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "[R] qreg does not print a closed form for vce(robust), so this rests on the sandwich reasoning plus measurement rather than a verbatim formula. Stata's robust SE differs from its iid default by only 1% on this DGP (.0352211 vs .0355009), which is the check that the sandwich is broadly right. An earlier version dropped the density factor and produced .0204, i.e. 42% too small -- the density does NOT cancel between bread and meat."
+
+- command: rreg
+  level: E3
+  tolerance: 2.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "rreg y x1 x2 on 400 observations with 5% of y contaminated by scale-30 noise: Stata x1 2.014204, x2 -.5340517, _cons .9933214"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Full [R] rreg algorithm implemented: Cook's D > 1 screen, then s = MAD/0.6745, then Huber weights (c_h = 1.345) to convergence, then biweights (c_b = 4.685*tune/7) to convergence, with pseudovalue standard errors. Measured 2.0145 / -.5342 / .9932 against Stata's 2.014204 / -.5340517 / .9933214. The Cook's screen drops nothing on this DGP (max D = 0.218) and Stata agrees -- the contamination is handled by the weights, not by deletion."
+
+- command: sqreg
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "sqreg y x1 x2, quantiles(.25 .5 .75) reps(200): Stata x1 SE .0705717/.0506841/.0709206; westata .0682194/.0429598/.0675913"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Coefficients are exact (they are the qreg fits, verified above). The bootstrap STANDARD ERRORS do not match: ratios 0.97/0.85/0.95. Stata seeds from its own RNG so a cell-for-cell match is impossible by construction, but the systematic downward bias suggests its resampling scheme differs -- most likely a different replicate-variance convention. Left at E1 rather than claiming agreement; this is the honest state."
+
+- command: bsqreg
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "bsqreg y x1 x2, quantile(.5) reps(200): Stata x1 SE .049082; westata .0429598"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Coefficients exact (identical to qreg by construction -- bsqreg is sqreg with one quantile, which the subclassing makes structural). Bootstrap SE 12% below Stata's, the same systematic gap as sqreg. E1, not E3."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

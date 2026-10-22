@@ -18,10 +18,13 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **399 passing** |
-| Source | ~6,600 lines across 8 subsystems |
-| Commands covered | 25 registry entries |
-| Evidence | 2 × E2, 23 × E1 |
+| Tests | **408 passing** (411 with the E3 fixtures) |
+| Source | ~7,200 lines across 9 subsystems |
+| Commands covered | 23 registry entries |
+| Evidence | **10 × E3**, 2 × E2, 11 × E1 |
+
+Verified against **StataNow 19.5 (MP)** through pystata; the captures are
+committed so the comparison replays without a licence.
 
 ## Install
 

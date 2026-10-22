@@ -22,9 +22,18 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-#: Public Stata 18 example datasets used as E2/E3 fixtures.
-DATASETS: dict[str, str] = {
-    "auto": "https://www.stata-press.com/data/r18/auto.dta",
+#: Public Stata example datasets used as E2/E3 fixtures.
+#:
+#: Values are candidate URLs in preference order.  The Stata Press server
+#: currently rejects TLS handshakes for the r18/r17 paths on some Windows
+#: builds (curl exit 35), so older releases are kept as fallbacks; they ship
+#: the same ``auto.dta`` content (74 observations, 12 variables).
+DATASETS: dict[str, tuple[str, ...]] = {
+    "auto": (
+        "https://www.stata-press.com/data/r18/auto.dta",
+        "https://www.stata-press.com/data/r17/auto.dta",
+        "https://www.stata-press.com/data/r16/auto.dta",
+    ),
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -88,16 +97,30 @@ def fetch(dataset: str, out_dir: Path, *, force: bool = False) -> Path:
         print(f"already present: {target} (use --force to re-download)")
         return target
 
-    url = DATASETS[dataset]
-    print(f"downloading {url}")
-    with urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS) as response:
-        payload = response.read()
+    urls = DATASETS[dataset]
+    payload = b""
+    errors: list[str] = []
+    for url in urls:
+        print(f"downloading {url}")
+        try:
+            with urllib.request.urlopen(url, timeout=TIMEOUT_SECONDS) as response:
+                candidate = response.read()
+        except (urllib.error.URLError, OSError) as exc:
+            errors.append(f"{url}: {exc}")
+            continue
+        if not candidate:
+            errors.append(f"{url}: empty response")
+            continue
+        if not candidate.startswith(DTA_MAGIC):
+            errors.append(f"{url}: not a Stata .dta file (expected {DTA_MAGIC!r})")
+            continue
+        payload = candidate
+        break
+
     if not payload:
-        raise ValueError(f"empty response downloading {url}")
-    if not payload.startswith(DTA_MAGIC):
         raise ValueError(
-            f"{url} did not return a Stata .dta file "
-            f"(expected magic {DTA_MAGIC!r})"
+            f"could not download {dataset!r} from any known URL:\n  "
+            + "\n  ".join(errors)
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)

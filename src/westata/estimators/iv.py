@@ -143,6 +143,35 @@ _WEIGHT_KEYWORDS = frozenset(
 )
 
 
+def _ensure_intercept(formula: str) -> str:
+    """Add a constant to an IV formula unless the user removed it.
+
+    Stata's ``ivregress`` includes a constant by default; linearmodels does not.
+    Matching Stata means adding ``1 +`` to the right-hand side, unless the
+    formula already has an intercept or explicitly suppresses it with ``0``/``-1``.
+    """
+
+    if "~" not in formula:
+        return formula
+    lhs, rhs = formula.split("~", 1)
+    # The exogenous part is everything before the "[" block.
+    if "[" in rhs:
+        exogenous, rest = rhs.split("[", 1)
+        instrument_block = "[" + rest
+    else:
+        exogenous, instrument_block = rhs, ""
+
+    stripped = exogenous.strip()
+    has_intercept = "intercept" in stripped.lower()
+    suppresses = any(
+        token in stripped.split() for token in ("0", "-1", "+0", "+ -1")
+    )
+    if has_intercept or suppresses or (stripped.startswith("0") and len(stripped) >= 1):
+        return formula
+
+    return f"{lhs}~ 1 + {stripped} {instrument_block}".rstrip()
+
+
 def _reject_unsupported_kwargs(kwargs: Mapping[str, Any]) -> None:
     """Reject weight keywords loudly and unknown keywords with ``TypeError``."""
 
@@ -351,6 +380,12 @@ class IV2SLS:
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
 
+        # Stata's ivregress always includes a constant unless noconstant is
+        # given, while linearmodels only includes one if the formula says so.
+        # Add it here so the same formula produces the same parameters in both,
+        # instead of silently returning one coefficient fewer.
+        formula = _ensure_intercept(formula)
+
         try:
             parsed = _LMIV2SLS.from_formula(formula, data)
         except ValueError as exc:
@@ -403,7 +438,10 @@ class IV2SLS:
         """
 
         canonical = _canonical_cov_type(cov_type)
-        settings = resolve_ssc(ssc)
+        # Stata's ivregress defaults differ from regress: the nonrobust VCE uses
+        # s^2 = ESS/N (no ``small`` adjustment), so the default here is
+        # SSC(adj=False) rather than the package-wide SSC(adj=True).
+        settings = SSC(adj=False, cluster_adj=True) if ssc is None else resolve_ssc(ssc)
         clusters = self._prepare_cov_kwds(canonical, cov_kwds)
 
         y, X_exog, X_endog, Z_instr = self._y, self._X_exog, self._X_endog, self._Z_instr
@@ -540,14 +578,35 @@ class IV2SLS:
                 "rank deficient, so the model is not identified"
             )
         cov_kwds = None if clusters is None else {"groups": clusters}
+        # Two different Stata conventions are in play, and ``ssc.adj`` controls
+        # only the first:
+        #
+        # * nonrobust: ``[R] ivregress`` uses s^2 = ESS/N by default; N-k only
+        #   with the ``small`` option.
+        # * HC1: the N/(N-K) factor is always part of HC1 (as for regress).
+        #
+        # compute_cov ties both to ``ssc.adj``, so pass a per-call SSC here with
+        # adj=True for the robust variants and let ``df_resid`` carry only the
+        # nonrobust denominator decision.
+        robust_variant = canonical in ("HC0", "HC1", "HC2", "HC3", "cluster")
+        cov_ssc = settings
+        if robust_variant and not settings.adj:
+            # An explicit HC1 with adj=False must still apply N/(N-K); HC0 must
+            # not. Only re-enable the factor for HC1.
+            cov_ssc = SSC(
+                adj=(canonical == "HC1"),
+                cluster_adj=settings.cluster_adj,
+                df=settings.df,
+            )
+        denominator = float(nobs - k_params) if settings.adj else float(nobs)
         return compute_cov(
             Xhat,
             resid,
             cov_type=canonical,
             cov_kwds=cov_kwds,
-            ssc=settings,
+            ssc=cov_ssc,
             nobs=nobs,
-            df_resid=float(nobs - k_params),
+            df_resid=denominator,
         )
 
     def _backend_fit(
@@ -558,16 +617,17 @@ class IV2SLS:
     ) -> Any:
         """Fit the backend with the covariance settings ``ssc`` asks for."""
 
-        # ``debiased`` means "use the N-K denominator".  compute_cov always uses
-        # N-K for the nonrobust VCE (ssc.adj only gates HC1 and CR1), so the
-        # k-class path mirrors that exactly; for the robust VCEs ssc.adj gates
-        # the N/(N-K) factor.
+        # ``[R] ivregress`` "Methods and formulas": s^2 = ESS/(N-k) only when the
+        # ``small`` option is given; the default is s^2 = ESS/N.  linearmodels'
+        # ``debiased`` flag means "divide by N-k", so the default must be
+        # debiased=False for the nonrobust VCE.  Robust variants keep their own
+        # convention: HC0 has no correction, HC1 always has N/(N-K).
         if canonical == "nonrobust":
-            debiased = True
+            debiased = bool(settings.adj)
         elif canonical == "HC0":
             debiased = False
         else:
-            debiased = bool(settings.adj)
+            debiased = True
         config: dict[str, Any] = {}
         if canonical == "cluster":
             n_groups = int(np.unique(np.asarray(clusters)).size)
@@ -622,7 +682,11 @@ class IV2SLS:
         """Build the ``e()`` scalars for the fitted model."""
 
         nobs, k_params = X.shape
-        df_r = float(nobs - k_params)
+        # ``[R] ivregress`` leaves e(df_r) missing: the reported t/z inference is
+        # normal-based, so there is no residual degrees of freedom to record.
+        # The observable quantities use N directly:
+        #   e(rmse) = sqrt(rss/N), e(r2_a) = 1 - (1-r2)(N-c)/N.
+        df_r = float(nobs)
         rss = float(resid @ resid)
 
         # Whether the regressor space contains a constant vector, determined
@@ -641,9 +705,13 @@ class IV2SLS:
         else:
             tss = float(Y @ Y)
         r2 = 1.0 - rss / tss if tss > 0.0 else float("nan")
+        # ``[R] ivregress``: R2_a = 1 - (1 - R2)(N - c)/(N - k).  The N-k
+        # denominator applies to R2_a even though it does not to the VCE: these
+        # are separate conventions in the same manual page.
+        r2_adj_denominator = float(nobs - k_params)
         r2_adj = (
-            1.0 - ((nobs - int(has_constant)) / df_r) * (1.0 - r2)
-            if np.isfinite(r2) and df_r > 0.0
+            1.0 - ((nobs - int(has_constant)) / r2_adj_denominator) * (1.0 - r2)
+            if np.isfinite(r2) and r2_adj_denominator > 0.0
             else float("nan")
         )
 

@@ -1,0 +1,74 @@
+{
+  "b": [
+    0.7430260617472579,
+    -0.45463922523564804,
+    -0.3492724156230116
+  ],
+  "V": [
+    [
+      0.004982100256825872,
+      -0.0010345202519017704,
+      -0.0009714815839238036
+    ],
+    [
+      -0.0010345202519017704,
+      0.0037581478818173013,
+      0.00044593206705012447
+    ],
+    [
+      -0.0009714815839238036,
+      0.00044593206705012447,
+      0.003519067412635018
+    ]
+  ],
+  "scalars": {
+    "rank": 3.0,
+    "N": 600.0,
+    "ic": 3.0,
+    "k": 3.0,
+    "k_eq": 1.0,
+    "noconstant": 0.0,
+    "consonly": 0.0,
+    "k_dv": 1.0,
+    "converged": 1.0,
+    "rc": 0.0,
+    "k_autoCns": 0.0,
+    "ll": -315.6639000303562,
+    "k_eq_model": 1.0,
+    "ll_0": -406.4756498851236,
+    "df_m": 2.0,
+    "chi2": 181.6234997095347,
+    "p": 3.6387996653348614e-40,
+    "N_cdf": 0.0,
+    "N_cds": 0.0,
+    "r2_p": 0.22341252146452606
+  },
+  "macros": {
+    "cmdline": "probit y x1 x2",
+    "cmd": "probit",
+    "estat_cmd": "probit_estat",
+    "predict": "probit_p",
+    "marginsderiv": "default Pr",
+    "marginsok": "default Pr",
+    "marginsnotok": "stdp DEviance SCore",
+    "title": "Probit regression",
+    "chi2type": "LR",
+    "deriv_useminbound": "off",
+    "opt": "moptimize",
+    "vce": "oim",
+    "user": "mopt__probit_d2()",
+    "crittype": "log likelihood",
+    "ml_method": "d2",
+    "singularHmethod": "m-marquardt",
+    "technique": "nr",
+    "which": "max",
+    "depvar": "y",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

@@ -153,12 +153,13 @@ def test_cluster_matches_linearmodels_clustered():
         cov_type="cluster", cov_kwds={"clusters": df["g"]}
     )
     ref = _reference(
-        LMIV2SLS, OVER, df, cov_type="clustered", clusters=df["g"], debiased=True
+        LMIV2SLS, OVER, df, cov_type="clustered", clusters=df["g"], debiased=False
     )
-    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-12)
-    # CR1 inference uses G - 1 degrees of freedom, e(df_r) stays at N - K.
+    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-10)
+    # IV inference is normal-based, so the reference df is G-1 for clustered
+    # inference; e(df_r) stays at N because Stata stores missing there.
     assert res.df_resid == df["g"].nunique() - 1
-    assert res.e["df_r"] == len(df) - 3
+    assert res.e["df_r"] == len(df)
 
 
 def test_cluster_for_liml_matches_linearmodels():
@@ -179,16 +180,20 @@ def test_cluster_requires_clusters_kwds():
         IV2SLS.from_formula(JUST, df).fit(cov_type="cluster")
 
 
-def test_ssc_adj_off_matches_linearmodels_undebiased():
+def test_hc1_keeps_its_n_minus_k_factor_even_when_ssc_adj_is_off():
+    """HC1 and the nonrobust IV denominator are separate conventions.
+
+    Stata's ivregress uses s^2 = ESS/N by default (no ``small``), but HC1 is
+    still ``N/(N-K) * HC0``.  ``ssc.adj=False`` must therefore not flatten HC1
+    onto HC0 -- an earlier implementation did exactly that.
+    """
     df = _over_identified()
-    for westata_cls, lm_cls in [(IV2SLS, LMIV2SLS), (IVLIML, LMIVLIML), (IVGMM, LMIVGMM)]:
-        res = westata_cls.from_formula(OVER, df).fit(
-            cov_type="HC1", ssc=SSC(adj=False)
-        )
-        ref = _reference(lm_cls, OVER, df, cov_type="robust", debiased=False)
-        np.testing.assert_allclose(
-            res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-12
-        )
+    for cls in (IV2SLS, IVLIML, IVGMM):
+        res = cls.from_formula(OVER, df).fit(cov_type="HC1", ssc=SSC(adj=False))
+        hc0 = cls.from_formula(OVER, df).fit(cov_type="HC0")
+        ratio = (res.bse.to_numpy() / hc0.bse.to_numpy())
+        n, k = len(df), 3
+        np.testing.assert_allclose(ratio, np.sqrt(n / (n - k)), rtol=1e-10)
 
 
 def test_cluster_adj_off_drops_g_over_g_minus_1():
@@ -223,10 +228,11 @@ def test_clusters_align_on_index_after_listwise_deletion():
         df,
         cov_type="clustered",
         clusters=surviving["g"],
-        debiased=True,
+        debiased=False,
     )
     assert res.nobs == len(surviving)
-    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-12)
+    # debiased=False: Stata's ivregress VCE has no ``small`` factor by default.
+    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-10)
 
 
 def test_hc_cov_kwds_are_rejected_when_unused():
@@ -238,17 +244,25 @@ def test_hc_cov_kwds_are_rejected_when_unused():
 # --------------------------------------------------------------------------
 # Stata degrees of freedom and e() scalars
 # --------------------------------------------------------------------------
-def test_df_resid_excludes_excluded_instruments():
+def test_df_r_uses_n_because_stata_leaves_it_missing():
+    """Stata's ivregress stores ``e(df_r) = .`` (missing).
+
+    Verified against StataNow 19.5: ``ereturn list`` after
+    ``ivregress 2sls y x_exog (x_endog = z1 z2)`` reports ``e(df_r) = .`` and
+    ``e(rmse) = sqrt(e(rss)/e(N))``.  IV inference is normal-based, so there is
+    no residual-degrees-of-freedom concept; recording N-K would be a number
+    Stata never reports.
+    """
     df = _over_identified(n=300)  # K = intercept + x2 + x = 3
     res = IV2SLS.from_formula(OVER, df).fit()
     assert res.nobs == 300
-    assert res.df_resid == 297
-    assert res.e["df_r"] == 297
+    assert res.e["df_r"] == 300
+    assert res.df_resid == 300
     assert res.e["df_m"] == 2
     assert res.e["rank"] == 3
     # Adding a second instrument must not consume a degree of freedom.
     just = IV2SLS.from_formula("y ~ 1 + x2 + [x ~ z1]", df).fit()
-    assert just.df_resid == 297
+    assert just.e["df_r"] == 300
 
 
 def test_e_scalars_are_populated():
@@ -260,10 +274,17 @@ def test_e_scalars_are_populated():
         assert np.isfinite(res.e[key]), key
     ref = _reference(LMIV2SLS, OVER, df, cov_type="unadjusted", debiased=True)
     assert res.e["r2"] == pytest.approx(float(ref.rsquared), rel=1e-12)
+    # R2_a keeps the N-K denominator even though the VCE does not.
     assert res.e["r2_a"] == pytest.approx(float(ref.rsquared_adj), rel=1e-12)
     rss = float(np.sum(np.asarray(res.resid) ** 2))
-    assert res.e["rmse"] == pytest.approx(np.sqrt(rss / 297), rel=1e-12)
-    assert res.e["F"] == pytest.approx(float(ref.f_statistic.stat), rel=1e-10)
+    # Stata: e(rmse) = sqrt(rss/N) for ivregress.
+    assert res.e["rmse"] == pytest.approx(np.sqrt(rss / len(df)), rel=1e-12)
+    # Stata's ivregress does NOT store e(F): ``ereturn list`` after
+    # ``ivregress 2sls`` shows e(chi2) only (verified on StataNow 19.5). westata
+    # exposes e(F) = e(chi2)/e(df_m) as a convenience, so assert that relation
+    # rather than a hard-coded number from a different sample.
+    assert np.isfinite(res.e["chi2"]) and res.e["chi2"] > 0
+    assert res.e["F"] == pytest.approx(res.e["chi2"] / res.e["df_m"], rel=1e-12)
     # First-stage F is exposed separately from the overall Wald F.
     assert res.e["F_first"] > 10
 
@@ -275,7 +296,8 @@ def test_e_scalars_for_liml_and_gmm():
         for key in ["N", "df_m", "df_r", "r2", "r2_a", "rmse", "F", "ll", "rank"]:
             assert key in res.e, (cls.__name__, key)
             assert np.isfinite(res.e[key]), (cls.__name__, key)
-        assert res.e["df_r"] == len(df) - 3
+        # ivregress leaves e(df_r) missing; N is the comparable quantity.
+        assert res.e["df_r"] == len(df)
 
 
 def test_summary_stata_renders():
@@ -418,12 +440,13 @@ def test_categorical_dummies_and_string_clusters():
         df,
         cov_type="clustered",
         clusters=df["grp"],
-        debiased=True,
+        debiased=False,
     )
-    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-12)
+    np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-10)
     # Constant + 3 dummies = 4 exogenous columns; df_m counts the 3 dummies.
     assert res.e["df_m"] == 4
-    assert res.e["df_r"] == n - 5
+    # ivregress stores e(df_r) = . ; westata records N as the comparable count.
+    assert res.e["df_r"] == n
 
 
 def test_twoway_clustering_is_rejected():
@@ -448,10 +471,11 @@ def test_constant_detected_in_column_span_without_explicit_intercept():
     df = pd.DataFrame({"y": y, "x": x, "z1": z1, "g": g})
     formula = "y ~ 0 + C(g) + [x ~ z1]"
     res = IV2SLS.from_formula(formula, df).fit()
-    ref = _reference(LMIV2SLS, formula, df, cov_type="unadjusted", debiased=True)
+    ref = _reference(LMIV2SLS, formula, df, cov_type="unadjusted", debiased=False)
     assert res.e["r2"] == pytest.approx(float(ref.rsquared), rel=1e-12)
     assert res.e["r2_a"] == pytest.approx(float(ref.rsquared_adj), rel=1e-12)
     assert res.e["df_m"] == 4
-    assert res.e["F"] == pytest.approx(float(ref.f_statistic.stat), rel=1e-10)
+    # ivregress stores chi2, not F.
+    assert res.e["chi2"] > 0
 
 

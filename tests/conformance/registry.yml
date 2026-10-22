@@ -1,125 +1,214 @@
 # Evidence registry for westata conformance claims.
 # Schema: docs/superpowers/specs/2026-10-22-westata-design.md section 11.3.
-# Entry-level `tolerance` is the binding one; per-source detail is free-form.
+#
+# E3 entries are backed by tests/conformance/test_stata_e3.py, which compares
+# against fixtures captured from StataNow 19.5 (MP) through pystata.  The
+# fixtures live in tests/conformance/stata_fixtures/ and can be regenerated with
+# scripts/capture_stata_fixtures.py.  E2 entries are backed by published Stata
+# output transcribed by hand.  E1 entries are implemented from the manual and
+# unit-tested, but have NOT been contrasted with a Stata run.
 
 - command: regress
-  level: E2
-  tolerance: 5.0e-5
-  sources:
-    - type: published_output
-      ref: "Stata [R] regress, auto.dta: regress mpg weight foreign (n=74); output rounded to 6-7 significant digits"
-      dataset: auto.dta
-    - type: statsmodels_reference
-      ref: "Full-precision algebraic cross-check; westata vs statsmodels OLS at 1e-10"
-      dataset: auto.dta
-  verified_by: lead
-  date: 2026-10-22
-  notes: "E3 pending an R (estimatr se_type='stata') cross-check on the same dataset."
-
-- command: ivregress 2sls
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "westata IV2SLS vs linearmodels.iv.IV2SLS (params, unadjusted/HC1/cluster SE) at 1e-16"
-    - type: published_output
-      ref: "Stata [R] ivregress Example 1 (hsng, n=50): table reports z / P>|z| and Wald chi2(2); westata uses dist='z' accordingly"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "E2 blocked: hsng.dta not yet wired into the fixture set."
-
-- command: ivregress liml
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "westata IVLIML vs linearmodels.iv.IVLIML at machine precision"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "e(ll) is the Gaussian likelihood at the estimates, not Stata's concentrated LIML likelihood."
-
-- command: ivregress gmm
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "westata IVGMM vs linearmodels.iv.IVGMM at machine precision"
-  verified_by: lead
-  date: 2026-10-22
-
-- command: reghdfe
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "FEOLS vs statsmodels OLS with explicit dummies (one-way FE) and vs two-way demeaned OLS at 1e-10"
-    - type: invariant
-      ref: "FEOLS with no fixed effects must reproduce westata OLS exactly"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "ssc defaults follow reghdfe (k_adj=True, G_adj=True, G_df='min'); not yet contrasted with real reghdfe output."
-
-- command: xtreg, fe
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "PanelOLS vs hand-coded within transform + OLS, and two-way FE vs two-way demeaned OLS, at 1e-10"
-    - type: invariant
-      ref: "df_r = N - K - n_entities + 1 asserted for a 5x4 balanced panel"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "E2 blocked: needs a published xtreg, fe output on a public dataset. Clustered VCE pinned to auto_df=False + group_debias=True after verifying it is the only setting that reproduces manual CR1 (0.11205179 vs 0.09996617 for the backend default)."
-
-- command: xtreg, re
-  level: E1
+  level: E3
   tolerance: 1.0e-12
   sources:
-    - type: statsmodels_reference
-      ref: "RandomEffects vs linearmodels RandomEffects (Swamy-Arora) params and standard errors at 1e-12"
+    - type: r_crosscheck
+      ref: "Regenerated fixture regress_auto.json: StataNow 19.5, sysuse auto, regress mpg weight foreign"
+      dataset: auto.dta
+    - type: invariant
+      ref: "Coefficients 5.1e-15, standard errors 6.8e-16 relative; e(N), e(df_r), e(df_m), e(r2), e(r2_a), e(rmse), e(F), e(ll) all match"
   verified_by: lead
   date: 2026-10-22
-  notes: "linearmodels is the implementation westata wraps, so this checks the wrapper, not Stata."
+  notes: "Matrix-level comparison against e(b)/e(V), not the printed table."
 
-- command: xtreg, be
-  level: E1
-  tolerance: 1.0e-10
+- command: regress, vce(robust)
+  level: E3
+  tolerance: 1.0e-12
   sources:
-    - type: statsmodels_reference
-      ref: "BetweenOLS vs hand-coded group-mean OLS at 1e-10"
+    - type: r_crosscheck
+      ref: "Fixture regress_auto_robust.json: regress mpg weight foreign, vce(robust)"
+      dataset: auto.dta
   verified_by: lead
   date: 2026-10-22
+  notes: "HC1 standard errors match at 4.6e-15 relative."
 
-- command: xtreg, fd
-  level: E1
-  tolerance: 1.0e-10
+- command: regress, cluster
+  level: E3
+  tolerance: 1.0e-12
   sources:
-    - type: statsmodels_reference
-      ref: "FirstDifferenceOLS vs hand-coded first-difference OLS without constant at 1e-10"
+    - type: r_crosscheck
+      ref: "Live comparison: regress mpg weight foreign, cluster(grp) with 7 groups"
+      dataset: auto.dta
   verified_by: lead
   date: 2026-10-22
+  notes: "CR1 standard errors match at 7.1e-15 relative; df_resid = G-1 confirmed."
+
+- command: regress, i.factor
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture regress_auto_factor.json: regress mpg weight i.foreign"
+      dataset: auto.dta
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Stata prints the base level 0b.foreign = 0 explicitly; the comparison drops it. Coefficients match at 3.7e-14."
+
+- command: ivregress 2sls
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Live comparison on a synthetic 2SLS DGP; nonrobust, vce(robust) and vce(cluster) all captured from StataNow 19.5"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Coefficients 7.8e-15; standard errors 7.5e-15 (nonrobust), 1.6e-14 (robust), 1.9e-14 (cluster). Two real defects were found this way and fixed: (1) westata omitted the constant that Stata adds by default; (2) the nonrobust VCE used s^2=ESS/(N-k) whereas Stata's default is ESS/N (the N-k form requires the `small` option). e(df_r) is recorded as N because Stata stores missing (.) there; e(chi2), e(r2), e(r2_a), e(rmse) match at 1e-16."
+
+- command: logit
+  level: E3
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture logit_sim.json: logit y x1 x2 on a 600-observation logistic DGP"
+    - type: invariant
+      ref: "z-distribution p-values and McFadden pseudo R2 in e(r2_p)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Coefficients agree to ~1e-7. The limit is the optimiser path, not the formula: Stata's Newton and statsmodels' converge to the same optimum but stop at slightly different points on a flat likelihood."
+
+- command: probit
+  level: E3
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture probit_sim.json: probit y x1 x2"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Measured 1.5e-7; same optimiser-path limit as logit."
+
+- command: poisson
+  level: E3
+  tolerance: 1.0e-9
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture poisson_sim.json: poisson y x1"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Coefficients and standard errors match at 3.9e-13."
 
 - command: test
   level: E2
-  tolerance: 1.0e-10
+  tolerance: 3.0e-5
   sources:
     - type: published_output
-      ref: "Stata [R] regress on auto.dta prints F(2, 71) = 69.75 for the joint test of weight and foreign; westata test('weight foreign') reproduces 69.75 exactly"
-      dataset: auto.dta
+      ref: "Stata [R] regress on auto.dta prints F(2, 71) = 69.75; westata computes 69.7485"
     - type: invariant
       ref: "For q=1 the F statistic equals the squared coefficient t statistic"
   verified_by: lead
   date: 2026-10-22
-  notes: "Uses the [R] test formula W=(Rb-r)'(RVR')^-1(Rb-r), with F=W/q for t models and chi2(q) for z models."
+  notes: "The 2.2e-5 relative difference is Stata's display rounding (69.75), not a computational gap; the underlying Wald form is asserted against hand computation in tests/test_postestimation.py."
 
 - command: lincom
+  level: E2
+  tolerance: 5.0e-7
+  sources:
+    - type: published_output
+      ref: "Stata [R] lincom on auto.dta: estimate -1650.036, std. err. 1075.994"
+    - type: invariant
+      ref: "Single-coefficient lincom equals the model's coefficient, SE, t and p exactly"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Reproduces [R] lincom semantics including level() and eform."
+
+- command: tobit
+  level: E3
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "Live comparison: tobit y x1 x2, ll(2) on an 800-observation censored DGP"
+    - type: invariant
+      ref: "Log-likelihood matches an independent implementation of the [R] tobit formula at 1e-12"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Slopes 8.5e-8, standard errors 6.4e-7. Stata reports var(e.y) = sigma^2 in e(b); westata reports /sigma, so that parameter is compared squared. The self-implemented likelihood is confirmed correct against real Stata, which is the outcome that mattered most for this estimator."
+
+- command: arima
+  level: E3
+  tolerance: 5.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "Live comparison: arima y, arima(1,0,0) against westata.ARIMA(trend='c')"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Measured 1.9e-3 on the AR coefficient. This is a genuine, larger gap: Stata maximises the conditional likelihood while statsmodels uses the Kalman-filtered exact likelihood, and the two differ slightly for finite samples. Documented rather than tightened away."
+
+# --- Not yet contrasted with a real Stata run (E1) -------------------------
+
+- command: ivregress liml / gmm
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "westata IVLIML/IVGMM vs linearmodels at machine precision"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Only 2SLS has been compared with Stata so far."
+
+- command: reghdfe / areg
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "FEOLS vs statsmodels OLS with explicit dummies; two-way FE vs demeaned OLS"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Not compared with Stata because reghdfe is a user-written package; it would need to be installed in the Stata session first."
+
+- command: xtreg fe / re / be / fd
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "PanelOLS vs hand-coded within transform; RandomEffects vs linearmodels; BE/FD vs hand computation"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Clustered VCE was independently verified against a manual CR1 computation; a full Stata comparison is still outstanding because it needs tsset and a panel dataset."
+
+- command: nbreg
+  level: E1
+  tolerance: 1.0e-6
+  sources:
+    - type: invariant
+      ref: "Dispersion parameter named /lnalpha like Stata; bfgs required because newton diverges"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Weakest evidence in the discrete family."
+
+- command: ologit / oprobit
+  level: E1
+  tolerance: 1.0e-6
+  sources:
+    - type: invariant
+      ref: "Cut points named /cut1../cutk like Stata; the Intercept is dropped"
+  verified_by: lead
+  date: 2026-10-22
+
+- command: margins
+  level: E1
+  tolerance: 1.0e-8
+  sources:
+    - type: invariant
+      ref: "Average marginal effects match closed forms: logit mean(p(1-p)b), probit mean(phi(xb)b), poisson mean(mu)b"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Matches the analytic derivative but has not been diffed against Stata's margins output. An earlier version differentiated xb and was 4.38x too large."
+
+- command: predict
   level: E1
   tolerance: 1.0e-12
   sources:
     - type: invariant
-      ref: "Single-coefficient lincom equals the model's own coefficient, standard error, statistic and p-value exactly"
-    - type: published_output
-      ref: "Stata [R] lincom: estimate Lb, variance LVL', t with e(df_r), plus level() and eform options"
+      ref: "OLS xb equals fittedvalues; logit pr equals the logistic transform; poisson n equals exp(xb)"
   verified_by: lead
   date: 2026-10-22
 
@@ -128,128 +217,16 @@
   tolerance: 1.0e-15
   sources:
     - type: invariant
-      ref: "Coefficient and standard-error rows come from params/bse unchanged; the Observations row equals e(N)"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Presentation layer; correctness means the numbers are the results object's, unaltered. The tolerance is machine epsilon because the values must match exactly."
-
-- command: logit
-  level: E1
-  tolerance: 1.0e-8
-  sources:
-    - type: statsmodels_reference
-      ref: "westata Logit vs statsmodels Logit (params 1e-8, bse 1e-6); both use observed information, like Stata's default"
-    - type: invariant
-      ref: "z-distribution p-values and McFadden pseudo R2 in e(r2_p)"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "E2 blocked: needs a published logit output on a public dataset."
-
-- command: probit
-  level: E1
-  tolerance: 1.0e-8
-  sources:
-    - type: statsmodels_reference
-      ref: "westata Probit vs statsmodels Probit at 1e-8"
+      ref: "Values come from params/bse unchanged; the Observations row equals e(N)"
   verified_by: lead
   date: 2026-10-22
 
-- command: poisson
-  level: E1
-  tolerance: 1.0e-8
-  sources:
-    - type: statsmodels_reference
-      ref: "westata Poisson vs statsmodels Poisson for both nonrobust and HC0 standard errors"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "statsmodels' Poisson covariance rejects cov_kwds; handled explicitly rather than suppressed."
-
-- command: nbreg
-  level: E1
-  tolerance: 1.0e-6
-  sources:
-    - type: invariant
-      ref: "Dispersion parameter named /lnalpha like Stata; bfgs is required because newton diverges"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Weakest evidence in the discrete family; no Stata output to contrast."
-
-- command: ologit / oprobit
-  level: E1
-  tolerance: 1.0e-6
-  sources:
-    - type: invariant
-      ref: "Cut points named /cut1../cutk like Stata; the Intercept is dropped because cuts identify location"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Robust VCE is not implemented for ordered models and raises rather than approximating."
-
-- command: tobit
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: invariant
-      ref: "Log-likelihood matches an independent implementation of the [R] tobit formula at 1e-12"
-    - type: statsmodels_reference
-      ref: "Recovers a known DGP (slopes within 0.08, sigma within 0.06); the Tobit slope exceeds the censored-data OLS slope"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "E2 blocked: gpa.dta appears in [R] tobit Example 1 but the Stata Press server would not serve it. Self-implemented, so this is the highest-risk estimator in the package."
-
-- command: predict
-  level: E1
-  tolerance: 1.0e-12
-  sources:
-    - type: invariant
-      ref: "For OLS, predict(kind='xb') equals fittedvalues exactly; for logit it equals the logistic transform of xb; for poisson it equals exp(xb)"
-    - type: published_output
-      ref: "Stata predict suboption names (xb, pr, n, e(a,b), ystar(a,b)) per [R] predict"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Unsupported types raise instead of returning the linear index."
-
-- command: margins
-  level: E1
-  tolerance: 1.0e-8
-  sources:
-    - type: published_output
-      ref: "Stata margins default is vce(delta) on the response scale (P>|z| for logit/probit, mean scale for poisson)"
-    - type: invariant
-      ref: "Average marginal effects match the closed form: logit mean(p(1-p)b), probit mean(phi(xb)b), poisson mean(mu)b, OLS the coefficient itself"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Critical correction: differentiating xb instead of the response gives the coefficient, 4.38x too large for the test logit. dydx/at()/over() supported; contrast/pwcompare/expression raise."
-
-- command: arima
-  level: E1
-  tolerance: 1.0e-3
-  sources:
-    - type: statsmodels_reference
-      ref: "Recovers a known AR(1) coefficient (0.705 vs true 0.7 at n=1500); AR(1) beats white noise on AIC by >100"
-    - type: invariant
-      ref: "Reports Wald chi2 for all ARMA coefficients and z inference, like Stata"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "statsmodels ARIMA.fit has no disp= argument; handled."
-
-- command: var
-  level: E1
-  tolerance: 1.0e-1
-  sources:
-    - type: statsmodels_reference
-      ref: "Recovers a known VAR(1) transition matrix within 0.12"
-    - type: invariant
-      ref: "select_order returns the full AIC/BIC/HQIC/FPE table (varsoc), not a single chosen lag"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "VAR.params is a bare ndarray; the L1.y1-style index is rebuilt for Stata-style access."
-
-- command: vec / vecrank
+- command: var / vec
   level: E1
   tolerance: 1.0e-1
   sources:
     - type: invariant
-      ref: "Johansen trace statistic exceeds the 5% critical value for a known cointegrated pair"
+      ref: "Recovers a known VAR(1) transition matrix; Johansen trace rejects for a cointegrated pair"
   verified_by: lead
   date: 2026-10-22
 
@@ -258,19 +235,15 @@
   tolerance: 5.0e-2
   sources:
     - type: invariant
-      ref: "Recovers GARCH(1,1) persistence alpha+beta near the true 0.96; omega positive"
-    - type: statsmodels_reference
-      ref: "Conditional volatility is strictly positive; EGARCH/GJR specifications run"
+      ref: "Recovers GARCH(1,1) persistence near 0.96; conditional volatility positive"
   verified_by: lead
   date: 2026-10-22
-  notes: "rescale=False so omega stays on the data's own scale like Stata. arch names parameters alpha[1], not alpha."
 
 - command: dfuller / pperron / kpss
   level: E1
   tolerance: 1.0e-3
   sources:
     - type: invariant
-      ref: "ADF fails to reject on a random walk and rejects on an AR(1) with phi=0.3; KPSS has the opposite null and rejects the random walk"
+      ref: "ADF rejects stationarity appropriately; KPSS has the opposite null"
   verified_by: lead
   date: 2026-10-22
-  notes: "Uses statsmodels result_object=True to avoid the deprecated tuple API."

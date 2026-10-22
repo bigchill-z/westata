@@ -1,0 +1,62 @@
+{
+  "b": [
+    0.5621323747776179,
+    0.27912014023566867
+  ],
+  "V": [
+    [
+      0.0014457184879653137,
+      -0.0007478234372477021
+    ],
+    [
+      -0.0007478234372477021,
+      0.0016940144312514943
+    ]
+  ],
+  "scalars": {
+    "rank": 2.0,
+    "N": 500.0,
+    "ic": 1.0,
+    "k": 2.0,
+    "k_eq": 1.0,
+    "noconstant": 0.0,
+    "consonly": 0.0,
+    "k_dv": 1.0,
+    "converged": 1.0,
+    "rc": 0.0,
+    "k_autoCns": 0.0,
+    "ll": -728.4494802267582,
+    "k_eq_model": 1.0,
+    "ll_0": -839.0878423199003,
+    "df_m": 1.0,
+    "chi2": 221.27672418628435,
+    "p": 4.763224712078877e-50,
+    "r2_p": 0.13185551799588768
+  },
+  "macros": {
+    "cmdline": "poisson y x1",
+    "cmd": "poisson",
+    "predict": "poisso_p",
+    "marginsderiv": "default N IR",
+    "estat_cmd": "poisson_estat",
+    "gof": "poiss_g",
+    "chi2type": "LR",
+    "deriv_useminbound": "off",
+    "opt": "moptimize",
+    "vce": "oim",
+    "title": "Poisson regression",
+    "user": "poiss_lf",
+    "crittype": "log likelihood",
+    "ml_method": "e2",
+    "singularHmethod": "m-marquardt",
+    "technique": "nr",
+    "which": "max",
+    "depvar": "y",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "_cons"
+  ],
+  "version": ""
+}

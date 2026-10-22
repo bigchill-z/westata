@@ -1,0 +1,74 @@
+{
+  "b": [
+    1.2695431108267483,
+    -0.7738801264250025,
+    -0.5856655458642395
+  ],
+  "V": [
+    [
+      0.016494838402818866,
+      -0.0042515011590833094,
+      -0.0036073882377617187
+    ],
+    [
+      -0.0042515011590833094,
+      0.011542246202478335,
+      0.0017463896682783633
+    ],
+    [
+      -0.0036073882377617187,
+      0.0017463896682783633,
+      0.010314837245290373
+    ]
+  ],
+  "scalars": {
+    "rank": 3.0,
+    "N": 600.0,
+    "ic": 4.0,
+    "k": 3.0,
+    "k_eq": 1.0,
+    "noconstant": 0.0,
+    "consonly": 0.0,
+    "k_dv": 1.0,
+    "converged": 1.0,
+    "rc": 0.0,
+    "k_autoCns": 0.0,
+    "ll": -315.2990795720847,
+    "k_eq_model": 1.0,
+    "ll_0": -406.4756498851236,
+    "df_m": 2.0,
+    "chi2": 182.3531406260778,
+    "p": 2.526496111651538e-40,
+    "N_cdf": 0.0,
+    "N_cds": 0.0,
+    "r2_p": 0.22431004252974762
+  },
+  "macros": {
+    "cmdline": "logit y x1 x2",
+    "cmd": "logit",
+    "estat_cmd": "logit_estat",
+    "predict": "logit_p",
+    "marginsderiv": "default Pr",
+    "marginsok": "default Pr",
+    "marginsnotok": "stdp DBeta DEviance DX2 DDeviance Hat Number Residuals RStandard SCore",
+    "title": "Logistic regression",
+    "chi2type": "LR",
+    "deriv_useminbound": "off",
+    "opt": "moptimize",
+    "vce": "oim",
+    "user": "mopt__logit_d2()",
+    "crittype": "log likelihood",
+    "ml_method": "d2",
+    "singularHmethod": "m-marquardt",
+    "technique": "nr",
+    "which": "max",
+    "depvar": "y",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

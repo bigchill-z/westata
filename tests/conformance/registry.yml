@@ -58,3 +58,43 @@
   verified_by: lead
   date: 2026-10-22
   notes: "ssc defaults follow reghdfe (k_adj=True, G_adj=True, G_df='min'); not yet contrasted with real reghdfe output."
+
+- command: xtreg, fe
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "PanelOLS vs hand-coded within transform + OLS, and two-way FE vs two-way demeaned OLS, at 1e-10"
+    - type: invariant
+      ref: "df_r = N - K - n_entities + 1 asserted for a 5x4 balanced panel"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "E2 blocked: needs a published xtreg, fe output on a public dataset."
+
+- command: xtreg, re
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: statsmodels_reference
+      ref: "RandomEffects vs linearmodels RandomEffects (Swamy-Arora) params and standard errors at 1e-12"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "linearmodels is the implementation westata wraps, so this checks the wrapper, not Stata."
+
+- command: xtreg, be
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "BetweenOLS vs hand-coded group-mean OLS at 1e-10"
+  verified_by: lead
+  date: 2026-10-22
+
+- command: xtreg, fd
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "FirstDifferenceOLS vs hand-coded first-difference OLS without constant at 1e-10"
+  verified_by: lead
+  date: 2026-10-22

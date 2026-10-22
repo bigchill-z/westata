@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    ARIMA,
     FEOLS,
+    GARCH,
     IV2SLS,
     IVGMM,
     IVLIML,
     OLS,
+    VAR,
+    VECM,
     BetweenOLS,
     FirstDifferenceOLS,
     Logit,
@@ -20,6 +24,8 @@ from westata.estimators import (
     Probit,
     RandomEffects,
     Tobit,
+    UnitRootResult,
+    unitroot,
 )
 from westata.errors import (
     ConsistencyError,
@@ -61,6 +67,12 @@ __all__ = [
     "OrderedLogit",
     "OrderedProbit",
     "Tobit",
+    "ARIMA",
+    "VAR",
+    "VECM",
+    "GARCH",
+    "UnitRootResult",
+    "unitroot",
     "WaldTest",
     "LincomResult",
     "MarginsResult",

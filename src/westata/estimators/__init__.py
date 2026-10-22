@@ -35,6 +35,14 @@ from westata.estimators.panel import (
     RandomEffects,
 )
 from westata.estimators.tobit import Tobit
+from westata.estimators.tseries import (
+    ARIMA,
+    GARCH,
+    VAR,
+    VECM,
+    UnitRootResult,
+    unitroot,
+)
 
 __all__ = [
     "OLS",
@@ -53,4 +61,10 @@ __all__ = [
     "OrderedLogit",
     "OrderedProbit",
     "Tobit",
+    "ARIMA",
+    "VAR",
+    "VECM",
+    "GARCH",
+    "UnitRootResult",
+    "unitroot",
 ]

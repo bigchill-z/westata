@@ -2,21 +2,164 @@
 
 Stata-conformant econometrics with a statsmodels-style API.
 
-Personal research tool. The design goal is that a model returns the same
-numbers as the corresponding Stata command, with every claim backed by a
-recorded evidence source (see `docs/superpowers/specs/`).
+`westata` is a personal research library that answers one question: *if I run
+this in Python, do I get the same numbers Stata would print?*
 
-Status: Phase 0 (skeleton + OLS + VCE).
+- **API follows statsmodels** — `Model.from_formula(...).fit()`, `params`,
+  `bse`, `pvalues`, `conf_int()`, `cov_params()`. Results are duck-typed, so
+  existing statsmodels-style downstream code keeps working.
+- **Numerics follow Stata** — small-sample corrections, weight semantics,
+  factor-variable coding, degrees of freedom, and degrees-of-freedom splits are
+  implemented per the corresponding Stata manual entry.
+- **Claims are auditable** — every command carries an evidence level in
+  `tests/conformance/registry.yml`. Nothing claims more than it can show.
 
-## Development
+## Status
+
+| | |
+|---|---|
+| Tests | **399 passing** |
+| Source | ~6,600 lines across 8 subsystems |
+| Commands covered | 25 registry entries |
+| Evidence | 2 × E2, 23 × E1 |
+
+## Install
 
 ```bash
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[test]"
-.venv\Scripts\python.exe -m pytest
+```
+
+Requires Python ≥ 3.10. Optional at runtime: `linearmodels` (IV, panel),
+`pyfixest` (HDFE), `arch` (GARCH, Phillips–Perron).
+
+## Quick start
+
+```python
+import westata as ws
+import pandas as pd
+
+df = pd.read_stata("auto.dta")
+
+# OLS with a factor variable and clustered standard errors (regress)
+res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit(
+    cov_type="cluster", cov_kwds={"groups": df["foreign"]},
+)
+print(res.summary(style="stata"))     # Stata layout
+res.test("weight foreign")            # F(2, 71) = 69.75, exactly as Stata
+res.lincom("weight + 1000*foreign")   # linear combination
+
+# IV (ivregress 2sls) — z statistics and Wald chi2, like Stata
+ws.IV2SLS.from_formula("y ~ x + [endog ~ z1 + z2]", df).fit()
+
+# High-dimensional FE (reghdfe)
+ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+
+# Panel (xtreg fe/re/be/fd)
+ws.PanelOLS.from_formula("y ~ x1", df, entity="firm", time="year").fit()
+ws.RandomEffects.from_formula("y ~ x1", df, entity="firm", time="year").fit()
+
+# Discrete choice and censored regression
+ws.Logit.from_formula("y ~ x1", df).fit()
+ws.Tobit.from_formula("wage ~ edu", df, lower=0).fit()
+
+# Marginal effects (margins)
+ws.Logit.from_formula("y ~ x1 + x2", df).fit().margins(dydx=["x1", "x2"])
+
+# Time series
+ws.ARIMA(y, order=(1, 1, 1)).fit()
+ws.unitroot(y, test="adf")
+
+# Paper table (esttab)
+ws.etable([res1, res2], model_names=["Base", "Full"])
+```
+
+## Command coverage
+
+| Family | westata | Stata |
+|---|---|---|
+| Linear | `OLS` | `regress` (4 weight types, `i.` factors) |
+| IV | `IV2SLS` / `IVLIML` / `IVGMM` | `ivregress 2sls/liml/gmm` |
+| HDFE | `FEOLS` | `reghdfe` / `areg` |
+| Panel | `PanelOLS` / `RandomEffects` / `BetweenOLS` / `FirstDifferenceOLS` | `xtreg fe/re/be/fd` |
+| Binary | `Logit` / `Probit` | `logit` / `probit` |
+| Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |
+| Ordered | `OrderedLogit` / `OrderedProbit` | `ologit` / `oprobit` |
+| Censored | `Tobit` (self-implemented) | `tobit` |
+| Time series | `ARIMA` / `VAR` / `VECM` / `GARCH` / `unitroot` | `arima` / `var` / `vec` / `arch` / `dfuller` |
+| Postestimation | `test` / `lincom` / `margins` / `predict` | same names |
+| Reporting | `etable` | `esttab` |
+
+## Weight semantics
+
+Following Stata `[U] 20.24`:
+
+| Type | Point estimate | Variance | Effective N |
+|---|---|---|---|
+| `fweight` | literal replication | conventional | `sum(w)` |
+| `aweight` | normalized to `sum(w) = N` | conventional | `N` |
+| `pweight` | same as aweight | **robust (HC1)** | `N` |
+| `iweight` | not normalized | conventional | `sum(w)` |
+
+`weight_type` is mandatory whenever weights are supplied — westata never
+guesses, because guessing silently changes the VCE.
+
+## Evidence levels
+
+| Level | Meaning |
+|---|---|
+| E1 | Implemented from the Stata manual formula; unit-tested against hand computation |
+| E2 | Numerically agrees with a published Stata output |
+| E3 | E2 plus agreement with ≥2 independent implementations |
+
+`regress` and `test` are E2 (validated against the printed `auto.dta` output).
+Everything else is E1: correct by construction and internally tested, but **not
+yet contrasted with a real Stata run**. This is a documentation of limits, not
+a marketing claim.
+
+## Design notes worth knowing
+
+Things that bit during development, documented so they do not bite again:
+
+- **`df_resid` vs `e(df_r)` are different quantities.** Under clustering, t
+  tests use `G − 1` while Stata's `e(df_r)` stays `N − K`. Conflating them
+  silently gives wrong p-values.
+- **Frequency weights must equal the expanded-data fit.** Stata's own stated
+  invariant. Getting the robust meat's weight form wrong inflates fweighted
+  standard errors by up to 51%.
+- **`margins` differentiates the response, not the linear index.** For a logit,
+  `mean(p(1-p))·b` — differentiating `xb` returns the coefficient, which was
+  4.38× too large in the first implementation.
+- **`PanelOLS.from_formula` ignores `entity_effects`.** Passing it through
+  `fit()` silently produces pooled OLS. The model must be constructed directly.
+- **linearmodels' clustered VCE needs `auto_df=False, group_debias=True`** to
+  reproduce Stata's `G/(G-1)·(N-1)/(N-K)`; the default is ~11% off.
+- **`ivregress` reports z / Wald chi2**, not t / F. OLS and panel use t.
+
+## Layout
+
+```
+src/westata/
+  data/            weight normalization, panel/time-series metadata
+  formula/         patsy design matrices, C(x, base=)
+  vce/             HC0-HC3, CR1, ssc
+  estimators/      linear, iv, hdfe, panel, discrete, tobit, tseries
+  results/         StataResults, E(RETURN), Stata/statsmodels summaries
+  postestimation/  test, lincom, margins, predict
+  report/          etable, LaTeX/Markdown renderers
+  conformance/     evidence registry, tolerances, invariants
+tests/conformance/ registry.yml + published-output fixtures
+docs/              design spec and implementation plans
 ```
 
 ## Documentation
 
-- Design spec: `docs/superpowers/specs/2026-10-22-westata-design.md`
-- Phase 0 plan: `docs/superpowers/plans/2026-10-22-westata-p0.md`
+- Design spec: [`docs/superpowers/specs/2026-10-22-westata-design.md`](docs/superpowers/specs/2026-10-22-westata-design.md)
+- Plans: [`docs/superpowers/plans/`](docs/superpowers/plans/)
+
+## Known gaps
+
+Not implemented, and they raise instead of approximating: `xtabond2`, `csdid`,
+`rdrobust`, `synth`, `heckman`, `margins` beyond `dydx`/`at()`/`over()`,
+`predict`, `contrast`, `pwcompare`, multi-way clustering (CGM), `xtreg` robust
+VCEs beyond HC1, and HAC in the discrete models.

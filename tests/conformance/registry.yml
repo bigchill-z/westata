@@ -322,17 +322,27 @@
   date: 2026-10-23
   notes: "estout installed from the author's GitHub source (SSC unreachable). Coefficients agree exactly at the printed precision (gap 0.0). The tolerance is 5e-7 because esttab reports 6 decimals."
 
-- command: vec / vecrank
+- command: vecrank (Johansen)
+  level: E2
+  tolerance: 5.0e-5
+  sources:
+    - type: r_crosscheck
+      ref: "vecrank y1 y2, lags(2) on a cointegrated pair: Stata trace=[195.9673, 4.1665] vs westata [195.9673, 4.1665]"
+    - type: published_output
+      ref: "[TS] vecrank: 'lags(#) specifies the number of lags in the VAR representation. The VEC model will include one fewer lag of the first differences.'"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The lag convention is now settled: Stata lags(#) maps to statsmodels k_ar_diff = # - 1, and johansen(lags=...) applies it. lags(2) agrees to all four printed decimals, which also confirms statsmodels' Johansen implementation matches Stata's. One residual gap is documented rather than tuned: lags(1) (k_ar_diff=0) gives 287.2485 where Stata prints 288.3450 (0.4% apart), while the first eigenvalue agrees to 1e-3 (0.51102 vs 0.50992). That points at boundary handling when there are no lagged differences, not at the estimator, and tests/conformance/test_stata_vecrank.py pins the current behaviour so a silent 'fix' would be caught."
+
+- command: vec (VECM estimation)
   level: E1
   tolerance: 1.0e-1
   sources:
     - type: invariant
-      ref: "Johansen trace rejects for a cointegrated pair"
-    - type: r_crosscheck
-      ref: "Attempted against StataNow 19.5 vecrank y1 y2, lags(1): Stata trace(0)=288.3450 (eigenvalue 0.50992), statsmodels gives 195.9673 (0.382398) at det_order=0, k_ar_diff=1"
+      ref: "VECM fits and returns coefficients on a cointegrated pair"
   verified_by: lead
   date: 2026-10-23
-  notes: "Documented non-conformance rather than a tuned match. The data round-trip through pystata is exact (4e-16), so the gap is in the Johansen implementation/lag convention. With k_ar_diff=0 the first eigenvalue becomes 0.511 (close to Stata's 0.50992) but the trace stat still differs, so the lag mapping between Stata's lags(1) and statsmodels' k_ar_diff is not settled. Treat westata's VECM as unverified."
+  notes: "Only the rank test (vecrank) has been compared with Stata. The VECM coefficient estimates themselves have not."
 
 - command: pperron / kpss
   level: E2

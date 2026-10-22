@@ -27,3 +27,6 @@ scratch_*
 
 # Commit message scratch files
 commit_msg.txt
+
+# Throwaway scratch from development
+tmp_*

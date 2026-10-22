@@ -21,3 +21,6 @@ docs/reference/
 
 # 子智能体临时探查脚本
 probe*.py
+
+# Scratch files from PDF/manual extraction during development
+scratch_*

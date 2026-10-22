@@ -18,10 +18,10 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **418 passing** |
-| Source | ~7,400 lines across 9 subsystems |
+| Tests | **424 passing** |
+| Source | ~7,500 lines across 9 subsystems |
 | Commands covered | 31 registry entries |
-| Evidence | **21 × E3**, 5 × E2, 5 × E1 |
+| Evidence | **22 × E3**, 5 × E2, 4 × E1 |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
@@ -111,9 +111,9 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 21 |
+| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 22 |
 | E2 | Agrees with Stata to its display precision, or with a documented wider gap | 5 |
-| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 5 |
+| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 4 |
 
 Measured relative agreement with StataNow 19.5:
 
@@ -130,6 +130,9 @@ Measured relative agreement with StataNow 19.5:
 | `xtreg, be` | 3.6e-16 | 1.7e-16 |
 | `xtreg, fd` | 7.5e-9 | 8.8e-10 |
 | `areg` | 4.6e-16 | 1.8e-16 |
+| `reghdfe` (1 FE) | 4.5e-16 | 3.3e-16 |
+| `reghdfe` (2 FE) | 4.4e-16 | 1.9e-16 |
+| `reghdfe` (2 FE, cluster) | 4.4e-16 | 2.0e-16 |
 | `var` | 2.9e-15 | — |
 | `poisson` | 3.9e-13 | 5.8e-14 |
 | `logit` | ~1e-7 | ~1e-7 |

@@ -24,3 +24,6 @@ probe*.py
 
 # Scratch files from PDF/manual extraction during development
 scratch_*
+
+# Commit message scratch files
+commit_msg.txt

@@ -18,12 +18,12 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **408 passing** (411 with the E3 fixtures) |
-| Source | ~7,200 lines across 9 subsystems |
-| Commands covered | 23 registry entries |
-| Evidence | **10 × E3**, 2 × E2, 11 × E1 |
+| Tests | **418 passing** |
+| Source | ~7,400 lines across 9 subsystems |
+| Commands covered | 31 registry entries |
+| Evidence | **21 × E3**, 5 × E2, 5 × E1 |
 
-Verified against **StataNow 19.5 (MP)** through pystata; the captures are
+Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
 
 ## Install
@@ -109,16 +109,52 @@ guesses, because guessing silently changes the VCE.
 
 ## Evidence levels
 
-| Level | Meaning |
-|---|---|
-| E1 | Implemented from the Stata manual formula; unit-tested against hand computation |
-| E2 | Numerically agrees with a published Stata output |
-| E3 | E2 plus agreement with ≥2 independent implementations |
+| Level | Meaning | Count |
+|---|---|---|
+| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 21 |
+| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 5 |
+| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 5 |
 
-`regress` and `test` are E2 (validated against the printed `auto.dta` output).
-Everything else is E1: correct by construction and internally tested, but **not
-yet contrasted with a real Stata run**. This is a documentation of limits, not
-a marketing claim.
+Measured relative agreement with StataNow 19.5:
+
+| Command | Parameters | Standard errors |
+|---|---|---|
+| `regress` | 5.1e-15 | 6.8e-16 |
+| `regress, vce(robust)` | 5.1e-15 | 4.6e-15 |
+| `regress, cluster` | 5.1e-15 | 7.1e-15 |
+| `regress, i.factor` | 3.7e-14 | 5.1e-16 |
+| `ivregress 2sls` | 7.8e-15 | 7.5e-15 |
+| `ivregress liml` | 3.7e-16 | 3.7e-16 |
+| `xtreg, fe` | 1.8e-16 | 1.9e-16 |
+| `xtreg, re` | 6.8e-16 | 1.0e-15 |
+| `xtreg, be` | 3.6e-16 | 1.7e-16 |
+| `xtreg, fd` | 7.5e-9 | 8.8e-10 |
+| `areg` | 4.6e-16 | 1.8e-16 |
+| `var` | 2.9e-15 | — |
+| `poisson` | 3.9e-13 | 5.8e-14 |
+| `logit` | ~1e-7 | ~1e-7 |
+| `probit` | 1.5e-7 | — |
+| `tobit` | 8.5e-8 | 6.4e-7 |
+| `margins, dydx` | 1.6e-7 | 5.2e-6 |
+| `ologit` / `oprobit` | ~2e-5 | — |
+| `nbreg` | 1.7e-5 | 9.1e-7 |
+| `arima` | 4.8e-5 | 8.2e-5 |
+| `dfuller` | 2.3e-4 | — |
+| `ivregress gmm` | 4.9e-16 | **2.9e-2** |
+| `arch` | **3.6e-2** | — |
+
+The linear and panel models agree to machine precision. Maximum-likelihood
+models stop near 1e-7 because Stata's Newton and statsmodels' optimiser reach
+the same optimum but halt at slightly different points; that is a real limit,
+not slack.
+
+Two gaps are larger and are left visible rather than tuned away:
+
+- **`ivregress gmm`**: coefficients are exact, robust standard errors differ by
+  2.9e-2. GMM's two-step weight matrix and finite-sample scaling are built
+  differently from Stata's.
+- **`arch`**: alpha differs by 6.9e-3, the mean constant by 3.6e-2. Stata uses
+  OPG standard errors by default and the optimisers differ.
 
 ## Design notes worth knowing
 

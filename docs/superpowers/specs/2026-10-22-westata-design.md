@@ -340,6 +340,17 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 - logit / probit / Poisson / NB / tobit / ordered：z 分布（正态）。
 - 具体以 Stata 对应命令的输出为准，写入证据表。
 
+**自由度必须分成两个量**（证据：Stata `[R] regress` → "Degrees of freedom"，第 26 页）：
+
+> For one-way cluster–robust variance estimators, p-values and confidence intervals are derived from a t distribution with G − 1 degrees of freedom.
+
+| 量 | 含义 | 聚类时 | 否则 |
+|---|---|---|---|
+| `results.df_resid` | 参考分布自由度，用于 t/p/CI/F | `G - 1` | `N - K` |
+| `results.e["df_r"]` | Stata 标量"残差自由度" | `N - K` | `N - K` |
+
+这两个量在聚类下**不相等**，且不能合并。`tests/test_cluster_df.py` 固化此行为。
+
 ### 10.5 MLE 容差与收敛
 
 - 默认 `tol=1e-8`（参数变化）、`maxiter=1000`。

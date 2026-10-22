@@ -15,3 +15,9 @@ build/
 tests/data/*.dta
 tests/data/*.csv
 tests/data/raw/
+
+# 本地下载的 Stata 官方手册（版权归 StataCorp，仅作查证用，不入库）
+docs/reference/
+
+# 子智能体临时探查脚本
+probe*.py

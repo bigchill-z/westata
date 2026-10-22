@@ -31,10 +31,11 @@ class OLS:
         Design matrix, ``n x k``.  An intercept must be included explicitly,
         matching statsmodels semantics.
     weights:
-        Not implemented in P0; passing it raises :class:`UnsupportedError`.
+        Optional Stata-weighted observation weights.
     weight_type:
-        One of ``"aweight"``, ``"pweight"``, ``"fweight"``, ``"iweight"``.
-        Required in P1 once weights are implemented.
+        One of ``"fweight"``, ``"aweight"``, ``"pweight"``, ``"iweight"``.
+        Required whenever ``weights`` is given; Stata never guesses the type.
+        See :mod:`westata.data.weights` and Stata ``[U] 20.24``.
     """
 
     def __init__(

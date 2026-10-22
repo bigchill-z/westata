@@ -253,10 +253,10 @@
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
-      ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111 (se .0367055), y:_cons 1.026726 (se .0706062), selected:z .8021853 (se .0433423)"
+      ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111 (se .0367055), y:_cons 1.026726 (se .0706062), selected:z .8021853 (se .0433423), lambda .2861034"
   verified_by: lead
   date: 2026-10-23
-  notes: "TWO-STEP estimator, with the Heckman correction applied to the standard errors (e(se_corrected) = 1). Coefficients match Stata's two-step closely and the corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. rho is a plug-in correlation rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
+  notes: "TWO-STEP estimator with the Heckman correction applied to the standard errors (e(se_corrected) = 1). The corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. The correction is validated independently against a 400-rep row bootstrap. e(lambda) follows Stata's definition rho*sigma (verified: .2849988 * 1.003876 = .2861035); westata reports .287883, 0.6% from Stata, and keeps the generated-regressor coefficient in e(lam_coef). rho itself remains a plug-in value rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
 
 - command: etregress
   level: E1
@@ -533,3 +533,14 @@
 # which matches no Stata output, while mean(y) gives 270.42 exactly. An earlier
 # implementation used mean(y) everywhere and consequently reported zip chi2
 # 657.68 against Stata's 248.04.
+
+# --- Note on predict coverage for the P6/P7 models -------------------------
+#
+# Registered and verified against StataNow 19.5 on 2026-10-23:
+#
+#   truncreg, intreg, heckman, etregress   xb, stdp, stdf  (continuous models)
+#   zip, zinb, ztp, tnbreg                 xb, n, stdp     (count models)
+#
+# A count model rejects stdf with r(198) "option stdf not allowed"; the same split
+# exists for poisson/nbreg. westata mirrors it rather than offering a type Stata
+# will not produce.

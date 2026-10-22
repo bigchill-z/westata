@@ -124,6 +124,21 @@ class _DiscreteBase:
 
         return [f"param{i + 1}" for i in range(count)]
 
+    def _rescale_extra_params(
+        self,
+        params: np.ndarray,
+        cov: np.ndarray,
+        names: list[str],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Optionally transform backend parameters into Stata's parameterisation.
+
+        The default is the identity.  Subclasses override this when the backend
+        estimates the same quantity on a different scale, so that the reported
+        *name* and *value* agree.
+        """
+
+        return params, cov
+
     def fit(
         self,
         cov_type: str | None = None,
@@ -215,6 +230,7 @@ class _DiscreteBase:
             # the position is known, and generically otherwise.
             extras = self._extra_param_names(params.size - len(names))
             names = names + extras
+        params, cov = self._rescale_extra_params(params, cov, names)
         llf = float(result.llf)
         nobs = int(result.nobs)
 
@@ -315,10 +331,74 @@ class NegativeBinomial(_DiscreteBase):
             return ["/lnalpha"]
         return super()._extra_param_names(count)
 
+    def _rescale_extra_params(
+        self,
+        params: np.ndarray,
+        cov: np.ndarray,
+        names: list[str],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Convert statsmodels' ``alpha`` to Stata's ``lnalpha``.
+
+        The likelihood is identical (the dispersion enters as ``1/alpha``), but
+        statsmodels estimates ``alpha`` while ``nbreg`` reports ``ln(alpha)``.
+        Reporting alpha under a ``/lnalpha`` label would be a units mismatch, so
+        the value and its variance are transformed by the delta method.
+        """
+
+        if "/lnalpha" not in names:
+            return params, cov
+
+        position = names.index("/lnalpha")
+        alpha = float(params[position])
+        if alpha <= 0:
+            return params, cov
+
+        adjusted_params = np.asarray(params, dtype=float).copy()
+        adjusted_cov = np.asarray(cov, dtype=float).copy()
+        adjusted_params[position] = float(np.log(alpha))
+
+        # delta method: d ln(a)/da = 1/a
+        jacobian = 1.0 / alpha
+        adjusted_cov[position, :] *= jacobian
+        adjusted_cov[:, position] *= jacobian
+        return adjusted_params, adjusted_cov
+
     def _make_sm_model(self) -> Any:
         import statsmodels.api as sm
 
         return sm.NegativeBinomial(self._y, self._X)
+
+
+def _to_cut_points(
+    params: np.ndarray, cov: np.ndarray, n_cuts: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert statsmodels' threshold parameterisation into cut points.
+
+    statsmodels stores ``[c1, log(c2 - c1), log(c3 - c2), ...]`` so the
+    thresholds stay monotone without constraints; Stata reports
+    ``c1, c2, c3, ...`` directly.  The covariance is transformed by the delta
+    method with the Jacobian of ``c_k = c_{k-1} + exp(theta_k)``.
+    """
+
+    params = np.asarray(params, dtype=float).copy()
+    cov = np.asarray(cov, dtype=float).copy()
+    n_slopes = params.size - n_cuts
+    theta = params[n_slopes:]
+
+    cuts = np.empty(n_cuts, dtype=float)
+    cuts[0] = theta[0]
+    for k in range(1, n_cuts):
+        cuts[k] = cuts[k - 1] + np.exp(theta[k])
+    params[n_slopes:] = cuts
+
+    # Jacobian J = d(cuts)/d(theta): lower triangular, 1 on the diagonal, and
+    # the derivatives of the cumulative sums w.r.t. earlier increments.
+    J = np.eye(n_cuts)
+    for k in range(1, n_cuts):
+        J[k, :k] = np.exp(theta[1 : k + 1])
+    block = J @ cov[n_slopes:, n_slopes:] @ J.T
+    cov[n_slopes:, n_slopes:] = block
+    return params, cov
 
 
 class _Ordered(_DiscreteBase):
@@ -370,8 +450,12 @@ class _Ordered(_DiscreteBase):
 
         params = np.asarray(result.params, dtype=float)
         # statsmodels orders the slope parameters first, then the cut points.
-        # Stata prints /cut1, /cut2, ... after the coefficients, so the design
-        # names line up positionally and the remaining entries are cuts.
+        # Its threshold parameterisation is NOT the cut points themselves: it
+        # stores [c1, log(c2-c1), log(c3-c2), ...] so the thresholds can be
+        # unconstrained.  Stata reports the cut points directly (``/cut1``,
+        # ``/cut2``), so recovering them is required for the values to mean the
+        # same thing -- verified against StataNow 19.5, where cut1 matches
+        # exactly and cut2 = cut1 + exp(param) to 2e-5.
         names = list(self._param_names)
         extra = params.size - len(names)
         if extra < 0:
@@ -382,6 +466,8 @@ class _Ordered(_DiscreteBase):
         names = names + [f"/cut{i + 1}" for i in range(extra)]
 
         cov = np.asarray(result.cov_params(), dtype=float)
+        if extra:
+            params, cov = _to_cut_points(params, cov, extra)
         llf = float(result.llf)
         nobs = int(result.nobs)
 

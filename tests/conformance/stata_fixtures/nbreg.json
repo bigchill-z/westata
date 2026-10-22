@@ -1,0 +1,78 @@
+{
+  "b": [
+    0.5101678164950636,
+    0.30657559564054865,
+    -0.8668295734538328
+  ],
+  "V": [
+    [
+      0.001967321861850408,
+      -0.0007537661804385046,
+      2.8058569755789248e-05
+    ],
+    [
+      -0.0007537661804385046,
+      0.0021312357689025514,
+      -4.476587181578221e-06
+    ],
+    [
+      2.8058569755789248e-05,
+      -4.476587181578221e-06,
+      0.026220467881908977
+    ]
+  ],
+  "scalars": {
+    "rank": 3.0,
+    "N": 600.0,
+    "ic": 4.0,
+    "k": 3.0,
+    "k_eq": 2.0,
+    "noconstant": 0.0,
+    "consonly": 0.0,
+    "k_dv": 1.0,
+    "converged": 1.0,
+    "rc": 0.0,
+    "k_autoCns": 0.0,
+    "ll": -976.791299423244,
+    "k_eq_model": 1.0,
+    "ll_0": -1040.145594343475,
+    "rank0": 2.0,
+    "df_m": 1.0,
+    "chi2": 126.70858984046208,
+    "p": 2.1515625145844913e-29,
+    "ll_c": -1025.0164795366088,
+    "chi2_c": 96.45036022672957,
+    "alpha": 0.4202819121555145,
+    "k_aux": 1.0,
+    "r2_p": 0.060909064331728824
+  },
+  "macros": {
+    "cmdline": "nbreg y x1",
+    "cmd": "nbreg",
+    "predict": "nbreg_p",
+    "marginsderiv": "default N IR",
+    "dispers": "mean",
+    "diparm_opt2": "noprob",
+    "chi2_ct": "LR",
+    "chi2type": "LR",
+    "deriv_useminbound": "off",
+    "opt": "moptimize",
+    "vce": "oim",
+    "title": "Negative binomial regression",
+    "diparm1": "lnalpha, exp label(\"alpha\")",
+    "user": "nbreg_lf",
+    "crittype": "log likelihood",
+    "ml_method": "e2",
+    "singularHmethod": "m-marquardt",
+    "technique": "nr",
+    "which": "max",
+    "depvar": "y",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "_cons",
+    "lnalpha"
+  ],
+  "version": ""
+}

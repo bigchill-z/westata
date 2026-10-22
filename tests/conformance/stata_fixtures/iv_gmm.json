@@ -1,0 +1,70 @@
+{
+  "b": [
+    1.983389477623425,
+    0.452888559373535,
+    1.0097537648824542
+  ],
+  "V": [
+    [
+      0.002468530875755659,
+      0.0002253414627325717,
+      7.467406625115452e-05
+    ],
+    [
+      0.0002253414627325717,
+      0.001917121468324346,
+      -1.2094183936518575e-05
+    ],
+    [
+      7.467406625115452e-05,
+      -1.2094183936518575e-05,
+      0.00206369042084687
+    ]
+  ],
+  "scalars": {
+    "J": 0.32350868509137837,
+    "rss": 518.8364067141935,
+    "N": 500.0,
+    "df_m": 2.0,
+    "rmse": 1.0186622666165597,
+    "mss": 2415.2976111221806,
+    "r2": 0.8231722192782515,
+    "r2_a": 0.8224606386717253,
+    "chi2": 1632.5551498446553,
+    "df_r": 8.98846567431158e+307,
+    "k_endog": 1.0,
+    "iterations": 1.0,
+    "rank": 3.0
+  },
+  "macros": {
+    "cmdline": "ivregress gmm y x2 (x = z1 z2)",
+    "cmd": "ivregress",
+    "estat_cmd": "ivregress_estat",
+    "robust_epilog": "ivregress_epilog",
+    "robust_prolog": "ivregress_prolog",
+    "wmatrix": "robust",
+    "vce": "robust",
+    "vcetype": "Robust",
+    "estimator": "gmm",
+    "footnote": "ivreg_footnote",
+    "marginsprop": "nolinearize",
+    "marginsnotok": "Residuals SCores",
+    "marginsok": "XB default",
+    "predict": "ivregress_p",
+    "depvar": "y",
+    "exogr": "x2",
+    "exog": "x2 z1 z2",
+    "endog": "x",
+    "insts": "x2 z1 z2",
+    "instd": "x",
+    "title": "Instrumental-variables GMM regression",
+    "idtype": "overidentified",
+    "properties": "b V"
+  },
+  "names": [
+    "x",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

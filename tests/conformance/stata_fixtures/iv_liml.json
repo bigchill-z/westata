@@ -1,0 +1,68 @@
+{
+  "b": [
+    1.9873763315601392,
+    0.45178703772965695,
+    1.0084806736108731
+  ],
+  "V": [
+    [
+      0.0024313424003896307,
+      7.083888490763561e-05,
+      -7.438092067418964e-05
+    ],
+    [
+      7.083888490763561e-05,
+      0.002025104917505505,
+      2.978103442226081e-05
+    ],
+    [
+      -7.438092067418964e-05,
+      2.978103442226081e-05,
+      0.002078415198974274
+    ]
+  ],
+  "scalars": {
+    "kappa": 1.0006817848410694,
+    "rss": 518.9087919372759,
+    "N": 500.0,
+    "df_m": 2.0,
+    "rmse": 1.0187333232375153,
+    "mss": 2415.225225899098,
+    "r2": 0.8231475492316065,
+    "r2_a": 0.8224358693492387,
+    "chi2": 1701.1675889146622,
+    "df_r": 8.98846567431158e+307,
+    "k_endog": 1.0,
+    "iterations": 0.0,
+    "rank": 3.0
+  },
+  "macros": {
+    "cmdline": "ivregress liml y x2 (x = z1 z2)",
+    "cmd": "ivregress",
+    "estat_cmd": "ivregress_estat",
+    "robust_epilog": "ivregress_epilog",
+    "robust_prolog": "ivregress_prolog",
+    "vce": "unadjusted",
+    "estimator": "liml",
+    "footnote": "ivreg_footnote",
+    "marginsprop": "nolinearize",
+    "marginsnotok": "Residuals SCores",
+    "marginsok": "XB default",
+    "predict": "ivregress_p",
+    "depvar": "y",
+    "exogr": "x2",
+    "exog": "x2 z1 z2",
+    "endog": "x",
+    "insts": "x2 z1 z2",
+    "instd": "x",
+    "title": "Instrumental-variables LIML regression",
+    "idtype": "overidentified",
+    "properties": "b V"
+  },
+  "names": [
+    "x",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

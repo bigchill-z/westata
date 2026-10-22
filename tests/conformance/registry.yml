@@ -146,64 +146,159 @@
 
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
-- command: ivregress liml / gmm
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "westata IVLIML/IVGMM vs linearmodels at machine precision"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Only 2SLS has been compared with Stata so far."
-
-- command: reghdfe / areg
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "FEOLS vs statsmodels OLS with explicit dummies; two-way FE vs demeaned OLS"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Not compared with Stata because reghdfe is a user-written package; it would need to be installed in the Stata session first."
-
-- command: xtreg fe / re / be / fd
-  level: E1
-  tolerance: 1.0e-10
-  sources:
-    - type: statsmodels_reference
-      ref: "PanelOLS vs hand-coded within transform; RandomEffects vs linearmodels; BE/FD vs hand computation"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Clustered VCE was independently verified against a manual CR1 computation; a full Stata comparison is still outstanding because it needs tsset and a panel dataset."
-
-- command: nbreg
-  level: E1
-  tolerance: 1.0e-6
-  sources:
-    - type: invariant
-      ref: "Dispersion parameter named /lnalpha like Stata; bfgs required because newton diverges"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Weakest evidence in the discrete family."
-
-- command: ologit / oprobit
-  level: E1
-  tolerance: 1.0e-6
-  sources:
-    - type: invariant
-      ref: "Cut points named /cut1../cutk like Stata; the Intercept is dropped"
-  verified_by: lead
-  date: 2026-10-22
-
 - command: margins
-  level: E1
-  tolerance: 1.0e-8
+  level: E3
+  tolerance: 1.0e-6
   sources:
+    - type: r_crosscheck
+      ref: "Live comparison: logit y x1 x2 then margins, dydx(x1 x2) on 800 observations"
     - type: invariant
       ref: "Average marginal effects match closed forms: logit mean(p(1-p)b), probit mean(phi(xb)b), poisson mean(mu)b"
   verified_by: lead
   date: 2026-10-22
-  notes: "Matches the analytic derivative but has not been diffed against Stata's margins output. An earlier version differentiated xb and was 4.38x too large."
+  notes: "Marginal effects 1.6e-7, standard errors 5.2e-6. An earlier version differentiated xb instead of the response and was 4.38x too large; this comparison is what confirms the fix."
+
+- command: xtreg, fe
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture xtreg_fe.json: xtset firm year; xtreg y x1 x2, fe (30 entities x 6 periods)"
+    - type: statsmodels_reference
+      ref: "PanelOLS vs hand-coded within transform"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters 1.8e-16, standard errors 1.9e-16, e(df_r)=148 and e(r2) both exact. The df rule N-K-n_entities+1 is confirmed against Stata, not just derived."
+
+- command: xtreg, re
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture xtreg_re.json: xtreg y x1 x2, re"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters 6.8e-16, standard errors 1.0e-15: linearmodels' Swamy-Arora matches Stata's default exactly."
+
+- command: xtreg, be
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture xtreg_be.json: xtreg y x1 x2, be"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters 3.6e-16, standard errors 1.7e-16."
+
+- command: xtreg, fd
+  level: E3
+  tolerance: 1.0e-8
+  sources:
+    - type: r_crosscheck
+      ref: "Compared against regress D.y D.x1 D.x2, noconstant, because StataNow 19 removed the fd option from xtreg (r(198))"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters 7.5e-9, standard errors 8.8e-10. Verified in StataNow 19.5 that `xtreg, fd` is no longer a valid option, so a direct comparison is impossible; the first-difference identity is used instead."
+
+- command: areg
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture areg.json: areg y x1 x2, absorb(firm)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Slopes 4.6e-16, standard errors 1.8e-16, e(df_r) exact. This also validates FEOLS's ssc defaults for the single-FE case. reghdfe itself could not be installed (SSC timed out), so the multi-way HDFE path remains E1."
+
+- command: reghdfe (multi-way)
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "FEOLS two-way FE vs explicitly demeaned OLS at 1e-10"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "reghdfe is not installed and `ssc install` timed out (network). The one-way case is covered by areg at E3; multi-way absorption is still E1."
+
+- command: ivregress liml
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture iv_liml.json: ivregress liml y x2 (x = z1 z2)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters and standard errors both 3.7e-16."
+
+- command: ivregress gmm
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture iv_gmm.json: ivregress gmm y x2 (x = z1 z2)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Point estimates 4.9e-16 but robust standard errors differ by 2.9e-2. GMM's two-step weight matrix and finite-sample scaling are constructed differently from Stata's; the coefficients are right, the inference is not. Deliberately not tuned to match."
+
+- command: nbreg
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture nbreg.json: nbreg y x1 on a Gamma-Poisson mixture"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Parameters 1.7e-5, standard errors 9.1e-7, e(ll) 8e-12. Fixing this required converting statsmodels' alpha to Stata's lnalpha via the delta method: the values differed by a factor of exp() before."
+
+- command: ologit
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture ologit.json: ologit y x1 x2 (3 categories)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Slopes 1.2e-5, cut points 2.9e-5. statsmodels stores thresholds as [c1, log(c2-c1)], so reporting them directly made cut2 wrong by 20%; the log-increment is now inverted before reporting."
+
+- command: oprobit
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture oprobit.json: oprobit y x1 x2"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Slopes 6.9e-6, cut points 1.5e-5."
+
+- command: var
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture var.json: tsset t; var y1 y2, lags(1)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Lag coefficients 2.9e-15. Both are equation-by-equation OLS, so exact agreement is expected once the ordering (Stata groups by equation) is handled."
+
+- command: arch
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "Live comparison: tsset t; arch r, arch(1) garch(1) on a GARCH DGP"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "alpha 6.9e-3, beta 6.3e-4, mean constant 3.6e-2. omega is not stored in Stata's e(b) under a comparable name, so the variance intercept is not compared. Stata uses OPG standard errors by default while arch uses the Hessian; the point estimates are close but not identical because the optimisers differ."
+
+- command: dfuller
+  level: E2
+  tolerance: 5.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "Live comparison: tsset t; dfuller y on a random walk"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Z(t) matches to 2.3e-4, which is the limit of Stata's 3-decimal display rather than a computational gap."
 
 - command: predict
   level: E1
@@ -213,6 +308,7 @@
       ref: "OLS xb equals fittedvalues; logit pr equals the logistic transform; poisson n equals exp(xb)"
   verified_by: lead
   date: 2026-10-22
+  notes: "Not separately diffed against `predict` output; the underlying quantities are covered by the margins comparison, which uses the same prediction machinery."
 
 - command: etable
   level: E1
@@ -222,30 +318,24 @@
       ref: "Values come from params/bse unchanged; the Observations row equals e(N)"
   verified_by: lead
   date: 2026-10-22
+  notes: "Presentation layer. esttab is not installed, so no output-level comparison is possible."
 
-- command: var / vec
+- command: vec / vecrank
   level: E1
   tolerance: 1.0e-1
   sources:
     - type: invariant
-      ref: "Recovers a known VAR(1) transition matrix; Johansen trace rejects for a cointegrated pair"
+      ref: "Johansen trace rejects for a cointegrated pair"
   verified_by: lead
   date: 2026-10-22
+  notes: "Not yet compared with `vec` output."
 
-- command: arch
-  level: E1
-  tolerance: 5.0e-2
-  sources:
-    - type: invariant
-      ref: "Recovers GARCH(1,1) persistence near 0.96; conditional volatility positive"
-  verified_by: lead
-  date: 2026-10-22
-
-- command: dfuller / pperron / kpss
+- command: pperron / kpss
   level: E1
   tolerance: 1.0e-3
   sources:
     - type: invariant
-      ref: "ADF rejects stationarity appropriately; KPSS has the opposite null"
+      ref: "KPSS rejects stationarity on a random walk; Phillips-Perron runs"
   verified_by: lead
   date: 2026-10-22
+  notes: "Only dfuller has been compared with Stata so far."

@@ -1,0 +1,87 @@
+{
+  "b": [
+    1.32848967541452,
+    -0.6518020949791572,
+    -1.060509515594814,
+    0.7338799374941234
+  ],
+  "V": [
+    [
+      0.01040222841675905,
+      -0.002275339831783932,
+      -0.0029941215084860386,
+      0.0008146305817997621
+    ],
+    [
+      -0.002275339831783932,
+      0.006584392082681842,
+      0.001191536875170179,
+      -0.0006431793148871241
+    ],
+    [
+      -0.0029941215084860386,
+      0.001191536875170179,
+      0.009180591247435655,
+      0.002867302643194168
+    ],
+    [
+      0.0008146305817997621,
+      -0.0006431793148871241,
+      0.002867302643194168,
+      0.008355551834346454
+    ]
+  ],
+  "scalars": {
+    "rank": 4.0,
+    "N": 700.0,
+    "ic": 4.0,
+    "k": 4.0,
+    "k_eq": 3.0,
+    "noconstant": 1.0,
+    "consonly": 0.0,
+    "k_dv": 1.0,
+    "converged": 1.0,
+    "rc": 0.0,
+    "k_autoCns": 0.0,
+    "ll": -638.3210300332915,
+    "k_eq_model": 1.0,
+    "ll_0": -768.7777066084335,
+    "df_m": 2.0,
+    "chi2": 260.9133531502839,
+    "p": 2.2048814108358262e-57,
+    "N_cd": 0.0,
+    "k_cat": 3.0,
+    "k_aux": 2.0,
+    "version": 3.0,
+    "r2_p": 0.16969362593859438
+  },
+  "macros": {
+    "cmdline": "ologit y x1 x2",
+    "cmd": "ologit",
+    "predict": "ologit_p",
+    "depvar_outcomes": "1 2 3",
+    "marginsdefault": "predict(pr outcome(1)) predict(pr outcome(2)) predict(pr outcome(3))",
+    "marginsderiv": "default Pr OUTcome(passthru)",
+    "marginsprop": "addcons",
+    "title": "Ordered logistic regression",
+    "chi2type": "LR",
+    "deriv_useminbound": "off",
+    "opt": "moptimize",
+    "vce": "oim",
+    "user": "mopt__ologit_d2()",
+    "crittype": "log likelihood",
+    "ml_method": "d2",
+    "singularHmethod": "m-marquardt",
+    "technique": "nr",
+    "which": "max",
+    "depvar": "y",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "x2",
+    "cut1",
+    "cut2"
+  ],
+  "version": ""
+}

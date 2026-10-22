@@ -69,7 +69,7 @@
       ref: "df_r = N - K - n_entities + 1 asserted for a 5x4 balanced panel"
   verified_by: lead
   date: 2026-10-22
-  notes: "E2 blocked: needs a published xtreg, fe output on a public dataset."
+  notes: "E2 blocked: needs a published xtreg, fe output on a public dataset. Clustered VCE pinned to auto_df=False + group_debias=True after verifying it is the only setting that reproduces manual CR1 (0.11205179 vs 0.09996617 for the backend default)."
 
 - command: xtreg, re
   level: E1

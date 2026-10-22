@@ -91,6 +91,8 @@ class Tobit:
             )
         self._lower = lower
         self._upper = upper
+        #: Estimation-sample covariates, retained for margins(over=...).
+        self._model_data: pd.DataFrame | None = None
 
     @classmethod
     def from_formula(
@@ -117,9 +119,11 @@ class Tobit:
                 f"tobit: left-hand side must be a plain column name, got {lhs!r}"
             )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
-        return cls(
+        model = cls(
             y, X, lower=lower, upper=upper, param_names=names
         )
+        model._model_data = data.loc[kept_index].reset_index(drop=True)
+        return model
 
     # ------------------------------------------------------------ likelihood
     def _censoring(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -287,6 +291,8 @@ class Tobit:
             model_name=self._stata_command,
             cov_type=requested,
             e=e,
+            design_matrix=(self._X, list(self._param_names)),
+            model_data=self._model_data,
         )
 
     # -------------------------------------------------------------- internals

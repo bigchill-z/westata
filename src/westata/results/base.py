@@ -81,6 +81,8 @@ class StataResults:
         model_name: str = "",
         cov_type: str = "nonrobust",
         e: Mapping[str, Any] | None = None,
+        design_matrix: tuple[np.ndarray, list[str]] | None = None,
+        model_data: pd.DataFrame | None = None,
     ) -> None:
         names = list(param_names)
         params_arr = np.asarray(params, dtype=float).reshape(-1)
@@ -139,6 +141,13 @@ class StataResults:
         if e is not None:
             merged_e.update(dict(e))
         self._e = EReturn(merged_e)
+        #: Retained estimation design (X, names) so postestimation can rebuild
+        #: predictions, marginal effects and adjusted means without asking the
+        #: user to re-supply the data.
+        self.design_matrix = design_matrix
+        #: Estimation-sample covariates, needed by ``margins(over=...)`` to
+        #: resolve group labels given as column names.
+        self.model_data = model_data
 
         index = pd.Index(names, dtype=object)
         self._params = pd.Series(params_arr, index=index, name="params")
@@ -334,6 +343,41 @@ class StataResults:
         from westata.postestimation.api import lincom_as_stata
 
         return lincom_as_stata(self, expression, **kwargs)
+
+    def margins(self, **kwargs: Any) -> Any:
+        """Marginal effects or predictive margins (Stata ``margins``).
+
+        The design matrix is taken from :attr:`design_matrix` when the
+        estimator stored one; otherwise pass ``exog=`` and ``param_names=``.
+        """
+
+        from westata.postestimation.margins import margins
+
+        return margins(self, **kwargs)
+
+    def predict(self, exog: Any = None, kind: str = "xb", **kwargs: Any) -> Any:
+        """Typed prediction (Stata ``predict, <type>``).
+
+        Parameters
+        ----------
+        exog:
+            Design matrix; defaults to the stored estimation design.
+        kind:
+            ``"xb"``, ``"pr"``, ``"n"``, ``"e"``, ``"ystar"``, ``"residuals"``,
+            depending on the model.
+        """
+
+        from westata.postestimation.predict import predict
+
+        if exog is None:
+            stored = getattr(self, "design_matrix", None)
+            if stored is None:
+                raise ConsistencyError(
+                    "predict: the design matrix was not retained on this result; "
+                    "pass exog=... explicitly"
+                )
+            exog = stored[0]
+        return predict(self, exog, kind, **kwargs)
 
     def wald_test(self, R: Any, q: Any = None, scalar: bool = True) -> Any:
         """statsmodels-compatible joint Wald test.

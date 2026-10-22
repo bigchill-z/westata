@@ -86,6 +86,8 @@ class _DiscreteBase:
                 f"param_names has {len(self._param_names)} entries but exog has "
                 f"{X.shape[1]} columns"
             )
+        #: Estimation-sample covariates, retained for margins(over=...).
+        self._model_data: pd.DataFrame | None = None
 
     @classmethod
     def from_formula(
@@ -105,7 +107,9 @@ class _DiscreteBase:
                 f"name, got {lhs!r}"
             )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
-        return cls(y, X, param_names=names)
+        model = cls(y, X, param_names=names)
+        model._model_data = data.loc[kept_index].reset_index(drop=True)
+        return model
 
     # ------------------------------------------------------------------ fit
     def _make_sm_model(self) -> Any:
@@ -229,6 +233,8 @@ class _DiscreteBase:
             model_name=self._stata_command,
             cov_type=requested,
             e=e,
+            design_matrix=(self._X, list(names)),
+            model_data=self._model_data,
         )
 
     # ------------------------------------------------------------- e() scalars

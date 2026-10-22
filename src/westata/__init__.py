@@ -29,7 +29,7 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
-from westata.postestimation import LincomResult, WaldTest
+from westata.postestimation import LincomResult, MarginsResult, WaldTest, margins
 from westata.protocols import SSC
 from westata.report import etable, to_latex, to_markdown
 
@@ -63,6 +63,8 @@ __all__ = [
     "Tobit",
     "WaldTest",
     "LincomResult",
+    "MarginsResult",
+    "margins",
     "etable",
     "to_latex",
     "to_markdown",

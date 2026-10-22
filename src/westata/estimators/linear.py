@@ -65,6 +65,8 @@ class OLS:
                 f"endog has {self._y.shape[0]} rows but exog has {self._X.shape[0]} rows"
             )
         self._weight_spec = None
+        #: Estimation-sample covariates, retained for margins(over=...).
+        self._model_data: pd.DataFrame | None = None
         if weights is not None:
             if weight_type is None:
                 raise WeightError(
@@ -111,6 +113,9 @@ class OLS:
                 f"got {lhs!r}"
             )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
+        model = cls(y, X, weights=weights, weight_type=weight_type, param_names=names)
+        model._model_data = data.loc[kept_index].reset_index(drop=True)
+        return model
 
         return cls(y, X, weights=weights, weight_type=weight_type, param_names=names)
 
@@ -260,4 +265,6 @@ class OLS:
             model_name="regress",
             cov_type=effective_cov_type,
             e=e,
+            design_matrix=(X, self._param_names),
+            model_data=self._model_data,
         )

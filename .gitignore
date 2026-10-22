@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+.ipynb_checkpoints/
+*.log
+.DS_Store
+
+# 本地下载的 Stata 示例数据集（不随仓库分发）
+tests/data/*.dta
+tests/data/*.csv
+tests/data/raw/

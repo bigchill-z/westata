@@ -1,0 +1,170 @@
+1071| In addition to the above, the following is stored in r():
+1072| Matrices
+1073| r(table) matrix containing the coefficients with their standard errors, test statistics, ?-values, and
+1074| confidence intervals
+1075| Note that results stored in r() are updated when the command is replayed and will be replaced when any
+1076| r-class command is run after the estimation command.
+1077| Methods and formulas
+1078| Methods and formulas are presented under the following headings:
+1079| Introduction
+1080| Linear programming formulation of quantile regression
+1081| Standard errors when residuals are i.i.d.
+1082| Pseudo-?2
+1083| Introduction
+1084| According to Stuart and Ord (1991, 1084), the method of minimum absolute deviations was first
+1085| proposed by Boscovich in 1757 and was later developed by Laplace; Stigler (1986, 39?55) and Hald
+1086| (1998, 97?103, 112?116) provide historical details. According to Bloomfield and Steiger (1980), Harris
+1087| (1950) later observed that the problem of minimum absolute deviations could be turned into the linear
+1088| programming problem that was first implemented by Wagner (1959). Interest has grown in this method
+1089| because robust methods and extreme value modeling have become more popular. Statistical and com-
+1090| putational properties of minimum absolute deviation estimators are surveyed by Narula and Wellington
+1091| (1982). Cameron and Trivedi (2005), Hao and Naiman (2007), and Wooldridge (2010) provide excel-
+1092| lent introductions to quantile regression methods, while Koenker (2005) gives an in-depth review of the
+1093| topic.
+1094| ===== PAGE 28 =====
+1095| qreg ? Quantile regression 28
+1096| Linear programming formulation of quantile regression
+1097| Define ? as the quantile to be estimated; the median is ? = 0.5. For each observation ?, let ?? be the
+1098| residual
+1099| ?? = ? ? ? x?????
+1100| The objective function to be minimized is
+1101| ??(??) = (? 1 {?? ? 0} + (1 ? ? )1 {?? < 0}) |??|
+1102| = (?1 {?? ? 0} ? (1 ? ? )1 {?? < 0}) ??
+1103| = (? ? 1 {?? < 0}) ?? (2)
+1104| where 1{?} is the indicator function. This function is sometimes referred to as the check function because
+1105| it resembles a check mark ( Wooldridge 2010, 450); the slope of ??(??) is ? when ?? > 0 and is ? ? 1
+1106| when ?? < 0, but is undefined for ?? = 0. Choosing the ??? that minimize ??(??) is equivalent to finding
+1107| the ??? that make x??? best fit the quantiles of the distribution of ? conditional on x.
+1108| This minimization problem is set up as a linear programming problem and is solved with linear pro-
+1109| gramming techniques, as suggested by Armstrong, Frome, and Kung (1979) and described in detail by
+1110| Koenker (2005). Here 2 ? slack variables, u??1 and v??1, are introduced, where ?? ? 0, ?? ? 0, and
+1111| ?? ? ?? = 0, reformulating the problem as
+1112| min??,u,v {?1??u + (1 ? ? )1??v | y ? X?? = u ? v}
+1113| where 1? is a vector of 1s. This is a linear objective function on a polyhedral constraint set with (??)
+1114| vertices, and our goal is to find the vertex that minimizes ( 2). Each step in the search is described by
+1115| a set of ? observations through which the regression plane passes, called the basis. A step is taken by
+1116| replacing a point in the basis if the linear objective function can be improved. If this occurs, a line is
+1117| printed in the iteration log. The definition of convergence is exact in the sense that no amount of added
+1118| iterations could improve the objective function.
+1119| A series of weighted least-squares ( WLS) regressions is used to identify a set of observations as a
+1120| starting basis. The WLS algorithm for ? = 0.5 is taken from Schlossmacher (1973) with a generalization
+1121| for 0 < ? < 1 implied from Hunter and Lange (2000).
+1122| Standard errors when residuals are i.i.d.
+1123| The estimator for the VCE implemented in qreg assumes that the errors of the model are independent
+1124| and identically distributed (i.i.d.). When the errors are i.i.d., the large-sample VCE is
+1125| cov(??) = ? (1 ? ? )? 2?(??) {?(x?x??)}?1 (3)
+1126| where ?? = ? ?1? (? ) and ??(?) is the distribution function of ? with density ??(?). See Koenker (2005,
+1127| 73) for this result. From ( 3), we see that the regression precision depends on the inverse of the density
+1128| function, termed the sparsity function, ?? = 1/??(??).
+1129| While 1 /? ???=1 x?x?? estimates ?(x?x??), estimating the sparsity function is more difficult. qregprovides several methods to estimate the sparsity function. The different estimators are specified through
+1130| the suboptions of vce(iid, denmethod bwidth). The suboption denmethod specifies the functional form
+1131| for the sparsity estimator. The default is fitted.
+1132| ===== PAGE 29 =====
+1133| qreg ? Quantile regression 29
+1134| Here we outline the logic underlying the fitted estimator. Because ??(?) is the distribution function
+1135| for ?, we have ??(?) = {?? ?(?)}/??, ? = ? ?(??), and ?? = ? ?1? (? ). When differentiating the identity
+1136| ??{? ?1? (? )} = ? , the sparsity function can be written as ?? = {? ?1? (? )}/??. Numerically, we can
+1137| approximate the derivative using the centered difference,
+1138| ? ?1? (? )
+1139| ?? ? ? ?1? (? + ?) ? ? ?1? (? ? ?)2? = ??+? ? ????2? = ? ?? (4)
+1140| where ? is the bandwidth.
+1141| The empirical quantile function is computed by first estimating ??+? and ???? , and then computing
+1142| ?? ?1? (? + ?) = x????+? and ?? ?1? (? ? ?) = x?????? , where x is the sample mean of the independent
+1143| variables x. These quantities are then substituted into ( 4).
+1144| Alternatively, as the option suggests, vce(iid, residual) specifies that qreg use the empirical
+1145| quantile function of the residuals to estimate the sparsity. Here we substitute ??, the distribution of the
+1146| residuals, for ??, which only differ by their first moments.
+1147| The ? residuals associated with the linear programming basis will be zero, where ? is the number of
+1148| regression coefficients. These zero residuals are removed before computing the ? +? and ? ?? quantiles,
+1149| ?(?+?) = ?? ?1? (? + ?) and ?(???) = ?? ?1? (? ? ?). The ?? ?1? estimates are then substituted for ? ?1? in (4).
+1150| Each of the estimators for the sparsity function depends on a bandwidth. The vce() suboption bwidth
+1151| specifies the bandwidth method to use. The three bandwidth options and their citations are hsheather
+1152| (Hall and Sheather 1988), bofinger (Bofinger 1975), and chamberlain (Chamberlain 1994).
+1153| Their formulas are
+1154| ?? = ? ?1/3??1 (1 ? ?2 )2/3 [ 32 ? ?{??1(? )}22??1(? )2 + 1 ]1/3
+1155| ?? = ? ?1/5 [
+1156| 9
+1157| 2 ?{??1(? )}4
+1158| {2??1(? )2 + 1}2 ]
+1159| 1/5
+1160| ?? = ? ?1 (1 ? ?2 ) ? ? (1 ? ? )?
+1161| where ?? is the Hall?Sheather bandwidth, ?? is the Bofinger bandwidth, ?? is the Chamberlain band-
+1162| width, ?() and ?() are the standard normal distribution and density functions, ? is the sample size, and
+1163| 100(1 ? ?) is the confidence level set by the level() option. Koenker (2005) discusses the derivation
+1164| of the Hall?Sheather and the Bofinger bandwidth formulas. Y ou should avoid modifying the confidence
+1165| level when replaying estimates that use the Hall?Sheather or Chamberlain bandwidths because these
+1166| methods use the confidence level to estimate the coefficient standard errors.
+1167| Finally, the vce() suboption kernel(kernel) specifies that qreg use one of several kernel density
+1168| estimators to estimate the sparsity function. kernel allows you to choose which kernel function to use,
+1169| where the default is the Epanechnikov kernel. See [R] kdensity for the functional form of the eight
+1170| kernels.
+1171| The kernel bandwidth is computed using an adaptive estimate of scale
+1172| ?? = min ( ? ?, ??1.34 ) ? {??1(? + ?) ? ? ?1(? ? ?)}
+1173| ===== PAGE 30 =====
+1174| qreg ? Quantile regression 30
+1175| where ? is one of ??, ??, or ??; ?? is the interquartile range; and ? ?is the standard deviation of y; see
+1176| Silverman (1986, 47) and Koenker (2005, 81) for discussions. Let ???(??) be the kernel density estimate
+1177| for the ?th residual, and then the kernel estimator for the sparsity function is
+1178| ? ?? = ???
+1179| ???=1 ???(??)
+1180| Finally, substituting your choice of sparsity estimate into ( 3) results in the i.i.d. variance?covariance
+1181| matrix
+1182| V? = ? ?2?? (1 ? ? ) (
+1183| ?
+1184| ?
+1185| ?=1
+1186| x?x??)
+1187| ?1
+1188| Pseudo-R2
+1189| The pseudo-?2 is calculated as
+1190| 1 ? sum of weighted deviations about estimated quantilesum of weighted deviations about raw quantile
+1191| This is based on the likelihood for a double-exponential distribution ???|??|, where ?? are multipliers
+1192| ?? = {? if ?? > 0(1 ? ? ) otherwise
+1193| Minimizing the objective function ( 2) with respect to ?? also minimizes ?? |??|??, the sum of weightedleast absolute deviations. For example, for the 50th percentile ?? = 1, for all ?, and we have median
+1194| regression. If we want to estimate the 75th percentile, we weight the negative residuals by 0.25 and the
+1195| positive residuals by 0.75. It can be shown that the criterion is minimized when 75% of the residuals are
+1196| negative.
+1197| References
+1198| Angrist, J. D., and J.-S. Pischke. 2009. Mostly Harmless Econometrics: An Empiricist?s Companion. Princeton, NJ: Prince-
+1199| ton University Press.
+1200| Armstrong, R. D., E. L. Frome, and D. S. Kung. 1979. Algorithm 79-01: A revised simplex algorithm for the absolute
+1201| deviation curve fitting problem. Communications in Statistics?Simulation and Computation 8: 175?190. https://doi.
+1202| org/10.1080/03610917908812113.
+1203| Biewen, M., and P . Erhardt. 2021. arhomme: An implementation of the Arellano and Bonhomme (2017) estimator for
+1204| quantile regression with selection correction . Stata Journal 21: 602?625.
+1205| Bloomfield, P ., and W. Steiger. 1980. Least absolute deviations curve-fitting. SIAM Journal on Scientific Computing 1:
+1206| 290?301. https://doi.org/10.1137/0901019.
+1207| Bofinger, E. 1975. Estimation of a density function using order statistics. Australian Journal of Statistics 17: 1?7. https:
+1208| //doi.org/10.1111/j.1467-842X.1975.tb01366.x.
+1209| Bottai, M., and N. Orsini. 2019. qmodel: A command for fitting parametric quantile models . Stata Journal 19: 261?293.
+1210| Cameron, A. C., and P . K. Trivedi. 2005.Microeconometrics: Methods and Applications. New Y ork: Cambridge University
+1211| Press.
+1212| ???. 2022. Microeconometrics Using Stata. 2nd ed. College Station, TX: Stata Press.
+1213| ===== PAGE 31 =====
+1214| qreg ? Quantile regression 31
+1215| Chamberlain, G. 1994. ?Quantile regression, censoring, and the structure of wages?. In Sixth World Congress. Advances
+1216| in Econometrics, edited by C. A. Sims, vol. 1: 171?210. Cambridge: Cambridge University Press. https://doi.org/10.
+1217| 1017/CCOL0521444594.005.
+1218| Chernozhukov, V ., I. Fern?ndez-V al, S. Han, and A. Kowalski. 2019.Censored quantile instrumental-variable estimation
+1219| with Stata. Stata Journal 19: 768?781.
+1220| Deb, P ., E. C. Norton, and W. G. Manning. 2017. Health Econometrics Using Stata . College Station, TX: Stata Press.
+1221| Drukker, D. M. 2016. Quantile regression allows covariate effects to differ by quantile. The Stata Blog: Not Elsewhere
+1222| Classified. https://blog.stata.com/2016/09/27/quantile-regression-allows-covariate-effects-to-differ-by-quantile/.
+1223| Efron, B., and R. J. Tibshirani. 1993. An Introduction to the Bootstrap . New Y ork: Chapman and Hall/CRC. https:
+1224| //doi.org/10.1201/9780429246593.
+1225| Fr?lich, M., and B. Melly. 2010. Estimation of quantile treatment effects with Stata . Stata Journal 10: 423?457.
+1226| Gould, W. W. 1992. sg11.1: Quantile regression with bootstrapped standard errors . Stata Technical Bulletin 9: 19?21.
+1227| Reprinted in Stata Technical Bulletin Reprints, vol. 2, pp. 137?139. College Station, TX: Stata Press.
+1228| ???. 1997a. crc46: Better numerical derivatives and integrals . Stata Technical Bulletin 35: 3?5. Reprinted in Stata
+1229| Technical Bulletin Reprints, vol. 6, pp. 8?12. College Station, TX: Stata Press.
+1230| ???. 1997b. sg70: Interquantile and simultaneous-quantile regression . Stata Technical Bulletin 38: 14?22. Reprinted
+1231| in Stata Technical Bulletin Reprints, vol. 7, pp. 167?176. College Station, TX: Stata Press.
+1232| Gould, W. W., and W. H. Rogers. 1994. ?Quantile regression as an alternative to robust regression?. In 1994 Proceedings
+1233| of the Statistical Computing Section . Alexandria, V A: American Statistical Association.
+1234| Hald, A. 1998. A History of Mathematical Statistics from 1750 to 1930 . New Y ork: Wiley.
+1235| Hall, P ., and S. J. Sheather. 1988. On the distribution of a Studentized quantile. Journal of the Royal Statistical Society,
+1236| B ser., 50: 381?391. https://doi.org/10.1111/j.2517-6161.1988.tb01735.x.
+1237| Hao, L., and D. Q. Naiman. 2007. Quantile Regression. Thousand Oaks, CA: Sage.
+1238| Harris, T. 1950. Regression using minimum absolute deviations. American Statistician 4: 14?15. https://doi.org/10.1080/
+1239| 00031305.1950.10501620.
+1240| Huber, P . J. 1967. ?The behavior of maximum likelihood estimates under nonstandard conditions?. In Proceedings of

@@ -215,3 +215,52 @@ def test_sqreg_bootstrap_standard_errors_are_the_right_order():
     stata = np.array([0.0705717, 0.0506841, 0.0709206])
     ratio = errors / stata
     assert np.all(ratio > 0.7) and np.all(ratio < 1.3), ratio
+
+def test_qreg_robust_standard_errors_match_stata_exactly():
+    """Stata's ``qreg, vce(robust)`` column, reproduced to 1e-6.
+
+    The sandwich uses an observation-specific density
+    ``f_i = 2h / (x_i'(b(tau+h) - b(tau-h)))``, so ``J = sum f_i x_i x_i'`` and
+    ``V = J^-1 M J^-1``. Two earlier versions were wrong: dropping the density
+    gave standard errors 42% too small, and using a single density at ``xbar``
+    plus an ad-hoc ``n/(n-k)`` gave 1.05% high.
+
+    Caveat recorded in the registry: the fixture only exercises tau = 0.5, where
+    ``psi_i^2 = 0.25`` for every observation and ``M`` collapses to
+    ``tau(1-tau)X'X``. The general-tau moment form is not directly evidenced.
+    """
+
+    QuantileRegression = _require("QuantileRegression")
+    result = QuantileRegression.from_formula(
+        "y ~ x1 + x2", quantile_frame(), quantile=0.5
+    ).fit(cov_type="robust")
+
+    # Stata: x1 .0352211  x2 .0336117  _cons .0359358
+    assert float(result.bse["x1"]) == pytest.approx(0.0352211, rel=1e-5)
+    assert float(result.bse["x2"]) == pytest.approx(0.0336117, rel=1e-5)
+    assert float(result.bse["Intercept"]) == pytest.approx(0.0359358, rel=1e-5)
+
+    # The robust and iid columns must differ -- if they were identical the
+    # "robust" label would be silently doing nothing.
+    iid = QuantileRegression.from_formula(
+        "y ~ x1 + x2", quantile_frame(), quantile=0.5
+    ).fit(cov_type="iid")
+    assert float(result.bse["x1"]) != pytest.approx(float(iid.bse["x1"]), rel=1e-6)
+
+
+def test_rreg_standard_errors_are_close_but_not_exact():
+    """rreg's pseudovalue SEs land within a few percent, not exactly.
+
+    Measured: .0548424 / .0543542 / .0545657 against Stata's
+    .0564219 / .0525755 / .0545107, i.e. -2.8% / +3.4% / +0.1%. The residual gap
+    is because [R] rreg cites Street-Carroll-Ruppert (1988) without specifying
+    the leave-one-out construction, so it is documented rather than tuned. An
+    earlier version was 26-36% wrong, which this band would still catch.
+    """
+
+    RobustRegression = _require("RobustRegression")
+    result = RobustRegression.from_formula("y ~ x1 + x2", outlier_frame()).fit()
+
+    assert float(result.bse["x1"]) == pytest.approx(0.0564219, rel=6e-2)
+    assert float(result.bse["x2"]) == pytest.approx(0.0525755, rel=6e-2)
+    assert float(result.bse["Intercept"]) == pytest.approx(0.0545107, rel=6e-2)

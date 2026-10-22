@@ -36,6 +36,19 @@ with the Hall-Sheather bandwidth. Using a kernel density instead shifts every
 standard error by roughly 29% on the reference DGP while leaving the coefficients
 untouched -- which is why the three extra regressions below are not optional.
 
+Two reporting details that are easy to get wrong:
+
+* ``e(sum_adev)``/``e(sum_rdev)`` are **check-function** sums
+  ``sum (tau - 1{u<0}) u``, not sums of ``|u|``.  The two coincide only at the
+  median, so a median-only check cannot tell them apart; at ``tau=.25`` Stata
+  prints 156.7522 against an absolute sum of 465.29.
+* ``e(q_v)``, the raw unconditional quantile printed as "(about q)", is the
+  ``ceil(n*tau)``-th order statistic here, not an interpolated quantile.
+
+``vce(robust)`` is implemented as the Huber sandwich with an
+observation-specific fitted density (see :meth:`QuantileRegression
+._robust_covariance`); it reproduces the fixture's Robust column exactly.
+
 Robust regression
 -----------------
 ``[R] rreg`` Methods and formulas, in order:
@@ -49,8 +62,17 @@ Robust regression
    with ``c_b = 4.685 * tune/7``.
 5. Standard errors by the Street-Carroll-Ruppert pseudovalue approach.
 
-All five steps are implemented; skipping the initial Cook's-distance screen or the
-Huber pass changes the answer materially on contaminated data.
+All five steps are implemented.  Both weighting stages matter: on the P8 fixture
+the Huber-only estimate sits 0.6% away from Stata's coefficients, while running
+biweight from the Huber result reproduces them to ``2e-4``.  The iteration log in
+the captured output shows the same hand-off (``Huber iteration 1..4``, then
+``Biweight iteration 5..6``).
+
+The pseudovalue standard errors are the one place westata is not exact: refitting
+the real two-stage estimator for each held-out observation leaves ``_cons`` +0.1%,
+``x1`` -2.8%, ``x2`` +3.4% against Stata.  ``[R] rreg`` does not document the
+refit precisely enough to close that, so it is measured and reported rather than
+tuned away.  ``e(F)`` inherits the same gap (0.8%).
 """
 
 from __future__ import annotations
@@ -94,6 +116,20 @@ def solve_lad(
     with a small floor so a zero residual does not divide by zero. The floor is a
     function of the current scale rather than a fixed constant, so it shrinks as
     the fit improves instead of pinning the step size.
+
+    With ``X`` a single constant column the minimiser is a sample quantile of
+    ``y``.  Which one is **not** unique: the objective is piecewise linear, and
+    whenever the solution lands between two order statistics a whole interval of
+    locations is optimal, so the returned value can differ from
+    ``numpy.quantile`` by up to one order-statistic gap.  That is a property of
+    the estimator, not a solver defect -- Stata's linear-programming solution has
+    the same freedom and warns "alternate solutions exist" when it matters.
+
+    Interpolation caveat: ``numpy.quantile`` interpolates *between* order
+    statistics by default, while a check-function minimiser is always an order
+    statistic (or an interval of them).  Tests must therefore compare with a
+    tolerance of about one spacing, or use a plain type-1 quantile, rather than
+    asserting equality.
     """
 
     X = np.asarray(X, dtype=float)
@@ -179,7 +215,10 @@ class QuantileRegression:
                 f"qreg: quantile must lie strictly between 0 and 1, got {quantile!r}"
             )
         self._quantile = float(quantile)
+        #: Estimation-sample covariates, retained for postestimation.
         self._model_data: pd.DataFrame | None = None
+        #: Populated by ``fit`` with the fitted-sparsity components.
+        self._sparsity: dict[str, Any] = {}
 
     @classmethod
     def from_formula(
@@ -244,23 +283,33 @@ class QuantileRegression:
 
         sum_adev = check(residual)
 
-        # The constant-only model's minimiser is the tau-th sample quantile.
-        raw_center = float(np.quantile(self._y, tau))
+        # The constant-only model's minimiser is the tau-th sample quantile;
+        # Stata prints it as "Raw sum of deviations ... (about q_v)".
+        raw_center = self._raw_quantile(tau)
         sum_rdev = check(self._y - raw_center)
         pseudo_r2 = 1.0 - sum_adev / sum_rdev if sum_rdev != 0 else float("nan")
 
         covariance = self._covariance(beta, normalized, n, k, residual)
+        sparsity = self._sparsity["sparsity"]
+        bandwidth = self._sparsity["bandwidth"]
 
         e: dict[str, Any] = {
             "N": n,
             "df_m": float(k - 1),
             "df_r": float(n - k),
             "q": self._quantile,
+            "q_v": raw_center,
             "sum_adev": sum_adev,
             "sum_rdev": sum_rdev,
             "r2_p": pseudo_r2,
             "rank": k,
+            "sparsity": sparsity,
+            "f_r": 1.0 / sparsity if sparsity > 0 else float("nan"),
+            "bwidth": bandwidth,
+            "bwmethod": "hsheather",
+            "denmethod": "fitted",
             "vce": normalized,
+            "convcode": 0,
         }
 
         return StataResults(
@@ -289,94 +338,126 @@ class QuantileRegression:
         k: int,
         residual: np.ndarray,
     ) -> np.ndarray:
+        self._sparsity = self._fitted_sparsity(n)
         if cov_type == "robust":
             return self._robust_covariance(beta, n, k)
         return self._iid_covariance(beta, n, k)
 
-    def _iid_covariance(self, beta: np.ndarray, n: int, k: int) -> np.ndarray:
-        """``tau(1-tau) s^2 (X'X/n)^-1`` with the fitted sparsity estimate."""
+    def _fitted_sparsity(self, n: int) -> dict[str, Any]:
+        """The ``fitted`` sparsity estimate, ``[R] qreg`` equation (4).
+
+        Requires the two extra quantile regressions at ``tau ± h``; their
+        ``xbar'b`` values give the inverse-quantile difference, and the shifted
+        coefficient vectors are also what the robust sandwich needs at each
+        observation, so they are cached here rather than recomputed.
+        """
 
         tau = self._quantile
         # Two-sided 95%, matching Stata's default level(95).
         alpha = 0.05
         h = _hall_sheather_bandwidth(tau, n, alpha)
-        h = min(h, min(tau - 0.001, 0.999 - tau))
-        if h <= 0:
+        # Keep both shifted quantiles inside (0, 1); past that a quantile
+        # regression is undefined and Stata likewise refuses.
+        h = min(h, 0.5 * min(tau, 1.0 - tau))
+        if h <= 0.0:
             raise ConsistencyError(
                 f"qreg: the Hall-Sheather bandwidth is not positive at quantile "
-                f"{tau}; the sparsity estimate is undefined at the extremes"
+                f"{tau}; the sparsity estimate is undefined this close to 0 or 1"
             )
 
+        beta_upper = solve_lad(self._X, self._y, quantile=float(tau + h))
+        beta_lower = solve_lad(self._X, self._y, quantile=float(tau - h))
         xbar = np.mean(self._X, axis=0)
-        upper = tau + h
-        lower = tau - h
-        if upper <= 0.0 or lower >= 1.0:
-            raise ConsistencyError(
-                "qreg: quantile too close to 0 or 1 for the sparsity estimate"
-            )
-
-        beta_upper = solve_lad(self._X, self._y, quantile=float(upper))
-        beta_lower = solve_lad(self._X, self._y, quantile=float(lower))
         sparsity = float((xbar @ beta_upper - xbar @ beta_lower) / (2.0 * h))
         if not np.isfinite(sparsity) or sparsity <= 0.0:
             raise ConsistencyError(
                 "qreg: the fitted sparsity estimate is not positive; the "
                 "quantile regression may not be identified on these data"
             )
+        return {
+            "sparsity": sparsity,
+            "bandwidth": float(h),
+            "beta_upper": beta_upper,
+            "beta_lower": beta_lower,
+        }
 
+    def _iid_covariance(self, beta: np.ndarray, n: int, k: int) -> np.ndarray:
+        """``tau(1-tau) s^2 (X'X/n)^-1 / n``, ``[R] qreg`` equation (5)."""
+
+        tau = self._quantile
+        sparsity = self._sparsity["sparsity"]
         xtx_inverse = np.linalg.pinv((self._X.T @ self._X) / n)
         return tau * (1.0 - tau) * sparsity**2 * xtx_inverse / n
 
     def _robust_covariance(self, beta: np.ndarray, n: int, k: int) -> np.ndarray:
-        """Eicker/Huber sandwich for the check-function score.
+        """Koenker's Huber sandwich with the observation-specific density.
 
-        The score is ``psi_tau(u_i) x_i`` with ``psi_tau(u) = tau - 1{u < 0}``.
-        Its expected outer product is ``tau(1-tau) E[x x']``, and the expected
-        Hessian is ``f(0) E[x x']``, so
+        With ``s_i = x_i'(b(tau+h) - b(tau-h)) / (2h)`` and ``f_i = 1/s_i``,
 
-            V = tau(1-tau) / f(0)^2 * (X'X/n)^-1 / n.
+            J = sum_i f_i x_i x_i',   M = sum_i psi_i^2 x_i x_i',
+            V = J^-1 M J^-1,          psi_i = tau - 1{u_i < 0}
 
-        The density is required -- it does not cancel -- so the same fitted
-        sparsity estimate used by the iid case is reused here. Dropping it was a
-        real error: it made the robust standard errors 42% too small
-        (0.0204 vs Stata's .0352 on the reference DGP).
+        Note that the density does **not** cancel between bread and meat: the
+        bread carries ``f_i`` and the meat only ``psi_i^2``.  Dropping ``f``
+        altogether (treating the bread as ``X'X``) makes these standard errors
+        42% too small — 0.0204 against Stata's .0352 on the reference DGP.
+
+        Verification: this reproduces the P8 fixture's ``qreg ..., quantile(.5)
+        vce(robust)`` column exactly (Stata .0352211 / .0336117 / .0359358 on
+        x1 / x2 / _cons).  Two near-misses that look plausible but are *not*
+        what Stata does: using the scalar sparsity at ``xbar`` for every
+        observation returns the iid answer (1% low), and using the scalar
+        density with an ``n/(n-k)`` correction lands 1-2% high.
+
+        Caveat: the fixture only exercises ``vce(robust)`` at ``tau = 0.5``,
+        where ``psi_i^2`` is 0.25 for every ``i`` and ``M`` collapses to
+        ``tau(1-tau) X'X``.  The moment condition above is general, but only that
+        special case is verified against Stata.
         """
 
         tau = self._quantile
-        density = self._fitted_density(n)
-        if density <= 0:
+        h = self._sparsity["bandwidth"]
+        difference = self._sparsity["beta_upper"] - self._sparsity["beta_lower"]
+        density_i = (2.0 * h) / (self._X @ difference)
+
+        if not np.all(np.isfinite(density_i)):
             raise ConsistencyError(
-                "qreg: the fitted density is not positive, so the robust "
-                "covariance is undefined"
+                "qreg: the observation-specific fitted density is not finite, so "
+                "the robust covariance is undefined"
             )
 
+        jacobian = (self._X.T * density_i) @ self._X
         residual = self._y - self._X @ beta
-        score = (tau - (residual < 0).astype(float))[:, None] * self._X
-        meat = (score.T @ score) / n
-        bread = (self._X.T @ self._X) / n
-        bread_inverse = np.linalg.pinv(bread)
-        sandwich = bread_inverse @ meat @ bread_inverse / (n * density**2)
-        # The small-sample scaling Stata applies; with the density restored this
-        # reproduces its vce(robust) column.
-        return sandwich * (n / max(n - k, 1))
+        psi = tau - (residual < 0).astype(float)
+        meat = (self._X.T * psi**2) @ self._X
 
-    def _fitted_density(self, n: int) -> float:
-        """The ``fitted`` sparsity estimate converted to a density."""
+        try:
+            jacobian_inverse = np.linalg.inv(jacobian)
+        except np.linalg.LinAlgError:
+            jacobian_inverse = np.linalg.pinv(jacobian)
+        return jacobian_inverse @ meat @ jacobian_inverse
 
-        tau = self._quantile
-        alpha = 0.05
-        h = _hall_sheather_bandwidth(tau, n, alpha)
-        h = min(h, min(tau - 0.001, 0.999 - tau))
-        if h <= 0:
-            raise ConsistencyError(
-                f"qreg: the Hall-Sheather bandwidth is not positive at quantile "
-                f"{tau}"
-            )
-        xbar = np.mean(self._X, axis=0)
-        beta_upper = solve_lad(self._X, self._y, quantile=float(tau + h))
-        beta_lower = solve_lad(self._X, self._y, quantile=float(tau - h))
-        sparsity = float((xbar @ beta_upper - xbar @ beta_lower) / (2.0 * h))
-        return 1.0 / sparsity if sparsity > 0 else float("nan")
+    def _raw_quantile(self, tau: float) -> float:
+        """The raw (unconditional) ``tau`` quantile of ``y``, as Stata prints it.
+
+        Stata reports this as "Raw sum of deviations ... (about q_v)".  For the
+        P8 fixture ``n * tau`` is an integer at all four quantiles and the
+        printed value is then exactly the ``n*tau``-th order statistic -- not the
+        average of the two neighbours that linear interpolation would give.  The
+        order statistic at 1-based position ``ceil(n*tau)`` reproduces all four
+        printed values.
+
+        Interpolation caveat: every reference case has integer ``n*tau``, so the
+        fixture cannot distinguish this rule from a neighbouring convention.  The
+        choice is also numerically unimportant, because the check-function sum is
+        flat in the centre: ``sum_rdev``, and hence the pseudo-R2, comes out
+        identical whether the raw centre is this order statistic, ``numpy``'s
+        interpolated quantile, or the LAD constant-only estimate.
+        """
+
+        ordered = np.sort(self._y)
+        position = int(np.ceil(ordered.size * tau))
+        return float(ordered[min(max(position, 1), ordered.size) - 1])
 
 
 class RobustRegression:
@@ -455,20 +536,52 @@ class RobustRegression:
         y = self._y[keep]
         self._dropped = ~keep
 
-        beta = self._huber_until_converged(X, y, maxiter=maxiter, strict=strict)
-        beta = self._biweight_until_converged(X, y, beta, maxiter=maxiter, strict=strict)
+        beta = self._two_stage(X, y, maxiter=maxiter, strict=strict)
 
         residual_full = self._y - self._X @ beta
         covariance = self._pseudovalue_covariance(X, y, beta)
+        scale = self._scale(residual_full[keep])
+
+        # Weighted sums of squares, the way Stata reports them for rreg: the
+        # final biweights enter both the model and the residual sum.
+        final_weights = self._biweight_weights(y - X @ beta)
+        weighted_sum = float(np.sum(final_weights))
+        mean_weighted = (
+            float(np.sum(final_weights * y) / weighted_sum)
+            if weighted_sum > 0
+            else float(np.mean(y))
+        )
+        mss = float(np.sum(final_weights * (X @ beta - mean_weighted) ** 2))
+        rss = float(np.sum(final_weights * (y - X @ beta) ** 2))
+        df_r = float(int(keep.sum()) - k)
+        total = mss + rss
+        r2 = mss / total if total > 0 else float("nan")
+        r2_adjusted = (
+            1.0 - (1.0 - r2) * (int(keep.sum()) - 1) / df_r
+            if df_r > 0
+            else float("nan")
+        )
+        rmse = float(np.sqrt(rss / df_r)) if df_r > 0 else float("nan")
+        f_stat = float("nan")
+        if k > 1 and df_r > 0 and rss > 0:
+            f_stat = (mss / (k - 1)) / (rss / df_r)
 
         e: dict[str, Any] = {
             "N": int(keep.sum()),
             "df_m": float(k - 1),
-            "df_r": float(int(keep.sum()) - k),
+            "df_r": df_r,
             "rank": k,
             "dropped": int(self._dropped.sum()),
-            "scale": self._scale(residual_full[keep]),
+            "scale": scale,
             "tune": self._tune,
+            "mss": mss,
+            "rss": rss,
+            "r2": r2,
+            "r2_a": r2_adjusted,
+            "F": f_stat,
+            "rmse": rmse,
+            "huber_c": _HUBER_C,
+            "biweight_c": _BIWEIGHT_C * self._tune / 7.0,
         }
 
         return StataResults(
@@ -527,10 +640,55 @@ class RobustRegression:
         centered = np.abs(residual - np.median(residual))
         return float(np.median(centered) / _MAD_TO_SIGMA)
 
-    def _huber_until_converged(
-        self, X: np.ndarray, y: np.ndarray, *, maxiter: int, strict: bool
+    def _biweight_weights(self, residual: np.ndarray) -> np.ndarray:
+        """The final biweight case weights at ``residual``.
+
+        Used for the reported weighted sums of squares (``e(mss)``/``e(rss)``),
+        which Stata computes from the weights that produced the estimate.
+        """
+
+        scale = self._scale(residual)
+        if scale <= 0:
+            return np.ones_like(residual)
+        c_b = _BIWEIGHT_C * self._tune / 7.0
+        scaled = residual / scale
+        return np.where(np.abs(scaled) <= c_b, (1.0 - (scaled / c_b) ** 2) ** 2, 0.0)
+
+    def _two_stage(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        *,
+        start: np.ndarray | None = None,
+        maxiter: int,
+        strict: bool,
     ) -> np.ndarray:
-        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        """The whole ``[R] rreg`` estimator: Huber to convergence, then biweight.
+
+        ``start`` defaults to the OLS fit.  Passing the full-sample estimate makes
+        the leave-one-out pseudovalue refits converge in a few iterations.
+        """
+
+        beta = self._huber_until_converged(
+            X, y, maxiter=maxiter, strict=strict, start=start
+        )
+        return self._biweight_until_converged(
+            X, y, beta, maxiter=maxiter, strict=strict
+        )
+
+    def _huber_until_converged(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        *,
+        maxiter: int,
+        strict: bool,
+        start: np.ndarray | None = None,
+    ) -> np.ndarray:
+        if start is None:
+            beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        else:
+            beta = np.asarray(start, dtype=float).copy()
         weight = np.ones(y.size, dtype=float)
 
         for _ in range(maxiter):
@@ -606,9 +764,21 @@ class RobustRegression:
     ) -> np.ndarray:
         """Street-Carroll-Ruppert pseudovalues, ``[R] rreg`` Methods and formulas.
 
-        Each observation's pseudovalue is ``n*b - (n-1)*b_{-i}``; their covariance
-        divided by n estimates the estimator's variance without assuming Gaussian
-        errors.
+        Each observation's pseudovalue is ``n*b - (n-1)*b_{-i}``, where ``b_{-i}``
+        re-estimates the *same two-stage Huber-then-biweight estimator* without
+        observation ``i``; their covariance over ``n`` estimates the variance of
+        ``b`` without a Gaussian assumption.
+
+        What the leave-one-out refit must be: a cheaper one-step weighted fit, or
+        a plain LAD refit, is not the estimator whose variance is wanted, and it
+        shows -- the one-step version lands 26-36% away from Stata's standard
+        errors on the P8 fixture, while refitting the two-stage estimator brings
+        all three within 3.4%.  The refits warm-start at the full-sample estimate
+        so each costs a handful of iterations rather than a fresh OLS start.
+
+        Residual gap against Stata: ``_cons`` +0.1%, ``x1`` -2.8%, ``x2`` +3.4%.
+        Stata's own pseudovalue step is not documented in enough detail to close
+        that, so it is reported rather than papered over.
         """
 
         n, k = X.shape
@@ -622,8 +792,10 @@ class RobustRegression:
             mask = np.ones(n, dtype=bool)
             mask[index] = False
             try:
-                leave_one_out = solve_lad_robust(X[mask], y[mask], beta)
-            except np.linalg.LinAlgError:
+                leave_one_out = self._two_stage(
+                    X[mask], y[mask], start=beta, maxiter=50, strict=False
+                )
+            except (np.linalg.LinAlgError, ConsistencyError):
                 leave_one_out = beta
             pseudovalues[index] = n * beta - (n - 1) * leave_one_out
 
@@ -634,28 +806,3 @@ class RobustRegression:
             sigma2 = float(residual @ residual) / max(n - k, 1)
             covariance = sigma2 * np.linalg.pinv(X.T @ X)
         return covariance
-
-
-def solve_lad_robust(
-    X: np.ndarray, y: np.ndarray, start: np.ndarray, *, maxiter: int = 50
-) -> np.ndarray:
-    """Refit a weighted least squares problem for the pseudovalue step.
-
-    Uses the full-sample estimate as the starting value and a short IRLS run, which
-    is enough for a leave-one-out refit and keeps the cost linear in the sample
-    size rather than restarting from OLS each time.
-    """
-
-    beta = np.asarray(start, dtype=float).copy()
-    for _ in range(maxiter):
-        residual = y - X @ beta
-        scale = float(np.median(np.abs(residual - np.median(residual))))
-        floor = max(scale * 1e-8, 1e-12)
-        inside = np.abs(residual) <= 1.0 * max(scale, 1e-12)
-        weight = np.where(inside, 1.0, 1.0 / np.maximum(np.abs(residual), floor))
-        root = np.sqrt(weight)
-        updated, *_ = np.linalg.lstsq(X * root[:, None], y * root, rcond=None)
-        if float(np.max(np.abs(updated - beta))) < 1e-10:
-            return updated
-        beta = updated
-    return beta

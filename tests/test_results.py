@@ -132,8 +132,19 @@ def test_summary_stata_contains_required_labels_and_t_statistics() -> None:
 def test_summary_stata_uses_z_labels_for_z_distribution() -> None:
     text = make_results(dist="z").summary("stata")
 
-    for token in STATA_LABELS:
+    # A z-distribution model reports a Wald chi2 model test, the way Stata's
+    # likelihood and IV estimators do ("Wald chi2(k) = ..." / "Prob > chi2 = ..."),
+    # instead of the F test used by regress.
+    for token in [
+        "Number of obs",
+        "Wald chi2(",
+        "Prob > chi2",
+        "R-squared",
+        "Coef.",
+        "Std. err.",
+    ]:
         assert token in text, f"missing Stata label {token!r}"
+    assert "F(" not in text
     assert "P>|z|" in text
     assert "P>|t|" not in text
 

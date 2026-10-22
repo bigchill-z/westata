@@ -178,11 +178,25 @@ def _stata_summary(result: Any) -> str:
         return "." if value is None or not np.isfinite(value) else f"{value:.{decimals}f}"
 
     lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
-    lines.append(
-        f"{'F(' + _df_label(df_model) + ', ' + _df_label(df_resid) + ')':<21}"
-        f" = {_fixed(fvalue, 2):>10}"
-    )
-    lines.append(f"{'Prob > F':<21} = {_fixed(p_f, 4):>10}")
+    if dist == "z":
+        # Stata's likelihood/IV estimators print a Wald chi2 model test rather
+        # than an F test (e.g. ``ivregress``: "Wald chi2(2) = 90.76").
+        chi2 = _e_float(result, "chi2")
+        if not np.isfinite(chi2) and np.isfinite(fvalue):
+            chi2 = fvalue * df_model
+        p_chi2 = _e_float(result, "p")
+        if not np.isfinite(p_chi2) and np.isfinite(chi2) and df_model > 0:
+            p_chi2 = float(stats.chi2.sf(chi2, df_model))
+        lines.append(
+            f"{'Wald chi2(' + _df_label(df_model) + ')':<21} = {_fixed(chi2, 2):>10}"
+        )
+        lines.append(f"{'Prob > chi2':<21} = {_fixed(p_chi2, 4):>10}")
+    else:
+        lines.append(
+            f"{'F(' + _df_label(df_model) + ', ' + _df_label(df_resid) + ')':<21}"
+            f" = {_fixed(fvalue, 2):>10}"
+        )
+        lines.append(f"{'Prob > F':<21} = {_fixed(p_f, 4):>10}")
     lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
     lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
     lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")

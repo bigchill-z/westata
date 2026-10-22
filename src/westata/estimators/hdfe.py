@@ -229,8 +229,8 @@ class FEOLS:
         ----------
         cov_type:
             ``None`` selects the Stata default (``"nonrobust"``, or ``"HC1"``
-            for a ``pweight`` model), ``"nonrobust"``, ``"HC0"``, ``"HC1"``,
-            ``"HC2"``, ``"HC3"`` or ``"cluster"``.
+            for a ``pweight`` model).  Supported: ``"nonrobust"``, ``"HC0"``,
+            ``"HC1"``, ``"cluster"``; see :data:`SUPPORTED_COV_TYPES`.
         cov_kwds:
             ``{"cluster": <name | list of names | array>}`` for
             ``cov_type="cluster"``; ``{"groups": ...}`` is accepted as an alias.
@@ -388,7 +388,7 @@ class FEOLS:
             # No small-sample factor by definition; the HC0 variance is the raw
             # sandwich, so the k_adj switch is forced off for this cov_type.
             return "hetero"
-        # HC1/HC2/HC3 map onto PyFixest's heteroskedastic variants.
+        # HC1 maps onto PyFixest's "HC1" heteroskedastic variant.
         return cov_type
 
     @staticmethod
@@ -460,11 +460,11 @@ class FEOLS:
             warnings.warn(
                 "reghdfe: "
                 + ", ".join(absorbed)
-                + f" dropped from the estimation sample because "
+                + " dropped from the model because "
                 + ("it is" if len(absorbed) == 1 else "they are")
                 + " collinear with the absorbed fixed effects or with another "
-                "regressor; the estimate is still reported but has no "
-                "coefficient",
+                "regressor; the reported coefficients are conditioned on this "
+                "omission",
                 RuntimeWarning,
                 stacklevel=3,
             )
@@ -482,7 +482,7 @@ class FEOLS:
         kept_weights = self._kept_weights(model, spec, nobs)
         n_effective = self._effective_n(spec, kept_weights, nobs)
 
-        rank = int(round(float(getattr(model, "_df_k", nobs - float(model._df_t)))))
+        rank = self._rank(model, nobs)
         # `results.df_resid` follows the reference distribution (G - 1 under
         # clustering, matching westata's OLS); the *residual* df used by rmse and
         # the adjusted R^2 stays N - K, as in Stata's e(df_r).
@@ -545,6 +545,30 @@ class FEOLS:
         # Reported, not hidden: absorbed regressors are part of the result.
         results.absorbed = absorbed
         return results
+
+    @staticmethod
+    def _rank(model: Any, nobs: int) -> int:
+        """Estimated-parameter count ``K`` used by the ``(N-1)/(N-K)`` factor.
+
+        This is PyFixest's ``_df_k``: reported regressors plus the absorbed
+        fixed-effect parameters that are *not* nested in the cluster variable.
+        It must not be confused with ``nobs - _df_t``: under clustering
+        ``_df_t`` is ``G - 1``, which has nothing to do with ``K``.
+        """
+
+        value = getattr(model, "_df_k", None)
+        if value is None:
+            raise ConsistencyError(
+                "reghdfe: PyFixest did not record the degrees-of-freedom count "
+                "(_df_k); westata cannot reconstruct e(rank) safely"
+            )
+        rank = int(round(float(value)))
+        if not 0 < rank <= nobs:
+            raise ConsistencyError(
+                f"reghdfe: PyFixest reported an impossible parameter count {rank} "
+                f"for {nobs} observations"
+            )
+        return rank
 
     @staticmethod
     def _wald_f(params: np.ndarray, cov: np.ndarray, tested: list[int]) -> float:

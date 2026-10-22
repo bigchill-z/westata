@@ -15,3 +15,46 @@
   verified_by: lead
   date: 2026-10-22
   notes: "E3 pending an R (estimatr se_type='stata') cross-check on the same dataset."
+
+- command: ivregress 2sls
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "westata IV2SLS vs linearmodels.iv.IV2SLS (params, unadjusted/HC1/cluster SE) at 1e-16"
+    - type: published_output
+      ref: "Stata [R] ivregress Example 1 (hsng, n=50): table reports z / P>|z| and Wald chi2(2); westata uses dist='z' accordingly"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "E2 blocked: hsng.dta not yet wired into the fixture set."
+
+- command: ivregress liml
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "westata IVLIML vs linearmodels.iv.IVLIML at machine precision"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "e(ll) is the Gaussian likelihood at the estimates, not Stata's concentrated LIML likelihood."
+
+- command: ivregress gmm
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "westata IVGMM vs linearmodels.iv.IVGMM at machine precision"
+  verified_by: lead
+  date: 2026-10-22
+
+- command: reghdfe
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: statsmodels_reference
+      ref: "FEOLS vs statsmodels OLS with explicit dummies (one-way FE) and vs two-way demeaned OLS at 1e-10"
+    - type: invariant
+      ref: "FEOLS with no fixed effects must reproduce westata OLS exactly"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "ssc defaults follow reghdfe (k_adj=True, G_adj=True, G_df='min'); not yet contrasted with real reghdfe output."

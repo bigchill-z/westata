@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**39 条命令条目**（见 `tests/conformance/registry.yml`），其中 31 条 E3
+- 已实现：**47 条命令条目**（见 `tests/conformance/registry.yml`），其中 36 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -78,24 +78,25 @@
 
 ## 3. 估计命令缺口
 
-### 3.1 受限因变量（P6）
+### 3.1 受限因变量（P6 已完成）
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `heckman` | ⬜ | Heckman 选择模型（两步 + MLE） |
-| `truncreg` | ⬜ | 截断回归 |
-| `intreg` | ⬜ | 区间回归 |
-| `etregress` | ⬜ | 内生处理效应 |
-| `treatreg` | ⬜ | `etregress` 的旧名 |
+| `truncreg` | ✅ E3 | 截断回归，自研似然 |
+| `intreg` | ✅ E3 | 区间回归，报 `/lnsigma` 如 Stata |
+| `heckman` | ⚠️ E2 | **仅两步法**；标准误**未做 Heckman 校正**（`e(se_corrected)=0`）；`rho` 是插件估计而非 ML |
+| `etregress` | ⚠️ E1 | 仅控制函数法，未与 Stata 对拍 |
+| `treatreg` | ❌ | `etregress` 的旧名，不单独实现 |
 
-### 3.2 计数模型（P7）
+### 3.2 计数模型（P7 已完成）
 
-| Stata | 状态 |
-|---|---|
-| `zip` / `zinb` | ⬜ 零膨胀 |
-| `ztp` / `ztnb` | ⬜ 零截断 |
-| `tpoisson` / `tnbreg` | ⬜ 截断计数 |
-| `gnbreg` | ⬜ 广义负二项 |
+| Stata | 状态 | 说明 |
+|---|---|---|
+| `zip` | ✅ E3 | 四个系数与 Stata 精确一致 |
+| `zinb` | ⚠️ E2 | 收敛且参数有限；`/lnalpha` |
+| `ztp` / `tpoisson` | ✅ E3 | 自研零截断似然 |
+| `tnbreg` / `ztnb` | ✅ E3 | 自研截断负二项 |
+| `gnbreg` | ⬜ | 广义负二项（方差方程含协变量） |
 
 ### 3.3 分位数与稳健回归（P8）
 
@@ -319,8 +320,8 @@
 | 批次 | 内容 | 工时 | 状态 |
 |---|---|---|---|
 | P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict stdp`） | 2–3 周 | **已完成** |
-| P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | 计划 |
-| P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`/`gnbreg`） | 2–3 周 | 计划 |
+| P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | **已完成** |
+| P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`） | 2–3 周 | **已完成**（`gnbreg` 除外） |
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | 计划 |
 | P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | 计划 |
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`nlsur`/`gmm`/`eivreg`/`frontier`） | 3–4 周 | 计划 |

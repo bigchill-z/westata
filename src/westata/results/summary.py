@@ -236,18 +236,35 @@ def _statsmodels_summary(result: Any) -> str:
     model_name = getattr(result, "model_name", "") or "westata results"
     cov_type = getattr(result, "cov_type", "nonrobust")
 
-    lines: list[str] = []
-    lines.append(model_name)
-    lines.append(f"{'Covariance type:':<21}{cov_type}")
-    lines.append("=" * 78)
-    lines.append(f"{'Number of obs:':<21}{nobs}")
-    lines.append(f"{'Df residuals:':<21}{_df_label(df_resid)}")
-    lines.append(f"{'Df model:':<21}{_df_label(df_model)}")
-    lines.append(f"{'R-squared:':<21}{_num(rsquared, 7)}")
-    lines.append(f"{'Adj. R-squared:':<21}{_num(rsquared_adj, 7)}")
-    lines.append(f"{'Log-likelihood:':<21}{_num(llf, 7)}")
-    lines.append(f"{'AIC:':<21}{_num(aic, 7)}")
-    lines.append(f"{'BIC:':<21}{_num(bic, 7)}")
+    fvalue = _e_float(result, "F")
+
+    title = f"{model_name} Results"
+    lines: list[str] = [f"{title:^78}", "=" * 78]
+
+    left_rows = [
+        ("No. Observations:", _df_label(nobs)),
+        ("Df Residuals:", _df_label(df_resid)),
+        ("Df Model:", _df_label(df_model)),
+        ("Covariance Type:", cov_type),
+    ]
+    right_rows = [
+        ("R-squared:", _num(rsquared, 4)),
+        ("Adj. R-squared:", _num(rsquared_adj, 4)),
+        ("F-statistic:", _num(fvalue, 4)),
+        ("Log-Likelihood:", _num(llf, 5)),
+        ("AIC:", _num(aic, 4)),
+        ("BIC:", _num(bic, 4)),
+    ]
+    for index in range(max(len(left_rows), len(right_rows))):
+        left_text = ""
+        if index < len(left_rows):
+            left_label, left_value = left_rows[index]
+            left_text = f"{left_label:<20}{left_value:>10}"
+        right_text = ""
+        if index < len(right_rows):
+            right_label, right_value = right_rows[index]
+            right_text = f"{right_label:<16}{right_value:>11}"
+        lines.append(f"{left_text:<36}{right_text}".rstrip())
     lines.append("=" * 78)
 
     name_width = max([8, *(len(name) for name in names)])

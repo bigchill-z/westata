@@ -159,6 +159,11 @@ class OLS:
             if has_intercept and df_model > 0 and r2 < 1.0
             else float("nan")
         )
+        # Stata e(aic)/e(bic) for regress use the Gaussian likelihood with the
+        # MLE of sigma; statsmodels' OLS estimates sigma by sqrt(RSS/df_resid),
+        # so report the Stata-consistent values here.
+        aic = float(n * np.log(rss / n) + 2 * k)
+        bic = float(n * np.log(rss / n) + k * np.log(n))
 
         e: dict[str, Any] = {
             "N": n,
@@ -171,6 +176,8 @@ class OLS:
             "F": fvalue,
             "ll": llf,
             "rank": k,
+            "aic": aic,
+            "bic": bic,
         }
 
         return StataResults(

@@ -17,6 +17,14 @@ westata                    Stata
 =========================  ========================
 """
 
+from westata.estimators.discrete import (
+    Logit,
+    NegativeBinomial,
+    OrderedLogit,
+    OrderedProbit,
+    Poisson,
+    Probit,
+)
 from westata.estimators.hdfe import FEOLS
 from westata.estimators.iv import IV2SLS, IVGMM, IVLIML
 from westata.estimators.linear import OLS
@@ -37,4 +45,10 @@ __all__ = [
     "RandomEffects",
     "BetweenOLS",
     "FirstDifferenceOLS",
+    "Logit",
+    "Probit",
+    "Poisson",
+    "NegativeBinomial",
+    "OrderedLogit",
+    "OrderedProbit",
 ]

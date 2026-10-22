@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    XtGls,
+    XtIvreg,
+    XtPcse,
+    XtUnitroot,
     Bsqreg,
     Sqreg,
     QuantileRegression,
@@ -74,6 +78,10 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "XtUnitroot",
+    "XtPcse",
+    "XtGls",
+    "XtIvreg",
     "Bsqreg",
     "Sqreg",
     "RobustRegression",

@@ -40,6 +40,7 @@ from westata.estimators.limited import (
     Truncreg,
 )
 from westata.estimators.linear import OLS
+from westata.estimators.panel_iv import XtGls, XtIvreg, XtPcse, XtUnitroot
 from westata.estimators.quantile import QuantileRegression, RobustRegression
 from westata.estimators.quantile_boot import Bsqreg, Sqreg
 from westata.estimators.panel import (
@@ -59,6 +60,10 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "XtUnitroot",
+    "XtPcse",
+    "XtGls",
+    "XtIvreg",
     "Bsqreg",
     "Sqreg",
     "RobustRegression",

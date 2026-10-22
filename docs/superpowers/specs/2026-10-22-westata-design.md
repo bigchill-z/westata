@@ -113,7 +113,7 @@ src/westata/
 │   ├── panel.py         # PanelData：entity/time、组内 lag/lead/diff
 │   └── timeseries.py    # TSData：频率、tsset 语义、时间算子
 ├── formula/
-│   ├── parse.py         # patsy/formulaic 集成
+│   ├── parse.py         # patsy 集成
 │   ├── factor.py        # C(x, base=)、交互展开、共线 omit
 │   └── transform.py     # L./F./D. 算子 → 显式列
 ├── vce/
@@ -168,7 +168,7 @@ src/westata/
 ### 7.2 formula
 
 - 语法与 statsmodels 一致：`y ~ x1 + x2 + C(region) + x1:x2`。
-- 使用 `formulaic` 作为解析引擎（比 patsy 更活跃、性能更好），对外暴露与 patsy 兼容的表达式子集。
+- 使用 `patsy` 作为解析引擎（statsmodels 自带依赖），确保设计矩阵与 statsmodels 完全一致；`formulaic` 作为 P1 的可选加速引擎，不在 P0 引入。
 - `C(x, base=...)` 指定参照组；默认规则对齐 Stata `i.` 的 base level 规则（数值取最小值、字符串按排序），实现时以证据表为准。
 - 共线列自动 omit，并在 `summary` 中标注 `(omitted)`，不静默丢弃。
 - `transform.py`：`L(x)`、`F(x)`、`D(x)` 生成显式列；面板数据下自动按 entity 分组。
@@ -420,7 +420,7 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 | linearmodels | IV/面板 | BSD-3 |
 | pyfixest | HDFE | MIT |
 | arch | GARCH/单位根 | NCSA |
-| formulaic | 公式解析 | MIT |
+| patsy | 公式解析（statsmodels 自带） | BSD-2 |
 | pyreadstat | 读 `.dta` | Apache-2.0 |
 | rpy2（可选） | 交叉验证 | GPL-2（仅测试环境使用，不随发布分发） |
 

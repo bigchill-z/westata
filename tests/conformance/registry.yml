@@ -225,6 +225,91 @@
   date: 2026-10-23
   notes: "stdp = sqrt(x'Vx), stdf = sqrt(x'Vx + sigma^2) with sigma^2 from e(rmse)^2 or rss/N. stdf is offered only for the linear families: verified that Stata's logit and poisson reject predict, stdf with r(198) 'option stdf not allowed', so westata refuses it too instead of returning a number under a name Stata will not produce."
 
+
+# --- P6: limited dependent variables ---------------------------------------
+
+- command: truncreg
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "truncreg y x1 x2, ll(0) on 582 truncated observations: Stata x1 1.568894, x2 -.5033393, _cons .9280214, /sigma .8153158"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Self-implemented truncated likelihood; verified against Stata's coefficients and scale. With very wide limits it reduces to OLS, which is pinned by a unit test."
+
+- command: intreg
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "intreg lo hi x1 on 600 interval-censored observations: Stata x1 1.197311, _cons 1.94128, /lnsigma -.0827015"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Reports /lnsigma like Stata, not /sigma. With point intervals (lo == hi == y) it reduces to OLS."
+
+- command: heckman
+  level: E2
+  tolerance: 2.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111, y:_cons 1.026726, selected:z .8021853"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "TWO-STEP ONLY, and the standard errors are NOT Heckman-corrected: the reported covariance is the OLS covariance of the augmented regression, so e(se_corrected) = 0. Stata's default heckman is ML and its standard errors differ. Coefficients match Stata's ML to 2e-2. rho is a plug-in correlation here, not the ML estimate, so it is not compared. method='ml' raises UnsupportedError rather than approximating."
+
+- command: etregress
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Control-function estimator runs and produces finite parameters"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Control function only; no Stata comparison yet. method='ml' raises UnsupportedError."
+
+# --- P7: count model extensions --------------------------------------------
+
+- command: zip
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "zip y x1, inflate(x1) on 1200 observations with 25% structural zeros: Stata x1 .559456, _cons .4039659, inflate x1 .0033665, inflate _cons -1.016455"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "All four coefficients match Stata to 1e-4. With inflate=None the model reduces exactly to Poisson, which is pinned by a unit test."
+
+- command: zinb
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "zinb y x1, inflate(_cons) on 1200 overdispersed observations (captured output in p6p7_outputs.txt)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Converges and produces finite parameters; the dispersion is reported as /lnalpha."
+
+- command: ztp
+  level: E3
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "ztp y x1 on 660 positive counts: Stata x1 .5415945, _cons .4189287"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Self-implemented zero-truncated likelihood; log-likelihood is also asserted against the closed form."
+
+- command: tnbreg
+  level: E3
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "tnbreg y x1, ll(0) on 802 positive counts: Stata x1 .6035713"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Stata requires ll() strictly below the minimum observed y; ll(1) on data whose minimum is 1 returns r(459), which westata replicates as a ConsistencyError."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

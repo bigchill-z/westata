@@ -27,6 +27,18 @@ from westata.estimators.discrete import (
 )
 from westata.estimators.hdfe import FEOLS
 from westata.estimators.iv import IV2SLS, IVGMM, IVLIML
+from westata.estimators.counts import (
+    TruncatedNegativeBinomial,
+    TruncatedPoisson,
+    ZeroInflatedNegativeBinomial,
+    ZeroInflatedPoisson,
+)
+from westata.estimators.limited import (
+    Etregress,
+    Heckman,
+    Intreg,
+    Truncreg,
+)
 from westata.estimators.linear import OLS
 from westata.estimators.panel import (
     BetweenOLS,
@@ -45,6 +57,14 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "TruncatedNegativeBinomial",
+    "TruncatedPoisson",
+    "ZeroInflatedNegativeBinomial",
+    "ZeroInflatedPoisson",
+    "Etregress",
+    "Heckman",
+    "Intreg",
+    "Truncreg",
     "OLS",
     "IV2SLS",
     "IVLIML",

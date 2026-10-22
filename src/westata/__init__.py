@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    Etregress,
+    Heckman,
+    Intreg,
+    Truncreg,
+    TruncatedNegativeBinomial,
+    TruncatedPoisson,
+    ZeroInflatedNegativeBinomial,
+    ZeroInflatedPoisson,
     ARIMA,
     FEOLS,
     GARCH,
@@ -62,6 +70,14 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "TruncatedNegativeBinomial",
+    "TruncatedPoisson",
+    "ZeroInflatedNegativeBinomial",
+    "ZeroInflatedPoisson",
+    "Etregress",
+    "Heckman",
+    "Intreg",
+    "Truncreg",
     "HausmanResult",
     "LRTestResult",
     "pwcompare",

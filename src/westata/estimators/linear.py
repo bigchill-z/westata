@@ -12,7 +12,8 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from westata.errors import ConsistencyError, UnsupportedError
+from westata.data.weights import normalize_weights
+from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.formula.factor import build_design
 from westata.protocols import SSC
 from westata.results.base import StataResults
@@ -62,11 +63,23 @@ class OLS:
             raise ValueError(
                 f"endog has {self._y.shape[0]} rows but exog has {self._X.shape[0]} rows"
             )
+        self._weight_spec = None
         if weights is not None:
-            raise UnsupportedError(
-                "weights are implemented in P1; pass weights=None for now"
-            )
-        self._weight_type = weight_type
+            if weight_type is None:
+                raise WeightError(
+                    "weights were supplied without weight_type; specify one of "
+                    "'fweight', 'aweight', 'pweight', 'iweight' (Stata never "
+                    "guesses the weight type)"
+                )
+            spec = normalize_weights(weights, weight_type)
+            if spec.weights.shape[0] != self._X.shape[0]:
+                raise WeightError(
+                    f"weights have {spec.weights.shape[0]} entries but the data "
+                    f"have {self._X.shape[0]} rows"
+                )
+            self._weight_spec = spec
+        elif weight_type is not None:
+            raise WeightError("weight_type was supplied without weights")
 
     @classmethod
     def from_formula(
@@ -103,11 +116,22 @@ class OLS:
     # ------------------------------------------------------------------ fit
     def fit(
         self,
-        cov_type: str = "nonrobust",
+        cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
     ) -> StataResults:
-        """Estimate the model and return a Stata-conformant result object."""
+        """Estimate the model and return a Stata-conformant result object.
+
+        Parameters
+        ----------
+        cov_type:
+            ``None`` selects the Stata default for this model: ``"nonrobust"``
+            for unweighted/aweighted/fweighted/iweighted OLS, ``"HC1"`` when the
+            model carries ``pweight`` (Stata: ``[pw=w]`` implies ``vce(robust)``).
+            Passing ``"nonrobust"`` explicitly for a pweighted model raises
+            :class:`ConsistencyError` because Stata cannot express that
+            combination either.
+        """
 
         X, y = self._X, self._y
         n, k = X.shape
@@ -128,30 +152,69 @@ class OLS:
                 f"(rank {rank} < {k} columns); drop collinear regressors"
             )
 
-        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        spec = self._weight_spec
+        if spec is None:
+            w = np.ones(n, dtype=float)
+            effective_n = float(n)
+        else:
+            w = spec.weights
+            effective_n = float(spec.effective_n)
+
+        if cov_type is None:
+            effective_cov_type = "HC1" if (spec is not None and spec.implies_robust) else "nonrobust"
+        else:
+            effective_cov_type = cov_type
+            if (
+                spec is not None
+                and spec.implies_robust
+                and str(cov_type).strip().lower() == "nonrobust"
+            ):
+                raise ConsistencyError(
+                    "pweight implies vce(robust): Stata's 'regress y x [pw=w]' is "
+                    "identical to adding vce(robust), so a nonrobust covariance "
+                    "cannot be requested for a pweighted model"
+                )
+
+        # Weighted least squares via the square-root transform keeps a single
+        # well-conditioned least-squares solve for both weighted and unweighted
+        # models and matches Stata's (X'WX)^-1 X'Wy exactly.
+        sw = np.sqrt(w)
+        Xw = X * sw[:, None]
+        yw = y * sw
+        beta, *_ = np.linalg.lstsq(Xw, yw, rcond=None)
         resid = y - X @ beta
-        bread = np.linalg.inv(X.T @ X)
-        df_resid = n - k
+
+        df_resid = effective_n - k
+        if df_resid <= 0:
+            raise ConsistencyError(
+                f"regress: {effective_n:g} effective observations but {k} "
+                "parameters; the model is not identified"
+            )
 
         cov, df_t = compute_cov(
-            X,
-            resid,
-            cov_type=cov_type,
+            Xw,
+            resid * sw,
+            cov_type=effective_cov_type,
             cov_kwds=cov_kwds,
             ssc=ssc,
             nobs=n,
             df_resid=df_resid,
         )
 
-        rss = float(resid @ resid)
-        tss = float(((y - y.mean()) ** 2).sum())
+        rss = float((w * resid**2).sum())
+        ybar = float((w * y).sum() / w.sum())
+        tss = float((w * (y - ybar) ** 2).sum())
         r2 = 1.0 - rss / tss if tss > 0 else float("nan")
         r2_adj = (
-            1.0 - (1.0 - r2) * (n - 1) / (n - k) if np.isfinite(r2) else float("nan")
+            1.0 - (1.0 - r2) * (effective_n - 1) / df_resid
+            if np.isfinite(r2)
+            else float("nan")
         )
         sigma2 = rss / df_resid
         rmse = float(np.sqrt(sigma2))
-        llf = float(-0.5 * n * (np.log(2 * np.pi) + np.log(rss / n) + 1.0))
+        llf = float(
+            -0.5 * effective_n * (np.log(2 * np.pi) + np.log(rss / effective_n) + 1.0)
+        )
         has_intercept = any(name == "Intercept" for name in self._param_names)
         df_model = k - 1 if has_intercept else k
         fvalue = (
@@ -162,11 +225,11 @@ class OLS:
         # Stata e(aic)/e(bic) for regress use the Gaussian likelihood with the
         # MLE of sigma; statsmodels' OLS estimates sigma by sqrt(RSS/df_resid),
         # so report the Stata-consistent values here.
-        aic = float(n * np.log(rss / n) + 2 * k)
-        bic = float(n * np.log(rss / n) + k * np.log(n))
+        aic = float(effective_n * np.log(rss / effective_n) + 2 * k)
+        bic = float(effective_n * np.log(rss / effective_n) + k * np.log(effective_n))
 
         e: dict[str, Any] = {
-            "N": n,
+            "N": effective_n,
             "df_m": df_model,
             "df_r": df_resid,
             "r2": r2,
@@ -186,11 +249,11 @@ class OLS:
             cov=cov,
             resid=resid,
             fittedvalues=X @ beta,
-            nobs=n,
+            nobs=int(n),
             df_resid=df_t,
             df_model=df_model,
             dist="t",
             model_name="regress",
-            cov_type=cov_type,
+            cov_type=effective_cov_type,
             e=e,
         )

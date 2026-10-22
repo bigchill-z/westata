@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import statsmodels.api as sm
 
-from westata.errors import ConsistencyError, UnsupportedError
+from westata.errors import ConsistencyError, WeightError
 from westata.estimators.linear import OLS
 
 
@@ -77,7 +77,9 @@ def test_rank_deficient_raises_consistency_error():
         OLS.from_formula("y ~ x1 + x1_copy", df).fit()
 
 
-def test_weights_are_rejected_in_p0():
+def test_weights_require_weight_type():
     df = _data()
-    with pytest.raises(UnsupportedError):
+    # Stata never guesses a weight type; P1 implements the four types and
+    # rejects a bare weight vector so a silent default cannot change the VCE.
+    with pytest.raises(WeightError):
         OLS.from_formula("y ~ x1", df, weights=df["x1"])

@@ -98,3 +98,100 @@
       ref: "FirstDifferenceOLS vs hand-coded first-difference OLS without constant at 1e-10"
   verified_by: lead
   date: 2026-10-22
+
+- command: test
+  level: E2
+  tolerance: 1.0e-10
+  sources:
+    - type: published_output
+      ref: "Stata [R] regress on auto.dta prints F(2, 71) = 69.75 for the joint test of weight and foreign; westata test('weight foreign') reproduces 69.75 exactly"
+      dataset: auto.dta
+    - type: invariant
+      ref: "For q=1 the F statistic equals the squared coefficient t statistic"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Uses the [R] test formula W=(Rb-r)'(RVR')^-1(Rb-r), with F=W/q for t models and chi2(q) for z models."
+
+- command: lincom
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: invariant
+      ref: "Single-coefficient lincom equals the model's own coefficient, standard error, statistic and p-value exactly"
+    - type: published_output
+      ref: "Stata [R] lincom: estimate Lb, variance LVL', t with e(df_r), plus level() and eform options"
+  verified_by: lead
+  date: 2026-10-22
+
+- command: etable
+  level: E1
+  tolerance: 1.0e-15
+  sources:
+    - type: invariant
+      ref: "Coefficient and standard-error rows come from params/bse unchanged; the Observations row equals e(N)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Presentation layer; correctness means the numbers are the results object's, unaltered. The tolerance is machine epsilon because the values must match exactly."
+
+- command: logit
+  level: E1
+  tolerance: 1.0e-8
+  sources:
+    - type: statsmodels_reference
+      ref: "westata Logit vs statsmodels Logit (params 1e-8, bse 1e-6); both use observed information, like Stata's default"
+    - type: invariant
+      ref: "z-distribution p-values and McFadden pseudo R2 in e(r2_p)"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "E2 blocked: needs a published logit output on a public dataset."
+
+- command: probit
+  level: E1
+  tolerance: 1.0e-8
+  sources:
+    - type: statsmodels_reference
+      ref: "westata Probit vs statsmodels Probit at 1e-8"
+  verified_by: lead
+  date: 2026-10-22
+
+- command: poisson
+  level: E1
+  tolerance: 1.0e-8
+  sources:
+    - type: statsmodels_reference
+      ref: "westata Poisson vs statsmodels Poisson for both nonrobust and HC0 standard errors"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "statsmodels' Poisson covariance rejects cov_kwds; handled explicitly rather than suppressed."
+
+- command: nbreg
+  level: E1
+  tolerance: 1.0e-6
+  sources:
+    - type: invariant
+      ref: "Dispersion parameter named /lnalpha like Stata; bfgs is required because newton diverges"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Weakest evidence in the discrete family; no Stata output to contrast."
+
+- command: ologit / oprobit
+  level: E1
+  tolerance: 1.0e-6
+  sources:
+    - type: invariant
+      ref: "Cut points named /cut1../cutk like Stata; the Intercept is dropped because cuts identify location"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "Robust VCE is not implemented for ordered models and raises rather than approximating."
+
+- command: tobit
+  level: E1
+  tolerance: 1.0e-10
+  sources:
+    - type: invariant
+      ref: "Log-likelihood matches an independent implementation of the [R] tobit formula at 1e-12"
+    - type: statsmodels_reference
+      ref: "Recovers a known DGP (slopes within 0.08, sigma within 0.06); the Tobit slope exceeds the censored-data OLS slope"
+  verified_by: lead
+  date: 2026-10-22
+  notes: "E2 blocked: gpa.dta appears in [R] tobit Example 1 but the Stata Press server would not serve it. Self-implemented, so this is the highest-risk estimator in the package."

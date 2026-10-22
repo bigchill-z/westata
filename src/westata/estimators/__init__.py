@@ -34,6 +34,7 @@ from westata.estimators.panel import (
     PanelOLS,
     RandomEffects,
 )
+from westata.estimators.tobit import Tobit
 
 __all__ = [
     "OLS",
@@ -51,4 +52,5 @@ __all__ = [
     "NegativeBinomial",
     "OrderedLogit",
     "OrderedProbit",
+    "Tobit",
 ]

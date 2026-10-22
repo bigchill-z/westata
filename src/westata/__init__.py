@@ -19,6 +19,7 @@ from westata.estimators import (
     Poisson,
     Probit,
     RandomEffects,
+    Tobit,
 )
 from westata.errors import (
     ConsistencyError,
@@ -59,6 +60,7 @@ __all__ = [
     "NegativeBinomial",
     "OrderedLogit",
     "OrderedProbit",
+    "Tobit",
     "WaldTest",
     "LincomResult",
     "etable",

@@ -1,10 +1,4 @@
-"""westata: Stata-conformant econometrics with a statsmodels-style API.
-
-The public surface mirrors statsmodels' modelling style (``Model.from_formula``
-then ``.fit()``), while the numerical behaviour targets the corresponding Stata
-command.  See ``docs/superpowers/specs/`` for the conformance levels and the
-evidence registry in ``tests/conformance/registry.yml``.
-"""
+"""Export postestimation and report helpers from the top-level package."""
 
 from __future__ import annotations
 
@@ -23,11 +17,14 @@ from westata.estimators import (
 from westata.errors import (
     ConsistencyError,
     ConvergenceError,
+    FormulaError,
     UnsupportedError,
     WeightError,
     WestataError,
 )
+from westata.postestimation import LincomResult, WaldTest
 from westata.protocols import SSC
+from westata.report import etable, to_latex, to_markdown
 
 __version__ = "0.0.1"
 
@@ -50,12 +47,18 @@ __all__ = [
     "RandomEffects",
     "BetweenOLS",
     "FirstDifferenceOLS",
+    "WaldTest",
+    "LincomResult",
+    "etable",
+    "to_latex",
+    "to_markdown",
     "WEIGHT_TYPES",
     "WeightSpec",
     "normalize_weights",
     "WestataError",
     "ConsistencyError",
     "ConvergenceError",
+    "FormulaError",
     "UnsupportedError",
     "WeightError",
     "__version__",

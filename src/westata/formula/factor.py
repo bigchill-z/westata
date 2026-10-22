@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import patsy
 
+from westata.errors import FormulaError
+
 # ``C(<plain data expression>, base=<string literal or number>)`` ->
 # ``C(<data>, Treatment(reference=<literal>))``.  The reference literal is
 # captured verbatim (quotes included) so that the resulting patsy column names
@@ -90,12 +92,21 @@ def build_design(
     an empty sample leak into estimation.
     """
     if len(data) == 0:
-        raise patsy.PatsyError(
+        raise FormulaError(
             "cannot build a design matrix from an empty DataFrame"
         )
 
     translated = _translate_base_terms(formula)
-    _, exog = patsy.dmatrices(translated, data, return_type="dataframe")
+    try:
+        _, exog = patsy.dmatrices(translated, data, return_type="dataframe")
+    except patsy.PatsyError as exc:
+        # Wrap the error so the traceback does not retain patsy's evaluation
+        # namespace (see FormulaError's docstring), and add the available
+        # column names to make the mistake obvious.
+        raise FormulaError(
+            f"cannot evaluate formula {formula!r}: {exc}\n"
+            f"available columns: {list(data.columns)}"
+        ) from None
 
     X = np.asarray(exog, dtype=float)
     column_names = list(exog.design_info.column_names)

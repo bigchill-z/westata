@@ -14,6 +14,7 @@ import patsy
 import pytest
 import statsmodels.formula.api as smf
 
+from westata.errors import FormulaError
 from westata.formula import build_design
 
 
@@ -177,15 +178,19 @@ def test_empty_data_raises() -> None:
             "x": pd.Series(dtype=float),
         }
     )
-    with pytest.raises(patsy.PatsyError):
+    with pytest.raises(FormulaError, match="empty"):
         build_design("y ~ x", df)
 
 
 def test_invalid_formula_raises() -> None:
-    with pytest.raises(patsy.PatsyError):
+    with pytest.raises(FormulaError, match="cannot evaluate"):
         build_design("y ~ x +", _factor_frame())
 
 
-def test_unknown_column_raises() -> None:
-    with pytest.raises(patsy.PatsyError):
+def test_unknown_column_raises_and_lists_available_columns() -> None:
+    # A missing column must produce a readable message naming the columns that
+    # do exist; the wrapped patsy error alone is hard to act on.
+    with pytest.raises(FormulaError) as excinfo:
         build_design("y ~ not_a_column", _factor_frame())
+    assert "not_a_column" in str(excinfo.value)
+    assert "available columns" in str(excinfo.value)

@@ -29,5 +29,17 @@ class WeightError(WestataError):
     """Raised for missing/unsupported/ambiguous Stata weight specifications."""
 
 
+class FormulaError(WestataError, ValueError):
+    """Raised when a model formula cannot be evaluated on the given data.
+
+    This deliberately wraps ``patsy.PatsyError``.  Patsy evaluates formulas
+    through its own namespace object held in the traceback frame, and a raw
+    ``PatsyError`` therefore keeps that frame alive; several exception
+    formatters (including pytest's) then fail while introspecting it and the
+    user sees an internal rendering error instead of the actual message.
+    Re-raising a plain exception with the original text keeps the diagnostic.
+    """
+
+
 class UnsupportedError(WestataError, NotImplementedError):
     """Raised when a capability exists in Stata but is not implemented yet."""

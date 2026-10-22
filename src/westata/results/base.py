@@ -314,6 +314,41 @@ class StataResults:
         return self._e_scalar("bic")
 
     # ------------------------------------------------------------------
+    # Postestimation
+    # ------------------------------------------------------------------
+    def test(self, *specs: Any, **kwargs: Any) -> Any:
+        """Wald test of linear hypotheses (Stata ``test``).
+
+        See :meth:`westata.postestimation.tests.run_wald_test`; this thin
+        forwarder exists so the results object owns its own postestimation
+        surface, like a Stata estimation result.
+        """
+
+        from westata.postestimation.api import test_as_stata
+
+        return test_as_stata(self, *specs, **kwargs)
+
+    def lincom(self, expression: str, **kwargs: Any) -> Any:
+        """Linear combination of parameters (Stata ``lincom``)."""
+
+        from westata.postestimation.api import lincom_as_stata
+
+        return lincom_as_stata(self, expression, **kwargs)
+
+    def wald_test(self, R: Any, q: Any = None, scalar: bool = True) -> Any:
+        """statsmodels-compatible joint Wald test.
+
+        Mirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object
+        with ``statistic``, ``df_denom``, ``df_num`` and ``pvalue``.  When
+        ``scalar`` is False a chi2 test is returned instead of the F test, which
+        matches statsmodels' documented behaviour.
+        """
+
+        from westata.postestimation.api import statsmodels_wald_test
+
+        return statsmodels_wald_test(self, R, q, scalar)
+
+    # ------------------------------------------------------------------
     # Presentation
     # ------------------------------------------------------------------
     def summary(self, style: str = "statsmodels") -> str:

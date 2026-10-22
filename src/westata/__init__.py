@@ -9,7 +9,17 @@ evidence registry in ``tests/conformance/registry.yml``.
 from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
-from westata.estimators import FEOLS, IV2SLS, IVGMM, IVLIML, OLS
+from westata.estimators import (
+    FEOLS,
+    IV2SLS,
+    IVGMM,
+    IVLIML,
+    OLS,
+    BetweenOLS,
+    FirstDifferenceOLS,
+    PanelOLS,
+    RandomEffects,
+)
 from westata.errors import (
     ConsistencyError,
     ConvergenceError,
@@ -36,6 +46,10 @@ __all__ = [
     "IVLIML",
     "IVGMM",
     "FEOLS",
+    "PanelOLS",
+    "RandomEffects",
+    "BetweenOLS",
+    "FirstDifferenceOLS",
     "WEIGHT_TYPES",
     "WeightSpec",
     "normalize_weights",

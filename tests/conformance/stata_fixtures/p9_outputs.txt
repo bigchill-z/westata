@@ -1,0 +1,563 @@
+=== xtlogit_0 ===
+COMMAND: xtlogit y x1 x2, fe
+
+note: multiple positive outcomes within groups encountered.
+note: 6 groups (48 obs) omitted because of all positive or
+      all negative outcomes.
+
+Iteration 0:  Log likelihood = -388.11281  
+Iteration 1:  Log likelihood = -387.92365  
+Iteration 2:  Log likelihood = -387.92362  
+
+Conditional fixed-effects logistic regression        Number of obs    =    912
+Group variable: firm                                 Number of groups =    114
+
+                                                     Obs per group:
+                                                                  min =      8
+                                                                  avg =    8.0
+                                                                  max =      8
+
+                                                     LR chi2(2)       =  32.46
+Log likelihood = -387.92362                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .3307537   .0807304     4.10   0.000      .172525    .4889824
+          x2 |  -.3134259   .0795823    -3.94   0.000    -.4694044   -.1574474
+------------------------------------------------------------------------------
+
+
+=== xtlogit_1 ===
+COMMAND: xtlogit y x1 x2, re
+
+
+Fitting comparison model:
+
+Iteration 0:  Log likelihood = -662.71876  
+Iteration 1:  Log likelihood = -646.57407  
+Iteration 2:  Log likelihood = -646.55433  
+Iteration 3:  Log likelihood = -646.55433  
+
+Fitting full model:
+
+tau =  0.0    Log likelihood = -646.55433
+tau =  0.1    Log likelihood = -638.83778
+tau =  0.2    Log likelihood =  -633.9057
+tau =  0.3    Log likelihood = -631.25993
+tau =  0.4    Log likelihood = -630.71892
+tau =  0.5    Log likelihood = -632.37965
+
+Iteration 0:  Log likelihood = -630.71892  
+Iteration 1:  Log likelihood = -630.38215  
+Iteration 2:  Log likelihood = -630.38212  
+
+Random-effects logistic regression                   Number of obs    =    960
+Group variable: firm                                 Number of groups =    120
+
+Random effects u_i ~ Gaussian                        Obs per group:
+                                                                  min =      8
+                                                                  avg =    8.0
+                                                                  max =      8
+
+Integration method: mvaghermite                      Integration pts. =     12
+
+                                                     Wald chi2(2)     =  31.99
+Log likelihood = -630.38212                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .3428887    .078075     4.39   0.000     .1898646    .4959129
+          x2 |  -.2896591   .0757354    -3.82   0.000    -.4380977   -.1412205
+       _cons |   .1685264   .1007916     1.67   0.095    -.0290216    .3660743
+-------------+----------------------------------------------------------------
+    /lnsig2u |  -.4766337   .2923424                     -1.049614    .0963469
+-------------+----------------------------------------------------------------
+     sigma_u |    .787953    .115176                      .5916695    1.049353
+         rho |   .1587603   .0390439                      .0961754    .2507717
+------------------------------------------------------------------------------
+LR test of rho=0: chibar2(01) = 32.34                  Prob >= chibar2 = 0.000
+
+
+=== xtlogit_2 ===
+COMMAND: xtlogit y x1 x2, pa
+
+
+Iteration 1:  Tolerance = .01137955
+Iteration 2:  Tolerance = .00005031
+Iteration 3:  Tolerance = 9.734e-08
+
+GEE population-averaged model                        Number of obs    =    960
+Group variable: firm                                 Number of groups =    120
+Family: Binomial                                     Obs per group:  
+Link:   Logit                                                     min =      8
+Correlation: exchangeable                                         avg =    8.0
+                                                                  max =      8
+                                                     Wald chi2(2)     =  32.48
+Scale parameter = 1                                  Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .3007615   .0685441     4.39   0.000     .1664176    .4351055
+          x2 |  -.2542736   .0659616    -3.85   0.000    -.3835558   -.1249913
+       _cons |   .1488734   .0888241     1.68   0.094    -.0252187    .3229655
+------------------------------------------------------------------------------
+
+
+=== xtprobit_0 ===
+COMMAND: xtprobit y x1 x2, re
+
+
+Fitting comparison model:
+
+Iteration 0:  Log likelihood = -662.71876  
+Iteration 1:  Log likelihood = -646.59903  
+Iteration 2:  Log likelihood = -646.58991  
+Iteration 3:  Log likelihood = -646.58991  
+
+Fitting full model:
+
+rho =  0.0    Log likelihood = -646.58991
+rho =  0.1    Log likelihood = -632.89181
+rho =  0.2    Log likelihood = -630.54729
+rho =  0.3    Log likelihood = -633.49602
+
+Iteration 0:  Log likelihood = -630.54726  
+Iteration 1:  Log likelihood = -630.25753  
+Iteration 2:  Log likelihood = -630.25751  
+
+Random-effects probit regression                     Number of obs    =    960
+Group variable: firm                                 Number of groups =    120
+
+Random effects u_i ~ Gaussian                        Obs per group:
+                                                                  min =      8
+                                                                  avg =    8.0
+                                                                  max =      8
+
+Integration method: mvaghermite                      Integration pts. =     12
+
+                                                     Wald chi2(2)     =  33.21
+Log likelihood = -630.25751                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |    .209834   .0470585     4.46   0.000      .117601    .3020669
+          x2 |   -.176559   .0456234    -3.87   0.000    -.2659793   -.0871387
+       _cons |   .1023312   .0613595     1.67   0.095    -.0179312    .2225935
+-------------+----------------------------------------------------------------
+    /lnsig2u |  -1.462809   .2828123                     -2.017111   -.9085072
+-------------+----------------------------------------------------------------
+     sigma_u |   .4812326   .0680492                      .3647455    .6349217
+         rho |   .1880381   .0431797                      .1174181    .2873054
+------------------------------------------------------------------------------
+LR test of rho=0: chibar2(01) = 32.66                  Prob >= chibar2 = 0.000
+
+
+=== xttobit_0 ===
+COMMAND: xttobit y x1, ll(.5)
+
+
+Fitting comparison model:
+
+Fitting constant-only model:
+
+Iteration 0:  Log likelihood = -997.34342  
+Iteration 1:  Log likelihood = -931.53369  
+Iteration 2:  Log likelihood = -930.11486  
+Iteration 3:  Log likelihood = -930.11311  
+Iteration 4:  Log likelihood = -930.11311  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -762.78134  
+Iteration 1:  Log likelihood = -668.41978  
+Iteration 2:  Log likelihood = -667.42104  
+Iteration 3:  Log likelihood = -667.42078  
+Iteration 4:  Log likelihood = -667.42078  
+
+Obtaining starting values for full model:
+
+Iteration 0:  Log likelihood = -598.11925
+Iteration 1:  Log likelihood =  -597.8643
+Iteration 2:  Log likelihood = -597.86417
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -686.17214  
+Iteration 1:  Log likelihood = -606.20986  
+Iteration 2:  Log likelihood = -598.87882  
+Iteration 3:  Log likelihood = -598.85058  
+Iteration 4:  Log likelihood = -598.85058  
+
+Random-effects tobit regression                     Number of obs     =    700
+                                                           Uncensored =    461
+Limits: Lower = 0.50                                    Left-censored =    239
+        Upper = +inf                                   Right-censored =      0
+
+Group variable: firm                                Number of groups  =    100
+Random effects u_i ~ Gaussian                       Obs per group:
+                                                                  min =      7
+                                                                  avg =    7.0
+                                                                  max =      7
+
+Integration method: mvaghermite                     Integration pts.  =     12
+
+                                                    Wald chi2(1)      = 762.30
+Log likelihood = -598.85058                         Prob > chi2       = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .9020131   .0326701    27.61   0.000     .8379808    .9660454
+       _cons |   .9253712   .0567642    16.30   0.000     .8141154    1.036627
+-------------+----------------------------------------------------------------
+    /sigma_u |   .4883516   .0458904    10.64   0.000     .3984081    .5782951
+    /sigma_e |   .6004406   .0216465    27.74   0.000     .5580142     .642867
+-------------+----------------------------------------------------------------
+         rho |   .3981316   .0483222                      .3072591    .4949185
+------------------------------------------------------------------------------
+LR test of sigma_u=0: chibar2(01) = 137.14             Prob >= chibar2 = 0.000
+
+
+
+=== xtpoisson_0 ===
+COMMAND: xtpoisson y x1, fe
+
+
+Iteration 0:  Log likelihood = -886.64425  
+Iteration 1:  Log likelihood = -775.44397  
+Iteration 2:  Log likelihood = -775.44068  
+Iteration 3:  Log likelihood = -775.44068  
+
+Conditional fixed-effects Poisson regression         Number of obs    =    700
+Group variable: firm                                 Number of groups =    100
+
+                                                     Obs per group:
+                                                                  min =      7
+                                                                  avg =    7.0
+                                                                  max =      7
+
+                                                     Wald chi2(1)     = 214.37
+Log likelihood = -775.44068                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .5041803   .0344352    14.64   0.000     .4366885     .571672
+------------------------------------------------------------------------------
+
+
+=== xtpoisson_1 ===
+COMMAND: xtpoisson y x1, re
+
+
+Fitting Poisson model:
+
+Iteration 0:  Log likelihood =  -1104.578  
+Iteration 1:  Log likelihood =  -1104.578  
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -1122.8241  
+Iteration 1:  Log likelihood = -1077.6928  
+Iteration 2:  Log likelihood = -1076.9142  
+Iteration 3:  Log likelihood = -1076.9058  
+Iteration 4:  Log likelihood = -1076.9058  
+
+Random-effects Poisson regression                    Number of obs    =    700
+Group variable: firm                                 Number of groups =    100
+
+Random effects u_i ~ Gamma                           Obs per group:
+                                                                  min =      7
+                                                                  avg =    7.0
+                                                                  max =      7
+
+                                                     Wald chi2(1)     = 221.86
+Log likelihood = -1076.9058                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .4795509   .0321955    14.89   0.000     .4164487     .542653
+       _cons |   .3485993   .0486943     7.16   0.000     .2531602    .4440383
+-------------+----------------------------------------------------------------
+    /lnalpha |  -2.073955    .240626                     -2.545573   -1.602337
+-------------+----------------------------------------------------------------
+       alpha |   .1256877   .0302437                      .0784281    .2014252
+------------------------------------------------------------------------------
+LR test of alpha=0: chibar2(01) = 55.34                Prob >= chibar2 = 0.000
+
+
+=== xtnbreg_0 ===
+COMMAND: xtnbreg y x1, fe
+
+
+Iteration 0:  Log likelihood = -829.62206  
+Iteration 1:  Log likelihood = -780.90681  
+Iteration 2:  Log likelihood = -776.67461  
+Iteration 3:  Log likelihood = -775.74041  
+Iteration 4:  Log likelihood = -775.52101  
+Iteration 5:  Log likelihood = -775.46237  
+Iteration 6:  Log likelihood = -775.44546  
+Iteration 7:  Log likelihood = -775.44174  
+Iteration 8:  Log likelihood = -775.44093  
+Iteration 9:  Log likelihood = -775.44074  
+Iteration 10: Log likelihood = -775.44069  
+Iteration 11: Log likelihood = -775.44069  
+
+Conditional FE negative binomial regression          Number of obs    =    700
+Group variable: firm                                 Number of groups =    100
+
+                                                     Obs per group:
+                                                                  min =      7
+                                                                  avg =    7.0
+                                                                  max =      7
+
+                                                     Wald chi2(1)     = 214.38
+Log likelihood = -775.44069                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .5041909   .0344353    14.64   0.000      .436699    .5716827
+       _cons |   15.21552   641.2254     0.02   0.981    -1241.563    1271.994
+------------------------------------------------------------------------------
+
+
+=== xtivreg_0 ===
+COMMAND: xtivreg y z (endog = z), fe
+
+FAILED: equation not identified; must have at least as many instruments not in
+the regression as there are instrumented variables
+r(481);
+
+
+=== xtivreg_1 ===
+COMMAND: xtivreg y z (endog = z), re
+
+FAILED: equation not identified; must have at least as many instruments not in
+the regression as there are instrumented variables
+r(481);
+
+
+=== xtabond_0 ===
+COMMAND: xtabond y x1, lags(1)
+
+
+Arellano–Bond dynamic panel-data estimation     Number of obs     =        630
+Group variable: firm                            Number of groups  =         90
+Time variable: year
+                                                Obs per group:
+                                                              min =          7
+                                                              avg =          7
+                                                              max =          7
+
+Number of instruments =     30                  Wald chi2(2)      =    1100.06
+                                                Prob > chi2       =     0.0000
+One-step results
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+           y |
+         L1. |   .4549539   .0329864    13.79   0.000     .3903017    .5196061
+             |
+          x1 |    .776234   .0234836    33.05   0.000     .7302069     .822261
+       _cons |  -.1628231   .0212884    -7.65   0.000    -.2045477   -.1210985
+------------------------------------------------------------------------------
+Instruments for differenced equation
+        GMM-type: L(2/.).y
+        Standard: D.x1
+Instruments for level equation
+        Standard: _cons
+
+
+=== xtabond_1 ===
+COMMAND: xtabond y x1, lags(2)
+
+
+Arellano–Bond dynamic panel-data estimation     Number of obs     =        540
+Group variable: firm                            Number of groups  =         90
+Time variable: year
+                                                Obs per group:
+                                                              min =          6
+                                                              avg =          6
+                                                              max =          6
+
+Number of instruments =     29                  Wald chi2(3)      =     887.65
+                                                Prob > chi2       =     0.0000
+One-step results
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+           y |
+         L1. |   .4305523     .03772    11.41   0.000     .3566226    .5044821
+         L2. |  -.0172748   .0270053    -0.64   0.522    -.0702043    .0356547
+             |
+          x1 |   .7623808   .0263676    28.91   0.000     .7107013    .8140603
+       _cons |  -.1847177   .0265498    -6.96   0.000    -.2367543    -.132681
+------------------------------------------------------------------------------
+Instruments for differenced equation
+        GMM-type: L(2/.).y
+        Standard: D.x1
+Instruments for level equation
+        Standard: _cons
+
+
+=== xtdpd_0 ===
+COMMAND: xtdpd y x1, dgmmiv(y)
+
+
+Dynamic panel-data estimation                   Number of obs     =        810
+Group variable: firm                            Number of groups  =         90
+Time variable: year
+                                                Obs per group:
+                                                              min =          9
+                                                              avg =          9
+                                                              max =          9
+
+Number of instruments =     29                  Wald chi2(1)      =      53.73
+                                                Prob > chi2       =     0.0000
+One-step results
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .7512093   .1024837     7.33   0.000     .5503451    .9520736
+       _cons |  -.2923482   .0178691   -16.36   0.000    -.3273709   -.2573254
+------------------------------------------------------------------------------
+Instruments for differenced equation
+        GMM-type: L(2/.).y
+Instruments for level equation
+        Standard: _cons
+
+
+=== xtdpdsys_0 ===
+COMMAND: xtdpdsys y x1
+
+
+System dynamic panel-data estimation            Number of obs     =        720
+Group variable: firm                            Number of groups  =         90
+Time variable: year
+                                                Obs per group:
+                                                              min =          8
+                                                              avg =          8
+                                                              max =          8
+
+Number of instruments =     37                  Wald chi2(2)      =    1276.05
+                                                Prob > chi2       =     0.0000
+One-step results
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+           y |
+         L1. |   .4935659   .0243088    20.30   0.000     .4459214    .5412103
+             |
+          x1 |   .7873742   .0233131    33.77   0.000     .7416812    .8330671
+       _cons |  -.1497253   .0202713    -7.39   0.000    -.1894563   -.1099943
+------------------------------------------------------------------------------
+Instruments for differenced equation
+        GMM-type: L(2/.).y
+        Standard: D.x1
+Instruments for level equation
+        GMM-type: LD.y
+        Standard: _cons
+
+
+=== xtgls_0 ===
+COMMAND: xtgls y x1, panels(heteroskedastic)
+
+
+Cross-sectional time-series FGLS regression
+
+Coefficients:  generalized least squares
+Panels:        heteroskedastic
+Correlation:   no autocorrelation
+
+Estimated covariances      =       100          Number of obs     =        700
+Estimated autocorrelations =         0          Number of groups  =        100
+Estimated coefficients     =         2          Time periods      =          7
+                                                Wald chi2(1)      =     246.99
+                                                Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .6798471   .0432583    15.72   0.000     .5950623    .7646319
+       _cons |   1.431659   .0421405    33.97   0.000     1.349065    1.514252
+------------------------------------------------------------------------------
+
+
+=== xtpcse_0 ===
+COMMAND: xtpcse y x1
+
+
+Linear regression, correlated panels corrected standard errors (PCSEs)
+
+Group variable:   firm                          Number of obs     =        700
+Time variable:    year                          Number of groups  =        100
+Panels:           correlated (balanced)         Obs per group:
+Autocorrelation:  no autocorrelation                          min =          7
+                                                              avg =          7
+                                                              max =          7
+Estimated covariances      =      5050          R-squared         =     0.2144
+Estimated autocorrelations =         0          Wald chi2(1)      =     178.20
+Estimated coefficients     =         2          Prob > chi2       =     0.0000
+
+------------------------------------------------------------------------------
+             |           Panel-corrected
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .7533126   .0564318    13.35   0.000     .6427083    .8639169
+       _cons |   1.572686   .0372998    42.16   0.000     1.499579    1.645792
+------------------------------------------------------------------------------
+
+
+=== xtunitroot_0 ===
+COMMAND: xtunitroot ips y
+
+
+Im–Pesaran–Shin unit-root test for y
+------------------------------------
+H0: All panels contain unit roots           Number of panels  =     90
+Ha: Some panels are stationary              Number of periods =      9
+
+AR parameter: Panel-specific                Asymptotics: T,N -> Infinity
+Panel means:  Included                                        sequentially
+Time trend:   Not included
+
+ADF regressions: No lags included
+------------------------------------------------------------------------------
+                                              Fixed-N exact critical values
+                    Statistic      p-value         1%      5%      10%
+------------------------------------------------------------------------------
+ t-bar               -2.0685                     -1.750  -1.680  -1.640
+ t-tilde-bar         -1.5727
+ Z-t-tilde-bar       -4.2953        0.0000
+------------------------------------------------------------------------------
+
+
+=== xtunitroot_1 ===
+COMMAND: xtunitroot llc y
+
+
+Levin–Lin–Chu unit-root test for y
+----------------------------------
+H0: Panels contain unit roots               Number of panels  =     90
+Ha: Panels are stationary                   Number of periods =      9
+
+AR parameter: Common                        Asymptotics: N/T -> 0
+Panel means:  Included
+Time trend:   Not included
+
+ADF regressions: 1 lag
+LR variance:     Bartlett kernel, 6.00 lags average (chosen by LLC)
+------------------------------------------------------------------------------
+                    Statistic      p-value
+------------------------------------------------------------------------------
+ Unadjusted t       -21.7694
+ Adjusted t*        -15.1701        0.0000
+------------------------------------------------------------------------------
+
+

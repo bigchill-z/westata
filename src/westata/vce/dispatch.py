@@ -58,6 +58,9 @@ def compute_cov(
     ssc: SSC | None = None,
     nobs: int | None = None,
     df_resid: float | None = None,
+    nobs_adj: float | None = None,
+    weights: np.ndarray | None = None,
+    weight_type: str | None = None,
 ) -> tuple[np.ndarray, float]:
     """Return ``(cov, df_t)`` for the requested variance estimator.
 
@@ -78,11 +81,17 @@ def compute_cov(
         Stata small-sample settings; defaults to
         ``SSC(adj=True, cluster_adj=True, df="stata")`` when ``None``.
     nobs:
-        Optional explicit sample size, validated against ``X``.
+        Optional explicit row count, validated against ``X``.
     df_resid:
         Optional denominator for the nonrobust ``sigma2`` (and the returned
         ``df_t``).  Robust HC and cluster variances always use their Stata
         degrees of freedom (``N-K`` and ``G-1``) and ignore it.
+    nobs_adj:
+        Sample size for the small-sample correction factors.  Defaults to the
+        number of rows of ``X``.  Frequency weights must pass ``sum(w)``: Stata
+        ``[U] 20.24.1`` requires ``fweight`` estimates to match the estimates
+        from the explicitly expanded data, and that includes the ``N/(N-K)``
+        and ``(N-1)/(N-K)`` factors.
 
     Returns
     -------
@@ -130,20 +139,52 @@ def compute_cov(
     canonical = _normalize_cov_type(cov_type)
     kwds: dict[str, Any] = {} if cov_kwds is None else dict(cov_kwds)
 
+    # The correction factors use the *effective* sample size.  For frequency
+    # weights that is sum(w), so fweighted results equal the expanded-data fit.
+    n_eff = float(n if nobs_adj is None else nobs_adj)
+    if n_eff <= k:
+        raise ValueError(
+            "effective nobs must exceed the number of columns (K); got "
+            f"nobs={n_eff:g}, K={k}"
+        )
+
     bread = np.linalg.inv(X.T @ X)
 
+    if weights is not None:
+        w = np.asarray(weights, dtype=float).reshape(-1)
+        if w.shape[0] != n:
+            raise ValueError(
+                f"weights have {w.shape[0]} entries but the data have {n} rows"
+            )
+        # Work in Stata's weighted space, X~ = W^{1/2}X and e~ = W^{1/2}e, so
+        # that bread = (X~'X~)^-1 is the same expression in both cases.
+        Xw = X * np.sqrt(w)[:, None]
+        rw = resid * np.sqrt(w)
+        bread = np.linalg.inv(Xw.T @ Xw)
+    else:
+        Xw, rw = X, resid
+
     if canonical == "nonrobust":
-        df_t = float(df_resid) if df_resid is not None else float(n - k)
+        df_t = float(df_resid) if df_resid is not None else float(n_eff - k)
         if df_t <= 0:
             raise ValueError(
                 f"df_resid must be positive; got df_resid={df_t}"
             )
-        cov = (float(resid @ resid) / df_t) * bread
+        cov = (float(rw @ rw) / df_t) * bread
         return cov, df_t
 
     if canonical in ("HC0", "HC1", "HC2", "HC3"):
-        cov = cov_hc(X, resid, variant=canonical, bread=bread, ssc=settings)
-        return cov, float(n - k)
+        cov = cov_hc(
+            Xw,
+            rw,
+            variant=canonical,
+            bread=bread,
+            ssc=settings,
+            nobs=n_eff,
+            weights=weights,
+            weight_type=weight_type,
+        )
+        return cov, float(n_eff - k)
 
     # canonical == "cluster"
     groups = kwds.get("groups")
@@ -152,5 +193,7 @@ def compute_cov(
             "cov_type='cluster' requires cov_kwds['groups']; pass the "
             "cluster labels as cov_kwds={'groups': groups}"
         )
-    cov, n_groups = cov_cluster(X, resid, groups, bread=bread, ssc=settings)
+    cov, n_groups = cov_cluster(
+        Xw, rw, groups, bread=bread, ssc=settings, nobs=n_eff
+    )
     return cov, float(n_groups - 1)

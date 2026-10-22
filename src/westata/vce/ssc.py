@@ -31,16 +31,20 @@ def resolve_ssc(ssc: SSC | None) -> SSC:
     return DEFAULT_SSC if ssc is None else ssc
 
 
-def _require_positive_df(nobs: int, k: int) -> None:
+def _require_positive_df(nobs: float, k: int) -> None:
     if nobs <= k:
         raise ValueError(
-            "nobs must exceed the number of columns (K); got "
-            f"nobs={nobs}, K={k}"
+            "effective nobs must exceed the number of columns (K); got "
+            f"nobs={nobs:g}, K={k}"
         )
 
 
-def hc1_factor(nobs: int, k: int, ssc: SSC | None) -> float:
-    """``N / (N - K)`` for HC1, or ``1`` when ``ssc.adj`` is off."""
+def hc1_factor(nobs: float, k: int, ssc: SSC | None) -> float:
+    """``N / (N - K)`` for HC1, or ``1`` when ``ssc.adj`` is off.
+
+    ``nobs`` is the effective sample size: the row count for unweighted data,
+    ``sum(w)`` for ``fweight``/``iweight``, and ``N`` for ``aweight``/``pweight``.
+    """
 
     settings = resolve_ssc(ssc)
     if not settings.adj:
@@ -49,7 +53,7 @@ def hc1_factor(nobs: int, k: int, ssc: SSC | None) -> float:
     return float(nobs) / (nobs - k)
 
 
-def cluster_factor(nobs: int, k: int, n_groups: int, ssc: SSC | None) -> float:
+def cluster_factor(nobs: float, k: int, n_groups: int, ssc: SSC | None) -> float:
     """CR1 scaling ``G/(G-1) * (N-1)/(N-K)`` for cluster-robust VCEs.
 
     Returns ``1`` when ``ssc.adj`` is off.  With ``ssc.cluster_adj`` off the

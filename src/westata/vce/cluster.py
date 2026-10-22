@@ -51,11 +51,16 @@ def cov_cluster(
     *,
     bread: np.ndarray | None = None,
     ssc: SSC | None = None,
+    nobs: float | None = None,
 ) -> tuple[np.ndarray, int]:
     """Return ``(cov, n_groups)`` for the CR1 cluster-robust covariance.
 
     ``df_t`` for t/F inference is ``n_groups - 1`` and is derived by the
     dispatcher from the returned group count.
+
+    ``nobs`` is the effective sample size used in the ``(N-1)/(N-K)`` factor;
+    it defaults to the number of rows of ``X``.  Frequency-weighted fits must
+    pass ``sum(w)`` so that the result matches the expanded-data fit.
     """
 
     X = np.asarray(X, dtype=float)
@@ -90,5 +95,6 @@ def cov_cluster(
         )
 
     meat = group_scores.T @ group_scores
-    cov = cluster_factor(n, k, n_groups, ssc) * (bread @ meat @ bread)
+    n_eff = n if nobs is None else float(nobs)
+    cov = cluster_factor(n_eff, k, n_groups, ssc) * (bread @ meat @ bread)
     return cov, n_groups

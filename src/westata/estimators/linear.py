@@ -193,13 +193,16 @@ class OLS:
             )
 
         cov, df_t = compute_cov(
-            Xw,
-            resid * sw,
+            X,
+            resid,
             cov_type=effective_cov_type,
             cov_kwds=cov_kwds,
             ssc=ssc,
             nobs=n,
             df_resid=df_resid,
+            nobs_adj=effective_n,
+            weights=None if spec is None else w,
+            weight_type=None if spec is None else spec.weight_type,
         )
 
         rss = float((w * resid**2).sum())

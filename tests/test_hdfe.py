@@ -143,6 +143,13 @@ def test_no_fixed_effects_matches_plain_ols():
 
 # ------------------------------------------------------- 4. cluster-robust
 def test_cluster_inference_uses_g_minus_one_and_finite_standard_errors():
+    """Verified against reghdfe: e(df_r) is G - 1 under clustering.
+
+    reghdfe marks a fixed effect nested in the cluster variable as redundant and
+    reports ``e(df_r) = G - 1``.  An earlier version of this test asserted
+    ``N - rank`` here, which real reghdfe contradicts (G=30 gave 29, not 177).
+    """
+
     df = _panel()
     n_clusters = df["cluster"].nunique()
 
@@ -152,9 +159,9 @@ def test_cluster_inference_uses_g_minus_one_and_finite_standard_errors():
 
     assert res.df_resid == n_clusters - 1
     assert res.e["N_clust"] == n_clusters
-    # Residual df stays N - K (Stata's e(df_r)); the two must differ here.
-    assert res.e["df_r"] == len(df) - res.e["rank"]
-    assert res.e["df_r"] != res.df_resid
+    # e(df_r) follows the cluster count, matching reghdfe's redundant-FE rule.
+    assert res.e["df_r"] == n_clusters - 1
+    assert res.e["df_r"] == res.df_resid
 
     bse = res.bse.to_numpy()
     assert np.all(np.isfinite(bse)) and np.all(bse > 0)
@@ -244,11 +251,14 @@ def test_e_contains_all_required_scalars():
     )
 
 
-def test_goodness_of_fit_scalars_do_not_depend_on_the_covariance():
-    # r2/rmse/df_r/r2_a are sample statistics: clustering changes the t/F
-    # reference df (G - 1) but must not rescale rmse or the adjusted R^2.
-    # The cluster variable must not be nested in a fixed effect, otherwise the
-    # absorbed parameters stop counting towards K (tested separately below).
+def test_r2_and_rmse_do_not_depend_on_the_covariance_but_df_r_does():
+    """r2/rmse/r2_a are sample statistics; e(df_r) is not.
+
+    Verified against reghdfe: with a cluster variable that is *not* nested in a
+    fixed effect, r2/r2_a/rmse are unchanged by clustering while e(df_r) switches
+    from N - rank to G - 1.
+    """
+
     df = _panel()
     df["cluster"] = np.random.default_rng(7).integers(0, 8, size=len(df))
     plain = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
@@ -257,8 +267,12 @@ def test_goodness_of_fit_scalars_do_not_depend_on_the_covariance():
     )
 
     assert clustered.df_resid != plain.df_resid
-    for key in ("r2", "r2_a", "rmse", "df_r", "N", "rank"):
+    # Sample statistics are covariance-independent.
+    for key in ("r2", "r2_a", "rmse", "N", "rank"):
         assert clustered.e[key] == pytest.approx(plain.e[key], rel=1e-12), key
+    # e(df_r) follows the reference distribution under clustering.
+    assert clustered.e["df_r"] == df["cluster"].nunique() - 1
+    assert plain.e["df_r"] != clustered.e["df_r"]
     # rmse is a residual standard deviation on N - K, never sqrt(rss / N).
     resid = plain.resid
     assert plain.e["rmse"] > np.sqrt(resid @ resid / plain.nobs)
@@ -276,7 +290,10 @@ def test_fixed_effect_nested_in_the_cluster_is_not_counted_in_the_df():
     )
 
     assert nested.e["rank"] < plain.e["rank"]
-    assert nested.e["df_r"] == len(df) - nested.e["rank"]
+    # With the effect nested in the cluster, e(df_r) is G - 1 (reghdfe's rule),
+    # not N - rank.
+    assert nested.e["df_r"] == df["cluster"].nunique() - 1
+    # The slopes themselves are unaffected by the dof adjustment.
     np.testing.assert_allclose(nested.params.to_numpy(), plain.params.to_numpy(),
                                rtol=0, atol=1e-10)
 

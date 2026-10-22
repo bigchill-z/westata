@@ -1,0 +1,81 @@
+{
+  "b": [
+    1.5159757852635338,
+    -0.44632036487212623,
+    1.318728173124013
+  ],
+  "V": [
+    [
+      0.001360097470389868,
+      -7.45583106113917e-05,
+      6.070584189073457e-05
+    ],
+    [
+      -7.45583106113917e-05,
+      0.0014988414514128488,
+      2.8849833926234644e-05
+    ],
+    [
+      6.070584189073457e-05,
+      2.8849833926234644e-05,
+      0.0009438375815281927
+    ]
+  ],
+  "scalars": {
+    "N": 180.0,
+    "rank": 2.0,
+    "df_r": 143.0,
+    "df_m": 2.0,
+    "tss": 589.0105327524358,
+    "tss_within": 325.18015377919875,
+    "rss": 24.206806718371592,
+    "mss": 564.8037260340642,
+    "rmse": 0.4114345253621057,
+    "F": 888.989389026558,
+    "ll": -74.8398670638448,
+    "ll_0": -308.6369607232153,
+    "r2": 0.9589025910873722,
+    "r2_within": 0.9255587819950158,
+    "r2_a": 0.9485563902422351,
+    "r2_a_within": 0.9245176460788622,
+    "sumweights": 180.0,
+    "ic": 2.0,
+    "converged": 1.0,
+    "report_constant": 1.0,
+    "N_full": 180.0,
+    "num_singletons": 0.0,
+    "drop_singletons": 1.0,
+    "df_a_nested": 0.0,
+    "df_a_redundant": 1.0,
+    "df_a_initial": 36.0,
+    "df_a": 35.0,
+    "N_hdfe_extended": 2.0,
+    "N_hdfe": 2.0
+  },
+  "macros": {
+    "_r_z_abs__CL": "|t|",
+    "_r_z__CL": "t",
+    "extended_absvars": "firm year",
+    "absvars": "firm year",
+    "title2": "Absorbing 2 HDFE groups",
+    "dofmethod": "pairwise clusters continuous",
+    "vce": "ols",
+    "title": "HDFE Linear regression",
+    "indepvars": "x1 x2 _cons",
+    "depvar": "y",
+    "marginsnotok": "Residuals SCore",
+    "footnote": "reghdfe_footnote",
+    "estat_cmd": "reghdfe_estat",
+    "predict": "reghdfe_p",
+    "model": "ols",
+    "cmdline": "reghdfe y x1 x2, absorb(firm year)",
+    "cmd": "reghdfe",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

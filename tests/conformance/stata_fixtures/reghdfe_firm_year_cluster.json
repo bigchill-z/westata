@@ -1,0 +1,88 @@
+{
+  "b": [
+    1.5159757852635338,
+    -0.44632036487212623,
+    1.318728173124013
+  ],
+  "V": [
+    [
+      0.0011971313145510986,
+      -0.0007935300204518621,
+      3.7762458134688255e-05
+    ],
+    [
+      -0.0007935300204518621,
+      0.0018450198729708992,
+      3.3633997107102895e-06
+    ],
+    [
+      3.7762458134688255e-05,
+      3.3633997107102895e-06,
+      1.8024353952498775e-06
+    ]
+  ],
+  "scalars": {
+    "N": 180.0,
+    "rank": 2.0,
+    "df_r": 29.0,
+    "df_m": 2.0,
+    "tss": 589.0105327524358,
+    "tss_within": 325.18015377919875,
+    "rss": 24.206806718371592,
+    "mss": 564.8037260340642,
+    "rmse": 0.4114345253621057,
+    "F": 1078.135681308876,
+    "ll": -74.8398670638448,
+    "ll_0": -308.6369607232153,
+    "r2": 0.9589025910873722,
+    "r2_within": 0.9255587819950158,
+    "r2_a": 0.9485563902422351,
+    "r2_a_within": 0.9245176460788622,
+    "sumweights": 180.0,
+    "ic": 2.0,
+    "converged": 1.0,
+    "report_constant": 1.0,
+    "N_full": 180.0,
+    "num_singletons": 0.0,
+    "drop_singletons": 1.0,
+    "df_a_nested": 30.0,
+    "df_a_redundant": 31.0,
+    "df_a_initial": 36.0,
+    "df_a": 5.0,
+    "N_hdfe_extended": 2.0,
+    "N_hdfe": 2.0,
+    "N_clust1": 30.0,
+    "N_clustervars": 1.0,
+    "N_clust": 30.0
+  },
+  "macros": {
+    "_r_z_abs__CL": "|t|",
+    "_r_z__CL": "t",
+    "extended_absvars": "firm year",
+    "absvars": "firm year",
+    "title2": "Absorbing 2 HDFE groups",
+    "dofmethod": "pairwise clusters continuous",
+    "vce": "cluster",
+    "vcetype": "Robust",
+    "title": "HDFE Linear regression",
+    "indepvars": "x1 x2 _cons",
+    "depvar": "y",
+    "marginsnotok": "Residuals SCore",
+    "footnote": "reghdfe_footnote",
+    "estat_cmd": "reghdfe_estat",
+    "predict": "reghdfe_p",
+    "model": "ols",
+    "cmdline": "reghdfe y x1 x2, absorb(firm year) cluster(firm)",
+    "cmd": "reghdfe",
+    "clustvar": "firm",
+    "title3": "Statistics robust to heteroskedasticity",
+    "clustvar1": "firm",
+    "properties": "b V"
+  },
+  "names": [
+    "x1",
+    "x2",
+    "_cons"
+  ],
+  "version": ""
+}

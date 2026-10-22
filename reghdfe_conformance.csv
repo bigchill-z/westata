@@ -1,0 +1,6 @@
+case,param_rel,se_rel,df_r_delta,r2_delta
+"reghdfe, absorb(firm)",4.523506204094678e-16,3.3122749319096654e-16,0.0,0.0
+"reghdfe, absorb(firm year)",4.394092710783601e-16,1.8815043672214908e-16,0.0,0.0
+"reghdfe, absorb(firm) vce(robust)",4.523506204094678e-16,3.6024992070546687e-16,0.0,0.0
+"reghdfe, absorb(firm) cluster(firm)",4.523506204094678e-16,5.895142476723075e-16,0.0,0.0
+"reghdfe, absorb(firm year) cluster(firm)",4.394092710783601e-16,2.0054846929721595e-16,0.0,0.0

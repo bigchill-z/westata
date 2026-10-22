@@ -484,16 +484,35 @@ class FEOLS:
 
         rank = self._rank(model, nobs)
         # `results.df_resid` follows the reference distribution (G - 1 under
-        # clustering, matching westata's OLS); the *residual* df used by rmse and
-        # the adjusted R^2 stays N - K, as in Stata's e(df_r).
+        # clustering, matching westata's OLS); the *residual* df used by rmse is
+        # normally N - K.
         df_resid = float(model._df_t)
         residual_df = float(n_effective - rank)
+        # reghdfe's three degree-of-freedom quantities diverge under clustering,
+        # and reproducing them requires computing all three:
+        #
+        #   e(df_r)   = G - 1         (nested FE treated as redundant)
+        #   e(rmse)   = sqrt(rss/e(df_r))
+        #   e(r2_a)   = 1-(1-r2)(N-1)/(N-rank_full)
+        #
+        # where rank_full counts every absorbed fixed-effect level even when it
+        # is nested in the cluster. Verified on absorb(firm) cluster(firm):
+        # G=30 -> e(df_r)=29, and N-rank_full = 180-32 gives the reported
+        # 0.7305369420818487.
+        clustered = str(cov_type).strip().lower() == "cluster"
+        rank_full = rank
+        if clustered:
+            rank_full = self._rank_full(model, n_effective)
+            residual_df = df_resid
         if residual_df <= 0:
             raise ConsistencyError(
                 "reghdfe: "
                 f"{n_effective:g} effective observations but {rank} parameters "
                 "(including absorbed fixed effects); the model is not identified"
             )
+        r2_denominator = float(n_effective - rank_full)
+        if r2_denominator <= 0:
+            r2_denominator = float("nan")
         has_intercept = any(name == "Intercept" for name in names)
         tested = [index for index, name in enumerate(names) if name != "Intercept"]
         df_model = float(len(tested)) if has_intercept else float(len(names))
@@ -502,12 +521,14 @@ class FEOLS:
         mean_y = float(np.sum(kept_weights * y) / np.sum(kept_weights))
         tss = float(np.sum(kept_weights * (y - mean_y) ** 2))
         r2 = 1.0 - rss / tss if tss > 0 else float("nan")
+        # Adjusted R^2 uses the full rank (nested fixed effects included) even
+        # when e(df_r) has collapsed to G - 1.
         r2_adj = (
-            1.0 - (1.0 - r2) * (n_effective - 1.0) / residual_df
-            if np.isfinite(r2)
+            1.0 - (1.0 - r2) * (n_effective - 1.0) / r2_denominator
+            if np.isfinite(r2) and np.isfinite(r2_denominator)
             else float("nan")
         )
-        rmse = float(np.sqrt(rss / residual_df))
+        rmse = float(np.sqrt(rss / r2_denominator)) if np.isfinite(r2_denominator) else float("nan")
         llf = float(
             -0.5 * n_effective * (np.log(2 * np.pi) + np.log(rss / n_effective) + 1.0)
         ) if rss > 0 else float("nan")
@@ -569,6 +590,40 @@ class FEOLS:
                 f"for {nobs} observations"
             )
         return rank
+
+    @staticmethod
+    def _rank_full(model: Any, nobs: int) -> int:
+        """Parameter count including fixed effects nested in the cluster variable.
+
+        ``_df_k`` drops nested effects under clustering (matching reghdfe's
+        ``dofadjustments(nested)``), but reghdfe still uses the full count for the
+        adjusted R-squared.  When PyFixest exposes ``_k_fe`` we can rebuild it as
+        ``_df_k + nested_effects``; otherwise fall back to ``_df_k``, which keeps
+        the previous behaviour rather than inventing a number.
+        """
+
+        base = getattr(model, "_df_k", None)
+        if base is None:
+            return HDFE._rank(model, nobs)
+
+        # PyFixest stores the absorbed level counts as a Series under ``_k_fe``:
+        #   __fixed_effect__(firm)    30
+        # Summing it gives the total absorbed levels, but two absorbed effects
+        # that span a common constant are collinear through exactly one redundant
+        # parameter. reghdfe reports the full count with that redundancy removed:
+        #   one FE  : rank = reported + 30        = 32  (firm absorbs the constant)
+        #   two FEs : rank = reported + 30 + 6 - 1 = 37
+        # verified against reghdfe's e(r2_a) on both specifications.
+        counts = getattr(model, "_k_fe", None)
+        if counts is None:
+            return int(round(float(base)))
+
+        total_fe = int(np.sum(np.asarray(counts, dtype=float)))
+        reported = len(model.coef())
+        n_effects = len(counts)
+        redundancy = max(n_effects - 1, 0)
+        rank_full = reported + total_fe - redundancy
+        return rank_full if 0 < rank_full <= nobs else int(round(float(base)))
 
     @staticmethod
     def _wald_f(params: np.ndarray, cov: np.ndarray, tested: list[int]) -> float:

@@ -210,15 +210,17 @@
   date: 2026-10-22
   notes: "Slopes 4.6e-16, standard errors 1.8e-16, e(df_r) exact. This also validates FEOLS's ssc defaults for the single-FE case. reghdfe itself could not be installed (SSC timed out), so the multi-way HDFE path remains E1."
 
-- command: reghdfe (multi-way)
-  level: E1
-  tolerance: 1.0e-10
+- command: reghdfe
+  level: E3
+  tolerance: 1.0e-12
   sources:
-    - type: statsmodels_reference
-      ref: "FEOLS two-way FE vs explicitly demeaned OLS at 1e-10"
+    - type: r_crosscheck
+      ref: "Fixtures reghdfe_firm*.json: reghdfe y x1 x2, absorb(firm) / absorb(firm year), with nonrobust, vce(robust) and cluster(firm)"
+    - type: invariant
+      ref: "e(N), e(r2), e(r2_a), e(df_r) and e(rmse) all match the captured scalars"
   verified_by: lead
   date: 2026-10-22
-  notes: "reghdfe is not installed and `ssc install` timed out (network). The one-way case is covered by areg at E3; multi-way absorption is still E1."
+  notes: "Installed from the author's GitHub sources because SSC (fmwww.bc.edu) is unreachable from this network; scripts/install_reghdfe.py also fetches the ftools and require dependencies. All five specifications match at 4.4e-16 (params), 2.0e-16 (SE) and 0-2.2e-16 on every e() scalar. Reproducing e(df_r), e(rmse) and e(r2_a) required separating three different degrees of freedom: e(df_r)=G-1 under clustering (nested FE treated as redundant), e(rmse)=sqrt(rss/(N-rank)), e(r2_a)=1-(1-r2)(N-1)/(N-rank_full) where rank_full counts every absorbed level minus one redundancy per extra effect."
 
 - command: ivregress liml
   level: E3

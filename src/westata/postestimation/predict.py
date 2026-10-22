@@ -75,13 +75,62 @@ def _predict_binary(result: Any, link: str, exog: np.ndarray) -> np.ndarray:
 def _predict_tobit_e(
     result: Any, exog: np.ndarray, lower: float | None, upper: float | None
 ) -> np.ndarray:
-    """Expected value of the censored outcome (Stata ``predict, e(a,b)``).
+    """E(y | a < y < b) -- the *conditional* mean, Stata's ``e(a,b)``.
 
-    Following ``[R] tobit``:
+    ``[R] tobit postestimation`` defines ``e(a,b)`` as ``E(y_j | a < y_j < b)``:
+    the mean of the observed outcome *conditional on it falling inside the
+    interval*.  For an observation whose linear index already lies inside
+    (a, b), that conditional mean is the truncated-normal mean
 
-        E[y|x] = a*Phi((a-xb)/s) + xb*(Phi((b-xb)/s) - Phi((a-xb)/s))
-                 + b*(1 - Phi((b-xb)/s))
-                 + s*(phi((a-xb)/s) - phi((b-xb)/s))
+        xb + sigma * (phi(z_a) - phi(z_b)) / (Phi(z_b) - Phi(z_a)).
+
+    Note this is NOT the same as Stata's ``ystar(a,b)``, which is the
+    unconditional expectation of the censored variable.
+    """
+
+    from scipy import stats as _stats
+
+    params = np.asarray(result.params, dtype=float)
+    beta = params[:-1]
+    sigma = float(params[-1])
+    xb = exog @ beta
+    z_lower = (lower - xb) / sigma if lower is not None else None
+    z_upper = (upper - xb) / sigma if upper is not None else None
+
+    # Mass of the interval. Computed with the survival function so that the
+    # upper tail keeps its precision (< 1 - 1e-16 would cancel to zero).
+    if z_lower is None and z_upper is None:
+        probability = np.ones_like(xb)
+    elif z_lower is None:
+        probability = _stats.norm.cdf(z_upper)
+    elif z_upper is None:
+        probability = _stats.norm.sf(z_lower)
+    else:
+        probability = _stats.norm.cdf(z_upper) - _stats.norm.cdf(z_lower)
+
+    lower_pdf = 0.0 if z_lower is None else _stats.norm.pdf(z_lower)
+    upper_pdf = 0.0 if z_upper is None else _stats.norm.pdf(z_upper)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        value = xb + sigma * (lower_pdf - upper_pdf) / probability
+    fallback = lower if lower is not None else (upper if upper is not None else 0.0)
+    return np.where(probability > 1e-300, value, fallback)
+
+
+def _predict_tobit_ystar(
+    result: Any, exog: np.ndarray, lower: float | None, upper: float | None
+) -> np.ndarray:
+    """E(y*) where y* = max{a, min{y, b}} -- Stata's ``ystar(a,b)``.
+
+    The *unconditional* expectation of the censored variable, i.e. the familiar
+    Tobit mean:
+
+        E[y*] = a*Phi(z_a) + xb*(Phi(z_b) - Phi(z_a)) + b*(1 - Phi(z_b))
+                + sigma*(phi(z_a) - phi(z_b))
+
+    This is the quantity ``margins, predict(ystar(0,.))`` averages.  It matches
+    Stata's ``e(a,b)`` output only when a < y < b for every observation, which is
+    why the two are easy to confuse.
     """
 
     from scipy import stats as _stats
@@ -104,28 +153,6 @@ def _predict_tobit_e(
     if upper is not None:
         value = value + upper * (1.0 - upper_cdf)
     return value
-
-
-def _predict_tobit_ystar(
-    result: Any, exog: np.ndarray, lower: float | None, upper: float | None
-) -> np.ndarray:
-    """Expected value of the latent outcome (Stata ``predict, ystar(a,b)``)."""
-
-    from scipy import stats as _stats
-
-    params = np.asarray(result.params, dtype=float)
-    beta = params[:-1]
-    sigma = float(params[-1])
-    xb = exog @ beta
-    z_lower = (lower - xb) / sigma if lower is not None else None
-    z_upper = (upper - xb) / sigma if upper is not None else None
-
-    lower_cdf = 0.0 if z_lower is None else _stats.norm.cdf(z_lower)
-    upper_cdf = 1.0 if z_upper is None else _stats.norm.cdf(z_upper)
-    lower_pdf = 0.0 if z_lower is None else _stats.norm.pdf(z_lower)
-    upper_pdf = 0.0 if z_upper is None else _stats.norm.pdf(z_upper)
-
-    return xb * (upper_cdf - lower_cdf) + sigma * (lower_pdf - upper_pdf)
 
 
 def predict(

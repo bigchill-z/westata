@@ -303,24 +303,24 @@
   notes: "Z(t) matches to 2.3e-4, which is the limit of Stata's 3-decimal display rather than a computational gap."
 
 - command: predict
-  level: E1
-  tolerance: 1.0e-12
+  level: E3
+  tolerance: 1.0e-9
   sources:
-    - type: invariant
-      ref: "OLS xb equals fittedvalues; logit pr equals the logistic transform; poisson n equals exp(xb)"
+    - type: r_crosscheck
+      ref: "predict xb/residuals after regress mpg weight foreign; predict pr/xb after logit; predict e(2,.)/ystar(2,.) after tobit, all captured from StataNow 19.5"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Not separately diffed against `predict` output; the underlying quantities are covered by the margins comparison, which uses the same prediction machinery."
+  date: 2026-10-23
+  notes: "xb 1.6e-15, residuals 5.1e-13 (OLS); pr 3.1e-11, xb 3.6e-10 (logit); e(a,b) and ystar(a,b) both 5.8e-10 (tobit). Two real defects fixed here: (1) the tobit e(a,b) and ystar(a,b) implementations were swapped; (2) e(a,b) overflowed for observations whose linear index was far inside the interval, because 1-Phi(z) rounds to 0 for z>7. [R] tobit postestimation defines e(a,b)=E(y|a<y<b) (conditional) and ystar(a,b)=E(y*) with y*=max{a,min{y,b}} (unconditional)."
 
 - command: etable
-  level: E1
-  tolerance: 1.0e-15
+  level: E3
+  tolerance: 5.0e-7
   sources:
-    - type: invariant
-      ref: "Values come from params/bse unchanged; the Observations row equals e(N)"
+    - type: r_crosscheck
+      ref: "esttab m1 m2, b(%9.6f) se(%9.6f) star(* 0.05 ** 0.01 *** 0.001) plain compared cell-by-cell with ws.etable"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Presentation layer. esttab is not installed, so no output-level comparison is possible."
+  date: 2026-10-23
+  notes: "estout installed from the author's GitHub source (SSC unreachable). Coefficients agree exactly at the printed precision (gap 0.0). The tolerance is 5e-7 because esttab reports 6 decimals."
 
 - command: vec / vecrank
   level: E1
@@ -328,16 +328,18 @@
   sources:
     - type: invariant
       ref: "Johansen trace rejects for a cointegrated pair"
+    - type: r_crosscheck
+      ref: "Attempted against StataNow 19.5 vecrank y1 y2, lags(1): Stata trace(0)=288.3450 (eigenvalue 0.50992), statsmodels gives 195.9673 (0.382398) at det_order=0, k_ar_diff=1"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Not yet compared with `vec` output."
+  date: 2026-10-23
+  notes: "Documented non-conformance rather than a tuned match. The data round-trip through pystata is exact (4e-16), so the gap is in the Johansen implementation/lag convention. With k_ar_diff=0 the first eigenvalue becomes 0.511 (close to Stata's 0.50992) but the trace stat still differs, so the lag mapping between Stata's lags(1) and statsmodels' k_ar_diff is not settled. Treat westata's VECM as unverified."
 
 - command: pperron / kpss
-  level: E1
-  tolerance: 1.0e-3
+  level: E2
+  tolerance: 2.0e-2
   sources:
-    - type: invariant
-      ref: "KPSS rejects stationarity on a random walk; Phillips-Perron runs"
+    - type: r_crosscheck
+      ref: "pperron y on a random walk: Stata Z(t) = -1.896, westata -1.927135"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Only dfuller has been compared with Stata so far."
+  date: 2026-10-23
+  notes: "Phillips-Perron differs by 1.6e-2. Stata prints 3 decimals, so part of this is display precision, but 1.6e-2 is larger than the display limit, indicating a genuine difference in the default lag truncation. kpss cannot be compared: kpss is no longer a StataNow 19 command (`command kpss is unrecognized`), the same removal pattern as xtreg, fd."

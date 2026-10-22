@@ -1,0 +1,219 @@
+=== qreg_0.25 ===
+
+Iteration 1:  WLS sum of weighted deviations =  186.44493
+
+Iteration 1:  Sum of abs. weighted deviations =  185.82214
+Iteration 2:  Sum of abs. weighted deviations =  180.36173
+Iteration 3:  Sum of abs. weighted deviations =  159.14116
+Iteration 4:  Sum of abs. weighted deviations =  159.03558
+Iteration 5:  Sum of abs. weighted deviations =  157.85569
+Iteration 6:  Sum of abs. weighted deviations =  156.94493
+Iteration 7:  Sum of abs. weighted deviations =  156.86602
+Iteration 8:  Sum of abs. weighted deviations =  156.85246
+Iteration 9:  Sum of abs. weighted deviations =  156.80043
+Iteration 10: Sum of abs. weighted deviations =  156.79542
+Iteration 11: Sum of abs. weighted deviations =  156.78573
+Iteration 12: Sum of abs. weighted deviations =  156.76993
+Iteration 13: Sum of abs. weighted deviations =  156.75737
+Iteration 14: Sum of abs. weighted deviations =  156.75224
+
+.25 Quantile regression                             Number of obs =        600
+  Raw sum of deviations 438.3735 (about -.46158607)
+  Min sum of deviations 156.7522                    Pseudo R2     =     0.6424
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   2.042842   .0472461    43.24   0.000     1.950053    2.135631
+          x2 |  -.8013571   .0452555   -17.71   0.000    -.8902364   -.7124778
+       _cons |    .518284   .0473547    10.94   0.000     .4252819     .611286
+------------------------------------------------------------------------------
+
+
+=== qreg_0.5 ===
+
+Iteration 1:  WLS sum of weighted deviations =  194.72432
+
+Iteration 1:  Sum of abs. weighted deviations =  194.69722
+Iteration 2:  Sum of abs. weighted deviations =  194.21404
+Iteration 3:  Sum of abs. weighted deviations =  194.18699
+Iteration 4:  Sum of abs. weighted deviations =  194.17028
+Iteration 5:  Sum of abs. weighted deviations =  194.13588
+Iteration 6:  Sum of abs. weighted deviations =  194.12952
+Iteration 7:  Sum of abs. weighted deviations =  194.12856
+
+Median regression                                   Number of obs =        600
+  Raw sum of deviations  533.517 (about .90882506)
+  Min sum of deviations 194.1286                    Pseudo R2     =     0.6361
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.965287   .0355009    55.36   0.000     1.895565    2.035008
+          x2 |  -.7475726   .0340052   -21.98   0.000    -.8143569   -.6807883
+       _cons |    .979461   .0355825    27.53   0.000     .9095788    1.049343
+------------------------------------------------------------------------------
+
+
+=== qreg_0.75 ===
+
+Iteration 1:  WLS sum of weighted deviations =  187.94627
+
+Iteration 1:  Sum of abs. weighted deviations =  189.67968
+Iteration 2:  Sum of abs. weighted deviations =  184.80845
+Iteration 3:  Sum of abs. weighted deviations =  179.63143
+Iteration 4:  Sum of abs. weighted deviations =  171.50065
+Iteration 5:  Sum of abs. weighted deviations =   163.8311
+Iteration 6:  Sum of abs. weighted deviations =  162.50359
+Iteration 7:  Sum of abs. weighted deviations =  162.13145
+Iteration 8:  Sum of abs. weighted deviations =  161.95057
+Iteration 9:  Sum of abs. weighted deviations =  161.77587
+Iteration 10: Sum of abs. weighted deviations =  161.77159
+
+.75 Quantile regression                             Number of obs =        600
+  Raw sum of deviations 431.6608 (about 2.2547184)
+  Min sum of deviations 161.7716                    Pseudo R2     =     0.6252
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.978264   .0513448    38.53   0.000     1.877426    2.079103
+          x2 |  -.7318384   .0491815   -14.88   0.000    -.8284282   -.6352486
+       _cons |   1.517499   .0514629    29.49   0.000     1.416429     1.61857
+------------------------------------------------------------------------------
+
+
+=== qreg_0.9 ===
+
+Iteration 1:  WLS sum of weighted deviations =  176.52976
+
+Iteration 1:  Sum of abs. weighted deviations =  177.59109
+Iteration 2:  Sum of abs. weighted deviations =  131.08931
+Iteration 3:  Sum of abs. weighted deviations =  100.66297
+Iteration 4:  Sum of abs. weighted deviations =  99.123997
+Iteration 5:  Sum of abs. weighted deviations =  97.682194
+Iteration 6:  Sum of abs. weighted deviations =  95.366493
+Iteration 7:  Sum of abs. weighted deviations =   94.12042
+Iteration 8:  Sum of abs. weighted deviations =  94.016271
+Iteration 9:  Sum of abs. weighted deviations =  93.812836
+Iteration 10: Sum of abs. weighted deviations =  93.753139
+Iteration 11: Sum of abs. weighted deviations =  93.611978
+Iteration 12: Sum of abs. weighted deviations =  93.610316
+Iteration 13: Sum of abs. weighted deviations =  93.599485
+
+.9 Quantile regression                              Number of obs =        600
+  Raw sum of deviations 249.2478 (about 3.8781506)
+  Min sum of deviations 93.59948                    Pseudo R2     =     0.6245
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.996667   .0717235    27.84   0.000     1.855806    2.137528
+          x2 |  -.7252009   .0687016   -10.56   0.000    -.8601271   -.5902748
+       _cons |   2.097133   .0718884    29.17   0.000     1.955948    2.238318
+------------------------------------------------------------------------------
+
+
+=== sqreg ===
+(fitting base model)
+
+Bootstrap replications (200): .........10.........20.........30.........40.....
+> ....50.........60.........70.........80.........90.........100.........110...
+> ......120.........130.........140.........150.........160.........170........
+> .180.........190.........200 done
+
+Simultaneous quantile regression                    Number of obs =        600
+  bootstrap(200) SEs                                .25 Pseudo R2 =     0.6424
+                                                    .50 Pseudo R2 =     0.6361
+                                                    .75 Pseudo R2 =     0.6252
+
+------------------------------------------------------------------------------
+             |              Bootstrap
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+q25          |
+          x1 |   2.042842   .0705717    28.95   0.000     1.904243    2.181441
+          x2 |  -.8013571   .0452183   -17.72   0.000    -.8901634   -.7125508
+       _cons |    .518284   .0521766     9.93   0.000      .415812    .6207559
+-------------+----------------------------------------------------------------
+q50          |
+          x1 |   1.965287   .0506841    38.78   0.000     1.865746    2.064827
+          x2 |  -.7475726   .0344652   -21.69   0.000    -.8152603   -.6798849
+       _cons |    .979461   .0401836    24.37   0.000     .9005426    1.058379
+-------------+----------------------------------------------------------------
+q75          |
+          x1 |   1.978264   .0709206    27.89   0.000      1.83898    2.117548
+          x2 |  -.7318384   .0535878   -13.66   0.000    -.8370818   -.6265949
+       _cons |   1.517499   .0574422    26.42   0.000     1.404686    1.630313
+------------------------------------------------------------------------------
+
+
+=== bsqreg ===
+(fitting base model)
+
+Bootstrap replications (200): .........10.........20.........30.........40.....
+> ....50.........60.........70.........80.........90.........100.........110...
+> ......120.........130.........140.........150.........160.........170........
+> .180.........190.........200 done
+
+Median regression, bootstrap(200) SEs               Number of obs =        600
+  Raw sum of deviations  533.517 (about .90882506)
+  Min sum of deviations 194.1286                    Pseudo R2     =     0.6361
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.965287    .049082    40.04   0.000     1.868892    2.061681
+          x2 |  -.7475726   .0324833   -23.01   0.000     -.811368   -.6837771
+       _cons |    .979461   .0378181    25.90   0.000     .9051884    1.053734
+------------------------------------------------------------------------------
+
+
+=== rreg ===
+
+   Huber iteration 1:  Maximum difference in weights = .9774051
+   Huber iteration 2:  Maximum difference in weights = .25149193
+   Huber iteration 3:  Maximum difference in weights = .05437287
+   Huber iteration 4:  Maximum difference in weights = .00524876
+Biweight iteration 5:  Maximum difference in weights = .29277001
+Biweight iteration 6:  Maximum difference in weights = .0078665
+
+Robust regression                               Number of obs     =        400
+                                                F(  2,       397) =     688.92
+                                                Prob > F          =     0.0000
+
+------------------------------------------------------------------------------
+           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   2.014204   .0564219    35.70   0.000     1.903281    2.125127
+          x2 |  -.5340517   .0525755   -10.16   0.000    -.6374129   -.4306905
+       _cons |   .9933214   .0545107    18.22   0.000     .8861558    1.100487
+------------------------------------------------------------------------------
+
+
+=== qreg_robust ===
+
+Iteration 1:  WLS sum of weighted deviations =  194.72432
+
+Iteration 1:  Sum of abs. weighted deviations =  194.69722
+Iteration 2:  Sum of abs. weighted deviations =  194.21404
+Iteration 3:  Sum of abs. weighted deviations =  194.18699
+Iteration 4:  Sum of abs. weighted deviations =  194.17028
+Iteration 5:  Sum of abs. weighted deviations =  194.13588
+Iteration 6:  Sum of abs. weighted deviations =  194.12952
+Iteration 7:  Sum of abs. weighted deviations =  194.12856
+
+Median regression                                   Number of obs =        600
+  Raw sum of deviations  533.517 (about .90882506)
+  Min sum of deviations 194.1286                    Pseudo R2     =     0.6361
+
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.965287   .0352211    55.80   0.000     1.896114    2.034459
+          x2 |  -.7475726   .0336117   -22.24   0.000    -.8135842   -.6815609
+       _cons |    .979461   .0359358    27.26   0.000     .9088849    1.050037
+------------------------------------------------------------------------------
+
+

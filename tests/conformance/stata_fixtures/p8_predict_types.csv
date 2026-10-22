@@ -1,0 +1,5 @@
+check,kind,status
+qreg_predict,xb,OK
+qreg_predict,residuals,OK
+qreg_predict,stdp,OK
+qreg_predict,stdf,REFUSED

@@ -249,14 +249,14 @@
   notes: "Reports /lnsigma like Stata, not /sigma. With point intervals (lo == hi == y) it reduces to OLS."
 
 - command: heckman
-  level: E2
-  tolerance: 2.0e-2
+  level: E3
+  tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
-      ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111, y:_cons 1.026726, selected:z .8021853"
+      ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111 (se .0367055), y:_cons 1.026726 (se .0706062), selected:z .8021853 (se .0433423)"
   verified_by: lead
   date: 2026-10-23
-  notes: "TWO-STEP ONLY, and the standard errors are NOT Heckman-corrected: the reported covariance is the OLS covariance of the augmented regression, so e(se_corrected) = 0. Stata's default heckman is ML and its standard errors differ. Coefficients match Stata's ML to 2e-2. rho is a plug-in correlation here, not the ML estimate, so it is not compared. method='ml' raises UnsupportedError rather than approximating."
+  notes: "TWO-STEP estimator, with the Heckman correction applied to the standard errors (e(se_corrected) = 1). Coefficients match Stata's two-step closely and the corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. rho is a plug-in correlation rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
 
 - command: etregress
   level: E1
@@ -281,14 +281,14 @@
   notes: "All four coefficients match Stata to 1e-4. With inflate=None the model reduces exactly to Poisson, which is pinned by a unit test."
 
 - command: zinb
-  level: E2
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-2
   sources:
     - type: r_crosscheck
-      ref: "zinb y x1, inflate(_cons) on 1200 overdispersed observations (captured output in p6p7_outputs.txt)"
+      ref: "zinb y x1, inflate(_cons) on 1200 overdispersed observations: Stata LR chi2(1) = 293.89, ll = -2028.728"
   verified_by: lead
   date: 2026-10-23
-  notes: "Converges and produces finite parameters; the dispersion is reported as /lnalpha."
+  notes: "chi2 and ll reproduce Stata exactly. The dispersion is reported as /lnalpha. The inflation intercept is weakly identified in this DGP (westata -13.24 vs Stata -14.07, both with SE in the hundreds), so only finiteness is asserted for it."
 
 - command: ztp
   level: E3
@@ -519,3 +519,17 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Phillips-Perron differs by 1.6e-2. Stata prints 3 decimals, so part of this is display precision, but 1.6e-2 is larger than the display limit, indicating a genuine difference in the default lag truncation. kpss cannot be compared: kpss is no longer a StataNow 19 command (`command kpss is unrecognized`), the same removal pattern as xtreg, fd."
+
+# --- Note on the count models' null baseline ------------------------------
+#
+# Stata does not use one null model for all four count commands, and getting
+# this wrong shifts chi2, p and pseudo-R2 without touching a single coefficient:
+#
+#   zip / zinb / tnbreg   a *fitted* constant-only model (Stata prints the
+#                         "Fitting constant-only model" block)
+#   ztp                   mean(y) with the truncation applied (no such block)
+#
+# Verified numerically: for ztp the fitted-constant route gives chi2 246.25,
+# which matches no Stata output, while mean(y) gives 270.42 exactly. An earlier
+# implementation used mean(y) everywhere and consequently reported zip chi2
+# 657.68 against Stata's 248.04.

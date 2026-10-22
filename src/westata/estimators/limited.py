@@ -1,4 +1,4 @@
-"""Limited dependent-variable models.
+"""Limited dependent-variable models (P6).
 
 ======================  ==================
 westata                 Stata
@@ -9,254 +9,555 @@ westata                 Stata
 ``Etregress``           ``etregress``
 ======================  ==================
 
-All four are fitted by maximum likelihood except ``Heckman``/``Etregress``,
-which implement the two-step / control-function estimators and refuse the MLE
-variant explicitly: a two-step Heckman whose standard errors were naive would be
-indistinguishable from a correct one to a reader, so the choice is stated in
-``e(estimator)`` and the docstring rather than hidden.
+``Truncreg`` and ``Intreg`` are maximum-likelihood estimators.  They reuse
+:class:`westata.estimators.discrete._DiscreteBase` for everything Stata-facing
+(parameter naming, ``e()`` discipline, ``StataResults`` assembly, ``strict=``
+convergence handling) and only supply a statsmodels ``GenericLikelihoodModel``
+whose ``loglikeobs`` is the Stata likelihood, plus the scale bookkeeping.
+``Heckman`` and ``Etregress`` are two-step estimators with no single likelihood
+to hand to a backend, so they assemble ``StataResults`` directly.
 
 Likelihoods
 -----------
-Truncated regression (``[R] truncreg``), observations only seen inside
-``(a, b)``::
+Truncated regression (``[R] truncreg``).  Observations outside ``(a, b)`` were
+never sampled, so the density is divided by the probability of being inside the
+interval::
 
     lnL = sum[ -ln(sigma) - 0.5 ln(2 pi) - 0.5 ((y - xb)/sigma)^2
                - ln( Phi((b - xb)/sigma) - Phi((a - xb)/sigma) ) ]
 
-Interval regression (``[R] intreg``), only the interval ``[a, b]`` is known::
+Interval regression (``[R] intreg``).  Only the interval ``[a, b]`` is known::
 
     lnL = sum[ ln( Phi((b - xb)/sigma) - Phi((a - xb)/sigma) ) ]
 
-Both are maximised with sigma on a log scale so it stays positive, following
-:mod:`westata.estimators.tobit`.
+``lower == upper`` marks an exactly observed value and contributes
+``ln phi(z) - ln sigma`` instead, which is what makes the point-interval case
+reduce to OLS.  ``-inf``/``+inf`` bounds mark censoring.
+
+Both likelihoods are maximised with ``sigma`` on a log scale so it stays
+positive, and reported the way Stata reports them: ``truncreg`` prints
+``/sigma``; ``intreg`` prints ``/lnsigma`` (with ``e(sigma)`` and a
+delta-method covariance for the exponentiated scale).
+
+Standard errors and model tests
+-------------------------------
+``cov_type="nonrobust"`` is the observed information (the numerical Hessian of
+the log-likelihood), which is Stata's default for both commands.  Against the
+captured StataNow 19.5 output in
+``tests/conformance/stata_fixtures/p6p7_outputs.txt`` this reproduces the
+coefficients to 7 significant digits, the standard errors to 6, ``e(ll)`` to 6,
+and the Wald/LR model test to 5.  ``truncreg`` prints a Wald ``chi2`` on the
+slopes; ``intreg`` the LR ``chi2`` against its constant-only model -- exactly the
+tests Stata reports for those two commands.  Both use ``dist="z"``.
+
+Two-step estimators and their standard errors
+---------------------------------------------
+``Heckman`` (two-step, Heckman 1979) and ``Etregress`` (control function) put a
+*generated regressor* into a linear equation: the inverse Mills ratio
+``lambda = phi(z g)/Phi(z g)``, or the control-function residual
+``t*phi/Phi - (1-t)*phi/(1-Phi)``, is estimated by a first-stage probit.  Their
+covariance is therefore the two-step M-estimator sandwich
+
+    V = A^-1 B A'^-1 / n,   A = E[d psi / d theta],   B = E[psi psi']
+
+with ``psi`` stacking the probit score and the augmented-regression moments.
+
+**The standard errors reported by :class:`Heckman` and :class:`Etregress` are
+this full correction, not naive OLS standard errors.**  They are still *not*
+Stata's numbers: Stata's ``heckman``/``etregress`` default to maximum likelihood,
+which reports ML standard errors for ML point estimates.  Here the point
+estimates are the two-step ones and the standard errors are the matching
+two-step ones, so the two sets differ by construction -- the approximation is
+the estimator, not the standard error.  ``e(vce)`` records ``"twostep"`` and
+``e(se_corrected)`` is ``1``, so this cannot be mistaken for naive OLS output.
+
+Not implemented (raises :class:`westata.errors.UnsupportedError`)
+----------------------------------------------------------------
+* ``Heckman.fit(method="ml")`` -- joint ML over ``beta``, ``gamma`` and ``rho``.
+* ``Etregress.fit(method="ml")`` -- joint ML over the outcome and treatment
+  equations.
+
+Neither is approximated silently: the request raises and names what is missing.
+
+Documented deviations from Stata
+--------------------------------
+* ``Heckman``'s ``sigma``/``rho`` come from the augmented regression
+  (``rho = b_lambda / sigma``), not from the ML information matrix.
+* ``e(lambda)`` follows the P6 plan and holds the **mean inverse Mills ratio**
+  over the selected sample.  Stata's ``e(lambda)`` is ``rho * sigma``, the
+  coefficient on ``lambda``; that value is available as ``e(lam_coef)``.
+* All four models record ``e(r2_p)`` (McFadden) although Stata prints no
+  pseudo R-squared for them.  It is an additional diagnostic, documented here
+  so it is never read as a Stata scalar.
+* ``Heckman``'s ``e(N)`` is the full sample (as in Stata) while ``nobs`` is the
+  number of selected observations, because that is the length of the residual
+  and fitted-value vectors.
 """
 
 from __future__ import annotations
 
+import re
 import warnings
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
 from scipy import optimize, stats
+from scipy.special import log_ndtr
+from statsmodels.base.model import GenericLikelihoodModel
 
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
+from westata.estimators.discrete import _DiscreteBase
+from westata.estimators.tobit import _numerical_hessian
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
 __all__ = ["Etregress", "Heckman", "Intreg", "Truncreg"]
 
 
-def _central_difference_hessian(
-    function: Any, point: np.ndarray, step: float = 1e-5
-) -> np.ndarray:
-    """Numerical Hessian, used for the observed information matrix."""
-
-    point = np.asarray(point, dtype=float)
-    size = point.size
-    hessian = np.zeros((size, size), dtype=float)
-    increments = step * np.maximum(np.abs(point), 1.0)
-
-    for i in range(size):
-        for j in range(i, size):
-            ei = np.zeros(size)
-            ej = np.zeros(size)
-            ei[i] = increments[i]
-            ej[j] = increments[j]
-            if i == j:
-                value = (
-                    function(point + ei) - 2.0 * function(point) + function(point - ei)
-                ) / (increments[i] ** 2)
-            else:
-                value = (
-                    function(point + ei + ej)
-                    - function(point + ei - ej)
-                    - function(point - ei + ej)
-                    + function(point - ei - ej)
-                ) / (4.0 * increments[i] * increments[j])
-            hessian[i, j] = value
-            hessian[j, i] = value
-    return hessian
+# --------------------------------------------------------------- arithmetic
 
 
-def _covariance_from_hessian(point: np.ndarray, function: Any) -> np.ndarray:
-    hessian = _central_difference_hessian(function, point)
-    try:
-        covariance = np.linalg.inv(hessian)
-    except np.linalg.LinAlgError:
-        covariance = np.linalg.pinv(hessian)
-    if not np.all(np.isfinite(covariance)):
-        raise ConvergenceError(
-            "the observed information matrix is not invertible; the model is "
-            "likely not identified"
-        )
-    return covariance
+def _interval_log_mass(z_lower: np.ndarray, z_upper: np.ndarray) -> np.ndarray:
+    """``log(Phi(z_upper) - Phi(z_lower))`` without catastrophic cancellation.
+
+    ``Phi(b) - Phi(a)`` cancels to zero when both bounds sit in the same tail,
+    which is exactly the regime truncation produces.  Factoring out the larger
+    term (``Phi(b)``, since ``b > a``) leaves
+
+        log(Phi(b) - Phi(a)) = log_ndtr(b) + log(-expm1(log_ndtr(a) - log_ndtr(b)))
+
+    and ``-expm1(delta)`` is accurate both for narrow intervals (``delta`` near
+    zero, where the direct difference would lose every digit) and for wide ones
+    (``delta`` very negative).  ``log_ndtr`` is used instead of
+    ``stats.norm.logcdf`` because it keeps full relative precision far into the
+    tails.  Infinite bounds are the caller's responsibility.
+    """
+
+    upper = log_ndtr(np.asarray(z_upper, dtype=float))
+    delta = log_ndtr(np.asarray(z_lower, dtype=float)) - upper
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return upper + np.log(-np.expm1(np.minimum(delta, 0.0)))
+
+
+def _mills_ratio(index: np.ndarray) -> np.ndarray:
+    """Inverse Mills ratio ``phi(w)/Phi(w)``, computed in the log domain.
+
+    ``phi(w)/Phi(w)`` overflows for large negative ``w``; taking the difference
+    of the logs keeps it finite for every attainable index.
+    """
+
+    index = np.asarray(index, dtype=float)
+    return np.exp(stats.norm.logpdf(index) - log_ndtr(index))
 
 
 def _pseudo_r2(llf: float, ll0: float) -> float:
-    if not np.isfinite(ll0) or ll0 == 0:
+    """McFadden's pseudo R-squared, NaN when there is no usable null model."""
+
+    if not np.isfinite(ll0) or ll0 == 0 or not np.isfinite(llf):
         return float("nan")
     return 1.0 - llf / ll0
 
 
-class _LimitedBase:
-    """Shared plumbing for the self-implemented censored/truncated likelihoods."""
+def _gaussian_pseudo_r2(
+    outcome: np.ndarray, fitted: np.ndarray, *, nobs: int, k: int
+) -> tuple[float, float, float]:
+    """McFadden pseudo R2, ``ll`` and ``ll_0`` for a Gaussian second stage.
 
-    _stata_command = ""
+    Stata's two-step estimators still report a log-likelihood, and it is the
+    Gaussian likelihood of the equation they actually fit.  The null model is
+    the same likelihood with only a constant, which is what
+    ``r2_p = 1 - ll/ll_0`` has to be computed against for the ratio to mean
+    anything.
+    """
 
-    def __init__(self, endog: Any, exog: Any, *, param_names: list[str] | None = None) -> None:
-        self._y = np.asarray(endog, dtype=float).reshape(-1)
-        X = np.asarray(exog, dtype=float)
-        if X.ndim == 1:
-            X = X.reshape(-1, 1)
-        self._X = X
-        self._param_names = (
-            list(param_names)
-            if param_names is not None
-            else [f"x{i}" for i in range(X.shape[1])]
-        )
-        if len(self._param_names) != X.shape[1]:
-            raise ValueError(
-                f"param_names has {len(self._param_names)} entries but exog has "
-                f"{X.shape[1]} columns"
-            )
-        #: Estimation-sample covariates, retained for margins(over=...).
-        self._model_data: pd.DataFrame | None = None
+    residual = outcome - fitted
+    dof = max(nobs - k, 1)
+    sigma2 = float(residual @ residual) / dof
+    if not np.isfinite(sigma2) or sigma2 <= 0:
+        return float("nan"), float("nan"), float("nan")
 
-    # -------------------------------------------------------------- fitting
-    def _fit_likelihood(
+    llf = float(-0.5 * nobs * (np.log(2.0 * np.pi * sigma2) + 1.0))
+
+    # Constant-only counterpart on the same sample.
+    centred = outcome - float(np.mean(outcome))
+    sigma2_null = float(centred @ centred) / max(nobs - 1, 1)
+    if not np.isfinite(sigma2_null) or sigma2_null <= 0:
+        return float("nan"), llf, float("nan")
+    ll0 = float(-0.5 * nobs * (np.log(2.0 * np.pi * sigma2_null) + 1.0))
+    return _pseudo_r2(llf, ll0), llf, ll0
+
+
+def _slope_positions(names: Sequence[str]) -> list[int]:
+    """Indices of the coefficients a Stata Wald/LR test covers.
+
+    Stata's ``Wald chi2(k)`` for these commands counts the structural regressor
+    slopes of the outcome equation.  Excluded:
+
+    * the constant, however the estimator spells it (``Intercept``, ``_cons``,
+      or an equation-prefixed ``y:Intercept``);
+    * the estimated scale (``/sigma``, ``/lnsigma``);
+    * the generated regressors -- ``lambda`` (Heckman) and the control-function
+      residual (``Etregress``) -- because they are auxiliary parameters, not
+      regressors whose null Stata tests;
+    * every coefficient of the selection/treatment equation (``select:`` /
+      ``treat:``), which belongs to a different equation.
+    """
+
+    positions = []
+    for position, name in enumerate(names):
+        leaf = name.split(":", 1)[-1]
+        if leaf in ("Intercept", "_cons", "lambda"):
+            continue
+        if name.startswith("/") or name.startswith("select:") or name.startswith(
+            "treat:"
+        ):
+            continue
+        positions.append(position)
+    return positions
+
+
+def _wald_statistic(
+    params: np.ndarray, cov: np.ndarray, positions: Sequence[int]
+) -> float:
+    """Wald statistic ``b' V^-1 b`` over the given coefficient block."""
+
+    if not positions:
+        return float("nan")
+    index = np.asarray(positions, dtype=int)
+    beta = np.asarray(params, dtype=float)[index]
+    block = np.asarray(cov, dtype=float)[np.ix_(index, index)]
+    try:
+        solved = np.linalg.solve(block, beta)
+    except np.linalg.LinAlgError:
+        solved = np.linalg.pinv(block) @ beta
+    with np.errstate(invalid="ignore"):
+        statistic = float(beta @ solved)
+    return statistic if np.isfinite(statistic) and statistic >= 0 else float("nan")
+
+
+def _chi2_pvalue(statistic: float, df: int) -> float:
+    if not np.isfinite(statistic) or df <= 0:
+        return float("nan")
+    return float(stats.chi2.sf(statistic, df))
+
+
+# --------------------------------------------------------------- ML backend
+
+
+class _SelfLikelihoodModel(GenericLikelihoodModel):
+    """statsmodels ``GenericLikelihoodModel`` carrying a Stata likelihood.
+
+    :meth:`westata.estimators.discrete._DiscreteBase.fit` drives this object: it
+    reads ``params``, ``cov_params()``, ``predict()``, ``llf``,
+    ``resid_response`` and ``mle_retvals['converged']``.  A
+    ``GenericLikelihoodModel`` supplies all but ``resid_response`` (attached in
+    :meth:`fit`), and it needs an explicit ``hessian`` both for Newton steps and
+    for Stata's observed-information covariance: statsmodels' default numerical
+    Hessian is computed from the score and is far noisier at the optimum.
+
+    Parameters
+    ----------
+    endog, exog:
+        Response and design matrix; ``exog`` includes the constant.
+    loglike_obs:
+        ``f(theta) -> length-n`` log-likelihood contributions, where ``theta``
+        is ``[beta..., extra]`` and ``extra`` is the scale on the log scale.
+    start_params:
+        Starting values (OLS coefficients plus a residual scale).
+    extra_names:
+        Stata's spelling for the parameters after ``beta``.
+    """
+
+    def __init__(
         self,
+        endog: np.ndarray,
+        exog: np.ndarray,
         *,
-        maxiter: int,
-        strict: bool,
+        loglike_obs: Callable[[np.ndarray], np.ndarray],
+        start_params: np.ndarray,
         extra_names: Sequence[str] = ("/sigma",),
-        scalars: Mapping[str, Any] | None = None,
-    ) -> StataResults:
-        """Maximise ``-self._loglike`` and assemble a Stata-style result."""
-
-        n, k = self._X.shape
-        if n <= k:
-            raise ConsistencyError(
-                f"{self._stata_command}: {n} observations but {k} regressors; the "
-                "model is not identified"
-            )
-
-        beta0, *_ = np.linalg.lstsq(self._X, self._y, rcond=None)
-        resid0 = self._y - self._X @ beta0
-        scale0 = max(float(np.std(resid0)), 1e-3)
-        start = np.concatenate([beta0, [np.log(scale0)]])
-        if len(extra_names) != 1:
-            raise UnsupportedError(
-                f"{self._stata_command}: only a single scale parameter is "
-                f"supported, got {extra_names}"
-            )
-
-        def objective(theta: np.ndarray) -> float:
-            value = self._loglike(theta)
-            return -value if np.isfinite(value) else 1e12
-
-        result = optimize.minimize(
-            objective, start, method="BFGS", options={"maxiter": maxiter}
-        )
-        if not result.success:
-            # BFGS routinely stops on "precision loss" at the optimum; refine with
-            # a derivative-free method as tobit does.
-            refined = optimize.minimize(
-                objective,
-                np.asarray(result.x, dtype=float),
-                method="Nelder-Mead",
-                options={"maxiter": maxiter, "xatol": 1e-9, "fatol": 1e-9},
-            )
-            if refined.fun <= result.fun:
-                result = refined
-
-        converged = bool(result.success) or bool(np.isfinite(result.fun))
-        if not result.success:
-            message = (
-                f"{self._stata_command}: optimiser did not converge ({result.message})"
-            )
-            if strict:
-                raise ConvergenceError(message)
-            warnings.warn(message, RuntimeWarning, stacklevel=2)
-
-        theta = np.asarray(result.x, dtype=float)
-        beta = theta[:k]
-        scale = float(np.exp(theta[k]))
-        covariance = _covariance_from_hessian(theta, objective)
-
-        llf = float(self._loglike(theta))
-        ll0 = self._null_loglike(k)
-        chi2 = 2.0 * (llf - ll0) if np.isfinite(ll0) else float("nan")
-        pseudo = _pseudo_r2(llf, ll0)
-
-        names = list(self._param_names) + list(extra_names)
-        params = np.concatenate([beta, [scale]])
-
-        e: dict[str, Any] = {
-            "N": n,
-            "df_m": float(k - 1),
-            "rank": k + 1,
-            "ll": llf,
-            "ll_0": ll0,
-            "chi2": chi2,
-            "chi2type": "LR",
-            "p": float(stats.chi2.sf(chi2, k - 1)) if k > 1 else float("nan"),
-            "r2_p": pseudo,
-            "sigma": scale,
-            "converged": int(converged),
-        }
-        if scalars:
-            e.update(dict(scalars))
-
-        return StataResults(
-            params=params,
-            param_names=names,
-            cov=covariance,
-            resid=self._y - self._X @ beta,
-            fittedvalues=self._X @ beta,
-            nobs=n,
-            df_resid=float(n - k),
-            df_model=float(k - 1),
-            dist="z",
-            model_name=self._stata_command,
-            cov_type="nonrobust",
-            e=e,
-            design_matrix=(self._X, list(self._param_names)),
-            model_data=self._model_data,
+    ) -> None:
+        self._loglike_obs = loglike_obs
+        self.start_params = np.asarray(start_params, dtype=float).reshape(-1)
+        super().__init__(
+            endog, exog, extra_params_names=list(extra_names) or None, missing="none"
         )
 
-    def _loglike(self, theta: np.ndarray) -> float:
+    # ------------------------------------------------------------ likelihood
+    def loglikeobs(self, params: Any) -> np.ndarray:
+        return np.asarray(self._loglike_obs(np.asarray(params, dtype=float))).reshape(-1)
+
+    def hessian(self, params: Any) -> np.ndarray:
+        """Observed information of the *log*-likelihood (Stata's default)."""
+
+        return _numerical_hessian(self.loglike, np.asarray(params, dtype=float))
+
+    def predict(self, params: Any, exog: Any = None, which: str = "mean") -> np.ndarray:
+        design = self.exog if exog is None else np.asarray(exog, dtype=float)
+        return design @ np.asarray(params, dtype=float)[: design.shape[1]]
+
+    # ------------------------------------------------------------------- fit
+    def fit(self, **kwargs: Any) -> Any:
+        """Fit with an optimiser ladder, returning the best usable result.
+
+        Newton is the step that lands on Stata's estimates, but it can diverge
+        from an unlucky start.  If Newton fails, the fit falls back to BFGS and
+        then Nelder-Mead, keeping whichever result reached the highest
+        likelihood.  ``mle_retvals['converged']`` always describes the result
+        actually returned, so ``_DiscreteBase``'s ``strict=`` handling stays
+        truthful.
+        """
+
+        kwargs.setdefault("disp", 0)
+        kwargs.setdefault("start_params", self.start_params)
+        method = str(kwargs.get("method", "newton")).lower()
+        attempts: list[dict[str, Any]] = [dict(kwargs)]
+        if method == "newton":
+            fallback = {key: value for key, value in kwargs.items() if key != "tol"}
+            attempts.append({**fallback, "method": "bfgs"})
+            attempts.append({**fallback, "method": "nm"})
+
+        best: Any = None
+        for attempt in attempts:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                try:
+                    candidate = GenericLikelihoodModel.fit(self, **attempt)
+                except (ValueError, np.linalg.LinAlgError, np.linalg.LinAlgWarning):
+                    continue
+            if not np.all(np.isfinite(np.asarray(candidate.params, dtype=float))):
+                continue
+            if best is None or float(candidate.llf) > float(best.llf):
+                best = candidate
+            if bool(candidate.mle_retvals.get("converged", False)):
+                break
+
+        if best is None:
+            raise ConvergenceError(
+                "the likelihood could not be evaluated to a finite value at any "
+                "starting point; check the data and the truncation/interval limits"
+            )
+
+        # ``_DiscreteBase.fit`` reads ``resid_response``; the generic-likelihood
+        # results class does not define it.  ``y - x'b`` is the response residual
+        # for these Gaussian-based models.
+        best.resid_response = np.asarray(
+            self.endog, dtype=float
+        ).reshape(-1) - np.asarray(self.predict(best.params), dtype=float)
+        return best
+
+
+# ---------------------------------------------------------- ML limited base
+
+
+class _MLLimitedBase(_DiscreteBase):
+    """Shared Stata layer for the self-implemented truncated/interval models.
+
+    Subclasses supply the likelihood (:meth:`_loglike_with`), the scale
+    parameter's name and the model-level test Stata prints.
+    """
+
+    #: ``/sigma`` (truncreg) or ``/lnsigma`` (intreg).
+    _scale_name = "/sigma"
+    _optimizer = "newton"
+
+    # ------------------------------------------------------------ parameters
+    def _extra_param_names(self, count: int) -> list[str]:
+        if count == 1:
+            return [self._scale_name]
+        return super()._extra_param_names(count)
+
+    def _sigma(self, params: np.ndarray) -> float:
+        """Scale estimate from the *reported* parameter vector."""
+
+        return float(params[-1])
+
+    # ------------------------------------------------------------ likelihood
+    def _loglike_with(
+        self, exog: np.ndarray, endog: np.ndarray, theta: np.ndarray
+    ) -> np.ndarray:
+        """Per-observation log-likelihood on an arbitrary design."""
+
         raise NotImplementedError
 
-    def _null_loglike(self, k: int) -> float:
-        """Intercept-only likelihood, for the LR statistic and pseudo R-squared."""
+    def _loglike_obs(self, theta: np.ndarray) -> np.ndarray:
+        return self._loglike_with(self._X, self._y, theta)
+
+    def _loglike(self, theta: np.ndarray) -> float:
+        """Total log-likelihood; public because the tests check it directly."""
+
+        values = np.asarray(self._loglike_obs(np.asarray(theta, dtype=float)))
+        if not np.all(np.isfinite(values)):
+            return float("-inf")
+        return float(np.sum(values))
+
+    def _null_loglike(self) -> float:
+        """Constant-only log-likelihood, used for the LR test and pseudo R2."""
 
         ones = np.ones((self._y.size, 1))
-        original_X, original_names = self._X, self._param_names
-        try:
-            self._X = ones
-            self._param_names = ["_cons"]
-            beta0, *_ = np.linalg.lstsq(ones, self._y, rcond=None)
-            scale0 = max(float(np.std(self._y - ones @ beta0)), 1e-3)
-            start = np.array([float(beta0[0]), np.log(scale0)])
+        start = np.array(
+            [float(np.mean(self._y)), np.log(max(float(np.std(self._y)), 1e-3))]
+        )
 
-            def objective(theta: np.ndarray) -> float:
-                value = self._loglike(theta)
-                return -value if np.isfinite(value) else 1e12
+        def objective(parameters: np.ndarray) -> float:
+            values = np.asarray(self._loglike_with(ones, self._y, parameters))
+            total = float(np.sum(values)) if np.all(np.isfinite(values)) else -np.inf
+            return -total if np.isfinite(total) else 1e12
 
-            result = optimize.minimize(
-                objective, start, method="BFGS", options={"maxiter": 1000}
+        result = optimize.minimize(
+            objective, start, method="BFGS", options={"maxiter": 1000, "gtol": 1e-10}
+        )
+        refined = optimize.minimize(
+            objective,
+            np.asarray(result.x, dtype=float),
+            method="Nelder-Mead",
+            options={"maxiter": 1000, "xatol": 1e-10, "fatol": 1e-10},
+        )
+        if refined.fun <= result.fun:
+            result = refined
+        value = -float(result.fun)
+        return value if np.isfinite(value) else float("nan")
+
+    def _make_sm_model(self) -> Any:
+        beta0, *_ = np.linalg.lstsq(self._X, self._y, rcond=None)
+        scale0 = max(float(np.std(self._y - self._X @ beta0)), 1e-3)
+        start = np.concatenate([beta0, [np.log(scale0)]])
+        return _SelfLikelihoodModel(
+            self._y,
+            self._X,
+            loglike_obs=self._loglike_obs,
+            start_params=start,
+            extra_names=[self._scale_name],
+        )
+
+    # ------------------------------------------------------------------- fit
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Mapping[str, Any] | None = None,
+        ssc: Any = None,
+        *,
+        maxiter: int = 500,
+        tol: float = 1e-10,
+        strict: bool = False,
+    ) -> StataResults:
+        requested = "nonrobust" if cov_type is None else str(cov_type).strip()
+        if requested.lower() != "nonrobust":
+            raise ValueError(
+                f"{self._stata_command}: only cov_type='nonrobust' is implemented; "
+                f"got {cov_type!r}. Stata reports the observed-information "
+                "covariance for this command, which is what 'nonrobust' returns; "
+                "the robust sandwich is not wired up."
             )
-            return float(self._loglike(np.asarray(result.x, dtype=float)))
-        finally:
-            self._X, self._param_names = original_X, original_names
+        self._llf_estimate = None
+        result = super().fit(
+            cov_type="nonrobust", maxiter=maxiter, tol=tol, strict=strict
+        )
+        # ``_DiscreteBase`` derives ``df_model`` as ``len(params) - 1``, which
+        # counts the estimated scale.  Stata's model test for these commands
+        # covers the slopes only, and the summary renderer labels that test with
+        # ``df_model``, so the result is restated with the Stata df.
+        return _restate(result, float(result.e["df_m"]))
+
+    # ------------------------------------------------------------- e() scalars
+    def _model_test(
+        self, params: np.ndarray, cov: np.ndarray, names: Sequence[str], llf: float
+    ) -> tuple[str, float, int]:
+        """Return ``(chi2type, statistic, df)`` for the printed model test."""
+
+        positions = _slope_positions(names)
+        return "Wald", _wald_statistic(params, cov, positions), len(positions)
+
+    def _extra_scalars(self, params: np.ndarray) -> dict[str, Any]:
+        return {}
+
+    def _stata_scalars(
+        self, result: Any, params: np.ndarray, llf: float, nobs: int
+    ) -> dict[str, Any]:
+        names = list(self._param_names) + [self._scale_name]
+        cov = np.asarray(result.cov_params(), dtype=float)
+        chi2type, statistic, df = self._model_test(params, cov, names, llf)
+        ll0 = self._null_loglike()
+        sigma = self._sigma(params)
+        k = len(params)
+
+        e: dict[str, Any] = {
+            "N": nobs,
+            "df_m": df,
+            "rank": k,
+            "ll": llf,
+            "ll_0": ll0,
+            "chi2": statistic,
+            "chi2type": chi2type,
+            "p": _chi2_pvalue(statistic, df),
+            "r2_p": _pseudo_r2(llf, ll0),
+            "sigma": sigma,
+            "var_e": sigma**2,
+            "converged": int(
+                bool(getattr(result, "mle_retvals", {}).get("converged", True))
+            ),
+            "aic": float(-2.0 * llf + 2.0 * k),
+            "bic": float(-2.0 * llf + k * np.log(nobs)),
+        }
+        e.update(self._extra_scalars(params))
+        return e
 
 
-class Truncreg(_LimitedBase):
+def _restate(result: StataResults, df_model: float) -> StataResults:
+    """Rebuild ``result`` with a corrected ``df_model``.
+
+    ``df_model`` drives the reported model-test label and the ``e(df_m)``
+    scalar, so it cannot simply be overwritten on the finished container
+    without leaving the summary and the p-value inconsistent; the container is
+    reassembled instead.  The ``e()`` mapping is copied verbatim.
+    """
+
+    return StataResults(
+        params=np.asarray(result.params, dtype=float),
+        param_names=result.param_names,
+        cov=np.asarray(result.cov_params(), dtype=float),
+        resid=np.asarray(result.resid, dtype=float),
+        fittedvalues=np.asarray(result.fittedvalues, dtype=float),
+        nobs=int(result.nobs),
+        df_resid=float(result.df_resid),
+        df_model=float(df_model),
+        dist="z",
+        model_name=result.model_name,
+        cov_type=result.cov_type,
+        e=dict(result.e),
+        design_matrix=result.design_matrix,
+        model_data=result.model_data,
+    )
+
+
+# ------------------------------------------------------------------ truncreg
+
+
+class Truncreg(_MLLimitedBase):
     """Truncated regression (Stata ``truncreg``).
 
-    Observations outside ``(lower, upper)`` are absent from the data, so the
-    likelihood is divided by the probability of falling inside the interval.
+    Observations outside ``(lower, upper)`` are absent from the sample, so each
+    contribution is the normal density divided by the probability of falling
+    inside the interval.
+
+    Parameters
+    ----------
+    endog:
+        Observed outcome; every value must lie strictly inside the limits.
+    exog:
+        Design matrix including a constant.
+    lower, upper:
+        Truncation limits in the units of ``endog``; at least one is required.
+        Use ``None`` for an open limit (``-inf`` / ``+inf``).
+
+    Notes
+    -----
+    Stata's ``truncreg`` excludes observations with ``y <= lower`` or
+    ``y >= upper`` from the estimation sample and reports the count as
+    ``(N obs truncated)``; this does the same, records the count in
+    ``e(n_truncated)`` and warns, because silently changing the sample would
+    make ``e(N)`` impossible to reconcile with the input data.
     """
 
     _stata_command = "truncreg"
@@ -270,7 +571,6 @@ class Truncreg(_LimitedBase):
         upper: float | None = None,
         param_names: list[str] | None = None,
     ) -> None:
-        super().__init__(endog, exog, param_names=param_names)
         if lower is None and upper is None:
             raise ConsistencyError(
                 "truncreg: at least one truncation limit is required; with no "
@@ -280,8 +580,47 @@ class Truncreg(_LimitedBase):
             raise ConsistencyError(
                 f"truncreg: lower limit ({lower}) must be below upper limit ({upper})"
             )
+
+        response = np.asarray(endog, dtype=float).reshape(-1)
+        design = np.asarray(exog, dtype=float)
+        if design.ndim == 1:
+            design = design.reshape(-1, 1)
+        if design.shape[0] != response.size:
+            raise ValueError(
+                f"endog has {response.size} rows but exog has {design.shape[0]} rows"
+            )
+
+        # Stata drops observations at or outside the truncation points; they
+        # could not have been sampled, so they carry no information.
+        outside = np.zeros(response.size, dtype=bool)
+        if lower is not None:
+            outside |= response <= lower
+        if upper is not None:
+            outside |= response >= upper
+        n_truncated = int(outside.sum())
+        kept = ~outside
+        if not kept.any():
+            raise ConsistencyError(
+                f"truncreg: all {response.size} observation(s) fall at or outside "
+                f"the truncation limits (lower={lower}, upper={upper}); there is "
+                "nothing left to estimate"
+            )
+
+        super().__init__(
+            response[kept], design[kept], param_names=param_names
+        )
         self._lower = lower
         self._upper = upper
+        self._n_truncated = n_truncated
+        if n_truncated:
+            warnings.warn(
+                f"truncreg: {n_truncated} observation(s) at or outside the "
+                f"truncation limits (lower={lower}, upper={upper}) were dropped "
+                f"(Stata's Truncated regression reports this as '{n_truncated} obs "
+                "truncated')",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
     @classmethod
     def from_formula(
@@ -293,85 +632,139 @@ class Truncreg(_LimitedBase):
         upper: float | None = None,
         subset: Any = None,
     ) -> "Truncreg":
+        """Build the model from a formula (Stata ``truncreg y x, ll(#) ul(#)``)."""
+
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
             data = data.loc[subset]
         data = data.reset_index(drop=True)
-        X, names, kept_index = build_design(formula, data)
+
         lhs = formula.split("~", 1)[0].strip()
         if lhs not in data.columns:
             raise ConsistencyError(
                 f"truncreg: the left-hand side must be a plain column name, got {lhs!r}"
             )
+        X, names, kept_index = build_design(formula, data)
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
+        # ``_model_data`` must describe the estimation sample, which drops the
+        # observations outside the truncation limits in ``__init__``.
+        frame = data.loc[kept_index].reset_index(drop=True)
         model = cls(y, X, lower=lower, upper=upper, param_names=names)
-        model._model_data = data.loc[kept_index].reset_index(drop=True)
+        model._model_data = frame.loc[_truncation_mask(y, lower, upper)].reset_index(
+            drop=True
+        )
         return model
 
-    def _loglike(self, theta: np.ndarray) -> float:
-        k = self._X.shape[1]
+    # ------------------------------------------------------------ likelihood
+    def _loglike_with(
+        self, exog: np.ndarray, endog: np.ndarray, theta: np.ndarray
+    ) -> np.ndarray:
+        theta = np.asarray(theta, dtype=float)
+        k = exog.shape[1]
         beta = theta[:k]
-        sigma = float(np.exp(theta[k]))
-        xb = self._X @ beta
-        z_lower = (self._lower - xb) / sigma if self._lower is not None else None
-        z_upper = (self._upper - xb) / sigma if self._upper is not None else None
+        log_sigma = float(theta[k])
+        sigma = float(np.exp(log_sigma))
+        xb = exog @ beta
+        residual = (endog - xb) / sigma
 
-        # Probability of the observed interval, computed with sf() in the upper
-        # tail so it does not cancel to zero.
-        if z_lower is None and z_upper is None:
-            mass = 1.0
-        elif z_lower is None:
-            mass = stats.norm.cdf(z_upper)
-        elif z_upper is None:
-            mass = stats.norm.sf(z_lower)
+        lower = -np.inf if self._lower is None else float(self._lower)
+        upper = np.inf if self._upper is None else float(self._upper)
+        z_lower = (lower - xb) / sigma
+        z_upper = (upper - xb) / sigma
+        lower_open = not np.isfinite(z_lower).any()
+        upper_open = not np.isfinite(z_upper).any()
+
+        if lower_open and upper_open:
+            log_mass = np.zeros_like(xb)
+        elif lower_open:
+            log_mass = log_ndtr(z_upper)
+        elif upper_open:
+            # log(1 - Phi(z)) = log_ndtr(-z), accurate far into the left tail.
+            log_mass = log_ndtr(-z_lower)
         else:
-            mass = stats.norm.cdf(z_upper) - stats.norm.cdf(z_lower)
-        if np.any(mass <= 0):
-            return float("-inf")
+            log_mass = _interval_log_mass(z_lower, z_upper)
 
-        residual = (self._y - xb) / sigma
-        return float(
-            np.sum(
-                -np.log(sigma)
-                - 0.5 * np.log(2 * np.pi)
+        with np.errstate(invalid="ignore"):
+            return (
+                -log_sigma
+                - 0.5 * np.log(2.0 * np.pi)
                 - 0.5 * residual**2
-                - np.log(mass)
+                - log_mass
             )
-        )
 
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 1000,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(
-                f"truncreg: only cov_type='nonrobust' is implemented, got {cov_type!r}"
-            )
-        return self._fit_likelihood(
-            maxiter=maxiter,
-            strict=strict,
-            scalars={
-                "lower": self._lower,
-                "upper": self._upper,
-                "n_truncated": 0,
-            },
-        )
+    def _sigma(self, params: np.ndarray) -> float:
+        # ``_rescale_extra_params`` has already exponentiated the reported scale.
+        return float(params[-1])
+
+    def _rescale_extra_params(
+        self, params: np.ndarray, cov: np.ndarray, names: list[str]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Report ``/sigma`` rather than ``/lnsigma``, via the delta method.
+
+        The backend optimises ``ln sigma`` so the scale stays positive;
+        ``truncreg`` prints ``sigma``, and ``d sigma / d ln sigma = sigma``.
+        """
+
+        position = names.index(self._scale_name)
+        sigma = float(np.exp(params[position]))
+        adjusted_params = np.asarray(params, dtype=float).copy()
+        adjusted_cov = np.asarray(cov, dtype=float).copy()
+        adjusted_params[position] = sigma
+        if np.isfinite(sigma) and sigma > 0:
+            adjusted_cov[position, :] *= sigma
+            adjusted_cov[:, position] *= sigma
+        return adjusted_params, adjusted_cov
+
+    def _extra_scalars(self, params: np.ndarray) -> dict[str, Any]:
+        return {
+            "lower": self._lower,
+            "upper": self._upper,
+            "n_truncated": self._n_truncated,
+            "n_uncensored": int(self._y.size),
+        }
 
 
-class Intreg(_LimitedBase):
+def _truncation_mask(
+    response: np.ndarray, lower: float | None, upper: float | None
+) -> np.ndarray:
+    """Observations strictly inside the truncation limits."""
+
+    kept = np.ones(np.asarray(response).size, dtype=bool)
+    if lower is not None:
+        kept &= response > lower
+    if upper is not None:
+        kept &= response < upper
+    return kept
+
+
+# ------------------------------------------------------------------- intreg
+
+
+class Intreg(_MLLimitedBase):
     """Interval regression (Stata ``intreg``).
 
-    ``y`` is known only to lie in ``[lower, upper]``; ``lower == upper`` marks an
-    exactly observed value, ``-inf``/``+inf`` a censored one.
+    Only the interval ``[lower, upper]`` is known for each observation:
+    ``lower == upper`` marks an exactly observed value, ``-inf`` a left-censored
+    one and ``+inf`` a right-censored one.
+
+    Parameters
+    ----------
+    lower, upper:
+        Interval bounds, length ``n``, with ``lower <= upper`` elementwise.
+    exog:
+        Design matrix including a constant.
+
+    Notes
+    -----
+    The class stores the interval midpoints as its response, but only as an
+    optimiser starting value and as the basis of the reported ``resid`` and
+    ``fittedvalues``; the likelihood never uses them.
     """
 
     _stata_command = "intreg"
+    #: Stata's intreg reports the log of the scale.
+    _scale_name = "/lnsigma"
 
     def __init__(
         self,
@@ -385,16 +778,24 @@ class Intreg(_LimitedBase):
         hi = np.asarray(upper, dtype=float).reshape(-1)
         if lo.size != hi.size:
             raise ConsistencyError(
-                f"intreg: lower and upper must have the same length ({lo.size} vs {hi.size})"
+                f"intreg: lower and upper must have the same length ({lo.size} vs "
+                f"{hi.size})"
             )
-        if np.any(lo > hi):
+        inverted = lo > hi
+        if inverted.any():
             raise ConsistencyError(
-                "intreg: every lower bound must be <= its upper bound"
+                f"intreg: {int(inverted.sum())} observation(s) have a lower bound "
+                "above the upper bound; every interval must satisfy lower <= upper"
+            )
+        if not np.isfinite(lo).any() and not np.isfinite(hi).any():
+            raise ConsistencyError(
+                "intreg: every observation is (-inf, +inf); the model carries no "
+                "information about the location"
             )
         self._lower = lo
         self._upper = hi
-        # The base class wants a response; use the midpoint only as an optimiser
-        # starting value, never as data.
+        # Starting values: the midpoint of a finite interval, a shifted bound for
+        # a censored one.  These never enter the likelihood.
         midpoint = np.where(
             np.isfinite(lo) & np.isfinite(hi),
             (lo + hi) / 2.0,
@@ -406,18 +807,25 @@ class Intreg(_LimitedBase):
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
     ) -> "Intreg":
+        """Build from a formula whose left-hand side is ``"lower upper"``."""
+
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
             data = data.loc[subset]
         data = data.reset_index(drop=True)
 
-        lhs = formula.split("~", 1)[0].strip()
+        if "~" not in formula:
+            raise ConsistencyError(
+                f"intreg: the formula must have the form 'lower upper ~ x', got "
+                f"{formula!r}"
+            )
+        lhs, rhs = formula.split("~", 1)
         pieces = lhs.split()
         if len(pieces) != 2:
             raise ConsistencyError(
                 "intreg: the left-hand side must name two columns, the lower and "
-                f"upper bounds (e.g. 'lo hi ~ x'), got {lhs!r}"
+                f"upper bounds (e.g. 'lo hi ~ x'), got {lhs.strip()!r}"
             )
         lower_column, upper_column = pieces
         for column in (lower_column, upper_column):
@@ -426,91 +834,411 @@ class Intreg(_LimitedBase):
                     f"intreg: column {column!r} not found in the data"
                 )
 
-        # Build the design matrix from the right-hand side only.
-        rhs_formula = f"{upper_column} ~ " + formula.split("~", 1)[1].strip()
-        X, names, kept_index = build_design(rhs_formula, data)
+        # Build the design matrix from the right-hand side only, borrowing one of
+        # the bound columns as patsy's response so that listwise deletion still
+        # applies to the regressors.
+        X, names, kept_index = build_design(f"{upper_column} ~ {rhs.strip()}", data)
         lower = data.loc[kept_index, lower_column].to_numpy(dtype=float)
         upper = data.loc[kept_index, upper_column].to_numpy(dtype=float)
-
         model = cls(lower, upper, X, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
         return model
 
-    def _loglike(self, theta: np.ndarray) -> float:
-        k = self._X.shape[1]
+    # ------------------------------------------------------------ likelihood
+    def _sigma(self, params: np.ndarray) -> float:
+        # The backend estimates ln sigma and no rescaling is applied here.
+        return float(np.exp(params[-1]))
+
+    def _loglike_with(
+        self, exog: np.ndarray, endog: np.ndarray, theta: np.ndarray
+    ) -> np.ndarray:
+        theta = np.asarray(theta, dtype=float)
+        k = exog.shape[1]
         beta = theta[:k]
-        sigma = float(np.exp(theta[k]))
-        xb = self._X @ beta
-        z_lower = (self._lower - xb) / sigma
-        z_upper = (self._upper - xb) / sigma
+        log_sigma = float(theta[k])
+        sigma = float(np.exp(log_sigma))
+        xb = exog @ beta
 
-        upper_cdf = np.where(np.isfinite(z_upper), stats.norm.cdf(z_upper), 1.0)
-        lower_cdf = np.where(np.isfinite(z_lower), stats.norm.cdf(z_lower), 0.0)
-        mass = upper_cdf - lower_cdf
-        if np.any(mass <= 0):
-            return float("-inf")
-        return float(np.sum(np.log(mass)))
+        # The bounds belong to the estimation sample, which is the same row set
+        # for every call (``_null_loglike`` only changes the design matrix).
+        lo = self._lower
+        hi = self._upper
+        z_lower = (lo - xb) / sigma
+        z_upper = (hi - xb) / sigma
 
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 1000,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(
-                f"intreg: only cov_type='nonrobust' is implemented, got {cov_type!r}"
-            )
-        result = self._fit_likelihood(maxiter=maxiter, strict=strict)
-        # Stata reports the log of the scale, not sigma itself.
-        names = list(result.param_names)
-        position = names.index("/sigma")
-        params = result.params.to_numpy().copy()
-        covariance = np.asarray(result.cov_params(), dtype=float).copy()
-        sigma = float(params[position])
-        scale = 1.0 / sigma if sigma != 0 else float("nan")
-        params[position] = float(np.log(sigma)) if sigma > 0 else float("nan")
-        covariance[position, :] *= scale
-        covariance[:, position] *= scale
-        names[position] = "/lnsigma"
+        exact = np.isfinite(lo) & np.isfinite(hi) & (lo == hi)
+        lower_open = ~np.isfinite(z_lower)
+        upper_open = ~np.isfinite(z_upper)
 
-        e = dict(result.e)
-        e["sigma"] = sigma
-        e["lnsigma"] = params[position]
+        values = np.zeros_like(xb)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            both_finite = ~lower_open & ~upper_open & ~exact
+            if both_finite.any():
+                values[both_finite] = _interval_log_mass(
+                    z_lower[both_finite], z_upper[both_finite]
+                )
+            only_upper = ~upper_open & lower_open & ~exact
+            if only_upper.any():
+                values[only_upper] = log_ndtr(z_upper[only_upper])
+            only_lower = ~lower_open & upper_open & ~exact
+            if only_lower.any():
+                values[only_lower] = log_ndtr(-z_lower[only_lower])
+            # (-inf, +inf) carries no information: a zero contribution keeps such
+            # an observation from poisoning the sum, and `matches the formula's
+            # limit of log(1) = 0.
+            if exact.any():
+                values[exact] = stats.norm.logpdf(z_lower[exact]) - log_sigma
+        return values
 
-        return StataResults(
-            params=params,
-            param_names=names,
-            cov=covariance,
-            resid=result.resid,
-            fittedvalues=result.fittedvalues,
-            nobs=result.nobs,
-            df_resid=result.df_resid,
-            df_model=result.df_model,
-            dist="z",
-            model_name=self._stata_command,
-            cov_type="nonrobust",
-            e=e,
-            design_matrix=result.design_matrix,
-            model_data=result.model_data,
+    def _model_test(
+        self, params: np.ndarray, cov: np.ndarray, names: Sequence[str], llf: float
+    ) -> tuple[str, float, int]:
+        # Stata's intreg prints the LR test against the constant-only model.
+        positions = _slope_positions(names)
+        df = len(positions)
+        if df == 0:
+            return "LR", float("nan"), 0
+        ll0 = self._null_loglike()
+        statistic = (
+            2.0 * (llf - ll0) if np.isfinite(ll0) and np.isfinite(llf) else float("nan")
         )
+        return "LR", float(statistic), df
+
+    def _extra_scalars(self, params: np.ndarray) -> dict[str, Any]:
+        lo, hi = self._lower, self._upper
+        return {
+            "lnsigma": float(params[-1]),
+            "n_left": int(np.isneginf(lo).sum()),
+            "n_right": int(np.isposinf(hi).sum()),
+            "n_interval": int((np.isfinite(lo) & np.isfinite(hi) & (lo != hi)).sum()),
+            "n_uncensored": int((np.isfinite(lo) & np.isfinite(hi) & (lo == hi)).sum()),
+        }
+
+
+# ------------------------------------------------------- two-step plumbing
+
+
+def _split_equation(formula: str, keyword: str, command: str) -> tuple[str, str]:
+    """Split ``"y ~ x + keyword(s ~ z)"`` into the two equation formulas.
+
+    The second equation is located by its ``keyword(...)`` block, which must be
+    the last term of the right-hand side and must be joined to the first
+    equation with ``+``.  Stata spells this ``heckman y x, select(...)``; the
+    formula transcription keeps every variable name in one string.
+
+    Returns
+    -------
+    (outcome_formula, second_formula):
+        Both are ordinary one-sided-in-``~`` formulas, e.g.
+        ``("y ~  x", "s ~ z")``.  The trailing ``+`` is removed from the
+        outcome equation and stray whitespace is normalised.
+    """
+
+    marker = f"{keyword}("
+    position = formula.find(marker)
+    if position < 0:
+        what = (
+            "a selection equation, as in 'y ~ x + select(s ~ z)'"
+            if keyword == "select"
+            else "a treatment equation, as in 'y ~ x + treat(t ~ z)'"
+        )
+        raise ConsistencyError(f"{command}: the formula must contain {what}")
+
+    head = formula[:position].rstrip()
+    tail = formula[position + len(marker) :].rstrip()
+
+    # The keyword block is the last term, so the only ')' that can close it is
+    # the formula's final one.  Anything after it would be a second term.
+    if not tail.endswith(")"):
+        raise ConsistencyError(
+            f"{command}: {keyword}(...) is missing its closing ')' in "
+            f"{formula!r}"
+        )
+    inner = tail[:-1]
+    if ")" in inner:
+        raise ConsistencyError(
+            f"{command}: unsupported nested parentheses inside {keyword}(...) "
+            f"in {formula!r}"
+        )
+    if not head.endswith("+"):
+        raise ConsistencyError(
+            f"{command}: expected '+' before {keyword}(...), as in "
+            f"'y ~ x + {keyword}(s ~ z)'; got {formula!r}"
+        )
+    head = head[:-1].rstrip()
+
+    if "~" not in head or "~" not in inner:
+        raise ConsistencyError(
+            f"{command}: both equations need a '~'; got {formula!r}"
+        )
+    return head, inner.strip()
+
+
+def _design_columns(formula: str) -> list[str]:
+    """Best-effort list of the data columns a formula references.
+
+    Only used to decide which rows may be missing; patsy owns the real parsing.
+    Identifier-like tokens that match a column are kept, formula operators and
+    numeric literals are dropped.
+    """
+
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", formula)
+    reserved = {"C", "Treatment", "reference", "base", "np", "log", "exp", "I"}
+    return [token for token in tokens if token not in reserved]
+
+
+def _augmented_regression(
+    y: np.ndarray, A: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """OLS of ``y`` on ``A`` returning ``(beta, resid)``."""
+
+    beta, *_ = np.linalg.lstsq(A, y, rcond=None)
+    return beta, y - A @ beta
+
+
+def _two_step_covariance(
+    *,
+    outcome: np.ndarray,
+    A: np.ndarray,
+    beta: np.ndarray,
+    selection: np.ndarray,
+    Z: np.ndarray,
+    gamma: np.ndarray,
+    selected: np.ndarray,
+    generated: Callable[[np.ndarray], np.ndarray],
+) -> np.ndarray:
+    """Two-step M-estimator covariance for a generated-regressor model.
+
+    The moment vector stacks the outcome equation's normal equations (only on
+    the selected rows, since ``A`` already contains the generated term) and the
+    probit score of the first stage::
+
+        psi_i = [ -1{s} (y - x'b) a_i ;  (s - Phi(w)) phi(w) / (Phi(1-Phi)) z_i ]
+
+    ``generated(gamma)`` maps first-stage coefficients to the generated
+    regressor, so the Jacobian can be taken numerically over the *whole*
+    parameter vector -- that is what propagates first-stage estimation error
+    into beta's covariance, the correction naive OLS omits.
+
+    Returns the ``(k_beta + k_gamma)`` covariance of ``[beta, gamma]``.
+    """
+
+    n = outcome.size
+    k_beta = beta.size
+    k_gamma = gamma.size
+    theta = np.concatenate([beta, gamma])
+
+    def moments(parameters: np.ndarray) -> np.ndarray:
+        b = parameters[:k_beta]
+        g = parameters[k_beta:]
+        generated_values = generated(g)
+        index = Z @ g
+        cdf = np.clip(stats.norm.cdf(index), 1e-300, 1.0 - 1e-16)
+        pdf = stats.norm.pdf(index)
+
+        augmented = A.copy()
+        augmented[:, -1] = generated_values
+        predicted = augmented @ b
+        weight = np.isin(np.arange(n), np.flatnonzero(selected))
+
+        psi = np.zeros((n, k_beta + k_gamma))
+        psi[selected, :k_beta] = -(outcome[selected] - predicted[selected])[
+            :, None
+        ] * augmented[selected]
+        # Probit score: (s - Phi) phi / (Phi (1 - Phi)) * z.
+        psi[:, k_beta:] = (
+            (selection - cdf) / (cdf * (1.0 - cdf)) * pdf
+        )[:, None] * Z
+        del weight
+        return psi
+
+    psi = moments(theta)
+    meat = psi.T @ psi / n
+
+    step = 1e-6 * np.maximum(np.abs(theta), 1.0)
+    jacobian = np.zeros((k_beta + k_gamma, k_beta + k_gamma))
+    for index in range(theta.size):
+        increment = np.zeros(theta.size)
+        increment[index] = step[index]
+        jacobian[index] = (
+            moments(theta + increment).sum(axis=0)
+            - moments(theta - increment).sum(axis=0)
+        ) / (2.0 * step[index])
+    jacobian /= n
+
+    try:
+        bread = np.linalg.inv(jacobian)
+    except np.linalg.LinAlgError:
+        bread = np.linalg.pinv(jacobian)
+    covariance = bread @ meat @ bread.T / n
+    return covariance
+
+
+def _probit_fit(
+    selection: np.ndarray, Z: np.ndarray, *, maxiter: int = 200
+) -> tuple[np.ndarray, np.ndarray]:
+    """Probit by Newton-Raphson with step halving.
+
+    statsmodels' ``Probit`` is used where available, but its failure modes are
+    noisy and its covariance is not needed here (the sandwich in
+    :func:`_two_step_covariance` handles inference), so a small self-contained
+    Newton loop keeps this module's error handling consistent.
+    """
+
+    k = Z.shape[1]
+    gamma = np.zeros(k)
+    cdf = np.clip(stats.norm.cdf(Z @ gamma), 1e-300, 1.0 - 1e-16)
+    loglike = float(np.sum(selection * np.log(cdf) + (1 - selection) * np.log(1 - cdf)))
+
+    for _ in range(maxiter):
+        index = Z @ gamma
+        cdf = np.clip(stats.norm.cdf(index), 1e-300, 1.0 - 1e-16)
+        pdf = stats.norm.pdf(index)
+        score = Z.T @ ((selection - cdf) * pdf / (cdf * (1.0 - cdf)))
+        weights = pdf**2 / (cdf * (1.0 - cdf))
+        information = (Z.T * weights) @ Z
+        try:
+            step = np.linalg.solve(information, score)
+        except np.linalg.LinAlgError:
+            step = np.linalg.pinv(information) @ score
+
+        # Step halving keeps the iteration monotone; probit Newton is otherwise
+        # capable of overshooting into the flat part of the likelihood.
+        scale = 1.0
+        while scale > 1e-10:
+            candidate = gamma + scale * step
+            cand_cdf = np.clip(
+                stats.norm.cdf(Z @ candidate), 1e-300, 1.0 - 1e-16
+            )
+            cand_loglike = float(
+                np.sum(
+                    selection * np.log(cand_cdf)
+                    + (1 - selection) * np.log(1 - cand_cdf)
+                )
+            )
+            if cand_loglike >= loglike - 1e-14:
+                gamma = candidate
+                loglike = cand_loglike
+                break
+            scale *= 0.5
+        else:  # pragma: no cover - no improving step means we are at the optimum
+            break
+
+        if np.max(np.abs(scale * step)) < 1e-12:
+            break
+
+    index = Z @ gamma
+    cdf = np.clip(stats.norm.cdf(index), 1e-300, 1.0 - 1e-16)
+    pdf = stats.norm.pdf(index)
+    weights = pdf**2 / (cdf * (1.0 - cdf))
+    information = (Z.T * weights) @ Z
+    try:
+        covariance = np.linalg.inv(information)
+    except np.linalg.LinAlgError:
+        covariance = np.linalg.pinv(information)
+    return gamma, covariance
+
+
+def _check_selection_indicator(
+    indicator: np.ndarray, command: str, keyword: str
+) -> np.ndarray:
+    """Validate a 0/1 indicator and return it as a boolean mask."""
+
+    unique = np.unique(indicator[np.isfinite(indicator)])
+    if not np.all(np.isin(unique, (0.0, 1.0))):
+        raise ConsistencyError(
+            f"{command}: the {keyword} equation's left-hand side must be a 0/1 "
+            f"indicator, got values {unique[:6].tolist()}"
+        )
+    selected = indicator > 0.5
+    if selected.all():
+        raise ConsistencyError(
+            f"{command}: the {keyword} indicator is 1 for every observation, so "
+            "the first stage cannot be estimated"
+        )
+    if not selected.any():
+        raise ConsistencyError(
+            f"{command}: the {keyword} indicator is 0 for every observation, so "
+            "there is nothing to model in the second stage"
+        )
+    return selected
+
+
+def _parse_two_equation(
+    formula: str,
+    data: pd.DataFrame,
+    *,
+    keyword: str,
+    command: str,
+    subset: Any = None,
+) -> tuple[str, str, pd.DataFrame]:
+    """Shared formula handling for ``heckman`` and ``etregress``."""
+
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("data must be a pandas DataFrame")
+    if subset is not None:
+        data = data.loc[subset]
+    data = data.reset_index(drop=True)
+
+    outcome_formula, second_formula = _split_equation(formula, keyword, command)
+    return outcome_formula, second_formula, data
+
+
+def _drop_missing(
+    data: pd.DataFrame, formulas: Sequence[str], *, command: str
+) -> pd.DataFrame:
+    """Listwise-delete rows with a missing value in any referenced column."""
+
+    columns = [
+        column
+        for formula in formulas
+        for column in _design_columns(formula)
+        if column in data.columns
+    ]
+    columns = list(dict.fromkeys(columns))
+    if not columns:
+        return data
+    kept = data.dropna(subset=columns)
+    if len(kept) == 0:
+        raise ConsistencyError(
+            f"{command}: every observation has a missing value in "
+            f"{', '.join(columns)}; nothing left to estimate"
+        )
+    return kept.reset_index(drop=True)
+
+
+# ------------------------------------------------------------------ heckman
 
 
 class Heckman:
     """Heckman sample-selection model (Stata ``heckman``), two-step estimator.
 
-    Step 1 fits a probit for participation. Step 2 regresses the outcome on the
-    covariates plus the inverse Mills ratio ``lambda = phi(z g) / Phi(z g)`` on the
-    selected observations.
+    Selection equation (probit, full sample)::
 
-    **Standard errors**: the second-stage covariance reported here is the OLS
-    covariance of the augmented regression, i.e. it does *not* include the
-    Heckman correction for the estimated ``lambda``. Stata's two-step standard
-    errors do. This is stated in ``e(se_corrected) = 0`` so a reader cannot
-    mistake one for the other; `method="ml"` is not implemented.
+        s* = z g + u,   s = 1[s* > 0]
+
+    Outcome equation (observed only where ``s == 1``)::
+
+        y = x b + e
+
+    Step 1 estimates ``g`` and forms the inverse Mills ratio
+    ``lambda = phi(z g)/Phi(z g)``; step 2 regresses ``y`` on ``x`` and
+    ``lambda`` over the selected rows.
+
+    Parameters
+    ----------
+    formula:
+        ``"y ~ x + select(s ~ z)"``.  The selection indicator must be 0/1 and
+        the selection equation is estimated on the full sample, which is the
+        point of the estimator: a missing ``y`` is what marks a non-selected
+        observation, so ``y`` may be missing off the selected rows.
+
+    Notes
+    -----
+    Standard errors are the two-step M-estimator sandwich: the first stage's
+    estimation error is propagated into the second stage, so they are *not*
+    naive OLS standard errors (see the module docstring).  They are also not
+    Stata's ML standard errors, because these are two-step estimates.
     """
 
     _stata_command = "heckman"
@@ -536,87 +1264,74 @@ class Heckman:
         self._selection_names = list(selection_names)
         self._model_data = model_data
 
+        if self._X.shape[0] != self._y.size or self._Z.shape[0] != self._y.size:
+            raise ConsistencyError(
+                "heckman: the outcome and selection equations must describe the "
+                "same observations"
+            )
+        if self._selected.size != self._y.size:
+            raise ConsistencyError(
+                "heckman: the selection indicator must have one entry per "
+                "observation"
+            )
+        if int(self._selected.sum()) <= self._X.shape[1] + 1:
+            raise ConsistencyError(
+                f"heckman: only {int(self._selected.sum())} selected observations "
+                f"for {self._X.shape[1]} outcome regressors plus the inverse Mills "
+                "ratio; the second stage is not identified"
+            )
+
     @classmethod
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
     ) -> "Heckman":
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("data must be a pandas DataFrame")
-        if subset is not None:
-            data = data.loc[subset]
-        data = data.reset_index(drop=True)
+        """Build the model from ``"y ~ x + select(s ~ z)"``."""
 
-        if "select(" not in formula:
-            raise ConsistencyError(
-                "heckman: the formula must contain a selection equation, as in "
-                "'y ~ x + select(selected ~ z)'"
-            )
-        main, selection_part = formula.split("select(", 1)
-        main = main.rstrip()
-        if not main.endswith("+"):
-            raise ConsistencyError(
-                "heckman: expected '+' before select(...), as in 'y ~ x + select(s ~ z)'"
-            )
-        main = main[:-1].strip()
-        selection_part = selection_part.rstrip()
-        if not selection_part.endswith(")"):
-            raise ConsistencyError("heckman: select(...) is missing its closing ')'")
-        selection_formula = selection_part[:-1].strip()
+        outcome_formula, selection_formula, data = _parse_two_equation(
+            formula, data, keyword="select", command="heckman", subset=subset
+        )
 
-        import patsy
-
-        lhs_main = main.split("~", 1)[0].strip()
-        rhs_main = main.split("~", 1)[1].strip()
-        lhs_selection = selection_formula.split("~", 1)[0].strip()
-        rhs_selection = selection_formula.split("~", 1)[1].strip()
-
-        for column in (lhs_main, lhs_selection):
+        outcome_lhs = outcome_formula.split("~", 1)[0].strip()
+        selection_lhs = selection_formula.split("~", 1)[0].strip()
+        for column in (outcome_lhs, selection_lhs):
             if column not in data.columns:
                 raise ConsistencyError(
                     f"heckman: column {column!r} not found in the data"
                 )
 
-        # The selection equation uses the FULL sample -- that is the whole point
-        # of the estimator: the probit must see the non-selected rows too. Only
-        # the covariates and the selector may not be missing; a missing outcome
-        # is exactly what marks a non-selected observation.
-        covariate_columns: list[str] = []
-        for term in (rhs_main, rhs_selection):
-            for token in term.replace("+", " ").split():
-                if token in data.columns:
-                    covariate_columns.append(token)
-        required = list(dict.fromkeys([lhs_selection, *covariate_columns]))
-        aligned = data.dropna(subset=required).reset_index(drop=True)
+        # The selection equation must see every row, so only its own columns may
+        # be required: a missing outcome is the marker of non-selection.
+        selection_rhs = selection_formula.split("~", 1)[1]
+        data = _drop_missing(
+            data,
+            [f"{selection_lhs} ~ {selection_rhs}", f"1 ~ {outcome_formula.split('~', 1)[1]}"],
+            command="heckman",
+        )
 
-        x_frame = patsy.dmatrix(rhs_main, aligned, return_type="dataframe")
-        z_frame = patsy.dmatrix(rhs_selection, aligned, return_type="dataframe")
+        outcome_design = _model_matrix(outcome_formula.split("~", 1)[1], data, "heckman")
+        selection_design = _model_matrix(selection_rhs, data, "heckman")
 
-        outcome = aligned[lhs_main].to_numpy(dtype=float)
-        selection = aligned[lhs_selection].to_numpy(dtype=float)
-        selected = selection > 0.5
-
-        if selected.all():
-            raise ConsistencyError(
-                "heckman: the selection indicator is 1 for every observation, so "
-                "the selection equation cannot be estimated"
-            )
-        if not selected.any():
-            raise ConsistencyError(
-                "heckman: the selection indicator is 0 for every observation, so "
-                "there is no outcome to model"
-            )
+        outcome = data[outcome_lhs].to_numpy(dtype=float)
+        selected = _check_selection_indicator(
+            data[selection_lhs].to_numpy(dtype=float), "heckman", "select"
+        )
+        # Rows off the selected set carry no outcome; they take part in the
+        # probit only.  Fill their y so the array stays numeric -- it is never
+        # read for them.
+        outcome = np.where(selected, outcome, 0.0)
 
         return cls(
             outcome,
-            np.asarray(x_frame, dtype=float),
-            selection,
-            np.asarray(z_frame, dtype=float),
-            outcome_names=list(x_frame.columns),
-            selection_names=list(z_frame.columns),
+            outcome_design[0],
+            data[selection_lhs].to_numpy(dtype=float),
+            selection_design[0],
+            outcome_names=outcome_design[1],
+            selection_names=selection_design[1],
             selected=selected,
-            model_data=aligned,
+            model_data=data,
         )
 
+    # ------------------------------------------------------------------- fit
     def fit(
         self,
         method: str = "twostep",
@@ -627,105 +1342,116 @@ class Heckman:
         maxiter: int = 200,
         strict: bool = False,
     ) -> StataResults:
+        """Estimate by the two-step (Heckman 1979) procedure."""
+
         normalized = str(method).strip().lower()
-        if normalized not in ("twostep", "two-step", "2sls"):
+        if normalized not in ("twostep", "two-step", "2step"):
             raise UnsupportedError(
                 f"heckman: only method='twostep' is implemented; {method!r} is not. "
-                "The maximum-likelihood variant needs a joint optimisation over "
-                "beta, gamma and rho that has not been implemented or verified "
-                "against Stata."
+                "The maximum likelihood variant requires a joint optimisation over "
+                "beta, gamma and rho together with the bivariate normal "
+                "probabilities, which has not been implemented or verified against "
+                "Stata."
             )
         if cov_type not in (None, "nonrobust"):
             raise ValueError(
                 f"heckman: only cov_type='nonrobust' is implemented, got {cov_type!r}"
             )
 
-        # Step 1: probit for participation, via statsmodels.
-        import statsmodels.api as sm
+        gamma, _ = _probit_fit(self._s, self._Z, maxiter=maxiter)
+        index = self._Z @ gamma
+        mills = _mills_ratio(index)
 
-        probit = sm.Probit(self._s, self._Z).fit(
-            method="newton", disp=0, maxiter=maxiter
+        selected = self._selected
+        augmented = np.column_stack([self._X, mills])
+        beta, residual = _augmented_regression(self._y[selected], augmented[selected])
+
+        n_selected = int(selected.sum())
+        k_augmented = augmented.shape[1]
+        dof = max(n_selected - k_augmented, 1)
+        sigma2 = float(residual @ residual) / dof
+        sigma = float(np.sqrt(sigma2)) if sigma2 > 0 else float("nan")
+
+        # The generated regressor's coefficient is rho * sigma in Stata's
+        # parameterisation, so rho = b_lambda / sigma.
+        lam_coef = float(beta[-1])
+        rho = lam_coef / sigma if np.isfinite(sigma) and sigma > 0 else float("nan")
+
+        covariance_all = _two_step_covariance(
+            outcome=self._y,
+            A=augmented,
+            beta=beta,
+            selection=self._s,
+            Z=self._Z,
+            gamma=gamma,
+            selected=selected,
+            generated=lambda g: _mills_ratio(self._Z @ g),
         )
-        gamma = np.asarray(probit.params, dtype=float)
-        z_index = self._Z @ gamma
-        # Inverse Mills ratio for the selected observations.
-        mills = stats.norm.pdf(z_index) / np.maximum(stats.norm.cdf(z_index), 1e-300)
+        k_beta = beta.size
+        k_gamma = gamma.size
+        covariance = np.zeros((k_beta + k_gamma, k_beta + k_gamma))
+        covariance[:k_beta, :k_beta] = covariance_all[:k_beta, :k_beta]
+        covariance[k_beta:, k_beta:] = covariance_all[k_beta:, k_beta:]
 
-        # Step 2: OLS of the outcome on X and the IMR, selected rows only.
-        mask = self._selected
-        y_sel = self._y[mask]
-        X_sel = self._X[mask]
-        augmented = np.column_stack([X_sel, mills[mask]])
-        beta, *_ = np.linalg.lstsq(augmented, y_sel, rcond=None)
-        resid = y_sel - augmented @ beta
-
-        dof = max(len(y_sel) - augmented.shape[1], 1)
-        sigma2 = float(resid @ resid) / dof
-        bread = np.linalg.pinv(augmented.T @ augmented)
-        covariance = sigma2 * bread * (dof / max(dof - 1, 1))
-
-        # `beta` already contains the coefficient on the inverse Mills ratio
-        # appended as an extra column, so the names must include it once here and
-        # must not repeat it at the end.
-        # Both equations carry an intercept, so the names are prefixed the way
-        # Stata labels its two blocks (y: and selected:) to stay unique.
+        # Equation-prefixed names keep the two equations' ``_cons`` distinct,
+        # mirroring Stata's "y |" / "selected |" blocks and the package-wide
+        # ``<equation>:<term>`` convention.
         names = (
             [f"y:{name}" for name in self._outcome_names]
             + ["lambda"]
             + [f"select:{name}" for name in self._selection_names]
         )
         params = np.concatenate([beta, gamma])
-        augmented_covariance = np.zeros(
-            (params.size, params.size), dtype=float
-        )
-        # Only the second-stage block is estimated here; the selection block stays
-        # zero, which is why e(se_corrected) is 0.
-        augmented_covariance[: beta.size, : beta.size] = covariance
 
-        llf = float(
-            -0.5 * len(y_sel) * (np.log(2 * np.pi) + np.log(sigma2) + 1.0)
-        ) if sigma2 > 0 else float("nan")
-        # rho is the correlation between the two equations' errors. The
-        # second-stage residual and the probit index are the closest available
-        # proxies; note this is a *plug-in* estimate, not the MLE of rho, which is
-        # why the two-step estimator's rho can differ from Stata's ML rho.
-        rho = (
-            float(np.corrcoef(resid, -z_index[mask])[0, 1])
-            if resid.size > 2
-            else float("nan")
+        # Gaussian log-likelihood of the augmented regression, which is the
+        # second-stage objective a two-step estimator maximises, together with
+        # its constant-only counterpart for r2_p.
+        r2_p, llf, ll0 = _gaussian_pseudo_r2(
+            self._y[selected],
+            augmented[selected] @ beta,
+            nobs=n_selected,
+            k=k_augmented,
         )
+
+        slope_positions = _slope_positions(names)
+        wald = _wald_statistic(params, covariance, slope_positions)
+        df_model = len(slope_positions)
 
         e: dict[str, Any] = {
             "N": int(self._y.size),
-            "N_selected": int(mask.sum()),
-            "df_m": float(self._X.shape[1] - 1),
+            "N_selected": n_selected,
+            "N_nonselected": int(self._y.size - n_selected),
+            "df_m": df_model,
             "rank": int(params.size),
             "ll": llf,
-            "chi2": float("nan"),
+            "ll_0": ll0,
+            "chi2": wald,
             "chi2type": "Wald",
-            "p": float("nan"),
-            "r2_p": float("nan"),
-            "sigma": float(np.sqrt(sigma2)),
+            "p": _chi2_pvalue(wald, df_model),
+            "r2_p": r2_p,
+            "sigma": sigma,
             "rho": rho,
-            "lambda": float(mills[mask].mean()),
+            "lambda": float(mills[selected].mean()),
+            "lam_coef": lam_coef,
             "estimator": "twostep",
-            "se_corrected": 0,
+            "vce": "twostep",
+            "se_corrected": 1,
         }
 
         return StataResults(
             params=params,
             param_names=names,
-            cov=augmented_covariance,
-            resid=resid,
-            fittedvalues=augmented @ beta,
-            nobs=int(y_sel.size),
+            cov=covariance,
+            resid=residual,
+            fittedvalues=augmented[selected] @ beta,
+            nobs=n_selected,
             df_resid=float(dof),
-            df_model=float(self._X.shape[1] - 1),
+            df_model=float(df_model),
             dist="z",
             model_name=self._stata_command,
             cov_type="nonrobust",
             e=e,
-            design_matrix=(X_sel, list(self._outcome_names)),
+            design_matrix=(self._X[selected], list(self._outcome_names)),
             model_data=self._model_data,
         )
 
@@ -733,27 +1459,120 @@ class Heckman:
 class Etregress:
     """Endogenous treatment regression (Stata ``etregress``), control function.
 
-    Like :class:`Heckman`, only the two-step control-function estimator is
-    implemented; the MLE variant raises :class:`UnsupportedError`.
+    Treatment equation (probit, full sample)::
+
+        t* = z g + u,   t = 1[t* > 0]
+
+    Outcome equation (full sample, unlike :class:`Heckman`)::
+
+        y = x b + d t + e
+
+    The control function adds the first-stage residual
+    ``t*phi(z g)/Phi(z g) - (1-t)*phi(z g)/(1-Phi(z g))`` to the outcome
+    regression, which absorbs the correlation between ``u`` and ``e`` and makes
+    the treatment coefficient ``d`` consistent.
+
+    Parameters
+    ----------
+    formula:
+        ``"y ~ x + treat(t ~ z)"``.  The treatment indicator is added to the
+        outcome equation automatically; naming it there as well
+        (``"y ~ x + t + treat(t ~ z)"``) is accepted and does not duplicate it.
+
+    Notes
+    -----
+    ``y`` is observed for treated and control units alike, so every row enters
+    the outcome equation -- that is the structural difference from
+    :class:`Heckman`, where the outcome is truncated by selection.
+
+    Standard errors are the two-step M-estimator sandwich (see the module
+    docstring), not naive OLS standard errors and not Stata's ML ones.
     """
 
     _stata_command = "etregress"
 
-    def __init__(self, model: Heckman) -> None:
-        self._model = model
+    def __init__(
+        self,
+        outcome: np.ndarray,
+        outcome_exog: np.ndarray,
+        treatment: np.ndarray,
+        treatment_exog: np.ndarray,
+        *,
+        outcome_names: Sequence[str],
+        treatment_names: Sequence[str],
+        treated: np.ndarray,
+        model_data: pd.DataFrame | None = None,
+    ) -> None:
+        self._y = np.asarray(outcome, dtype=float).reshape(-1)
+        self._X = np.asarray(outcome_exog, dtype=float)
+        self._t = np.asarray(treatment, dtype=float).reshape(-1)
+        self._Z = np.asarray(treatment_exog, dtype=float)
+        self._treated = np.asarray(treated, dtype=bool)
+        self._outcome_names = list(outcome_names)
+        self._treatment_names = list(treatment_names)
+        self._model_data = model_data
+
+        if self._X.shape[0] != self._y.size or self._Z.shape[0] != self._y.size:
+            raise ConsistencyError(
+                "etregress: the outcome and treatment equations must describe the "
+                "same observations"
+            )
+        if self._y.size <= self._X.shape[1] + 1:
+            raise ConsistencyError(
+                f"etregress: {self._y.size} observations for "
+                f"{self._X.shape[1]} outcome regressors plus the control function; "
+                "the outcome equation is not identified"
+            )
 
     @classmethod
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
     ) -> "Etregress":
-        if "treat(" not in formula:
-            raise ConsistencyError(
-                "etregress: the formula must contain a treatment equation, as in "
-                "'y ~ x + treat(t ~ z)'"
-            )
-        transformed = formula.replace("treat(", "select(")
-        return cls(Heckman.from_formula(transformed, data, subset=subset))
+        """Build the model from ``"y ~ x + treat(t ~ z)"``."""
 
+        outcome_formula, treatment_formula, data = _parse_two_equation(
+            formula, data, keyword="treat", command="etregress", subset=subset
+        )
+
+        outcome_lhs = outcome_formula.split("~", 1)[0].strip()
+        treatment_lhs = treatment_formula.split("~", 1)[0].strip()
+        for column in (outcome_lhs, treatment_lhs):
+            if column not in data.columns:
+                raise ConsistencyError(
+                    f"etregress: column {column!r} not found in the data"
+                )
+
+        treatment_rhs = treatment_formula.split("~", 1)[1]
+        outcome_rhs = outcome_formula.split("~", 1)[1]
+        data = _drop_missing(
+            data,
+            [f"{outcome_lhs} ~ {outcome_rhs}", f"{treatment_lhs} ~ {treatment_rhs}"],
+            command="etregress",
+        )
+
+        # The treatment indicator joins the outcome equation, so it must appear
+        # exactly once even when the user also wrote it among the regressors.
+        outcome_terms = _strip_term(outcome_rhs, treatment_lhs)
+        outcome_x = _model_matrix(outcome_terms, data, "etregress")
+        treatment_design = _model_matrix(treatment_rhs, data, "etregress")
+        treat_vector = data[treatment_lhs].to_numpy(dtype=float)
+        _check_selection_indicator(treat_vector, "etregress", "treat")
+
+        augmented = np.column_stack([outcome_x[0], treat_vector])
+        names = list(outcome_x[1]) + [treatment_lhs]
+
+        return cls(
+            data[outcome_lhs].to_numpy(dtype=float),
+            augmented,
+            treat_vector,
+            treatment_design[0],
+            outcome_names=names,
+            treatment_names=treatment_design[1],
+            treated=treat_vector > 0.5,
+            model_data=data,
+        )
+
+    # ------------------------------------------------------------------- fit
     def fit(
         self,
         method: str = "control",
@@ -764,36 +1583,158 @@ class Etregress:
         maxiter: int = 200,
         strict: bool = False,
     ) -> StataResults:
+        """Estimate by the control-function (two-step) procedure."""
+
         normalized = str(method).strip().lower()
-        if normalized not in ("control", "twostep", "two-step"):
+        if normalized not in ("control", "controlfunction", "control-function", "twostep", "two-step"):
             raise UnsupportedError(
                 f"etregress: only method='control' is implemented; {method!r} is "
-                "not. The ML variant needs a joint likelihood that has not been "
-                "implemented or verified."
+                "not. The maximum likelihood variant requires the joint likelihood "
+                "of the outcome and treatment equations with a bivariate normal "
+                "error term, which has not been implemented or verified against "
+                "Stata."
             )
-        result = self._model.fit(
-            method="twostep",
-            cov_type=cov_type,
-            cov_kwds=cov_kwds,
-            ssc=ssc,
-            maxiter=maxiter,
-            strict=strict,
+        if cov_type not in (None, "nonrobust"):
+            raise ValueError(
+                f"etregress: only cov_type='nonrobust' is implemented, got {cov_type!r}"
+            )
+
+        gamma, _ = _probit_fit(self._t, self._Z, maxiter=maxiter)
+        control = self._control_function(gamma, self._t)
+
+        augmented = np.column_stack([self._X, control])
+        beta, residual = _augmented_regression(self._y, augmented)
+
+        n = self._y.size
+        k_augmented = augmented.shape[1]
+        dof = max(n - k_augmented, 1)
+        sigma2 = float(residual @ residual) / dof
+        sigma = float(np.sqrt(sigma2)) if sigma2 > 0 else float("nan")
+
+        covariance_all = _two_step_covariance(
+            outcome=self._y,
+            A=augmented,
+            beta=beta,
+            selection=self._t,
+            Z=self._Z,
+            gamma=gamma,
+            selected=np.ones(n, dtype=bool),
+            generated=lambda g: self._control_function(g, self._t),
         )
-        e = dict(result.e)
-        e["estimator"] = "control"
+        k_beta = beta.size
+        covariance = np.zeros((k_beta + gamma.size, k_beta + gamma.size))
+        covariance[:k_beta, :k_beta] = covariance_all[:k_beta, :k_beta]
+        covariance[k_beta:, k_beta:] = covariance_all[k_beta:, k_beta:]
+
+        # Equation-prefixed names, as for ``heckman``: Stata labels these blocks
+        # "y" and by the treatment variable, and the prefix keeps the two
+        # constants distinct.
+        names = (
+            [f"y:{name}" for name in self._outcome_names]
+            + ["lambda"]
+            + [f"treat:{name}" for name in self._treatment_names]
+        )
+        params = np.concatenate([beta, gamma])
+
+        # The control-function coefficient is -rho*sigma in Stata's
+        # parameterisation, so rho = -b_control / sigma.
+        control_coef = float(beta[-1])
+        rho = -control_coef / sigma if np.isfinite(sigma) and sigma > 0 else float("nan")
+
+        r2_p, llf, ll0 = _gaussian_pseudo_r2(
+            self._y, augmented @ beta, nobs=n, k=k_augmented
+        )
+
+        slope_positions = _slope_positions(names)
+        wald = _wald_statistic(params, covariance, slope_positions)
+        df_model = len(slope_positions)
+
+        e: dict[str, Any] = {
+            "N": n,
+            "N_treated": int(self._treated.sum()),
+            "df_m": df_model,
+            "rank": int(params.size),
+            "ll": llf,
+            "ll_0": ll0,
+            "chi2": wald,
+            "chi2type": "Wald",
+            "p": _chi2_pvalue(wald, df_model),
+            "r2_p": r2_p,
+            "sigma": sigma,
+            "rho": rho,
+            "estimator": "control",
+            "vce": "twostep",
+            "se_corrected": 1,
+        }
+
         return StataResults(
-            params=result.params,
-            param_names=result.param_names,
-            cov=result.cov_params(),
-            resid=result.resid,
-            fittedvalues=result.fittedvalues,
-            nobs=result.nobs,
-            df_resid=result.df_resid,
-            df_model=result.df_model,
+            params=params,
+            param_names=names,
+            cov=covariance,
+            resid=residual,
+            fittedvalues=augmented @ beta,
+            nobs=n,
+            df_resid=float(dof),
+            df_model=float(df_model),
             dist="z",
             model_name=self._stata_command,
             cov_type="nonrobust",
             e=e,
-            design_matrix=result.design_matrix,
-            model_data=result.model_data,
+            design_matrix=(self._X, list(self._outcome_names)),
+            model_data=self._model_data,
         )
+
+    # -------------------------------------------------------------- internals
+    def _control_function(self, gamma: np.ndarray, treatment: np.ndarray) -> np.ndarray:
+        """Generalised residual ``phi(w) [t/Phi(w) - (1-t)/(1-Phi(w))]``.
+
+        This is ``E[u | t, z]`` for a standard normal ``u`` in the probit, so
+        including it in the outcome equation absorbs the endogeneity.  Both
+        mill-ratio pieces are evaluated through the log CDF so neither tail
+        overflows: ``phi/Phi = exp(log phi - log Phi)``.
+        """
+
+        index = self._Z @ gamma
+        log_pdf = stats.norm.logpdf(index)
+        log_cdf = log_ndtr(index)
+        log_sf = log_ndtr(-index)
+        with np.errstate(over="ignore", invalid="ignore"):
+            ratio = np.where(
+                treatment > 0.5,
+                np.exp(log_pdf - log_cdf),
+                -np.exp(log_pdf - log_sf),
+            )
+        return np.nan_to_num(ratio, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def _model_matrix(rhs: str, data: pd.DataFrame, command: str) -> tuple[np.ndarray, list[str]]:
+    """Design matrix for a right-hand side, with a Stata-style error message."""
+
+    X, names, _ = build_design(f"__response__ ~ {rhs}", _with_response(data))
+    return X, names
+
+
+def _with_response(data: pd.DataFrame) -> pd.DataFrame:
+    """Attach a dummy response column so :func:`build_design` can be reused."""
+
+    frame = data.copy()
+    frame["__response__"] = 0.0
+    return frame
+
+
+def _strip_term(rhs: str, term: str) -> str:
+    """Remove every standalone occurrence of ``term`` from a formula RHS.
+
+    Stata's ``etregress y x treat(t ~ z)`` adds the treatment indicator itself;
+    a user who spelled out ``y ~ x + t + treat(t ~ z)`` would otherwise get a
+    duplicated and perfectly collinear column.
+    """
+
+    pattern = re.compile(rf"(?<![\w.]){re.escape(term)}(?![\w.])")
+    cleaned = pattern.sub(" ", rhs)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"^\s*\+\s*|\s*\+\s*(?=\+|$)", "", cleaned)
+    cleaned = re.sub(r"\+\s*\+", "+", cleaned).strip()
+    if not cleaned or cleaned in ("+", "0"):
+        return "1"
+    return cleaned

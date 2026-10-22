@@ -1,51 +1,86 @@
 """Zero-inflated and truncated count models.
 
-==========================  ==================
-westata                     Stata
-==========================  ==================
-``ZeroInflatedPoisson``     ``zip``
+==============================  ==================================
+westata                         Stata
+==============================  ==================================
+``ZeroInflatedPoisson``         ``zip``
 ``ZeroInflatedNegativeBinomial``  ``zinb``
-``TruncatedPoisson``        ``ztp`` / ``tpoisson``
-``TruncatedNegativeBinomial``  ``ztnb`` / ``tnbreg``
-==========================  ==================
-
-All four maximise a self-written likelihood rather than wrapping statsmodels.
-The reason is parameterisation: statsmodels' ``ZeroInflatedPoisson`` models the
-zero-inflation probability through ``exog_infl`` with its own sign convention,
-and it does not expose a truncated-count model at all. Sorting that out for every
-family would leave four different conventions to keep straight; one explicit
-likelihood per family is easier to verify against Stata and impossible to
-"accidentally" mis-specify.
+``TruncatedPoisson``            ``ztp`` / ``tpoisson`` / ``tpois``
+``TruncatedNegativeBinomial``   ``tnbreg``
+==============================  ==================================
 
 Likelihoods
 -----------
-Zero-inflated::
+Zero-inflated (inflation probability ``pi = logistic(w'g)``, ``f`` the Poisson
+or negative-binomial mass)::
 
     P(y = 0) = pi + (1 - pi) f(0; mu)
-    P(y = k) = (1 - pi) f(k; mu),  k > 0
-    pi = logistic(w' gamma)
+    P(y = k) = (1 - pi) f(k; mu),   k > 0
 
-with ``f`` the Poisson or negative-binomial mass.  When ``inflate is None`` the
-model collapses to the plain Poisson/NB because ``pi`` is then fixed at 0.
+With ``inflate is None`` there is no mixture: ``P(y = k) = f(k; mu)`` and the
+model *is* the plain Poisson / negative binomial of
+:mod:`westata.estimators.discrete`.  That degenerate case is the strongest
+available correctness check and is covered by a regression test.
 
-Truncated (lower limit ``a``, optional upper ``b``)::
+Truncated counts, observed only for integers in ``[lower, upper]``::
 
-    P(y = k | a <= k <= b) = f(k; mu) / (F(b; mu) - F(a - 1; mu))
+    P(y = k | lower <= k <= upper) = f(k; mu) / (F(upper) - F(lower - 1))
 
-Zero truncation is the special case ``a = 1``.
+Zero truncation (``ztp`` / ``tnbreg``) is the special case ``lower = 1``.
+
+Why not wrap statsmodels?
+-------------------------
+statsmodels offers ``ZeroInflatedPoisson``/``ZeroInflatedNegativeBinomialP``,
+but its inflation equation is written with the opposite sign convention from
+Stata's ``inflate()`` and its finite-difference Hessian is not what Stata
+reports; it has no truncated-count model at all.  Wrapping would therefore
+leave one convention per family and no way to test the likelihood itself, so
+the likelihoods here are written out explicitly and verified two ways: against
+a hand-written ``sum(log ...)`` in the tests, and against captured StataNow
+19.5 output in ``tests/conformance/stata_fixtures/p6p7_outputs.txt``.
+
+What *is* reused is all the surrounding machinery: these classes subclass
+:class:`westata.estimators.discrete._DiscreteBase`, so parameter naming,
+``cov_type`` dispatch, the convergence policy (``strict=True`` raises
+:class:`~westata.errors.ConvergenceError`) and the ``StataResults`` assembly are
+shared with ``poisson``/``nbreg``.  Only the likelihood, the start values and
+the constant-only baseline are new.
+
+Stata reporting notes
+---------------------
+* ``e(ll_0)`` is Stata's "constant-only model": the *main* equation reduced to a
+  constant, with the inflation equation (and the NB dispersion) left as
+  specified.  This matters: ``e(chi2)``, ``e(p)`` and ``e(r2_p)`` are all
+  relative to it, and using ``mean(y)`` as the null instead makes ``zip``
+  report chi2 657.68 where Stata reports 248.04.
+* ``e(df_m)`` counts only the main-equation regressors beyond the constant, so
+  ``zip y x1, inflate(x1)`` prints ``LR chi2(1)`` even though it estimates four
+  parameters (``e(rank)`` is 4).
+* The NB dispersion is parameterised as ``alpha`` with ``Var = mu +
+  alpha*mu^2`` (Stata's NB2) and estimated on the log scale, so the reported
+  coefficient is ``/lnalpha`` exactly as ``nbreg``/``zinb``/``tnbreg`` print it;
+  ``e(alpha)`` is the exponentiated value.
+* Robust/cluster VCEs are passed through to statsmodels' sandwich and are *not*
+  yet verified against Stata ``vce(robust)``; the default observed-information
+  covariance is verified (ztp: .0350626/.04102 vs Stata .0350626/.04102).
 """
 
 from __future__ import annotations
 
-import warnings
 from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
-from scipy import optimize, stats
-from scipy.special import gammaln, logsumexp
+from scipy import stats
+from scipy.special import gammaln
 
-from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
+from statsmodels.base.model import (
+    GenericLikelihoodModel,
+    GenericLikelihoodModelResults,
+)
+
+from westata.errors import ConsistencyError
+from westata.estimators.discrete import _DiscreteBase
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
@@ -56,174 +91,488 @@ __all__ = [
     "ZeroInflatedPoisson",
 ]
 
+#: Largest linear predictor fed through ``exp``.  Beyond this the density is
+#: numerically zero anyway, and clipping keeps ``mu`` finite so the optimiser
+#: sees ``-inf`` instead of NaN when it wanders.
+_ETA_CLIP = 700.0
 
-# ---------------------------------------------------------------- mass functions
+
+# ----------------------------------------------------------------- mass functions
 
 
 def _poisson_logpmf(y: np.ndarray, mu: np.ndarray) -> np.ndarray:
-    return y * np.log(np.maximum(mu, 1e-300)) - mu - gammaln(y + 1.0)
+    """Poisson log mass, evaluated without leaving ``[0, 1]`` probabilities."""
+
+    return y * np.log(mu) - mu - gammaln(y + 1.0)
+
+
+def _nb_terms(mu: np.ndarray, alpha: float) -> tuple[float, np.ndarray]:
+    """``(size, p)`` of the NB2 mass written as ``nbinom(size, p)``.
+
+    Stata's ``alpha`` satisfies ``Var = mu + alpha*mu^2``, i.e.
+    ``size = 1/alpha`` and ``p = size / (size + mu)``.
+    """
+
+    size = 1.0 / max(alpha, 1e-12)
+    return size, size / (size + mu)
 
 
 def _nb_logpmf(y: np.ndarray, mu: np.ndarray, alpha: float) -> np.ndarray:
-    """Negative-binomial mass with variance ``mu + alpha * mu^2`` (Stata's)."""
-
-    size = 1.0 / max(alpha, 1e-12)
+    size, p = _nb_terms(mu, alpha)
     return (
         gammaln(y + size)
         - gammaln(size)
         - gammaln(y + 1.0)
-        + size * np.log(size / (size + mu))
-        + y * np.log(np.maximum(mu / (size + mu), 1e-300))
+        + size * np.log(p)
+        + y * np.log(np.maximum(1.0 - p, 1e-300))
     )
 
 
-def _poisson_cdf_counts(mu: np.ndarray, k: np.ndarray) -> np.ndarray:
-    """``P(Y <= k)`` for each observation, vectorised over observations."""
+def _nb_cdf(k: float, mu: np.ndarray, alpha: float) -> np.ndarray:
+    size, p = _nb_terms(mu, alpha)
+    return stats.nbinom.cdf(k, size, p)
 
-    return stats.poisson.cdf(k, mu)
+
+def _nb_logsf(k: float, mu: np.ndarray, alpha: float) -> np.ndarray:
+    size, p = _nb_terms(mu, alpha)
+    return stats.nbinom.logsf(k, size, p)
 
 
-class _CountBase:
-    """Shared plumbing for the self-implemented count likelihoods."""
+# ---------------------------------------------------------- statsmodels backend
 
-    _stata_command = ""
-    _optimizer = "bfgs"
 
-    def __init__(self, endog: Any, exog: Any, *, param_names: list[str] | None = None) -> None:
-        self._y = np.asarray(endog, dtype=float).reshape(-1)
-        X = np.asarray(exog, dtype=float)
-        if X.ndim == 1:
-            X = X.reshape(-1, 1)
-        self._X = X
-        self._param_names = (
-            list(param_names)
-            if param_names is not None
-            else [f"x{i}" for i in range(X.shape[1])]
+class _CountResults(GenericLikelihoodModelResults):
+    """Results object the generic likelihood needs to look like a real fit.
+
+    ``GenericLikelihoodModelResults`` already supplies ``params``, ``llf``,
+    ``aic``, ``bic``, ``cov_params`` and ``predict``; the two pieces the
+    :class:`._DiscreteBase` plumbing expects and it does not provide are
+    ``resid_response`` (response minus fitted) and ``llnull`` (Stata's
+    constant-only baseline, which the model knows how to compute).
+    """
+
+    @property
+    def resid_response(self) -> np.ndarray:
+        return np.asarray(self.model.endog, dtype=float) - np.asarray(
+            self.predict(), dtype=float
         )
-        if len(self._param_names) != X.shape[1]:
-            raise ValueError(
-                f"param_names has {len(self._param_names)} entries but exog has "
-                f"{X.shape[1]} columns"
-            )
-        self._model_data: pd.DataFrame | None = None
 
-    @staticmethod
-    def _formula_parts(formula: str) -> tuple[str, str]:
-        lhs, rhs = formula.split("~", 1)
-        return lhs.strip(), rhs.strip()
+    @property
+    def llnull(self) -> float:
+        return self.model.null_loglike()
 
-    def _optimise(
-        self, objective: Any, start: np.ndarray, *, maxiter: int, strict: bool, label: str
-    ) -> np.ndarray:
-        result = optimize.minimize(
-            objective, start, method=self._optimizer.upper(),
-            options={"maxiter": maxiter},
-        )
-        if not result.success:
-            refined = optimize.minimize(
-                objective,
-                np.asarray(result.x, dtype=float),
-                method="Nelder-Mead",
-                options={"maxiter": maxiter, "xatol": 1e-9, "fatol": 1e-9},
-            )
-            if refined.fun <= result.fun:
-                result = refined
-        if not result.success:
-            message = f"{label}: optimiser did not converge ({result.message})"
-            if strict:
-                raise ConvergenceError(message)
-            warnings.warn(message, RuntimeWarning, stacklevel=2)
-        return np.asarray(result.x, dtype=float)
 
-    def _covariance(self, objective: Any, point: np.ndarray) -> np.ndarray:
-        size = point.size
-        step = 1e-5
-        hessian = np.zeros((size, size), dtype=float)
-        increments = step * np.maximum(np.abs(point), 1.0)
-        for i in range(size):
-            for j in range(i, size):
-                ei = np.zeros(size)
-                ej = np.zeros(size)
-                ei[i] = increments[i]
-                ej[j] = increments[j]
-                if i == j:
-                    value = (
-                        objective(point + ei) - 2 * objective(point) + objective(point - ei)
-                    ) / increments[i] ** 2
-                else:
-                    value = (
-                        objective(point + ei + ej)
-                        - objective(point + ei - ej)
-                        - objective(point - ei + ej)
-                        + objective(point - ei - ej)
-                    ) / (4 * increments[i] * increments[j])
-                hessian[i, j] = value
-                hessian[j, i] = value
-        try:
-            covariance = np.linalg.inv(hessian)
-        except np.linalg.LinAlgError:
-            covariance = np.linalg.pinv(hessian)
-        if not np.all(np.isfinite(covariance)):
-            raise ConvergenceError(
-                f"{self._stata_command}: the observed information is not "
-                "invertible; the model is likely not identified"
-            )
-        return covariance
+class _CountLikelihood(GenericLikelihoodModel):
+    """One explicit count likelihood, optimised by statsmodels' machinery.
 
-    def _assemble(
+    Parameters are ordered ``[beta, gamma, lnalpha]``, where ``gamma`` is
+    present only when an inflation equation was given and ``lnalpha`` only for
+    a negative binomial.  Keeping the dispersion on the log scale (as ``nbreg``
+    reports it) means no delta-method rescaling is needed afterwards, unlike
+    :class:`westata.estimators.discrete.NegativeBinomial`.
+
+    The truncation/zero-inflation switch is explicit rather than implied: the
+    two are never combined, but the branch order keeps that obvious.
+    """
+
+    results_class = _CountResults
+
+    def __init__(
         self,
-        params: np.ndarray,
-        names: list[str],
-        covariance: np.ndarray,
+        endog: Any,
+        exog: Any,
         *,
-        llf: float,
-        ll0: float,
-        nobs: int,
-        n_parameters: int,
-        extra: Mapping[str, Any] | None = None,
-    ) -> StataResults:
-        chi2 = 2.0 * (llf - ll0) if np.isfinite(ll0) else float("nan")
-        pseudo = 1.0 - llf / ll0 if np.isfinite(ll0) and ll0 != 0 else float("nan")
-        e: dict[str, Any] = {
+        family: str = "poisson",
+        inflate_exog: Any = None,
+        lower: float | None = None,
+        upper: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        if family not in ("poisson", "nb"):
+            raise ValueError(f"unknown count family {family!r}")
+        self.family = family
+        self._inflate_exog = (
+            None if inflate_exog is None else np.asarray(inflate_exog, dtype=float)
+        )
+        self.lower = lower
+        self.upper = upper
+        self._null_loglike: float | None = None
+
+        n_main = np.asarray(exog, dtype=float).shape[1]
+        n_inflate = 0 if self._inflate_exog is None else self._inflate_exog.shape[1]
+        n_extra = n_inflate + (1 if family == "nb" else 0)
+
+        super().__init__(endog, exog, **kwargs)
+
+        if n_extra:
+            # statsmodels sizes its parameter vector from ``exog_names``; the
+            # real names are supplied by the westata wrapper, these are only
+            # placeholders that keep the generic model consistent.
+            self.exog_names.extend([f"param{i + 1}" for i in range(n_extra)])
+            self.k_extra = n_extra
+            self.nparams = n_main + n_extra
+
+        # Keep statsmodels' own bookkeeping self-consistent so its results
+        # constructor does not emit "df_model/df_resid differs from k_params"
+        # warnings.  These values are *not* what westata reports: ``_DiscreteBase``
+        # supplies ``e(df_m)``/``df_model`` from Stata's convention (main-equation
+        # regressors beyond the constant, excluding inflation and dispersion).
+        self.df_model = float(n_main - self.k_constant)
+        self.df_resid = float(np.asarray(endog).shape[0] - self.nparams)
+
+    # ------------------------------------------------------------ parameters
+    @property
+    def start_params(self) -> np.ndarray:
+        """Start from a plain Poisson / log-OLS fit, as Stata does."""
+
+        log_y = np.log(np.maximum(np.asarray(self.endog, dtype=float), 0.5))
+        beta0, *_ = np.linalg.lstsq(self.exog, log_y, rcond=None)
+
+        parts = [np.asarray(beta0, dtype=float)]
+        if self._inflate_exog is not None:
+            share_zero = float(np.mean(np.asarray(self.endog, dtype=float) == 0.0))
+            share_zero = min(max(share_zero, 1e-3), 0.95)
+            gamma0 = np.zeros(self._inflate_exog.shape[1])
+            gamma0[0] = np.log(share_zero / (1.0 - share_zero))
+            parts.append(gamma0)
+        if self.family == "nb":
+            counts = np.asarray(self.endog, dtype=float)
+            mean = max(float(np.mean(counts)), 1e-6)
+            variance = float(np.var(counts))
+            alpha0 = max((variance - mean) / max(mean**2, 1e-12), 0.1)
+            parts.append(np.array([np.log(alpha0)]))
+        return np.concatenate(parts)
+
+    def _split(self, params: np.ndarray) -> tuple[np.ndarray, np.ndarray | None, float | None]:
+        """Unpack ``[beta, gamma, lnalpha]`` into mean, pi-index and alpha."""
+
+        params = np.asarray(params, dtype=float).reshape(-1)
+        k = self.exog.shape[1]
+        eta = np.clip(self.exog @ params[:k], -_ETA_CLIP, _ETA_CLIP)
+        mu = np.exp(eta)
+
+        gamma = None
+        if self._inflate_exog is not None:
+            m = self._inflate_exog.shape[1]
+            gamma = self._inflate_exog @ params[k : k + m]
+        alpha = None
+        if self.family == "nb":
+            alpha = float(np.exp(np.clip(params[-1], -_ETA_CLIP, _ETA_CLIP)))
+        return mu, gamma, alpha
+
+    # ------------------------------------------------------------ likelihood
+    def _log_mass(self, mu: np.ndarray, alpha: float | None) -> np.ndarray:
+        if alpha is None:
+            return _poisson_logpmf(np.asarray(self.endog, dtype=float), mu)
+        return _nb_logpmf(np.asarray(self.endog, dtype=float), mu, alpha)
+
+    def _log_truncation(self, mu: np.ndarray, alpha: float | None) -> np.ndarray:
+        """``log(F(upper) - F(lower - 1))``, the truncation normaliser."""
+
+        assert self.lower is not None
+        below = self.lower - 1.0
+        if self.upper is None:
+            if alpha is None:
+                return stats.poisson.logsf(below, mu)
+            return _nb_logsf(below, mu, alpha)
+        if alpha is None:
+            upper_cdf = stats.poisson.cdf(self.upper, mu)
+            lower_cdf = stats.poisson.cdf(below, mu)
+        else:
+            upper_cdf = _nb_cdf(self.upper, mu, alpha)
+            lower_cdf = _nb_cdf(below, mu, alpha)
+        return np.log(np.maximum(upper_cdf - lower_cdf, 1e-300))
+
+    def loglikeobs(self, params: np.ndarray) -> np.ndarray:
+        mu, gamma, alpha = self._split(params)
+        log_f = self._log_mass(mu, alpha)
+
+        if self.lower is not None:
+            return log_f - self._log_truncation(mu, alpha)
+
+        if gamma is None:
+            return log_f
+
+        # Zero-inflated: P(0) = pi + (1-pi) f(0), P(k>0) = (1-pi) f(k).
+        # Both logarithms are taken in log-space (log sigmoid / log 1-sigmoid)
+        # so a near-certain structural zero cannot underflow to log(0).
+        gamma = np.clip(gamma, -_ETA_CLIP, _ETA_CLIP)
+        log_pi = -np.logaddexp(0.0, -gamma)
+        log_one_minus = -np.logaddexp(0.0, gamma)
+        log_zero = np.logaddexp(log_pi, log_one_minus + self._zero_log_mass(mu, alpha))
+        y = np.asarray(self.endog, dtype=float)
+        return np.where(y == 0.0, log_zero, log_one_minus + log_f)
+
+    def _zero_log_mass(self, mu: np.ndarray, alpha: float | None) -> np.ndarray:
+        """``log f(0; mu)`` -the mass the mixture replaces at ``y = 0``."""
+
+        zeros = np.zeros_like(mu)
+        if alpha is None:
+            return _poisson_logpmf(zeros, mu)
+        return _nb_logpmf(zeros, mu, alpha)
+
+    # --------------------------------------------------------------- predict
+    def predict(self, params: np.ndarray, exog: Any = None, **kwargs: Any) -> np.ndarray:
+        """Conditional mean of the observed count (Stata ``predict, n``)."""
+
+        params = np.asarray(params, dtype=float).reshape(-1)
+        if exog is None:
+            exog = self.exog
+        exog = np.asarray(exog, dtype=float)
+        eta = np.clip(exog @ params[: exog.shape[1]], -_ETA_CLIP, _ETA_CLIP)
+        mu = np.exp(eta)
+
+        if self.lower is not None:
+            return self._truncated_mean(mu, params)
+
+        if self._inflate_exog is None:
+            return mu
+        m = self._inflate_exog.shape[1]
+        k = self.exog.shape[1]
+        gamma = self._inflate_exog @ params[k : k + m]
+        pi = 1.0 / (1.0 + np.exp(-np.clip(gamma, -_ETA_CLIP, _ETA_CLIP)))
+        return (1.0 - pi) * mu
+
+    def _truncated_mean(self, mu: np.ndarray, params: np.ndarray) -> np.ndarray:
+        """``E[Y | lower <= Y <= upper]`` using ``E[Y; sel] = mu (F(u-1)-F(l-2))``."""
+
+        assert self.lower is not None
+        alpha = None
+        if self.family == "nb":
+            alpha = float(np.exp(np.clip(params[-1], -_ETA_CLIP, _ETA_CLIP)))
+
+        denominator = np.exp(self._log_truncation(mu, alpha))
+        below_two = self.lower - 2.0
+        if self.upper is None:
+            numerator = mu * (
+                stats.poisson.sf(below_two, mu)
+                if alpha is None
+                else _nb_logsf(below_two, mu, alpha)
+            )
+        else:
+            if alpha is None:
+                numerator = mu * (
+                    stats.poisson.cdf(self.upper - 1.0, mu)
+                    - stats.poisson.cdf(below_two, mu)
+                )
+            else:
+                numerator = mu * (
+                    _nb_cdf(self.upper - 1.0, mu, alpha) - _nb_cdf(below_two, mu, alpha)
+                )
+        return numerator / np.maximum(denominator, 1e-300)
+
+    # ------------------------------------------------------- constant-only ll
+    def null_loglike(self) -> float:
+        """Log-likelihood of Stata's "constant-only model" for this family.
+
+        Stata's baseline is *not* uniform across these commands, and using one
+        rule everywhere silently breaks ``e(chi2)``/``e(r2_p)``:
+
+        * ``zip``/``zinb``/``tnbreg`` print a "Fitting constant-only model" block
+          and use its *maximised* log-likelihood, i.e. the model refitted with
+          the main equation reduced to a constant but the inflation equation
+          kept.  For the ``zip`` fixture that is -1824.7258 (chi2 248.04) and
+          for ``tnbreg`` -1407.598 (chi2 171.80).
+        * ``ztp`` prints no such block and measures chi2 against the
+          ``mean(y)`` single-parameter null *with the truncation applied*:
+          -1051.8155 (chi2 270.42).  Refitting a truncated constant-only model
+          instead gives -1039.73 and chi2 246.25, which matches no Stata output.
+
+        The evidence for the split is in ``p6p7_outputs.txt``: only ``ztp``
+        lacks a constant-only block, and only ``ztp``'s chi2 is reproducible
+        from ``mean(y)``.
+        """
+
+        if self._null_loglike is not None:
+            return self._null_loglike
+
+        y = np.asarray(self.endog, dtype=float)
+        n = y.shape[0]
+        if self.lower is not None and self.family == "poisson":
+            # ztp/tpoisson: single-parameter null at mu = mean(y), truncation kept.
+            mu = np.full(n, max(float(np.mean(y)), 1e-6))
+            value = float(
+                np.sum(_poisson_logpmf(y, mu) - self._log_truncation(mu, None))
+            )
+        else:
+            null = type(self)(
+                self.endog,
+                np.ones((n, 1)),
+                family=self.family,
+                inflate_exog=self._inflate_exog,
+                lower=self.lower,
+                upper=self.upper,
+            )
+            try:
+                fitted = null.fit(
+                    method="bfgs", maxiter=2000, disp=0, start_params=null.start_params
+                )
+                value = float(fitted.llf)
+            except Exception:  # noqa: BLE001 - a failed null fit only costs e(ll_0)
+                value = float("nan")
+        self._null_loglike = value
+        return value
+
+
+# ---------------------------------------------------------------- westata layer
+
+
+class _CountBase(_DiscreteBase):
+    """Shared Stata-facing behaviour for the count extensions."""
+
+    _family = "poisson"
+    _accepts_hc_kwds = False
+
+    def _main_count(self) -> int:
+        """Regressors in the main equation (including the constant)."""
+
+        return int(self._X.shape[1])
+
+    def _model_df(self) -> int:
+        """``e(df_m)``: main-equation regressors *beyond* the constant.
+
+        Stata prints ``LR chi2(df_m)`` for these models and the inflation
+        equation does not contribute to it: ``zip y x1, inflate(x1)`` reports
+        ``LR chi2(1)`` with ``e(rank) = 4``.
+        """
+
+        return max(self._main_count() - 1, 0)
+
+    # -- backend -----------------------------------------------------------
+    def _make_sm_model(self) -> Any:
+        return _CountLikelihood(
+            self._y,
+            self._X,
+            family=self._family,
+            inflate_exog=getattr(self, "_inflate_exog", None),
+            lower=getattr(self, "_lower", None),
+            upper=getattr(self, "_upper", None),
+        )
+
+    # -- helpers used by the tests and by postestimation -------------------
+    def _loglike(self, theta: np.ndarray) -> float:
+        """Log-likelihood at ``theta`` (kept public-ish for verification)."""
+
+        return float(np.sum(self._make_sm_model().loglikeobs(np.asarray(theta, dtype=float))))
+
+    def start_params(self) -> np.ndarray:
+        return self._make_sm_model().start_params
+
+    # -- Stata e() ---------------------------------------------------------
+    def _stata_scalars(
+        self, result: Any, params: np.ndarray, llf: float, nobs: int
+    ) -> dict[str, Any]:
+        ll0 = getattr(result, "llnull", None)
+        ll_null = float(ll0) if ll0 is not None else float("nan")
+        df_m = self._model_df()
+
+        if np.isfinite(ll_null):
+            chi2 = 2.0 * (llf - ll_null)
+            p_value = float(stats.chi2.sf(chi2, df_m)) if df_m > 0 else float("nan")
+            pseudo_r2 = 1.0 - llf / ll_null if ll_null != 0 else float("nan")
+        else:
+            chi2 = float("nan")
+            p_value = float("nan")
+            pseudo_r2 = float("nan")
+
+        scalars: dict[str, Any] = {
             "N": nobs,
-            "df_m": float(n_parameters - 1),
+            "df_m": df_m,
             "rank": int(params.size),
             "ll": float(llf),
-            "ll_0": float(ll0),
+            "ll_0": ll_null,
             "chi2": chi2,
             "chi2type": "LR",
-            "p": float(stats.chi2.sf(chi2, max(n_parameters - 1, 1))),
-            "r2_p": pseudo,
+            "p": p_value,
+            "r2_p": pseudo_r2,
+            "aic": float(getattr(result, "aic", float("nan"))),
+            "bic": float(getattr(result, "bic", float("nan"))),
         }
-        if extra:
-            e.update(dict(extra))
+        if self._family == "nb":
+            lnalpha = float(params[-1])
+            scalars["lnalpha"] = lnalpha
+            scalars["alpha"] = float(np.exp(np.clip(lnalpha, -_ETA_CLIP, _ETA_CLIP)))
+        return scalars
 
-        mu = np.exp(self._X @ params[: self._X.shape[1]])
+    def _extra_scalars(self) -> dict[str, Any]:
+        """Model-specific extra ``e()`` scalars, merged in by subclasses."""
+
+        return {}
+
+    # -- fit ---------------------------------------------------------------
+    def _optimizer_tolerance(self, tol: float) -> float:
+        """Relax ``tol`` for statsmodels' ``newton``.
+
+        ``_DiscreteBase.fit`` forwards ``tol`` as the Newton convergence
+        criterion, but statsmodels' Newton stops on the gradient norm, which is
+        not on the log-likelihood scale: 1e-10 is below what finite-difference
+        Hessians can resolve, so the line search makes no progress and every
+        fit burns all ``maxiter`` iterations while still being flagged
+        non-converged.  Measured on ``tpoisson`` (upper=4) that meant 2000
+        iterations and a spurious ConvergenceError warning at ``tol=1e-10``
+        versus 5 iterations and the identical log-likelihood at 1e-8.  The
+        estimates are unchanged, so the looser criterion costs nothing.
+        """
+
+        return max(float(tol), 1e-8)
+
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Mapping[str, Any] | None = None,
+        ssc: Any = None,
+        *,
+        maxiter: int = 500,
+        tol: float = 1e-10,
+        strict: bool = False,
+    ) -> StataResults:
+        """Maximise the count likelihood.
+
+        ``_DiscreteBase.fit`` reuses every part of the estimation machinery but
+        reports ``df_model = len(params) - 1``, which counts inflation and
+        dispersion parameters.  Stata's ``e(df_m)`` does not, so the container
+        is restamped here with the corrected value rather than reimplementing
+        the fit.
+        """
+
+        if self._optimizer == "newton":
+            tol = self._optimizer_tolerance(tol)
+        result = super().fit(
+            cov_type=cov_type,
+            cov_kwds=cov_kwds,
+            ssc=ssc,
+            maxiter=maxiter,
+            tol=tol,
+            strict=strict,
+        )
+        extras = self._extra_scalars()
+        df_m = float(self._model_df())
+        if not extras and df_m == result.df_model:
+            return result
+
+        e = dict(result.e)
+        e.update(extras)
+        e["df_m"] = df_m
         return StataResults(
-            params=params,
-            param_names=names,
-            cov=covariance,
-            resid=self._y - mu,
-            fittedvalues=mu,
-            nobs=nobs,
-            df_resid=float(nobs),
-            df_model=float(n_parameters - 1),
-            dist="z",
-            model_name=self._stata_command,
-            cov_type="nonrobust",
+            params=result.params.to_numpy(),
+            param_names=result.param_names,
+            cov=result.cov_params(),
+            resid=result.resid,
+            fittedvalues=result.fittedvalues,
+            nobs=result.nobs,
+            df_resid=result.df_resid,
+            df_model=df_m,
+            dist=result.dist,
+            model_name=result.model_name,
+            cov_type=result.cov_type,
             e=e,
-            design_matrix=(self._X, list(self._param_names)),
-            model_data=self._model_data,
+            design_matrix=result.design_matrix,
+            model_data=result.model_data,
         )
 
 
-# ------------------------------------------------------------- zero-inflated
-
-
-class ZeroInflatedPoisson(_CountBase):
-    """Zero-inflated Poisson (Stata ``zip``)."""
-
-    _stata_command = "zip"
+class _ZeroInflatedBase(_CountBase):
+    """Shared ``from_formula`` handling for the two zero-inflated models."""
 
     def __init__(
         self,
@@ -231,18 +580,19 @@ class ZeroInflatedPoisson(_CountBase):
         exog: Any,
         *,
         inflate_exog: Any = None,
-        param_names: list[str] | None = None,
         inflate_names: list[str] | None = None,
+        param_names: list[str] | None = None,
     ) -> None:
         super().__init__(endog, exog, param_names=param_names)
-        self._inflate_exog = (
-            None
-            if inflate_exog is None
-            else np.asarray(inflate_exog, dtype=float)
+        self._inflate_exog: np.ndarray | None = (
+            None if inflate_exog is None else np.asarray(inflate_exog, dtype=float)
         )
-        self._inflate_names = (
-            list(inflate_names) if inflate_names is not None else ["_cons"]
-        )
+        self._inflate_names: list[str] = list(inflate_names or [])
+        if (
+            self._inflate_exog is not None
+            and len(self._inflate_names) != self._inflate_exog.shape[1]
+        ):
+            self._inflate_names = [f"z{i}" for i in range(self._inflate_exog.shape[1])]
 
     @classmethod
     def from_formula(
@@ -252,220 +602,140 @@ class ZeroInflatedPoisson(_CountBase):
         *,
         inflate: str | None = None,
         subset: Any = None,
-    ) -> "ZeroInflatedPoisson":
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("data must be a pandas DataFrame")
-        if subset is not None:
-            data = data.loc[subset]
-        data = data.reset_index(drop=True)
+    ) -> "_ZeroInflatedBase":
+        """Build the model from a formula (Stata ``zip y x, inflate(z)``).
 
-        X, names, kept_index = build_design(formula, data)
-        lhs, _ = cls._formula_parts(formula)
-        y = data.loc[kept_index, lhs].to_numpy(dtype=float)
+        ``inflate=None`` leaves the mixture switched off entirely, which is the
+        pure Poisson/NB model.  ``inflate="_cons"`` is Stata's spelling for a
+        constant-only inflation equation and is translated to ``~ 1`` so patsy
+        does not go looking for a column named ``_cons``.
+        """
 
-        inflate_exog = None
-        inflate_names = None
+        model = super().from_formula(formula, data, subset=subset)
         if inflate is not None:
-            # `_cons` is Stata's spelling for a constant-only equation; patsy
-            # would try to look it up as a data column.
-            inflate_formula = (
-                f"{lhs} ~ 1" if inflate.strip() == "_cons" else f"{lhs} ~ {inflate}"
-            )
-            inflate_exog, inflate_names, inflate_index = build_design(
-                inflate_formula, data
-            )
-            if len(inflate_index) != len(kept_index):
-                raise ConsistencyError(
-                    "zip: the inflation equation and the count equation must "
-                    "describe the same observations"
-                )
-
-        model = cls(
-            y,
-            X,
-            inflate_exog=inflate_exog,
-            param_names=names,
-            inflate_names=inflate_names,
-        )
-        model._model_data = data.loc[kept_index].reset_index(drop=True)
+            model._set_inflate(formula, str(inflate).strip(), model._model_data)
         return model
 
-    # -- likelihood -------------------------------------------------------
-    def _loglike(self, theta: np.ndarray) -> float:
-        k = self._X.shape[1]
-        beta = theta[:k]
-        mu = np.exp(self._X @ beta)
+    def _set_inflate(
+        self, formula: str, inflate: str, frame: pd.DataFrame | None
+    ) -> None:
+        if frame is None:  # pragma: no cover - from_formula always sets it
+            raise ConsistencyError(
+                f"{self._stata_command}: the estimation sample was not retained"
+            )
+        lhs = formula.split("~", 1)[0].strip()
+        inflate_formula = f"{lhs} ~ 1" if inflate in ("_cons", "1", "constant") else f"{lhs} ~ {inflate}"
+        Z, names, index = build_design(inflate_formula, frame)
+        if len(index) != len(frame):
+            raise ConsistencyError(
+                f"{self._stata_command}: the inflation equation drops "
+                f"{len(frame) - len(index)} observations that the count equation "
+                "keeps; both equations must describe the same sample"
+            )
+        self._inflate_exog = Z
+        self._inflate_names = list(names)
 
+    def _extra_param_names(self, count: int) -> list[str]:
+        names = [f"inflate:{name}" for name in self._inflate_names]
+        if self._family == "nb":
+            names.append("/lnalpha")
+        if len(names) != count:
+            names = names[:count]
+            names += [f"param{i + 1}" for i in range(count - len(names))]
+        return names
+
+    def _extra_scalars(self) -> dict[str, Any]:
+        y = self._y
+        scalars: dict[str, Any] = {
+            "n_zero": int(np.sum(y == 0.0)),
+            "n_nonzero": int(np.sum(y != 0.0)),
+        }
         if self._inflate_exog is None:
-            return float(np.sum(_poisson_logpmf(self._y, mu)))
-
-        gamma = theta[k:]
-        pi = 1.0 / (1.0 + np.exp(-(self._inflate_exog @ gamma)))
-        log_f = _poisson_logpmf(self._y, mu)
-        zero = self._y == 0
-
-        # log of the mixture probability, computed in log space so a
-        # near-certain structural zero does not underflow.
-        log_zero = np.logaddexp(
-            np.log(np.maximum(pi, 1e-300)),
-            np.log(np.maximum(1.0 - pi, 1e-300)) + log_f,
-        )
-        log_positive = np.log(np.maximum(1.0 - pi, 1e-300)) + log_f
-        return float(np.sum(np.where(zero, log_zero, log_positive)))
-
-    def _null_loglike(self) -> float:
-        ybar = float(np.mean(self._y))
-        return float(np.sum(_poisson_logpmf(self._y, np.full(self._y.size, ybar))))
-
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 500,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(f"zip: only cov_type='nonrobust' is supported, got {cov_type!r}")
-
-        k = self._X.shape[1]
-        beta0, *_ = np.linalg.lstsq(self._X, np.log(np.maximum(self._y, 0.5)), rcond=None)
-        start = beta0.copy()
-        if self._inflate_exog is not None:
-            start = np.concatenate([start, np.zeros(self._inflate_exog.shape[1])])
-
-        def objective(theta: np.ndarray) -> float:
-            value = self._loglike(theta)
-            return -value if np.isfinite(value) else 1e12
-
-        theta = self._optimise(objective, start, maxiter=maxiter, strict=strict, label="zip")
-        covariance = self._covariance(objective, theta)
-        names = list(self._param_names)
-        if self._inflate_exog is not None:
-            names = names + [f"inflate:{name}" for name in self._inflate_names]
-        return self._assemble(
-            theta,
-            names,
-            covariance,
-            llf=self._loglike(theta),
-            ll0=self._null_loglike(),
-            nobs=self._y.size,
-            n_parameters=theta.size,
-        )
+            scalars["inflate"] = "none"
+        return scalars
 
 
-class ZeroInflatedNegativeBinomial(ZeroInflatedPoisson):
-    """Zero-inflated negative binomial (Stata ``zinb``)."""
+class ZeroInflatedPoisson(_ZeroInflatedBase):
+    """Zero-inflated Poisson (Stata ``zip``).
+
+    With ``inflate is None`` the model is the plain Poisson regression, fit by
+    the same likelihood, so its coefficients agree with
+    :class:`westata.estimators.discrete.Poisson` to optimiser tolerance.
+    """
+
+    _stata_command = "zip"
+    _family = "poisson"
+    #: Stata's ``ml`` default.  Newton converges in a handful of steps from the
+    #: Poisson start and reproduces the Stata coefficients exactly.
+    _optimizer = "newton"
+
+
+class ZeroInflatedNegativeBinomial(_ZeroInflatedBase):
+    """Zero-inflated negative binomial, NB2 (Stata ``zinb``).
+
+    ``alpha`` is estimated as ``/lnalpha``.  Quasi-Newton is used because the
+    dispersion parameter makes the Newton step diverge from the Poisson start,
+    the same reason ``nbreg`` uses ``bfgs`` here.
+    """
 
     _stata_command = "zinb"
-
-    def _loglike(self, theta: np.ndarray) -> float:
-        k = self._X.shape[1]
-        beta = theta[:k]
-        mu = np.exp(self._X @ beta)
-        # The dispersion is the last parameter, on a log scale for positivity.
-        alpha = float(np.exp(theta[-1]))
-        log_f = _nb_logpmf(self._y, mu, alpha)
-
-        if self._inflate_exog is None:
-            return float(np.sum(log_f))
-
-        gamma = theta[k:-1]
-        pi = 1.0 / (1.0 + np.exp(-(self._inflate_exog @ gamma)))
-        zero = self._y == 0
-        log_zero = np.logaddexp(
-            np.log(np.maximum(pi, 1e-300)),
-            np.log(np.maximum(1 - pi, 1e-300)) + log_f,
-        )
-        positive_part = np.where(zero, 0.0, np.log(np.maximum(1 - pi, 1e-300)) + log_f)
-        return float(np.sum(np.where(zero, log_zero, positive_part)))
-
-    def _null_loglike(self) -> float:
-        ybar = float(np.mean(self._y))
-        variance = float(np.var(self._y))
-        alpha = max((variance - ybar) / max(ybar**2, 1e-12), 1e-6)
-        return float(np.sum(_nb_logpmf(self._y, np.full(self._y.size, ybar), alpha)))
-
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 800,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(f"zinb: only cov_type='nonrobust' is supported, got {cov_type!r}")
-
-        k = self._X.shape[1]
-        beta0, *_ = np.linalg.lstsq(self._X, np.log(np.maximum(self._y, 0.5)), rcond=None)
-        alpha0 = max((float(np.var(self._y)) - float(np.mean(self._y))) / max(float(np.mean(self._y)) ** 2, 1e-12), 1e-3)
-        start = np.concatenate([beta0, [np.log(alpha0)]])
-        if self._inflate_exog is not None:
-            start = np.concatenate([start[:k], np.zeros(self._inflate_exog.shape[1]), start[k:]])
-
-        def objective(theta: np.ndarray) -> float:
-            value = self._loglike(theta)
-            return -value if np.isfinite(value) else 1e12
-
-        theta = self._optimise(objective, start, maxiter=maxiter, strict=strict, label="zinb")
-        covariance = self._covariance(objective, theta)
-
-        names = list(self._param_names)
-        if self._inflate_exog is not None:
-            names = names + [f"inflate:{name}" for name in self._inflate_names]
-        names = names + ["/lnalpha"]
-        return self._assemble(
-            theta,
-            names,
-            covariance,
-            llf=self._loglike(theta),
-            ll0=self._null_loglike(),
-            nobs=self._y.size,
-            n_parameters=theta.size - 1,
-            extra={"alpha": float(np.exp(theta[-1]))},
-        )
-
-
-# ---------------------------------------------------------------- truncated
+    _family = "nb"
+    _optimizer = "bfgs"
 
 
 class _TruncatedBase(_CountBase):
-    """Shared normalisation for count data observed inside ``[lower, upper]``."""
+    """Shared truncation bookkeeping for ``ztp``/``tpoisson``/``tnbreg``."""
 
-    _negative_binomial = False
+    #: Stata command name used in error messages before the limits are known.
+    _base_command = "tpoisson"
 
     def __init__(
         self,
         endog: Any,
         exog: Any,
         *,
-        lower: float = 1,
+        lower: float | None = 1,
         upper: float | None = None,
         param_names: list[str] | None = None,
     ) -> None:
         super().__init__(endog, exog, param_names=param_names)
+        self._set_limits(lower, upper)
+
+    def _set_limits(self, lower: float | None, upper: float | None) -> None:
         if lower is None:
             lower = 1
-        if upper is not None and not lower <= upper:
+        if upper is not None and not float(lower) <= float(upper):
             raise ConsistencyError(
-                f"{self._stata_command}: lower truncation point ({lower}) must not "
-                f"exceed the upper one ({upper})"
+                f"{self._base_command}: the lower truncation point ({lower}) must "
+                f"not exceed the upper one ({upper})"
             )
-        if np.any(self._y < lower):
+        if np.any(self._y < float(lower)):
             raise ConsistencyError(
-                f"{self._stata_command}: the data contain observations below the "
-                f"truncation point ({lower}); truncation requires every y >= {lower}"
+                f"{self._base_command}: the data violate the truncation: "
+                f"{int(np.sum(self._y < float(lower)))} observation(s) fall below "
+                f"the lower limit {lower}. Truncation requires every y >= {lower}"
             )
-        if upper is not None and np.any(self._y > upper):
+        if upper is not None and np.any(self._y > float(upper)):
             raise ConsistencyError(
-                f"{self._stata_command}: the data contain observations above the "
-                f"truncation point ({upper})"
+                f"{self._base_command}: the data violate the truncation: "
+                f"{int(np.sum(self._y > float(upper)))} observation(s) fall above "
+                f"the upper limit {upper}"
+            )
+        if not np.allclose(self._y, np.round(self._y)):
+            raise ConsistencyError(
+                f"{self._base_command}: truncated count models require integer "
+                "outcomes; the data contain non-integer values"
             )
         self._lower = float(lower)
         self._upper = None if upper is None else float(upper)
+        # Stata names the zero-truncated case ``ztp`` and the general case
+        # ``tpoisson``; ``tnbreg`` already covers both.
+        if self._family == "poisson":
+            self._stata_command = (
+                "ztp"
+                if self._lower == 1.0 and self._upper is None
+                else "tpoisson"
+            )
 
     @classmethod
     def from_formula(
@@ -473,149 +743,65 @@ class _TruncatedBase(_CountBase):
         formula: str,
         data: pd.DataFrame,
         *,
-        lower: float = 1,
+        lower: float | None = 1,
         upper: float | None = None,
         subset: Any = None,
     ) -> "_TruncatedBase":
+        """Build from a formula (Stata ``ztp y x``, ``tpoisson y x, ll(1)``).
+
+        This mirrors :meth:`westata.estimators.discrete._DiscreteBase.from_formula`
+        but passes the truncation limits into ``__init__``, where the data are
+        validated: the design construction itself is the shared
+        :func:`westata.formula.factor.build_design`.
+        """
+
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
             data = data.loc[subset]
         data = data.reset_index(drop=True)
+
         X, names, kept_index = build_design(formula, data)
-        lhs, _ = cls._formula_parts(formula)
+        lhs = formula.split("~", 1)[0].strip()
+        if lhs not in data.columns:
+            raise ConsistencyError(
+                f"truncated count model: left-hand side must be a plain column "
+                f"name, got {lhs!r}"
+            )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
         model = cls(y, X, lower=lower, upper=upper, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
         return model
 
-    def _log_mass_denominator(self, mu: np.ndarray, alpha: float | None) -> np.ndarray:
-        """``log(F(upper) - F(lower - 1))``, the truncation normaliser."""
+    def _extra_param_names(self, count: int) -> list[str]:
+        names = ["/lnalpha"] if self._family == "nb" else []
+        return (names + [f"param{i + 1}" for i in range(count)])[:count]
 
-        lower_cdf = self._cdf(self._lower - 1.0, mu, alpha)
-        if self._upper is None:
-            return np.log(np.maximum(1.0 - lower_cdf, 1e-300))
-        upper_cdf = self._cdf(self._upper, mu, alpha)
-        return np.log(np.maximum(upper_cdf - lower_cdf, 1e-300))
-
-    def _cdf(self, k: float, mu: np.ndarray, alpha: float | None) -> np.ndarray:
-        if alpha is None:
-            return stats.poisson.cdf(k, mu)
-        size = 1.0 / max(alpha, 1e-12)
-        return stats.nbinom.cdf(k, size, size / (size + mu))
-
-    def _logpmf(self, mu: np.ndarray, alpha: float | None) -> np.ndarray:
-        if alpha is None:
-            return _poisson_logpmf(self._y, mu)
-        return _nb_logpmf(self._y, mu, alpha)
+    def _extra_scalars(self) -> dict[str, Any]:
+        return {
+            "truncation_point": self._lower,
+            "lower": self._lower,
+            "upper": self._upper,
+        }
 
 
 class TruncatedPoisson(_TruncatedBase):
-    """Poisson truncated to ``[lower, upper]`` (Stata ``ztp``/``tpoisson``)."""
+    """Poisson truncated to ``[lower, upper]`` (Stata ``ztp`` / ``tpoisson``).
 
+    ``lower=1`` with no upper limit is the zero-truncated ``ztp``; any other
+    limit is Stata's ``tpoisson``, and ``model_name`` follows suit.
+    """
+
+    _family = "poisson"
+    _base_command = "ztp"
     _stata_command = "ztp"
-
-    def _loglike(self, theta: np.ndarray) -> float:
-        k = self._X.shape[1]
-        mu = np.exp(self._X @ theta[:k])
-        log_f = _poisson_logpmf(self._y, mu)
-        return float(np.sum(log_f - self._log_mass_denominator(mu, None)))
-
-    def _null_loglike(self) -> float:
-        ybar = max(float(np.mean(self._y)), 1e-6)
-        mu = np.full(self._y.size, ybar)
-        return float(
-            np.sum(_poisson_logpmf(self._y, mu) - self._log_mass_denominator(mu, None))
-        )
-
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 500,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(f"ztp: only cov_type='nonrobust' is supported, got {cov_type!r}")
-        beta0, *_ = np.linalg.lstsq(self._X, np.log(np.maximum(self._y, 0.5)), rcond=None)
-
-        def objective(theta: np.ndarray) -> float:
-            value = self._loglike(theta)
-            return -value if np.isfinite(value) else 1e12
-
-        theta = self._optimise(objective, beta0, maxiter=maxiter, strict=strict, label="ztp")
-        covariance = self._covariance(objective, theta)
-        return self._assemble(
-            theta,
-            list(self._param_names),
-            covariance,
-            llf=self._loglike(theta),
-            ll0=self._null_loglike(),
-            nobs=self._y.size,
-            n_parameters=theta.size,
-            extra={"lower": self._lower, "upper": self._upper},
-        )
+    _optimizer = "newton"
 
 
 class TruncatedNegativeBinomial(_TruncatedBase):
-    """Negative binomial truncated to ``[lower, upper]`` (Stata ``tnbreg``/``ztnb``)."""
+    """Negative binomial truncated to ``[lower, upper]`` (Stata ``tnbreg``)."""
 
+    _family = "nb"
+    _base_command = "tnbreg"
     _stata_command = "tnbreg"
-    _negative_binomial = True
-
-    def _split(self, theta: np.ndarray) -> tuple[np.ndarray, float]:
-        k = self._X.shape[1]
-        return theta[:k], float(np.exp(theta[k]))
-
-    def _loglike(self, theta: np.ndarray) -> float:
-        beta, alpha = self._split(theta)
-        mu = np.exp(self._X @ beta)
-        log_f = _nb_logpmf(self._y, mu, alpha)
-        return float(np.sum(log_f - self._log_mass_denominator(mu, alpha)))
-
-    def _null_loglike(self) -> float:
-        ybar = max(float(np.mean(self._y)), 1e-6)
-        variance = float(np.var(self._y))
-        alpha = max((variance - ybar) / max(ybar**2, 1e-12), 1e-4)
-        mu = np.full(self._y.size, ybar)
-        return float(np.sum(_nb_logpmf(self._y, mu, alpha) - self._log_mass_denominator(mu, alpha)))
-
-    def fit(
-        self,
-        cov_type: str | None = None,
-        cov_kwds: Mapping[str, Any] | None = None,
-        ssc: Any = None,
-        *,
-        maxiter: int = 800,
-        strict: bool = False,
-    ) -> StataResults:
-        if cov_type not in (None, "nonrobust"):
-            raise ValueError(f"tnbreg: only cov_type='nonrobust' is supported, got {cov_type!r}")
-        k = self._X.shape[1]
-        beta0, *_ = np.linalg.lstsq(self._X, np.log(np.maximum(self._y, 0.5)), rcond=None)
-        ybar = max(float(np.mean(self._y)), 1e-6)
-        alpha0 = max((float(np.var(self._y)) - ybar) / max(ybar**2, 1e-12), 1e-3)
-        start = np.concatenate([beta0, [np.log(alpha0)]])
-
-        def objective(theta: np.ndarray) -> float:
-            value = self._loglike(theta)
-            return -value if np.isfinite(value) else 1e12
-
-        theta = self._optimise(objective, start, maxiter=maxiter, strict=strict, label="tnbreg")
-        covariance = self._covariance(objective, theta)
-        return self._assemble(
-            theta,
-            list(self._param_names) + ["/lnalpha"],
-            covariance,
-            llf=self._loglike(theta),
-            ll0=self._null_loglike(),
-            nobs=self._y.size,
-            n_parameters=k,
-            extra={
-                "alpha": float(np.exp(theta[k])),
-                "lower": self._lower,
-                "upper": self._upper,
-            },
-        )
+    _optimizer = "bfgs"

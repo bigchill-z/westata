@@ -172,8 +172,18 @@ def test_heckman_coefficients_match_stata():
     assert float(result.params["y:x"]) == pytest.approx(1.965111, rel=1e-2)
     assert float(result.params["y:Intercept"]) == pytest.approx(1.026726, rel=1e-2)
     assert float(result.params["select:z"]) == pytest.approx(0.8021853, rel=1e-2)
+
+    # The two-step estimator is identified in e(), and its standard errors now
+    # carry the Heckman correction for the estimated inverse Mills ratio. The
+    # corrected SEs are within 3% of Stata's ML SEs:
+    #   y:x       0.036413 vs 0.0367055
+    #   y:_cons   0.072621 vs 0.0706062
+    #   select:z  0.042623 vs 0.0433423
     assert result.e["estimator"] == "twostep"
-    assert result.e["se_corrected"] == 0
+    assert result.e["se_corrected"] == 1
+    assert float(result.bse["y:x"]) == pytest.approx(0.0367055, rel=5e-2)
+    assert float(result.bse["y:Intercept"]) == pytest.approx(0.0706062, rel=5e-2)
+    assert float(result.bse["select:z"]) == pytest.approx(0.0433423, rel=5e-2)
 
 
 def test_heckman_ml_is_refused():

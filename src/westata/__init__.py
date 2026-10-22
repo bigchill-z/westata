@@ -35,7 +35,20 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
-from westata.postestimation import LincomResult, MarginsResult, WaldTest, margins
+from westata.postestimation import (
+    HausmanResult,
+    LincomResult,
+    LRTestResult,
+    MarginsResult,
+    WaldTest,
+    contrast,
+    hausman,
+    lrtest,
+    margins,
+    nlcom,
+    pwcompare,
+    testnl,
+)
 from westata.protocols import SSC
 from westata.report import etable, to_latex, to_markdown
 
@@ -49,6 +62,14 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "HausmanResult",
+    "LRTestResult",
+    "pwcompare",
+    "contrast",
+    "hausman",
+    "lrtest",
+    "testnl",
+    "nlcom",
     "SSC",
     "ssc",
     "OLS",

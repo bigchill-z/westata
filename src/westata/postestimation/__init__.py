@@ -10,7 +10,15 @@ from westata.postestimation.api import (
     statsmodels_wald_test,
     test_as_stata,
 )
+from westata.postestimation.contrast import contrast, pwcompare
 from westata.postestimation.lincom import LincomResult, run_lincom
+from westata.postestimation.modeltests import (
+    HausmanResult,
+    LRTestResult,
+    hausman,
+    lrtest,
+)
+from westata.postestimation.nonlinear import nlcom, testnl
 from westata.postestimation.margins import MarginsResult, margins
 from westata.postestimation.predict import SUPPORTED_TYPES, predict, supported_types
 from westata.postestimation.tests import (
@@ -22,6 +30,14 @@ from westata.postestimation.tests import (
 )
 
 __all__ = [
+    "HausmanResult",
+    "LRTestResult",
+    "hausman",
+    "lrtest",
+    "testnl",
+    "nlcom",
+    "pwcompare",
+    "contrast",
     "WaldTest",
     "LincomResult",
     "MarginsResult",

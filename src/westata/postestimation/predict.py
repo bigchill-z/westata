@@ -4,6 +4,8 @@ Each estimator family exposes the prediction types Stata offers for it:
 
 ======================  ==========================================
 ``xb``                  linear prediction ``x b``
+``stdp``                standard error of the linear prediction
+``stdf``                standard error of the forecast
 ``pr``                  predicted probability (binary models)
 ``mu`` / ``n``          predicted mean (count models)
 ``residuals``           ``y - fitted``
@@ -23,29 +25,33 @@ from typing import Any, Callable
 
 import numpy as np
 
-from westata.errors import UnsupportedError
+from westata.errors import ConsistencyError, UnsupportedError
 
 __all__ = ["SUPPORTED_TYPES", "predict", "supported_types"]
 
 #: ``model_name -> tuple of valid predict types``.  Keys are the Stata command
 #: names westata's ``StataResults.model_name`` carries.
+#:
+#: Every model that offers ``xb`` also offers the two prediction-standard-error
+#: types ``stdp``/``stdf``: both are functions of the design matrix and the
+#: parameter covariance alone, which every result carries.
 SUPPORTED_TYPES: dict[str, tuple[str, ...]] = {
-    "regress": ("xb", "residuals", "fitted"),
-    "ivregress 2sls": ("xb", "residuals", "fitted"),
-    "ivregress liml": ("xb", "residuals", "fitted"),
-    "ivregress gmm": ("xb", "residuals", "fitted"),
-    "reghdfe": ("xb", "residuals", "fitted"),
-    "xtreg, fe": ("xb", "residuals", "fitted", "ue"),
-    "xtreg, re": ("xb", "residuals", "fitted", "ue"),
-    "xtreg, be": ("xb", "residuals", "fitted"),
-    "xtreg, fd": ("xb", "residuals", "fitted"),
-    "logit": ("xb", "pr", "residuals"),
-    "probit": ("xb", "pr", "residuals"),
-    "poisson": ("xb", "n", "residuals"),
-    "nbreg": ("xb", "n", "residuals"),
-    "ologit": ("xb", "pr", "residuals"),
-    "oprobit": ("xb", "pr", "residuals"),
-    "tobit": ("xb", "e", "ystar", "residuals"),
+    "regress": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "ivregress 2sls": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "ivregress liml": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "ivregress gmm": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "reghdfe": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "xtreg, fe": ("xb", "stdp", "stdf", "residuals", "fitted", "ue"),
+    "xtreg, re": ("xb", "stdp", "stdf", "residuals", "fitted", "ue"),
+    "xtreg, be": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "xtreg, fd": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    "logit": ("xb", "stdp", "pr", "residuals"),
+    "probit": ("xb", "stdp", "pr", "residuals"),
+    "poisson": ("xb", "stdp", "n", "residuals"),
+    "nbreg": ("xb", "stdp", "n", "residuals"),
+    "ologit": ("xb", "stdp", "pr", "residuals"),
+    "oprobit": ("xb", "stdp", "pr", "residuals"),
+    "tobit": ("xb", "stdp", "stdf", "e", "ystar", "residuals"),
 }
 
 
@@ -155,6 +161,170 @@ def _predict_tobit_ystar(
     return value
 
 
+def _coefficient_block(result: Any, n_columns: int) -> np.ndarray:
+    """Return the parameter indices that multiply the columns of ``exog``.
+
+    For a plain model every parameter is a regressor and the block is the whole
+    vector.  Maximum-likelihood estimators append *auxiliary* parameters that
+    Stata reports with a leading slash and that never appear in a design
+    matrix: ``/sigma`` for tobit, ``/lnalpha`` for nbreg, ``/cut1``, ``/cut2``,
+    ... for the ordered models.  Those must be dropped before forming
+    ``x' V x`` -- mixing a scale parameter into a coefficient would be a units
+    error -- so ``stdp``/``stdf`` use only the coefficient block, together with
+    the matching block of the covariance matrix.  This is exactly what Stata
+    does: `predict, stdp` after `tobit` treats the coefficients as the estimand
+    and ``sigma`` as a nuisance parameter.
+
+    A mismatch between ``exog``'s width and the number of *regressors* is a
+    caller error and raises rather than guessing which columns were meant.
+    """
+
+    params = np.asarray(result.params, dtype=float).reshape(-1)
+    n_params = params.size
+    names = [str(name) for name in getattr(result, "param_names", []) or []]
+
+    if len(names) == n_params:
+        block = np.array(
+            [position for position, name in enumerate(names) if not name.startswith("/")],
+            dtype=int,
+        )
+    else:
+        block = np.arange(n_params)
+
+    n_regressors = block.size
+    if n_columns != n_regressors:
+        raise ValueError(
+            f"predict: exog has {n_columns} column(s) but the model has "
+            f"{n_regressors} coefficient(s)"
+            + (
+                f" (design columns: {[names[i] for i in block]})"
+                if len(names) == n_params
+                else ""
+            )
+            + "; pass one column per regressor, i.e. the design matrix the "
+            "model was fitted with (auxiliary parameters such as /sigma are not "
+            "design columns)."
+        )
+
+    return block
+
+
+def _residual_variance(result: Any) -> float:
+    """Residual variance ``sigma^2`` used by ``stdf``.
+
+    Follows the contract's Stata chain: ``e(rmse)`` squared when it is recorded,
+    otherwise ``rss / N`` from the stored residuals.  A model that records
+    neither is a genuine consistency problem -- falling back to, say,
+    ``rss / (N - k)`` would silently report a different quantity than Stata --
+    so it raises instead.
+
+    Note for the non-Gaussian families: Stata's own ``stdf`` after ``logit`` /
+    ``probit`` / ``poisson`` adds the *distribution-specific* innovation
+    variance (``pi^2/3`` for logit, ``1`` for probit, ``mu_i`` for Poisson)
+    rather than a residual variance, so those numbers differ from this
+    implementation.  ``stdf`` is documented here as meaningful for models with
+    an additive ``sigma^2`` -- ``regress``, ``ivregress``, ``reghdfe``,
+    ``xtreg`` and ``tobit`` -- where it reproduces Stata exactly; for the
+    binary/count families it reports ``x'Vx + rss/N`` on the response scale.
+    """
+
+    e = getattr(result, "e", None)
+    raw_rmse = None
+    if e is not None:
+        getter = getattr(e, "get", None)
+        raw_rmse = getter("rmse") if callable(getter) else getattr(e, "rmse", None)
+
+    rmse = None if raw_rmse is None else float(np.asarray(raw_rmse, dtype=float))
+    if rmse is not None and np.isfinite(rmse):
+        return rmse**2
+
+    resid = getattr(result, "resid", None)
+    if resid is not None:
+        resid_arr = np.asarray(resid, dtype=float).reshape(-1)
+        nobs = getattr(result, "nobs", None)
+        count = resid_arr.size
+        if nobs is not None and int(nobs) != count:
+            raise ConsistencyError(
+                "predict: stdf needs a residual variance, but this result stores "
+                f"{count} residuals against nobs={nobs}; the residuals cannot be "
+                "used to recover the residual variance"
+            )
+        if count > 0 and np.all(np.isfinite(resid_arr)):
+            rss = float(np.dot(resid_arr, resid_arr))
+            if rss == 0.0:
+                # An all-zero residual vector is a placeholder, not a perfect
+                # fit: a genuinely perfect fit records e(rmse) == 0 and returns
+                # through the branch above.  Dividing by N here would report
+                # sigma2 == 0 and silently make stdf identical to stdp.
+                raise ConsistencyError(
+                    "predict: stdf cannot be computed for this result -- the "
+                    "stored residuals are all zero (a placeholder, as for the "
+                    "ordered models), so rss/N is not a residual variance. "
+                    "Use kind='stdp' for the standard error of the linear "
+                    "prediction."
+                )
+            return rss / float(count)
+
+    raise ConsistencyError(
+        "predict: stdf needs the residual variance, but this result records "
+        "neither a finite e(rmse) nor usable residuals to compute rss/N from; "
+        "refit with an estimator that stores e(rmse) or the residuals"
+    )
+
+
+def _predict_standard_error(
+    result: Any, exog: np.ndarray, *, forecast: bool
+) -> np.ndarray:
+    """``sqrt(diag(X V X'))``, plus ``sigma^2`` for the forecast version."""
+
+    exog = np.asarray(exog, dtype=float)
+    if exog.ndim != 2:
+        raise ValueError(
+            f"predict: exog must be 2-dimensional (observations x regressors), "
+            f"got {exog.ndim} dimension(s)"
+        )
+
+    block = _coefficient_block(result, exog.shape[1])
+
+    cov = np.asarray(result.cov_params(), dtype=float)
+    if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
+        raise ConsistencyError(
+            f"predict: the parameter covariance must be square, got shape {cov.shape}"
+        )
+    cov = cov[np.ix_(block, block)]
+    if not np.all(np.isfinite(cov)):
+        raise ConsistencyError(
+            "predict: the parameter covariance contains non-finite entries; the "
+            "model may be unidentified or the VCE failed"
+        )
+
+    # Guarantee symmetry: the quadratic form is only meaningful for a symmetric
+    # matrix, and a sandwich estimator can carry 1-ulp asymmetry.
+    variance = np.einsum("ij,jk,ik->i", exog, (cov + cov.T) / 2.0, exog)
+    if not np.all(np.isfinite(variance)):
+        raise ConsistencyError(
+            "predict: x'Vx is not finite; check the design matrix for extreme "
+            "values or non-finite entries"
+        )
+
+    tolerance = (
+        -1e-10 * max(float(np.max(np.abs(variance))), 1.0) if variance.size else 0.0
+    )
+    if np.any(variance < tolerance):
+        raise ConsistencyError(
+            "predict: x'Vx is negative for at least one observation, so the "
+            "covariance matrix is not positive semidefinite; the reported "
+            "prediction standard errors would be undefined"
+        )
+    # Round-off can leave a genuinely zero variance slightly negative.
+    variance = np.maximum(variance, 0.0)
+
+    if forecast:
+        variance = variance + _residual_variance(result)
+
+    return np.sqrt(variance)
+
+
 def predict(
     result: Any,
     exog: np.ndarray,
@@ -171,7 +341,10 @@ def predict(
         Design matrix to predict at.  Pass the estimation sample for the usual
         in-sample predictions, or new rows for out-of-sample work.
     kind:
-        One of the types returned by :func:`supported_types`.
+        One of the types returned by :func:`supported_types`.  ``"stdp"`` and
+        ``"stdf"`` are the prediction standard errors (``[R] predict``): the
+        standard error of the linear prediction, and of the forecast, which adds
+        the residual variance.
     lower, upper:
         Censoring limits, required by the ``tobit`` types ``e`` and ``ystar``.
         When omitted, ``result.e["lower"]``/``result.e["upper"]`` are used.
@@ -187,6 +360,11 @@ def predict(
 
     exog = np.asarray(exog, dtype=float)
     params = np.asarray(result.params, dtype=float)
+
+    # Standard errors of the prediction come first: they consume the raw design
+    # matrix and covariance, so they must not run through the ``xb`` branch.
+    if normalized in ("stdp", "stdf"):
+        return _predict_standard_error(result, exog, forecast=normalized == "stdf")
 
     if normalized in ("xb", "fitted"):
         return exog @ params[: exog.shape[1]]

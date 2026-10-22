@@ -144,6 +144,87 @@
   date: 2026-10-22
   notes: "Measured 4.8e-5 on the AR coefficient, 9.8e-5 on the constant, 4.0e-5 on sigma. An earlier version used enforce_stationarity=False/enforce_invertibility=False, which changed the optimiser parameterisation and produced a 1.9e-3 gap (40x worse); removing them is the fix. The residual difference is a stopping-point difference, proven by the likelihood comparison above: statsmodels stops marginally closer to the maximum than Stata. scripts/diagnose_arima.py reproduces this."
 
+
+# --- P5: postestimation completion -----------------------------------------
+
+- command: nlcom
+  level: E3
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "nlcom exp(_b[x1]) after regress: Stata 7.298097, se .3291511, CI [6.652973, 7.943221]; westata identical"
+    - type: r_crosscheck
+      ref: "nlcom _b[x1]/_b[x2]: Stata -1.911292, se .0912806; westata identical"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Delta method G V G' with central differences. Stata's nlcom reports z / P>|z| and a NORMAL interval even after regress -- the fixture's [6.652973, 7.943221] is est -/+ 1.959964*se, while a t(196) interval would be [6.648965, 7.947229]. westata follows Stata, so nlcom and lincom agree on the estimate and standard error but not on the p-value or interval. An earlier draft used the model's t distribution and was wrong for this reason."
+
+- command: testnl
+  level: E3
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "testnl exp(_b[x1]) = 2: Stata chi2(1) = 259.09; westata 259.0891"
+    - type: r_crosscheck
+      ref: "testnl _b[x1] = _b[x2]: Stata chi2(1) = 2146.92"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Expressions are parsed with ast and a whitelist; there is no eval anywhere, so __import__, attribute access, lambdas and containers all raise ValueError. Joint constraints are accepted as comma-, whitespace- or parenthesised lists."
+
+- command: lrtest
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "lrtest small big on y ~ x1 vs y ~ x1 + x2 + x3: Stata LR chi2(2) = 300.40; westata 300.40"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Verifies nesting (restricted names must be a subset) and equal nobs. df == 0 (identical models) returns p = 1.0 rather than raising, since chi2(0) is a point mass and scipy would return nan; an argument-order mistake (unrestricted having FEWER parameters) still raises."
+
+- command: hausman
+  level: E3
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "hausman fe re after xtreg on a 40x6 panel: Stata chi2(2) = 0.23, p = 0.8923; westata 0.2280, p = 0.8923"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The constant is excluded from the comparison, matching [R] hausman's default. Including it makes V_consistent - V_efficient naturally indefinite (eigenvalues [-0.0212, 1.2e-05, 1.9e-05] on a plain panel) because a within-transformed intercept and a GLS intercept estimate different quantities. A non-positive-definite difference falls back to a generalised inverse with a RuntimeWarning, as Stata does."
+
+- command: contrast
+  level: E3
+  tolerance: 2.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "contrast r.g on a 3-level factor: Stata (1 vs 0) .8134023 se .0699776, (2 vs 0) -.5222208 se .0705751"
+    - type: r_crosscheck
+      ref: "contrast a.g: Stata (0 vs 1) -.8134023, (1 vs 2) 1.335623"
+    - type: r_crosscheck
+      ref: "contrast g.g: Stata -.0970605, .7163418, -.6192813"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Direction matters and was verified: Stata's a. reports low-vs-high, the opposite sign to r.'s high-vs-low. h. (Helmert) and m. (multiple-comparison) raise UnsupportedError, as does sum/Helmert coding, because those coefficients are already contrasts rather than level means."
+
+- command: pwcompare
+  level: E3
+  tolerance: 2.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "pwcompare g: Stata 1 vs 0 .8134023, 2 vs 0 -.5222208, 2 vs 1 -1.335623"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "adjust() accepts only None. Bonferroni/Holm/Sidak raise UnsupportedError rather than returning unadjusted p-values under a correction label."
+
+- command: predict, stdp/stdf
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: r_crosscheck
+      ref: "predict stdp and stdf after regress mpg weight foreign: 74 observations captured from StataNow 19.5"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "stdp = sqrt(x'Vx), stdf = sqrt(x'Vx + sigma^2) with sigma^2 from e(rmse)^2 or rss/N. stdf is offered only for the linear families: verified that Stata's logit and poisson reject predict, stdf with r(198) 'option stdf not allowed', so westata refuses it too instead of returning a number under a name Stata will not produce."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

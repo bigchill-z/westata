@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from westata.errors import ConsistencyError
 from westata.results.stata_return import EReturn
 from westata.results.summary import render_summary
 
@@ -343,6 +344,48 @@ class StataResults:
         from westata.postestimation.api import lincom_as_stata
 
         return lincom_as_stata(self, expression, **kwargs)
+
+    def lrtest(self, restricted: Any) -> Any:
+        """Likelihood-ratio test against a nested model (Stata `lrtest`)."""
+
+        from westata.postestimation.modeltests import lrtest
+
+        return lrtest(self, restricted)
+
+    def hausman(self, efficient: Any) -> Any:
+        """Hausman specification test (Stata `hausman`)."""
+
+        from westata.postestimation.modeltests import hausman
+
+        return hausman(self, efficient)
+
+    def contrast(self, term: str, method: str = "r", **kwargs: Any) -> Any:
+        """ANOVA-style contrast of a factor's levels (Stata `contrast`)."""
+
+        from westata.postestimation.contrast import contrast
+
+        return contrast(self, term, method, **kwargs)
+
+    def pwcompare(self, term: str, **kwargs: Any) -> Any:
+        """All pairwise level differences (Stata `pwcompare`)."""
+
+        from westata.postestimation.contrast import pwcompare
+
+        return pwcompare(self, term, **kwargs)
+
+    def nlcom(self, expression: str, **kwargs: Any) -> Any:
+        """Nonlinear combination of parameters (Stata `nlcom`)."""
+
+        from westata.postestimation.nonlinear import nlcom
+
+        return nlcom(self, expression, **kwargs)
+
+    def testnl(self, expression: str) -> Any:
+        """Nonlinear Wald test (Stata `testnl`)."""
+
+        from westata.postestimation.nonlinear import testnl
+
+        return testnl(self, expression)
 
     def margins(self, **kwargs: Any) -> Any:
         """Marginal effects or predictive margins (Stata ``margins``).

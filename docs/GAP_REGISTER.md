@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**32 条命令条目**（见 `tests/conformance/registry.yml`）
+- 已实现：**39 条命令条目**（见 `tests/conformance/registry.yml`），其中 31 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -54,25 +54,24 @@
 
 ---
 
-## 2. 后估计缺口（P5，最高优先级）
+## 2. 后估计（P5 已完成）
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `nlcom` | ⬜ | 非线性组合，delta method |
-| `testnl` | ⬜ | 非线性 Wald 检验 |
-| `lrtest` | ⬜ | 似然比检验，需要模型间比较 |
-| `hausman` | ⬜ | 固定效应 vs 随机效应检验 |
-| `contrast` | ⬜ | ANOVA 式对比 |
-| `pwcompare` | ⬜ | 成对比较 |
+| `nlcom` | ✅ E3 | delta method；**用 z 分布**，与 lincom 不同 |
+| `testnl` | ✅ E3 | 非线性 Wald；支持逗号/空格/括号三种联合写法 |
+| `lrtest` | ✅ E3 | 嵌套检验，`df==0` 返回 p=1.0 |
+| `hausman` | ✅ E3 | **排除常数项**，否则 `V_c−V_e` 不定 |
+| `contrast` | ✅ E3 | `r.`/`g.`/`a.`；`a.` 是 low-vs-high |
+| `pwcompare` | ✅ E3 | 无多重比较校正 |
+| `predict, stdp/stdf` | ✅ E3 | **`stdf` 仅线性族**，Stata 对 logit/poisson 报 `r(198)` |
 | `margins, expression()` | ⬜ | 任意表达式 |
 | `margins, contrast()` | ⬜ | |
 | `marginsplot` | ❌ | 绘图，超出范围 |
-| `estat` | ⚠️ | 只支持部分：`estat ic` 可由 `e(aic)`/`e(bic)` 替代；`estat vce`、`estat summarize`、`estat firststage`、`estat classification` 未实现 |
+| `estat` | ⚠️ | `estat ic` 可由 `e(aic)`/`e(bic)` 替代；`estat vce`、`summarize`、`firststage`、`classification` 未实现 |
 | `suest` | ⬜ | 联合估计，跨模型对比 |
 | `linktest` | ⬜ | 模型设定检验 |
-| `estat gof` | ⬜ | |
-| `estat hetest` | ⬜ | |
-| `predict, stdp/stdp/stdf` | ⬜ | 预测的标准误 |
+| `estat gof` / `estat hetest` | ⬜ | |
 | `predict, scores` | ⬜ | 得分向量 |
 
 ---
@@ -294,6 +293,16 @@
 
 ---
 
+## 8.1 P5 期间发现并修正的真实缺陷
+
+| 缺陷 | 性质 |
+|---|---|
+| `nlcom` 用了模型的 t 分布 | Stata 的 `nlcom` 恒用 z / 正态区间，即使 `regress` 后 |
+| `contrast a.` 方向错误 | Stata 是 low-vs-high，与 `r.` 的 high-vs-low 相反 |
+| `hausman` 包含常数项 | 使 `V_c−V_e` 不定（特征值含 −0.0212），Stata 默认排除 |
+| `predict stdf` 对 logit 可用 | Stata 报 `r(198)`；westata 现已同样拒绝 |
+| `results/base.py` 引用未导入的 `ConsistencyError` | ordered 模型路径才触发 |
+
 ## 9. 环境层面的已知限制
 
 | 限制 | 说明 |
@@ -309,7 +318,7 @@
 
 | 批次 | 内容 | 工时 | 状态 |
 |---|---|---|---|
-| P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict stdp`） | 2–3 周 | **进行中** |
+| P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict stdp`） | 2–3 周 | **已完成** |
 | P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | 计划 |
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`/`gnbreg`） | 2–3 周 | 计划 |
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | 计划 |

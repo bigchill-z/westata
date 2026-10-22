@@ -18,10 +18,10 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **430 passing** |
-| Source | ~7,600 lines across 9 subsystems |
-| Commands covered | 31 registry entries |
-| Evidence | **24 × E3**, 6 × E2, 1 × E1 |
+| Tests | **437 passing** |
+| Source | ~7,700 lines across 9 subsystems |
+| Commands covered | 32 registry entries |
+| Evidence | **24 × E3**, 7 × E2, 1 × E1 |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
@@ -112,7 +112,7 @@ guesses, because guessing silently changes the VCE.
 | Level | Meaning | Count |
 |---|---|---|
 | E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 24 |
-| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 6 |
+| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 7 |
 | E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 1 |
 
 Measured relative agreement with StataNow 19.5:
@@ -146,6 +146,7 @@ Measured relative agreement with StataNow 19.5:
 | `predict` (logit pr) | 3.1e-11 | — |
 | `predict` (tobit e/ystar) | 5.8e-10 | — |
 | `etable` vs `esttab` | 0.0 | — |
+| `vecrank` (`lags(2)`) | 0.0 (4 dp) | — |
 | `dfuller` | 2.3e-4 | — |
 | `ivregress gmm` | 4.9e-16 | **2.9e-2** |
 | `arch` | **3.6e-2** | — |
@@ -162,11 +163,15 @@ Two gaps are larger and are left visible rather than tuned away:
   differently from Stata's.
 - **`arch`**: alpha differs by 6.9e-3, the mean constant by 3.6e-2. Stata uses
   OPG standard errors by default and the optimisers differ.
-- **`vec` / `vecrank`**: the only E1 entry. Stata reports a trace statistic of
-  288.3450 where statsmodels gives 195.9673 (eigenvalue 0.50992 vs 0.382398).
-  The data round-trip through pystata is exact to 4e-16, so this is a real
-  Johansen/lag-convention difference, left unresolved and marked unverified
-  rather than tuned.
+- **`vecrank`, `lags(1)` case**: the lag mapping is settled
+  (`[TS] vecrank`: `lags(#)` counts VAR lags, so `k_ar_diff = # - 1`), and
+  `lags(2)` matches Stata's trace to all four printed decimals. With `lags(1)`
+  westata gives 287.2485 against Stata's 288.3450 (0.4% apart) while the first
+  eigenvalue agrees to 1e-3 -- boundary handling when there are no lagged
+  differences, not a different estimator. Pinned by a test so a silent "fix"
+  would fail the suite.
+- **`vec` estimation** is the remaining E1 entry: the rank test is verified but
+  the VECM coefficient estimates themselves have not been compared.
 - Two commands could not be compared at all because StataNow 19 removed them:
   `xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are
   validated by other means.

@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**47 条命令条目**（见 `tests/conformance/registry.yml`），其中 36 条 E3
+- 已实现：**52 条命令条目**（见 `tests/conformance/registry.yml`），其中 40 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -98,13 +98,24 @@
 | `tnbreg` / `ztnb` | ✅ E3 | 自研截断负二项 |
 | `gnbreg` | ⬜ | 广义负二项（方差方程含协变量） |
 
-### 3.3 分位数与稳健回归（P8）
+### 3.3 分位数与稳健回归（P8 已完成）
 
-| Stata | 状态 |
-|---|---|
-| `qreg` / `sqreg` / `bsqreg` | ⬜ 分位数回归 |
-| `rreg` | ⬜ 稳健回归（Huber） |
+| Stata | 状态 | 说明 |
+|---|---|---|
+| `qreg` | ✅ E3 | 系数、标准误、Pseudo R² 全部与 Stata 精确一致 |
+| `qreg, vce(robust)` | ⚠️ E2 | 差 1.05%；手册未给闭式公式 |
+| `rreg` | ✅ E3 | 完整实现 Cook's D + Huber + biweight |
+| `sqreg` | ⚠️ E1 | **系数精确，但 bootstrap 标准误偏小 5–15%** |
+| `bsqreg` | ⚠️ E1 | 同上，标准误偏小 12% |
+| `iqreg` | ⬜ | 分位差回归，未实现 |
 | `qreg2` | ❌ 用户包，不在 base |
+
+> **P8 的关键陷阱**：`qreg` 默认的稀疏度估计是 `fitted` 法（在 τ±h 处重估），
+> 不是残差核密度。用核密度会让标准误偏 29% 而系数完全不变。
+>
+> **`sqreg`/`bsqreg` 为什么只到 E1**：系数是 `qreg` 的拟合值（已验证精确），
+> 但 bootstrap 标准误系统性偏小。Stata 用自己的 RNG，逐格对比不可能；
+> 但偏差是系统性的，说明抽样方案不同。不声称 E3。
 
 ### 3.4 面板扩展（P9）
 
@@ -322,7 +333,7 @@
 | P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict stdp`） | 2–3 周 | **已完成** |
 | P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | **已完成** |
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`） | 2–3 周 | **已完成**（`gnbreg` 除外） |
-| P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | 计划 |
+| P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | **已完成**（`sqreg`/`bsqreg` 止于 E1） |
 | P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | 计划 |
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`nlsur`/`gmm`/`eivreg`/`frontier`） | 3–4 周 | 计划 |
 | P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | 计划 |

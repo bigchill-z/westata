@@ -1,0 +1,17 @@
+# Evidence registry for westata conformance claims.
+# Schema: docs/superpowers/specs/2026-10-22-westata-design.md section 11.3.
+# Entry-level `tolerance` is the binding one; per-source detail is free-form.
+
+- command: regress
+  level: E2
+  tolerance: 5.0e-5
+  sources:
+    - type: published_output
+      ref: "Stata [R] regress, auto.dta: regress mpg weight foreign (n=74); output rounded to 6-7 significant digits"
+      dataset: auto.dta
+    - type: statsmodels_reference
+      ref: "Full-precision algebraic cross-check; westata vs statsmodels OLS at 1e-10"
+      dataset: auto.dta
+  verified_by: lead
+  date: 2026-10-22
+  notes: "E3 pending an R (estimatr se_type='stata') cross-check on the same dataset."

@@ -374,15 +374,14 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 ```yaml
 - command: regress
   level: E3
+  tolerance: 1.0e-10
   sources:
     - type: published_output
       ref: "Stata 18 [R] regress, Example 1"
       dataset: auto.dta
-      tolerance: 1.0e-10
     - type: r_crosscheck
       package: estimatr
       call: 'lm_robust(mpg ~ weight + foreign, se_type = "stata")'
-      tolerance: 1.0e-10
   verified_by: lead
   date: 2026-10-22
 ```

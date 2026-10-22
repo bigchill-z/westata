@@ -9,6 +9,7 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
+from westata.estimators import OLS
 from westata.protocols import SSC
 
 __version__ = "0.0.1"

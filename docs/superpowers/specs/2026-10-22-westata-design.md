@@ -336,7 +336,8 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 
 ### 10.4 推断分布
 
-- OLS / WLS / IV / 面板 FE：t 分布，`df_resid = N - K`（聚类时按 `G - 1`）。
+- OLS / WLS / 面板 FE：t 分布，`df_resid = N - K`（聚类时按 `G - 1`）。
+- **IV（`ivregress`）用 z 分布**：Stata 的 `ivregress` 输出 `Wald chi2(k)` 与 `P>|z|`，系数表统计量为 `z`，不是 `t`。证据：`[R] ivregress` Example 1（`Wald chi2(2) = 90.76`，系数表列 `z`、`P>|z|`）。
 - logit / probit / Poisson / NB / tobit / ordered：z 分布（正态）。
 - 具体以 Stata 对应命令的输出为准，写入证据表。
 

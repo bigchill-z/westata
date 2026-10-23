@@ -655,7 +655,7 @@
       ref: "svyset psu [pw=w], strata(stratum) singleunit(certainty); svy: mean y on 576 observations: Stata b 1.061346613529383, V 0.007628317455187414; westata gap 0 and 8.7e-19"
   verified_by: lead
   date: 2026-10-23
-  notes: "Taylor linearisation, psi_i = y_i/sum(w) centred on the estimate, accumulated as PSU totals within strata with the n_h/(n_h-1) factor. The weight sits in the DENOMINATOR, not in psi_i. Compared against full-precision e(b)/e(V) rather than the printed six decimals, because survey variance conventions agree on the point estimate and diverge in the fourth decimal of the standard error."
+  notes: "Taylor linearisation, psi_i = w_i (y_i - ybar) / sum(w), accumulated as PSU totals within strata with the n_h/(n_h-1) factor. THE WEIGHT IS INSIDE psi: my plan said psi_i = y_i/sum(w) and called it verified, but measurement contradicts that -- it gives V 65% low, w_i y_i/sum(w) gives 30% high, and only w_i (y_i - ybar)/sum(w) reproduces Stata at 3e-16. The plan's claim was wrong because the mean it was checked against used a different centring from the score written down, so the numbers never contradicted each other and the error lived only in the prose. Compared against full-precision e(b)/e(V) rather than the printed six decimals, because survey variance conventions agree on the point estimate and diverge in the fourth decimal of the standard error."
 
 - command: "svy: regress"
   level: E3
@@ -675,7 +675,7 @@
       ref: "svy: total y: full-precision e(b)/e(V) captured with the other design-A commands"
   verified_by: lead
   date: 2026-10-23
-  notes: "psi_i = w_i y_i. The point estimate satisfies the exact identity total = mean * sum(w); the VARIANCES are not related by sum(w)^2, which I asserted first and had to withdraw -- the PSU accumulation and the between-stratum spread do not factor through a constant."
+  notes: "psi_i = w_i y_i, NOT w_i (y_i - total). Getting that wrong puts V off by a factor of 2.4e5 while the point estimate stays right, and it went unnoticed because the conformance test asserted only np.isfinite on the variance. It now asserts the full-precision value: b gap 0, V gap 4.4e-16. The point estimate satisfies total = mean * sum(w); the VARIANCES are not related by sum(w)^2, which I asserted first and had to withdraw -- the PSU accumulation and the between-stratum spread do not factor through a constant."
 
 - command: "svy: proportion"
   level: E3
@@ -688,17 +688,14 @@
   notes: "One parameter per level, each treated exactly like a mean after binarisation, which is what svy: proportion is."
 
 - command: "svy: logit"
-  level: E2
-  tolerance: 1.0e-6
+  level: E3
+  tolerance: 1.0e-9
   sources:
     - type: r_crosscheck
-      ref: "svy: logit binary x1 x2: full-precision e(b)/e(V) captured"
-    - type: invariant
-      ref: "weighted maximum likelihood with the linearised score I^-1 w_i x_i (y_i - p_i)"
+      ref: "svy: logit binary x1 x2: Stata b [1.599752259583883, -0.7175541048578664, -0.037837440539974] and V 3x3; westata b gap 4.8e-10, V gap 4.7e-10"
   verified_by: lead
   date: 2026-10-23
-  notes: "Point estimates and covariance both finite and positive definite; the linearisation follows the weighted-information form analogous to the verified regress case, but the logit case has not itself been diffed to the full-precision capture yet, so it is E2 rather than E3."
-
+  notes: "Weighted maximum likelihood with the linearised score I^-1 w_i x_i (y_i - p_i). The tolerance is 1e-9 rather than 1e-10 because that residual is STATS's stopping tolerance, not ours: evaluating Stata's score at Stata's own published coefficients gives 1.7e-8, while these estimates are the exact maximiser with a gradient of 8e-15. Asserting 1e-10 would have asserted something false about Stata. This command had NO conformance test at all before, and in the version first committed its coefficients were permuted against Stata's x1/x2/_cons order, putting b off by a factor of 18 while the file stayed green."
 - command: svyset fpc / singleunit
   level: E3
   tolerance: 1.0e-10

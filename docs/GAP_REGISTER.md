@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**77 条命令条目**（见 `tests/conformance/registry.yml`），其中 56 条 E3
+- 已实现：**83 条命令条目**（见 `tests/conformance/registry.yml`），其中 61 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -213,12 +213,19 @@
 
 ### 3.8 复杂抽样与重抽样（P12/P13）
 
-| Stata | 状态 |
-|---|---|
-| `svy:` 前缀 | ⬜ 调查设计与线性化方差 |
-| `svyset` / `svydescribe` / `svy: tabulate` | ⬜ |
-| `bootstrap` / `jackknife` / `permute` | ⬜ |
-| `bs` | ⬜ |
+| Stata | 状态 | 说明 |
+|---|---|---|
+| `svyset` | ✅ **E3** | 3 种 `singleunit` 策略、`fpc` |
+| `svy: mean` | ✅ **E3** | b 差 **0**，V 差 **8.7e-19** |
+| `svy: total` | ✅ **E3** | 全精度对拍 |
+| `svy: proportion` | ✅ **E3** | 全精度对拍 |
+| `svy: regress` | ✅ **E3** | b 差 1.1e-15，V 差 **1.8e-15** |
+| `svy: logit` | ⚠️ E2 | 已实现，未逐项对拍 |
+| `svy: logistic` / `probit` | ⬜ | 首期只做 logit |
+| `svy: tabulate` / `ratio` | ⬜ | |
+| `svy bootstrap` / `brr` / `jackknife` | ⬜ | 重抽样方差，归 P13 |
+| `subpop()` | ⬜ | 子总体需特殊方差处理 |
+| `bootstrap` / `jackknife` / `permute` / `bs` | ⬜ | P13 |
 
 ### 3.9 时间序列扩展
 
@@ -418,6 +425,35 @@ Stata 两种算法都报 .04886691，差异只在非对角块
 （`V[0,4] = 0.0013157 = 0.556·√(V₀₀V₄₄)`）。
 实现者按我的要求写了测试、发现它失败、然后改测试而非改代码——这是正确的判断。
 
+## 8.5 P12 的教训：方差 bug 对系数完全隐形（第三次）
+
+`svy: regress` 的正确线性化得分是：
+
+```
+psi_i = (X'WX)⁻¹ w_i x_i e_i
+```
+
+我第一版写成 `x_i e_i`——**漏了权重 `w` 和 `(X'WX)⁻¹`**：
+
+| 版本 | 系数差距 | **V 差距** |
+|---|---|---|
+| `(X'WX)⁻¹ w x e` | 1e-15 | **1.8e-15** ✅ |
+| `x e`（我的初版） | 1e-15 | **167%** ❌ |
+
+这是本项目**第三次**出现"方差错而系数对"的缺陷（前两次是 P8 的 `rreg` 伪值、P11 的 `teffects` 影响函数）。
+
+**方法论收获**：我先验证 `svy: mean`，它一次就对到 **8.7e-19**。当 `mean` 对而 `regress` 错时，
+这个对比**直接排除了 PSU/分层累加层**（两者共用），把问题定位到得分公式本身。
+**分而治之的验证顺序比单点对拍更有效。**
+
+另外两个我自己写错的测试：
+- 我断言 `total` 与 `mean` 的**方差**满足 `sum(w)²` 关系。不成立——
+  PSU 累加与层间离散都无法通过常数因子分解。只有点估计满足 `total = mean·Σw`。
+- `svy: proportion` 把逐水平残差矩阵塞进了"每观测一项"的槽位。
+
+还有一个我引入的 YAML 缺陷：`command: svy: mean` 中未加引号的冒号让**整个登记册无法解析**。
+因为每次新增都验证登记册，所以当场就发现了。
+
 ## 9. 环境层面的已知限制
 
 | 限制 | 说明 |
@@ -440,7 +476,7 @@ Stata 两种算法都报 .04886691，差异只在非对角块
 | P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | **已完成** |
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`eivreg`/`frontier`/`manova`） | 3–4 周 | **已完成**（`nlsur`/`gmm` 除外） |
 | P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | **已完成**（部分） |
-| P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | 计划 |
+| P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | **已完成**（`logit` 止于 E2） |
 | P13 | 重抽样（`bootstrap`/`jackknife`/`permute`） | 2–3 周 | 计划 |
 
 **合计约 26–38 周。** 完成后预计覆盖 Stata 估计类命令的 60–70%（按使用频率加权），仍然不含 §7 的所有子系统。

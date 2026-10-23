@@ -408,11 +408,19 @@ class VECM:
 
         Notes
         -----
-        ``lags(1)`` (``k_ar_diff=0``) does **not** reproduce Stata's printed
-        statistic exactly: Stata reports 288.3450 where statsmodels gives
-        287.2485. Both agree on the first eigenvalue to 1e-3, so the difference
-        is in the boundary handling when no lagged differences are present, not
-        in the estimator. ``lags(2)`` and above agree exactly.
+        ``lags(2)`` and above reproduce Stata's printed statistic exactly.
+
+        ``lags(1)`` (``k_ar_diff=0``) does **not**: Stata reports 288.3450 where
+        statsmodels gives 287.2485, a 0.4% difference that appears only when no lagged
+        differences are present. Both agree on the first eigenvalue to 1e-3, so the
+        discrepancy is in the boundary handling rather than the estimator, and it is
+        recorded in the registry as the reason this entry is E2 rather than E3.
+
+        That distinction matters for the rank DECISION at ``lags(1)``: Stata's rank-1
+        statistic is 3.7832 against a 5% critical value of 3.76, a 0.6% margin, which is
+        the same order as the 0.4% implementation difference. The rank verdict can
+        therefore differ, and callers should not treat the two as interchangeable at
+        ``lags(1)``.
         """
 
         from statsmodels.tsa.vector_ar.vecm import coint_johansen
@@ -427,7 +435,12 @@ class VECM:
         elif k_ar_diff is not None:
             resolved = int(k_ar_diff)
         else:
-            resolved = 1
+            # Fall back to the lag order the model was CONSTRUCTED with. This previously
+            # defaulted to 1 unconditionally, so VECM(data, lags=1).johansen() and
+            # VECM(data, lags=3).johansen() returned identical statistics -- the lag order
+            # was ignored entirely. k_ar_diff = 1 happens to equal Stata's lags(2), which is
+            # the one case the registry had checked, so the defect stayed hidden.
+            resolved = max(int(self._lags) - 1, 0)
 
         outcome = coint_johansen(self._data, det_order, resolved)
         return JohansenResult(

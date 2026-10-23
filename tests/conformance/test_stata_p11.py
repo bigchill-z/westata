@@ -1,0 +1,211 @@
+"""E3 conformance for the P11 causal-inference commands.
+
+Reference values from ``stata_fixtures/p11_outputs.txt`` and ``p11_did.txt``
+(StataNow 19.5).
+
+===================  =========  =========  ==========================
+command              ATE/ATET   se         POmean(0)
+===================  =========  =========  ==========================
+teffects ra          2.034515   .0610149   .9785032 (se .0619697)
+teffects ipw         1.888171   .0939242   1.018208 (se .1001317)
+teffects aipw        2.018836   .0625084   .9801461 (se .0615501)
+teffects ra, atet    2.04958    .06474     1.48981  (se .0771474)
+teffects nnmatch     2.051839   .0691114   --
+didregress           1.18613    .0590465   --  (N=1600)
+===================  =========  =========  ==========================
+
+The DGP treatment effect is 2.0 for the teffects sample and 1.2 for the DID panel.
+
+Two things this file deliberately checks that a point-estimate test would miss:
+
+* the potential-outcome means. Stata reports ``POmean`` as its own row, and an
+  estimator can hit the right ATE with the wrong counterfactual level.
+* that ATE and ATET are different numbers. They coincide only under no
+  confounding, which is exactly what this DGP violates.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import westata as ws
+
+FIXTURES = Path(__file__).resolve().parent / "stata_fixtures"
+TEFFECTS_REFERENCE = FIXTURES / "p11_outputs.txt"
+DID_REFERENCE = FIXTURES / "p11_did.txt"
+
+if not TEFFECTS_REFERENCE.exists():
+    pytest.skip("P11 fixtures missing", allow_module_level=True)
+
+
+def _require(name: str):
+    attribute = getattr(ws, name, None)
+    if attribute is None:
+        pytest.skip(f"{name} is not exposed on westata yet")
+    return attribute
+
+
+def treatment_frame(n: int = 1200, seed: int = 211) -> pd.DataFrame:
+    """Confounded observational sample: x1 drives both y and the treatment."""
+
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    propensity = 1.0 / (1.0 + np.exp(-(0.2 + 0.8 * x1 - 0.4 * x2)))
+    treated = (rng.random(size=n) < propensity).astype(float)
+    y = 1.0 + 2.0 * treated + 1.5 * x1 - 0.5 * x2 + rng.normal(size=n)
+    return pd.DataFrame({"y": y, "treated": treated, "x1": x1, "x2": x2})
+
+
+def did_frame(n_units: int = 200, n_periods: int = 8, seed: int = 223) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    rows = []
+    for unit in range(n_units):
+        effect = rng.normal(scale=0.6)
+        in_treatment_arm = unit % 2 == 0
+        for period in range(1, n_periods + 1):
+            treated_now = 1.0 if (in_treatment_arm and period >= 4) else 0.0
+            x1 = rng.normal()
+            y = (
+                1.0
+                + 0.5 * x1
+                + effect
+                + 0.3 * period
+                + 1.2 * treated_now
+                + rng.normal(scale=0.5)
+            )
+            rows.append((unit, period, y, x1, treated_now, float(in_treatment_arm)))
+    return pd.DataFrame(rows, columns=["unit", "period", "y", "x1", "treated", "group"])
+
+
+# ------------------------------------------------------------ teffects ra
+
+
+def test_regression_adjustment_matches_stata():
+    RegressionAdjustment = _require("RegressionAdjustment")
+    outcome = RegressionAdjustment.from_formula(
+        "y", "treated", treatment_frame()
+    ).fit()
+
+    # Stata: ATE 2.034515 (se .0610149)
+    assert outcome.estimate == pytest.approx(2.034515, rel=1e-5)
+    assert outcome.std_err == pytest.approx(0.0610149, rel=5e-2)
+
+
+def test_regression_adjustment_reports_the_potential_outcome_means():
+    """An estimator can hit the right ATE with a wrong counterfactual level."""
+
+    RegressionAdjustment = _require("RegressionAdjustment")
+    outcome = RegressionAdjustment.from_formula(
+        "y", "treated", treatment_frame()
+    ).fit()
+
+    # Stata: POmean(0) .9785032
+    assert outcome.potential_outcomes["0"][0] == pytest.approx(0.9785032, rel=1e-5)
+
+
+def test_atet_differs_from_ate_and_matches_stata():
+    """ATE and ATET coincide only under no confounding; this DGP is confounded."""
+
+    RegressionAdjustment = _require("RegressionAdjustment")
+    ate = RegressionAdjustment.from_formula(
+        "y", "treated", treatment_frame(), estimand="ate"
+    ).fit()
+    atet = RegressionAdjustment.from_formula(
+        "y", "treated", treatment_frame(), estimand="atet"
+    ).fit()
+
+    assert ate.estimate != pytest.approx(atet.estimate, rel=1e-4)
+    # Stata: ATET 2.04958
+    assert atet.estimate == pytest.approx(2.04958, rel=1e-4)
+
+
+# ---------------------------------------------------------- teffects ipw
+
+
+def test_ipw_matches_stata():
+    IPW = _require("IPW")
+    outcome = IPW.from_formula("y", "treated", treatment_frame()).fit()
+    # Stata: ATE 1.888171 (se .0939242)
+    assert outcome.estimate == pytest.approx(1.888171, rel=2e-2)
+
+
+def test_ipw_reports_positive_standard_errors():
+    IPW = _require("IPW")
+    outcome = IPW.from_formula("y", "treated", treatment_frame()).fit()
+    assert np.isfinite(outcome.std_err) and outcome.std_err > 0
+
+
+# --------------------------------------------------------- teffects aipw
+
+
+def test_aipw_matches_stata():
+    AIPW = _require("AIPW")
+    outcome = AIPW.from_formula("y", "treated", treatment_frame()).fit()
+    # Stata: ATE 2.018836 (se .0625084)
+    assert outcome.estimate == pytest.approx(2.018836, rel=2e-2)
+
+
+# ------------------------------------------------------ teffects nnmatch
+
+
+def test_nearest_neighbour_matching_is_close_to_stata():
+    NearestNeighbourMatching = _require("NearestNeighbourMatching")
+    outcome = NearestNeighbourMatching.from_formula(
+        "y", "treated", treatment_frame(), nneighbor=1
+    ).fit()
+    # Stata: ATE 2.051839 (se .0691114). Matching depends on tie-breaking, so a
+    # couple of percent is the realistic target.
+    assert outcome.estimate == pytest.approx(2.051839, rel=2e-2)
+
+
+# -------------------------------------------------------------- didregress
+
+
+def test_didregress_matches_stata():
+    Didregress = _require("Didregress")
+    result = Didregress.from_formula(
+        "y", "treated", did_frame(), group="unit", time="period"
+    ).fit()
+
+    # Stata: ATET 1.18613 (se .0590465), N = 1600
+    assert float(result.params["treated"]) == pytest.approx(1.18613, rel=1e-3)
+    assert int(result.e["N"]) == 1600
+
+
+def test_xtdidregress_agrees_with_didregress_on_a_balanced_panel():
+    Xtdidregress = _require("Xtdidregress")
+    Didregress = _require("Didregress")
+    frame = did_frame()
+
+    panel = Xtdidregress.from_formula(
+        "y", "treated", frame, group="unit", time="period"
+    ).fit()
+    pooled = Didregress.from_formula(
+        "y", "treated", frame, group="unit", time="period"
+    ).fit()
+
+    assert float(panel.params["treated"]) == pytest.approx(
+        float(pooled.params["treated"]), rel=1e-10
+    )
+
+
+def test_didregress_rejects_a_time_invariant_treatment():
+    """A treatment that never changes within a unit IS the fixed effect.
+
+    Stata says "treatment variable omitted because of collinearity" (r(198)); a
+    silent zero coefficient would be far worse than an error.
+    """
+
+    Didregress = _require("Didregress")
+    frame = did_frame()
+    # Replace the time-varying treatment with the constant group indicator.
+    frame = frame.assign(treated=frame["group"])
+    with pytest.raises(Exception):
+        Didregress.from_formula(
+            "y", "treated", frame, group="unit", time="period"
+        ).fit()

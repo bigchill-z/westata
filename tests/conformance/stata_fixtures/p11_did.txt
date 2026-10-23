@@ -1,0 +1,70 @@
+=== didregress ===
+COMMAND: didregress (y x1) (treated), group(unit) time(period)
+
+
+Treatment and time information
+
+Time variable: period
+Control:       treated = 0
+Treatment:     treated = 1
+-----------------------------------
+             |   Control  Treatment
+-------------+---------------------
+Group        |
+        unit |       100        100
+-------------+---------------------
+Time         |
+     Minimum |         1          4
+     Maximum |         1          4
+-----------------------------------
+
+Difference-in-differences regression                     Number of obs = 1,600
+Data type: Repeated cross-sectional
+
+                                 (Std. err. adjusted for 200 clusters in unit)
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATET         |
+     treated |
+   (1 vs 0)  |    1.18613   .0590465    20.09   0.000     1.069692    1.302567
+------------------------------------------------------------------------------
+Note: ATET estimate adjusted for covariates, group effects, and time effects.
+
+
+=== xtdidregress ===
+COMMAND: xtdidregress (y x1) (treated), group(unit) time(period)
+
+
+Treatment and time information
+
+Time variable: period
+Control:       treated = 0
+Treatment:     treated = 1
+-----------------------------------
+             |   Control  Treatment
+-------------+---------------------
+Group        |
+        unit |       100        100
+-------------+---------------------
+Time         |
+     Minimum |         1          4
+     Maximum |         1          4
+-----------------------------------
+
+Difference-in-differences regression                     Number of obs = 1,600
+Data type: Longitudinal
+
+                                 (Std. err. adjusted for 200 clusters in unit)
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATET         |
+     treated |
+   (1 vs 0)  |    1.18613    .055228    21.48   0.000     1.077222    1.295037
+------------------------------------------------------------------------------
+Note: ATET estimate adjusted for covariates, panel effects, and time effects.
+
+

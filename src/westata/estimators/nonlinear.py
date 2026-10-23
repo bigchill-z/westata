@@ -674,7 +674,12 @@ class Nl:
         best = objective(theta)
         converged = bool(result.success)
 
-        if not converged:
+        # Polish only when the optimiser stopped for a reason other than the
+        # evaluation budget.  ``least_squares`` reports status 0 when
+        # ``max_nfev`` is exhausted, so a caller who asked for ``maxiter=1`` gets
+        # exactly one iteration rather than a derivative-free polish silently
+        # overriding the request.
+        if not converged and int(result.status) != 0:
             refined = optimize.minimize(
                 objective,
                 theta,
@@ -918,7 +923,10 @@ class Frontier:
         best = negative(theta)
         converged = bool(result.success)
 
-        if not converged:
+        # Skip the polish when the user's own iteration budget is what stopped the
+        # optimiser: ``maxiter=1`` must mean one iteration, not "one BFGS
+        # iteration plus 4000 Nelder-Mead ones".
+        if not converged and int(result.status) != 1:
             refined = optimize.minimize(
                 negative,
                 theta,

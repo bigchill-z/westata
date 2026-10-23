@@ -1,0 +1,134 @@
+=== teffects_ra ===
+COMMAND: teffects ra (y x1 x2) (treated)
+
+
+Iteration 0:  EE criterion = 2.733e-31  
+Iteration 1:  EE criterion = 2.404e-31  
+
+Treatment-effects estimation                    Number of obs     =      1,200
+Estimator      : regression adjustment
+Outcome model  : linear
+Treatment model: none
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATE          |
+     treated |
+   (1 vs 0)  |   2.034515   .0610149    33.34   0.000     1.914928    2.154102
+-------------+----------------------------------------------------------------
+POmean       |
+     treated |
+          0  |   .9785032   .0619697    15.79   0.000     .8570448    1.099962
+------------------------------------------------------------------------------
+
+
+=== teffects_ipw ===
+COMMAND: teffects ipw (y) (treated x1 x2)
+
+
+Iteration 0:  EE criterion = 7.692e-18  
+Iteration 1:  EE criterion = 3.312e-32  
+
+Treatment-effects estimation                    Number of obs     =      1,200
+Estimator      : inverse-probability weights
+Outcome model  : weighted mean
+Treatment model: logit
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATE          |
+     treated |
+   (1 vs 0)  |   1.888171   .0939242    20.10   0.000     1.704083    2.072259
+-------------+----------------------------------------------------------------
+POmean       |
+     treated |
+          0  |   1.018208   .1001317    10.17   0.000     .8219536    1.214462
+------------------------------------------------------------------------------
+
+
+=== teffects_aipw ===
+COMMAND: teffects aipw (y x1 x2) (treated x1 x2)
+
+
+Iteration 0:  EE criterion = 7.692e-18  
+Iteration 1:  EE criterion = 4.781e-32  
+
+Treatment-effects estimation                    Number of obs     =      1,200
+Estimator      : augmented IPW
+Outcome model  : linear by ML
+Treatment model: logit
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATE          |
+     treated |
+   (1 vs 0)  |   2.018836   .0625084    32.30   0.000     1.896322     2.14135
+-------------+----------------------------------------------------------------
+POmean       |
+     treated |
+          0  |   .9801461   .0615501    15.92   0.000     .8595101    1.100782
+------------------------------------------------------------------------------
+
+
+=== teffects_ra_atet ===
+COMMAND: teffects ra (y x1 x2) (treated), atet
+
+
+Iteration 0:  EE criterion = 2.816e-31  
+Iteration 1:  EE criterion = 6.240e-32  
+
+Treatment-effects estimation                    Number of obs     =      1,200
+Estimator      : regression adjustment
+Outcome model  : linear
+Treatment model: none
+------------------------------------------------------------------------------
+             |               Robust
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATET         |
+     treated |
+   (1 vs 0)  |    2.04958     .06474    31.66   0.000     1.922692    2.176468
+-------------+----------------------------------------------------------------
+POmean       |
+     treated |
+          0  |    1.48981   .0771474    19.31   0.000     1.338604    1.641016
+------------------------------------------------------------------------------
+
+
+=== teffects_nnmatch ===
+COMMAND: teffects nnmatch (y x1 x2) (treated), nneighbor(1)
+
+
+Treatment-effects estimation                   Number of obs      =      1,200
+Estimator      : nearest-neighbor matching     Matches: requested =          1
+Outcome model  : matching                                     min =          1
+Distance metric: Mahalanobis                                  max =          1
+------------------------------------------------------------------------------
+             |              AI robust
+           y | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ATE          |
+     treated |
+   (1 vs 0)  |   2.051839   .0691114    29.69   0.000     1.916384    2.187295
+------------------------------------------------------------------------------
+
+
+=== didregress ===
+COMMAND: didregress (y x1) (treated), group(unit) time(period)
+
+FAILED: model is not identified
+    The treatment variable treated was omitted because of collinearity.
+r(198);
+
+
+=== xtdidregress ===
+COMMAND: xtdidregress (y x1) (treated), group(unit) time(period)
+
+FAILED: model is not identified
+    The treatment variable treated was omitted because of collinearity.
+r(198);
+
+

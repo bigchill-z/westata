@@ -174,14 +174,35 @@ def test_equal_weights_reduce_to_ordinary_ols():
     )
 
 
-def test_svy_total_matches_stata():
+STATA_TOTAL_B = 888.9760173443246
+STATA_TOTAL_V = 6936.575460544632
+
+
+def test_svy_total_matches_stata_at_full_precision():
+    """Assert the value, not merely that a value exists.
+
+    An earlier version of this test checked only ``np.isfinite`` on the variance,
+    and the implementation at that time had it wrong by a factor of 2.4e5 -- its
+    score was ``w*(y - total)`` instead of ``w*y``. A finiteness check cannot
+    distinguish a survey total from anything else.
+    """
+
     SvyTotal = _require("SvyTotal")
     frame = survey_frame()
     result = SvyTotal.from_frame(["y"], frame, _design(frame)).fit()
 
-    assert np.isfinite(float(result.params.iloc[0]))
-    # The total is the weighted sum, so it must exceed the unweighted one.
-    assert float(result.params.iloc[0]) != pytest.approx(float(frame["y"].sum()), rel=1e-6)
+    assert float(result.params.iloc[0]) == pytest.approx(STATA_TOTAL_B, rel=1e-12)
+    assert float(np.asarray(result.cov_params())[0, 0]) == pytest.approx(
+        STATA_TOTAL_V, rel=1e-12
+    )
+
+
+def test_svy_total_equals_the_weighted_sum():
+    SvyTotal = _require("SvyTotal")
+    frame = survey_frame()
+    result = SvyTotal.from_frame(["y"], frame, _design(frame)).fit()
+    expected = float((frame["y"] * frame["w"]).sum())
+    assert float(result.params.iloc[0]) == pytest.approx(expected, rel=1e-14)
 
 
 def test_degrees_of_freedom_is_psu_minus_strata():
@@ -239,3 +260,48 @@ def test_an_unknown_singleunit_strategy_is_rejected():
             frame, psu="psu", strata="stratum", weights="w",
             singleunit="nonsense",
         )
+
+STATA_LOGIT_B = np.array(
+    [1.599752259583883, -0.7175541048578664, -0.037837440539974]
+)
+STATA_LOGIT_V = np.array(
+    [
+        [0.045049164775974454, -0.02789850499411344, -0.008946498981062131],
+        [-0.02789850499411344, 0.0355735421399913, -0.0007433121266066349],
+        [-0.008946498981062131, -0.0007433121266066349, 0.02924090503833132],
+    ]
+)
+
+
+def test_svy_logit_matches_stata():
+    """Logit had NO conformance coverage before this test.
+
+    The version I first committed returned its coefficients permuted against
+    Stata's order -- b off by 18x -- and the file stayed green because nothing
+    looked at logit at all.
+
+    The tolerance is 1e-9 rather than 1e-10 because that gap is Stata's own
+    stopping tolerance, not ours: Stata's score evaluated at Stata's published
+    coefficients is 1.7e-8, while these estimates are the exact maximiser with a
+    gradient of 8e-15. Asserting 1e-10 would assert something false about Stata.
+    """
+
+    SvyLogit = _require("SvyLogit")
+    frame = survey_frame()
+    result = SvyLogit.from_frame(frame, "binary ~ x1 + x2", _design(frame)).fit()
+
+    # Stata's column order is x1, x2, _cons -- not Intercept first.
+    assert list(result.param_names) == ["x1", "x2", "_cons"]
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float), STATA_LOGIT_B, rtol=1e-9
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.cov_params(), dtype=float), STATA_LOGIT_V, rtol=1e-9
+    )
+
+
+def test_svy_regress_names_the_constant_as_stata_does():
+    SvyRegress = _require("SvyRegress")
+    frame = survey_frame()
+    result = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    assert list(result.param_names) == ["x1", "x2", "_cons"]

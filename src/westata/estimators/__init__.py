@@ -40,6 +40,7 @@ from westata.estimators.limited import (
     Truncreg,
 )
 from westata.estimators.linear import OLS
+from westata.estimators.panel_dynamic import XtAbond
 from westata.estimators.panel_nonlinear import (
     XtLogit,
     XtNbreg,
@@ -67,6 +68,7 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "XtAbond",
     "XtNbreg",
     "XtPoisson",
     "XtTobit",

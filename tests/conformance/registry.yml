@@ -365,6 +365,139 @@
   date: 2026-10-23
   notes: "Coefficients exact (identical to qreg by construction -- bsqreg is sqreg with one quantile, which the subclassing makes structural). Bootstrap SE 12% below Stata's, the same systematic gap as sqreg. E1, not E3."
 
+
+# --- P9: panel extensions --------------------------------------------------
+
+- command: xtlogit, fe
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "xtlogit y x1 x2, fe on a 120x8 panel: Stata x1 .3307537 (se .0807304), x2 -.3134259; westata .3307538 / -.3134260"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Chamberlain's conditional likelihood, implemented by exhaustive enumeration of the C(T,k) subsets. The estimation sample matches Stata's exactly: 912 of 960, because groups whose outcome never varies are conditioned out. Both the estimate and the sample size agreeing is what makes this a real check."
+
+- command: xtlogit, pa
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Population-averaged GEE runs and reports a clustered sandwich VCE"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "GEE is not a likelihood, so e(ll) is deliberately ABSENT rather than approximated -- a log-likelihood that does not exist would invite a meaningless comparison. Not yet compared with Stata's coefficients (.3007615 / -.2542736)."
+
+- command: xtprobit, re
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Gauss-Hermite quadrature over the random effect produces finite estimates"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Converges and reports sigma_u. Stata's coefficients on the reference panel are x1 .209834, x2 -.176559; not yet compared."
+
+- command: xttobit
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Random-effects Tobit runs and reports both sigma_u and sigma_e"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Quadrature over the random effect with the censoring handled at the lower limit. Not yet compared with Stata's output."
+
+- command: xtpoisson, fe
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "xtpoisson y x1, fe on a 100x7 panel: Stata x1 .5041803 (se .0344352); westata within 5%"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The multinomial conditional likelihood is a genuine likelihood, unlike xtnbreg's. The intercept is reported as NaN because conditioning on the group totals absorbs it -- reporting a number there would be inventing an unidentified parameter."
+
+- command: xtpoisson, re
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Random-effects Poisson with quadrature produces finite estimates"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Not yet compared with Stata's x1 .4795509 / _cons .3485993 / lnalpha -2.073955."
+
+- command: xtnbreg, fe
+  level: E1
+  tolerance: 5.0e-2
+  sources:
+    - type: invariant
+      ref: "Conditional FE negative binomial runs and estimates /lnalpha"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "This is a QUASI-likelihood, not a likelihood: the negative binomial is not conditionable the same way the Poisson is, and Stata's own documentation says so. Recorded as estimator='conditional_quasi_ml' and quasi_likelihood=1 so its log-likelihood is not compared with a real one. Stata's x1 is .5041909; not yet compared."
+
+- command: xtivreg, fe
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "xtivreg y w (endog = z), fe on a 100x7 panel: Stata endog 1.102058 (se .0694014), w .5391216, _cons 1.014978; westata matches all three"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The within transform eliminates the constant, and Stata reconstructs it from the ORIGINAL variables' means as b_0 = ybar - betabar'xbar. Verified that reconstruction reproduces 1.014978 before relying on it. Using the transformed variables' means instead gives 1.029681, which is wrong by 1.4% because those means are zero by construction."
+
+- command: xtivreg, re
+  level: E2
+  tolerance: 1.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "xtivreg y w (endog = z), re: Stata endog 1.120466, w .5286517, _cons 1.014533; westata 1.116635 / .530879 / 1.014624"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Within 0.42%. The residual gap is the theta estimate: Stata decomposes the variance into within and between components with its own convention, and theta enters every quasi-demeaned moment."
+
+- command: xtgls
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "xtgls y x1, panels(heteroskedastic) on a 100x7 panel: Stata x1 .6798471, _cons 1.431659; westata matches"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Feasible GLS with one variance per panel: sigma_i^2 = e_i'e_i / T_i, dividing by T and not T-1, which is the convention that reproduces Stata's e(V). This does NOT reduce to pooled OLS -- an earlier note here claimed it did, which was simply wrong; OLS on the same data gives .753313 / 1.572686 against GLS's .679847 / 1.431659. An earlier version of the conformance test asserted OLS equality and had to be rewritten, because the test was wrong and the estimator was right. panels(correlated) is also implemented for balanced panels; unbalanced data there raises ConsistencyError rather than silently using a different estimator."
+
+- command: xtpcse
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "xtpcse y x1 on a 100x7 panel: Stata x1 .7533126 (se .0564318), _cons 1.572686; westata matches"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Beck-Katz panel-corrected VCE with the N/(N-k) * T/(T-1) small-sample factor. Coefficients are OLS by construction, which the tests assert."
+
+- command: xtunitroot
+  level: E1
+  tolerance: 1.0e-1
+  sources:
+    - type: invariant
+      ref: "IPS and LLC both produce finite statistics with p-values in [0,1]"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "NOT verified against Stata. Stata's IPS output reports fixed-N exact critical values (-1.750 / -1.680 / -1.640) from published tables that are not reproducible here, and its LLC lag rule ('Bartlett kernel, 6.00 lags average, chosen by LLC') is not fully specified in the manual. Both statistics are labelled approximate in the returned object rather than tuned to match, and the test names say so."
+
+- command: xtabond
+  level: E2
+  tolerance: 2.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "xtabond y x1, lags(1) on a 90x9 AR(1) panel: Stata L1.y .4549539, x1 .776234, 30 instruments; westata .454107 / .775963 / 30 instruments"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "One-step GMM per [XT] xtdpd. THE INSTRUMENT COUNT IS THE KEY CHECK: Stata reports 30 for lags(1) on T=9, which is 28 GMM columns plus the differenced covariate and a constant. Three separate bugs were caught by that single number while the estimates still looked plausible: a per-instrument H matrix instead of per-unit, an instrument block starting at y_2 instead of y_1 (same column count, wrong content), and the missing standard instruments (x1 came out 0.878 instead of 0.776). Sargan/Hansen/AR(1)/AR(2) are deliberately NOT reported: the manual does not fully specify their construction, and an approximate number under Stata's name would look more authoritative than its absence."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

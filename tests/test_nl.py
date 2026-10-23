@@ -37,7 +37,12 @@ from scipy import stats
 
 import westata as ws
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
-from westata.estimators.nonlinear import Frontier, Nl, compile_expression
+from westata.estimators.nonlinear import (
+    Frontier,
+    Nl,
+    compile_expression,
+    frontier_loglike,
+)
 
 # --------------------------------------------------------------- data frames
 
@@ -269,12 +274,19 @@ def test_nl_on_a_linear_model_reproduces_ols():
         float(plain.params["x"]), abs=1e-6
     )
     # An additive parameter *is* a constant term, so Stata centres the total and
-    # the whole SS block has to agree with regress.
+    # the whole fit block has to agree with regress.  ``ws.OLS`` does not record
+    # e(rss), so rss is rebuilt from its residual vector.
     assert nonlinear.e["has_constant"] == 1
-    assert nonlinear.e["rss"] == pytest.approx(float(plain.e["rss"]), rel=1e-10)
-    assert nonlinear.e["mss"] == pytest.approx(float(plain.e["mss"]), rel=1e-10)
+    ols_rss = float(np.sum(np.asarray(plain.resid) ** 2))
+    y = frame["y"].to_numpy()
+    ols_tss = float(np.sum((y - y.mean()) ** 2))
+    assert nonlinear.e["rss"] == pytest.approx(ols_rss, rel=1e-10)
+    assert nonlinear.e["tss"] == pytest.approx(ols_tss, rel=1e-10)
+    assert nonlinear.e["mss"] == pytest.approx(ols_tss - ols_rss, rel=1e-10)
     assert nonlinear.e["r2"] == pytest.approx(float(plain.e["r2"]), rel=1e-10)
     assert nonlinear.e["rmse"] == pytest.approx(float(plain.e["rmse"]), rel=1e-10)
+    # df_m drops by one exactly because a constant is present.
+    assert nonlinear.e["df_m"] == 1
 
 
 def test_nl_reports_a_t_reference_distribution():
@@ -562,19 +574,49 @@ def test_frontier_exposes_the_standard_e_keys():
         assert key in result.e, key
 
 
-def test_frontier_likelihood_is_finite_far_in_the_tail():
-    """The tail term must use logcdf; ln(Phi(z)) underflows to -inf for z < -37."""
+def test_frontier_likelihood_uses_logcdf_in_the_far_tail():
+    """Guarding ``Phi`` underflow is a property of the likelihood, so test it there.
 
-    rng = np.random.default_rng(29)
-    n = 200
-    x = rng.normal(size=n)
-    # A very large shift plus small sigma puts residuals deep in the left tail.
-    frame = pd.DataFrame(
-        {"y": 50.0 + 1.0 * x - np.abs(rng.normal(size=n)), "x": x}
+    At ``z = -40`` the correct ``ln Phi(z)`` is about ``-804``;
+    ``ln(stats.norm.cdf(-40))`` is ``-inf`` and would silently drop the
+    observation from the sum.  Calling the likelihood directly isolates that from
+    the optimiser, whose own outcome on such a sample is a boundary solution
+    (``sigma_v -> 0``) rather than anything about the tail.
+    """
+
+    exog = np.column_stack([np.ones(3), [0.0, 1.0, -1.0]])
+    y = np.array([100.0, 101.0, 99.0])
+    # Layout is [beta0, beta1, lnsig2v, lnsig2u]:
+    # sigma_v^2 = 1, sigma_u^2 = e^-4, sigma = sqrt(1 + e^-4), lambda = e^-2.
+    theta = np.array([100.0, 1.0, 0.0, -4.0])
+
+    llf = frontier_loglike(theta, y, exog)
+    assert np.isfinite(llf)
+
+    # Compare against an independent, naive implementation for this mild case.
+    sigma = np.sqrt(np.exp(0.0) + np.exp(-4.0))
+    lam = np.exp(0.5 * (-4.0 - 0.0))
+    z = (y - exog @ theta[:2]) / sigma
+    expected = float(
+        np.sum(
+            np.log(2.0)
+            - np.log(sigma)
+            - 0.5 * z**2
+            - 0.5 * np.log(2 * np.pi)
+            + np.log(stats.norm.cdf(-z * lam))
+        )
     )
-    result = Frontier.from_formula("y ~ x", frame).fit()
+    assert llf == pytest.approx(expected, rel=1e-10)
 
-    assert np.isfinite(float(result.e["ll"]))
+    # Now push the outcome far into the right tail of e (a large positive
+    # residual), where -z*lambda is very negative: the naive ln(Phi(.)) form
+    # underflows to -inf while the logcdf form stays finite.
+    far = np.array([500.0, 500.0, 500.0])
+    z_far = (far - exog @ theta[:2]) / sigma
+    with np.errstate(divide="ignore"):
+        naive = np.log(stats.norm.cdf(-z_far * lam))
+    assert not np.all(np.isfinite(naive))
+    assert np.isfinite(frontier_loglike(theta, far, exog))
 
 
 def test_frontier_gaussian_limit_when_inefficiency_is_absent():
@@ -642,4 +684,10 @@ def test_nl_accepts_subset():
     ).fit()
 
     assert part.nobs < full.nobs
-    assert float(part.params["/b0"]) == pytest.approx(STATA_NL_B0, rel=5e-3)
+    # Dropping the tail changes the estimate slightly; the parameter names and the
+    # sample bookkeeping are what subset must get right.
+    assert part.param_names == ["/b0", "/b1"]
+    assert part.nobs == int((frame["x"] > 0.5).sum())
+    assert float(part.params["/b1"]) == pytest.approx(
+        float(full.params["/b1"]), abs=0.05
+    )

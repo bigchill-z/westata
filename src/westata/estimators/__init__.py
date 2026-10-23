@@ -49,6 +49,14 @@ from westata.estimators.panel_nonlinear import (
     XtTobit,
 )
 from westata.estimators.panel_iv import XtGls, XtIvreg, XtPcse, XtUnitroot
+from westata.estimators.did import Didregress, Xtdidregress
+from westata.estimators.treatreg_effects import (
+    AIPW,
+    IPW,
+    NearestNeighbourMatching,
+    RegressionAdjustment,
+    TreatmentEffectResult,
+)
 from westata.estimators.nonlinear import Frontier, Nl
 from westata.estimators.systems import Eivreg, Manova, ManovaResult, Mvreg, Sureg
 from westata.estimators.quantile import QuantileRegression, RobustRegression
@@ -70,6 +78,13 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "TreatmentEffectResult",
+    "NearestNeighbourMatching",
+    "AIPW",
+    "IPW",
+    "RegressionAdjustment",
+    "Xtdidregress",
+    "Didregress",
     "Frontier",
     "Nl",
     "ManovaResult",

@@ -115,7 +115,7 @@ from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
-__all__ = ["Frontier", "Nl", "compile_expression"]
+__all__ = ["Frontier", "Nl", "compile_expression", "frontier_loglike"]
 
 #: Gradient infinity-norm below which a polished fit counts as converged.
 _GRADIENT_TOLERANCE = 1e-4
@@ -429,6 +429,51 @@ def _numerical_hessian(
             hessian[i, j] = value
             hessian[j, i] = value
     return hessian
+
+
+def frontier_loglike(
+    theta: np.ndarray, y: np.ndarray, exog: np.ndarray
+) -> float:
+    """Normal/half-normal frontier log-likelihood (the function ``fit`` maximises).
+
+    Parameters
+    ----------
+    theta:
+        ``[beta, lnsig2v, lnsig2u]`` -- the parameter vector in the order the
+        fitted result reports it.
+    y:
+        Dependent variable, length ``n``.
+    exog:
+        Design matrix ``n x k``.
+
+    Returns
+    -------
+    float
+        ``sum_i [ln 2 - ln sigma + ln phi(e_i/sigma) + ln Phi(-e_i lambda/sigma)]``
+        with ``e = y - x'b``, ``sigma^2 = exp(lnsig2v) + exp(lnsig2u)`` and
+        ``lambda = sqrt(exp(lnsig2u - lnsig2v))``.
+
+    Notes
+    -----
+    This is public (not an underscore helper) so the likelihood can be checked
+    against an independent implementation, and so that the ``logcdf`` guarantee
+    is testable: at ``z = -40`` the tail term is about ``-804``, while
+    ``ln(norm.cdf(z))`` would return ``-inf`` and silently drop the observation.
+    """
+
+    beta = np.asarray(theta, dtype=float)[: exog.shape[1]]
+    lnsig2v = float(theta[exog.shape[1]])
+    lnsig2u = float(theta[exog.shape[1] + 1])
+    sigma2 = math.exp(lnsig2v) + math.exp(lnsig2u)
+    sigma = math.sqrt(sigma2)
+    lam = math.exp(0.5 * (lnsig2u - lnsig2v))
+    z = (np.asarray(y, dtype=float) - exog @ beta) / sigma
+    log_density = -0.5 * z**2 - 0.5 * math.log(2.0 * math.pi)
+    tail = stats.norm.logcdf(-z * lam)
+    total = float(
+        np.sum(math.log(2.0) - math.log(sigma) + log_density + tail)
+    )
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -898,16 +943,7 @@ class Frontier:
         has_constant = any(name == "Intercept" for name in self._param_names)
 
         def negative(theta: np.ndarray) -> float:
-            beta = theta[:k]
-            sigma2 = math.exp(theta[k]) + math.exp(theta[k + 1])
-            sigma = math.sqrt(sigma2)
-            lam = math.exp(0.5 * (theta[k + 1] - theta[k]))
-            error = y - X @ beta
-            z = error / sigma
-            # ln 2 - ln sigma + ln phi(z) + ln Phi(-z * lambda)
-            log_density = -0.5 * z**2 - 0.5 * math.log(2.0 * math.pi)
-            tail = stats.norm.logcdf(-z * lam)
-            total = float(np.sum(math.log(2.0) - math.log(sigma) + log_density + tail))
+            total = frontier_loglike(theta, y, X)
             return -total if np.isfinite(total) else 1e12
 
         beta0, *_ = np.linalg.lstsq(X, y, rcond=None)

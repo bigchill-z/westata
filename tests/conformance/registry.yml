@@ -561,6 +561,89 @@
   date: 2026-10-23
   notes: "Normal/half-normal stochastic frontier, lnf = ln2 - ln(sigma) + ln(phi(z)) + ln(Phi(-z*lambda)). The tail term uses log_ndtr: computing ln(Phi(z)) directly underflows to -inf for z < -7, which would silently make the likelihood infinite. sigma_u/sigma_v/lambda/gamma are reported in e(). Only distribution(halfnormal) is in scope; truncated and exponential raise UnsupportedError."
 
+
+# --- P11: causal inference ------------------------------------------------
+
+- command: teffects ra
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "teffects ra (y x1 x2) (treated) on 1200 confounded observations: Stata ATE 2.034515 (se .0610149), POmean(0) .9785032; westata 2.034515 / .0606287 / .9785032"
+    - type: r_crosscheck
+      ref: "teffects ra ..., atet: Stata ATET 2.04958 (se .06474), POmean(0) 1.48981; westata 2.049580 / .0649368 / 1.489810"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "ate, atet and the potential-outcome means all reproduce Stata to the printed digit; the standard errors land within 0.6%. Getting the standard error right took two wrong attempts, and the reason is instructive: OLS residuals are orthogonal to the design, so the model-error terms of the influence function are IDENTICALLY zero, and an influence function built only from them collapses to the plug-in variation (0.0018, 33x too small). The variance is dominated by the arm-coefficient uncertainty: xbar'(V1+V0)xbar. Adding that term gives 0.06063 against Stata's 0.06101."
+
+- command: teffects ipw
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "teffects ipw (y) (treated x1 x2): Stata ATE 1.888171 (se .0939242), POmean(0) 1.018208; westata estimate exact"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The point estimate reproduces Stata exactly. The standard error does NOT: westata reports 0.1632 against Stata's 0.0939, because the propensity-score estimation error is not propagated into the weighting variance. Point estimate E3, standard error unverified -- recorded rather than dressed up."
+
+- command: teffects aipw
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "teffects aipw (y x1 x2) (treated x1 x2): Stata ATE 2.018836 (se .0625084), POmean(0) .9801461; westata 2.018836 / .0641594 / exact"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "ATE exact, standard error within 2.6% (.0641594 vs .0625084). The double-robust correction keeps the estimate right even though the weighting-variance propagation is approximate."
+
+- command: teffects nnmatch
+  level: E2
+  tolerance: 3.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "teffects nnmatch (y x1 x2) (treated), nneighbor(1): Stata ATE 2.051839 (se .0691114)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Within a few percent, but matching depends on tie-breaking and on the exact distance standardisation Stata uses, so an exact match is not achievable by construction. The variance is an Abadie-Imbens approximation, labelled as such in the result."
+
+- command: didregress
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "didregress (y x1) (treated), group(unit) time(period) on 1600 observations: Stata ATET 1.18613 (se .0590465); westata 1.18613 / .0550896"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "The ATET matches to the printed digit through two-way fixed-effect absorption (alternating projections, no dummy expansion). The standard error is 6.7% below Stata's: every plausible cluster correction (G/(G-1) with and without (N-1)/(N-k)) lands near .0551, so Stata's DID variance accounts for more than unit clustering -- most likely the sampling of the treatment arm. [R] didregress could not be downloaded to confirm, so the gap is recorded rather than tuned. Hence E2, not E3."
+
+- command: xtdidregress
+  level: E2
+  tolerance: 5.0e-2
+  sources:
+    - type: r_crosscheck
+      ref: "xtdidregress is the same estimator as didregress; identical output on the same balanced panel"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Implemented as a subclass of Didregress so the two cannot drift apart. Shares the standard-error caveat above."
+
+# --- Note on the nl / frontier defects found after P10 shipped -------------
+#
+# Two P10 numbers were wrong in a way the coefficient comparison could not catch:
+#
+#   nl's Total sum of squares was centred. Stata centres only when a parameter
+#   enters additively, and {b0}*exp(...) has none, so Stata reports the UNCENTRED
+#   sum(y^2) = 1017.4143. The centred value is 406.7919, which produced R2 .9914
+#   instead of Stata's .9932 -- same fitted model, wrong reported statistics.
+#
+#   frontier omitted /lnsig2v and /lnsig2u, the two rows that carry the
+#   variance-component inference, and had neither the Wald chi2 (4462.60) nor the
+#   boundary LR test (chibar2(01) = 23.60).
+#
+# Both are now exact. frontier's lambda STANDARD ERROR is still not reported: a
+# delta-method value gives 0.388 against Stata's .0478678, the fixture does not
+# identify which scale Stata uses, and printing a number 8x off would be worse
+# than omitting it.
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

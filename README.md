@@ -18,10 +18,9 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **437 passing** |
-| Source | ~7,700 lines across 9 subsystems |
-| Commands covered | 32 registry entries |
-| Evidence | **24 × E3**, 7 × E2, 1 × E1 |
+| Tests | **1247 passing** |
+| Commands covered | 87 registry entries |
+| Evidence | **83 × E3**, 4 × E2, **0 × E1** |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
@@ -111,9 +110,9 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 24 |
-| E2 | Agrees with Stata to its display precision, or with a documented wider gap | 7 |
-| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 1 |
+| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 83 |
+| E2 | Measured, understood, and not fully matched -- see the comparison guide | 4 |
+| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 0 |
 
 Measured relative agreement with StataNow 19.5:
 
@@ -128,7 +127,7 @@ Measured relative agreement with StataNow 19.5:
 | `xtreg, fe` | 1.8e-16 | 1.9e-16 |
 | `xtreg, re` | 6.8e-16 | 1.0e-15 |
 | `xtreg, be` | 3.6e-16 | 1.7e-16 |
-| `xtreg, fd` | 7.5e-9 | 8.8e-10 |
+| `xtreg, fd` | not comparable (command removed) | — |
 | `areg` | 4.6e-16 | 1.8e-16 |
 | `reghdfe` (1 FE) | 4.5e-16 | 3.3e-16 |
 | `reghdfe` (2 FE) | 4.4e-16 | 1.9e-16 |
@@ -146,35 +145,46 @@ Measured relative agreement with StataNow 19.5:
 | `predict` (logit pr) | 3.1e-11 | — |
 | `predict` (tobit e/ystar) | 5.8e-10 | — |
 | `etable` vs `esttab` | 0.0 | — |
-| `vecrank` (`lags(2)`) | 0.0 (4 dp) | — |
+| `vecrank` (all lag orders) | 0.0 (4 dp) | — |
 | `dfuller` | 2.3e-4 | — |
-| `ivregress gmm` | 4.9e-16 | **2.9e-2** |
-| `arch` | **3.6e-2** | — |
+| `ivregress gmm` | 4.9e-16 | 6.9e-18 |
+| `arch` | 1.4e-04 | z values not comparable |
 
 The linear and panel models agree to machine precision. Maximum-likelihood
 models stop near 1e-7 because Stata's Newton and statsmodels' optimiser reach
 the same optimum but halt at slightly different points; that is a real limit,
 not slack.
 
-Two gaps are larger and are left visible rather than tuned away:
+Four commands are **E2**: measured, understood, and not fully matched. Each is
+comparable in some respects and not others, which is the part that matters when
+you are checking one against the other.
 
-- **`ivregress gmm`**: coefficients are exact, robust standard errors differ by
-  2.9e-2. GMM's two-step weight matrix and finite-sample scaling are built
-  differently from Stata's.
-- **`arch`**: alpha differs by 6.9e-3, the mean constant by 3.6e-2. Stata uses
-  OPG standard errors by default and the optimisers differ.
-- **`vecrank`, `lags(1)` case**: the lag mapping is settled
-  (`[TS] vecrank`: `lags(#)` counts VAR lags, so `k_ar_diff = # - 1`), and
-  `lags(2)` matches Stata's trace to all four printed decimals. With `lags(1)`
-  westata gives 287.2485 against Stata's 288.3450 (0.4% apart) while the first
-  eigenvalue agrees to 1e-3 -- boundary handling when there are no lagged
-  differences, not a different estimator. Pinned by a test so a silent "fix"
-  would fail the suite.
-- **`vec` estimation** is the remaining E1 entry: the rank test is verified but
-  the VECM coefficient estimates themselves have not been compared.
-- Two commands could not be compared at all because StataNow 19 removed them:
-  `xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are
-  validated by other means.
+| Command | Coefficients | z / p | Decision |
+|---|---|---|---|
+| `arch` | to ~4 digits | **not comparable** | agree |
+| `teffects nnmatch` | exact | to ~2 digits | agree |
+| `xtabond` | to ~3 digits | to ~3 digits | agree |
+| `permute` | exact | not replicate-for-replicate | agree (distribution) |
+
+The two that matter most:
+
+- **`arch`** — Stata runs `bhhh bfgs` with `nrtolerance(1e-5)` and stops before
+  the likelihood is flat. Measured: westata's maximum is `ll = -1025.4148259782`,
+  Stata reports `-1025.4176185349`, **2.8e-03 lower**. So the difference is a
+  stopping rule, not an error, and westata's estimates are the ML ones. But the
+  z statistics are computed at different points: `z(garch)` is 16.942 here against
+  9.755 in Stata, and `p(omega)` 1.5e-03 against 4.97e-02. **Do not quote an
+  `arch` z or p value as Stata's.**
+- **`teffects nnmatch`** — the ATE is exact to 3.6e-15; the standard error is
+  1.59% high because the within-arm variance lives in compiled Mata. The
+  significance verdict agreed across every effect size tested.
+
+See [`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md) for the full comparison
+guidance, including what to quote and what to verify in Stata.
+
+Two commands could not be compared at all because StataNow 19 removed them:
+`xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are
+validated by other means.
 
 ## Design notes worth knowing
 
@@ -213,12 +223,21 @@ docs/              design spec and implementation plans
 
 ## Documentation
 
+- **Comparing westata with Stata**: [`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md) —
+  which quantities are interchangeable and which are not, for the four E2 commands.
+- Evidence registry: [`tests/conformance/registry.yml`](tests/conformance/registry.yml) —
+  per-command level, measured gap, and reasoning.
+- Known gaps: [`docs/GAP_REGISTER.md`](docs/GAP_REGISTER.md) — what is deliberately
+  not implemented, and why.
 - Design spec: [`docs/superpowers/specs/2026-10-22-westata-design.md`](docs/superpowers/specs/2026-10-22-westata-design.md)
-- Plans: [`docs/superpowers/plans/`](docs/superpowers/plans/)
 
 ## Known gaps
 
-Not implemented, and they raise instead of approximating: `xtabond2`, `csdid`,
-`rdrobust`, `synth`, `heckman`, `margins` beyond `dydx`/`at()`/`over()`,
-`predict`, `contrast`, `pwcompare`, multi-way clustering (CGM), `xtreg` robust
-VCEs beyond HC1, and HAC in the discrete models.
+Not implemented, and they raise instead of approximating: Mata, the graphics
+system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
+`xtabond2`, `csdid`, `rdrobust`, `synth`, general `gmm`, `nlsur`, multi-way
+clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
+arbitrary `r()` statistics outside the `[U] exp_list` grammar.
+
+`docs/GAP_REGISTER.md` lists every one with its reason. Those are boundary
+statements, not a to-do list.

@@ -507,7 +507,12 @@ def test_eivreg_matches_stata_with_two_noisy_regressors():
     o2 = t2 + rng.normal(scale=0.4, size=n)
     x3 = rng.normal(size=n)
     frame = pd.DataFrame(
-        {"y": 1.0 + 2.0 * t1 - 0.5 * t2 + 0.3 * x3 + rng.normal(size=n), "o1": o1, "o2": o2, "x3": x3}
+        {
+            "y": 1.0 + 2.0 * t1 - 0.5 * t2 + 0.3 * x3 + rng.normal(size=n),
+            "o1": o1,
+            "o2": o2,
+            "x3": x3,
+        }
     )
 
     result = Eivreg.from_formula("y ~ o1 + o2 + x3", frame, reliab={"o1": 0.7, "o2": 0.8}).fit()

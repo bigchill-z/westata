@@ -303,8 +303,11 @@ class _DidFEOLS(FEOLS):
         self.capture = {
             "design": design,
             "design_names": names,
-            # `_df_k` already reflects this subclass's `k_fixef`: 209 for the
-            # repeated cross-section, 10 for the panel.
+            # Under clustering `_df_k` reflects this subclass's `k_fixef`: 209
+            # for the repeated cross-section, 10 for the panel.  Without
+            # clustering the nested-effect rule does not apply and PyFixest
+            # counts all 209 regardless -- correctly, because `N - K` must then
+            # pay for every absorbed parameter.
             "rank": FEOLS._rank(model, nobs),
             "n_clusters": n_clusters,
         }
@@ -762,10 +765,14 @@ class Didregress:
         }
         if cov_type == "cluster":
             # Verified against the fixture's 95% interval: .0590465 * t(199).
+            # `rank` is the *nested* count here, so the two spellings differ.
             updates["df_r"] = float(results.df_resid)
             if capture["n_clusters"] is not None:
                 updates["N_clust"] = float(capture["n_clusters"])
         else:
+            # No clustering, so no nested-effect reduction: e(df_r) is N - K with
+            # every absorbed fixed-effect parameter counted, which is what
+            # `capture["rank"]` already holds for both spellings.
             updates["df_r"] = nobs - rank
         results.e.update(updates)
 

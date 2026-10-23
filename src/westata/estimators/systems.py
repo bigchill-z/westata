@@ -298,7 +298,10 @@ class Sureg:
         if not self._designs:
             raise ConsistencyError("sureg: at least one equation is required")
         if not (
-            len(self._designs) == len(self._responses) == len(self._equation_names) == len(self._param_names)
+            len(self._designs)
+            == len(self._responses)
+            == len(self._equation_names)
+            == len(self._param_names)
         ):
             raise ValueError(
                 "sureg: designs, responses, equation_names and param_names must "
@@ -469,7 +472,10 @@ class Sureg:
 
         # SUR residuals, in Stata's equation order, for the reported fit
         # statistics and the log-likelihood.
-        residuals = [y - X @ beta[offsets[i] : offsets[i + 1]] for i, (X, y) in enumerate(zip(designs, responses))]
+        residuals = [
+            y - X @ beta[offsets[position] : offsets[position + 1]]
+            for position, (X, y) in enumerate(zip(designs, responses))
+        ]
 
         sigma_resid = np.empty((equations, equations), dtype=float)
         for i in range(equations):

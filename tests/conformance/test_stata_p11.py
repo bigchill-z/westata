@@ -174,10 +174,25 @@ def test_didregress_matches_stata():
 
     # Stata: ATET 1.18613 (se .0590465), N = 1600
     assert float(result.params["treated"]) == pytest.approx(1.18613, rel=1e-3)
+    # The standard error is exact too; the earlier 6.7% gap in this file came from
+    # the ATET-only implementation it replaced, not from a Stata convention.
+    assert float(result.bse["treated"]) == pytest.approx(0.0590465, rel=1e-5)
     assert int(result.e["N"]) == 1600
 
 
-def test_xtdidregress_agrees_with_didregress_on_a_balanced_panel():
+def test_the_two_did_spellings_share_the_atet_but_not_the_standard_error():
+    """didregress and xtdidregress differ in their degrees of freedom.
+
+    Stata labels them differently -- "Repeated cross-sectional" versus
+    "Longitudinal" -- and prints .0590465 against .055228 for the same ATET. The
+    ratio is sqrt(1391/1590) = 0.9353302985, i.e. the repeated-cross-section
+    version counts the 199 unit effects in K while the longitudinal one nests them
+    in the cluster and counts only the 7 period effects.
+
+    Asserting equality here -- which an earlier version of this file did -- would
+    have forced one of the two correct standard errors to be wrong.
+    """
+
     Xtdidregress = _require("Xtdidregress")
     Didregress = _require("Didregress")
     frame = did_frame()
@@ -189,9 +204,19 @@ def test_xtdidregress_agrees_with_didregress_on_a_balanced_panel():
         "y", "treated", frame, group="unit", time="period"
     ).fit()
 
+    # The point estimate is the same estimator on the same data.
     assert float(panel.params["treated"]) == pytest.approx(
-        float(pooled.params["treated"]), rel=1e-10
+        float(pooled.params["treated"]), rel=1e-12
     )
+
+    # The standard errors are NOT the same, and both are testable against Stata.
+    assert float(pooled.bse["treated"]) == pytest.approx(0.0590465, rel=1e-5)
+    assert float(panel.bse["treated"]) == pytest.approx(0.055228, rel=1e-5)
+
+    # And the ratio is the closed-form degrees-of-freedom factor, which pins the
+    # mechanism rather than only the two numbers.
+    ratio = float(panel.bse["treated"]) / float(pooled.bse["treated"])
+    assert ratio == pytest.approx((1391 / 1590) ** 0.5, rel=1e-9)
 
 
 def test_didregress_rejects_a_time_invariant_treatment():

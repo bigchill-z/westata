@@ -607,24 +607,24 @@
   notes: "Within a few percent, but matching depends on tie-breaking and on the exact distance standardisation Stata uses, so an exact match is not achievable by construction. The variance is an Abadie-Imbens approximation, labelled as such in the result."
 
 - command: didregress
-  level: E2
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
-      ref: "didregress (y x1) (treated), group(unit) time(period) on 1600 observations: Stata ATET 1.18613 (se .0590465); westata 1.18613 / .0550896"
+      ref: "didregress (y x1) (treated), group(unit) time(period) on 1600 observations: Stata ATET 1.18613 (se .0590465); westata 1.186129621 / .059046515"
   verified_by: lead
   date: 2026-10-23
-  notes: "The ATET matches to the printed digit through two-way fixed-effect absorption (alternating projections, no dummy expansion). The standard error is 6.7% below Stata's: every plausible cluster correction (G/(G-1) with and without (N-1)/(N-k)) lands near .0551, so Stata's DID variance accounts for more than unit clustering -- most likely the sampling of the treatment arm. [R] didregress could not be downloaded to confirm, so the gap is recorded rather than tuned. Hence E2, not E3."
+  notes: "Both the ATET and the standard error reproduce Stata to 1e-8. Two-way fixed effects are absorbed, not dummy-expanded. An earlier version of this entry claimed the standard error was 6.7% low and called it a Stata convention; that was wrong twice over -- the gap came from the ATET-only implementation it measured, and the real convention is the degrees-of-freedom one recorded under xtdidregress."
 
 - command: xtdidregress
-  level: E2
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
-      ref: "xtdidregress is the same estimator as didregress; identical output on the same balanced panel"
+      ref: "xtdidregress (y x1) (treated), group(unit) time(period): Stata ATET 1.18613 (se .055228); westata 1.186129621 / .055227994"
   verified_by: lead
   date: 2026-10-23
-  notes: "Implemented as a subclass of Didregress so the two cannot drift apart. Shares the standard-error caveat above."
+  notes: "THE TWO SPELLINGS DO NOT SHARE A STANDARD ERROR, and Stata says so by labelling one 'Repeated cross-sectional' and the other 'Longitudinal'. Same ATET, different variance: .0590465 vs .055228. The cause is a degrees-of-freedom convention. In the repeated cross-section the unit effects behave as ordinary regressors, so K = 1 constant + 1 treatment + 1 covariate + 199 unit + 7 period = 209 and N-K = 1391. In the longitudinal case the unit effect is nested in the cluster variable, so only the period effects count: K = 10, N-K = 1590. The variance ratio is sqrt(1391/1590) = 0.935330298501870 against a measured .055228/.0590465 = 0.935330629. Both numbers are now reproduced to 1e-8, and a test pins the closed-form ratio rather than merely asserting that they differ."
 
 # --- Note on the nl / frontier defects found after P10 shipped -------------
 #

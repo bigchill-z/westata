@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**71 条命令条目**（见 `tests/conformance/registry.yml`），其中 50 条 E3
+- 已实现：**77 条命令条目**（见 `tests/conformance/registry.yml`），其中 53 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -189,12 +189,18 @@
 > 还删掉了 `Mvreg` 和 `Eivreg` 两个类。文件从未提交，git 无法恢复，只能重建。
 > **新模块要先提交再打补丁。**
 
-### 3.7 因果推断（P11）
+### 3.7 因果推断（P11 已完成）
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `didregress` / `xtdidregress` | ⬜ | 双重差分（Stata 17+ 内置） |
-| `teffects` | ⬜ | 处理效应（IPW/AIPW/匹配/回归调整） |
+| `teffects ra` | ✅ **E3** | ATE/ATET/POmean 全精确；标准误差 0.6% |
+| `teffects ipw` | ⚠️ E3 | **点估计精确，标准误未验证**（0.1632 vs 0.0939） |
+| `teffects aipw` | ✅ **E3** | 点估计精确；标准误差 2.6% |
+| `teffects nnmatch` | ⚠️ E2 | 差数个百分点（依赖 tie-breaking） |
+| `didregress` | ⚠️ E2 | **ATET 精确**；标准误差 6.7%（聚类口径不明） |
+| `xtdidregress` | ⚠️ E2 | 与 `didregress` 同估计量 |
+| `teffects psmatch` / `ipwra` | ⬜ | 倾向得分匹配 / 加权回归调整 |
+| `didregress` 多期交错 | ⬜ | 仅做标准 2×2 |
 | `stteffects` | ⬜ | 生存处理效应 |
 | `csdid` | ❌ | 用户包，非 base |
 | `drdid` | ❌ | 用户包 |
@@ -342,6 +348,16 @@
 | `predict stdf` 对 logit 可用 | Stata 报 `r(198)`；westata 现已同样拒绝 |
 | `results/base.py` 引用未导入的 `ConsistencyError` | ordered 模型路径才触发 |
 
+## 8.2 P11 期间发现并修正的真实缺陷
+
+| 缺陷 | 性质 |
+|---|---|
+| DID 协变量列索引错位 | 从已过滤的名字列表取索引，导致截距（全 1）成为唯一协变量；吸水后零方差，x1 系数变 0，`treated` 从 1.186 悄悄变成 1.154 |
+| `_absorb` 的转置启发式 | `shape[0] != n` 时转置，把 `(n,1)` 变成 `(1,n)`，吸收了错误的轴 |
+| `teffects ra` 影响函数 | OLS 残差与设计正交，模型误差项**恒为零**；只用它们会使标准误小 33 倍 |
+| `nl` 的 Total SS 应**不中心化** | Stata 只在有加性参数时中心化；`{b0}*exp(...)` 没有，故 Total = `sum(y²)` = 1017.4143，非 406.7919 |
+| `frontier` 缺 `/lnsig2v`、`/lnsig2u` | 方差分量的推断行完全缺失，也无 Wald χ² 与边界 LR |
+
 ## 9. 环境层面的已知限制
 
 | 限制 | 说明 |
@@ -363,7 +379,7 @@
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | **已完成**（`sqreg`/`bsqreg` 止于 E1） |
 | P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | **已完成** |
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`eivreg`/`frontier`/`manova`） | 3–4 周 | **已完成**（`nlsur`/`gmm` 除外） |
-| P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | 计划 |
+| P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | **已完成**（部分） |
 | P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | 计划 |
 | P13 | 重抽样（`bootstrap`/`jackknife`/`permute`） | 2–3 周 | 计划 |
 

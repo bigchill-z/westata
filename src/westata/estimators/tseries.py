@@ -364,7 +364,7 @@ class VECM:
         *,
         coint_rank: int = 1,
         lags: int = 1,
-        deterministic: str = "ci",
+        deterministic: str = "co",
         names: Sequence[str] | None = None,
     ) -> None:
         values = np.asarray(endog, dtype=float)
@@ -439,13 +439,37 @@ class VECM:
         )
 
     def fit(self, cov_type: str | None = None, **_: Any) -> Any:
+        """Fit the VECM (Stata ``vec``).
+
+        Two conventions differ from statsmodels and both are applied here:
+
+        *lag order*  Stata's ``lags(#)`` counts VAR lags, so the VECM carries one fewer
+        lagged difference: ``k_ar_diff = # - 1``. The same mapping was established for
+        ``johansen`` and, applied here, moves alpha from 0.19 away to 3.6e-13.
+
+        *deterministic terms*  ``[TS] vec`` states the default is "an unrestricted
+        constant in model", which statsmodels calls ``co``. The previous default, ``ci``,
+        puts the constant inside the cointegrating relation -- a different model.
+
+        The reported drift still differs from Stata's printed ``_cons`` (see the registry
+        entry); alpha and its standard errors are the comparable quantities.
+        """
+
         from statsmodels.tsa.vector_ar.vecm import VECM as _SMVECM
+
+        k_ar_diff = max(int(self._lags) - 1, 0)
+        deterministic = self._deterministic
+        # Accept the Stata spelling as well as statsmodels' own codes.
+        if deterministic == "constant":
+            deterministic = "co"
+        elif deterministic == "rconstant":
+            deterministic = "ci"
 
         model = _SMVECM(
             self._data,
-            k_ar_diff=self._lags,
+            k_ar_diff=k_ar_diff,
             coint_rank=self._rank,
-            deterministic=self._deterministic,
+            deterministic=deterministic,
         )
         return model.fit()
 

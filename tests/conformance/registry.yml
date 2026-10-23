@@ -938,17 +938,16 @@
   notes: "The lag convention is now settled: Stata lags(#) maps to statsmodels k_ar_diff = # - 1, and johansen(lags=...) applies it. lags(2) agrees to all four printed decimals, which also confirms statsmodels' Johansen implementation matches Stata's. One residual gap is documented rather than tuned: lags(1) (k_ar_diff=0) gives 287.2485 where Stata prints 288.3450 (0.4% apart), while the first eigenvalue agrees to 1e-3 (0.51102 vs 0.50992). That points at boundary handling when there are no lagged differences, not at the estimator, and tests/conformance/test_stata_vecrank.py pins the current behaviour so a silent 'fix' would be caught."
 
 - command: vec (VECM estimation)
-  level: E1
-  tolerance: 1.0e-1
+  level: E3
+  tolerance: 1.0e-4
   sources:
-    - type: invariant
-      ref: "VECM fits and returns alpha and beta on a cointegrated pair"
     - type: r_crosscheck
-      ref: "vec y1 y2, lags(1) rank(1): Stata reports L._ce1 = [-0.09162246, 0.92297218] plus two _cons drift terms; westata alpha gap 1.9e-1 and det_coef EMPTY"
+      ref: "vec y1 y2, lags(1) rank(1) on a 400-observation cointegrated pair: Stata L._ce1 = [-0.09162245885644234, 0.9229721838807049]; westata alpha gap 3.6e-13"
+    - type: r_crosscheck
+      ref: "se(alpha): Stata [0.11425557, 0.12730802] vs westata [0.11396886, 0.12698855], gap 3.2e-4"
   verified_by: lead
   date: 2026-10-23
-  notes: "Now measured, and the measurement explains the E1: this is a MISSING FEATURE, not an unverified one. Stata's default vec includes an unrestricted constant in the short-run dynamics, and westata's VECM estimates no deterministic terms at all -- det_coef is empty. Alpha is therefore fitted on a misspecified model and differs by 0.19. To promote this, the deterministic terms have to be implemented first; tightening a tolerance instead would be fitting the test to the code. Recorded rather than quietly left as 'not yet compared', because those two states call for completely different work."
-
+  notes: "Promoted from E1 on re-measurement, and the measurement found a REAL DEFECT rather than a missing feature: VECM.fit passed k_ar_diff = lags, but Stata counts VAR lags while statsmodels counts lagged differences, so Stata lags(1) is k_ar_diff = 0. That exact off-by-one had already been diagnosed and fixed in johansen during the vecrank work and was never carried across to fit -- the two methods disagreed about what a lag means. Fixing it moved alpha from 0.19 away to 3.6e-13. The deterministic default was also wrong: it was ci (constant inside the cointegrating relation) where [TS] vec states the default is an unrestricted constant, i.e. co. Alpha is the comparable quantity because Stata normalises beta away and never prints it. REMAINING GAP, recorded rather than tuned: the drift term. westata det_coef [-0.02271056, -0.03237466] against Stata _cons [-0.02567138, -0.00254837]. That is a reparameterisation question independent of alpha; deriving it would be worth doing, inventing a transform to land on Stata's two numbers would not, so it is stated here and not asserted in the tests."
 - command: pperron / kpss
   level: E3
   tolerance: 1.0e-3

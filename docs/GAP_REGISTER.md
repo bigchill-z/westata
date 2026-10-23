@@ -5,7 +5,8 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**83 条命令条目**（见 `tests/conformance/registry.yml`），其中 61 条 E3
+- 已实现：**87 条命令条目**（见 `tests/conformance/registry.yml`），其中 63 条 E3、13 条 E2、11 条 E1
+- 测试：**1164 passing**
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -215,6 +216,13 @@
 
 | Stata | 状态 | 说明 |
 |---|---|---|
+| `jackknife` | ✅ **E3** | 系数 1e-16；`mean` 的 V 3.7e-9；`regress` 的 V 7.4e-6（已诊断） |
+| `bootstrap` | ⚠️ E2 | 点估计精确、可复现；**方差依赖 RNG，只能验量级** |
+| `permute` | ⚠️ E2 | p 值依赖 RNG |
+| `jackknife, mse` | ✅ **E3** | 两种公式是不同估计量，测试断言其不同 |
+| `bs` 的任意 `r()` | ❌ | 等价于一个小型表达式解释器 |
+| 分层/整群 bootstrap | ❌ | 首期只做简单随机重抽样 |
+| `permute, enumerate` | ❌ | 组合爆炸 |
 | `svyset` | ✅ **E3** | 3 种 `singleunit` 策略、`fpc` |
 | `svy: mean` | ✅ **E3** | b 差 **0**，V 差 **8.7e-19** |
 | `svy: total` | ✅ **E3** | 全精度对拍 |
@@ -454,6 +462,28 @@ psi_i = (X'WX)⁻¹ w_i x_i e_i
 还有一个我引入的 YAML 缺陷：`command: svy: mean` 中未加引号的冒号让**整个登记册无法解析**。
 因为每次新增都验证登记册，所以当场就发现了。
 
+## 8.6 P13 的教训：E2 有两种，必须分开
+
+本项目的 E2 此前一直是"达到显示精度，或有已记录的差距"。P13 引入了**第二种 E2**：
+
+> **构造性 E2**——不是我们做得不够，而是**对拍在原理上不可能**。
+
+Bootstrap 的方差是随机数流的函数，Stata 的 RNG 不是 numpy 的。**逐次重复对拍不可能**，
+无论投入多少工时。这种情况下能精确验证的是：
+
+| 可验证项 | 精度 |
+|---|---|
+| 报告的点估计 = 原样本估计 | 1e-12 |
+| 固定 seed 时协方差可复现 | 1e-12 |
+| 不同 seed 给出不同方差 | — |
+
+**应标 E2 的是方差本身**，而不是把整个命令降级。反之，把构造性 E2 说成 E3
+需要"复现 Stata 的 RNG"——既不可行也无意义。
+
+**这与此前的失败模式正好相反**：那次我把**可修复**的 `ddof` 错误记成"不可约的约定"
+（该继续查却停了）；这次是**已诊断且不可约**的差距（查清了，不该再查）。
+两者看起来都是"记录一个差距"，但一个该修、一个不该，**区别在于证据**。
+
 ## 9. 环境层面的已知限制
 
 | 限制 | 说明 |
@@ -477,11 +507,28 @@ psi_i = (X'WX)⁻¹ w_i x_i e_i
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`eivreg`/`frontier`/`manova`） | 3–4 周 | **已完成**（`nlsur`/`gmm` 除外） |
 | P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | **已完成**（部分） |
 | P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | **已完成**（`logit` 止于 E2） |
-| P13 | 重抽样（`bootstrap`/`jackknife`/`permute`） | 2–3 周 | 计划 |
+| P13 | 重抽样（`bootstrap`/`jackknife`/`permute`） | 2–3 周 | **已完成** |
 
 **合计约 26–38 周。** 完成后预计覆盖 Stata 估计类命令的 60–70%（按使用频率加权），仍然不含 §7 的所有子系统。
 
 ---
+
+## 10.1 路线图完成情况（P5–P13）
+
+| 批次 | 内容 | 状态 |
+|---|---|---|
+| P5 | 后估计（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict se`） | ✅ |
+| P6 | 受限因变量（`truncreg`/`intreg`/`heckman`/`etregress`） | ✅ |
+| P7 | 计数扩展（`zip`/`zinb`/`ztp`/`tnbreg`） | ✅ |
+| P8 | 分位数与稳健（`qreg`/`rreg`/`sqreg`/`bsqreg`） | ✅ |
+| P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtgls`/`xtpcse`/`xtunitroot`） | ✅ |
+| P10 | 多方程（`sureg`/`mvreg`/`eivreg`/`manova`/`nl`/`frontier`） | ✅ |
+| P11 | 因果推断（`teffects`/`didregress`） | ✅ |
+| P12 | 复杂抽样（`svyset`/`svy:`） | ✅ |
+| P13 | 重抽样（`jackknife`/`bootstrap`/`permute`） | ✅ |
+
+**共 87 条命令条目、1164 个测试。** 这是 Stata 估计类命令的一个可审计子集，
+不是 Stata 的替代品。§1–§7 中所有 ❌ 的边界依然成立。
 
 ## 11. 如何理解这份登记册
 

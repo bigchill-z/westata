@@ -1,0 +1,180 @@
+=== design_a_0 ===
+COMMAND: svy: mean y
+
+(running mean on estimation sample)
+
+Survey: Mean estimation
+
+Number of strata =  8             Number of obs   =        576
+Number of PSUs   = 48             Population size = 837.592551
+                                  Design df       =         40
+
+--------------------------------------------------------------
+             |             Linearized
+             |       Mean   std. err.     [95% conf. interval]
+-------------+------------------------------------------------
+           y |   1.061347   .0873402      .8848254    1.237868
+--------------------------------------------------------------
+
+
+=== design_a_1 ===
+COMMAND: svy: total y
+
+(running total on estimation sample)
+
+Survey: Total estimation
+
+Number of strata =  8             Number of obs   =        576
+Number of PSUs   = 48             Population size = 837.592551
+                                  Design df       =         40
+
+--------------------------------------------------------------
+             |             Linearized
+             |      Total   std. err.     [95% conf. interval]
+-------------+------------------------------------------------
+           y |    888.976   83.28611      720.6485    1057.304
+--------------------------------------------------------------
+
+
+=== design_a_2 ===
+COMMAND: svy: proportion binary
+
+(running proportion on estimation sample)
+
+Survey: Proportion estimation
+
+Number of strata =  8             Number of obs   =        576
+Number of PSUs   = 48             Population size = 837.592551
+                                  Design df       =         40
+
+--------------------------------------------------------------
+             |             Linearized            Logit
+             | Proportion   std. err.     [95% conf. interval]
+-------------+------------------------------------------------
+      binary |
+          0  |   .4903781   .0307108      .4287728    .5522769
+          1  |   .5096219   .0307108      .4477231    .5712272
+--------------------------------------------------------------
+
+
+=== design_a_3 ===
+COMMAND: svy: regress y x1 x2
+
+(running regress on estimation sample)
+
+Survey: Linear regression
+
+Number of strata =  8                             Number of obs   =        576
+Number of PSUs   = 48                             Population size = 837.592551
+                                                  Design df       =         40
+                                                  F(2, 39)        =     238.36
+                                                  Prob > F        =     0.0000
+                                                  R-squared       =     0.5090
+
+------------------------------------------------------------------------------
+             |             Linearized
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .8112779   .0368202    22.03   0.000     .7368615    .8856942
+          x2 |  -.3624168   .0481377    -7.53   0.000    -.4597067   -.2651269
+       _cons |   1.008043   .0784199    12.85   0.000     .8495503    1.166536
+------------------------------------------------------------------------------
+
+
+=== design_a_4 ===
+COMMAND: svy: logit binary x1 x2
+
+(running logit on estimation sample)
+
+Survey: Logistic regression
+
+Number of strata =  8                             Number of obs   =        576
+Number of PSUs   = 48                             Population size = 837.592551
+                                                  Design df       =         40
+                                                  F(2, 39)        =      29.68
+                                                  Prob > F        =     0.0000
+
+------------------------------------------------------------------------------
+             |             Linearized
+      binary | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   1.599752   .2122479     7.54   0.000     1.170783    2.028721
+          x2 |  -.7175541   .1886095    -3.80   0.000    -1.098748   -.3363601
+       _cons |  -.0378374   .1709997    -0.22   0.826    -.3834408    .3077659
+------------------------------------------------------------------------------
+
+
+=== design_b_0 ===
+COMMAND: svy: mean y
+
+(running mean on estimation sample)
+
+Survey: Mean estimation
+
+Number of strata =  8             Number of obs   =        576
+Number of PSUs   = 48             Population size = 837.592551
+                                  Design df       =         40
+
+--------------------------------------------------------------
+             |             Linearized
+             |       Mean   std. err.     [95% conf. interval]
+-------------+------------------------------------------------
+           y |   1.061347   .0845668      .8904307    1.232263
+--------------------------------------------------------------
+
+
+=== design_b_1 ===
+COMMAND: svy: regress y x1
+
+(running regress on estimation sample)
+
+Survey: Linear regression
+
+Number of strata =  8                             Number of obs   =        576
+Number of PSUs   = 48                             Population size = 837.592551
+                                                  Design df       =         40
+                                                  F(1, 40)        =     392.36
+                                                  Prob > F        =     0.0000
+                                                  R-squared       =     0.4212
+
+------------------------------------------------------------------------------
+             |             Linearized
+           y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .8094806   .0408664    19.81   0.000     .7268866    .8920747
+       _cons |   .9922935   .0756562    13.12   0.000     .8393867      1.1452
+------------------------------------------------------------------------------
+
+
+=== full_regress ===
+COMMAND: svy: regress y x1 x2
+NAMES: ['x1', 'x2', '_cons']
+B: [np.float64(0.811277851322903), np.float64(-0.3624167886992473), np.float64(1.0080429196046916)]
+V:
+0.001355726149501127 -0.0004611343763046304 -0.0005972217607257482
+-0.0004611343763046304 0.0023172378712389033 -0.00029017309174927025
+-0.0005972217607257482 -0.00029017309174927025 0.006149685753044548
+
+=== full_mean ===
+COMMAND: svy: mean y
+NAMES: ['y']
+B: [np.float64(1.061346613529383)]
+V:
+0.007628317455187414
+
+=== full_logit ===
+COMMAND: svy: logit binary x1 x2
+NAMES: ['x1', 'x2', '_cons']
+B: [np.float64(1.599752259583883), np.float64(-0.7175541048578664), np.float64(-0.037837440539974)]
+V:
+0.045049164775974454 -0.02789850499411344 -0.008946498981062131
+-0.02789850499411344 0.0355735421399913 -0.0007433121266066349
+-0.008946498981062131 -0.0007433121266066349 0.02924090503833132
+
+=== full_total ===
+COMMAND: svy: total y
+NAMES: ['y']
+B: [np.float64(888.9760173443246)]
+V:
+6936.575460544632
+

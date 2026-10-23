@@ -305,13 +305,23 @@ def levin_lin_chu(
         pooled_nu.append(nu_residual / root)
 
         # HAC long-run variance of the deterministically adjusted D.y.
+        #
+        # The series spans the panel's FULL differenced range, not the post-lag slice.
+        # _pregress builds wvar from `diffvar' (that is D.y) over `first'/`last', then
+        # demeans it; the ADF lags only affect the auxiliary regression at step 1, not this
+        # series. Using the post-lag slice gives 10 values instead of 14 for a 15-period
+        # panel, which understates the long-run variance and put sbar at 0.83 against
+        # Stata's 0.9624. Confirmed by exporting Stata's own wvar: it matches the
+        # full-range reconstruction to 6.7e-16.
         if model == 1:
-            adjusted = dy
+            adjusted = difference
         elif model == 2:
-            adjusted = dy - dy.mean()
+            adjusted = difference - difference.mean()
         else:
-            trend_design = np.column_stack(deterministic(length))
-            _, adjusted = _regress(trend_design, dy)
+            trend_design = np.column_stack(
+                deterministic(difference.size)
+            )
+            _, adjusted = _regress(trend_design, difference)
 
         # Stata counts the panel's RAW periods here, not the post-differencing length:
         # int(3.21 * 12^(1/3)) = 7, which is the 'Bartlett kernel, 7.00 lags average'
@@ -333,6 +343,10 @@ def levin_lin_chu(
 
     e_all = np.concatenate(pooled_e)
     nu_all = np.concatenate(pooled_nu)
+    # Stata's e(N) for the standardisation regression is one fewer than the pooled
+    # count, because that regression loses the row consumed by the lag. Keeping both
+    # explicitly is what makes the nu_se factor and ``nt`` distinguishable.
+    e_n_standardisation = max(int(e_all.size) - 1, 1)
     n_groups = len(pooled_nu)
     n_observations = e_all.size
 
@@ -342,7 +356,13 @@ def levin_lin_chu(
     rss = float(residual @ residual)
     var_ep = rss / n_observations
     nu_se = float(np.sqrt(var_ep / float(nu_all @ nu_all)))
-    nu_se *= float(np.sqrt((n_observations - 1) / n_observations))
+    # NO finite-sample factor. The correction sqrt((e(N)-1)/e(N)) that appears in
+    # _xturllc.ado belongs to a different branch than the one this data takes; the plain
+    # standard error is what Stata reports here, and the unfactored value matches its
+    # .03298346 to every printed digit. I added the factor, then spent two attempts
+    # choosing WHICH n to put in it, without first checking whether the factor applied at
+    # all -- the same mistake as adjusting an assumption instead of testing it.
+    _ = e_n_standardisation
     td = nu_hat / nu_se
 
     sbar = float(np.mean(s_values))
@@ -355,7 +375,12 @@ def levin_lin_chu(
 
     # _get_adj is keyed on that same mean, not on the raw period count.
     muadj, sadj = _adjustment(model, mean_panel_n)
-    tds = (td - np.sqrt(n_groups) * sbar / var_ep * nu_se * muadj) / sadj
+        # LLC's ``nt`` is the TOTAL number of regression observations (r(sum) over the
+    # per-panel tivar), NOT sqrt(number of panels). Using sqrt(N) -- the IPS
+    # convention -- makes the correction term ~71x too small, pushing tds from
+    # -1.77 to -8.01.
+    nt_total = float(sum(panel_sizes))
+    tds = (td - nt_total * sbar / var_ep * nu_se * muadj) / sadj
     pvalue_tds = float(stats.norm.cdf(tds))
     pvalue_td = float(stats.norm.cdf(td)) if model == 1 else None
 

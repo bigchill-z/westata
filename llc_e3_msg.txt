@@ -1,0 +1,42 @@
+fix(xtunitroot): LLC reaches E3 -- three defects, all found by exporting not reasoning
+
+LLC now reproduces Stata to machine precision on two independent fixtures:
+
+    fixture            td          tds         sbar        Var_ep
+    30x12 mixed        0.0e+00     1.8e-15     1.1e-16     2.2e-16
+    30x15 random walk  5.3e-15     5.8e-15     1.1e-16     0.0e+00
+
+Three defects accounted for the entire gap, which had stood at 1.24 on tds:
+
+1. HAC series. It used only the post-lag slice of the differenced series (10 values) where
+   Stata uses the panel's full differenced range (14). That alone put sbar at 0.8259833
+   against 0.9624458.
+
+2. tds correction. I scaled by sqrt(N) -- the IPS convention -- but LLC's ``nt`` is r(sum)
+   over the per-panel tivar, i.e. the total regression observation count, 390. sqrt(N) made
+   the correction term 71x too small and drove tds to -8.01 against -1.77.
+
+3. nu_se. It carried a finite-sample factor sqrt((e(N)-1)/e(N)) that this code path never
+   applies. The unfactored value matches Stata's .03298346 to every printed digit.
+
+The method matters more than the fixes, and this entry is the worst offender in the project
+on that axis. Twice I built a confident causal story from an INDIRECT measurement and was
+wrong:
+
+    "the wvar series differs, mine has less low-frequency variation"
+        -> exporting Stata's actual wvar showed a 6.7e-16 match. Wrong.
+
+    "the divisor is wrong, solve for it"
+        -> the solved divisor was 17.65, not a clean number, and every whole-number
+           candidate failed. The divisor was never the problem.
+
+Each time, exporting the real quantity from a patched copy of _xturllc.ado settled it in
+minutes. The source is readable and the values are exportable, so inference should have been
+the last resort rather than the first. Two of those wrong turns are now recorded in the
+registry as method notes, because the next reader will hit the same temptation.
+
+Also corrected: I removed one of my own tests rather than keeping it green. It asserted
+"random walks must not reject"; Stata reports tds = -1.772, p = 0.038, on exactly those
+random walks. The assertion encoded my expectation, not Stata's behaviour.
+
+Registry: 88 entries, 74 E3 / 11 E2 / 3 E1. Suite: 1212 passing.

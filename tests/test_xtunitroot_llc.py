@@ -169,8 +169,9 @@ def test_random_walks_still_give_a_strongly_negative_unadjusted_t():
     frame = pd.DataFrame(rows, columns=["firm", "year", "y"])
 
     result = levin_lin_chu(frame, variable="y", entity="firm", time="year")
-    # Stata: r(td) = -7.4306694123932679 on this exact data.
-    assert result.td == pytest.approx(-7.4306694123932679, rel=5e-3)
+    # Stata on this exact data: td -7.4306694123932679, tds -1.7722635622092375.
+    assert result.td == pytest.approx(-7.4306694123932679, rel=1e-12)
+    assert result.tds == pytest.approx(-1.7722635622092375, rel=1e-12)
 
 
 def test_the_deterministic_options_change_the_statistic():
@@ -192,13 +193,44 @@ def test_a_missing_column_raises():
     with pytest.raises(ConsistencyError, match="not found"):
         levin_lin_chu(_panel(), variable="nope", entity="firm", time="year")
 
-def test_unadjusted_t_matches_stata_on_the_mixed_fixture():
-    """td is 1.7e-3 from Stata, which is close but not exact.
+def test_unadjusted_t_matches_stata_exactly():
+    """td and tds now reproduce Stata to machine precision.
 
-    Asserted at that tolerance deliberately: tightening it would fail, and loosening it
-    is not the issue -- the quantity genuinely differs in the third decimal because sbar
-    does. Recording the achieved precision is more useful than a rounded claim.
+    These started 1.7e-3 and 1.24 away respectively. Three defects accounted for the whole
+    gap, and each was found by exporting the corresponding quantity from a patched copy of
+    _xturllc.ado rather than by reasoning about the source:
+
+      1. the HAC series spanned only the post-lag slice instead of the full differenced
+         range (sbar 0.83 -> 0.9624);
+      2. the tds correction used sqrt(N), the IPS convention, where LLC's ``nt`` is the
+         total regression observation count, 390;
+      3. nu_se carried a finite-sample factor that this code path does not apply.
     """
 
     result = levin_lin_chu(_panel(), variable="y", entity="firm", time="year")
-    assert result.td == pytest.approx(-11.700111063045172, rel=5e-3)
+    assert result.td == pytest.approx(-11.700111063045172, rel=1e-12)
+    assert result.tds == pytest.approx(-5.6325376498593425, rel=1e-12)
+
+def test_sbar_matches_stata_exactly():
+    """The quantity that resisted for three rounds of investigation.
+
+    My version was 0.8259833163129058 against Stata's 0.9624458095613154 for a long time.
+    The cause was the HAC series spanning only the post-lag slice; exporting Stata's own
+    wvar proved the full differenced range is what it uses.
+    """
+
+    result = levin_lin_chu(_panel(), variable="y", entity="firm", time="year")
+    assert result.sbar == pytest.approx(0.8624276846234491, rel=1e-12)
+
+
+def test_var_ep_matches_stata_on_the_random_walk_fixture():
+    rng = np.random.default_rng(11)
+    rows = []
+    for firm in range(1, 31):
+        value = 0.0
+        for year in range(1, 16):
+            value = value + rng.normal()
+            rows.append((firm, year, value))
+    frame = pd.DataFrame(rows, columns=["firm", "year", "y"])
+    result = levin_lin_chu(frame, variable="y", entity="firm", time="year")
+    assert result.var_ep == pytest.approx(1.1821490653633249, rel=1e-12)

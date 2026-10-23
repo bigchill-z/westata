@@ -239,7 +239,7 @@
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `vec` | ⚠️ | 秩检验已到 E2，**系数估计未验证** |
+| `vec` | ✅ **E3** | α 精确（3.6e-13）；`se(α)` 差 3.2e-4；漂移项未对拍 |
 | `var` 的 `irf`/`fevd`/`vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
 | `svar` | ⬜ | 结构 VAR |
 | `vecm` 的 `vecrank` 之外的 `vec stable`/`vecnorm` | ⬜ | |
@@ -345,7 +345,7 @@
 | `arch` | alpha 差 6.9e-3，均值常数差 **3.6e-2**；Stata 默认用 OPG 标准误 |
 | `pperron` | 差 1.6e-2，超出 Stata 显示精度，可能是默认滞后截断不同 |
 | `vecrank, lags(1)` | 差 0.4%；无滞后差分时的边界处理 |
-| `vec`（系数估计） | **完全未验证** |
+| `vec` 的漂移项 | westata `[-0.0227, -0.0324]` vs Stata `[-0.0257, -0.0025]`；β 归一化已一致，属重参数化问题 |
 | `arima` | 4.8e-5，优化器停止点差异 |
 | `var` 的 IRF/FEVD/Granger | 有封装，未对拍 |
 | `margins` 的因子变量 | 支持 `factor_vars` 参数，但未与 Stata 的离散变化定义对拍 |

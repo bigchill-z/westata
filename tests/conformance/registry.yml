@@ -470,16 +470,27 @@
   date: 2026-10-23
   notes: "Beck-Katz panel-corrected VCE with the N/(N-k) * T/(T-1) small-sample factor. Coefficients are OLS by construction, which the tests assert."
 
-- command: xtunitroot
+- command: xtunitroot ips
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "xtunitroot ips y on 30 panels x 12 periods: Stata r(tbar) -2.2259105396588366, r(ttildebar) -1.7875342227529116, r(zt) -3.9114817625880884, r(zttildebar) -3.6087323273920875, r(p_zttildebar) .00015384844272522537; westata matches all five to 1e-12 or better"
+    - type: published_output
+      ref: "Transliterated from Stata's own ado source, ado/base/_/_xturips.ado and its _ipstab1 table"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "IMPLEMENTED FROM SOURCE, NOT REVERSE ENGINEERED. The earlier note here claimed the fixed-N critical values were an 'irreproducible published table' and that was wrong twice: _xturips.ado is plain readable Stata (21,790 bytes), and the tables it contains are the mean/variance standardisation tables, not critical values. Reading the source gave the algorithm directly -- per-panel ADF t, t-tilde with sd(dy) substituted for rmse, then Z = sqrt(N)(tbar-mu)/sqrt(var) with mu/var linearly interpolated in T. One detail was easy to get backwards and worth recording: Stata writes 'b / (se/rmse) * sd', which evaluates left to right as (b/se)*(rmse/sd). Using the reciprocal gives t-tilde 23% off while t-bar and Z-t-bar stay exact, so the t-bar assertion alone would not have caught it. STILL MISSING: the fixed-N exact critical values (IPS Table 2), which is a large N-by-T grid; requesting them raises UnsupportedError rather than returning a plausible number, because the critical value is exactly what a user reads to decide the test."
+
+- command: xtunitroot llc
   level: E1
   tolerance: 1.0e-1
   sources:
     - type: invariant
-      ref: "IPS and LLC both produce finite statistics with p-values in [0,1]"
+      ref: "LLC produces a finite statistic and a p-value in [0, 1]"
   verified_by: lead
   date: 2026-10-23
-  notes: "NOT verified against Stata. Stata's IPS output reports fixed-N exact critical values (-1.750 / -1.680 / -1.640) from published tables that are not reproducible here, and its LLC lag rule ('Bartlett kernel, 6.00 lags average, chosen by LLC') is not fully specified in the manual. Both statistics are labelled approximate in the returned object rather than tuned to match, and the test names say so."
-
+  notes: "Still unverified. Unlike IPS, its source (_xturllc.ado, 18,075 bytes) has not been transliterated yet; the IPS work showed the approach is feasible and that the code is readable, so this is a task rather than a barrier. Also out of scope for now: xtunitroot ht, fisher and breitung, whose sources are also present."
 - command: xtabond
   level: E2
   tolerance: 2.0e-2

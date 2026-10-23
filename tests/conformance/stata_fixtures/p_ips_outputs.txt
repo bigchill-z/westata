@@ -1,0 +1,148 @@
+=== ips_default ===
+COMMAND: xtunitroot ips y
+
+
+Im–Pesaran–Shin unit-root test for y
+------------------------------------
+H0: All panels contain unit roots           Number of panels  =     30
+Ha: Some panels are stationary              Number of periods =     12
+
+AR parameter: Panel-specific                Asymptotics: T,N -> Infinity
+Panel means:  Included                                        sequentially
+Time trend:   Not included
+
+ADF regressions: No lags included
+------------------------------------------------------------------------------
+                                              Fixed-N exact critical values
+                    Statistic      p-value         1%      5%      10%
+------------------------------------------------------------------------------
+ t-bar               -2.2259                     -1.830  -1.740  -1.690
+ t-tilde-bar         -1.7875
+ Z-t-tilde-bar       -3.6087        0.0002
+------------------------------------------------------------------------------
+
+
+=== ips_trend ===
+COMMAND: xtunitroot ips y, trend
+
+
+Im–Pesaran–Shin unit-root test for y
+------------------------------------
+H0: All panels contain unit roots           Number of panels  =     30
+Ha: Some panels are stationary              Number of periods =     12
+
+AR parameter: Panel-specific                Asymptotics: T,N -> Infinity
+Panel means:  Included                                        sequentially
+Time trend:   Included
+
+ADF regressions: No lags included
+------------------------------------------------------------------------------
+                                              Fixed-N exact critical values
+                    Statistic      p-value         1%      5%      10%
+------------------------------------------------------------------------------
+ t-bar               -2.6375                     -2.480  -2.380  -2.330
+ t-tilde-bar         -1.9410
+ Z-t-tilde-bar       -4.7538        0.0000
+------------------------------------------------------------------------------
+
+
+=== ips_demean ===
+COMMAND: xtunitroot ips y, demean
+
+
+Im–Pesaran–Shin unit-root test for y
+------------------------------------
+H0: All panels contain unit roots           Number of panels  =     30
+Ha: Some panels are stationary              Number of periods =     12
+
+AR parameter: Panel-specific                Asymptotics: T,N -> Infinity
+Panel means:  Included                                        sequentially
+Time trend:   Not included                  Cross-sectional means removed
+
+ADF regressions: No lags included
+------------------------------------------------------------------------------
+                                              Fixed-N exact critical values
+                    Statistic      p-value         1%      5%      10%
+------------------------------------------------------------------------------
+ t-bar               -2.2186                     -1.830  -1.740  -1.690
+ t-tilde-bar         -1.7869
+ Z-t-tilde-bar       -3.6039        0.0002
+------------------------------------------------------------------------------
+
+
+=== ips_lag1 ===
+COMMAND: xtunitroot ips y, lags(1)
+
+
+Im–Pesaran–Shin unit-root test for y
+------------------------------------
+H0: All panels contain unit roots           Number of panels  =     30
+Ha: Some panels are stationary              Number of periods =     12
+
+AR parameter: Panel-specific                Asymptotics: T,N -> Infinity
+Panel means:  Included                                        sequentially
+Time trend:   Not included
+
+ADF regressions: 1 lags
+------------------------------------------------------------------------------
+                    Statistic      p-value
+------------------------------------------------------------------------------
+ W-t-bar             -2.5869        0.0048
+------------------------------------------------------------------------------
+
+
+=== llc_default ===
+COMMAND: xtunitroot llc y
+
+
+Levin–Lin–Chu unit-root test for y
+----------------------------------
+H0: Panels contain unit roots               Number of panels  =     30
+Ha: Panels are stationary                   Number of periods =     12
+
+AR parameter: Common                        Asymptotics: N/T -> 0
+Panel means:  Included
+Time trend:   Not included
+
+ADF regressions: 1 lag
+LR variance:     Bartlett kernel, 7.00 lags average (chosen by LLC)
+------------------------------------------------------------------------------
+                    Statistic      p-value
+------------------------------------------------------------------------------
+ Unadjusted t       -11.7001
+ Adjusted t*         -5.6325        0.0000
+------------------------------------------------------------------------------
+
+
+=== ht_default ===
+COMMAND: xtunitroot ht y
+
+
+Harris-Tzavalis unit-root test for y
+------------------------------------
+H0: Panels contain unit roots               Number of panels  =     30
+Ha: Panels are stationary                   Number of periods =     12
+
+AR parameter: Common                        Asymptotics: N -> Infinity
+Panel means:  Included                                   T Fixed
+Time trend:   Not included
+------------------------------------------------------------------------------
+                    Statistic         z         p-value
+------------------------------------------------------------------------------
+ rho                  0.4585       -7.2410       0.0000
+------------------------------------------------------------------------------
+
+
+=== ips_scalars ===
+tbar = -2.2259105396588366
+ttildebar = -1.7875342227529116
+zt = -3.9114817625880884
+zttildebar = -3.6087323273920875
+p_zttildebar = .00015384844272522537
+N_g = 30
+N_t = 12
+N = 330
+cv_1 = -1.8300000000000001
+cv_5 = -1.74
+cv_10 = -1.6899999999999999
+

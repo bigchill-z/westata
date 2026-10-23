@@ -59,6 +59,7 @@ from westata.estimators.treatreg_effects import (
 )
 from westata.estimators.nonlinear import Frontier, Nl
 from westata.estimators.resample import Bootstrap, Jackknife, Permute
+from westata.estimators.xtunitroot_ips import IpsResult, im_pesaran_shin
 from westata.estimators.survey import (
     SurveyDesign,
     SvyLogit,
@@ -87,6 +88,8 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "IpsResult",
+    "im_pesaran_shin",
     "Permute",
     "Bootstrap",
     "Jackknife",

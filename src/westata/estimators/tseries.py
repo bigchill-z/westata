@@ -612,6 +612,16 @@ class UnitRootResult:
         )
 
 
+def _newey_west_lags(observations: int) -> int:
+    """Stata's default Newey-West truncation, ``floor(4 * (n/100)^(2/9))``.
+
+    Used for ``pperron`` when no bandwidth is given. Stata prints this value as
+    "Newey-West lags = k", so it is directly checkable from its output.
+    """
+
+    return int(np.floor(4.0 * (max(observations, 1) / 100.0) ** (2.0 / 9.0)))
+
+
 def unitroot(
     endog: Any,
     *,
@@ -657,7 +667,14 @@ def unitroot(
     if test == "pp":
         from arch.unitroot import PhillipsPerron
 
-        outcome = PhillipsPerron(series, trend=regression, lags=maxlag)
+        # Stata's pperron prints "Newey-West lags = k" and uses the standard rule
+        #     k = floor(4 * (n/100)^(2/9))
+        # which gives 5 for n = 399. Letting arch choose (maxlag=None) gave
+        # -1.994881 against Stata's -1.953, a 2.1e-2 gap that was recorded in the
+        # registry as an unexplained truncation difference; with the rule applied the
+        # agreement is 1.1e-4, i.e. Stata's 3-decimal display.
+        bandwidth = maxlag if maxlag is not None else _newey_west_lags(series.size)
+        outcome = PhillipsPerron(series, trend=regression, lags=bandwidth)
         return UnitRootResult(
             test="Phillips-Perron",
             statistic=float(outcome.stat),

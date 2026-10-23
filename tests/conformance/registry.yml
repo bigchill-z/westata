@@ -259,17 +259,14 @@
   notes: "TWO-STEP estimator with the Heckman correction applied to the standard errors (e(se_corrected) = 1). The corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. The correction is validated independently against a 400-rep row bootstrap. e(lambda) follows Stata's definition rho*sigma (verified: .2849988 * 1.003876 = .2861035); westata reports .287883, 0.6% from Stata, and keeps the generated-regressor coefficient in e(lam_coef). rho itself remains a plug-in value rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
 
 - command: etregress
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-6
   sources:
-    - type: invariant
-      ref: "Control-function estimator runs and produces finite parameters"
+    - type: r_crosscheck
+      ref: "etregress y x1, treat(treated = z) twostep on 800 observations: Stata x1 2.033928092563467, treated 1.4984041587868442, _cons 0.9348034986765116, z 0.5831897686471033, lambda 0.38980698782943624; westata matches all six to 1e-9"
   verified_by: lead
   date: 2026-10-23
-  notes: "Control function only; no Stata comparison yet. method='ml' raises UnsupportedError."
-
-# --- P7: count model extensions --------------------------------------------
-
+  notes: "Control-function (two-step) only; method='ml' raises UnsupportedError. THE FIRST COMPARISON HERE WAS MISLEADING: I diffed against Stata's DEFAULT, which is maximum likelihood, and the treatment effect came out 5.3e-2 apart. That measured the difference between two estimators, not a defect. Stata exposes the two-step version as 'etregress, twostep', and against that the agreement is 1e-9 on every parameter including lambda. Recording the near-miss because a gap of that size looks like a bug and the temptation is to go tune the implementation."
 - command: zip
   level: E3
   tolerance: 1.0e-4
@@ -353,7 +350,7 @@
       ref: "sqreg y x1 x2, quantiles(.25 .5 .75) reps(200): Stata x1 SE .0705717/.0506841/.0709206; westata .0682194/.0429598/.0675913"
   verified_by: lead
   date: 2026-10-23
-  notes: "Coefficients are exact (they are the qreg fits, verified above). The bootstrap STANDARD ERRORS do not match: ratios 0.97/0.85/0.95. Stata seeds from its own RNG so a cell-for-cell match is impossible by construction, but the systematic downward bias suggests its resampling scheme differs -- most likely a different replicate-variance convention. Left at E1 rather than claiming agreement; this is the honest state."
+  notes: "Coefficients are exact (they are the qreg fits, verified above). The bootstrap STANDARD ERRORS do not match: ratios 0.967 / 0.848 / 0.953. The earlier note here guessed the cause was 'a different replicate-variance convention'; that guess was tested and is WRONG. All three plausible conventions -- ddof=1, ddof=0, and RMSE about the point estimate -- land in the same 0.85-0.97 band, and the median is the worst under every one of them (0.848). A variance-formula difference would put ONE convention on 1.0 and leave the rest off; uniform failure means the REPLICATES differ, i.e. Stata resamples differently from i.i.d. row draws. That is a design difference rather than a defect, so this stays E1 with the measurement recorded instead of a tolerance widened until it passes."
 
 - command: bsqreg
   level: E1
@@ -363,7 +360,7 @@
       ref: "bsqreg y x1 x2, quantile(.5) reps(200): Stata x1 SE .049082; westata .0429598"
   verified_by: lead
   date: 2026-10-23
-  notes: "Coefficients exact (identical to qreg by construction -- bsqreg is sqreg with one quantile, which the subclassing makes structural). Bootstrap SE 12% below Stata's, the same systematic gap as sqreg. E1, not E3."
+  notes: "Coefficients exact (identical to qreg by construction -- bsqreg is sqreg with one quantile, which the subclassing makes structural). Bootstrap SE 15% below Stata's, the same gap as sqreg and now traced to the same cause: the replicates themselves differ, not the variance formula (see the sqreg entry for the three-convention measurement that rules the formula out). E1, not E3."
 
 
 # --- P9: panel extensions --------------------------------------------------
@@ -379,35 +376,32 @@
   notes: "Chamberlain's conditional likelihood, implemented by exhaustive enumeration of the C(T,k) subsets. The estimation sample matches Stata's exactly: 912 of 960, because groups whose outcome never varies are conditioned out. Both the estimate and the sample size agreeing is what makes this a real check."
 
 - command: xtlogit, pa
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
-    - type: invariant
-      ref: "Population-averaged GEE runs and reports a clustered sandwich VCE"
+    - type: r_crosscheck
+      ref: "xtlogit y x1 x2, pa on a 120x8 panel: Stata x1 0.3007615470018262, x2 -0.2542735657384027, _cons 0.1488733810746218; westata gaps 9.1e-6 / 9.7e-6 / 7.4e-8"
   verified_by: lead
   date: 2026-10-23
-  notes: "GEE is not a likelihood, so e(ll) is deliberately ABSENT rather than approximated -- a log-likelihood that does not exist would invite a meaningless comparison. Not yet compared with Stata's coefficients (.3007615 / -.2542736)."
-
+  notes: "Population-averaged GEE with an exchangeable working correlation. GEE is NOT a likelihood, so e(ll) is deliberately ABSENT -- a log-likelihood that does not exist would invite a meaningless comparison. The coefficients are estimable and now verified; the standard errors are not yet diffed."
 - command: xtprobit, re
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
-    - type: invariant
-      ref: "Gauss-Hermite quadrature over the random effect produces finite estimates"
+    - type: r_crosscheck
+      ref: "xtprobit y x1 x2, re on a 120x8 panel: Stata x1 0.20983396078276506, x2 -0.17655902464995493; westata gaps 2.4e-8 and 1.0e-7"
   verified_by: lead
   date: 2026-10-23
-  notes: "Converges and reports sigma_u. Stata's coefficients on the reference panel are x1 .209834, x2 -.176559; not yet compared."
-
+  notes: "Gauss-Hermite quadrature over the normal random effect. Parameter names now follow Stata: _cons rather than Intercept, and lnsig2u bare rather than slashed, because Stata prints those without a leading slash for this command."
 - command: xttobit
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
-    - type: invariant
-      ref: "Random-effects Tobit runs and reports both sigma_u and sigma_e"
+    - type: r_crosscheck
+      ref: "xttobit y x1, ll(.5) on a 100x7 panel: Stata x1 0.9020131009529725, _cons 0.9253712092561762; westata gap 1.3e-9"
   verified_by: lead
   date: 2026-10-23
-  notes: "Quadrature over the random effect with the censoring handled at the lower limit. Not yet compared with Stata's output."
-
+  notes: "Random-effects Tobit with quadrature over the random effect and censoring at the lower limit. Stata reports sigma_u and sigma_e bare -- not /sigma_u -- so the implementation was renamed to match, with the slashed forms kept out of the canonical names."
 - command: xtpoisson, fe
   level: E2
   tolerance: 5.0e-2
@@ -419,25 +413,23 @@
   notes: "The multinomial conditional likelihood is a genuine likelihood, unlike xtnbreg's. The intercept is reported as NaN because conditioning on the group totals absorbs it -- reporting a number there would be inventing an unidentified parameter."
 
 - command: xtpoisson, re
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-5
   sources:
-    - type: invariant
-      ref: "Random-effects Poisson with quadrature produces finite estimates"
+    - type: r_crosscheck
+      ref: "xtpoisson y x1, re on a 100x7 panel: Stata x1 0.47955085149744847, _cons 0.3485992628857865, lnalpha -2.073955137815788; westata x1 gap 3.9e-8"
   verified_by: lead
   date: 2026-10-23
-  notes: "Not yet compared with Stata's x1 .4795509 / _cons .3485993 / lnalpha -2.073955."
-
+  notes: "Random-effects Poisson with quadrature. The dispersion parameter is reported as bare lnalpha, matching Stata's spelling for this command."
 - command: xtnbreg, fe
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-4
   sources:
-    - type: invariant
-      ref: "Conditional FE negative binomial runs and estimates /lnalpha"
+    - type: r_crosscheck
+      ref: "xtnbreg y x1, fe on a 100x7 panel: Stata x1 0.5041908533303101; westata gap 2.1e-5"
   verified_by: lead
   date: 2026-10-23
-  notes: "This is a QUASI-likelihood, not a likelihood: the negative binomial is not conditionable the same way the Poisson is, and Stata's own documentation says so. Recorded as estimator='conditional_quasi_ml' and quasi_likelihood=1 so its log-likelihood is not compared with a real one. Stata's x1 is .5041909; not yet compared."
-
+  notes: "This is a QUASI-likelihood, not a likelihood: the negative binomial is not conditionable the way the Poisson is, and Stata's documentation says so. Recorded as estimator='conditional_quasi_ml' and quasi_likelihood=1 so its log-likelihood is never compared with a real one. The 2.1e-5 gap is the quasi-likelihood converging from a different starting point than Stata's; the tolerance reflects that rather than pretending machine precision."
 - command: xtivreg, fe
   level: E3
   tolerance: 1.0e-3
@@ -904,14 +896,14 @@
   notes: "alpha 6.9e-3, beta 6.3e-4, mean constant 3.6e-2. omega is not stored in Stata's e(b) under a comparable name, so the variance intercept is not compared. Stata uses OPG standard errors by default while arch uses the Hessian; the point estimates are close but not identical because the optimisers differ."
 
 - command: dfuller
-  level: E2
-  tolerance: 5.0e-4
+  level: E3
+  tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
       ref: "Live comparison: tsset t; dfuller y on a random walk"
   verified_by: lead
   date: 2026-10-22
-  notes: "Z(t) matches to 2.3e-4, which is the limit of Stata's 3-decimal display rather than a computational gap."
+  notes: "Z(t) = -1.941126 against Stata's printed -1.941 on a 400-observation random walk, i.e. agreement to its three-decimal display rather than a computational gap. Promoted to E3 during the bandwidth investigation: unlike pperron, dfuller's automatic lag selection already matched, so nothing needed changing -- only measuring. This is the case that shows an E2 label was sometimes the absence of evidence rather than a real shortfall, which is why the whole remaining E2/E1 list was worth re-measuring."
 
 - command: predict
   level: E3
@@ -950,42 +942,21 @@
   tolerance: 1.0e-1
   sources:
     - type: invariant
-      ref: "VECM fits and returns coefficients on a cointegrated pair"
+      ref: "VECM fits and returns alpha and beta on a cointegrated pair"
+    - type: r_crosscheck
+      ref: "vec y1 y2, lags(1) rank(1): Stata reports L._ce1 = [-0.09162246, 0.92297218] plus two _cons drift terms; westata alpha gap 1.9e-1 and det_coef EMPTY"
   verified_by: lead
   date: 2026-10-23
-  notes: "Only the rank test (vecrank) has been compared with Stata. The VECM coefficient estimates themselves have not."
+  notes: "Now measured, and the measurement explains the E1: this is a MISSING FEATURE, not an unverified one. Stata's default vec includes an unrestricted constant in the short-run dynamics, and westata's VECM estimates no deterministic terms at all -- det_coef is empty. Alpha is therefore fitted on a misspecified model and differs by 0.19. To promote this, the deterministic terms have to be implemented first; tightening a tolerance instead would be fitting the test to the code. Recorded rather than quietly left as 'not yet compared', because those two states call for completely different work."
 
 - command: pperron / kpss
-  level: E2
-  tolerance: 2.0e-2
+  level: E3
+  tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
-      ref: "pperron y on a random walk: Stata Z(t) = -1.896, westata -1.927135"
+      ref: "pperron y1 on a 400-observation random walk: Stata prints Newey-West lags = 5 and Z(t) = -1.953; westata -1.953113 with lags=5"
+    - type: published_output
+      ref: "[TS] pperron default bandwidth: floor(4*(n/100)^(2/9))"
   verified_by: lead
   date: 2026-10-23
-  notes: "Phillips-Perron differs by 1.6e-2. Stata prints 3 decimals, so part of this is display precision, but 1.6e-2 is larger than the display limit, indicating a genuine difference in the default lag truncation. kpss cannot be compared: kpss is no longer a StataNow 19 command (`command kpss is unrecognized`), the same removal pattern as xtreg, fd."
-
-# --- Note on the count models' null baseline ------------------------------
-#
-# Stata does not use one null model for all four count commands, and getting
-# this wrong shifts chi2, p and pseudo-R2 without touching a single coefficient:
-#
-#   zip / zinb / tnbreg   a *fitted* constant-only model (Stata prints the
-#                         "Fitting constant-only model" block)
-#   ztp                   mean(y) with the truncation applied (no such block)
-#
-# Verified numerically: for ztp the fitted-constant route gives chi2 246.25,
-# which matches no Stata output, while mean(y) gives 270.42 exactly. An earlier
-# implementation used mean(y) everywhere and consequently reported zip chi2
-# 657.68 against Stata's 248.04.
-
-# --- Note on predict coverage for the P6/P7 models -------------------------
-#
-# Registered and verified against StataNow 19.5 on 2026-10-23:
-#
-#   truncreg, intreg, heckman, etregress   xb, stdp, stdf  (continuous models)
-#   zip, zinb, ztp, tnbreg                 xb, n, stdp     (count models)
-#
-# A count model rejects stdf with r(198) "option stdf not allowed"; the same split
-# exists for poisson/nbreg. westata mirrors it rather than offering a type Stata
-# will not produce.
+  notes: "The recorded 1.6e-2 gap was NEVER an estimator problem. Stata prints 'Newey-West lags = 5' straight in its output and uses the standard rule floor(4*(n/100)^(2/9)); westata was letting arch choose the bandwidth, which picked a different value. Applying the rule gives -1.953113 against Stata's -1.953, i.e. agreement to its three-decimal display. That the rule was visible in Stata's own output and went unread for two batches is the lesson. kpss still cannot be compared: StataNow 19 removed the command (r(199)), the same pattern as xtreg, fd."

@@ -1,0 +1,95 @@
+=== pperron_default ===
+COMMAND: pperron y1
+
+
+Phillips–Perron test for unit root       Number of obs   = 399
+Variable: y1                             Newey–West lags =   5
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(rho)          -6.422      -20.419      -14.000      -11.200
+ Z(t)            -1.953       -3.448       -2.874       -2.570
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.3075.
+
+
+=== pperron_lag1 ===
+COMMAND: pperron y1, lags(1)
+
+
+Phillips–Perron test for unit root       Number of obs   = 399
+Variable: y1                             Newey–West lags =   1
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(rho)          -6.640      -20.419      -14.000      -11.200
+ Z(t)            -1.980       -3.448       -2.874       -2.570
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.2955.
+
+
+=== pperron_lag0 ===
+COMMAND: pperron y1, lags(0)
+
+
+Phillips–Perron test for unit root       Number of obs   = 399
+Variable: y1                             Newey–West lags =   0
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(rho)          -6.325      -20.419      -14.000      -11.200
+ Z(t)            -1.941       -3.448       -2.874       -2.570
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.3130.
+
+
+=== dfuller ===
+COMMAND: dfuller y1
+
+
+Dickey–Fuller test for unit root          Number of obs  = 399
+Variable: y1                              Number of lags =   0
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)            -1.941       -3.448       -2.874       -2.570
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.3130.
+
+
+=== dfuller_lag1 ===
+COMMAND: dfuller y1, lags(1)
+
+
+Augmented Dickey–Fuller test for unit root
+
+Variable: y1                              Number of obs  = 398
+                                          Number of lags =   1
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)            -2.043       -3.448       -2.874       -2.570
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.2682.
+
+

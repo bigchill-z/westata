@@ -283,7 +283,7 @@ def test_xtlogit_fe_has_no_intercept(fe_result):
     which poisons ``lincom``/``test``/``predict`` downstream.
     """
 
-    assert "Intercept" not in fe_result.param_names
+    assert "_cons" not in fe_result.param_names
     assert np.all(np.isfinite(fe_result.params.to_numpy()))
     assert np.all(np.isfinite(fe_result.cov_params()))
 
@@ -292,7 +292,7 @@ def test_xtlogit_fe_has_no_intercept(fe_result):
 def test_xtlogit_re_coefficients_match_stata(re_result):
     """p9_outputs.txt lines 71-75: .3428887 / -.2896591 / .1685264."""
 
-    for name, expected in zip(("x1", "x2", "Intercept"), STATA_XTLOGIT_RE):
+    for name, expected in zip(("x1", "x2", "_cons"), STATA_XTLOGIT_RE):
         assert float(re_result.params[name]) == pytest.approx(expected, abs=1e-5)
 
 
@@ -303,8 +303,8 @@ def test_xtlogit_re_lnsig2u_matches_stata(re_result):
     ``/lnsigma``; Stata stores the log of the *variance*.
     """
 
-    assert "/lnsig2u" in re_result.param_names
-    assert float(re_result.params["/lnsig2u"]) == pytest.approx(
+    assert "lnsig2u" in re_result.param_names
+    assert float(re_result.params["lnsig2u"]) == pytest.approx(
         STATA_XTLOGIT_RE_LNSIG2U, abs=1e-4
     )
 
@@ -375,7 +375,7 @@ def test_xtlogit_pa_coefficients_match_stata(pa_result):
     Verified to 3e-5 on this panel.
     """
 
-    for name, expected in zip(("x1", "x2", "Intercept"), STATA_XTLOGIT_PA):
+    for name, expected in zip(("x1", "x2", "_cons"), STATA_XTLOGIT_PA):
         assert float(pa_result.params[name]) == pytest.approx(expected, abs=1e-4)
 
 
@@ -387,7 +387,7 @@ def test_xtlogit_pa_reports_the_model_based_variance_by_default(pa_result):
 
     assert pa_result.cov_type == "nonrobust"
     assert pa_result.e["vce"] == "model-based"
-    for name, expected in zip(("x1", "x2", "Intercept"), STATA_XTLOGIT_PA_SE):
+    for name, expected in zip(("x1", "x2", "_cons"), STATA_XTLOGIT_PA_SE):
         assert float(pa_result.bse[name]) == pytest.approx(expected, abs=1e-4)
 
 
@@ -414,9 +414,9 @@ def test_xtlogit_pa_robust_variance_is_available_and_different():
 def test_xtprobit_re_matches_stata(probit_result):
     """p9_outputs.txt lines 147-154: .209834 / -.176559 / .1023312 / -1.462809."""
 
-    for name, expected in zip(("x1", "x2", "Intercept"), STATA_XTPROBIT_RE):
+    for name, expected in zip(("x1", "x2", "_cons"), STATA_XTPROBIT_RE):
         assert float(probit_result.params[name]) == pytest.approx(expected, abs=1e-5)
-    assert float(probit_result.params["/lnsig2u"]) == pytest.approx(
+    assert float(probit_result.params["lnsig2u"]) == pytest.approx(
         STATA_XTPROBIT_RE_LNSIG2U, abs=1e-4
     )
     assert float(probit_result.e["ll"]) == pytest.approx(STATA_XTPROBIT_RE_LL, abs=1e-4)
@@ -476,7 +476,7 @@ def test_xtpoisson_re_matches_stata(poisson_re_result):
     """
 
     for name, expected in zip(
-        ("x1", "Intercept", "/lnalpha"), STATA_XTPOISSON_RE
+        ("x1", "_cons", "lnalpha"), STATA_XTPOISSON_RE
     ):
         assert float(poisson_re_result.params[name]) == pytest.approx(expected, abs=1e-5)
     assert float(poisson_re_result.e["ll"]) == pytest.approx(
@@ -488,7 +488,7 @@ def test_xtpoisson_re_alpha_is_exp_lnalpha(poisson_re_result):
     """``e(alpha)`` must be the exponentiated dispersion, not a second estimate."""
 
     assert float(poisson_re_result.e["alpha"]) == pytest.approx(
-        float(np.exp(float(poisson_re_result.params["/lnalpha"])))
+        float(np.exp(float(poisson_re_result.params["lnalpha"])))
     )
     assert float(poisson_re_result.e["alpha"]) == pytest.approx(0.1256877, abs=1e-5)
 
@@ -538,8 +538,8 @@ def test_xtnbreg_fe_agrees_with_the_poisson_kernel(nbreg_fe_result, poisson_fe_r
 def test_xtnbreg_fe_reports_no_dispersion(nbreg_fe_result):
     """The conditional kernel does not identify alpha, so none is reported."""
 
-    assert "/lnalpha" not in nbreg_fe_result.param_names
-    assert "/lnalpha" not in nbreg_fe_result.e
+    assert "lnalpha" not in nbreg_fe_result.param_names
+    assert "lnalpha" not in nbreg_fe_result.e
 
 
 # ------------------------------------------------------------------ xttobit
@@ -547,7 +547,7 @@ def test_xttobit_matches_stata(tobit_result):
     """p9_outputs.txt lines 214-220: .9020131 / .9253712, rho .3981316."""
 
     assert float(tobit_result.params["x1"]) == pytest.approx(STATA_XTTOBIT[0], abs=1e-5)
-    assert float(tobit_result.params["Intercept"]) == pytest.approx(
+    assert float(tobit_result.params["_cons"]) == pytest.approx(
         STATA_XTTOBIT[1], abs=1e-5
     )
     assert float(tobit_result.e["ll"]) == pytest.approx(STATA_XTTOBIT_LL, abs=1e-4)
@@ -556,10 +556,10 @@ def test_xttobit_matches_stata(tobit_result):
 def test_xttobit_reports_both_variance_components(tobit_result):
     """p9_outputs.txt lines 217-220: sigma_u .4883516, sigma_e .6004406."""
 
-    assert float(tobit_result.params["/sigma_u"]) == pytest.approx(
+    assert float(tobit_result.params["sigma_u"]) == pytest.approx(
         STATA_XTTOBIT_SIGMA_U, abs=1e-5
     )
-    assert float(tobit_result.params["/sigma_e"]) == pytest.approx(
+    assert float(tobit_result.params["sigma_e"]) == pytest.approx(
         STATA_XTTOBIT_SIGMA_E, abs=1e-5
     )
     sigma_u = float(tobit_result.e["sigma_u"])
@@ -605,7 +605,7 @@ def test_xttobit_with_a_very_low_limit_approximates_xtreg_re():
     assert float(tobit.params["x1"]) == pytest.approx(
         float(linear.params["x1"]), abs=2e-2
     )
-    assert float(tobit.params["Intercept"]) == pytest.approx(
+    assert float(tobit.params["_cons"]) == pytest.approx(
         float(linear.params["Intercept"]), abs=2e-2
     )
     # With no censoring the model is the linear random-effects model, so

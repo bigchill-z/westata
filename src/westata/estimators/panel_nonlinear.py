@@ -120,6 +120,27 @@ _CONSTANT_NAMES = frozenset({"intercept", "const", "_cons", "1"})
 # --------------------------------------------------------------------- helpers
 
 
+def _stata_names(names: list[str]) -> list[str]:
+    """Rename parameters to Stata's spellings for the panel models.
+
+    ``Intercept`` -> ``_cons``. A leading ``/`` is dropped from auxiliary parameters:
+    Stata prints ``sigma_u``, ``sigma_e``, ``lnalpha`` and ``lnsig2u`` bare for
+    ``xttobit``, ``xtpoisson`` and ``xtprobit`` -- the slash belongs to ``nl``, not to
+    these commands. Both spellings resolve because ``StataResults`` matches on the
+    canonical name and the old names remain unique prefixes.
+    """
+
+    mapped: list[str] = []
+    for name in names:
+        if name == "Intercept":
+            mapped.append("_cons")
+        elif name.startswith("/"):
+            mapped.append(name[1:])
+        else:
+            mapped.append(name)
+    return mapped
+
+
 def _codes(values: Any) -> np.ndarray:
     """Dense integer codes for the panel identifier, in first-appearance order."""
 
@@ -738,7 +759,7 @@ class _PanelBase:
             design = self._drop_constant()[0][rows]
         return StataResults(
             params=params,
-            param_names=list(names),
+            param_names=_stata_names(list(names)),
             cov=np.asarray(covariance, dtype=float),
             resid=self._y[rows] - fitted,
             fittedvalues=fitted,
@@ -803,7 +824,7 @@ class XtLogit(_PanelBase):
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         return cls(
-            y, X, groups, param_names=names, method=normalized, model_data=model_data
+            y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
 
     def fit(
@@ -1220,7 +1241,7 @@ class XtProbit(_PanelBase):
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         return cls(
-            y, X, groups, param_names=names, method=normalized, model_data=model_data
+            y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
 
     def fit(
@@ -1389,7 +1410,7 @@ class XtTobit(_PanelBase):
             y,
             X,
             groups,
-            param_names=names,
+            param_names=_stata_names(list(names)),
             method=normalized,
             model_data=model_data,
             lower=lower,
@@ -1564,7 +1585,7 @@ class XtPoisson(_PanelBase):
                 f"{int(np.sum(y < 0.0))} observation(s) are negative"
             )
         return cls(
-            y, X, groups, param_names=names, method=normalized, model_data=model_data
+            y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
 
     def fit(
@@ -1782,7 +1803,7 @@ class XtNbreg(_PanelBase):
                 "the data contain non-integer values"
             )
         return cls(
-            y, X, groups, param_names=names, method=normalized, model_data=model_data
+            y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
 
     def fit(

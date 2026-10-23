@@ -1140,14 +1140,44 @@ class NearestNeighbourMatching:
 
     @staticmethod
     def _same_arm_sigma(
-        distances: np.ndarray, index: np.ndarray, y: np.ndarray
+        distances: np.ndarray,
+        index: np.ndarray,
+        y: np.ndarray,
+        matches: int = 2,
     ) -> np.ndarray:
-        """``0.5 (y_i - y_j)^2`` with ``j`` the nearest same-arm neighbour."""
+        """Within-arm conditional variance over each observation's neighbourhood.
+
+        ``Psi(i)`` is observation ``i`` together with its ``matches`` nearest same-treatment
+        neighbours, and the estimate is the ordinary sample variance over that set:
+
+            xi^2_i = var( {y_j : j in Psi(i)}, ddof=1 )
+
+        The manual writes this with a ``(sum_j w_j - 1)`` divisor, but that is the general
+        weighted form. Applied literally to the unweighted h = 2 case it makes ``ybar`` the SUM
+        of the two neighbours instead of their mean and inflates the variance about fourfold --
+        measured, se 0.4548 against Stata's 0.1063. Reading ``Psi(i)`` as including ``i`` and
+        taking the plain sample variance lands within 1.7e-3 of Stata (se 0.10458), which is the
+        best of the five variants tested.
+
+        Stata's default is ``vce(robust, nn(2))``: "robust standard errors estimated using two
+        matches". The remaining 1.7e-3 may come from the distance definition or tie handling;
+        it is recorded rather than tuned, since ``_matchnn_estimates`` is Mata bytecode with no
+        readable source.
+        """
 
         block = distances[np.ix_(index, index)].copy()
         np.fill_diagonal(block, np.inf)
-        nearest = index[np.argmin(block, axis=1)]
-        return 0.5 * (y[index] - y[nearest]) ** 2
+        count = min(max(int(matches), 1), index.size - 1)
+        if count < 1:
+            return np.zeros(index.size, dtype=float)
+
+        order = np.argsort(block, axis=1, kind="stable")[:, :count]
+        neighbours = y[index[order]]
+
+        # Include the observation itself, so the set has count + 1 members.
+        group = np.column_stack([y[index], neighbours])
+        return group.var(axis=1, ddof=1)
+
 
     def fit(self) -> TreatmentEffectResult:
         y, treated = self._y, self._treated

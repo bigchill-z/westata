@@ -587,14 +587,15 @@
 
 - command: teffects nnmatch
   level: E2
-  tolerance: 3.0e-2
+  tolerance: 2.0e-2
   sources:
     - type: r_crosscheck
-      ref: "teffects nnmatch (y x1 x2) (treated), nneighbor(1): Stata ATE 2.051839 (se .0691114)"
+      ref: "teffects nnmatch (y x1 x2) (t) on 600 observations: Stata ATE 2.4958995091937606, se .10627231325063335; westata ATE gap 3.6e-15, se 0.10458249615030689, relative gap 1.59e-2"
+    - type: published_output
+      ref: "[CAUSAL] teffects nnmatch Methods and formulas p.12: xi^2_ti = sum_j w_j (y_j - ybar_Psi_i)^2 / (sum_j w_j - 1), and 'By default, teffects nnmatch uses robust standard errors estimated using two matches'"
   verified_by: lead
   date: 2026-10-23
-  notes: "The POINT estimate is exact (2.05183948 vs 2.051839) with Mahalanobis-style standardisation and exact reuse counts. The standard error is +2.2% (.0706220 vs .0691114) and stays approximate: the gap is entirely in sigma^2(X_i), roughly fifteen variance estimators were tried and bracket 0.0691-0.0706 without singling one out, and Stata's exact form for that term is not documented to the digit. The result labels itself se_method='Abadie-Imbens approximation' so the approximation is machine-checkable rather than buried in prose. A 120-replicate Monte Carlo puts the true sampling SD near 0.0765, which supports Stata's magnitude."
-
+  notes: "The POINT ESTIMATE is exact (3.6e-15); only the standard error differs, down from 2.2% to 1.59%. Method: the manual was consulted instead of guessing at variance estimators -- something I had failed to do through roughly fifteen earlier attempts, every one of which consisted of trying a different sigma^2(X_i) formula from memory. The manual gives the estimator and, crucially, states the DEFAULT: robust standard errors from TWO matches, i.e. vce(robust, nn(2)). Five variants of the within-arm variance were then measured against Stata rather than argued about: (A) literal (sum w - 1) divisor, se 0.4548; (B) exclude i, var of the two neighbours, 0.10222; (C) include i plus two neighbours, sample variance, 0.10458; (D) the h=1 form 0.5(y_i-y_j)^2, 0.10780; (E) 0.5*C, 0.07395. C is adopted as closest. NOTE ON A LITERAL READING I GOT WRONG: applying '(sum w_j - 1)' with unit weights and h = 2 makes ybar the SUM of the neighbours rather than their mean and inflates the variance about fourfold (variant A). The formula is written for the general weighted case; the unweighted instance needs a plain sample variance. REMAINING 1.59%: _matchnn_estimates is compiled Mata bytecode, so there is no source to read. Its symbol table IS legible (strings on lmataado.mlib yields _matchnn_biasAdjustedMeans, __matchnn_lsfit, _matchnn_indices, _matchnn_neighbors, _matchnn_scaleVariables, _matchnn_estimates), which confirms the algorithm's structure but not its arithmetic. Reaching E3 would need disassembly of Mata bytecode, and the residual may equally be a distance or tie-handling difference. Left at E2 with the number recorded."
 - command: didregress
   level: E3
   tolerance: 1.0e-5

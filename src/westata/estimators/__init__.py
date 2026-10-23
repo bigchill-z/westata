@@ -49,6 +49,8 @@ from westata.estimators.panel_nonlinear import (
     XtTobit,
 )
 from westata.estimators.panel_iv import XtGls, XtIvreg, XtPcse, XtUnitroot
+from westata.estimators.nonlinear import Frontier, Nl
+from westata.estimators.systems import Eivreg, Manova, ManovaResult, Mvreg, Sureg
 from westata.estimators.quantile import QuantileRegression, RobustRegression
 from westata.estimators.quantile_boot import Bsqreg, Sqreg
 from westata.estimators.panel import (
@@ -68,6 +70,13 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "Frontier",
+    "Nl",
+    "ManovaResult",
+    "Manova",
+    "Eivreg",
+    "Mvreg",
+    "Sureg",
     "XtAbond",
     "XtNbreg",
     "XtPoisson",

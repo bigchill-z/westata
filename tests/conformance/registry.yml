@@ -498,6 +498,69 @@
   date: 2026-10-23
   notes: "One-step GMM per [XT] xtdpd. THE INSTRUMENT COUNT IS THE KEY CHECK: Stata reports 30 for lags(1) on T=9, which is 28 GMM columns plus the differenced covariate and a constant. Three separate bugs were caught by that single number while the estimates still looked plausible: a per-instrument H matrix instead of per-unit, an instrument block starting at y_2 instead of y_1 (same column count, wrong content), and the missing standard instruments (x1 came out 0.878 instead of 0.776). Sargan/Hansen/AR(1)/AR(2) are deliberately NOT reported: the manual does not fully specify their construction, and an approximate number under Stata's name would look more authoritative than its absence."
 
+
+# --- P10: multi-equation and system estimation -----------------------------
+
+- command: sureg
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "sureg (y1 x1 x2) (y2 x2 x3) on 400 observations with correlated errors: Stata coefficients 1.00723 / 1.960029 / -.6210211 and -.4903816 / .9412217 / .8024322, SEs .0492993/.040549/.0476005 and .0487194/.047139/.039197"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Feasible GLS, Sigma_ij = e_i'e_j/n (divide by n, not n-k), Omega = Sigma^-1 (x) I, beta = (X'Omega X)^-1 X'Omega y. Coefficients AND standard errors reproduce Stata digit for digit. The standard errors are the meaningful check: a wrong Sigma leaves every coefficient untouched while moving every SE, and the fitted cross-equation correlation here is 0.5544. iterate=True (Stata's isure) raises UnsupportedError rather than guessing a convergence rule."
+
+- command: mvreg
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "mvreg y1 y2 = x1 x2 x3: Stata y1 x1 1.95372, x2 -.6277454, x3 -.0732678; y2 x2 .9381316"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Every equation shares one design, so the coefficients are per-equation OLS and only the VCE uses the cross-equation covariance. mvreg and sureg give DIFFERENT coefficients on the same data because mvreg puts every regressor in every equation -- a specification difference, not an inconsistency, and a test asserts that difference explicitly so it cannot be mistaken for a regression."
+
+- command: eivreg
+  level: E3
+  tolerance: 1.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "eivreg y x1 x2, reliab(x1 .7) on 500 observations: Stata x1 2.073214, x2 -.4678675, _cons .8649387"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "[R] eivreg: b = A^-1 X'y with A = X'X/n - S and S = diag((1-r_j) s_j^2). Getting this right took three attempts, all of them wrong in instructive ways: weighting by 1/lambda gave x1 = 1.214, weighting by lambda gave 1.735, and using the RAW X'X instead of X'X/n gave 1.452. The normalisation is the crux -- s_j^2 is a per-observation quantity, so the cross-product must be too, and without it the subtracted term is ~200x too small to matter. With X'X/n the answer is 2.074996 against Stata's 2.073214, a 1.8e-3 gap from the variance convention, recorded rather than tuned. reliab=1.0 reproduces OLS exactly."
+
+- command: manova
+  level: E2
+  tolerance: 5.0e-3
+  sources:
+    - type: r_crosscheck
+      ref: "manova y1 y2 = g on 240 observations, 3 groups: Stata Wilks' lambda .4290, F 62.15, p 0.0000"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Wilks' lambda matches to 5e-3 through Rao's F approximation. Only Wilks' lambda is implemented; Pillai's trace, Lawley-Hotelling and Roy's largest root raise nothing because they are simply absent. Multiple factors raise UnsupportedError -- one-way only."
+
+- command: nl
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "nl (y = {b0} * exp(-{b1} * x)) on 300 observations: Stata /b0 4.943526 (se .0381662), /b1 .7912568 (se .0080793)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Coefficients AND standard errors reproduce Stata to the printed digit. The expression is compiled through an ast whitelist -- there is no eval anywhere -- so a formula like {b0}*__import__('os').system(...) is rejected at validation rather than executed. Parameters are reported with Stata's leading slash. A linear model written as {b0} + {b1}*x reproduces OLS to 1e-5."
+
+- command: frontier
+  level: E3
+  tolerance: 1.0e-4
+  sources:
+    - type: r_crosscheck
+      ref: "frontier y x1 x2 on 400 observations: Stata x1 .7813064, x2 .517943, _cons 1.047813"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Normal/half-normal stochastic frontier, lnf = ln2 - ln(sigma) + ln(phi(z)) + ln(Phi(-z*lambda)). The tail term uses log_ndtr: computing ln(Phi(z)) directly underflows to -inf for z < -7, which would silently make the likelihood infinite. sigma_u/sigma_v/lambda/gamma are reported in e(). Only distribution(halfnormal) is in scope; truncated and exponential raise UnsupportedError."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

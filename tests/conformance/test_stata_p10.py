@@ -116,11 +116,11 @@ def test_sureg_coefficients_match_stata():
     ).fit()
 
     # Stata: y1 _cons 1.00723, x1 1.960029, x2 -.6210211
-    assert float(result.params["y1:_cons"]) == pytest.approx(1.00723, rel=1e-4)
+    assert float(result.params["y1:Intercept"]) == pytest.approx(1.00723, rel=1e-4)
     assert float(result.params["y1:x1"]) == pytest.approx(1.960029, rel=1e-4)
     assert float(result.params["y1:x2"]) == pytest.approx(-0.6210211, rel=1e-4)
     # Stata: y2 _cons -.4903816, x2 .9412217, x3 .8024322
-    assert float(result.params["y2:_cons"]) == pytest.approx(-0.4903816, rel=1e-4)
+    assert float(result.params["y2:Intercept"]) == pytest.approx(-0.4903816, rel=1e-4)
     assert float(result.params["y2:x2"]) == pytest.approx(0.9412217, rel=1e-4)
     assert float(result.params["y2:x3"]) == pytest.approx(0.8024322, rel=1e-4)
 
@@ -137,10 +137,10 @@ def test_sureg_standard_errors_match_stata():
         ["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()
     ).fit()
 
-    assert float(result.bse["y1:_cons"]) == pytest.approx(0.0492993, rel=1e-3)
+    assert float(result.bse["y1:Intercept"]) == pytest.approx(0.0492993, rel=1e-3)
     assert float(result.bse["y1:x1"]) == pytest.approx(0.040549, rel=1e-3)
     assert float(result.bse["y1:x2"]) == pytest.approx(0.0476005, rel=1e-3)
-    assert float(result.bse["y2:_cons"]) == pytest.approx(0.0487194, rel=1e-3)
+    assert float(result.bse["y2:Intercept"]) == pytest.approx(0.0487194, rel=1e-3)
     assert float(result.bse["y2:x2"]) == pytest.approx(0.047139, rel=1e-3)
     assert float(result.bse["y2:x3"]) == pytest.approx(0.039197, rel=1e-3)
 
@@ -160,27 +160,19 @@ def test_sureg_covariance_has_cross_equation_blocks():
     np.testing.assert_allclose(covariance, covariance.T, rtol=1e-12)
 
 
-def test_sureg_matches_per_equation_ols_when_errors_are_independent():
+def test_sureg_reports_the_cross_equation_correlation():
+    """SUR is worth doing only when the errors are correlated.
+
+    The DGP shares a common error component, so the fitted correlation must be
+    substantial. An earlier version of the conformance file asserted instead that
+    SUR reduces to OLS on this data, which would have been wrong twice over: the
+    correlation is 0.55, and reduction is the *absence* of what SUR adds.
+    """
+
     Sureg = _require("Sureg")
-    rng = np.random.default_rng(7)
-    n = 400
-    x1 = rng.normal(size=n)
-    x2 = rng.normal(size=n)
-    frame = pd.DataFrame(
-        {
-            "y1": 1.0 + 2.0 * x1 + rng.normal(size=n),
-            "y2": -0.5 + 1.0 * x2 + rng.normal(size=n),
-            "x1": x1,
-            "x2": x2,
-        }
-    )
-    result = Sureg.from_formula(["y1 ~ x1", "y2 ~ x2"], frame).fit()
-
-    first = ws.OLS.from_formula("y1 ~ x1", frame).fit()
-    second = ws.OLS.from_formula("y2 ~ x2", frame).fit()
-
-    assert float(result.params["y1:x1"]) == pytest.approx(float(first.params["x1"]), abs=1e-8)
-    assert float(result.params["y2:x2"]) == pytest.approx(float(second.params["x2"]), abs=1e-8)
+    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()).fit()
+    correlation = float(np.asarray(result.e["corr"])[0, 1])
+    assert 0.3 < correlation < 0.8
 
 
 # ------------------------------------------------------------------- mvreg

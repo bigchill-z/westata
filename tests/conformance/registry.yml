@@ -509,7 +509,7 @@
       ref: "sureg (y1 x1 x2) (y2 x2 x3) on 400 observations with correlated errors: Stata coefficients 1.00723 / 1.960029 / -.6210211 and -.4903816 / .9412217 / .8024322, SEs .0492993/.040549/.0476005 and .0487194/.047139/.039197"
   verified_by: lead
   date: 2026-10-23
-  notes: "Feasible GLS, Sigma_ij = e_i'e_j/n (divide by n, not n-k), Omega = Sigma^-1 (x) I, beta = (X'Omega X)^-1 X'Omega y. Coefficients AND standard errors reproduce Stata digit for digit. The standard errors are the meaningful check: a wrong Sigma leaves every coefficient untouched while moving every SE, and the fitted cross-equation correlation here is 0.5544. iterate=True (Stata's isure) raises UnsupportedError rather than guessing a convergence rule."
+  notes: "Feasible GLS, Sigma_ij = e_i'e_j/n (divide by n, not n-k), Omega = Sigma^-1 (x) I, beta = (X'Omega X)^-1 X'Omega y. Coefficients AND standard errors reproduce Stata digit for digit, and the full 6x6 V matches Stata's e(V) at rtol 1e-10 -- verified against live Stata, not only the fixture. The standard errors are the meaningful check: a wrong Sigma leaves every coefficient untouched while moving every SE, and the fitted cross-equation correlation here is 0.5544. The solver uses exact solve/inv rather than pinv, so a singular system fails instead of silently returning something. iterate=True (Stata's isure) raises UnsupportedError. e() uses Stata's positional spellings (r2_1, rmse_1, chi2_1) with label-based aliases."
 
 - command: mvreg
   level: E3
@@ -519,27 +519,27 @@
       ref: "mvreg y1 y2 = x1 x2 x3: Stata y1 x1 1.95372, x2 -.6277454, x3 -.0732678; y2 x2 .9381316"
   verified_by: lead
   date: 2026-10-23
-  notes: "Every equation shares one design, so the coefficients are per-equation OLS and only the VCE uses the cross-equation covariance. mvreg and sureg give DIFFERENT coefficients on the same data because mvreg puts every regressor in every equation -- a specification difference, not an inconsistency, and a test asserts that difference explicitly so it cannot be mistaken for a regression."
+  notes: "Every equation shares one design, so the coefficients are per-equation OLS. mvreg and sureg give DIFFERENT coefficients on the same data because mvreg puts every regressor in every equation -- a specification difference, not an inconsistency, and a test asserts it explicitly. One correction to the original brief: the VCE does not differ from per-equation OLS on its DIAGONAL. Stata reports identical standard errors (.04886691 both ways), and the difference lives entirely in the off-diagonal blocks, e.g. V[0,4] = 0.0013157 = 0.556 * sqrt(V00*V44). An earlier test asserted a standard-error difference that does not exist; it now asserts the cross-blocks and the correlation identity instead."
 
 - command: eivreg
   level: E3
-  tolerance: 1.0e-3
+  tolerance: 1.0e-7
   sources:
     - type: r_crosscheck
-      ref: "eivreg y x1 x2, reliab(x1 .7) on 500 observations: Stata x1 2.073214, x2 -.4678675, _cons .8649387"
+      ref: "eivreg y x1 x2, reliab(x1 .7) on 500 observations, cross-checked against live e(b)/e(V) in StataNow 19.5: x1 2.073214, x2 -.4678675, _cons .8649387; westata coefficients gap 4.2e-8, full V rtol 1e-9"
   verified_by: lead
   date: 2026-10-23
-  notes: "[R] eivreg: b = A^-1 X'y with A = X'X/n - S and S = diag((1-r_j) s_j^2). Getting this right took three attempts, all of them wrong in instructive ways: weighting by 1/lambda gave x1 = 1.214, weighting by lambda gave 1.735, and using the RAW X'X instead of X'X/n gave 1.452. The normalisation is the crux -- s_j^2 is a per-observation quantity, so the cross-product must be too, and without it the subtracted term is ~200x too small to matter. With X'X/n the answer is 2.074996 against Stata's 2.073214, a 1.8e-3 gap from the variance convention, recorded rather than tuned. reliab=1.0 reproduces OLS exactly."
+  notes: "[R] eivreg: b = A^-1 X'y with A = X'X/n - S and S = diag((1-r_j) s_j^2). The route there had four wrong turns worth keeping: weighting by 1/lambda gave x1 = 1.214, weighting by lambda gave 1.735, raw X'X instead of X'X/n gave 1.452, and the final 1.8e-3 residual was a ddof choice -- Stata uses ddof=0, not ddof=1. That last gap had been recorded here as an unavoidable variance convention; it was a fixable mistake, and recording it as unavoidable was the worst of the four because it tells a future reader to stop looking. e(r2) = 0.863984 (Stata 0.8640), e(rmse) = 0.835714 (0.8357) and e(F) = 407.779 are all now present and exact; earlier they were 0.511, 0.8335 and missing. reliab=1.0 still reproduces OLS exactly."
 
 - command: manova
-  level: E2
-  tolerance: 5.0e-3
+  level: E3
+  tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
-      ref: "manova y1 y2 = g on 240 observations, 3 groups: Stata Wilks' lambda .4290, F 62.15, p 0.0000"
+      ref: "manova y1 y2 = g on 240 observations, 3 groups: Stata Wilks' lambda .4290, F(4, 472) 62.15; westata lambda 0.4290353821, F 62.15049200"
   verified_by: lead
   date: 2026-10-23
-  notes: "Wilks' lambda matches to 5e-3 through Rao's F approximation. Only Wilks' lambda is implemented; Pillai's trace, Lawley-Hotelling and Roy's largest root raise nothing because they are simply absent. Multiple factors raise UnsupportedError -- one-way only."
+  notes: "Rao's F is an approximation by definition -- an exact F via Wilks' lambda exists only for small numbers of responses and groups -- and Stata itself flags which case applies, a flag reproduced here. My first implementation used a different parameterisation of the Rao transform and produced F = 30.68 against Stata's 62.15, i.e. it was off by a factor of two while Wilks' lambda looked right. Verified now across eight designs (p = 1..4, 2-5 groups), including the exact-versus-approximate flag. Only Wilks' lambda is implemented; the other three statistics are absent rather than approximated, and multiple factors raise UnsupportedError."
 
 - command: nl
   level: E3

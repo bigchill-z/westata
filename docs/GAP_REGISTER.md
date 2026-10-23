@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**52 条命令条目**（见 `tests/conformance/registry.yml`），其中 40 条 E3
+- 已实现：**65 条命令条目**（见 `tests/conformance/registry.yml`），其中 45 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -117,23 +117,38 @@
 > 但 bootstrap 标准误系统性偏小。Stata 用自己的 RNG，逐格对比不可能；
 > 但偏差是系统性的，说明抽样方案不同。不声称 E3。
 
-### 3.4 面板扩展（P9）
+### 3.4 面板扩展（P9 已完成）
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `xtlogit` / `xtprobit` | ⬜ | 面板二值（FE/RE/PA） |
-| `xttobit` | ⬜ | 面板 Tobit |
-| `xtpoisson` / `xtnbreg` | ⬜ | |
-| `xtivreg` | ⬜ | 面板 IV |
-| `xtabond` | ⬜ | Arellano-Bond 动态面板 |
-| `xtdpd` / `xtdpdsys` | ⬜ | 动态面板 GMM |
-| `xtgls` / `xtpcse` | ⬜ | 面板 GLS / PCSE |
+| `xtlogit, fe` | ✅ **E3** | 条件似然；系数与 N=912 都与 Stata 一致 |
+| `xtlogit, re` | ⚠️ E1 | quadrature 已实现，未逐项对拍 |
+| `xtlogit, pa` | ⚠️ E1 | GEE，**不是似然**，`e(ll)` 故意缺席 |
+| `xtprobit, re` | ⚠️ E1 | 已实现未对拍 |
+| `xttobit` | ⚠️ E1 | 已实现未对拍 |
+| `xtpoisson, fe` | ⚠️ E2 | 真似然（多项条件化），差 <5% |
+| `xtpoisson, re` | ⚠️ E1 | 已实现未对拍 |
+| `xtnbreg, fe` | ⚠️ E1 | **准似然**，`e(quasi_likelihood)=1` |
+| `xtivreg, fe` | ✅ **E3** | 三项系数全精确 |
+| `xtivreg, re` | ⚠️ E2 | 差 0.42%（theta 分解差异） |
+| `xtgls` | ✅ **E3** | 精确匹配；**不等于 OLS** |
+| `xtpcse` | ✅ **E3** | 精确匹配 |
+| `xtabond` | ⚠️ E2 | 工具数精确 =30；系数差 0.2% |
+| `xtdpd` / `xtdpdsys` | ⚠️ E1 | 别名；**系统 GMM 附加矩未实现** |
+| `xtunitroot` | ⚠️ E1 | IPS/LLC 近似，Stata 用不可复现的临界值表 |
 | `xtheckman` | ⬜ | |
 | `xtcloglog` / `xtmelogit` | ⬜ | |
-| `xtunitroot` | ⬜ | 面板单位根 |
 | `xtcointreg` | ⬜ | |
 | `xtfrontier` | ⬜ | |
 | `xtmixed` / `mixed` | ❌ | 混合模型，需要专用混合效应引擎，与 lme4 生态重叠 |
+
+> **P9 的关键教训**：`xtabond` 的判别式不是系数，而是 **`e(instruments)` 必须等于 30**。
+> 这个数字抓出了三个 bug（H 矩阵维度错误、工具块从 y2 而非 y1 开始、缺标准工具），
+> 而这三个 bug 发生时**系数看起来都还合理**。工具数错了，系数一定错；工具数对了，才有资格谈系数。
+>
+> **P9 的另一教训**：我两次写错了**测试**而不是代码。
+> `xtgls` 的测试断言"等于 OLS"——那是错的，`xtgls` 是真 GLS（0.679847 vs OLS 0.753313），
+> 而 westata 的实现本来就是对的。若按错误测试去"修"实现，会把正确的代码改坏。
 
 ### 3.5 离散选择扩展
 
@@ -334,7 +349,7 @@
 | P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | **已完成** |
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`） | 2–3 周 | **已完成**（`gnbreg` 除外） |
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | **已完成**（`sqreg`/`bsqreg` 止于 E1） |
-| P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | 计划 |
+| P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | **已完成** |
 | P10 | 多方程（`sureg`/`mvreg`/`nl`/`nlsur`/`gmm`/`eivreg`/`frontier`） | 3–4 周 | 计划 |
 | P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | 计划 |
 | P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | 计划 |

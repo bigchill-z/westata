@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    LlcResult,
+    levin_lin_chu,
     IpsResult,
     im_pesaran_shin,
     Bootstrap,
@@ -109,6 +111,8 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "LlcResult",
+    "levin_lin_chu",
     "IpsResult",
     "im_pesaran_shin",
     "Permute",

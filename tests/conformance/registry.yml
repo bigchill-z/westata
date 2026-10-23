@@ -486,11 +486,13 @@
   level: E1
   tolerance: 1.0e-1
   sources:
-    - type: invariant
-      ref: "LLC produces a finite statistic and a p-value in [0, 1]"
+    - type: r_crosscheck
+      ref: "xtunitroot llc y on 30x12: Var_ep matches Stata to 1.9e-16; mu_adj -0.554 and sig_adj 0.919 exact; N=300, N_t=12, N_g=30 exact"
+    - type: r_crosscheck
+      ref: "NOT matching: sbar 0.8287 (Stata 0.8624), td -11.72 (Stata -11.70), tds -12.63 (Stata -5.63)"
   verified_by: lead
   date: 2026-10-23
-  notes: "Still unverified. Unlike IPS, its source (_xturllc.ado, 18,075 bytes) has not been transliterated yet; the IPS work showed the approach is feasible and that the code is readable, so this is a task rather than a barrier. Also out of scope for now: xtunitroot ht, fisher and breitung, whose sources are also present."
+  notes: "Implemented from _xturllc.ado by transliteration, and PARTIALLY verified. Four things were found and fixed along the way, each by comparing against full-precision r() scalars: (1) LLC's default ADF lag is 1, not 0 as in IPS -- [_xturllc.ado line 32] -- which had shifted N to 330 against Stata's 300; (2) N_t is the RAW period count, not the post-differencing length; (3) the HAC bandwidth int(3.21*T^(1/3)) also counts raw periods, giving the '7.00 lags average' Stata prints; (4) mrssdf divides by capT-p-1 where capT is the raw period count. After those, Var_ep is exact to 1.9e-16 and the adjustment table lookup is exact, which pins the pooled regression and the deterministic specification. STILL UNRESOLVED: sbar, and hence td (1.7e-3) and tds (large). Tested and rejected as explanations: mrssdf denominators of raw-p-1, length, length-1 and capT-p-1, and HAC variance over the post-lag range versus the full differenced range -- none reproduces 0.8624. The correction term in tds is about the size of td itself (N=30, Var_ep=1.15, nu_se=0.052, muadj=-0.554), so a 4% error in sbar moves tds by several units, which is exactly the symptom. The likely culprit is the exact sample Stata's _predict markings leave for wvar, which follows its by-group sample machinery rather than a formula readable from the source. Left at E1 deliberately: the parts that DO match are asserted by tests so they cannot silently regress, and the gap is stated numerically instead of being hidden behind a loose tolerance. This entry replaced a previous note claiming LLC was simply 'not yet transliterated', which was wrong -- it is transliterated and three quarters verified."
 - command: xtabond
   level: E2
   tolerance: 2.0e-2

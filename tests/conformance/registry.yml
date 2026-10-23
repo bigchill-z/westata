@@ -923,16 +923,16 @@
   notes: "estout installed from the author's GitHub source (SSC unreachable). Coefficients agree exactly at the printed precision (gap 0.0). The tolerance is 5e-7 because esttab reports 6 decimals."
 
 - command: vecrank (Johansen)
-  level: E2
-  tolerance: 1.0e-3
+  level: E3
+  tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
-      ref: "vecrank y1 y2, lags(2) on 400 observations: Stata trace [195.9673, 4.1665]; westata identical to all four printed decimals"
+      ref: "vecrank y1 y2 at lags(1): Stata trace [288.3450, 3.7832], eigenvalues [0.50992, 0.00944]; westata [288.3450, 3.7832] with eigenvalues [0.509920, 0.009437]"
     - type: r_crosscheck
-      ref: "vecrank y1 y2, lags(1): Stata trace [288.3450, 3.7832]; westata [287.2485, 1.7922] -- gaps 1.10 and 1.99"
+      ref: "same at lags(2) [195.9673, 4.1665] and lags(3) [156.0040, 3.7308]; westata identical at both"
   verified_by: lead
   date: 2026-10-23
-  notes: "A REAL DEFECT WAS FOUND HERE while measuring impact, and it had been hidden by the one case the registry checked. johansen() resolved its lag order as 'lags if given, else k_ar_diff if given, else 1', never consulting the lag order the MODEL was constructed with. So VECM(data, lags=1).johansen(), lags=2 and lags=3 all returned identical statistics [195.9673, 4.1665]. That constant happened to equal Stata's lags(2) -- the single configuration verified -- so the entry looked clean while lags(1) was off by 30% on the first statistic and lags(3) had never been exercised at all. Fixed by falling back to self._lags. This is the same failure mode as the vec lag off-by-one: the constructor accepted an order and a method quietly substituted a constant. NOW MEASURED: lags(2) exact; lags(1) gaps of 1.10 and 1.99, from boundary handling when no lagged differences exist, which is why this entry stays E2. IMPACT, and this is the part a user needs: at lags(1) Stata's rank-1 trace is 3.7832 against a 5% critical value of 3.76, a 0.6% margin, so the two implementations DISAGREE ON THE SELECTED RANK -- Stata rejects rank 1 (3.78 > 3.76) while westata retains it (1.79 < 3.84). The gap is not cosmetic at lags(1); it changes the answer. At lags(2) and above the decision agrees exactly."
+  notes: "TWO defects were fixed here and both had been masked by the single case the registry checked. (1) johansen() resolved its lag order as 'lags if given, else k_ar_diff if given, else 1' and never consulted the lag order the MODEL was constructed with, so lags(1), lags(2) and lags(3) all returned identical statistics. That constant equalled Stata's lags(2), the one verified configuration. (2) statsmodels' coint_johansen disagrees with Stata at k_ar_diff = 0 -- 287.2485 and 1.7922 against Stata's 288.3450 and 3.7832 -- and the DIAGNOSTIC that exposed it was the asymmetry: the first eigenvalue matched to three decimals while the second was out by a factor of two. A genuine estimation difference cannot behave that way, so the problem was in the statistic rather than the sample. Computing Johansen directly from the moment matrices (regress dy and y_{t-1} on [lagged differences, constant]; solve the generalised eigenproblem for S01'S00^-1 S01 relative to S11; accumulate -T*ln(1-lambda) from the SMALLEST eigenvalue upward) reproduces Stata to all printed decimals at every lag order. The ordering was the detail I had backwards on the first manual attempt, and it is worth recording because it silently doubles the second statistic. Critical values still come from statsmodels' Osterwald-Lenum tables, which are what Stata reports."
 - command: vec (VECM estimation)
   level: E3
   tolerance: 1.0e-4

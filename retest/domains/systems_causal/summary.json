@@ -1,0 +1,760 @@
+{
+  "domain": "systems_causal",
+  "total": 56,
+  "counts": {
+    "pass": 36,
+    "error": 2,
+    "fail": 16,
+    "skip": 2
+  },
+  "max_param_rel": 14.184100350209507,
+  "generated_at": "2026-10-24T02:27:57",
+  "stata_version": "19.5",
+  "items": [
+    {
+      "name": "sureg 2eq (default = small-sample VCE)",
+      "status": "pass",
+      "param_rel": 5.754719914040546e-13,
+      "se_rel": 6.089747679067565e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "sureg (price weight mpg) (mpg weight foreign)",
+      "notes": [
+        "e(b) repeats each variable name once per equation, so the comparison is positional (equation-major, then regressor order). westata names the rows ['price:weight', 'price:mpg', 'price:_cons', 'mpg:weight', 'mpg:foreign', 'mpg:_cons']; Stata stores ['weight', 'mpg', '_cons', 'weight', 'foreign', '_cons'].",
+        "Stata's e(ll) = -875.73335761, westata's = -875.73335761 (rel 9.087e-16).",
+        "Stata stores no system-wide e(df_m); it records e(df_m1)/e(df_m2) per equation (2.0, 2.0), while westata's e(df_m) = 4.0 is the slope count over the whole system. Different quantities, so not compared.",
+        "westata reports nobs = 148 (the stacked k_eq * n residual vector) with e(N) = 74 per equation; Stata's e(N) is also 74. The two nobs attributes are on different scales by design."
+      ],
+      "error": ""
+    },
+    {
+      "name": "sureg vce(robust) (westata unsupported)",
+      "status": "error",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "sureg (price weight mpg) (mpg weight foreign), vce(robust)",
+      "notes": [
+        "westata implements only cov_type='nonrobust' for sureg. Stata's vce(robust) standard errors [0.75993745, 91.70326703, 4053.05585619, 0.00053137, 1.0926504, 1.74656612] therefore have no westata counterpart; the exception is the recorded evidence."
+      ],
+      "error": "RuntimeError: UnsupportedError: sureg: cov_type='robust' is not implemented; only the unadjusted VCE (cov_type='nonrobust') is verified against Stata for this command"
+    },
+    {
+      "name": "mvreg 2 outcomes, shared design",
+      "status": "pass",
+      "param_rel": 7.176090061132646e-15,
+      "se_rel": 9.12121299897706e-14,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "mvreg price mpg = weight foreign",
+      "notes": [
+        "mvreg puts every regressor in every equation, so its coefficients differ from sureg's by specification, not by error."
+      ],
+      "error": ""
+    },
+    {
+      "name": "manova p=2, q=1 (Wilks lambda / Rao F / df)",
+      "status": "pass",
+      "param_rel": 1.9597454586516083e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "manova price mpg = foreign",
+      "notes": [
+        "p=2, q=1: p^2+q^2 = 5, so the Rao transform degenerates to s = 1 and Stata marks the F exact ('e' in the table)."
+      ],
+      "error": ""
+    },
+    {
+      "name": "manova p=3, q=2 (s=2)",
+      "status": "pass",
+      "param_rel": 4.6818156548888045e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "manova y1 y2 y3 = g",
+      "notes": [
+        "Pillai / Lawley-Hotelling / Roy rows are stored by Stata but not implemented by westata; only the Wilks row is compared."
+      ],
+      "error": ""
+    },
+    {
+      "name": "manova p=3, q=3 (approximate Rao F, fractional df2)",
+      "status": "pass",
+      "param_rel": 7.550725848257887e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "manova z1 z2 z3 = g",
+      "notes": [
+        "df2 = 228.92... is fractional: the Rao approximation, not a counting formula, decides it.",
+        "Pillai / Lawley-Hotelling / Roy rows are stored by Stata but not implemented by westata; only the Wilks row is compared."
+      ],
+      "error": ""
+    },
+    {
+      "name": "nl exp decay, Stata start values supplied",
+      "status": "fail",
+      "param_rel": 1.5693385951900566e-07,
+      "se_rel": 1.577176880579673e-07,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "nl (price = {b0}*exp({b1}*mpg))",
+      "notes": [
+        "westata defaults every start value to 1, which does not converge for this model; the starts Stata's grid search reaches are passed explicitly so the two optimisers are compared on equal footing.",
+        "Stata stores the parameter names without the '/' it prints (e(b) columns are 'b0','b1'); westata uses '/b0','/b1'. Mapped explicitly."
+      ],
+      "error": ""
+    },
+    {
+      "name": "nl quadratic with additive constant",
+      "status": "fail",
+      "param_rel": 6.327967707348355e-08,
+      "se_rel": 0.9999999314426019,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "nl (mpg = {b0} + {b1}*weight + {b2}*weight^2)",
+      "notes": [
+        "Stata's {b0} + {b1}*weight + {b2}*weight^2 has an additive constant, so Stata centres the total SS and df_m = k - 1 = 2.",
+        "Stata names the e(b) columns 'b0','b1','b2'; westata uses '/b0' etc.",
+        "The point estimates and every fit statistic agree; the SEs do not. The design is weight and weight^2, whose cross-product has condition number 6.1e9, so the smallest eigenvalue of J'J sits below numpy's default pinv cut-off (6.7e-16 relative) and is silently dropped: westata reports se(b0) = 3.95e-07 against Stata's 5.77. Same fit, unusable inference."
+      ],
+      "error": ""
+    },
+    {
+      "name": "nl linear-in-parameters (well conditioned)",
+      "status": "pass",
+      "param_rel": 2.3794376007585587e-16,
+      "se_rel": 8.196290026068513e-11,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "nl (price = {b0} + {b1}*mpg)",
+      "notes": [
+        "Condition number of the Jacobian cross-product is ~1e2 here, so the Gauss-Newton covariance is stable and both sides agree."
+      ],
+      "error": ""
+    },
+    {
+      "name": "nl power function {b0}*mpg^{b1}",
+      "status": "fail",
+      "param_rel": 8.022366614164048e-08,
+      "se_rel": 9.23382573241841e-08,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "nl (price = {b0}*mpg^{b1})",
+      "notes": [
+        "Both the estimates and the SEs land inside 1e-7; the residual gap is the difference between Stata's Gauss-Newton iteration and westata's Levenberg-Marquardt, not a formula difference."
+      ],
+      "error": ""
+    },
+    {
+      "name": "nl default start values (convergence gap)",
+      "status": "fail",
+      "param_rel": 14.184100350209507,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "nl (price = {b0}*exp({b1}*mpg))",
+      "notes": [
+        "westata starts every parameter at 1.0 and Levenberg-Marquardt stalls there (RSS 3.41743e+09 vs Stata's 4.53839e+08); Stata runs its own grid search before iterating. A warning is emitted but a misleading fit is still returned unless strict=True.",
+        "warnings raised: nl: the optimiser did not converge (The maximum number of function evaluations is exceeded.)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects ra ATE",
+      "status": "pass",
+      "param_rel": 3.8372775753170025e-15,
+      "se_rel": 1.206414378333991e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "teffects ra (y x1 x2) (t)",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons, x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects ra ATET",
+      "status": "pass",
+      "param_rel": 3.2818044429303454e-14,
+      "se_rel": 3.3992891405710324e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "teffects ra (y x1 x2) (t), atet",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons, x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects ipw ATE",
+      "status": "pass",
+      "param_rel": 1.038183498414086e-15,
+      "se_rel": 3.5858302701562673e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "teffects ipw (y) (t x1 x2)",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects ipw ATET",
+      "status": "pass",
+      "param_rel": 6.199928645063027e-16,
+      "se_rel": 1.1070726540537246e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "teffects ipw (y) (t x1 x2), atet",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects aipw ATE",
+      "status": "pass",
+      "param_rel": 1.1121332727969874e-16,
+      "se_rel": 1.081520713513708e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "teffects aipw (y x1 x2) (t x1 x2)",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons, x1, x2, _cons, x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects aipw ATET",
+      "status": "fail",
+      "param_rel": 0.5234730280080024,
+      "se_rel": 0.0292516025670193,
+      "tier": "E",
+      "se_tier": "E",
+      "command": "teffects aipw (y x1 x2) (t x1 x2), atet",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (x1, x2, _cons, x1, x2, _cons, x1, x2, _cons); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects aipw ATET: Stata's PO formulas reconstructed",
+      "status": "pass",
+      "param_rel": 4.4052629122800696e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "teffects aipw (y x1 x2) (t x1 x2), atet",
+      "notes": [
+        "Root cause isolated. For the ATET, Stata's PO(0) is the augmented estimator (1/n1)[sum_t x0'b0 + sum_c odds_i (y_i - x0'b0)] = 0.02362705941306397; its PO(1) is the plain treated mean 2.0766293842852925. Both are reproduced here from westata's own propensity scores and outcome regressions, so the difference is in the ATET assembly, not in the components.",
+        "westata's ATET branch instead reports PO(0) = mean_t(x0'b0) = 0.011258931079182398 (no control augmentation, because augmented0 is multiplied by (1-t) before the mean is taken over the treated) and PO(1) = mean_t(x1'b1 + r1/p) = 2.057952653902358 (an extra 1/p inside the treated mean). The two errors do not cancel: ATET is 2.04669372 vs Stata's 2.05300232.",
+        "The ATE branch is correct -- it matches Stata to 1e-16 -- so this is a defect confined to estimand='atet', not in the propensity model or the outcome regressions."
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects nnmatch ATE, nneighbor(1)",
+      "status": "fail",
+      "param_rel": 4.504462929372294e-16,
+      "se_rel": 0.05087531503944678,
+      "tier": "A",
+      "se_tier": "E",
+      "command": "teffects nnmatch (y x1 x2) (t)",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0",
+        "Point estimate matches to machine precision (Mahalanobis metric, matching with replacement); the SE is westata's own approximation and is labelled as such on the result (se_method)."
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects nnmatch ATE, nneighbor(3)",
+      "status": "fail",
+      "param_rel": 8.856403134509044e-16,
+      "se_rel": 0.04532391893331018,
+      "tier": "A",
+      "se_tier": "E",
+      "command": "teffects nnmatch (y x1 x2) (t), nneighbor(3)",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0",
+        "Same conclusion with 3 neighbours: the estimate is exact, the Abadie-Imbens SE is approximate."
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects nnmatch ATET, nneighbor(1)",
+      "status": "fail",
+      "param_rel": 0.0,
+      "se_rel": 0.16261506845095836,
+      "tier": "A",
+      "se_tier": "E",
+      "command": "teffects nnmatch (y x1 x2) (t), atet",
+      "notes": [
+        "Stata's e(b) also carries the nuisance models (); those rows have no westata counterpart and are excluded from the comparison (see NOTES.md).",
+        "stata_N=400.0, n1=205.0, n0=195.0",
+        "The ATET point estimate is exact as well; only the SE differs, and it is not just rescaled -- westata reports the same standard error for the ATE and the ATET, so the ATET SE is the ATE one."
+      ],
+      "error": ""
+    },
+    {
+      "name": "teffects nnmatch biasadj(x1 x2) (westata unsupported)",
+      "status": "error",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "teffects nnmatch (y x1 x2) (t), biasadj(x1 x2)",
+      "notes": [
+        "westata's NearestNeighbourMatching.fit() takes no arguments, so there is no bias-adjustment path at all."
+      ],
+      "error": "TypeError: TypeError: NearestNeighbourMatching.fit() got an unexpected keyword argument 'bias_adjust'"
+    },
+    {
+      "name": "didregress two-period, covariate, vce(cluster)",
+      "status": "pass",
+      "param_rel": 2.0790573471566487e-15,
+      "se_rel": 9.934957046183854e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "didregress (y x1) (treated), group(unit) time(period)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', 'x1', '2.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress two-period, no covariate, vce(cluster)",
+      "status": "pass",
+      "param_rel": 1.8117423043136117e-16,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "didregress (y) (treated), group(unit) time(period)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', '2.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress (y) with an unrelated numeric column present",
+      "status": "fail",
+      "param_rel": 0.00018498042764381948,
+      "se_rel": NaN,
+      "tier": "C",
+      "se_tier": "NA",
+      "command": "didregress (y) (treated), group(unit) time(period)",
+      "notes": [
+        "Specification hazard, not a numerical bug: westata's didregress treats every other time-varying numeric column as a covariate when the outcome block names none (it warns), so ['x1'] enters the regression and the ATET moves from 1.22558603 to 1.22581273. Stata's '(y)' uses no covariate. Callers must narrow the frame or name the covariates explicitly."
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress two-period, vce(robust)",
+      "status": "pass",
+      "param_rel": 2.0790573471566487e-15,
+      "se_rel": 1.058216995018265e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "didregress (y x1) (treated), group(unit) time(period) vce(robust)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', 'x1', '2.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress vce(unadjusted)",
+      "status": "skip",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "didregress (y x1) (treated), group(unit) time(period) vce(unadjusted)",
+      "notes": [
+        "Stata 19.5 rejects vce(unadjusted) for didregress (r(198);); westata implements cov_type='nonrobust' anyway, so there is no Stata number to compare: westata ATET 1.22581273 se 0.209524096."
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress five-period staggered, vce(cluster)",
+      "status": "pass",
+      "param_rel": 1.7790693810014787e-15,
+      "se_rel": 1.1306193830559953e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "didregress (y) (treated), group(unit) time(period)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', '2.period', '3.period', '4.period', '5.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "xtdidregress five-period staggered, vce(cluster)",
+      "status": "pass",
+      "param_rel": 1.7790693810014787e-15,
+      "se_rel": 1.2643369907784622e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "xtdidregress (y) (treated), group(unit) time(period)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', '2.period', '3.period', '4.period', '5.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "xtdidregress two-period, covariate, vce(cluster)",
+      "status": "pass",
+      "param_rel": 2.0790573471566487e-15,
+      "se_rel": 1.0629646551365124e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "xtdidregress (y x1) (treated), group(unit) time(period)",
+      "notes": [
+        "Only the ATET column (and named covariates) is compared; Stata's e(b) also stores the created i.period dummies and the constant, which are absorbed by the fixed effects on the westata side. stata rows = ['r1vs0.treated', 'x1', '2.period', '_cons']"
+      ],
+      "error": ""
+    },
+    {
+      "name": "didregress vs xtdidregress dof convention",
+      "status": "pass",
+      "param_rel": 1.811407229429675e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "didregress/xtdidregress (y x1) (treated), group(unit) time(period)",
+      "notes": [
+        "Identical ATET; only the nested-effect (N-1)/(N-K) factor differs. Stata se 0.297463534 (didregress) vs 0.208517335 (xtdidregress); westata 0.297463534 vs 0.208517335."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: mean (pw + strata)",
+      "status": "pass",
+      "param_rel": 3.841058528746431e-15,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: mean y x1",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: total (pw + strata)",
+      "status": "pass",
+      "param_rel": 3.897387964166018e-15,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: total y x1",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: proportion 3 levels (pw + strata)",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": 1.4739584598047798e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: proportion grp",
+      "notes": [
+        "Stata stores the level-0 proportion as '0bn.grp', which is the base-level spelling; it is a genuine estimate here, so the capture keeps every row and renames it explicitly."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: proportion binary (pw + strata)",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: proportion f",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: regress (pw + strata)",
+      "status": "pass",
+      "param_rel": 9.769394946122506e-16,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: regress y x1",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: regress with i.factor (pw + strata)",
+      "status": "pass",
+      "param_rel": 3.463135112672428e-15,
+      "se_rel": 1.8583909951738177e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: regress y x1 i.f",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: logit (pw + strata)",
+      "status": "pass",
+      "param_rel": 1.847845704514104e-14,
+      "se_rel": 1.507412874870742e-15,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: logit gbin x1",
+      "notes": [
+        "westata reports a linearised (Taylor) VCE for svy: logit; Stata's default is the same linearisation."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: mean self-weight, single stratum",
+      "status": "pass",
+      "param_rel": 1.2749573956852457e-16,
+      "se_rel": 1.2627683273261132e-16,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: mean y",
+      "notes": [
+        "No pweight: every observation counts once on both sides."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: mean no weights + strata (self-weight per PSU)",
+      "status": "pass",
+      "param_rel": 1.2749573956852457e-16,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: mean y",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "svy: mean with fpc (population PSUs)",
+      "status": "pass",
+      "param_rel": 1.2761448640725358e-16,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: mean y",
+      "notes": [
+        "fpc() above one is the population number of PSUs per stratum; the (1 - n_h/N_h) factor must match exactly."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: singleunit(missing) with lone PSUs",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "svyset psu [pw=w], strata(h); svy: mean y",
+      "notes": [
+        "Stata prints '.' with the note 'Missing standard error because of stratum with single sampling unit' and stores e(V) = 0; westata returns NaN. Both sides conclude that the design cannot identify the variance; the representation differs (0 sentinel vs NaN), so the zero is mapped to 'not estimable' before the comparison."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: singleunit(centered) with lone PSUs",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": 0.0,
+      "tier": "A",
+      "se_tier": "A",
+      "command": "svy: mean y",
+      "notes": [
+        "singleunit(centered) adds (T_h - Tbar)^2 for lone strata."
+      ],
+      "error": ""
+    },
+    {
+      "name": "svy: mean, over(f)",
+      "status": "skip",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "svy: mean y, over(f)",
+      "notes": [
+        "westata's SvyMean/SvyProportion expose no over() subpopulation estimator; Stata computes separate means per level with the full design's linearisation. Not implemented, not compared."
+      ],
+      "error": ""
+    },
+    {
+      "name": "jackknife: regress (pseudovalue VCE)",
+      "status": "fail",
+      "param_rel": 1.1548103805394348e-15,
+      "se_rel": 5.112629186067175e-07,
+      "tier": "A",
+      "se_tier": "B",
+      "command": "jackknife: regress mpg weight",
+      "notes": [
+        "Ground truth computed with exact rational arithmetic (Fraction) over all 74 leave-one-out OLS refits: [0.0005948844161012902, 2.0220336550078213]. It matches westata to 6.4e-15 and differs from Stata by 5.1e-07.",
+        "The gap is Stata's storage, not a formula difference: jackknife (and bootstrap) keep each replicate at single precision. Rounding the exact replicates through float32 and re-applying the same pseudovalue formula reproduces Stata's published SE to 2.2e-16."
+      ],
+      "error": ""
+    },
+    {
+      "name": "jackknife, mse: regress",
+      "status": "fail",
+      "param_rel": 1.1548103805394348e-15,
+      "se_rel": 5.122463810550223e-07,
+      "tier": "A",
+      "se_tier": "B",
+      "command": "jackknife, mse: regress mpg weight",
+      "notes": [
+        "Same attribution as the pseudovalue case: westata reproduces the exact rational answer, Stata is ~5e-7 away from it, and the float32-rounded emulation reproduces Stata's number."
+      ],
+      "error": ""
+    },
+    {
+      "name": "jackknife: mean",
+      "status": "fail",
+      "param_rel": 0.0,
+      "se_rel": 4.58187279692018e-06,
+      "tier": "A",
+      "se_tier": "C",
+      "command": "jackknife: mean mpg",
+      "notes": [
+        "Stata labels the single parameter with the variable name ('mpg'); westata calls it 'mean'. Mapped explicitly.",
+        "Exact jackknife SE = np.float64(0.6725510870764972) (algebraically identical to s/sqrt(n) for a mean). westata 0.6725510870764978 matches it; Stata 0.6725541686341475 is 4.6e-06 off. Rounding the leave-one-out means through float32 reproduces Stata's value to 1.7e-16, so the cause is single-precision replicate storage."
+      ],
+      "error": ""
+    },
+    {
+      "name": "jackknife: residual degrees of freedom used for t tests",
+      "status": "fail",
+      "param_rel": 0.0136986301369863,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "jackknife: regress mpg weight",
+      "notes": [
+        "Stata stores e(df_r) = 73.0 (N - 1: one degree of freedom per replicate) and tests with t(df_r); westata reports df_resid = 72.0 (N - k), so its critical value is 1.993464 against Stata's 1.992997. The 95% CI for _cons is [35.40943, 43.47113] in westata vs [35.41037, 43.47019] in Stata: same variance, different reference distribution."
+      ],
+      "error": ""
+    },
+    {
+      "name": "bootstrap: normal (z) vs t reference distribution",
+      "status": "fail",
+      "param_rel": 0.017091937599903885,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "bootstrap, reps(100) seed(20241024): regress mpg weight",
+      "notes": [
+        "A discrete difference, so the recorded number is the relative gap between the critical values westata uses and Stata's, not a coefficient difference.",
+        "Stata's bootstrap reports z / P>|z| and stores no e(df_r); westata sets dist='t' with df_resid = 72.0. The 95% CI for _cons is [35.22342, 43.65714] vs Stata's [35.29429, 43.58628]; t(72)'s critical value is 0.0171 relatively wider than z, so every interval and p-value is mildly conservative."
+      ],
+      "error": ""
+    },
+    {
+      "name": "bootstrap replicate-for-replicate (100 reps, seed 20241024)",
+      "status": "pass",
+      "param_rel": 1.4114764775955272e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "bootstrap, reps(100) seed(20241024): regress mpg weight",
+      "notes": [
+        "Stata's bootstrap passes bsampl_w frequency weights to the command; westata reproduces bsampl_w (both the index draw and the tie-break stream) from the same MT19937-64 seed, so the replicates are the same ones -- not merely the same distribution. Every replicate agrees to 1.4e-15.",
+        "Reproducible check: the program above re-fits the OLS by hand and POSTs _b[weight], _b[_cons], so the comparison is against Stata's replicate statistics, not against a printed table."
+      ],
+      "error": ""
+    },
+    {
+      "name": "bootstrap SE of regress (100 reps, seed 20241024)",
+      "status": "fail",
+      "param_rel": 1.1548103805394348e-15,
+      "se_rel": 8.700151966062607e-09,
+      "tier": "A",
+      "se_tier": "B",
+      "command": "bootstrap, reps(100) seed(20241024) nodots: regress mpg weight",
+      "notes": [
+        "Same seed and same replicates on both sides, so any residual gap is arithmetic, not sampling. Covariance of Stata's *saved* replicates (full double) gives SEs 8.7e-09 from Stata's own e(V) and 4.2e-16 from westata's. Rounding the saved replicates through float32 first reproduces Stata's e(V) to 2.1e-16, so the same single-precision replicate storage that explains the jackknife gap explains this one too."
+      ],
+      "error": ""
+    },
+    {
+      "name": "bootstrap SE of mean (100 reps, seed 20241024)",
+      "status": "fail",
+      "param_rel": 0.0,
+      "se_rel": 1.1216668926985396e-07,
+      "tier": "A",
+      "se_tier": "B",
+      "command": "bootstrap, reps(100) seed(20241024) nodots: mean mpg",
+      "notes": [
+        "Stata labels the parameter 'mpg'; westata calls it 'mean'. The same-seed replicates match, so the residual SE gap (~1e-7) is floating-point accumulation in the two covariance routines."
+      ],
+      "error": ""
+    },
+    {
+      "name": "permute: observed (unpermuted) statistic",
+      "status": "pass",
+      "param_rel": 2.796917175698454e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "permute weight bweight = _b[weight], reps(200): regress price mpg weight",
+      "notes": [
+        "The unpermuted estimate is deterministic and is printed from the unpermuted fit's e(b); westata reproduces it. Stata's own r(b) copy is stored at float32 precision (1.746559143066406 vs e(b)'s 1.7465591583457587, 8.7e-09 apart), which is a Stata storage artefact, not an estimation difference."
+      ],
+      "error": ""
+    },
+    {
+      "name": "permute: Monte Carlo p-value (same seed, not replicate-reproducible)",
+      "status": "pass",
+      "param_rel": 0.004975124378109453,
+      "se_rel": NaN,
+      "tier": "D",
+      "se_tier": "NA",
+      "command": "permute weight bweight = _b[weight], reps(200) seed(20241024)",
+      "notes": [
+        "NOT reproducible replicate-for-replicate. Stata's shuffle order is undocumented; westata uses Fisher-Yates over its own MT19937-64 stream, so the permutation sequences differ even with the same seed. Only the distribution of the p-value is comparable.",
+        "Stata p_lower=1.0000 p_upper=0.0000 -> two-sided 0.0000; westata 0.0050. The whole effect is discrete: Stata's two-sided p is 0 here because not one of the 200 permutations reached the observed statistic on the upper side, while westata's (c+1)/(reps+1) rule floors the same situation at 1/201 = 0.0050. With reps=200 the resolution is 0.0050, so a difference of 0.0050 is 1.00 grid steps."
+      ],
+      "error": ""
+    },
+    {
+      "name": "permute: Monte Carlo p-value across 6 seeds (weak effect, 400 reps)",
+      "status": "pass",
+      "param_rel": 0.012076059850373966,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "permute x tx = _b[x], reps(400) seed(S): regress y x",
+      "notes": [
+        "Neither engine reproduces the other's permutations, so the only meaningful comparison is the distribution of the reported p-value.",
+        "Stata mean 0.8242, westata mean 0.8362 (difference 0.0121). With 6 draws the standard error of each mean is ~0.014, so a 0.05 threshold on the difference only detects a gross error, not a subtle bias -- this row must not be read as a precision claim.",
+        "Note westata's (c+1)/(reps+1) rule makes its p-values slightly larger than Stata's c/n by ~1/(reps+1) = 0.0025."
+      ],
+      "error": ""
+    },
+    {
+      "name": "bootstrap: SE over 3 further seeds (200 reps each)",
+      "status": "pass",
+      "param_rel": 4.129322963672249e-08,
+      "se_rel": 4.129322963672249e-08,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "bootstrap, reps(200) seed(S): regress mpg weight",
+      "notes": [
+        "Stata's e(V) is stored in single precision for the bootstrap prefix, which caps the achievable agreement near 1e-7; the replicate-level comparison above is the one that reaches 1e-15."
+      ],
+      "error": ""
+    }
+  ]
+}

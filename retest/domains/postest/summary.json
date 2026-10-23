@@ -1,0 +1,1033 @@
+{
+  "domain": "postest",
+  "total": 77,
+  "counts": {
+    "pass": 45,
+    "fail": 32
+  },
+  "max_param_rel": 0.7355385520903455,
+  "generated_at": "2026-10-24T02:16:39",
+  "stata_version": "19.5",
+  "items": [
+    {
+      "name": "sample: regress mpg weight foreign",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "regress mpg weight foreign",
+      "notes": [
+        "listwise deletion must leave the same rows on both sides; the frames are pushed to Stata so the sample is literally the same one"
+      ],
+      "error": ""
+    },
+    {
+      "name": "sample: logit foreign weight mpg",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "logit foreign weight mpg",
+      "notes": [
+        "listwise deletion must leave the same rows on both sides; the frames are pushed to Stata so the sample is literally the same one"
+      ],
+      "error": ""
+    },
+    {
+      "name": "sample: poisson rep78 mpg weight",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "poisson rep78 mpg weight",
+      "notes": [
+        "listwise deletion must leave the same rows on both sides; the frames are pushed to Stata so the sample is literally the same one"
+      ],
+      "error": ""
+    },
+    {
+      "name": "sample: tobit mpg weight foreign, ll(17)",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "listwise deletion must leave the same rows on both sides; the frames are pushed to Stata so the sample is literally the same one"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: single coefficient (regress)",
+      "status": "pass",
+      "param_rel": 2.6582195004921924e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight",
+      "notes": [
+        "F form, df_r = e(df_r) = 71"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: joint (regress)",
+      "status": "pass",
+      "param_rel": 1.0187217166795653e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight foreign",
+      "notes": [
+        "two rows, F(2, 71)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: constraint weight=0.5 (regress)",
+      "status": "pass",
+      "param_rel": 9.206687257349433e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight=0.5",
+      "notes": [
+        "non-zero right-hand side"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: equality weight=foreign (regress)",
+      "status": "pass",
+      "param_rel": 1.335025632447969e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight=foreign",
+      "notes": [
+        "R = (0, 1, -1), r = 0"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: joint after vce(robust) (regress)",
+      "status": "pass",
+      "param_rel": 4.813588683451386e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight foreign",
+      "notes": [
+        "HC1 covariance on both sides"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: single coefficient (logit, Wald chi2)",
+      "status": "pass",
+      "param_rel": 1.911350653714499e-10,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight",
+      "notes": [
+        "Stata reports chi2(q)/Prob > chi2 after a z model; an F form here would be a different distribution"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: joint (logit, Wald chi2)",
+      "status": "pass",
+      "param_rel": 4.6190453354830104e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight mpg",
+      "notes": [
+        "Stata reports chi2(q)/Prob > chi2 after a z model; an F form here would be a different distribution"
+      ],
+      "error": ""
+    },
+    {
+      "name": "test: constraint weight=0 (logit)",
+      "status": "pass",
+      "param_rel": 1.911350653714499e-10,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "test weight=0",
+      "notes": [
+        "Stata reports chi2(q)/Prob > chi2 after a z model; an F form here would be a different distribution"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lincom: single coefficient (regress)",
+      "status": "pass",
+      "param_rel": 6.80697008755077e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lincom weight",
+      "notes": [
+        "t(71) interval, not z"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lincom: 2*weight - 3*foreign (regress)",
+      "status": "pass",
+      "param_rel": 1.4035431498570841e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lincom 2*weight - 3*foreign",
+      "notes": [
+        "weighted combination"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lincom: constant term + 10 (westata rejects)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "lincom 2*weight - 3*foreign + 10",
+      "notes": [
+        "Stata r(estimate) = 14.936911544776347, r(se) = 3.2272271185374004, r(df) = 71.0",
+        "westata raises ValueError: constant '10' is not a coefficient reference; put constants on the right-hand side of '='",
+        "Stata evaluates the whole expression (2w - 3f + 10) and only the coefficient part carries variance; westata's grammar rejects a bare constant and points the user at results.test()"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lincom: level(90) interval (regress)",
+      "status": "pass",
+      "param_rel": 6.235173092869785e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lincom 2*weight - 3*foreign, level(90)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "lincom: weight + mpg (logit, z)",
+      "status": "pass",
+      "param_rel": 7.808364755674065e-10,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lincom weight + mpg",
+      "notes": [
+        "after a z model Stata switches to z/P>|z|; the same call after regress must switch back to t"
+      ],
+      "error": ""
+    },
+    {
+      "name": "nlcom: ratio _b[weight]/_b[foreign] (z interval after regress)",
+      "status": "fail",
+      "param_rel": 1.3358048350376703e-05,
+      "se_rel": NaN,
+      "tier": "C",
+      "se_tier": "NA",
+      "command": "nlcom _b[weight]/_b[foreign]",
+      "notes": [
+        "Stata prints z/P>|z| and a normal interval even after regress, unlike lincom's t; the two commands must not be conflated"
+      ],
+      "error": ""
+    },
+    {
+      "name": "nlcom: exp(_b[weight]) (nonlinear, z)",
+      "status": "pass",
+      "param_rel": 5.868362572171889e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "nlcom exp(_b[weight])",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "nlcom: exp(_b[weight]) after logit",
+      "status": "pass",
+      "param_rel": 1.132948161143585e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "nlcom exp(_b[weight])",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "nlcom: ratio SE, analytic delta method as arbiter",
+      "status": "pass",
+      "param_rel": 6.791794310647167e-12,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "nlcom _b[weight]/_b[foreign]",
+      "notes": [
+        "analytic delta-method SE = 0.0023949589179793032",
+        "westata = 0.0023949589179955693 (rel 6.79e-12)",
+        "StataNow 19.5 = 0.0023949636987286491 (rel 2.00e-06)",
+        "westata equals the analytic delta method to 7e-12 while Stata's own number is 2e-6 away from it, so the 1.3e-5 gap in the entry above is Stata-side numerical noise, not a westata error"
+      ],
+      "error": ""
+    },
+    {
+      "name": "testnl: parenthesised joint form",
+      "status": "pass",
+      "param_rel": 5.856526517460798e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "testnl (_b[weight]=1) (_b[foreign]=0)",
+      "notes": [
+        "the only joint spelling StataNow 19.5 accepts"
+      ],
+      "error": ""
+    },
+    {
+      "name": "testnl: single nonlinear constraint",
+      "status": "pass",
+      "param_rel": 8.126040271747004e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "testnl exp(_b[weight])=1",
+      "notes": [
+        "reported as chi2(1); Stata never uses F for testnl"
+      ],
+      "error": ""
+    },
+    {
+      "name": "testnl: comma-separated joint form (syntax)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "testnl _b[weight]=1, _b[foreign]=0",
+      "notes": [
+        "Stata: rejected -> SystemError: option _b not allowed\nr(198);",
+        "westata: accepted -> chi2=3844373.727, df=2, p=0",
+        "westata accepts a joint spelling StataNow 19.5 rejects with r(198); the number it computes equals the parenthesised form, so the divergence is grammar acceptance, not arithmetic"
+      ],
+      "error": ""
+    },
+    {
+      "name": "testnl: whitespace-separated joint form (syntax)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "testnl _b[weight]=1 _b[foreign]=0",
+      "notes": [
+        "Stata: rejected -> SystemError: 1_b invalid name\nr(198);",
+        "westata: accepted -> chi2=3844373.727, df=2, p=0",
+        "westata accepts a joint spelling StataNow 19.5 rejects with r(198); the number it computes equals the parenthesised form, so the divergence is grammar acceptance, not arithmetic"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lrtest: nested logit (df=1)",
+      "status": "pass",
+      "param_rel": 9.108393721652522e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lrtest LU LR",
+      "notes": [
+        "LR = 2(lnL_u - lnL_r) on the same 74 observations"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lrtest: nested regress (df=1)",
+      "status": "pass",
+      "param_rel": 7.0272376584402025e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "lrtest RU RR",
+      "notes": [
+        "Gaussian log-likelihood; Stata's regress stores e(ll)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lrtest: df=0 (same model fitted twice)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "lrtest E1 E2",
+      "notes": [
+        "Stata: rejected -> SystemError: df(unrestricted) = df(restricted) = 2\nr(498);",
+        "westata: accepted -> {'chi2': 0.0, 'df': 0.0, 'p': 1.0}",
+        "StataNow 19.5 refuses a pair with equal parameter counts (r(498) 'df(unrestricted) = df(restricted)'); westata returns chi2=0, df=0, p=1.0. Its p is the correct chi2(0) survival value (the module docstring says so), but the command succeeds where Stata errors, so a script that works in westata fails in Stata"
+      ],
+      "error": ""
+    },
+    {
+      "name": "lrtest: non-nested models (Stata accepts, westata refuses)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "lrtest N1 N2",
+      "notes": [
+        "Stata: accepted -> {'chi2': -2.683549733214136, 'df': 1.0, 'p': 1.0}",
+        "westata: rejected -> ConsistencyError: lrtest: the models are not nested - the restricted model estimates parameter(s) the unrestricted model does not: ['weight']. unrestricted=['Intercept', 'foreign', 'length'], restricted=['Intercept', 'weight']",
+        "Stata checks only the parameter counts, so it returns a negative LR chi2 for two models that are not nested; westata checks nesting by coefficient name and refuses. westata's error is the statistically right answer, but a script ported from Stata will now raise"
+      ],
+      "error": ""
+    },
+    {
+      "name": "hausman: xtreg fe vs re (positive definite V_fe - V_re)",
+      "status": "pass",
+      "param_rel": 2.5968054553054416e-13,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "hausman FEm REm",
+      "notes": [
+        "westata warned: False",
+        "df = 2 counts the slopes only (constant excluded on both sides: Stata's default, westata's design)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "hausman: constant option (positive definite V_fe - V_re)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "hausman FEm REm, constant",
+      "notes": [
+        "Stata (constant): [0.952546096131752, 3.0, 0.8127322054037279]",
+        "westata: df=2, excluded=[]; its HausmanResult exposes no constant switch",
+        "westata's exclusion of the constant is deliberate and documented; Stata exposes it as an opt-in option, so the API surfaces differ"
+      ],
+      "error": ""
+    },
+    {
+      "name": "hausman: indefinite V_fe - V_re (Stata warns, chi2 < 0)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "hausman FEm REm",
+      "notes": [
+        "Stata chi2=-2.35424, df=2, p=1.0 (it prints a negative chi2 and warns that the asymptotic assumptions fail)",
+        "westata chi2=0, df=2, p=1; generalised-inverse warning=True",
+        "both end at p = 1, but the statistics differ in sign: westata clamps the quadratic form at 0 by design, Stata keeps the negative value"
+      ],
+      "error": ""
+    },
+    {
+      "name": "hausman: constant option (indefinite V_fe - V_re (Stata warns, chi2 < 0))",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "hausman FEm REm, constant",
+      "notes": [
+        "Stata (constant): [-2.3542427182283774, 3.0, 1.0]",
+        "westata: df=2, excluded=[]; its HausmanResult exposes no constant switch",
+        "westata's exclusion of the constant is deliberate and documented; Stata exposes it as an opt-in option, so the API surfaces differ"
+      ],
+      "error": ""
+    },
+    {
+      "name": "contrast: r. (reference), 2-level factor",
+      "status": "pass",
+      "param_rel": 5.3780947564064164e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast r.foreign",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "contrast: g. (grand mean), 2-level factor",
+      "status": "pass",
+      "param_rel": 5.3780947564064164e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast g.foreign",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "contrast: a. (adjacent), 2-level factor",
+      "status": "pass",
+      "param_rel": 5.3780947564064164e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast a.foreign",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "contrast: r. (3-level factor)",
+      "status": "pass",
+      "param_rel": 5.349887199912313e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast r.r3",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "contrast: g. (3-level factor)",
+      "status": "pass",
+      "param_rel": 3.811231047696561e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast g.r3",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "contrast: a. (3-level factor)",
+      "status": "pass",
+      "param_rel": 5.349887199912313e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "contrast a.r3",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "pwcompare: 3-level factor (unadjusted)",
+      "status": "pass",
+      "param_rel": 5.349887199912313e-14,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "pwcompare r3",
+      "notes": [
+        "Stata stores the pairwise contrasts in r(b_vs)/r(V_vs); r(b) holds the cell means instead"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: logit dydx(weight) average marginal effect",
+      "status": "fail",
+      "param_rel": 0.007152281366536532,
+      "se_rel": NaN,
+      "tier": "D",
+      "se_tier": "NA",
+      "command": "margins, dydx(weight)",
+      "notes": [
+        "delta-method SE; Stata keeps the exact gradient in r(Jacobian), westata differentiates numerically"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: logit AME SE, analytic delta method as arbiter",
+      "status": "fail",
+      "param_rel": 0.007101560531620475,
+      "se_rel": NaN,
+      "tier": "D",
+      "se_tier": "NA",
+      "command": "margins, dydx(weight)",
+      "notes": [
+        "analytic gradient [-0.110858046927, -0.00066492651, -4.7969962e-05] vs Stata r(Jacobian) [-0.110858046927, -0.00066492651, -4.7969962e-05]; analytic delta-method SE = 5.70605514651e-05, Stata prints 5.70605514651e-05, westata gives 5.66553325049e-05. westata's SE differs because margins() differentiates the covariate numerically with a fixed h = 1e-6 instead of using the analytic p(1-p) derivative",
+        "westata's own gradient differs from the analytic one by 1.707e-03",
+        "the AME point estimate itself is right to 7e-8 relative; only the SE carries the numerical-differentiation error"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: logit dydx(weight) at(mpg=20)",
+      "status": "fail",
+      "param_rel": 0.05382283459864189,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "margins, dydx(weight) at(mpg=20)",
+      "notes": [
+        "conditional AME; the same numeric-gradient issue is amplified because the effect itself is smaller"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: predictive margin (regress, t form)",
+      "status": "pass",
+      "param_rel": 4.076738585719096e-12,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "margins",
+      "notes": [
+        "t(71) interval on both sides, not z"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: over(foreign) predictive margins (regress)",
+      "status": "fail",
+      "param_rel": 1.8539225253114911e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "margins, over(foreign)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "margins: dydx(foreign) discrete change (regress)",
+      "status": "fail",
+      "param_rel": 7.736893055299457e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "margins, dydx(foreign)",
+      "notes": [
+        "Stata also prints a zero base-level row; westata reports only the non-base row, and a factor's marginal effect is the discrete change P(x=1) - P(x=0) rather than a derivative"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: dydx(foreign) discrete change, coefficient as arbiter",
+      "status": "fail",
+      "param_rel": 1.7866372005918735e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "margins, dydx(foreign)",
+      "notes": [
+        "in a linear model the discrete change equals the coefficient exactly, so b = -1.65002910584 and se = 1.07599411819 are the analytic answer",
+        "Stata b=-1.65002910584, se=1.07599411819 (rel 0.00e+00)",
+        "westata b=-1.65002910584, se=1.07599412012 (rel 1.79e-09)",
+        "again only the SE moves: the estimate is the coefficient, and the numeric gradient of a linear function should have returned the coefficient vector exactly, so the residual is round-off in predict() evaluated at beta +/- 1e-6"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: over(foreign) SE, analytic delta method as arbiter",
+      "status": "fail",
+      "param_rel": 1.8539228309949059e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "margins, over(foreign)",
+      "notes": [
+        "analytic SEs [0.47247411357547947, 0.7263874803669521]",
+        "Stata [0.47247411357547947, 0.7263874803669523] (rel to analytic ['0.00e+00', '3.06e-16'])",
+        "westata [0.47247411361387104, 0.7263874817136184] (rel to analytic ['8.13e-11', '1.85e-09'])",
+        "the quantity is an exact linear combination of b, so the analytic SE is unambiguous: westata is 1e-11..1e-9 away and Stata is at machine precision, which identifies westata's fixed h = 1e-6 parameter step as the source (not a formula error)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "margins: logit AME at(mpg=20), analytic delta method as arbiter",
+      "status": "fail",
+      "param_rel": 0.05382283459864641,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "margins, dydx(weight) at(mpg=20)",
+      "notes": [
+        "analytic point estimate -0.000351977277986, SE 1.77996692283e-06",
+        "Stata -0.000351977277986 / 1.77996692283e-06 (b rel 0.00e+00, se rel 4.28e-15)",
+        "westata -0.000351977239801 / 1.87576978811e-06 (b rel 1.08e-07, se rel 5.38e-02)",
+        "the point estimates agree with the analytic value to ~1e-8 on both sides; only the delta-method SE differs, by 5.4e-2 relative, because westata's gradient is a fixed-step finite difference of a quantity that is ~3.5e-4 in magnitude"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict poisson: n link check (Stata e(b) reproduces Stata n)",
+      "status": "pass",
+      "param_rel": 2.6425961248911727e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict, n",
+      "notes": [
+        "evaluating exp(X b_Stata) at Stata's own e(b) reproduces its predict, n to 2.64e-16",
+        "the coefficients themselves differ by up to 1.44e-08 (ML convergence, not the link function)",
+        "so predict poisson's 2.4e-9 is entirely inherited from the coefficient difference; the exp() link is exact"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: xb link check (Stata e(b) reproduces Stata xb)",
+      "status": "pass",
+      "param_rel": 1.7307003156515746e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict, xb",
+      "notes": [
+        "X b_Stata reproduces Stata's own xb to 1.73e-16",
+        "westata's xb differs at 1.5e-8, the scale of the ML coefficient gap (weight 1.2e-8, foreign 4.1e-8), so e() and ystar() follow the same cause; only stdf and the /sigma SE have a structural problem"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: stdp formula check (Stata e(V) reproduces Stata stdp)",
+      "status": "pass",
+      "param_rel": 1.3173882669567312e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict, stdp",
+      "notes": [
+        "sqrt(x'V_Stata x) with Stata's coefficient block reproduces its own stdp to 1.32e-15",
+        "so westata's 7.2e-5 gap is not an stdp formula error: the coefficient block of westata's V differs from Stata's at ~8.9e-5 relative, because westata builds V from a central-difference numerical Hessian (step 1e-5) where Stata uses the analytic observed information",
+        "the same numeric-Hessian error is what moves the coefficient SEs and therefore every stdp-derived interval"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict regress: xb",
+      "status": "pass",
+      "param_rel": 1.4509263446746104e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double p_xb, xb",
+      "notes": [
+        "predict into a double variable so the comparison is not limited by Stata's default float storage"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict regress: stdp",
+      "status": "pass",
+      "param_rel": 3.951892359791988e-15,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double p_stdp, stdp",
+      "notes": [
+        "predict into a double variable so the comparison is not limited by Stata's default float storage"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict regress: stdf",
+      "status": "pass",
+      "param_rel": 2.5580629289905484e-16,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double p_stdf, stdf",
+      "notes": [
+        "predict into a double variable so the comparison is not limited by Stata's default float storage"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict regress: residuals",
+      "status": "pass",
+      "param_rel": 5.110344609325369e-13,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double p_residuals, residuals",
+      "notes": [
+        "predict into a double variable so the comparison is not limited by Stata's default float storage"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict logit: pr",
+      "status": "pass",
+      "param_rel": 4.589857099709827e-10,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double l_pr, pr",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict logit: xb",
+      "status": "pass",
+      "param_rel": 1.1125669266533919e-10,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double l_xb, xb",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict logit: stdp",
+      "status": "pass",
+      "param_rel": 6.804458314364695e-11,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "predict double l_stdp, stdp",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict logit: stdf rejected consistently",
+      "status": "pass",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "predict l_stdf, stdf",
+      "notes": [
+        "Stata: rejected -> SystemError: option stdf not allowed\nr(198);",
+        "westata: UnsupportedError: predict: 'logit' supports ('xb', 'stdp', 'pr', 'residuals'); got 'stdf'",
+        "both refuse stdf for a binary model, so no caller can silently get a number Stata would not produce"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict poisson: n",
+      "status": "fail",
+      "param_rel": 2.4426429797515234e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "predict double po_n, n",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict poisson: stdf rejected consistently",
+      "status": "pass",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "predict po_stdf, stdf",
+      "notes": [
+        "Stata: rejected -> SystemError: option stdf not allowed\nr(198);",
+        "westata: UnsupportedError: predict: 'poisson' supports ('xb', 'stdp', 'n', 'residuals'); got 'stdf'",
+        "same split as logit: Stata's stdf for a count model would add mu_i, not a residual variance, and both sides refuse instead of guessing"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit: design coefficient point estimates",
+      "status": "fail",
+      "param_rel": 4.0582403698767994e-08,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "slopes and constant only; the scale row is compared separately because Stata parameterises it as var(e.mpg) = sigma^2"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit: SEs of the design coefficients",
+      "status": "fail",
+      "param_rel": 8.884499684147248e-05,
+      "se_rel": NaN,
+      "tier": "C",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "max relative difference 8.884e-05 over weight/foreign/_cons",
+        "westata's observed information is computed numerically, which is where the ~1e-7 residual comes from"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit: sigma point estimate (var(e.mpg) -> sigma)",
+      "status": "fail",
+      "param_rel": 6.92878492819806e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "Stata stores var(e.mpg) = sigma^2 and prints sigma; westata calls the same parameter /sigma, and the point estimate matches"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit: SE of /sigma is the log-scale SE",
+      "status": "fail",
+      "param_rel": 0.7355385520903455,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "Stata var(e.mpg) = 14.2978442 with SE 2.717956239; sigma = 3.781249027 and its SE (delta method) is 0.3593992646",
+        "westata reports /sigma = 3.781249001 with SE 0.09504724989; sigma * that SE = 0.3593973187",
+        "ratio westata/Stata = 0.264461, which is exactly 1/sigma (0.264463): westata's SE is the SE of log(sigma), carried into the sigma row without the Jacobian",
+        "consequence: the printed t for /sigma becomes 39.78 instead of 10.52, so any test or interval on the scale parameter is wrong; the coefficient block is unaffected"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit: residual degrees of freedom e(df_r)",
+      "status": "fail",
+      "param_rel": 0.013888888888888888,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "tobit mpg weight foreign, ll(17)",
+      "notes": [
+        "Stata: df_r = N - df_m = 74 - 2 = 72, because the scale parameter does not consume a degree of freedom; westata: df_resid = 71 = N - (slopes + constant). Every t statistic, p-value and t interval westata reports for this model therefore uses 71 df where Stata uses 72"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: e(17,.)",
+      "status": "fail",
+      "param_rel": 5.784127731464509e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "predict double t_e_17, e(17,.)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: ystar(17,.)",
+      "status": "fail",
+      "param_rel": 5.7883261643981365e-09,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "predict double t_ystar_17, ystar(17,.)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: stdp",
+      "status": "fail",
+      "param_rel": 7.171540232437674e-05,
+      "se_rel": NaN,
+      "tier": "C",
+      "se_tier": "NA",
+      "command": "predict double t_stdp, stdp",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: xb",
+      "status": "fail",
+      "param_rel": 1.5025392426073828e-08,
+      "se_rel": NaN,
+      "tier": "B",
+      "se_tier": "NA",
+      "command": "predict double t_xb, xb",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: stdf",
+      "status": "fail",
+      "param_rel": 0.07712528798383285,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "predict double t_stdf, stdf",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: stdf adds rss/N instead of sigma^2",
+      "status": "fail",
+      "param_rel": 0.1518018595156593,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "predict, stdf",
+      "notes": [
+        "Stata: stdf^2 - stdp^2 = sigma^2 = 14.2978442 for every observation",
+        "westata: stdf^2 - stdp^2 = rss/N = 12.12740487 (rel 1.518e-01)",
+        "predict._residual_variance falls back to rss/N because tobit records e(sigma) and not e(rmse); for a censored model rss/N is not the innovation variance, which is the entire 7.7e-2 gap in stdf",
+        "stdp is unaffected (it uses the coefficient block only), so the error enters only through the forecast variance"
+      ],
+      "error": ""
+    },
+    {
+      "name": "predict tobit: pr(a,b) (Stata returns P(uncensored), westata rejects)",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "predict double t_pr, pr(17,.)",
+      "notes": [
+        "Stata returns the probability of being uncensored; first three values [0.910612, 0.683815, 0.973967]",
+        "westata: UnsupportedError: predict: 'tobit' supports ('xb', 'stdp', 'stdf', 'e', 'ystar', 'residuals'); got 'pr'",
+        "predict's SUPPORTED_TYPES for tobit lists xb/stdp/stdf/e/ystar/residuals but not pr, so 'margins, predict(pr ...)' workflows cannot be reproduced; the number is unavailable rather than wrong"
+      ],
+      "error": ""
+    },
+    {
+      "name": "etable vs esttab (printing layer)",
+      "status": "pass",
+      "param_rel": 0.0,
+      "se_rel": NaN,
+      "tier": "A",
+      "se_tier": "NA",
+      "command": "esttab m1 m2, b(%12.6f) se(%12.6f) nostar stats(N r2 r2_a, labels(Observations R-squared Adj-R2))",
+      "notes": [
+        "parsed 4 rows / 14 numeric cells from esttab 2.1.4, which is installed, so no fallback to 'estimates table' was needed",
+        "row labels: Stata '_cons' vs westata 'Intercept' (matched on that alias)",
+        "row order differs: westata uses design-matrix order (Intercept first), esttab follows estimation order (_cons last)",
+        "westata prints N as an integer ('74') where esttab's b() format prints '74.000000'; both parse to 74.0",
+        "printing-layer check only: the underlying e(b)/e(V) numbers are compared in the other sections"
+      ],
+      "error": ""
+    },
+    {
+      "name": "pwcompare: mcompare(bonferroni) adjustment",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "pwcompare foreign, mcompare(bonferroni)",
+      "notes": [
+        "Stata: accepted",
+        "westata: rejected -> UnsupportedError: pwcompare: multiple-comparison adjustment is not implemented; the only supported value is adjust=None (Stata's adjust(none)), got 'bonferroni'. Refusing to report unadjusted p-values as if they had been corrected.",
+        "westata refuses every multiple-comparison adjustment rather than reporting unadjusted p-values under a corrected label; this is a documented gap, not a silent wrong number"
+      ],
+      "error": ""
+    },
+    {
+      "name": "contrast: h. (Helmert) contrast",
+      "status": "fail",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "contrast h.foreign",
+      "notes": [
+        "Stata: accepted",
+        "westata: rejected -> UnsupportedError: contrast: the Helmert contrast 'h' is not implemented; supported methods are ['a', 'g', 'r'] (reference, grand mean, adjacent)",
+        "r. / g. / a. are implemented; Helmert is refused by design"
+      ],
+      "error": ""
+    }
+  ]
+}

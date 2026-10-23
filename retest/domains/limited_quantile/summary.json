@@ -1,0 +1,391 @@
+{
+  "domain": "limited_quantile",
+  "total": 25,
+  "counts": {
+    "fail": 22,
+    "error": 3
+  },
+  "max_param_rel": 0.05427995523530366,
+  "generated_at": "2026-10-24T03:15:36",
+  "stata_version": "19.5",
+  "items": [
+    {
+      "name": "tobit ll(0)",
+      "status": "fail",
+      "param_rel": 1.3799620529707983e-08,
+      "se_rel": 0.054280909044349464,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "tobit y x1 x2, ll(0)",
+      "notes": [
+        "Stata stores var(e.y)=sigma^2; sqrt + delta method map it to /sigma",
+        "Stata's own /sigma standard error is obtained here as se(var(e.y)) / (2*sqrt(var(e.y))), the delta method used by Stata for the sigma row it prints"
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit /sigma SE root cause (diagnostic)",
+      "status": "fail",
+      "param_rel": 0.05427995523530366,
+      "se_rel": 0.054280909044349464,
+      "tier": "E",
+      "se_tier": "E",
+      "command": "tobit y x1 x2, ll(0)",
+      "notes": [
+        "westata's reported se(/sigma) is the standard error of ln(sigma), not of sigma: against an independent central-difference Hessian it matches the (b, lnsigma) parameterisation to 0.00e+00 and misses the (b, sigma) one by 5.43e-02.",
+        "It also reproduces Stata's own se(lnsigma) = se(var(e.y))/(2*var(e.y)) = 0.0383998173 to 2.12e-06, while Stata's se(sigma) = se(var)/(2*sqrt(var)) = 0.0406037441; westata = 0.0383997360.",
+        "The ratio is exactly 1/sigma_hat: 0.945719091 vs 1/1.057394212 (rel 2.11e-06).",
+        "The point estimate of sigma agrees to 1e-8, so this is purely a reported-SE bug: the coefficient's last element is on the sigma scale while the covariance matrix is still the lnsigma one. Effect on inference: sigma's z/t statistic is overstated by 1/sigma (here 7.9%)."
+      ],
+      "error": ""
+    },
+    {
+      "name": "tobit ul(2.5)",
+      "status": "fail",
+      "param_rel": 1.063132063706108e-08,
+      "se_rel": 0.016246933290739164,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "tobit yu x1 x2, ul(2.5)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "tobit ll(0) ul(2)",
+      "status": "fail",
+      "param_rel": 3.372316118094081e-08,
+      "se_rel": 0.06647661526288329,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "tobit yb x1 x2, ll(0) ul(2)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "truncreg ll(0)",
+      "status": "fail",
+      "param_rel": 1.050389859181819e-07,
+      "se_rel": 6.744468003598401e-06,
+      "tier": "B",
+      "se_tier": "C",
+      "command": "truncreg y x1 x2, ll(0)",
+      "notes": [
+        "Stata e(N)=366.0: truncated rows leave the estimation sample but stay in the dataset (st.nobs()=500); westata nobs=366, e(n_truncated)=134",
+        "scalar e(chi2) rel diff 9.217e-06"
+      ],
+      "error": ""
+    },
+    {
+      "name": "truncreg ul(2.5)",
+      "status": "fail",
+      "param_rel": 1.9072077415736067e-08,
+      "se_rel": 1.632241890728837e-06,
+      "tier": "B",
+      "se_tier": "C",
+      "command": "truncreg yu x1 x2, ul(2.5)",
+      "notes": [
+        "Stata e(N)=430.0: truncated rows leave the estimation sample but stay in the dataset (st.nobs()=500); westata nobs=430, e(n_truncated)=70",
+        "scalar e(chi2) rel diff 2.832e-06"
+      ],
+      "error": ""
+    },
+    {
+      "name": "truncreg ll(0) ul(2)",
+      "status": "fail",
+      "param_rel": 1.6294596071002668e-06,
+      "se_rel": 8.279660344041303e-05,
+      "tier": "C",
+      "se_tier": "C",
+      "command": "truncreg yb x1 x2, ll(0) ul(2)",
+      "notes": [
+        "Stata e(N)=250.0: truncated rows leave the estimation sample but stay in the dataset (st.nobs()=500); westata nobs=250, e(n_truncated)=250",
+        "scalar e(chi2) rel diff 1.610e-04"
+      ],
+      "error": ""
+    },
+    {
+      "name": "intreg interval model",
+      "status": "fail",
+      "param_rel": 2.8756986788692447e-09,
+      "se_rel": 2.01359421059846e-06,
+      "tier": "B",
+      "se_tier": "C",
+      "command": "intreg lo hi x1 x2",
+      "notes": [
+        "intervals: [floor(y*), floor(y*)+1); y*<0 left-censored (lo missing, hi=0)",
+        "Stata e(b) colnames are ['x1','x2','_cons','_cons'] -- the /lnsigma row reuses the _cons label; positions taken from the printed table",
+        "Stata prints /lnsigma and a derived sigma row; westata reports /lnsigma as a coefficient and e(sigma)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "heckman twostep",
+      "status": "fail",
+      "param_rel": 1.335456767496874e-09,
+      "se_rel": 0.0681304934971832,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "heckman y_sel x1, select(s = z1 z2) twostep",
+      "notes": [
+        "Stata e(b) order from the printed table: y|x1, y|_cons, s|z1, s|z2, s|_cons, then /mills lambda",
+        "Stata's two-step store: e(rho), e(sigma), e(lambda), e(selambda). e(sigma) reproduces sqrt(RSS/m + b_lambda^2*mean(lambda(lambda+w))) to rel 1.83e-10 -- it is NOT sqrt(RSS/(m-3)), which is what westata uses for both sigma and rho",
+        "the coefficient on lambda agrees to 1e-9 (0.5301503851 vs 0.5301503857); only the derived e(sigma)/e(rho) differ",
+        "selection-equation SEs: Stata keeps the plain probit VCE (ratio to 'probit' 0.99998), westata's joint sandwich bread mixes the outcome block in and inflates select:z1 by 6.8%",
+        "outcome-block SEs differ by 2-3%: westata's sandwich is a different (M-estimator) approximation from Stata's Heckman corrected VCE",
+        "scalar e(rho) rel diff 7.217e-02",
+        "scalar e(sigma) rel diff 6.732e-02"
+      ],
+      "error": ""
+    },
+    {
+      "name": "heckman ml",
+      "status": "error",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "heckman y_sel x1, select(s = z1 z2)",
+      "notes": [
+        "Stata ML works and is the default: b=[ 0.94936305  0.9878724   0.68493422 -0.34621549  0.48339523  0.63715466\n -0.02719471]",
+        "se=[0.04343817 0.08143272 0.07100291 0.05728226 0.05969308 0.16828703\n 0.04820686]",
+        "e(rho)=0.5629590789365696 e(sigma)=0.973171736540929 e(lambda)=0.5478558644501834 ll=-818.2496669528897",
+        "westata raises UnsupportedError (text above): the estimator is absent, so the gap is coverage, not numerics."
+      ],
+      "error": "UnsupportedError: heckman: only method='twostep' is implemented; 'ml' is not. The maximum likelihood variant requires a joint optimisation over beta, gamma and rho together with the bivariate normal probabilities, which has not been implemented or verified against Stata."
+    },
+    {
+      "name": "etregress twostep",
+      "status": "fail",
+      "param_rel": 3.843095865258807e-11,
+      "se_rel": 0.06768776946288786,
+      "tier": "A",
+      "se_tier": "E",
+      "command": "etregress y x1, treat(s = z1 z2) twostep",
+      "notes": [
+        "Stata e(b) order: y|x1, y|s, y|_cons, s|z1, s|z2, s|_cons, lambda",
+        "Stata's twostep store holds e(rho), e(sigma), e(lambda), e(selambda), e(ll_p) -- e(sigma1)/e(sigma2) do not exist for etregress in 19.5 (full get_ereturn dump in NOTES), so that pair is untestable",
+        "westata's e(rho) has the wrong SIGN on two independent DGPs (+0.4283 Stata vs -0.4486 westata here); westata computes rho = -b_ctrl/sigma while Stata's lambda = rho*sigma",
+        "scalar e(rho) rel diff 2.047e+00",
+        "scalar e(sigma) rel diff 4.516e-02"
+      ],
+      "error": ""
+    },
+    {
+      "name": "etregress ml",
+      "status": "error",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "etregress y x1, treat(s = z1 z2)",
+      "notes": [
+        "Stata's DEFAULT for etregress is ML -- 'twostep' is the option that selects the control-function estimator, so westata's only available path is not Stata's default. ML reference:",
+        "b=[ 0.92442027  0.14566395  0.90985491  0.69259854 -0.34114759  0.47796736\n  0.452679   -0.03440277]",
+        "se=[0.03582317 0.16585594 0.11143677 0.07053739 0.05784362 0.05983991\n 0.12554969 0.03640273]",
+        "e(rho)=0.4240986539296641 e(sigma)=0.9661822784535223 ll=-1124.693682764672"
+      ],
+      "error": "UnsupportedError: etregress: only method='control' is implemented; 'ml' is not. The maximum likelihood variant requires the joint likelihood of the outcome and treatment equations with a bivariate normal error term, which has not been implemented or verified against Stata."
+    },
+    {
+      "name": "frontier halfnormal",
+      "status": "fail",
+      "param_rel": 0.0010765871449960062,
+      "se_rel": 0.004026917169796863,
+      "tier": "D",
+      "se_tier": "D",
+      "command": "frontier y x1 x2",
+      "notes": [
+        "Stata's e(b) colnames are ['x1','x2','_cons','_cons','_cons']; the last two rows are /lnsig2v and /lnsig2u in the printed order",
+        "DGP carries real inefficiency (u ~ |N(0, 0.7^2)|); without it both estimators sit on the sigma_u = 0 boundary and the /lnsig2u SE is meaningless, so the boundary case is not used",
+        "scalar e(chi2) rel diff 2.369e-06",
+        "scalar e(sigma_u) rel diff 1.751e-04",
+        "scalar e(sigma_v) rel diff 2.547e-05"
+      ],
+      "error": ""
+    },
+    {
+      "name": "frontier exponential",
+      "status": "error",
+      "param_rel": NaN,
+      "se_rel": NaN,
+      "tier": "NA",
+      "se_tier": "NA",
+      "command": "frontier y x1 x2, distribution(exponential)",
+      "notes": [
+        "Stata (same data, exponential inefficiency): b=[ 0.85738363 -0.36704394  0.60453848  0.12578931 -3.76259437] ll=-745.970270319937",
+        "westata rejects the option at model construction (text above)."
+      ],
+      "error": "UnsupportedError: frontier: distribution='exponential' is not implemented; only 'halfnormal' is. The truncated and exponential variants need different likelihoods, not a flag."
+    },
+    {
+      "name": "qreg median",
+      "status": "fail",
+      "param_rel": 4.56416242764477e-09,
+      "se_rel": 5.146118833326171e-09,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "qreg y x1 x2",
+      "notes": [
+        "two independent LP solutions of the same check-function objective can differ when the optimum is not unique; Stata's 'alternate solutions' warning was not raised for this DGP"
+      ],
+      "error": ""
+    },
+    {
+      "name": "qreg quantile(.25)",
+      "status": "fail",
+      "param_rel": 5.677930536862679e-07,
+      "se_rel": 4.2216375601876325e-09,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "qreg y x1 x2, quantile(.25)",
+      "notes": [],
+      "error": ""
+    },
+    {
+      "name": "qreg vce(robust) median",
+      "status": "fail",
+      "param_rel": 4.56416242764477e-09,
+      "se_rel": 5.8351380723116345e-09,
+      "tier": "B",
+      "se_tier": "B",
+      "command": "qreg y x1 x2, vce(robust)",
+      "notes": [
+        "at tau=.5, (tau - 1{u<0})^2 == tau(1-tau) for every i, so this point cannot tell the two candidate sandwich meats apart; the .25 case below is the discriminating one"
+      ],
+      "error": ""
+    },
+    {
+      "name": "qreg vce(robust) quantile(.25)",
+      "status": "fail",
+      "param_rel": 5.677930536862679e-07,
+      "se_rel": 0.0462849086140423,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "qreg y x1 x2, quantile(.25) vce(robust)",
+      "notes": [
+        "A = J^-1 M J^-1 with J = sum f_i x x' and M = sum psi_i^2 x x'. Stata's M is tau(1-tau) X'X to 9e-9; westata's psi_i^2 meat is 4.6% off at tau=.25 and 3.5% at tau=.75 (verified separately, see NOTES)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "sqreg q(.25 .5) pooled 4x500",
+      "status": "fail",
+      "param_rel": 5.677930554739923e-07,
+      "se_rel": 0.033516987046630906,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "sqreg y x1 x2, quantile(.25 .5) reps(500)",
+      "notes": [
+        "coefficients are deterministic qreg fits; only the bootstrap VCE can differ",
+        "both sides are averaged over 4 seeds x 500 reps (variance average) to remove bootstrap Monte-Carlo error, since Stata's RNG stream cannot be reproduced in numpy",
+        "Stata e(b) order is q.25|x1,x2,_cons then q.5|x1,x2,_cons"
+      ],
+      "error": ""
+    },
+    {
+      "name": "bsqreg median pooled 4x500",
+      "status": "fail",
+      "param_rel": 4.564162312491247e-09,
+      "se_rel": 0.021891364165441938,
+      "tier": "B",
+      "se_tier": "E",
+      "command": "bsqreg y x1 x2, quantile(.5) reps(500)",
+      "notes": [
+        "same pooling as sqreg; Stata e(b) order x1, x2, _cons",
+        "Stata's bsqreg SE exceeds its own analytic qreg vce(robust) by ~26% on this heteroskedastic DGP, and westata's bootstrap reproduces that, so the two bootstraps agree within MC error (see NOTES)"
+      ],
+      "error": ""
+    },
+    {
+      "name": "rreg hetero DGP",
+      "status": "fail",
+      "param_rel": 0.00027022019959671193,
+      "se_rel": 0.20604466356627843,
+      "tier": "C",
+      "se_tier": "E",
+      "command": "rreg y x1 x2, gen(wt)",
+      "notes": [
+        "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
+        "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
+        "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
+        "per-coefficient b/se relative differences in extra['detail']",
+        "scalar e(F) rel diff 2.370e-01",
+        "scalar e(r2) rel diff 1.401e-01",
+        "scalar e(rmse) rel diff 1.437e-01"
+      ],
+      "error": ""
+    },
+    {
+      "name": "rreg final biweight case weights",
+      "status": "fail",
+      "param_rel": 0.0013508936619371452,
+      "se_rel": NaN,
+      "tier": "D",
+      "se_tier": "NA",
+      "command": "rreg y x1 x2, gen(wt)",
+      "notes": [
+        "sum(w): Stata 368.639486 vs westata 368.590579",
+        "max|dw| = 1.351e-03, corr = 0.999998973",
+        "both sides are biweights with c = 4.685 on residual/MAD scale; the small gap follows from the ~1e-4 coefficient difference feeding the weights"
+      ],
+      "error": ""
+    },
+    {
+      "name": "rreg clean normal DGP",
+      "status": "fail",
+      "param_rel": 0.002151041523160494,
+      "se_rel": 0.2967963654729774,
+      "tier": "D",
+      "se_tier": "E",
+      "command": "rreg y x1 x2",
+      "notes": [
+        "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
+        "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
+        "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
+        "per-coefficient b/se relative differences in extra['detail']",
+        "scalar e(F) rel diff 3.103e-01",
+        "scalar e(r2) rel diff 2.425e-01",
+        "scalar e(rmse) rel diff 1.635e-01"
+      ],
+      "error": ""
+    },
+    {
+      "name": "rreg outlier DGP",
+      "status": "fail",
+      "param_rel": 0.0014002283684163928,
+      "se_rel": 0.15366007259734987,
+      "tier": "D",
+      "se_tier": "E",
+      "command": "rreg y x1 x2",
+      "notes": [
+        "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
+        "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
+        "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
+        "per-coefficient b/se relative differences in extra['detail']",
+        "scalar e(F) rel diff 2.644e-01",
+        "scalar e(r2) rel diff 1.902e-01",
+        "scalar e(rmse) rel diff 1.645e-01"
+      ],
+      "error": ""
+    },
+    {
+      "name": "rreg auto",
+      "status": "fail",
+      "param_rel": 0.0018331664330895785,
+      "se_rel": 0.22875862892361815,
+      "tier": "D",
+      "se_tier": "E",
+      "command": "rreg mpg weight length",
+      "notes": [
+        "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
+        "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
+        "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
+        "per-coefficient b/se relative differences in extra['detail']",
+        "scalar e(F) rel diff 3.784e-01",
+        "scalar e(r2) rel diff 6.273e-02",
+        "scalar e(rmse) rel diff 2.617e-01"
+      ],
+      "error": ""
+    }
+  ]
+}

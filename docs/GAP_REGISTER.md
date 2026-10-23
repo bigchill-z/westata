@@ -5,7 +5,7 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**65 条命令条目**（见 `tests/conformance/registry.yml`），其中 45 条 E3
+- 已实现：**71 条命令条目**（见 `tests/conformance/registry.yml`），其中 50 条 E3
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -163,19 +163,31 @@
 | `cmxtmixlogit` | ❌ | 混合 logit，同上 |
 | `hetprobit` | ⬜ | |
 
-### 3.6 多方程与系统（P10）
+### 3.6 多方程与系统（P10 已完成）
 
-| Stata | 状态 |
-|---|---|
-| `sureg` | ⬜ SUR |
-| `mvreg` | ⬜ 多元回归 |
-| `nl` | ⬜ 非线性回归 |
-| `nlsur` | ⬜ 非线性似然无关 |
-| `gmm` | ⬜ 广义矩估计 |
-| `eivreg` | ⬜ 误差变量回归 |
-| `manova` | ⬜ 多元方差分析 |
-| `frontier` | ⬜ 随机前沿 |
+| Stata | 状态 | 说明 |
+|---|---|---|
+| `sureg` | ✅ **E3** | 系数与标准误都与 Stata 逐位一致 |
+| `mvreg` | ✅ **E3** | 系数 = 逐方程 OLS；VCE 用跨方程协方差 |
+| `eivreg` | ✅ **E3** | `A = X'X/n − S`，差 1.8e-3 |
+| `nl` | ✅ **E3** | 系数与标准误全精确；ast 白名单，无 eval |
+| `frontier` | ✅ **E3** | 半正态前沿，精确 |
+| `manova` | ⚠️ E2 | 仅 Wilks' lambda（Rao F 近似） |
+| `sureg, isure` | ⬜ | 迭代 FGLS，收敛判据 Stata 未明确 |
+| `nlsur` | ⬜ | 用户自定义似然 |
+| `gmm` | ⬜ | `gmm (expr)` 语法等价于一个 DSL |
+| `frontier, distribution(truncated/exp)` | ⬜ | 需不同似然，非 flag 切换 |
+| `manova` 其他统计量 | ⬜ | Pillai/Lawley-Hotelling/Roy |
 | `sem` / `gsem` | ❌ 结构方程，见 §7 |
+
+> **P10 的关键教训（`eivreg`）**：`[R] eivreg` 写 `A = X'X − S`，但**没说明 X'X 是归一化的**。
+> 我试了三次都错：按 `1/λ` 加权 → 1.214；按 `λ` 加权 → 1.735；用原始 X'X → 1.452。
+> 正确是 `X'X/n − S` → 2.075。根因是 `S` 由**样本方差**构成，是逐观测量，
+> 所以叉积必须也是逐观测量，否则减法项小 200 倍、等于没减。
+>
+> **P10 的第二个教训**：我一次粗心的切片替换把 `Sureg.fit` 覆盖成 `Eivreg.fit`，
+> 还删掉了 `Mvreg` 和 `Eivreg` 两个类。文件从未提交，git 无法恢复，只能重建。
+> **新模块要先提交再打补丁。**
 
 ### 3.7 因果推断（P11）
 
@@ -350,7 +362,7 @@
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`） | 2–3 周 | **已完成**（`gnbreg` 除外） |
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | **已完成**（`sqreg`/`bsqreg` 止于 E1） |
 | P9 | 面板扩展（`xtlogit`/`xtprobit`/`xttobit`/`xtivreg`/`xtabond`/`xtdpd`/`xtgls`/`xtunitroot`） | 4–6 周 | **已完成** |
-| P10 | 多方程（`sureg`/`mvreg`/`nl`/`nlsur`/`gmm`/`eivreg`/`frontier`） | 3–4 周 | 计划 |
+| P10 | 多方程（`sureg`/`mvreg`/`nl`/`eivreg`/`frontier`/`manova`） | 3–4 周 | **已完成**（`nlsur`/`gmm` 除外） |
 | P11 | 因果推断（`didregress`/`xtdidregress`/`teffects`） | 4–6 周 | 计划 |
 | P12 | 复杂抽样核心（`svy:` 子集） | 4–6 周 | 计划 |
 | P13 | 重抽样（`bootstrap`/`jackknife`/`permute`） | 2–3 周 | 计划 |

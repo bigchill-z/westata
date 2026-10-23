@@ -426,15 +426,14 @@
   notes: "The within transform eliminates the constant, and Stata reconstructs it from the ORIGINAL variables' means as b_0 = ybar - betabar'xbar. Verified that reconstruction reproduces 1.014978 before relying on it. Using the transformed variables' means instead gives 1.029681, which is wrong by 1.4% because those means are zero by construction."
 
 - command: xtivreg, re
-  level: E2
-  tolerance: 1.0e-2
+  level: E3
+  tolerance: 1.0e-12
   sources:
     - type: r_crosscheck
-      ref: "xtivreg y w (endog = z), re: Stata endog 1.120466, w .5286517, _cons 1.014533; westata 1.116635 / .530879 / 1.014624"
+      ref: "xtivreg y w (endog = z), re on a 120x8 panel: Stata _b[endog] 1.1781189721019891, _b[w] .49911501692775756, _b[_cons] 1.1154966490309419, e(theta) .54628552489462834; westata gaps 8.9e-16, 2.8e-16, 1.1e-14 and 4.6e-16 on theta"
   verified_by: lead
   date: 2026-10-23
-  notes: "Within 0.42%. The residual gap is the theta estimate: Stata decomposes the variance into within and between components with its own convention, and theta enters every quasi-demeaned moment."
-
+  notes: "Was E2 at 'within 0.42%, the residual gap is the theta estimate'. On a controlled comparison the agreement is at machine precision on all four quantities, including theta itself -- 4.6e-16. So the 0.42% did not reproduce, and the explanation attached to it ('Stata decomposes the variance into within and between components with its own convention, and theta enters every quasi-demeaned moment') was a plausible-sounding account of a discrepancy that is not there. That is the fourth entry in this register where a diagnosed-looking cause turned out to describe nothing: the fix is always the same, which is to compare against a full-precision r()/e() value on data built for the comparison, rather than against a number recorded earlier under different conditions."
 - command: xtgls
   level: E3
   tolerance: 1.0e-4
@@ -831,15 +830,16 @@
   notes: "Parameters and standard errors both 3.7e-16."
 
 - command: ivregress gmm
-  level: E2
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-12
   sources:
     - type: r_crosscheck
-      ref: "Fixture iv_gmm.json: ivregress gmm y x2 (x = z1 z2)"
+      ref: "ivregress gmm y x (endog = z1 z2) on 800 observations: Stata _b[endog] 2.0329648694426172, _se[endog] .034610475593064904; westata b gap 0, se gap 0. _se[x] gap 1.4e-17, _se[_cons] gap 6.9e-18"
+    - type: published_output
+      ref: "[R] ivregress: V(beta) = N{X'ZWZ'X}^-1 X'ZW S W Z'X {X'ZWZ'X}^-1, where 'W is calculated using the residuals from the initial 2SLS estimates, whereas S is estimated using the residuals based on beta_GMM'"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Point estimates 4.9e-16 but robust standard errors differ by 2.9e-2. GMM's two-step weight matrix and finite-sample scaling are constructed differently from Stata's; the coefficients are right, the inference is not. Deliberately not tuned to match."
-
+  date: 2026-10-23
+  notes: "Was E2 at 'coefficients 4.9e-16, robust SEs 2.9e-2 apart, two-step weight matrix and finite-sample scaling'. The coefficients were indeed exact; the standard errors were 0.2% to 21% off and the recorded cause was a guess. THE MANUAL STATES THE DIFFERENCE IN ONE SENTENCE: W is built from the INITIAL 2SLS RESIDUALS and S from the GMM RESIDUALS. Two different residual sets. linearmodels constructs a single weight matrix and reports a robust sandwich around it, which is a valid estimator but not Stata's, and the discrepancy is invisible to any coefficients-only comparison. Implementing the published formula with the split -- np.linalg.pinv-based, two explicit steps -- brings every standard error to machine precision: 0, 1.4e-17, 6.9e-18. Two rounding attempts were needed on the WRAPPER rather than the maths: the first tested whether the canonical cov_type was None, but _canonical_cov_type(None) returns a default NAME so the branch never fired; the variance stayed wrong and all tests still passed because the coefficients were right. The override now keys off whether the CALLER passed cov_type, so Stata's two-step form is the default while an explicit HC0/HC1/cluster request still works."
 - command: nbreg
   level: E3
   tolerance: 1.0e-4

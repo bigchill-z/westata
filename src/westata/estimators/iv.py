@@ -793,3 +793,82 @@ class IVGMM(IV2SLS):
     _backend_cls = _LMIVGMM
     _stata_command = "ivregress gmm"
     _uses_shared_vce = False
+
+    def _stata_two_step_covariance(self) -> np.ndarray:
+        """Two-step GMM covariance exactly as ``[R] ivregress`` defines it.
+
+        The defining feature is that the two weight matrices use DIFFERENT residual sets:
+
+            W  from the initial 2SLS residuals
+            S  from the GMM residuals
+
+        A single sandwich construction -- one residual set for both -- produces standard errors
+        0.2% to 21% away from Stata's while the point estimates agree to 1e-15, which is why
+        this went unnoticed for several batches.
+        """
+
+        design = np.column_stack(
+            [self._X_exog, self._X_endog]
+            if self._X_exog.shape[1]
+            else [self._X_endog]
+        )
+        instruments = np.column_stack(
+            [self._X_exog, self._Z_instr]
+            if self._X_exog.shape[1]
+            else [self._Z_instr]
+        )
+        response = self._y.reshape(-1)
+        n = response.size
+
+        # Step 1: 2SLS, whose residuals build W.
+        projection = (
+            instruments @ np.linalg.pinv(instruments.T @ instruments) @ instruments.T
+        )
+        beta_2sls = np.linalg.pinv(design.T @ projection @ design) @ (
+            design.T @ projection @ response
+        )
+        residual_2sls = response - design @ beta_2sls
+        moments_2sls = instruments * residual_2sls[:, None]
+        weight = np.linalg.pinv(moments_2sls.T @ moments_2sls / n)
+
+        # Step 2: the GMM estimate, whose residuals build S.
+        cross = design.T @ instruments
+        bread = np.linalg.pinv(cross @ weight @ cross.T)
+        beta_gmm = bread @ (cross @ weight @ (instruments.T @ response))
+        residual_gmm = response - design @ beta_gmm
+        moments_gmm = instruments * residual_gmm[:, None]
+        score = moments_gmm.T @ moments_gmm / n
+
+        return n * bread @ (cross @ weight @ score @ weight @ cross.T) @ bread
+
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Any = None,
+        ssc: Any = None,
+        **kwargs: Any,
+    ) -> StataResults:
+        """Fit, using Stata's two-step GMM variance unless the caller asked for another.
+
+        The distinction has to be made HERE, on what the caller passed. ``_canonical_cov_type``
+        maps ``None`` to a default NAME, so testing for None downstream never fires -- the
+        earlier attempt did exactly that, left the variance unchanged, and still passed every
+        test because the coefficients were already exact.
+        """
+
+        self._explicit_cov_type = cov_type is not None
+        return super().fit(cov_type, cov_kwds, ssc, **kwargs)
+
+    def _backend_vce(self, ref: Any, *args: Any, **kwargs: Any) -> Any:
+        """Covariance for a GMM fit: Stata's two-step form by default, the requested one if asked.
+
+        An explicit ``cov_type`` still wins. A caller asking for HC0, HC1 or a cluster variance
+        has asked for that estimator, and overriding it silently would be the wrong kind of
+        conformance.
+        """
+
+        result = super()._backend_vce(ref, *args, **kwargs)
+        if getattr(self, "_explicit_cov_type", False):
+            return result
+        _, df_t = result
+        return self._stata_two_step_covariance(), df_t

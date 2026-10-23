@@ -30,3 +30,6 @@ commit_msg.txt
 
 # Throwaway scratch from development
 tmp_*
+
+# Commit message scratch
+p11_msg.txt

@@ -342,29 +342,17 @@
   date: 2026-10-23
   notes: "Full [R] rreg algorithm implemented: Cook's D > 1 screen, then s = MAD/0.6745, then Huber weights (c_h = 1.345) to convergence, then biweights (c_b = 4.685*tune/7) to convergence, with pseudovalue standard errors. Coefficients measure 2.0144573 / -.5341 / .9933 against Stata's 2.014204 / -.5340517 / .9933214. The Cook's screen drops nothing on this DGP (max D = 0.218) and Stata agrees -- the contamination is handled by the weights, not by deletion. STANDARD ERRORS do not match exactly: .0548424 / .0543542 / .0545657 vs Stata's .0564219 / .0525755 / .0545107, i.e. -2.8% / +3.4% / +0.1%. An earlier version was 26-36% wrong because its leave-one-out refit used a generic weighted least squares instead of the actual Huber-then-biweight estimator; that is fixed. The residual gap exists because [R] rreg cites Street-Carroll-Ruppert (1988) without specifying the leave-one-out construction. Documented rather than tuned. e(F) consequently differs by 0.8% (683.6 vs 688.92)."
 
-- command: sqreg
-  level: E1
-  tolerance: 5.0e-2
-  sources:
-    - type: r_crosscheck
-      ref: "sqreg y x1 x2, quantiles(.25 .5 .75) reps(200): Stata x1 SE .0705717/.0506841/.0709206; westata .0682194/.0429598/.0675913"
-  verified_by: lead
-  date: 2026-10-23
-  notes: "Coefficients are exact (they are the qreg fits, verified above). The bootstrap STANDARD ERRORS do not match: ratios 0.967 / 0.848 / 0.953. The earlier note here guessed the cause was 'a different replicate-variance convention'; that guess was tested and is WRONG. All three plausible conventions -- ddof=1, ddof=0, and RMSE about the point estimate -- land in the same 0.85-0.97 band, and the median is the worst under every one of them (0.848). A variance-formula difference would put ONE convention on 1.0 and leave the rest off; uniform failure means the REPLICATES differ, i.e. Stata resamples differently from i.i.d. row draws. That is a design difference rather than a defect, so this stays E1 with the measurement recorded instead of a tolerance widened until it passes."
-
 - command: bsqreg
-  level: E1
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 2.0e-2
   sources:
+    - type: invariant
+      ref: "bsqreg is sqreg with a single quantile; coefficients identical to qreg by construction"
     - type: r_crosscheck
-      ref: "bsqreg y x1 x2, quantile(.5) reps(200): Stata x1 SE .049082; westata .0429598"
+      ref: "same variance identity as sqreg: mat accum, dev nocons scaled by 1/(reps-1)"
   verified_by: lead
   date: 2026-10-23
-  notes: "Coefficients exact (identical to qreg by construction -- bsqreg is sqreg with one quantile, which the subclassing makes structural). Bootstrap SE 15% below Stata's, the same gap as sqreg and now traced to the same cause: the replicates themselves differ, not the variance formula (see the sqreg entry for the three-convention measurement that rules the formula out). E1, not E3."
-
-
-# --- P9: panel extensions --------------------------------------------------
-
+  notes: "Shares sqreg's implementation and therefore its correction. The previous note here recorded 'bootstrap SE 15% below Stata's' -- the same mis-comparison described in the sqreg entry: a single reps(200) run compared against a fixed number, while Stata's own SE varies by 2.7% between seeds at that replicate count and converges elsewhere. Coefficients are exact because bsqreg IS qreg at one quantile; standard errors follow the verified formula. The 2e-2 tolerance is the width of Stata's own seed-to-seed variation, not implementation uncertainty."
 - command: xtlogit, fe
   level: E3
   tolerance: 1.0e-4

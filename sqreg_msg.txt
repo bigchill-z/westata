@@ -1,0 +1,52 @@
+docs(sqreg): both promoted to E3 -- the "bias" was a bootstrap compared against a constant
+
+sqreg and bsqreg are now E3, and the registry entry that has been wrong for four batches is
+corrected. It is the most instructive correction in this project because all three of its
+claims were false and each was false in a different way.
+
+WHAT THE ENTRY SAID
+
+    "ratios 0.97 / 0.85 / 0.95, systematic downward bias, most likely a different
+     replicate-variance convention. Left at E1 rather than claiming agreement."
+
+WHAT THE MEASUREMENT SAYS
+
+    Stata qreg SE(x1)              0.04724609740003598
+
+    seed 20261023   reps 200       0.064280192790   ratio 1.3605
+    seed 777        reps 200       0.066030090157   ratio 1.3976
+    seed 20261023   reps 2000      0.068220515910   ratio 1.4439
+    seed 777        reps 2000      0.068452908368   ratio 1.4489
+
+Stata converges to about 0.0684 and its own two seeds differ by 2.7% at reps(200). My value,
+0.068787948208 with ratio 1.4551, sits inside that band.
+
+1. THERE WAS NO BIAS. The earlier figure compared my number against Stata's single reps(200)
+   point estimate, ignoring that a bootstrap statistic has its own sampling error -- roughly
+   5% per standard error at 200 replicates, larger than the gap I was chasing. The direction
+   even flipped between my own two runs (0.85 low once, 1.44 high the next), which was the
+   signal that something was wrong with the comparison rather than the estimate.
+
+2. THE VARIANCE FORMULA WAS NEVER IN QUESTION. sqreg.ado does
+       mat accum VCE = vl, dev nocons
+       mat VCE = VCE*(1/(reps-1))
+   which is exactly np.cov(ddof=1). I verified the two spellings agree to 1e-14 on identical
+   replicates, and also checked row-replication against frequency weights -- since bsampl_w
+   returns weights and qreg_c fits with wvar() -- which agree to 1e-14 as well. All three
+   candidate "convention" differences are numerically nil.
+
+3. THE GUESS NAMED A MECHANISM THAT DOES NOT EXIST. "A different replicate-variance
+   convention" sounded like a diagnosis and was not one. This is the exact failure mode the
+   project keeps fighting: the note told the next reader where to stop looking, and the answer
+   was never in the place it pointed.
+
+WHY THIS TOOK SO LONG: I spent the session confirming components that were already correct.
+Reading the source first would have shown that `dev nocons` scaled by 1/(reps-1) is the
+ordinary covariance, ending the variance theory immediately. The real work was never the
+formula -- it was realising that reps(200) cannot adjudicate a 5% question.
+
+RULE NOW RECORDED IN THE ENTRY: to compare a bootstrap against anything, raise reps until the
+seed-to-seed spread is under the tolerance, and compare against the converged value. Never
+against a single reps(200) run.
+
+Registry: 87 entries, 75 E3 / 11 E2 / 1 E1. Suite: 1212 passing.

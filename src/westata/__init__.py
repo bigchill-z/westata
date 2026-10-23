@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    Bootstrap,
+    Jackknife,
+    Permute,
     SurveyDesign,
     SvyLogit,
     SvyMean,
@@ -104,6 +107,9 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "Permute",
+    "Bootstrap",
+    "Jackknife",
     "SvyLogit",
     "SvyRegress",
     "SvyProportion",

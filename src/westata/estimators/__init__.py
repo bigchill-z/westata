@@ -58,6 +58,7 @@ from westata.estimators.treatreg_effects import (
     TreatmentEffectResult,
 )
 from westata.estimators.nonlinear import Frontier, Nl
+from westata.estimators.resample import Bootstrap, Jackknife, Permute
 from westata.estimators.survey import (
     SurveyDesign,
     SvyLogit,
@@ -86,6 +87,9 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "Permute",
+    "Bootstrap",
+    "Jackknife",
     "SvyLogit",
     "SvyRegress",
     "SvyProportion",

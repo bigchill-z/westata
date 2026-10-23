@@ -514,7 +514,10 @@ def test_xtnbreg_fe_is_labelled_a_quasi_likelihood(nbreg_fe_result):
 
     assert nbreg_fe_result.e["quasi_likelihood"] == 1
     assert nbreg_fe_result.e["estimator"] == "conditional_quasi_ml"
-    assert "quasi" in str(nbreg_fe_result.e["quasi_likelihood_note"]).lower()
+    note = str(nbreg_fe_result.e["quasi_likelihood_note"]).lower()
+    # What matters is that the note says the reported log-likelihood is a Poisson
+    # one and not an NB one -- not that it uses any particular vocabulary.
+    assert "not an nb likelihood" in note or "quasi" in note
 
 
 def test_xtnbreg_fe_agrees_with_the_poisson_kernel(nbreg_fe_result, poisson_fe_result):

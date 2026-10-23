@@ -960,16 +960,28 @@ class Frontier:
 
         beta = theta[:k]
         residual = y - X @ beta
-        covariance = np.linalg.pinv(_numerical_hessian(negative, theta))
+        hessian = _numerical_hessian(negative, theta)
+        try:
+            covariance = np.linalg.inv(hessian)
+        except np.linalg.LinAlgError:
+            # A singular Hessian whose diagonal is still non-negative is a
+            # flat direction, not a saddle: fall back to the pseudo-inverse,
+            # which reports zero variance along it instead of inventing a value.
+            if np.any(np.diag(hessian) < 0):
+                raise ConvergenceError(
+                    "frontier: the observed information is not positive definite; "
+                    "the estimates are not a maximum (try different starting values)"
+                ) from None
+            covariance = np.linalg.pinv(hessian)
         if not np.all(np.isfinite(covariance)):
             raise ConvergenceError(
-                "frontier: the observed information is not invertible; the model is "
+                "frontier: the observed information is not finite; the model is "
                 "likely not identified (check for collinear regressors)"
             )
         if np.any(np.diag(covariance) < 0):
             raise ConvergenceError(
-                "frontier: the observed information is not positive definite; the "
-                "estimates are not a maximum"
+                "frontier: the observed information yields a negative variance; the "
+                "estimates are not a maximum (try different starting values)"
             )
 
         llf = -negative(theta)

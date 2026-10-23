@@ -91,9 +91,9 @@ def test_regression_adjustment_matches_stata():
         "y", "treated", treatment_frame()
     ).fit()
 
-    # Stata: ATE 2.034515 (se .0610149)
-    assert outcome.estimate == pytest.approx(2.034515, rel=1e-5)
-    assert outcome.std_err == pytest.approx(0.0610149, rel=5e-2)
+    # Stata: ATE 2.034515 (se .0610149). Both to the printed digit.
+    assert outcome.estimate == pytest.approx(2.034515, rel=1e-6)
+    assert outcome.std_err == pytest.approx(0.0610149, rel=1e-6)
 
 
 def test_regression_adjustment_reports_the_potential_outcome_means():
@@ -104,8 +104,9 @@ def test_regression_adjustment_reports_the_potential_outcome_means():
         "y", "treated", treatment_frame()
     ).fit()
 
-    # Stata: POmean(0) .9785032
-    assert outcome.potential_outcomes["0"][0] == pytest.approx(0.9785032, rel=1e-5)
+    # Stata: POmean(0) .9785032 (se .0619697)
+    assert outcome.potential_outcomes["0"][0] == pytest.approx(0.9785032, rel=1e-6)
+    assert outcome.potential_outcomes["0"][1] == pytest.approx(0.0619697, rel=1e-6)
 
 
 def test_atet_differs_from_ate_and_matches_stata():
@@ -120,8 +121,10 @@ def test_atet_differs_from_ate_and_matches_stata():
     ).fit()
 
     assert ate.estimate != pytest.approx(atet.estimate, rel=1e-4)
-    # Stata: ATET 2.04958
-    assert atet.estimate == pytest.approx(2.04958, rel=1e-4)
+    # Stata: ATET 2.04958 (se .06474), POmean(0) 1.48981 (se .0771474)
+    assert atet.estimate == pytest.approx(2.04958, rel=1e-6)
+    assert atet.std_err == pytest.approx(0.06474, rel=1e-6)
+    assert atet.potential_outcomes["0"][0] == pytest.approx(1.48981, rel=1e-6)
 
 
 # ---------------------------------------------------------- teffects ipw
@@ -130,8 +133,11 @@ def test_atet_differs_from_ate_and_matches_stata():
 def test_ipw_matches_stata():
     IPW = _require("IPW")
     outcome = IPW.from_formula("y", "treated", treatment_frame()).fit()
-    # Stata: ATE 1.888171 (se .0939242)
-    assert outcome.estimate == pytest.approx(1.888171, rel=2e-2)
+    # Stata: ATE 1.888171 (se .0939242). The influence function must propagate
+    # the propensity-score estimation error; treating the propensity as fixed
+    # gives .1216 instead of .0939.
+    assert outcome.estimate == pytest.approx(1.888171, rel=1e-6)
+    assert outcome.std_err == pytest.approx(0.0939242, rel=1e-6)
 
 
 def test_ipw_reports_positive_standard_errors():
@@ -147,7 +153,8 @@ def test_aipw_matches_stata():
     AIPW = _require("AIPW")
     outcome = AIPW.from_formula("y", "treated", treatment_frame()).fit()
     # Stata: ATE 2.018836 (se .0625084)
-    assert outcome.estimate == pytest.approx(2.018836, rel=2e-2)
+    assert outcome.estimate == pytest.approx(2.018836, rel=1e-6)
+    assert outcome.std_err == pytest.approx(0.0625084, rel=1e-6)
 
 
 # ------------------------------------------------------ teffects nnmatch
@@ -158,9 +165,15 @@ def test_nearest_neighbour_matching_is_close_to_stata():
     outcome = NearestNeighbourMatching.from_formula(
         "y", "treated", treatment_frame(), nneighbor=1
     ).fit()
-    # Stata: ATE 2.051839 (se .0691114). Matching depends on tie-breaking, so a
-    # couple of percent is the realistic target.
-    assert outcome.estimate == pytest.approx(2.051839, rel=2e-2)
+    # Stata: ATE 2.051839 (se .0691114).
+    #
+    # The POINT estimate is exact; the standard error is not, and the result says
+    # so through se_method. The gap is entirely in sigma^2(X_i): the reuse counts
+    # match, roughly fifteen variance estimators bracket 0.0691-0.0706 without
+    # singling one out, and Stata's exact form for that term is undocumented.
+    assert outcome.estimate == pytest.approx(2.051839, rel=1e-5)
+    assert outcome.std_err == pytest.approx(0.0691114, rel=5e-2)
+    assert "approximation" in outcome.se_method.lower()
 
 
 # -------------------------------------------------------------- didregress

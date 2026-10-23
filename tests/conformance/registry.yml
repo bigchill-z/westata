@@ -569,32 +569,32 @@
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
-      ref: "teffects ra (y x1 x2) (treated) on 1200 confounded observations: Stata ATE 2.034515 (se .0610149), POmean(0) .9785032; westata 2.034515 / .0606287 / .9785032"
+      ref: "teffects ra (y x1 x2) (treated) on 1200 confounded observations: Stata ATE 2.034515 (se .0610149), POmean(0) .9785032 (se .0619697); westata 2.03451514 / .06101488 / .97850324 / .06196974"
     - type: r_crosscheck
-      ref: "teffects ra ..., atet: Stata ATET 2.04958 (se .06474), POmean(0) 1.48981; westata 2.049580 / .0649368 / 1.489810"
+      ref: "teffects ra ..., atet: Stata ATET 2.04958 (se .06474), POmean(0) 1.48981 (se .0771474); westata 2.04958010 / .06473996 / 1.48980965 / .07714740"
   verified_by: lead
   date: 2026-10-23
-  notes: "ate, atet and the potential-outcome means all reproduce Stata to the printed digit; the standard errors land within 0.6%. Getting the standard error right took two wrong attempts, and the reason is instructive: OLS residuals are orthogonal to the design, so the model-error terms of the influence function are IDENTICALLY zero, and an influence function built only from them collapses to the plug-in variation (0.0018, 33x too small). The variance is dominated by the arm-coefficient uncertainty: xbar'(V1+V0)xbar. Adding that term gives 0.06063 against Stata's 0.06101."
+  notes: "ate, atet and both potential-outcome means reproduce Stata to every printed digit, standard errors included (largest residual 6e-7). Getting the standard error right took two wrong attempts and the reason is instructive: OLS residuals are orthogonal to the design, so the model-error terms vanish identically and an influence function built only from them collapses to the plug-in variation, 0.0018 -- 33x too small. The variance is dominated by the arm-coefficient term, psi = (yhat1-yhat0 - ATE) + (u1 - u0)'xbar with u_t = (X_t'X_t/n)^-1 x_i t_i e_i. Verified independently against a numerical-differentiation M-estimator engine."
 
 - command: teffects ipw
   level: E3
-  tolerance: 1.0e-4
+  tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
-      ref: "teffects ipw (y) (treated x1 x2): Stata ATE 1.888171 (se .0939242), POmean(0) 1.018208; westata estimate exact"
+      ref: "teffects ipw (y) (treated x1 x2): Stata ATE 1.888171 (se .0939242), POmean(0) 1.018208 (se .1001317); westata 1.88817061 / .09392416 / 1.01820803 / .10013166"
   verified_by: lead
   date: 2026-10-23
-  notes: "The point estimate reproduces Stata exactly. The standard error does NOT: westata reports 0.1632 against Stata's 0.0939, because the propensity-score estimation error is not propagated into the weighting variance. Point estimate E3, standard error unverified -- recorded rather than dressed up."
+  notes: "Point estimate AND standard error reproduce every printed digit. The propensity-score estimation error IS propagated: the estimator is written as an M-estimator over (beta, mu1, mu0) with Hajek ratios, so psi = -A^-1 m feeds the propensity Jacobian into the weighting variance. Two wrong versions went before it and both are instructive: treating the propensity as fixed gives 0.1216 against Stata's 0.1001 (21% high), and a naive arm-variance formula gave 0.1632 (74% high). Normalisation is Stata's 1/n, not ddof=1 -- ddof=1 shifts every SE by sqrt((n-1)/n) and breaks conformance."
 
 - command: teffects aipw
   level: E3
-  tolerance: 1.0e-4
+  tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
-      ref: "teffects aipw (y x1 x2) (treated x1 x2): Stata ATE 2.018836 (se .0625084), POmean(0) .9801461; westata 2.018836 / .0641594 / exact"
+      ref: "teffects aipw (y x1 x2) (treated x1 x2): Stata ATE 2.018836 (se .0625084), POmean(0) .9801461 (se .0615501); westata 2.01883606 / .06250844 / .98014607 / .06155009"
   verified_by: lead
   date: 2026-10-23
-  notes: "ATE exact, standard error within 2.6% (.0641594 vs .0625084). The double-robust correction keeps the estimate right even though the weighting-variance propagation is approximate."
+  notes: "Every quantity matches to its printed digit. The influence function carries the outcome-model coefficients (b1, b0) AND the propensity Jacobian; omitting the coefficient terms gives 0.0641 against Stata's 0.0625, which is how the earlier draft fell 2.6% short."
 
 - command: teffects nnmatch
   level: E2
@@ -604,7 +604,7 @@
       ref: "teffects nnmatch (y x1 x2) (treated), nneighbor(1): Stata ATE 2.051839 (se .0691114)"
   verified_by: lead
   date: 2026-10-23
-  notes: "Within a few percent, but matching depends on tie-breaking and on the exact distance standardisation Stata uses, so an exact match is not achievable by construction. The variance is an Abadie-Imbens approximation, labelled as such in the result."
+  notes: "The POINT estimate is exact (2.05183948 vs 2.051839) with Mahalanobis-style standardisation and exact reuse counts. The standard error is +2.2% (.0706220 vs .0691114) and stays approximate: the gap is entirely in sigma^2(X_i), roughly fifteen variance estimators were tried and bracket 0.0691-0.0706 without singling one out, and Stata's exact form for that term is not documented to the digit. The result labels itself se_method='Abadie-Imbens approximation' so the approximation is machine-checkable rather than buried in prose. A 120-replicate Monte Carlo puts the true sampling SD near 0.0765, which supports Stata's magnitude."
 
 - command: didregress
   level: E3

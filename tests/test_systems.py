@@ -197,9 +197,30 @@ def test_sureg_constant_answers_to_both_stata_and_patsy_spellings():
     result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert float(result.params["y1:_cons"]) == float(result.params["y1:Intercept"])
     assert float(result.bse["y2:_cons"]) == float(result.bse["y2:Intercept"])
+    assert float(result.tvalues["y1:_cons"]) == float(result.tvalues["y1:Intercept"])
     # A genuine typo must still fail rather than silently matching something.
     with pytest.raises(KeyError):
         result.params["y1:nonexistent"]
+    # Fancy indexing goes through the same resolution path, and boolean masks
+    # must keep pandas' positional semantics.
+    assert result.params[["y1:_cons", "y2:Intercept"]].to_list() == pytest.approx(
+        [float(result.params["y1:_cons"]), float(result.params["y2:_cons"])]
+    )
+    mask = np.array([True, False, False, False, True, False])
+    assert result.params[mask].to_list() == pytest.approx(
+        [float(result.params["y1:x1"]), float(result.params["y2:x3"])]
+    )
+
+
+def test_sureg_parameter_order_follows_stata():
+    """e(b) column order: slopes then ``_cons``, equation by equation."""
+
+    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    assert list(result.params.index) == result.param_names
+    # Directly comparable with Stata's e(b) without a permutation.
+    np.testing.assert_allclose(
+        result.params.to_numpy(), [SUR_B[name] for name in result.param_names], rtol=1e-10
+    )
 
 
 def test_sureg_coefficients_equal_per_equation_ols_when_errors_are_uncorrelated():
@@ -289,16 +310,43 @@ def test_sureg_rejects_iterated_estimation():
         model.fit(iterate=True)
 
 
+def test_sureg_handles_three_equations():
+    """The system is not hard-wired to two equations."""
+
+    rng = np.random.default_rng(11)
+    n = 200
+    frame = pd.DataFrame(
+        {"a": rng.normal(size=n), "b": rng.normal(size=n), "c": rng.normal(size=n)}
+    )
+    shared = rng.normal(size=n)
+    frame["y1"] = 1.0 + 2.0 * frame["a"] + shared
+    frame["y2"] = -1.0 + 1.5 * frame["b"] + 0.8 * shared
+    frame["y3"] = 0.5 + 0.7 * frame["c"] - 0.4 * shared
+
+    result = Sureg.from_formula(["y1 ~ a", "y2 ~ b", "y3 ~ c"], frame).fit()
+    assert result.param_names == ["y1:a", "y1:_cons", "y2:b", "y2:_cons", "y3:c", "y3:_cons"]
+    assert result.cov_params().shape == (6, 6)
+    correlation = np.asarray(result.e["corr"], dtype=float)
+    assert correlation.shape == (3, 3)
+    # y1 and y2 share the error component with the same sign, y3 with the
+    # opposite one -- if the off-diagonals were dropped this would be identity.
+    assert correlation[0, 1] > 0.3
+    assert correlation[0, 2] < -0.2
+    # Per-equation statistics are positionally indexed, as Stata stores them.
+    assert set(("r2_1", "r2_2", "r2_3", "rmse_1", "rmse_2", "rmse_3")) <= set(result.e)
+    assert float(result.e["k_eq"]) == 3.0
+
+
 def test_sureg_reports_stata_fit_statistics():
     """e(ll), e(r2), e(rmse) and e(chi2) per equation, from Stata."""
 
     result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert float(result.e["ll"]) == pytest.approx(-1042.83530993779, rel=1e-10)
-    assert float(result.e["r2_y1"]) == pytest.approx(0.8122297261145611, rel=1e-10)
-    assert float(result.e["r2_y2"]) == pytest.approx(0.599515039818118, rel=1e-10)
+    assert float(result.e["r2_1"]) == pytest.approx(0.8122297261145611, rel=1e-10)
+    assert float(result.e["r2_2"]) == pytest.approx(0.599515039818118, rel=1e-10)
     # RMSE divides the SUR residual sum of squares by n, not n - k.
-    assert float(result.e["rmse_y1"]) == pytest.approx(0.9834311830146563, rel=1e-10)
-    assert float(result.e["rmse_y2"]) == pytest.approx(0.9723055408248386, rel=1e-10)
+    assert float(result.e["rmse_1"]) == pytest.approx(0.9834311830146563, rel=1e-10)
+    assert float(result.e["rmse_2"]) == pytest.approx(0.9723055408248386, rel=1e-10)
     assert float(result.e["chi2_1"]) == pytest.approx(2464.039068310004, rel=1e-10)
     assert float(result.e["chi2_2"]) == pytest.approx(757.6555036767809, rel=1e-10)
     assert float(result.e["N"]) == 400.0
@@ -411,14 +459,37 @@ def test_mvreg_reports_per_equation_fit_statistics():
     result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     assert float(result.e["F_y1"]) == pytest.approx(575.2300094917224, rel=1e-9)
     assert float(result.e["F_y2"]) == pytest.approx(198.29447572298326, rel=1e-9)
+    # Stata stores these as per-equation macros -- e(r2) = " .8134 .6004" -- so
+    # e(r2) is a two-element list, plus one scalar per outcome.
+    assert [float(value) for value in result.e["r2"]] == pytest.approx(
+        [0.8133563363708692, 0.6003566220383658], rel=1e-10
+    )
     assert float(result.e["r2_y1"]) == pytest.approx(0.8133563363708692, rel=1e-10)
     assert float(result.e["rmse_y1"]) == pytest.approx(0.9854159399833834, rel=1e-10)
+    assert float(result.e["rmse_y2"]) == pytest.approx(0.976176544657905, rel=1e-10)
     assert float(result.e["df_r"]) == 396.0
 
 
 def test_mvreg_rejects_a_missing_equals_sign():
     with pytest.raises(ConsistencyError, match="="):
         Mvreg.from_formula("y1 y2 ~ x1 x2", _sur())
+
+
+def test_mvreg_applies_listwise_deletion_to_every_equation():
+    """One shared design means one shared sample: N drops to 396 in Stata too.
+
+    Captured from Stata on the same frame with four ``x3`` values missing:
+    e(N) = 396 and y1:x1 = 1.95559904.
+    """
+
+    frame = _sur()
+    frame.loc[:3, "x3"] = np.nan
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    assert result.e["N"] == 396
+    assert result.nobs == 792  # stacked: k_eq * N
+    assert float(result.params["y1:x1"]) == pytest.approx(1.95559904, rel=1e-8)
+    assert float(result.params["y2:x3"]) == pytest.approx(0.7613504, rel=1e-7)
 
 
 # ----------------------------------------------------------------------- eivreg
@@ -620,6 +691,45 @@ def test_manova_reduces_to_the_univariate_f_for_one_response():
     within = sum(((block - block.mean()) ** 2).sum() for block in groups)
     anova_f = (between / (len(groups) - 1)) / (within / (n - len(groups)))
     assert float(outcome.F) == pytest.approx(anova_f, rel=1e-9)
+
+
+def test_manova_flags_exact_versus_approximate_f_like_stata():
+    """Stata marks the F exact ("e") iff the Rao transform is exact: s in {1, 2}.
+
+    Two designs are checked because the interesting case is the boundary:
+    p=2 q=2 gives s=2 (exact) while p=3 q=3 gives s=2.4337 (approximate).
+    Both flags were read off Stata's printed table.
+    """
+
+    def build(p: int, group_count: int, seed: int) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        g = rng.integers(0, group_count, size=200)
+        effect = np.arange(group_count, dtype=float)[g]
+        return pd.DataFrame(
+            {
+                **{
+                    f"y{j + 1}": 1.0 + (j + 1) * 0.4 * effect + rng.normal(scale=0.8, size=200)
+                    for j in range(p)
+                },
+                "g": g,
+            }
+        )
+
+    # p=2 q=2 (two outcomes, three groups) gives s=2, so the Rao transform is
+    # exact; Stata prints "e" and F(4, 392) = 37.24.
+    exact = Manova.from_formula("y1 y2 = g", build(2, 3, 109)).fit()
+    assert exact.statistics["s"] == pytest.approx(2.0)
+    assert exact.statistics["exact"] == 1.0
+    assert float(exact.F) == pytest.approx(37.24, abs=5e-3)
+    assert float(exact.df2) == 392.0
+
+    # p=3 q=3 (three outcomes, four groups) gives s=2.4337, so the transform is
+    # approximate; Stata prints "a" and F(9.0, 472.3) = 62.10.
+    approximate = Manova.from_formula("y1 y2 y3 = g", build(3, 4, 304)).fit()
+    assert approximate.statistics["s"] == pytest.approx(2.4337, abs=5e-4)
+    assert approximate.statistics["exact"] == 0.0
+    assert float(approximate.F) == pytest.approx(62.10, abs=5e-3)
+    assert float(approximate.df2) == pytest.approx(472.3, abs=0.05)
 
 
 def test_manova_rejects_multiple_factors():

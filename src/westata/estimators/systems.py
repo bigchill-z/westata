@@ -487,6 +487,8 @@ class Sureg:
             "k_eq": equations,
             "k": total,
             "rank": total,
+            # e(df_m) is the number of tested slopes across the system (the
+            # constants are excluded), which is what the header's Wald chi2 uses.
             "df_m": float(total - equations),
             "equations": list(self._equation_names),
             "sigma": sigma_resid.tolist(),
@@ -509,13 +511,22 @@ class Sureg:
             equation_names = [f"{label}:{name}" for name in self._param_names[position]]
             rss = float(residuals[position] @ residuals[position])
             tss = float(((response - response.mean()) ** 2).sum())
-            e[f"rss_{label}"] = rss
-            e[f"mss_{label}"] = tss - rss
-            e[f"r2_{label}"] = 1.0 - rss / tss if tss > 0 else float("nan")
-            e[f"rmse_{label}"] = float(np.sqrt(rss / n))
+            r2 = 1.0 - rss / tss if tss > 0 else float("nan")
             slopes = _slope_positions(equation_names)
-            e[f"df_m{position + 1}"] = float(len(slopes))
-            e[f"cons_{position + 1}"] = int(_CONSTANT_STATA in equation_names)
+            # Stata names these positionally -- e(r2_1), e(rmse_2), e(rss_1) --
+            # not by equation label, so the positional spelling is canonical and
+            # the label-based one is kept as a convenience alias.
+            per_equation: dict[str, Any] = {
+                "rss": rss,
+                "mss": tss - rss,
+                "r2": r2,
+                "rmse": float(np.sqrt(rss / n)),
+                "df_m": float(len(slopes)),
+                "cons": int(_CONSTANT_STATA in equation_names),
+            }
+            for key, value in per_equation.items():
+                e[f"{key}_{position + 1}"] = value
+                e[f"{key}_{label}"] = value
             if slopes:
                 b = beta[block][slopes]
                 V = covariance[block, block][np.ix_(slopes, slopes)]
@@ -686,25 +697,41 @@ class Mvreg:
             "corr": _correlation(sigma).tolist(),
             "vce": "unadjusted",
         }
-        # Stata prints per-equation fit rows above the coefficient table.
+        # Stata prints per-equation fit rows above the coefficient table and
+        # stores them as *macros* -- e(r2) = " .8134 .6004" -- because a single
+        # scalar cannot describe two equations.  Both spellings are recorded:
+        # the macro-shaped list under Stata's own name, and a per-outcome scalar
+        # (``e["r2_y1"]``) for convenient access.
+        slopes = [
+            i
+            for i, name in enumerate(self._param_names)
+            if str(name) not in (_CONSTANT_STATA, _CONSTANT_PATSY)
+        ]
+        fit_rows: dict[str, list[float]] = {"r2": [], "rmse": [], "F": [], "p_F": []}
         for position, (outcome, response) in enumerate(
             zip(self._outcome_names, self._responses)
         ):
             rss = float(residuals[position] @ residuals[position])
             tss = float(((response - response.mean()) ** 2).sum())
             r2 = 1.0 - rss / tss if tss > 0 else float("nan")
-            slopes = [
-                i
-                for i, name in enumerate(self._param_names)
-                if str(name) not in (_CONSTANT_STATA, _CONSTANT_PATSY)
-            ]
-            e[f"r2_{outcome}"] = r2
-            e[f"rmse_{outcome}"] = float(np.sqrt(rss / (n - k)))
+            rmse = float(np.sqrt(rss / (n - k)))
+            statistic = float("nan")
             if slopes and np.isfinite(r2):
-                df_model = len(slopes)
-                statistic = (r2 / df_model) / ((1.0 - r2) / (n - k))
-                e[f"F_{outcome}"] = statistic
-                e[f"p_{outcome}"] = float(stats.f.sf(statistic, df_model, n - k))
+                statistic = (r2 / len(slopes)) / ((1.0 - r2) / (n - k))
+            pvalue = (
+                float(stats.f.sf(statistic, len(slopes), n - k))
+                if np.isfinite(statistic)
+                else float("nan")
+            )
+            fit_rows["r2"].append(r2)
+            fit_rows["rmse"].append(rmse)
+            fit_rows["F"].append(statistic)
+            fit_rows["p_F"].append(pvalue)
+            e[f"r2_{outcome}"] = r2
+            e[f"rmse_{outcome}"] = rmse
+            e[f"F_{outcome}"] = statistic
+            e[f"p_{outcome}"] = pvalue
+        e.update(fit_rows)
 
         return _SystemResults(
             params=beta,
@@ -1105,9 +1132,10 @@ class Manova:
         statistic = ((1.0 - powered) / powered) * (df2 / df1)
         pvalue = float(stats.f.sf(statistic, df1, df2))
 
-        # Stata prints the exact/approximate flag next to each statistic; for
-        # Wilks' lambda the Rao transform is exact when s = 1 or p q <= 2.
-        exact = bool(s == 1.0 or df1 <= 2.0)
+        # Stata flags the F as exact ("e") when the Rao transform is exact, and
+        # that happens exactly when s is 1 or 2 -- e.g. p=2 q=2 gives s=2 (and
+        # Stata prints "e"), while p=3 q=3 gives s=2.4337 ("a").
+        exact = bool(s in (1.0, 2.0))
 
         return ManovaResult(
             wilks_lambda=wilks,

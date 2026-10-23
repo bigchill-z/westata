@@ -885,11 +885,12 @@
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
-      ref: "Live comparison: tsset t; arch r, arch(1) garch(1) on a GARCH DGP"
+      ref: "arch r, arch(1) garch(1) on 800 observations: Stata b [mu -0.040745987731, alpha 0.116921861394, beta 0.780018069780, omega 0.081835127984]; westata gaps 4.7e-04, 1.2e-03, 2.8e-03, 1.5e-03"
+    - type: r_crosscheck
+      ref: "same fit, standard errors: Stata [0.029336114, 0.037699677, 0.079961894, 0.041705752]; westata gaps 9.2e-05, 9.8e-03, 3.4e-02, 1.6e-02"
   verified_by: lead
-  date: 2026-10-22
-  notes: "alpha 6.9e-3, beta 6.3e-4, mean constant 3.6e-2. omega is not stored in Stata's e(b) under a comparable name, so the variance intercept is not compared. Stata uses OPG standard errors by default while arch uses the Hessian; the point estimates are close but not identical because the optimisers differ."
-
+  date: 2026-10-23
+  notes: "Stays E2, and the previous explanation here was WRONG. It said 'Stata's default is the OPG standard errors, whereas ours come from the Hessian; the optimisers also differ'. That cannot be the whole story, because an OPG-versus-Hessian difference moves the STANDARD ERRORS while leaving the point estimates at their optimum -- and the point estimates differ too (4.7e-04 to 2.8e-03). So the two optimisers are converging to different maxima of slightly different objective functions, not evaluating the same optimum with different curvature formulas. MEASURED STATE: coefficients agree to 1e-3, standard errors disagree by up to 40% (beta's SE is 0.0462 against 0.0800). Reaching parity needs the GARCH likelihood and its numerical derivatives reimplemented to match Stata's, which is substantial work rather than a tolerance adjustment, so the E2 stands with the numbers recorded. Also recorded: Stata's parameter names are equation-qualified (r:_cons, ARCH:L.arch, ARCH:L.garch, ARCH:_cons) while westata reports mu, alpha[1], beta[1], omega -- a naming difference that has to be reconciled before any value comparison, and did produce a spurious 'MISSING' the first time."
 - command: dfuller
   level: E3
   tolerance: 1.0e-3

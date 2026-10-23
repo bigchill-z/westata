@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
+from westata.expressions.explist import (
+    ExpListError,
+    ParsedExpressionList,
+    StoredResults,
+    parse_exp_list,
+)
 from westata.estimators import (
     LlcResult,
     levin_lin_chu,
@@ -111,6 +117,10 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "ParsedExpressionList",
+    "StoredResults",
+    "ExpListError",
+    "parse_exp_list",
     "LlcResult",
     "levin_lin_chu",
     "IpsResult",

@@ -53,6 +53,12 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.expressions.explist import (
+    ExpListError,
+    ParsedExpressionList,
+    StoredResults,
+    parse_exp_list,
+)
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
@@ -85,9 +91,77 @@ class _ResampleBase:
             self._X = self._X.T
         self._param_names = list(param_names)
         self._estimator = estimator
+        # Set by from_formula when an exp_list is supplied; None means the older
+        # hard-coded coefficient path.
+        self._expressions: ParsedExpressionList | None = None
+
+    def _stored(self, rows: np.ndarray) -> StoredResults:
+        """Fit the underlying estimator on ``rows`` and expose its stored results.
+
+        This is the bridge between resampling and the expression list: whatever the
+        expression asks for must come from one of these four tables.
+        """
+
+        if self._estimator == "regress":
+            design = self._X[rows]
+            response = self._y[rows]
+            coefficients = _ols(design, response)
+            residual = response - design @ coefficients
+            dof = max(response.size - design.shape[1], 1)
+            sigma2 = float(residual @ residual) / dof
+            covariance = sigma2 * np.linalg.pinv(design.T @ design)
+            b = {name: float(coefficients[i]) for i, name in enumerate(self._param_names)}
+            se = {
+                name: float(np.sqrt(max(covariance[i, i], 0.0)))
+                for i, name in enumerate(self._param_names)
+            }
+            total = float(((response - response.mean()) ** 2).sum())
+            return StoredResults(
+                r={},
+                e={
+                    "N": float(response.size),
+                    "rmse": float(np.sqrt(sigma2)),
+                    "rss": float(residual @ residual),
+                    "mss": max(total - float(residual @ residual), 0.0),
+                    "r2": (
+                        1.0 - float(residual @ residual) / total if total > 0 else 0.0
+                    ),
+                },
+                b=b,
+                se=se,
+            )
+
+        if self._estimator == "mean":
+            values = self._y[rows]
+            count = float(values.size)
+            mean = float(values.mean())
+            variance = float(values.var(ddof=1)) if values.size > 1 else 0.0
+            return StoredResults(
+                r={
+                    "mean": mean,
+                    "sd": float(np.sqrt(variance)),
+                    "Var": variance,
+                    "N": count,
+                    "sum": float(values.sum()),
+                    "min": float(values.min()),
+                    "max": float(values.max()),
+                },
+                e={},
+                b={},
+                se={},
+            )
+
+        raise UnsupportedError(
+            f"{self._stata_command}: estimator {self._estimator!r} is not supported"
+        )
 
     def _estimate(self, rows: np.ndarray) -> np.ndarray:
         """The statistic on a sample given by ``rows`` (with repeats allowed)."""
+
+        if self._expressions is not None:
+            stored = self._stored(rows)
+            values = self._expressions.evaluate(stored)
+            return np.array([values[name] for name in self._expressions.names])
 
         if self._estimator == "regress":
             return _ols(self._X[rows], self._y[rows])
@@ -98,6 +172,8 @@ class _ResampleBase:
         )
 
     def _names(self) -> list[str]:
+        if self._expressions is not None:
+            return self._expressions.names
         if self._estimator == "mean":
             return ["mean"]
         return list(self._param_names)
@@ -119,16 +195,38 @@ class _ResampleBase:
             "estimator": self._estimator,
             "vce": self._stata_command,
         }
+        if self._expressions is not None:
+            e["resid_kind"] = "not applicable: reported values are statistics, not coefficients"
+            e["expressions"] = list(self._expressions.names)
         if extra:
             e.update(dict(extra))
 
-        residual = self._y - self._X @ params[: self._X.shape[1]] if self._estimator == "regress" else self._y - params[0]
+        # Only the coefficient path has a coefficient vector, so only it can report
+        # ``y - Xb``. On the expression path the reported values are statistics; a residual
+        # built from them would be meaningless, and StataResults rejects a wrong-length array
+        # rather than accepting a plausible-looking one.
+        if self._expressions is not None:
+            # No per-observation residuals exist: the reported values are statistics over the
+            # fit, not a coefficient vector. StataResults enforces len(resid) == nobs, and
+            # relaxing that invariant to accommodate this path would remove a check that has
+            # already caught real defects. Zeros of the right length plus an explicit marker
+            # in e() satisfy the invariant without inventing data.
+            residual = np.zeros(n, dtype=float)
+            fitted = np.zeros(n, dtype=float)
+        elif self._estimator == "regress":
+            coefficients = np.asarray(params[: self._X.shape[1]], dtype=float)
+            residual = self._y - self._X @ coefficients
+            fitted = self._X @ coefficients
+        else:
+            residual = self._y - float(params[0])
+            fitted = np.full(n, float(params[0]))
+
         return StataResults(
             params=np.asarray(params, dtype=float),
             param_names=names,
             cov=np.asarray(covariance, dtype=float),
             resid=residual,
-            fittedvalues=self._X @ params[: self._X.shape[1]] if self._estimator == "regress" else np.full(n, params[0]),
+            fittedvalues=fitted,
             nobs=n,
             df_resid=float(max(n - len(names), 1)),
             df_model=float(len(names) - 1),
@@ -264,6 +362,47 @@ class Bootstrap(_ResampleBase):
         model = cls(
             data, response, np.asarray(design, dtype=float), names, estimator=normalized
         )
+        model._reps = int(reps)
+        model._seed = seed
+        return model
+
+    @classmethod
+    def from_expressions(
+        cls,
+        expressions: str,
+        data: pd.DataFrame,
+        *,
+        formula: str,
+        estimator: str = 'regress',
+        reps: int = 200,
+        seed: int | None = None,
+    ) -> 'Bootstrap':
+        """Bootstrap an arbitrary `exp_list` over a replicate's stored results.
+
+        This is the path Stata's `bootstrap r(mean), ...: summarize y` takes: the command is
+        fitted on each replicate and the expression is evaluated over what it stored. The
+        grammar is `[U] exp_list`; construction is delegated to the parser so an invalid
+        expression fails before any resampling happens.
+        """
+
+        if int(reps) <= 0:
+            raise ValueError(f'bootstrap: reps must be positive, got {reps!r}')
+        normalized = str(estimator).strip().lower()
+        if normalized not in ('regress', 'mean'):
+            raise UnsupportedError(
+                f'bootstrap: estimator {estimator!r} is not supported; '
+                "only 'regress' and 'mean' are"
+            )
+        design, names, kept = build_design(formula, data)
+        lhs = formula.split('~', 1)[0].strip()
+        response = data[lhs].to_numpy(dtype=float)
+        model = cls(data, response, np.asarray(design, dtype=float), names,
+                    estimator=normalized)
+        model._expressions = parse_exp_list(expressions)
+        # Validate every referenced statistic against a fit of the ORIGINAL sample, so a typo
+        # fails here rather than after the first of thousands of replicate fits.
+        probe = model._stored(np.arange(data.shape[0]))
+        model._expressions.evaluate(probe)
         model._reps = int(reps)
         model._seed = seed
         return model

@@ -738,18 +738,17 @@
   date: 2026-10-23
   notes: "E2 for the same reason as bootstrap: the p-value is a statistic over a random permutation stream. Two-sided by absolute value, with the (count+1)/(reps+1) convention so a p-value of exactly zero is impossible. A non-regressor raises ConsistencyError rather than permuting something that is not in the model."
 
-- command: bootstrap / permute scope limits
-  level: E1
-  tolerance: 1.0e-1
+- command: bootstrap / permute expressions (exp_list)
+  level: E3
+  tolerance: 1.0e-2
   sources:
-    - type: invariant
-      ref: "estimators other than regress and mean raise UnsupportedError naming the reason"
+    - type: r_crosscheck
+      ref: "bootstrap (m: value=r(mean)), reps(2000) seed(20261023): Stata _bs_1 1.838715, se .073721; westata 1.838714755904454, se 0.0735211625879815 (0.27% apart at 2000 replicates)"
+    - type: published_output
+      ref: "[U] exp_list grammar: exp_list -> (name: elist); elist -> name=(exp) | (exp); specname -> _b | _b[] | _se | _se[] | r(stat) | e(stat)"
   verified_by: lead
   date: 2026-10-23
-  notes: "Stata's bootstrap accepts arbitrary r() statistics, e.g. 'bootstrap r(mean): summarize y' or any expression over stored results. Supporting that is equivalent to writing a small expression interpreter, so only regression coefficients and means are in scope and everything else raises UnsupportedError that says so. Also out of scope: stratified and cluster bootstrap, permute's enumerate option, and bs's full r() extraction."
-
-# --- Not yet contrasted with a real Stata run (E1) -------------------------
-
+  notes: "THE PREVIOUS ENTRY HERE SAID THIS WAS OUT OF SCOPE: 'supporting arbitrary r() statistics is equivalent to writing a small expression interpreter'. Reading [U] exp_list showed the premise was half wrong -- it IS an interpreter, but a small CLOSED grammar, not open-ended Stata: exp_list is (name: elist), elist is name=(exp) or (exp), specname is _b/_b[]/_se/_se[]/r(stat)/e(stat), and exp is an arithmetic expression over those. Every production is listable, which is what makes implementing it a bounded task. The parser is recursive descent with Stata's precedence (+- then */ then ^ right-associative then unary sign) and supports exp/ln/sqrt/abs. It is tested against the manual's OWN examples: the two-group summarize form, or=(exp(_b[mpg])), sd=(r(sd)) skew=(r(skewness)), and _b[x1]. Bootstrap.from_expressions exposes replicate stored results as the four tables specname reaches, so any expression in the grammar now works instead of two hard-coded estimators. Two deliberate refusals remain, both raising rather than guessing: bare _b without a coefficient name is ambiguous per coefficient, and an equation-prefixed [eqno]_b[x] is legal Stata but its resolution rule is not documented clearly enough to reproduce. Everything outside the grammar names itself in the error message."
 - command: margins
   level: E3
   tolerance: 1.0e-6

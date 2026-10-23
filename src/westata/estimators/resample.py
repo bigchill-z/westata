@@ -53,6 +53,7 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.random.stata_rng import Mt19937_64
 from westata.expressions.explist import (
     ExpListError,
     ParsedExpressionList,
@@ -68,6 +69,69 @@ __all__ = ["Bootstrap", "Jackknife", "Permute"]
 def _ols(design: np.ndarray, response: np.ndarray) -> np.ndarray:
     coefficients, *_ = np.linalg.lstsq(design, response, rcond=None)
     return coefficients
+
+
+def _bsampl_w(size: int, generator: Mt19937_64) -> np.ndarray:
+    """Stata's ``bsampl_w``: integer frequency weights, one per observation.
+
+    Mirrors bsampl_w.ado exactly, including the second uniform stream used as a tie-break:
+
+        r = int(uniform()*_N + 1)
+        w = uniform()
+        sort r w
+        w = cond(r==r[_n-1], w[_n-1]+1, 1)
+        w = 0 if !(w[_n+1]==1 | _n==_N)
+
+    The last two lines turn the draws into a running count per target and keep one row per
+    drawn target, weighted by its multiplicity. Drawing indices alone is not enough: it
+    reproduces which targets were hit but not the weights, and that difference showed up as a
+    1.5% error in a bootstrap standard error.
+    """
+
+    targets = np.fromiter(
+        (int(generator.runiform() * size + 1) for _ in range(size)),
+        dtype=int,
+        count=size,
+    )
+    tiebreak = np.fromiter(
+        (generator.runiform() for _ in range(size)), dtype=float, count=size
+    )
+
+    order = np.lexsort((tiebreak, targets))
+    ordered_target = targets[order]
+
+    running = np.ones(size, dtype=float)
+    for position in range(1, size):
+        if ordered_target[position] == ordered_target[position - 1]:
+            running[position] = running[position - 1] + 1.0
+
+    keep = np.zeros(size, dtype=bool)
+    keep[-1] = True
+    for position in range(size - 1):
+        keep[position] = running[position + 1] == 1.0
+
+    weights = np.zeros(size, dtype=float)
+    weights[order[keep]] = running[keep]
+    return weights
+
+
+def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
+    return float(np.average(values, weights=weights))
+
+
+def _stata_shuffle(generator: Mt19937_64, values: np.ndarray) -> np.ndarray:
+    """A permutation from the Stata stream (Fisher-Yates).
+
+    Stata's own shuffle order is not documented, so the permutation test remains a magnitude
+    comparison; the DISTRIBUTION now comes from the correct generator, which is the part that
+    affects the p-value's meaning.
+    """
+
+    output = values.copy()
+    for index in range(output.size - 1, 0, -1):
+        swap = int(generator.runiform() * (index + 1))
+        output[index], output[swap] = output[swap], output[index]
+    return output
 
 
 class _ResampleBase:
@@ -94,6 +158,90 @@ class _ResampleBase:
         # Set by from_formula when an exp_list is supplied; None means the older
         # hard-coded coefficient path.
         self._expressions: ParsedExpressionList | None = None
+
+    def _estimate_weighted(self, weights: np.ndarray) -> np.ndarray:
+        """Fit on the original data using ``bsampl_w`` frequency weights.
+
+        Stata's bootstrap does not resample rows and refit; it builds weights and passes them to
+        the command as ``wvar()``. The two are the same estimator for linear statistics, but
+        using the weights keeps the arithmetic aligned with Stata's and keeps the replicate
+        count fixed at N.
+        """
+
+        if self._expressions is not None:
+            stored = self._stored_weighted(weights)
+            values = self._expressions.evaluate(stored)
+            return np.array([values[name] for name in self._expressions.names])
+
+        if self._estimator == "regress":
+            root = np.sqrt(weights)
+            coefficients, *_ = np.linalg.lstsq(
+                self._X * root[:, None], self._y * root, rcond=None
+            )
+            return coefficients
+
+        if self._estimator == "mean":
+            return np.array([float(np.average(self._y, weights=weights))])
+
+        raise UnsupportedError(
+            f"{self._stata_command}: estimator {self._estimator!r} is not supported"
+        )
+
+    def _stored_weighted(self, weights: np.ndarray) -> StoredResults:
+        """Stored results for a frequency-weighted fit."""
+
+        if self._estimator == "regress":
+            root = np.sqrt(weights)
+            design = self._X * root[:, None]
+            response = self._y * root
+            coefficients, *_ = np.linalg.lstsq(design, response, rcond=None)
+            residual = response - design @ coefficients
+            dof = max(int(weights.sum()) - self._X.shape[1], 1)
+            sigma2 = float(residual @ residual) / dof
+            covariance = sigma2 * np.linalg.pinv(design.T @ design)
+            b = {name: float(coefficients[i]) for i, name in enumerate(self._param_names)}
+            se = {
+                name: float(np.sqrt(max(covariance[i, i], 0.0)))
+                for i, name in enumerate(self._param_names)
+            }
+            total = float(((response - np.average(response, weights=weights)) ** 2).sum())
+            return StoredResults(
+                r={},
+                e={
+                    "N": float(weights.sum()),
+                    "rmse": float(np.sqrt(sigma2)),
+                    "rss": float(residual @ residual),
+                    "mss": max(total - float(residual @ residual), 0.0),
+                    "r2": (
+                        1.0 - float(residual @ residual) / total if total > 0 else 0.0
+                    ),
+                },
+                b=b,
+                se=se,
+            )
+
+        if self._estimator == "mean":
+            mean = float(np.average(self._y, weights=weights))
+            variance = float(
+                np.average((self._y - mean) ** 2, weights=weights) * weights.sum()
+                / max(weights.sum() - 1.0, 1.0)
+            )
+            return StoredResults(
+                r={
+                    "mean": mean,
+                    "sd": float(np.sqrt(variance)),
+                    "Var": variance,
+                    "N": float(weights.sum()),
+                    "sum": float((self._y * weights).sum()),
+                },
+                e={},
+                b={},
+                se={},
+            )
+
+        raise UnsupportedError(
+            f"{self._stata_command}: estimator {self._estimator!r} is not supported"
+        )
 
     def _stored(self, rows: np.ndarray) -> StoredResults:
         """Fit the underlying estimator on ``rows`` and expose its stored results.
@@ -412,11 +560,15 @@ class Bootstrap(_ResampleBase):
         rows = np.arange(n)
         observed = self._estimate(rows)
 
-        generator = np.random.default_rng(self._seed)
+        # Stata's RNG, not numpy's. bsampl_w draws indices as
+        #     int(uniform()*_N + 1)
+        # and the MT19937-64 stream reproduces that index-for-index, so these replicates
+        # are the same ones Stata would take for the same seed.
+        generator = Mt19937_64(self._seed if self._seed is not None else 123456789)
         replicates = np.empty((self._reps, observed.size))
         for index in range(self._reps):
-            draw = generator.integers(0, n, size=n)
-            replicates[index] = self._estimate(draw)
+            weights = _bsampl_w(n, generator)
+            replicates[index] = self._estimate_weighted(weights)
 
         # Percentile-based covariance: the sample covariance of the replicates.
         covariance = np.atleast_2d(np.cov(replicates, rowvar=False, ddof=1))
@@ -486,12 +638,12 @@ class Permute(_ResampleBase):
         observed = self._estimate(np.arange(n))
         target = self._permuted_column
 
-        generator = np.random.default_rng(self._seed)
+        generator = Mt19937_64(self._seed if self._seed is not None else 123456789)
         count = 0
         column = self._X[:, target].copy()
         permuted = self._X.copy()
         for _ in range(self._reps):
-            permuted[:, target] = generator.permutation(column)
+            permuted[:, target] = _stata_shuffle(generator, column)
             statistics = _ols(permuted, self._y)
             # Two-sided: at least as extreme in absolute value.
             if abs(statistics[target]) >= abs(observed[target]) - 1e-15:

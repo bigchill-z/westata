@@ -97,29 +97,27 @@
   notes: "Coefficients and standard errors match at 3.9e-13."
 
 - command: test
-  level: E2
-  tolerance: 3.0e-5
+  level: E3
+  tolerance: 1.0e-12
   sources:
-    - type: published_output
-      ref: "Stata [R] regress on auto.dta prints F(2, 71) = 69.75; westata computes 69.7485"
+    - type: r_crosscheck
+      ref: "test mpg weight after regress price mpg weight on auto.dta: Stata r(F) 14.739815385384107, r(df) 2, r(df_r) 71; westata gap 1.6e-14"
     - type: invariant
-      ref: "For q=1 the F statistic equals the squared coefficient t statistic"
+      ref: "for a single restriction the F statistic equals the squared coefficient t statistic"
   verified_by: lead
-  date: 2026-10-22
-  notes: "The 2.2e-5 relative difference is Stata's display rounding (69.75), not a computational gap; the underlying Wald form is asserted against hand computation in tests/test_postestimation.py."
-
+  date: 2026-10-23
+  notes: "Was E2 because it was checked against Stata's PRINTED table -- 'Stata [R] regress on auto.dta prints F(2, 71) = 69.75; westata computes 69.7485' -- which is a comparison at six significant figures. Against full-precision r(F) the gap is 1.6e-14, machine precision. The E2 label was an artefact of the reference, not of the implementation. This is the third entry in this register to be under-graded for that reason, after dfuller and sqreg, and the pattern is always the same: compare against r()/e() rather than against a displayed number."
 - command: lincom
-  level: E2
-  tolerance: 5.0e-7
+  level: E3
+  tolerance: 1.0e-11
   sources:
-    - type: published_output
-      ref: "Stata [R] lincom on auto.dta: estimate -1650.036, std. err. 1075.994"
-    - type: invariant
-      ref: "Single-coefficient lincom equals the model's coefficient, SE, t and p exactly"
+    - type: r_crosscheck
+      ref: "lincom mpg after regress price mpg weight on auto.dta: Stata r(estimate) -49.512220666355319, r(se) 86.156038867184776; westata gaps 7.7e-13 and 4.7e-13"
+    - type: r_crosscheck
+      ref: "lincom 2*mpg + weight: Stata r(estimate) -97.277882174364876, r(se) 172.83017706604397; westata gaps 1.5e-12 and 9.4e-13"
   verified_by: lead
-  date: 2026-10-22
-  notes: "Reproduces [R] lincom semantics including level() and eform."
-
+  date: 2026-10-23
+  notes: "Was E2 because the comparison used Stata's printed estimate and standard error, which show six decimals. Against full-precision r(estimate) and r(se) the agreement is at the 1e-12 level for both a single coefficient and a linear combination with two terms. Reproduces [R] lincom semantics including level() and eform. Same under-grading pattern as test: the reference was the bottleneck, not the arithmetic."
 - command: tobit
   level: E3
   tolerance: 1.0e-6
@@ -391,15 +389,14 @@
   date: 2026-10-23
   notes: "Random-effects Tobit with quadrature over the random effect and censoring at the lower limit. Stata reports sigma_u and sigma_e bare -- not /sigma_u -- so the implementation was renamed to match, with the slashed forms kept out of the canonical names."
 - command: xtpoisson, fe
-  level: E2
-  tolerance: 5.0e-2
+  level: E3
+  tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
-      ref: "xtpoisson y x1, fe on a 100x7 panel: Stata x1 .5041803 (se .0344352); westata within 5%"
+      ref: "xtpoisson y x1, fe on a 100x7 panel: Stata _b[x1] .50418026583838182, _se[x1] .034435190766923057; westata b gap 4.7e-9, se gap 2.9e-7"
   verified_by: lead
   date: 2026-10-23
-  notes: "The multinomial conditional likelihood is a genuine likelihood, unlike xtnbreg's. The intercept is reported as NaN because conditioning on the group totals absorbs it -- reporting a number there would be inventing an unidentified parameter."
-
+  notes: "Was E2 at 'within 5%', which understated the implementation by five orders of magnitude -- the measured gaps are 4.7e-9 on the coefficient and 2.9e-7 on the SE. The 5% figure came from an early comparison, not from a property of the code. REACHING THIS REQUIRED UNDERSTANDING ONE NON-OBVIOUS THING: four mathematically identical spellings of the conditional likelihood, all optimised to a ZERO gradient, disagree in the ninth significant digit -- expanded form 0.5041802532, with log-factorials 0.5041802850, multinomial-logit form 0.5041802705, logsumexp route 0.5041802532. Each is the exact maximiser of the function as written, so the difference is FLOATING-POINT ROUTING, not estimation error. The multinomial-logit form is adopted because it is 2.7x closer to Stata and because it has the better conditioning argument: it forms a normalised log-probability per observation before weighting by the count, so summed magnitudes stay bounded by log(group size) instead of growing with |eta|. The residual 4.7e-9 is recorded rather than claimed away. The SE moved slightly the other way (7.9e-8 to 2.9e-7) because the Hessian is now evaluated at a marginally different point -- still six orders below the tolerance."
 - command: xtpoisson, re
   level: E3
   tolerance: 1.0e-5
@@ -715,29 +712,27 @@
   notes: "The jackknife is the one resampling method with no random numbers, so it is held to an exact standard and it meets that standard on the coefficients (1e-16) and on the mean's variance (3.7e-9). The regression VARIANCE sits 7.4e-6 away and that residual is understood rather than tuned: a single best-fit scaling of 0.9974973603895577 reproduces the whole matrix to 7.7e-9 while (n-1)/n is 0.9975, so the factor is right and the difference lives in the leave-one-out estimates past their sixth digit -- consistent with Stata updating each fit by Sherman-Morrison instead of refitting. Direct refitting is kept deliberately: it is explainable and independently checkable, and guessing at Stata's update formula to win the sixth digit would trade a verifiable implementation for an unverifiable one. e(expected_gap) records this so a future reader does not chase it again. Both the default pseudovalue form and the mse form are implemented; they are different estimators and a test asserts they differ."
 
 - command: bootstrap
-  level: E2
-  tolerance: 5.0e-1
+  level: E3
+  tolerance: 1.0e-7
   sources:
     - type: r_crosscheck
-      ref: "bootstrap, reps(200) seed(20261023): regress y x1 x2, and bootstrap r(mean) seed(20261023): summarize y -- captured with the seed recorded"
-    - type: invariant
-      ref: "the point estimate is independent of the resampling and equals the original fit exactly; a fixed seed reproduces the variance exactly; different seeds give different variances"
+      ref: "bootstrap r(mean), reps(200) seed(20261023): Stata _bs_1 b 1.838714755904454, se 0.07917283273150272; westata b gap 0, se gap 1.1e-9 (relative 1.4e-8)"
+    - type: published_output
+      ref: "[R] set seed reference values: seed 123456789 gives runiform() 0.348871704556195 then 0.266885709753138; seed 472195 gives 0.713028143573182 then 0.920524469911484"
   verified_by: lead
   date: 2026-10-23
-  notes: "E2 BY CONSTRUCTION, not by shortfall. Bootstrap variances are functions of the random stream, and Stata's generator is not numpy's, so replicate-for-replicate agreement is impossible. What IS verified exactly is everything that does not depend on the stream: the reported point estimate equals the original fit to 1e-12, a fixed seed reproduces the covariance to 1e-12, and distinct seeds produce distinct variances. The variance itself is checked only for magnitude -- the ratio to the analytic OLS standard error must land between 0.5 and 2. Claiming E3 here would require reproducing Stata's RNG, which is neither feasible nor meaningful."
-
+  notes: "THIS WAS E2 'BY CONSTRUCTION' AND THAT WAS WRONG. The reasoning was: 'bootstrap variances are functions of the random stream and Stata's generator is not numpy's, so replicate-for-replicate agreement is impossible by construction'. The premise is true of numpy's generator and FALSE of the problem -- Stata uses MT19937-64, a published standard from Matsumoto and Nishimura (1998). Implementing it reproduced the two reference values that [R] set seed prints in its own documentation, which is a check that cannot be faked by fitting. Two steps were needed, and the second is the one that mattered: (1) runiform() matched to one ulp over 400 consecutive draws, and the resampling INDICES matched EXACTLY, 400 out of 400 -- but the bootstrap SE was then still 1.5% off; (2) bsampl_w returns WEIGHTS, not a row sample: it draws a target per row, sorts, builds a running count within each target and keeps one weighted row per target, using a SECOND uniform stream as tie-break. Reproducing that too gives b gap 0 and se gap 1.4e-8. Drawing indices alone reproduces which targets were hit but not their multiplicities. THE GENERAL LESSON: 'impossible by construction' deserves the same scrutiny as any other claim, and here it was one manual page away from being false."
 - command: permute
   level: E2
   tolerance: 5.0e-1
   sources:
-    - type: r_crosscheck
-      ref: "permute with reps(200) seed(20261023) captured"
     - type: invariant
-      ref: "a genuinely driving regressor yields a small permuted p-value; the p-value always lies in [0, 1]"
+      ref: "a genuinely driving regressor yields a small permuted p-value; the p-value always lies in [0,1]"
+    - type: published_output
+      ref: "the permutation stream now comes from the verified MT19937-64 generator"
   verified_by: lead
   date: 2026-10-23
-  notes: "E2 for the same reason as bootstrap: the p-value is a statistic over a random permutation stream. Two-sided by absolute value, with the (count+1)/(reps+1) convention so a p-value of exactly zero is impossible. A non-regressor raises ConsistencyError rather than permuting something that is not in the model."
-
+  notes: "Improved from 'arbitrary numpy stream' to the verified Stata generator, but still E2, for a reason narrower than before. The GENERATOR is now correct -- MT19937-64, verified against Stata's documented reference values and against resampling indices. What is still not reproducible is the SHUFFLE ORDER: Stata permutes through its own internal routine whose call sequence is not documented, so a given seed does not produce the same permutation. Since the p-value depends on the empirical distribution of the permuted statistic rather than on any single permutation, the result is statistically equivalent and its MEANING is now anchored to the right generator -- but a cell-for-cell comparison remains unavailable for an honest reason, not a convenient one. bootstrap was promoted to E3 in the same session precisely because its shuffle order IS documented (bsampl_w.ado) while permute's is not."
 - command: bootstrap / permute expressions (exp_list)
   level: E3
   tolerance: 1.0e-2

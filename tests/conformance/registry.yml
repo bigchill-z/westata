@@ -644,6 +644,71 @@
 # identify which scale Stata uses, and printing a number 8x off would be worse
 # than omitting it.
 
+
+# --- P12: complex survey design -------------------------------------------
+
+- command: "svyset / svy: mean"
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: r_crosscheck
+      ref: "svyset psu [pw=w], strata(stratum) singleunit(certainty); svy: mean y on 576 observations: Stata b 1.061346613529383, V 0.007628317455187414; westata gap 0 and 8.7e-19"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Taylor linearisation, psi_i = y_i/sum(w) centred on the estimate, accumulated as PSU totals within strata with the n_h/(n_h-1) factor. The weight sits in the DENOMINATOR, not in psi_i. Compared against full-precision e(b)/e(V) rather than the printed six decimals, because survey variance conventions agree on the point estimate and diverge in the fourth decimal of the standard error."
+
+- command: "svy: regress"
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: r_crosscheck
+      ref: "svy: regress y x1 x2: Stata b [0.811277851322903, -0.3624167886992473, 1.0080429196046916], V 3x3; westata max gap 1.1e-15 on b and 1.8e-15 on V"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Coefficients are weighted least squares; only the covariance is new. THE SCORE IS THE TRAP: it is psi_i = (X'WX)^-1 w_i x_i e_i, and my first attempt used x_i e_i, which left V 167% wrong while the coefficients stayed exact to 1e-15. Both the weight and the inverse are required. The equivalent sandwich form (X'WX)^-1 [PSU covariance of sum(w x e)] (X'WX)^-1 also matches to 9e-14. Reported order is slopes then _cons, as Stata prints it."
+
+- command: "svy: total"
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: r_crosscheck
+      ref: "svy: total y: full-precision e(b)/e(V) captured with the other design-A commands"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "psi_i = w_i y_i. The point estimate satisfies the exact identity total = mean * sum(w); the VARIANCES are not related by sum(w)^2, which I asserted first and had to withdraw -- the PSU accumulation and the between-stratum spread do not factor through a constant."
+
+- command: "svy: proportion"
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: r_crosscheck
+      ref: "svy: proportion binary: full-precision capture alongside the design-A commands"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "One parameter per level, each treated exactly like a mean after binarisation, which is what svy: proportion is."
+
+- command: "svy: logit"
+  level: E2
+  tolerance: 1.0e-6
+  sources:
+    - type: r_crosscheck
+      ref: "svy: logit binary x1 x2: full-precision e(b)/e(V) captured"
+    - type: invariant
+      ref: "weighted maximum likelihood with the linearised score I^-1 w_i x_i (y_i - p_i)"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "Point estimates and covariance both finite and positive definite; the linearisation follows the weighted-information form analogous to the verified regress case, but the logit case has not itself been diffed to the full-precision capture yet, so it is E2 rather than E3."
+
+- command: svyset fpc / singleunit
+  level: E3
+  tolerance: 1.0e-10
+  sources:
+    - type: invariant
+      ref: "(1 - n_h/N_h) can only shrink a variance; a lone PSU contributes zero under certainty, the average stratum contribution under scaling, and NaN under missing"
+  verified_by: lead
+  date: 2026-10-23
+  notes: "All three singleunit strategies are implemented and they demonstrably differ: certainty skips the lone-PSU stratum, scaling substitutes the mean of the strata that do vary, missing propagates NaN so a user cannot silently get a number where Stata would refuse. df_r = #PSU - #strata is reported in e(df_r); using nobs there instead would make every t statistic look far more precise than it is."
+
 # --- Not yet contrasted with a real Stata run (E1) -------------------------
 
 - command: margins

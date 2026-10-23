@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from westata.data import WEIGHT_TYPES, WeightSpec, normalize_weights
 from westata.estimators import (
+    SurveyDesign,
+    SvyLogit,
+    SvyMean,
+    SvyProportion,
+    SvyRegress,
+    SvyTotal,
     AIPW,
     Didregress,
     IPW,
@@ -98,6 +104,12 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "SvyLogit",
+    "SvyRegress",
+    "SvyProportion",
+    "SvyTotal",
+    "SvyMean",
+    "SurveyDesign",
     "TreatmentEffectResult",
     "NearestNeighbourMatching",
     "AIPW",

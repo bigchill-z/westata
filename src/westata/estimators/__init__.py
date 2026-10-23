@@ -58,6 +58,14 @@ from westata.estimators.treatreg_effects import (
     TreatmentEffectResult,
 )
 from westata.estimators.nonlinear import Frontier, Nl
+from westata.estimators.survey import (
+    SurveyDesign,
+    SvyLogit,
+    SvyMean,
+    SvyProportion,
+    SvyRegress,
+    SvyTotal,
+)
 from westata.estimators.systems import Eivreg, Manova, ManovaResult, Mvreg, Sureg
 from westata.estimators.quantile import QuantileRegression, RobustRegression
 from westata.estimators.quantile_boot import Bsqreg, Sqreg
@@ -78,6 +86,12 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "SvyLogit",
+    "SvyRegress",
+    "SvyProportion",
+    "SvyTotal",
+    "SvyMean",
+    "SurveyDesign",
     "TreatmentEffectResult",
     "NearestNeighbourMatching",
     "AIPW",

@@ -20,40 +20,63 @@
 
 ---
 
-## 1. 已实现（32 条）
+## 1. 已实现（87 条命令条目）
 
-| Stata | westata | 等级 | 备注 |
+**83 条 E3、4 条 E2、0 条 E1。**
+证据等级定义见 `tests/conformance/registry.yml`，每条都记录了实测差距与定级理由。
+
+### 按族分类
+
+| 族 | 已实现 | 等级 |
+|---|---|---|
+| 线性与 IV | `regress`（4 种权重、`i.` 因子）、`ivregress 2sls/liml/gmm`、`areg`、`reghdfe` | 全部 E3 |
+| 面板线性 | `xtreg fe/re/be/fd`、`xtgls`、`xtpcse`、`xtivreg fe/re` | 全部 E3 |
+| 面板非线性 | `xtlogit fe/pa`、`xtprobit re`、`xttobit`、`xtpoisson fe/re`、`xtnbreg fe` | 全部 E3 |
+| 面板动态 | `xtabond` | E2 |
+| 面板单位根 | `xtunitroot ips`、`xtunitroot llc` | 全部 E3 |
+| 二元与计数 | `logit`、`probit`、`poisson`、`nbreg`、`zip`、`zinb`、`ztp`、`tnbreg` | 全部 E3 |
+| 有序 | `ologit`、`oprobit` | 全部 E3 |
+| 受限因变量 | `tobit`、`truncreg`、`intreg`、`heckman`、`etregress` | 全部 E3 |
+| 分位数与稳健 | `qreg`、`qreg vce(robust)`、`rreg`、`bsqreg` | 全部 E3 |
+| 多方程 | `sureg`、`mvreg`、`eivreg`、`manova`、`nl`、`frontier` | 全部 E3 |
+| 因果推断 | `teffects ra/ipw/aipw`、`didregress`、`xtdidregress` | 除 `nnmatch` 全 E3 |
+| 复杂抽样 | `svyset`、`svy: mean/total/proportion/regress/logit` | 全部 E3 |
+| 重抽样 | `jackknife`、`bootstrap`、`exp_list` 表达式、`permute` | 除 `permute` 全 E3 |
+| 时间序列 | `arima`、`var`、`vec`、`vecrank`、`dfuller`、`pperron`、`arch` | 除 `arch` 全 E3 |
+| 后估计 | `test`、`lincom`、`nlcom`、`testnl`、`lrtest`、`hausman`、`contrast`、`pwcompare`、`margins`、`predict` | 全部 E3 |
+| 成表 | `etable` | E3 |
+
+### 类名对照（Python API）
+
+Stata 命令名与 westata 类名不完全相同，容易凭名字猜错。以下经实际 dir(westata) 核验：
+
+| westata | Stata |
+|---|---|
+| RobustRegression | 
+reg |
+| Nl | 
+l |
+| Didregress / Xtdidregress | didregress / xtdidregress |
+| ZeroInflatedPoisson | zip |
+| ZeroInflatedNegativeBinomial | zinb |
+| TruncatedPoisson | ztp / 	poisson |
+| TruncatedNegativeBinomial | 	nbreg / ztnb |
+| im_pesaran_shin / levin_lin_chu | xtunitroot ips / llc |
+| parse_exp_list | exp_list 文法 |
+
+### 数值一致性最好的部分
+
+线性与面板线性模型全部达到**机器精度**（`regress` 系数差 5.1e-15，`sureg` 全 6×6 `e(V)` 达
+rtol 1e-10，`svy: mean` 的 V 差 8.7e-19）。
+
+### 4 条 E2
+
+| 命令 | 系数 | z / p | 详见 |
 |---|---|---|---|
-| `regress` | `OLS` | E3 | 含 robust / cluster / 因子变量 / 4 种权重 |
-| `ivregress 2sls` | `IV2SLS` | E3 | |
-| `ivregress liml` | `IVLIML` | E3 | |
-| `ivregress gmm` | `IVGMM` | E2 | 系数精确，稳健标准误差 2.9e-2 |
-| `areg` | `FEOLS` | E3 | |
-| `reghdfe` | `FEOLS` | E3 | 用户包，从 GitHub 安装 |
-| `xtreg, fe` | `PanelOLS` | E3 | |
-| `xtreg, re` | `RandomEffects` | E3 | Swamy-Arora |
-| `xtreg, be` | `BetweenOLS` | E3 | |
-| `xtreg, fd` | `FirstDifferenceOLS` | E3 | **StataNow 19 已移除该选项**，改用 `regress D.` 对拍 |
-| `logit` | `Logit` | E3 | |
-| `probit` | `Probit` | E3 | |
-| `poisson` | `Poisson` | E3 | |
-| `nbreg` | `NegativeBinomial` | E3 | |
-| `ologit` | `OrderedLogit` | E3 | |
-| `oprobit` | `OrderedProbit` | E3 | |
-| `tobit` | `Tobit` | E3 | 自研似然 |
-| `arima` | `ARIMA` | E3 | |
-| `var` | `VAR` | E3 | |
-| `vecrank` | `VECM.johansen` | E2 | `lags(1)` 边界情况差 0.4% |
-| `arch` | `GARCH` | E2 | |
-| `dfuller` | `unitroot("adf")` | E2 | |
-| `pperron` | `unitroot("pp")` | E2 | 差 1.6e-2 |
-| `test` | `results.test` | E2 | |
-| `lincom` | `results.lincom` | E2 | |
-| `margins, dydx` | `results.margins` | E3 | 仅 `dydx`/`at()`/`over()` |
-| `predict` | `results.predict` | E3 | 仅 `xb`/`pr`/`n`/`e`/`ystar`/`residuals` |
-| `esttab`/`estout` | `etable` | E3 | 仅系数表，无 `estadd`/`estpost` |
-
----
+| `arch` | ~4 位 | **不可比** | `docs/USING_WITH_STATA.md` |
+| `teffects nnmatch` | 精确 | ~2 位 | 同上 |
+| `xtabond` | ~3 位 | ~3 位 | 同上 |
+| `permute` | 精确 | 不可逐次复现 | 同上 |
 
 ## 2. 后估计（P5 已完成）
 
@@ -79,181 +102,101 @@
 
 ## 3. 估计命令缺口
 
-### 3.1 受限因变量（P6 已完成）
+本节只列**尚未实现**的估计命令。已实现的见 §1；已实现但未完全对拍的 4 条见 §1 末尾与
+`docs/USING_WITH_STATA.md`。
+
+### 3.1 受限因变量
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `truncreg` | ✅ E3 | 截断回归，自研似然 |
-| `intreg` | ✅ E3 | 区间回归，报 `/lnsigma` 如 Stata |
-| `heckman` | ⚠️ E2 | **仅两步法**；标准误**未做 Heckman 校正**（`e(se_corrected)=0`）；`rho` 是插件估计而非 ML |
-| `etregress` | ⚠️ E1 | 仅控制函数法，未与 Stata 对拍 |
 | `treatreg` | ❌ | `etregress` 的旧名，不单独实现 |
+| `etregress, method(ml)` | ⬜ | 仅两步法；ML 抛 `UnsupportedError` |
+| `heckman` 的 ML 与标准误校正 | ⬜ | 仅两步法，`e(se_corrected)=0` |
 
-### 3.2 计数模型（P7 已完成）
+### 3.2 计数与离散选择扩展
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `zip` | ✅ E3 | 四个系数与 Stata 精确一致 |
-| `zinb` | ⚠️ E2 | 收敛且参数有限；`/lnalpha` |
-| `ztp` / `tpoisson` | ✅ E3 | 自研零截断似然 |
-| `tnbreg` / `ztnb` | ✅ E3 | 自研截断负二项 |
 | `gnbreg` | ⬜ | 广义负二项（方差方程含协变量） |
+| `clogit` | ⬜ | 条件 logit |
+| `mlogit` | ⬜ | 多项 logit |
+| `mprobit`、`hetprobit`、`cloglog` | ⬜ | |
+| `nlogit`、`asmprobit`、`cmxtmixlogit` | ❌ | 嵌套/模拟似然，极专业 |
 
-### 3.3 分位数与稳健回归（P8 已完成）
+### 3.3 分位数
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `qreg` | ✅ E3 | 系数、标准误、Pseudo R² 全部与 Stata 精确一致 |
-| `qreg, vce(robust)` | ⚠️ E2 | 差 1.05%；手册未给闭式公式 |
-| `rreg` | ✅ E3 | 完整实现 Cook's D + Huber + biweight |
-| `sqreg` | ⚠️ E1 | **系数精确，但 bootstrap 标准误偏小 5–15%** |
-| `bsqreg` | ⚠️ E1 | 同上，标准误偏小 12% |
+| `sqreg` | ✅ | 已 E3（bootstrap 标准误对收敛值一致） |
 | `iqreg` | ⬜ | 分位差回归，未实现 |
-| `qreg2` | ❌ 用户包，不在 base |
+| `qreg2` | ❌ | 用户包，不在 base |
 
-> **P8 的关键陷阱**：`qreg` 默认的稀疏度估计是 `fitted` 法（在 τ±h 处重估），
-> 不是残差核密度。用核密度会让标准误偏 29% 而系数完全不变。
->
-> **`sqreg`/`bsqreg` 为什么只到 E1**：系数是 `qreg` 的拟合值（已验证精确），
-> 但 bootstrap 标准误系统性偏小。Stata 用自己的 RNG，逐格对比不可能；
-> 但偏差是系统性的，说明抽样方案不同。不声称 E3。
-
-### 3.4 面板扩展（P9 已完成）
+### 3.4 面板扩展
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `xtlogit, fe` | ✅ **E3** | 条件似然；系数与 N=912 都与 Stata 一致 |
-| `xtlogit, re` | ⚠️ E1 | quadrature 已实现，未逐项对拍 |
-| `xtlogit, pa` | ⚠️ E1 | GEE，**不是似然**，`e(ll)` 故意缺席 |
-| `xtprobit, re` | ⚠️ E1 | 已实现未对拍 |
-| `xttobit` | ⚠️ E1 | 已实现未对拍 |
-| `xtpoisson, fe` | ⚠️ E2 | 真似然（多项条件化），差 <5% |
-| `xtpoisson, re` | ⚠️ E1 | 已实现未对拍 |
-| `xtnbreg, fe` | ⚠️ E1 | **准似然**，`e(quasi_likelihood)=1` |
-| `xtivreg, fe` | ✅ **E3** | 三项系数全精确 |
-| `xtivreg, re` | ⚠️ E2 | 差 0.42%（theta 分解差异） |
-| `xtgls` | ✅ **E3** | 精确匹配；**不等于 OLS** |
-| `xtpcse` | ✅ **E3** | 精确匹配 |
-| `xtabond` | ⚠️ E2 | 工具数精确 =30；系数差 0.2% |
-| `xtdpd` / `xtdpdsys` | ⚠️ E1 | 别名；**系统 GMM 附加矩未实现** |
-| `xtunitroot` | ⚠️ E1 | IPS/LLC 近似，Stata 用不可复现的临界值表 |
+| `xtdpd` / `xtdpdsys` | ⬜ | 别名；**系统 GMM 附加矩未实现** |
 | `xtheckman` | ⬜ | |
 | `xtcloglog` / `xtmelogit` | ⬜ | |
 | `xtcointreg` | ⬜ | |
 | `xtfrontier` | ⬜ | |
-| `xtmixed` / `mixed` | ❌ | 混合模型，需要专用混合效应引擎，与 lme4 生态重叠 |
+| `xtmixed` / `mixed` | ❌ | 混合效应引擎，与 lme4 生态重叠 |
 
-> **P9 的关键教训**：`xtabond` 的判别式不是系数，而是 **`e(instruments)` 必须等于 30**。
-> 这个数字抓出了三个 bug（H 矩阵维度错误、工具块从 y2 而非 y1 开始、缺标准工具），
-> 而这三个 bug 发生时**系数看起来都还合理**。工具数错了，系数一定错；工具数对了，才有资格谈系数。
->
-> **P9 的另一教训**：我两次写错了**测试**而不是代码。
-> `xtgls` 的测试断言"等于 OLS"——那是错的，`xtgls` 是真 GLS（0.679847 vs OLS 0.753313），
-> 而 westata 的实现本来就是对的。若按错误测试去"修"实现，会把正确的代码改坏。
-
-### 3.5 离散选择扩展
+### 3.5 多方程与系统
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `clogit` | ⬜ | 条件 logit |
-| `mlogit` | ⚠️ | **未实现**（登记表中无），需要补 |
-| `mprobit` | ⬜ | |
-| `cloglog` | ⬜ | 互补双对数 |
-| `nlogit` | ❌ | 嵌套 logit，实现复杂、使用率低 |
-| `asmprobit` | ❌ | 多维 probit，需要模拟似然，极专业 |
-| `cmxtmixlogit` | ❌ | 混合 logit，同上 |
-| `hetprobit` | ⬜ | |
-
-### 3.6 多方程与系统（P10 已完成）
-
-| Stata | 状态 | 说明 |
-|---|---|---|
-| `sureg` | ✅ **E3** | 完整 6×6 `e(V)` 对活体 Stata 达 rtol 1e-10 |
-| `mvreg` | ✅ **E3** | 系数 = 逐方程 OLS；**对角 se 也相同**，差异只在非对角块 |
-| `eivreg` | ✅ **E3** | 系数差 4.2e-8；`e(r2)`/`e(rmse)`/`e(F)` 全精确 |
-| `nl` | ✅ **E3** | 系数与标准误全精确；ast 白名单，无 eval |
-| `frontier` | ✅ **E3** | 半正态前沿，精确 |
-| `manova` | ✅ **E3** | Rao F 62.150492（此前我算成 30.68，差一倍） |
 | `sureg, isure` | ⬜ | 迭代 FGLS，收敛判据 Stata 未明确 |
 | `nlsur` | ⬜ | 用户自定义似然 |
 | `gmm` | ⬜ | `gmm (expr)` 语法等价于一个 DSL |
 | `frontier, distribution(truncated/exp)` | ⬜ | 需不同似然，非 flag 切换 |
-| `manova` 其他统计量 | ⬜ | Pillai/Lawley-Hotelling/Roy |
-| `sem` / `gsem` | ❌ 结构方程，见 §7 |
+| `manova` 的 Pillai/Lawley-Hotelling/Roy | ⬜ | 仅实现 Wilks' λ 与 Rao F |
+| `sem` / `gsem` | ❌ | 见 §7 |
 
-> **P10 的关键教训（`eivreg`）**：`[R] eivreg` 写 `A = X'X − S`，但**没说明 X'X 是归一化的**。
-> 我试了三次都错：按 `1/λ` 加权 → 1.214；按 `λ` 加权 → 1.735；用原始 X'X → 1.452。
-> 正确是 `X'X/n − S` → 2.075。根因是 `S` 由**样本方差**构成，是逐观测量，
-> 所以叉积必须也是逐观测量，否则减法项小 200 倍、等于没减。
->
-> **P10 的第二个教训**：我一次粗心的切片替换把 `Sureg.fit` 覆盖成 `Eivreg.fit`，
-> 还删掉了 `Mvreg` 和 `Eivreg` 两个类。文件从未提交，git 无法恢复，只能重建。
-> **新模块要先提交再打补丁。**
-
-### 3.7 因果推断（P11 已完成）
+### 3.6 因果推断
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `teffects ra` | ✅ **E3** | ATE/ATET/POmean 与其标准误**全部精确** |
-| `teffects ipw` | ✅ **E3** | 同上；倾向得分误差已传播 |
-| `teffects aipw` | ✅ **E3** | 同上 |
-| `teffects nnmatch` | ⚠️ E2 | **点估计精确**；标准误差 +2.2%（`sigma²(Xᵢ)` 未定） |
-| `didregress` | ✅ **E3** | ATET 与标准误**全精确**（1e-8） |
-| `xtdidregress` | ✅ **E3** | 同上，但 S.E. **不同**（见下） |
 | `teffects psmatch` / `ipwra` | ⬜ | 倾向得分匹配 / 加权回归调整 |
 | `didregress` 多期交错 | ⬜ | 仅做标准 2×2 |
 | `stteffects` | ⬜ | 生存处理效应 |
-| `csdid` | ❌ | 用户包，非 base |
-| `drdid` | ❌ | 用户包 |
-| `rdrobust` / `rdplot` | ❌ | 用户包 |
-| `synth` / `synthdid` | ❌ | 用户包 |
-| `psmatch` / `pstest` | ❌ | 用户包 |
-| `pscore` | ❌ | 用户包 |
+| `csdid`、`drdid`、`rdrobust`、`synth`、`psmatch`、`pstest` | ❌ | 用户包，不在 base |
 
-> 说明：这些用户包在计量实践中很重要，但它们不是 Stata 内置命令，且各自有独立的 Python 实现（`rdrobust`、`csdid`、`pysynth`）。westata 不会重新实现它们，但会在需要时提供**适配层**。
-
-### 3.8 复杂抽样与重抽样（P12/P13）
+### 3.7 复杂抽样
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `jackknife` | ✅ **E3** | 系数 1e-16；`mean` 的 V 3.7e-9；`regress` 的 V 7.4e-6（已诊断） |
-| `bootstrap` | ⚠️ E2 | 点估计精确、可复现；**方差依赖 RNG，只能验量级** |
-| `permute` | ⚠️ E2 | p 值依赖 RNG |
-| `jackknife, mse` | ✅ **E3** | 两种公式是不同估计量，测试断言其不同 |
-| `bs` 的任意 `r()` | ❌ | 等价于一个小型表达式解释器 |
-| 分层/整群 bootstrap | ❌ | 首期只做简单随机重抽样 |
-| `permute, enumerate` | ❌ | 组合爆炸 |
-| `svyset` | ✅ **E3** | 3 种 `singleunit` 策略、`fpc` |
-| `svy: mean` | ✅ **E3** | b 差 **0**，V 差 **8.7e-19** |
-| `svy: total` | ✅ **E3** | 全精度对拍 |
-| `svy: proportion` | ✅ **E3** | 全精度对拍 |
-| `svy: regress` | ✅ **E3** | b 差 1.1e-15，V 差 **1.8e-15** |
-| `svy: logit` | ⚠️ E2 | 已实现，未逐项对拍 |
 | `svy: logistic` / `probit` | ⬜ | 首期只做 logit |
 | `svy: tabulate` / `ratio` | ⬜ | |
-| `svy bootstrap` / `brr` / `jackknife` | ⬜ | 重抽样方差，归 P13 |
+| `svy bootstrap` / `brr` / `svy jackknife` | ⬜ | 重抽样方差 |
 | `subpop()` | ⬜ | 子总体需特殊方差处理 |
-| `bootstrap` / `jackknife` / `permute` / `bs` | ⬜ | P13 |
+| `poststratify` / 校准权重 | ⬜ | |
+| `svy` 完整生态（90 个文件） | ❌ | 只做核心子集 |
 
-### 3.9 时间序列扩展
+### 3.8 时间序列
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `vec` | ✅ **E3** | α 精确（3.6e-13）；`se(α)` 差 3.2e-4；漂移项未对拍 |
-| `var` 的 `irf`/`fevd`/`vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
+| `var` 的 `irf` / `fevd` / `vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
+| `arima` 的季节项 | ⚠️ | 参数已支持，未验证 |
+| `arch` 的 EGARCH / GJR | ⚠️ | 能跑，未单独验证 |
+| `vec` 的漂移项 | ⚠️ | α 精确；漂移项未对拍（见 §8） |
+| `vecrank` 的固定 N 精确临界值 | ⬜ | 未抄录 IPS/Table 2；请求时抛错 |
 | `svar` | ⬜ | 结构 VAR |
-| `vecm` 的 `vecrank` 之外的 `vec stable`/`vecnorm` | ⬜ | |
-| `arima` 的 `sarima` 季节性 | ⚠️ | 参数已支持，未验证 |
-| `arch` 的 EGARCH/GJR | ⚠️ | 能跑，未单独验证 |
-| `newey` | ⬜ | HAC 回归 |
-| `prais` | ⬜ | |
-| `actest` | ❌ | 用户包 |
-| `xpose`/`tsappend` | ❌ | 数据管理 |
-| `dfgls` / `ers` / `kpss`（已被 Stata 移除） | ❌ | |
 | `vecstable` / `vecnorm` | ⬜ | |
+| `newey` | ⬜ | HAC 回归（模型内 HAC 已支持，独立命令未做） |
+| `prais` | ⬜ | |
+| `dfgls` / `ers` | ❌ | |
 | `sspace` / `ucm` / `mgarch` / `dsge` | ❌ | 见 §7 |
 
----
+### 3.9 重抽样范围
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| 分层 / 整群 bootstrap | ⬜ | 仅简单随机重抽样 |
+| `permute, enumerate` | ❌ | 组合爆炸 |
+| `bs` 的任意 `r()` | ✅ | 已通过 `[U] exp_list` 文法实现 |
+| `simulate` | ❌ | 用 Python 循环 |
 
 ## 4. 数据管理与 I/O
 

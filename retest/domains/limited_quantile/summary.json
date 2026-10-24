@@ -2,12 +2,12 @@
   "domain": "limited_quantile",
   "total": 25,
   "counts": {
-    "pass": 10,
-    "fail": 12,
+    "pass": 11,
+    "fail": 11,
     "error": 3
   },
   "max_param_rel": 0.0010765871449960062,
-  "generated_at": "2026-10-24T13:27:56",
+  "generated_at": "2026-10-24T13:45:39",
   "stata_version": "19.5",
   "items": [
     {
@@ -123,9 +123,9 @@
       "name": "heckman twostep",
       "status": "fail",
       "param_rel": 1.335456767496874e-09,
-      "se_rel": 0.0305937605318881,
+      "se_rel": 1.879604741958569e-05,
       "tier": "B",
-      "se_tier": "E",
+      "se_tier": "C",
       "command": "heckman y_sel x1, select(s = z1 z2) twostep",
       "notes": [
         "Stata e(b) order from the printed table: y|x1, y|_cons, s|z1, s|z2, s|_cons, then /mills lambda",
@@ -154,11 +154,11 @@
     },
     {
       "name": "etregress twostep",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 3.843095865258807e-11,
-      "se_rel": 0.06768776946288786,
+      "se_rel": 2.1741488450703635e-11,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "etregress y x1, treat(s = z1 z2) twostep",
       "notes": [
         "Stata e(b) order: y|x1, y|s, y|_cons, s|z1, s|z2, s|_cons, lambda",

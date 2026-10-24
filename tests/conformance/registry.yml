@@ -262,7 +262,7 @@
   retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: heckman
   level: E1
-  # retest: worst tier E over 1 row(s); example 'heckman twostep' param_rel 1.335456767496874e-09 se_rel 0.0681304934971832
+  # retest: after the corrected-VCE fix, se_rel 1.88e-05 (was 6.81e-02); the residual is in how the two _cons entries are aligned
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
@@ -273,8 +273,8 @@
 
   retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md"
 - command: etregress
-  level: E1
-  # retest: worst tier E over 1 row(s); example 'etregress twostep' param_rel 3.843095865258807e-11 se_rel 0.06768776946288786
+  level: E3
+  # retest: after the corrected-VCE fix, coefficients 3.8e-11 and standard errors 2.2e-11 (re-measured 2026-10-24)
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck

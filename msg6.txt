@@ -1,0 +1,50 @@
+fix(heckman, etregress): read the corrected VCE out of the ado source instead of fitting it
+
+Round 3 ended with heckman's outcome block 5.9% off and no formula: five candidate structures were fitted
+numerically, the best left a 6.3e-03 residual, and its fitted scalar grew with rho in a way rho^2 could not
+explain. The conclusion then was that the structure was not yet right and no formula would be adopted on a
+hunch. This round read heckman.ado.
+
+`Heck2` (lines 858-897) gives it exactly:
+
+    XpX1    = (A'A)^-1                        A = [X, _cons, lambda] on the selected rows
+    delthat = lambda (lambda + w)
+    F       = sum_i delthat_i A[i,:]' Z[i,:]  the SELECTION regressors
+    Q       = rho^2 F Vprb F'                 Vprb = the PROBIT's covariance
+    VBm     = sum_i (1 - rho^2 delthat_i) A[i,:]' A[i,:]
+    V       = sigma^2 XpX1 (VBm + Q) XpX1
+
+Why the numerical fit missed it, and the two things it got wrong:
+
+  * F is a WEIGHTED cross-product with weight delthat, not the unweighted A' diag(dlambda) A that fitted
+    best. The fit was chasing the same matrix through the wrong parameterisation, which is why no scalar
+    worked.
+  * Q is scaled by rho^2 and carries the probit covariance through F, rather than a scalar fitted to the
+    data. That explains the symptom that defeated the fit: the scalar appeared to grow with rho faster than
+    rho^2 because Vprb and the weighted cross-product were missing from the expression.
+
+etregress.ado `TwoStep` (lines 501-534) applies the same correction with one difference that matters: its
+`mtao` is the mean of tao over the FULL sample, because the treatment equation is estimated there, while
+heckman averages over the SELECTED rows only. Both are now implemented, and both take the selection block
+from the probit -- Stata leaves the first stage's inference untouched.
+
+Measured against a live Stata, then confirmed by re-running the domain:
+
+    etregress twostep   se 6.77e-02 -> 2.174e-11      (3.1e9 times better, machine precision)
+    heckman   twostep   se 6.81e-02 -> 1.880e-05      (3600 times better)
+
+heckman's residual 1.9e-05 is not the formula: it is how the two `_cons` entries align, since this package
+names them `y:Intercept` / `select:Intercept` while the sweep compares positionally. So heckman stays E2 and
+etregress moves to E3 -- on the measurement, not on the change.
+
+Also removed: `_two_step_covariance`, the M-estimator sandwich both models used before. It is dead code
+now, and worse than dead -- its docstring claims to own inference for these models, which is known to be
+wrong. iv.py has its own `_two_step_covariance` for IV/GMM, a different quantity, untouched.
+
+The sweep caught an error worth recording: after editing the registry to E3 I ran it before re-aggregating,
+and it failed with "etregress declared E3, measured worst E" against the stale aggregate. That is the check
+working exactly as designed -- a level edited on the strength of a belief rather than a measurement is
+caught even when the belief happens to be right.
+
+Suite: 1408 passing. This is the fourth time this project has been rescued by reading the ado source
+instead of inferring behaviour from output.

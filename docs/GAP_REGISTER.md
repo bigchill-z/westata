@@ -724,6 +724,44 @@ outcome 块与 `lambda` 仍差 **1.6%~5.9%**。`_two_step_covariance` 构造的�
 而 Stata 用的是 Heckman 两步**修正 VCE**——这是**结构差异，不是数值差异**，需要推导修正 VCE 才能闭合。
 系数已达 **4.9e-13**。
 
+## 8.17 `heckman` / `etregress` 的 VCE：从 ado 源码读出确切公式
+
+上一轮用**数值拟合**反推 Stata 的修正 VCE，最好的候选仍差 6.3e-03，拟合标量随 ρ 变化的方式
+也不能用 ρ² 解释。**读 `heckman.ado` 的 `Heck2`（858–897 行）直接得到答案。**
+
+```
+XpX1    = (A'A)⁻¹                          A = [X, _cons, lambda]（选择样本）
+delthat = lambda * (lambda + w)             w = probit 线性指标
+F       = Σ_i delthat_i · A[i,:]' Z[i,:]    Z = 选择方程回归元（选择样本）
+Q       = rho² · F · Vprb · F'              Vprb = probit 的协方差
+VBm     = Σ_i (1 - rho² · delthat_i) · A[i,:]' A[i,:]
+V       = sigma² · XpX1 · (VBm + Q) · XpX1
+```
+
+**数值拟合错在哪：**
+
+1. `F` 是**带 `delthat` 权重**的交叉积，不是无权的 `A' diag(dλ) A`——拟合一直在用错误参数化追同一个矩阵；
+2. `Q` 按 `rho²` 缩放并用 **probit 协方差**，不是拟合出的标量。这才是"标量随 ρ 增长却不能用 ρ² 解释"的原因：缺的是 `Vprb` 与加权交叉积。
+
+### 实测结果
+
+| 条目 | 修复前 | 修复后 | 改善 |
+|---|---|---|---|
+| `etregress twostep`（SE）| 6.77e-02 | **2.17e-11** | **31 亿倍** |
+| `heckman twostep`（SE）| 6.81e-02 | **1.88e-05** | 3600 倍 |
+
+`etregress` 已达机器精度。`heckman` 的剩余 1.9e-05 来自**两个 `_cons` 的对齐**（本包称
+`y:Intercept` / `select:Intercept`，而扫描按位置对齐），不是公式问题。
+
+### 两个命令的差异（都已按源码实现）
+
+| | `heckman` | `etregress` |
+|---|---|---|
+| `delthat` 的均值 | 选择样本上的 `mean(λ(λ+w))` | 全样本上的 `mean(tao)` |
+| 选择块 VCE | probit 的 VCE | probit 的 VCE |
+
+**这是本项目第四次"读 ado 源码胜过从输出反推"**，本轮第一次用在这个文件上。
+
 ## 9. 环境层面的已知限制
 
 | 限制 | 说明 |

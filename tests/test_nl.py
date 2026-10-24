@@ -630,6 +630,12 @@ def test_frontier_observed_information_comes_from_the_analytic_gradient():
     instead of the objective itself, the SEs at westata's optimum agree with
     Stata's at Stata's own optimum to 6.5e-4; the objective Hessian at step 1e-5
     was 4.0e-3 away and diverged entirely at 1e-6 (``se(/lnsig2u) = NaN``).
+
+    Re-pinned after BFGS was given the analytic gradient. That moved the two
+    dispersion SEs by 4e-6 to 1e-5 relative and left the coefficients and slope
+    SEs alone -- a stopping-point effect on the flat direction this docstring
+    describes, two orders below the 2.3e-3 formula error the test guards
+    against. The dispersion tolerances are 1e-5 for that reason.
     """
 
     rng = np.random.default_rng(99)
@@ -643,16 +649,21 @@ def test_frontier_observed_information_comes_from_the_analytic_gradient():
 
     result = Frontier.from_formula("y ~ x1 + x2", frame).fit()
 
-    assert float(result.params["x1"]) == pytest.approx(0.8575818596, rel=1e-6)
-    assert float(result.params["x2"]) == pytest.approx(-0.3671225067, rel=1e-6)
-    assert float(result.bse["x1"]) == pytest.approx(0.0471955063, rel=1e-4)
-    assert float(result.bse["x2"]) == pytest.approx(0.0493030650, rel=1e-4)
+    assert float(result.params["x1"]) == pytest.approx(0.8575820695308978, rel=1e-6)
+    assert float(result.params["x2"]) == pytest.approx(-0.3671226211619315, rel=1e-6)
+    assert float(result.bse["x1"]) == pytest.approx(0.047195293584465045, rel=1e-4)
+    assert float(result.bse["x2"]) == pytest.approx(0.049302782304334575, rel=1e-4)
     # /lnsig2u is the direction that the *objective* Hessian got wrong by 1.0%
     # (2.7148 at step 1e-5, NaN at 1e-6) and the gradient Hessian gets to 2.3e-3.
     # 2.7105 vs 2.7044 is the remaining optimiser-location gap, not a formula gap:
     # evaluated at Stata's own e(b) the same Hessian gives 2.7026 (6.5e-4 away).
-    assert float(result.bse["/lnsig2u"]) == pytest.approx(2.7105387218, rel=1e-6)
-    assert float(result.bse["/lnsig2v"]) == pytest.approx(0.2866055534, rel=1e-6)
+    #
+    # This number moved from 2.7105387 to 2.7105654 (9.8e-06 relative) when BFGS was given the analytic
+    # gradient, which is an optimiser change on a surface this flat -- still two orders below the 2.3e-3
+    # formula error this test exists to catch. Pinned at 1e-5 so a formula regression (1e-3 or worse) fails
+    # while a further stopping-point refinement does not.
+    assert float(result.bse["/lnsig2u"]) == pytest.approx(2.7105653744346463, rel=1e-5)
+    assert float(result.bse["/lnsig2v"]) == pytest.approx(0.2866067945306163, rel=1e-5)
     # The gradient itself must agree with a numerical derivative of the
     # log-likelihood, or the whole observed information is built on sand.
     from westata.estimators.nonlinear import frontier_gradient, frontier_loglike
@@ -690,10 +701,111 @@ def test_frontier_rejects_an_unsupported_distribution():
         Frontier.from_formula("y ~ x1 + x2", frontier_frame(), distribution="truncated")
 
 
-@pytest.mark.parametrize("distribution", ["truncated", "exponential", "half"])
+@pytest.mark.parametrize("distribution", ["truncated", "half", "truncatednormal"])
 def test_frontier_rejects_every_other_distribution(distribution):
+    """`exponential` is no longer in this list: it is implemented and has its own test below.
+
+    `truncated` needs a different likelihood rather than a spelling change, and `half` is not a spelling Stata
+    accepts, so both still raise instead of being guessed at.
+    """
+
     with pytest.raises(UnsupportedError):
         Frontier.from_formula("y ~ x1 + x2", frontier_frame(), distribution=distribution)
+
+
+def test_frontier_exponential_matches_stata():
+    """Normal/exponential frontier, from fron_ex.ado.
+
+    Reference values from a live Stata on a frontier with an exponential inefficiency component
+    (u ~ Exponential(mean 0.6), v ~ N(0, 0.5^2), 600 observations, seed 20261024).
+
+    Worth stating what this catches: the likelihood transcription is verified separately by comparing it at
+    STAT'S estimates, where it agrees to 7.1e-16. This test then checks that the estimator converges to the
+    same place. If the likelihood were wrong, that shared-point check would fail first.
+    """
+
+    rng = np.random.default_rng(20261024)
+    n = 600
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    u = rng.exponential(scale=0.6, size=n)
+    v = rng.normal(scale=0.5, size=n)
+    frame = pd.DataFrame(
+        {"y": 1.0 + 0.8 * x1 - 0.4 * x2 + v - u, "x1": x1, "x2": x2}
+    )
+
+    result = Frontier.from_formula(
+        "y ~ x1 + x2", frame, distribution="exponential"
+    ).fit()
+
+    # Stata order is [x1, x2, _cons, /lnsig2v, /lnsig2u]; ours is [Intercept, x1, x2, ...].
+    order = [1, 2, 0, 3, 4]
+    expected_b = np.array(
+        [0.80583456, -0.46693057, 0.92746179, -1.29044671, -1.3570339]
+    )
+    expected_se = np.array(
+        [0.0284928, 0.02742839, 0.05455416, 0.13329437, 0.21389526]
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float)[order], expected_b, rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.bse, dtype=float)[order], expected_se, rtol=1e-6
+    )
+    assert float(result.e["ll"]) == pytest.approx(-643.2414884477989, rel=1e-12)
+
+
+def test_frontier_exponential_loglike_matches_stata_at_a_shared_point():
+    """The likelihood itself, evaluated at Stata's estimates.
+
+    This is the check that catches a transcription error: at our own optimum a wrong likelihood still looks
+    plausible, but at a FIXED external point it cannot.
+    """
+
+    from westata.estimators.nonlinear import frontier_exponential_loglike
+
+    rng = np.random.default_rng(20261024)
+    n = 600
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    u = rng.exponential(scale=0.6, size=n)
+    v = rng.normal(scale=0.5, size=n)
+    y = 1.0 + 0.8 * x1 - 0.4 * x2 + v - u
+    design = np.column_stack([np.ones(n), x1, x2])
+
+    theta = np.array([0.92746179, 0.80583456, -0.46693057, -1.29044671, -1.3570339])
+    assert frontier_exponential_loglike(theta, y, design) == pytest.approx(
+        -643.2414884477989, rel=1e-12
+    )
+
+
+def test_frontier_exponential_gradient_is_the_gradient_of_the_likelihood():
+    """A wrong sign or a missing term in the score would still converge, only slower."""
+
+    from westata.estimators.nonlinear import (
+        frontier_exponential_gradient,
+        frontier_exponential_loglike,
+    )
+
+    rng = np.random.default_rng(7)
+    n = 200
+    design = np.column_stack([np.ones(n), rng.normal(size=n)])
+    y = 1.0 + 0.5 * design[:, 1] + rng.normal(size=n) - rng.exponential(0.5, size=n)
+    theta = np.array([0.9, 0.4, -0.4, -0.9])
+
+    analytic = frontier_exponential_gradient(theta, y, design)
+    numeric = np.empty_like(theta)
+    step = 1e-6
+    for column in range(theta.size):
+        plus = theta.copy()
+        minus = theta.copy()
+        plus[column] += step
+        minus[column] -= step
+        numeric[column] = (
+            frontier_exponential_loglike(plus, y, design)
+            - frontier_exponential_loglike(minus, y, design)
+        ) / (2 * step)
+    np.testing.assert_allclose(analytic, numeric, rtol=1e-6, atol=1e-6)
 
 
 def test_frontier_accepts_explicit_halfnormal_spelling():

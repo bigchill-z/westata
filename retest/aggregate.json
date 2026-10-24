@@ -2,16 +2,16 @@
   "total": 386,
   "status_counts": {
     "pass": 285,
-    "fail": 85,
+    "fail": 86,
     "skip": 11,
-    "error": 5
+    "error": 4
   },
   "tier_counts": {
     "A": 249,
     "B": 57,
-    "D": 9,
+    "D": 10,
     "C": 21,
-    "NA": 32,
+    "NA": 31,
     "E": 7
   },
   "per_domain": {
@@ -33,17 +33,17 @@
     "limited_quantile": {
       "counts": {
         "pass": 11,
-        "fail": 11,
-        "error": 3
+        "fail": 12,
+        "error": 2
       },
       "tiers": {
         "A": 12,
         "B": 7,
         "C": 1,
-        "NA": 3,
-        "D": 2
+        "NA": 2,
+        "D": 3
       },
-      "max_param_rel": 0.0010765871449960062
+      "max_param_rel": 0.001516827415567701
     },
     "linear_iv": {
       "counts": {
@@ -4742,23 +4742,76 @@
         "domain": "limited_quantile",
         "name": "frontier exponential",
         "stata_command": "frontier y x1 x2, distribution(exponential)",
-        "status": "error",
+        "status": "fail",
         "tolerance": 1e-09,
-        "param_rel": NaN,
-        "se_rel": NaN,
-        "n_params": 0,
+        "param_rel": 0.001516827415567701,
+        "se_rel": 0.04318500191318106,
+        "n_params": 5,
         "mismatched": [],
         "scalars": {},
-        "extra": {},
+        "extra": {
+          "stata": {
+            "sigma_u": 0.15239229612035382,
+            "sigma_v": 1.064914648636322,
+            "ll": -745.970270319937
+          },
+          "westata": {
+            "sigma_u": 0.15195804886335107,
+            "sigma_v": 1.0649593321616595,
+            "ll": -745.9702691902793
+          },
+          "detail": {
+            "__const__": {
+              "stata_b": 0.6045384818694106,
+              "westata_b": 0.6041627880223424,
+              "b_rel": 0.0006214556365485674,
+              "stata_se": 0.5691702635158343,
+              "westata_se": 0.5919005060431122,
+              "se_rel": 0.03993575206629798
+            },
+            "x1": {
+              "stata_b": 0.8573836293593798,
+              "westata_b": 0.8573833904772827,
+              "b_rel": 2.7861751603749326e-07,
+              "stata_se": 0.04713848537592035,
+              "westata_se": 0.04713786781653948,
+              "se_rel": 1.3100959352946198e-05
+            },
+            "x2": {
+              "stata_b": -0.36704394043661115,
+              "westata_b": -0.367043826940486,
+              "b_rel": 3.0921672492331757e-07,
+              "stata_se": 0.049265716888441564,
+              "westata_se": 0.04926493333705175,
+              "se_rel": 1.590459734072886e-05
+            },
+            "/lnsig2v": {
+              "stata_b": 0.12578930764863486,
+              "westata_b": 0.12587322533718717,
+              "b_rel": 0.0006671289485646987,
+              "stata_se": 0.16447433816077994,
+              "westata_se": 0.16968065913809383,
+              "se_rel": 0.03165430568399373
+            },
+            "/lnsig2u": {
+              "stata_b": -3.7625943747973687,
+              "westata_b": -3.768301581098722,
+              "b_rel": 0.001516827415567701,
+              "stata_se": 7.444304262612983,
+              "westata_se": 7.765786556436226,
+              "se_rel": 0.04318500191318106
+            }
+          }
+        },
         "notes": [
-          "Stata (same data, exponential inefficiency): b=[ 0.85738363 -0.36704394  0.60453848  0.12578931 -3.76259437] ll=-745.970270319937",
-          "westata rejects the option at model construction (text above)."
+          "似然与梯度逐项取自 fron_ex.ado；在 Stata 系数处似然差 7.1e-16",
+          "起始值按 frontier.ado:347-350 的三阶矩拆分"
         ],
-        "error": "UnsupportedError: frontier: distribution='exponential' is not implemented; only 'halfnormal' is. The truncated and exponential variants need different likelihoods, not a flag.",
+        "error": "",
         "stata_version": "19.5",
         "seconds": 0.0,
-        "param_tier": "NA",
-        "se_tier": "NA"
+        "param_tier": "D",
+        "se_tier": "E"
       },
       {
         "domain": "limited_quantile",
@@ -4777,9 +4830,9 @@
             "rel": 0.0
           },
           "sum_adev": {
-            "stata": 208.04731048707464,
+            "stata": 208.04731048707467,
             "westata": 208.04731048707464,
-            "rel": 0.0
+            "rel": 1.3661176087238946e-16
           },
           "sum_rdev": {
             "stata": 258.60347687093315,
@@ -4787,9 +4840,9 @@
             "rel": 0.0
           },
           "r2_p": {
-            "stata": 0.19549685485895718,
+            "stata": 0.19549685485895707,
             "westata": 0.19549685485895718,
-            "rel": 0.0
+            "rel": 5.678981513161102e-16
           },
           "q": {
             "stata": 0.5,

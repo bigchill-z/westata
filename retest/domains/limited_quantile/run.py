@@ -527,19 +527,17 @@ with Stata() as st:
                "westata": {k: res_f.e.get(k) for k in
                            ("sigma_u", "sigma_v", "sigma2", "lambda", "gamma")}},
     ))
-    try:
-        ws.Frontier.from_formula("y ~ x1 + x2", fr_df, distribution="exponential")
-        rec.skip("frontier exponential", "westata unexpectedly accepted exponential")
-    except UnsupportedError as exc:
-        cap_ex = st.estimate("frontier y x1 x2, distribution(exponential)")
-        rec.error(
-            "frontier exponential", exc,
-            command="frontier y x1 x2, distribution(exponential)",
-            notes=["Stata (same data, exponential inefficiency): b=" +
-                   str(np.array2string(np.asarray(cap_ex.b), precision=8)) +
-                   f" ll={cap_ex.scalars.get('ll')}",
-                   "westata rejects the option at model construction (text above)."],
-        )
+    cap_ex = st.estimate("frontier y x1 x2, distribution(exponential)")
+    res_ex = ws.Frontier.from_formula("y ~ x1 + x2", fr_df,
+                                      distribution="exponential").fit()
+    rec.add(compare(
+        "frontier exponential", renamed(cap_ex, ["x1", "x2", "Intercept",
+                                                "/lnsig2v", "/lnsig2u"]), res_ex,
+        extra={"stata": {k: cap_ex.scalars.get(k) for k in ("sigma_u", "sigma_v", "ll")},
+               "westata": {k: res_ex.e.get(k) for k in ("sigma_u", "sigma_v", "ll")}},
+        notes=["似然与梯度逐项取自 fron_ex.ado；在 Stata 系数处似然差 7.1e-16",
+               "起始值按 frontier.ado:347-350 的三阶矩拆分"],
+    ))
 
     # ================================================================== QREG
     st.send(q_df)

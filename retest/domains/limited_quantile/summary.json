@@ -3,11 +3,11 @@
   "total": 25,
   "counts": {
     "pass": 11,
-    "fail": 11,
-    "error": 3
+    "fail": 12,
+    "error": 2
   },
-  "max_param_rel": 0.0010765871449960062,
-  "generated_at": "2026-10-24T13:45:39",
+  "max_param_rel": 0.001516827415567701,
+  "generated_at": "2026-10-24T15:31:18",
   "stata_version": "19.5",
   "items": [
     {
@@ -202,17 +202,17 @@
     },
     {
       "name": "frontier exponential",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "status": "fail",
+      "param_rel": 0.001516827415567701,
+      "se_rel": 0.04318500191318106,
+      "tier": "D",
+      "se_tier": "E",
       "command": "frontier y x1 x2, distribution(exponential)",
       "notes": [
-        "Stata (same data, exponential inefficiency): b=[ 0.85738363 -0.36704394  0.60453848  0.12578931 -3.76259437] ll=-745.970270319937",
-        "westata rejects the option at model construction (text above)."
+        "\u4f3c\u7136\u4e0e\u68af\u5ea6\u9010\u9879\u53d6\u81ea fron_ex.ado\uff1b\u5728 Stata \u7cfb\u6570\u5904\u4f3c\u7136\u5dee 7.1e-16",
+        "\u8d77\u59cb\u503c\u6309 frontier.ado:347-350 \u7684\u4e09\u9636\u77e9\u62c6\u5206"
       ],
-      "error": "UnsupportedError: frontier: distribution='exponential' is not implemented; only 'halfnormal' is. The truncated and exponential variants need different likelihoods, not a flag."
+      "error": ""
     },
     {
       "name": "qreg median",

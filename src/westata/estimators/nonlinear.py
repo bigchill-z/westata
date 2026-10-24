@@ -771,6 +771,121 @@ def frontier_loglike(
     return total
 
 
+def frontier_exponential_loglike(
+    theta: np.ndarray,
+    y: np.ndarray,
+    exog: np.ndarray,
+    *,
+    cost: bool = False,
+) -> float:
+    """Normal/exponential frontier log-likelihood, from ``fron_ex.ado``.
+
+    ``theta = [beta, lnsig2v, lnsig2u]`` with ``lnsig2v = ln(sigma_v^2)`` and ``lnsig2u = ln(sigma_u^2)``,
+    matching the half-normal path's parameter order so the two are interchangeable from the caller's side.
+
+    ``cost=False`` is a production frontier (``S_COST = 1``), ``cost=True`` a cost frontier (``S_COST = -1``),
+    which is how ``frontier.ado`` selects the sign.
+
+        e  = y - x'b
+        z  = -S_COST e exp(-lnsig2v/2) - exp((lnsig2v - lnsig2u)/2)
+        ll = sum[ -1/2 lnsig2u + 1/2 exp(lnsig2v - lnsig2u) + ln Phi(z) + S_COST e exp(-lnsig2u/2) ]
+
+    The tail is evaluated through ``stats.norm.logcdf`` rather than ``log(norm.cdf)`` for the reason recorded on
+    the half-normal version: at ``z = -40`` the term is about -804 while ``log(cdf)`` returns ``-inf`` and
+    silently drops the observation.
+    """
+
+    beta = np.asarray(theta, dtype=float)[: exog.shape[1]]
+    lnsig2v = float(theta[exog.shape[1]])
+    lnsig2u = float(theta[exog.shape[1] + 1])
+    sign = -1.0 if cost else 1.0
+
+    residual = np.asarray(y, dtype=float) - exog @ beta
+    z = -sign * residual * math.exp(-0.5 * lnsig2v) - math.exp(0.5 * (lnsig2v - lnsig2u))
+
+    total = (
+        -0.5 * lnsig2u
+        + 0.5 * math.exp(lnsig2v - lnsig2u)
+        + stats.norm.logcdf(z)
+        + sign * residual * math.exp(-0.5 * lnsig2u)
+    )
+    return float(np.sum(total))
+
+
+def frontier_exponential_gradient(
+    theta: np.ndarray,
+    y: np.ndarray,
+    exog: np.ndarray,
+    *,
+    cost: bool = False,
+) -> np.ndarray:
+    """Analytic gradient of :func:`frontier_exponential_loglike`, from ``fron_ex.ado``'s g1/g2/g3.
+
+    Transcribed rather than differentiated: the score in the ado file is the authority, and this project has
+    twice been burned by a hand-derived second derivative that looked right and was not.
+    """
+
+    k = exog.shape[1]
+    beta = np.asarray(theta, dtype=float)[:k]
+    lnsig2v = float(theta[k])
+    lnsig2u = float(theta[k + 1])
+    sign = -1.0 if cost else 1.0
+
+    residual = np.asarray(y, dtype=float) - exog @ beta
+    z = -sign * residual * math.exp(-0.5 * lnsig2v) - math.exp(0.5 * (lnsig2v - lnsig2u))
+
+    # zr = phi(z)/Phi(z), guarded so a far tail yields a finite gradient instead of NaN.
+    density = stats.norm.pdf(z)
+    cdf = np.maximum(stats.norm.cdf(z), 1e-300)
+    zr = density / cdf
+
+    half_v = math.exp(-0.5 * lnsig2v)
+    half_u = math.exp(-0.5 * lnsig2u)
+    ratio = math.exp(lnsig2v - lnsig2u)
+
+    ztd1 = sign * half_v
+    ztd2 = 0.5 * sign * residual * half_v - 0.5 * math.exp(0.5 * (lnsig2v - lnsig2u))
+    ztd3 = 0.5 * math.exp(0.5 * (lnsig2v - lnsig2u))
+
+    g1 = zr * ztd1 - sign * half_u
+    g2 = 0.5 * ratio + zr * ztd2
+    g3 = -0.5 - 0.5 * ratio + zr * ztd3 - 0.5 * sign * residual * half_u
+
+    out = np.empty(k + 2)
+    out[:k] = exog.T @ g1
+    out[k] = float(np.sum(g2))
+    out[k + 1] = float(np.sum(g3))
+    return out
+
+
+def frontier_exponential_information(
+    theta: np.ndarray,
+    y: np.ndarray,
+    exog: np.ndarray,
+    *,
+    cost: bool = False,
+) -> np.ndarray:
+    """Observed information: minus the Jacobian of the verified analytic gradient.
+
+    A central difference of the gradient converges as eps/h rather than eps/h^2 and involves no cancellation of
+    the objective, which is why the half-normal path takes the same route.
+    """
+
+    size = theta.size
+    step = 1e-6 * np.maximum(np.abs(theta), 1.0)
+    jacobian = np.zeros((size, size))
+    for column in range(size):
+        plus = theta.copy()
+        minus = theta.copy()
+        plus[column] += step[column]
+        minus[column] -= step[column]
+        jacobian[:, column] = (
+            frontier_exponential_gradient(plus, y, exog, cost=cost)
+            - frontier_exponential_gradient(minus, y, exog, cost=cost)
+        ) / (2.0 * step[column])
+    return -(jacobian + jacobian.T) / 2.0
+
+
 def _inverse_mills(z: np.ndarray) -> np.ndarray:
     """``phi(z)/Phi(z)``, clamped where the tail would underflow.
 
@@ -1352,11 +1467,12 @@ class Frontier:
                 f"frontier: only cov_type='nonrobust' is implemented (the observed "
                 f"information, Stata's default); got {cov_type!r}"
             )
-        if self._distribution != "halfnormal":
+        if self._distribution not in ("halfnormal", "exponential"):
             raise UnsupportedError(
                 f"frontier: distribution={self._distribution!r} is not implemented; "
-                "only 'halfnormal' is"
+                "supported values are 'halfnormal' and 'exponential'"
             )
+        exponential = self._distribution == "exponential"
 
         y, X = self._y, self._X
         n, k = X.shape
@@ -1367,18 +1483,50 @@ class Frontier:
             )
         has_constant = any(name == "Intercept" for name in self._param_names)
 
+        def loglike(theta: np.ndarray) -> float:
+            if exponential:
+                return frontier_exponential_loglike(theta, y, X)
+            return frontier_loglike(theta, y, X)
+
         def negative(theta: np.ndarray) -> float:
-            total = frontier_loglike(theta, y, X)
+            total = loglike(theta)
             return -total if np.isfinite(total) else 1e12
 
         beta0, *_ = np.linalg.lstsq(X, y, rcond=None)
         residual0 = y - X @ beta0
         variance0 = max(float(np.var(residual0)), 1e-6)
-        # Split the OLS variance evenly between the two components.
-        start = np.concatenate([beta0, [math.log(variance0) - math.log(2.0)] * 2])
+        if exponential:
+            # frontier.ado lines 347-350: sigma2_u = (-S_COST m3 / 2)^(2/3), sigma2_v = m2 - sigma2_u with a
+            # 1e-4 floor. S_COST is 1 here (production frontier).
+            third = float(np.mean((residual0 - residual0.mean()) ** 3))
+            sigma2_u0 = (-third / 2.0) ** (2.0 / 3.0) if -third / 2.0 > 0 else variance0 / 2.0
+            sigma2_v0 = variance0 - sigma2_u0
+            if not np.isfinite(sigma2_v0) or sigma2_v0 <= 0:
+                sigma2_v0 = 1e-4
+            if not np.isfinite(sigma2_u0) or sigma2_u0 <= 0:
+                sigma2_u0 = variance0 / 2.0
+            start = np.concatenate(
+                [beta0, [math.log(sigma2_v0), math.log(sigma2_u0)]]
+            )
+        else:
+            # Split the OLS variance evenly between the two components.
+            start = np.concatenate([beta0, [math.log(variance0) - math.log(2.0)] * 2])
+
+        def gradient_of_negative(theta: np.ndarray) -> np.ndarray:
+            # Supplying the analytic gradient removes finite-difference noise from the step direction. On the
+            # flat region where sigma_u is barely identified (lnsig2u near -3.8 with sigma_v near 1.1) that is
+            # the difference between stopping at |grad| ~ 2e-5 and at ~1e-8: the surface itself is shallow, so
+            # the step direction is all an optimiser has to work with.
+            if exponential:
+                return -frontier_exponential_gradient(theta, y, X)
+            return -frontier_gradient(theta, y, X)
 
         result = optimize.minimize(
-            negative, start, method="BFGS", options={"maxiter": int(maxiter)}
+            negative,
+            start,
+            method="BFGS",
+            jac=gradient_of_negative,
+            options={"maxiter": int(maxiter), "gtol": 1e-10},
         )
         theta = np.asarray(result.x, dtype=float)
         best = negative(theta)
@@ -1430,8 +1578,11 @@ class Frontier:
         # 4.6e-6 from step 1e-4 through 1e-6.  What remains of the reported SE's
         # 2.5e-5 is `theta`'s stopping point, not the Hessian -- see the module
         # docstring and retest/fix/systems/repro_T8_stopping_point.py.
+        gradient_for = (
+            frontier_exponential_gradient if exponential else frontier_gradient
+        )
         hessian = _numerical_hessian(
-            negative, theta, gradient=lambda point: -frontier_gradient(point, y, X)
+            negative, theta, gradient=lambda point: -gradient_for(point, y, X)
         )
         try:
             covariance = np.linalg.inv(hessian)
@@ -1521,10 +1672,12 @@ def _normalize_distribution(distribution: Any) -> str:
     """Validate the frontier's inefficiency distribution."""
 
     normalized = str(distribution).strip().lower().replace("-", "").replace("_", "")
-    if normalized != "halfnormal":
-        raise UnsupportedError(
-            f"frontier: distribution={distribution!r} is not implemented; only "
-            "'halfnormal' is. The truncated and exponential variants need different "
-            "likelihoods, not a flag."
-        )
-    return "halfnormal"
+    if normalized == "halfnormal":
+        return "halfnormal"
+    if normalized == "exponential":
+        return "exponential"
+    raise UnsupportedError(
+        f"frontier: distribution={distribution!r} is not implemented; supported values "
+        "are 'halfnormal' and 'exponential'. The truncated-normal variants need their own "
+        "likelihood, not a flag."
+    )

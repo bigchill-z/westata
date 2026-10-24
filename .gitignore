@@ -33,3 +33,4 @@ tmp_*
 
 # Commit message scratch
 p11_msg.txt
+.agent-teams/

@@ -78,7 +78,14 @@ def resolve_names(
     available = list(available)
     positions: list[int] = []
     for ref in requested:
-        if wildcards and any(ch in ref for ch in "*?["):
+        # EXACT MATCH FIRST. A factor level's name is `C(foreign)[T.Foreign]` -- the brackets are part of the
+        # literal name, not a wildcard. Testing for wildcard characters before testing for an exact match sent
+        # that name to fnmatch, which reads `[T.Foreign]` as a character class and matches nothing, so every
+        # factor variable was unreachable through test()/lincom even though its name was in `available`.
+        if ref in available:
+            positions.append(available.index(ref))
+            continue
+        if wildcards and any(ch in ref for ch in "*?"):
             matches = [
                 i for i, name in enumerate(available) if fnmatch.fnmatchcase(name, ref)
             ]
@@ -88,9 +95,7 @@ def resolve_names(
                 )
             positions.extend(matches)
         else:
-            if ref not in available:
-                raise KeyError(f"coefficient {ref!r} not found; available: {available}")
-            positions.append(available.index(ref))
+            raise KeyError(f"coefficient {ref!r} not found; available: {available}")
     # Deduplicate but keep order (Stata tests each coefficient once).
     seen: set[int] = set()
     ordered: list[int] = []

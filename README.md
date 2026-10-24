@@ -55,62 +55,88 @@ committed so the comparison replays without a licence.
 
 ## Install
 
+`westata` is **not on PyPI yet**. Install it from the repository:
+
 ```bash
+git clone https://github.com/bigchill-z/westata.git
+cd westata
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[test]"
 ```
 
+On Linux or macOS the last line is `./.venv/bin/python -m pip install -e ".[test]"`.
+
 Requires Python ≥ 3.10. `numpy`, `pandas`, `scipy`, `statsmodels`, `patsy`,
-`pyfixest` (HDFE), `linearmodels` (IV, panel) and `pyyaml` are installed
+`pyfixest` (HDFE), `linearmodels` (IV, panel) and `pyyaml` come in
 automatically — the package does not import without the last three.
 
-`arch` is genuinely optional and only needed for GARCH and the Phillips–Perron
-test; those commands raise a clear `UnsupportedError` naming the install command
-if it is absent:
+`arch` is optional and only needed for GARCH, EGARCH and the Phillips–Perron
+test. Install it alongside the package:
 
 ```bash
-python -m pip install "westata[arch]"
+.venv\Scripts\python.exe -m pip install -e ".[test,arch]"
 ```
+
+Without it those commands raise an `UnsupportedError` naming the missing extra,
+and their tests skip rather than fail. Once the package is on PyPI, the
+equivalent commands will be `pip install westata` and `pip install
+"westata[arch]"`.
 
 ## Quick start
 
-```python
-import westata as ws
-import pandas as pd
+Every line below is executed as written against `tests/data/auto.dta`.
 
-df = pd.read_stata("auto.dta")
+```python
+import pandas as pd
+import westata as ws
+
+df = pd.read_stata("tests/data/auto.dta")
 
 # OLS with a factor variable and clustered standard errors (regress)
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit(
     cov_type="cluster", cov_kwds={"groups": df["foreign"]},
 )
-print(res.summary(style="stata"))     # Stata layout
-res.test("weight foreign")            # F(2, 71) = 69.75, exactly as Stata
-res.lincom("weight + 1000*foreign")   # linear combination
+print(res.summary(style="stata"))          # Stata layout
+```
 
-# IV (ivregress 2sls) — z statistics and Wald chi2, like Stata
-ws.IV2SLS.from_formula("y ~ x + [endog ~ z1 + z2]", df).fit()
+Coefficient names keep the formula's spelling, so a factor level appears as
+`C(foreign)[T.Foreign]`. Use that exact string:
 
-# High-dimensional FE (reghdfe)
-ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+```python
+res.test("weight")                                  # single restriction
+res.test("weight", "C(foreign)[T.Foreign]")         # joint test of both
+res.test("weight = 0")                              # same, as an equation
+res.lincom("weight + 1000*C(foreign)[T.Foreign]")   # linear combination
+```
 
-# Panel (xtreg fe/re/be/fd)
-ws.PanelOLS.from_formula("y ~ x1", df, entity="firm", time="year").fit()
-ws.RandomEffects.from_formula("y ~ x1", df, entity="firm", time="year").fit()
+`test` takes one specification per argument; a comma inside a single string is not a separator.
 
-# Discrete choice and censored regression
-ws.Logit.from_formula("y ~ x1", df).fit()
-ws.Tobit.from_formula("wage ~ edu", df, lower=0).fit()
+Other models, on the same data:
 
-# Marginal effects (margins)
-ws.Logit.from_formula("y ~ x1 + x2", df).fit().margins(dydx=["x1", "x2"])
+```python
+# Quantile regression (qreg) — median
+ws.QuantileRegression.from_formula("mpg ~ weight + C(foreign)", df).fit()
 
-# Time series
-ws.ARIMA(y, order=(1, 1, 1)).fit()
-ws.unitroot(y, test="adf")
+# Robust regression (rreg)
+ws.RobustRegression.from_formula("mpg ~ weight", df).fit()
 
-# Paper table (esttab)
-ws.etable([res1, res2], model_names=["Base", "Full"])
+# Systems of equations (sureg): one list entry per equation
+ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
+ws.Sureg.from_formula(
+    ["price ~ weight + mpg", "mpg ~ weight + foreign"], df
+).fit(cov_type="robust")                     # robust VCE
+
+# Censored regression (tobit). `lower` is a from_formula argument, not a fit one.
+# `rep78` has missing values, which are dropped.
+ws.Tobit.from_formula("rep78 ~ weight + mpg", df, lower=0).fit()
+```
+
+A publication-style table:
+
+```python
+base = ws.OLS.from_formula("mpg ~ weight", df).fit()
+full = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+print(ws.etable([base, full], model_names=["Base", "Full"]))
 ```
 
 ## Command coverage

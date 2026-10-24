@@ -1,0 +1,57 @@
+﻿fix: execute the README examples -- they were broken, and running them found a library bug
+
+The question was whether the README install command works. Answering it meant running things, and what turned up
+was worse than a stale command.
+
+INSTALL: the primary line works; the OPTIONAL one does not
+
+    git clone + `pip install -e ".[test]"`   -> installs, imports, 1434 tests pass
+    `pip install "westata[arch]"`            -> ERROR: No matching distribution found
+
+The second was written as if the package were already on PyPI. It is not, so a reader following that line fails.
+It now says plainly that `westata` is not published yet, gives the working repository command, and mentions the
+PyPI form as future.
+
+QUICK START: four defects, and roughly 80% of it could never have run
+    It read `auto.dta` and then used `y`, `x`, `x1`, `x2`, `endog`, `z1`, `z2`, `firm`, `year`, `wage`, `edu`,
+    plus undefined `res1`/`res2`. `auto` has make, price, mpg, rep78, headroom, trunk, weight, length, turn,
+    displacement, gear_ratio, foreign -- none of those. Replaced with an example built on real columns.
+
+    The block that LOOKED fine also failed, which corrected my own first reading:
+        res.test("weight foreign")
+        KeyError: coefficient 'foreign' not found;
+                  available: ['Intercept', 'C(foreign)[T.Foreign]', 'weight']
+    with a comment beside it quoting "F(2, 71) = 69.75, exactly as Stata" -- a number nobody could have obtained.
+
+    `res.test("weight = 0, C(foreign)[T.Foreign] = 0")` used a comma as a separator; `test` takes one
+    specification per argument.
+
+    `Tobit.from_formula(...).fit(lower=0)` passed `lower` to the wrong method -- it belongs to `from_formula`.
+
+THEN A LIBRARY BUG, not a documentation one
+    Making the factor example work required fixing real code. `resolve_names` decided wildcard-vs-name with
+
+        if wildcards and any(ch in ref for ch in "*?["):
+
+    The `[` is wrong: `C(foreign)[T.Foreign]` is a literal column name, and routing it to `fnmatch` made
+    `[T.Foreign]` a CHARACTER CLASS matching one of {T,.,F,o,r,e,i,g,n} -- so nothing matched, even though the
+    name was in the `available` list printed in the error. EVERY factor variable was unreachable through test()
+    and lincom(), and the README documented exactly the call that fails.
+
+    Fixed by trying an EXACT match before wildcard interpretation (what Stata does implicitly: a name is a name
+    before it is a pattern), and dropping `[` from the wildcard set. `x*` still works, plain names unchanged.
+
+TESTED SO IT CANNOT DRIFT
+    tests/test_readme_examples.py extracts the fenced ```python blocks under "## Quick start" and EXECUTES them,
+    in one namespace and in order, the way a reader pastes them. It also pins the factor-level regression, since
+    a future refactor of the resolver would otherwise silently restore the bug.
+
+    Writing this test is what forced the four defects into the open. Proofreading had not found them across
+    several rounds of editing the same file; execution found them immediately.
+
+VERIFIED
+    every README Quick start block executes      4/4
+    factor coefficient referencable              test("C(foreign)[T.Foreign]") -> chi2 2.3516, p 0.1296
+    wildcards still work                         test("weight*") -> ok
+    fresh clone + README install + full suite    1434 passed
+    full suite on this tree                      1444 passed, 3 skipped

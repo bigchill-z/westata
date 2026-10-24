@@ -1,0 +1,46 @@
+feat(retest): make the independent sweep a single re-runnable check
+
+The sweep was seven per-domain scripts plus an aggregator, so running it meant knowing which files
+to invoke in which order. That friction is enough that a check gets skipped, and a skipped check is
+worth nothing -- this whole apparatus exists because the library's own suite passed at 1247 tests
+while 24 defects sat undetected.
+
+    python -m retest.sweep                  # run everything, then compare with the registry
+    python -m retest.sweep --domains tseries panel
+    python -m retest.sweep --no-run         # compare saved results only
+
+Exit 0 agreement, 1 false claim, 2 could-not-run.
+
+THE CHECK IS ONE-DIRECTIONAL BY DESIGN. It fails only when a registry level is BETTER than the sweep
+measured. A level that is too low is conservative; a level that is too high is a false claim. It
+never rewrites the registry -- a check that edits the thing it checks cannot be trusted.
+
+THREE MISTAKES WERE MADE BUILDING THIS, and each left a test behind:
+
+1. Completion was judged by exit code. Domain scripts exit non-zero *when they find defects* --
+   tseries reports arima and var failures and exits 1 -- so the first version printed "ok" only for
+   runs that happened to pass everything, hiding the findings entirely. Completion is now judged by
+   whether results.jsonl was rewritten.
+
+2. Stale results compare as a pass. A crashed domain leaves the previous results.jsonl in place, so
+   a dead run would silently grade as green. The results file's mtime is now the completion signal,
+   and a domain that writes nothing is reported as DEAD.
+
+3. Row filtering. `retest/lib/tiering.py` now holds the three rules that took five failed attempts
+   to get right: drop PROBE rows (the sweep's own diagnostics -- counting them demoted `var` to E1
+   while its output measured at 1e-14), drop ALTERNATIVE rows (comparisons against a mapping the
+   repair round corrected -- counting them penalised `ivregress` and `areg` for having been FIXED),
+   and use an EXPLICIT entry->row map instead of keyword matching (`jackknife: regress` was charged
+   to `regress`; `teffects ra/ipw/aipw` absorbed `nnmatch`'s failures).
+
+Verified by injection: declaring `arima` as E3 when it measures D makes the sweep exit 1 and name
+the entry. Restored afterwards.
+
+tests/test_retest_sweep.py (12 tests, no Stata needed) pins the filtering rules, the tier rule, the
+attribution disjointness, and the end-to-end property that no entry claims better than measured --
+because a conformance check that silently rots produces confidence without evidence.
+
+retest/README.md documents the runner, the tier rules, the failure modes, and the one response to a
+failing sweep that is not legitimate: widening the tolerance until it passes.
+
+Suite: 1391 passing.

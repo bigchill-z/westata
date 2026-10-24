@@ -225,6 +225,9 @@ docs/              design spec and implementation plans
   per-command level, measured gap, and reasoning.
 - Known gaps: [`docs/GAP_REGISTER.md`](docs/GAP_REGISTER.md) — what is deliberately
   not implemented, and why.
+- **Independent sweep**: [retest/README.md](retest/README.md) — the 386-point
+  check against live Stata, and how to re-run it. This is where the evidence
+  levels come from.
 - Design spec: [`docs/superpowers/specs/2026-10-22-westata-design.md`](docs/superpowers/specs/2026-10-22-westata-design.md)
 
 ## Known gaps

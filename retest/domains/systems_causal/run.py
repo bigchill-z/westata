@@ -351,34 +351,23 @@ def run_sureg(st: Stata, auto: pd.DataFrame) -> None:
         ],
     ))
 
-    # Stata's vce(robust) counterpart: westata refuses the option outright, so
-    # this is an unsupported-path row rather than a numeric comparison.
+    # Stata's vce(robust) counterpart. `reg3.ado` delegates this to `_reg3robust`, whose sandwich is
+    # implemented; see GAP_REGISTER 8.20.
     command_r = command + ", vce(robust)"
     cap_r = st.estimate(command_r)
-    message, refused = probe_unsupported(
-        "sureg vce(robust)",
-        command_r,
-        lambda: ws.Sureg.from_formula(
-            ["price ~ weight + mpg", "mpg ~ weight + foreign"], auto
-        ).fit(cov_type="robust"),
-    )
-    if refused:
-        comp = REC.error(
-            "sureg vce(robust) (westata unsupported)",
-            RuntimeError(message),
-            command=command_r,
-            notes=[
-                "westata implements only cov_type='nonrobust' for sureg. Stata's "
-                "vce(robust) standard errors "
-                f"{np.sqrt(np.diag(cap_r.V)).round(8).tolist()} therefore have no "
-                "westata counterpart; the exception is the recorded evidence.",
-            ],
-        )
-        comp.extra["stata_robust_se"] = np.sqrt(np.diag(cap_r.V)).tolist()
-    else:
-        REC.skip("sureg vce(robust) (westata unsupported)",
-                 "westata accepted cov_type='robust'; nothing to report",
-                 command=command_r)
+    res_r = ws.Sureg.from_formula(
+        ["price ~ weight + mpg", "mpg ~ weight + foreign"], auto
+    ).fit(cov_type="robust")
+    add(positional(
+        "sureg 2eq vce(robust)",
+        cap_r,
+        res_r.params.to_numpy(),
+        res_r.bse.to_numpy(),
+        matrix=np.asarray(res_r.cov),
+        extra={"westata_names": list(res_r.param_names), "stata_names": cap_r.names},
+        notes=["稳健 VCE 在 Stata 侧由 _reg3robust.GetSandwich 计算：",
+               "meat 的每个观测得分是 Omega 加权后的残差，不是裸残差"],
+    ))
 
 
 # ---------------------------------------------------------------------- 2 mvreg

@@ -2,13 +2,13 @@
   "domain": "systems_causal",
   "total": 56,
   "counts": {
-    "pass": 40,
-    "error": 2,
+    "pass": 41,
     "fail": 12,
+    "error": 1,
     "skip": 2
   },
   "max_param_rel": 0.012076059850373966,
-  "generated_at": "2026-10-24T10:27:09",
+  "generated_at": "2026-10-24T16:14:07",
   "stata_version": "19.5",
   "items": [
     {
@@ -28,17 +28,18 @@
       "error": ""
     },
     {
-      "name": "sureg vce(robust) (westata unsupported)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "name": "sureg 2eq vce(robust)",
+      "status": "pass",
+      "param_rel": 5.754719914040546e-13,
+      "se_rel": 2.0453160168309753e-14,
+      "tier": "A",
+      "se_tier": "A",
       "command": "sureg (price weight mpg) (mpg weight foreign), vce(robust)",
       "notes": [
-        "westata implements only cov_type='nonrobust' for sureg. Stata's vce(robust) standard errors [0.75993745, 91.70326703, 4053.05585619, 0.00053137, 1.0926504, 1.74656612] therefore have no westata counterpart; the exception is the recorded evidence."
+        "\u7a33\u5065 VCE \u5728 Stata \u4fa7\u7531 _reg3robust.GetSandwich \u8ba1\u7b97\uff1a",
+        "meat \u7684\u6bcf\u4e2a\u89c2\u6d4b\u5f97\u5206\u662f Omega \u52a0\u6743\u540e\u7684\u6b8b\u5dee\uff0c\u4e0d\u662f\u88f8\u6b8b\u5dee"
       ],
-      "error": "RuntimeError: UnsupportedError: sureg: cov_type='robust' is not implemented; only the unadjusted VCE (cov_type='nonrobust') is verified against Stata for this command"
+      "error": ""
     },
     {
       "name": "mvreg 2 outcomes, shared design",
@@ -322,8 +323,8 @@
     {
       "name": "didregress two-period, covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.9305532509311738e-15,
-      "se_rel": 8.693087415410873e-16,
+      "param_rel": 2.0790573471566487e-15,
+      "se_rel": 9.934957046183854e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "didregress (y x1) (treated), group(unit) time(period)",
@@ -335,7 +336,7 @@
     {
       "name": "didregress two-period, no covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 0.0,
+      "param_rel": 1.8117423043136117e-16,
       "se_rel": 0.0,
       "tier": "A",
       "se_tier": "A",
@@ -348,7 +349,7 @@
     {
       "name": "didregress (y) with an unrelated numeric column present",
       "status": "pass",
-      "param_rel": 0.0,
+      "param_rel": 1.8117423043136117e-16,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -361,7 +362,7 @@
     {
       "name": "didregress two-period, vce(robust)",
       "status": "pass",
-      "param_rel": 1.9305532509311738e-15,
+      "param_rel": 2.0790573471566487e-15,
       "se_rel": 1.058216995018265e-15,
       "tier": "A",
       "se_tier": "A",
@@ -387,8 +388,8 @@
     {
       "name": "didregress five-period staggered, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.6678775446888861e-15,
-      "se_rel": 3.391858149167986e-16,
+      "param_rel": 1.7790693810014787e-15,
+      "se_rel": 1.1306193830559953e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "didregress (y) (treated), group(unit) time(period)",
@@ -400,8 +401,8 @@
     {
       "name": "xtdidregress five-period staggered, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.6678775446888861e-15,
-      "se_rel": 2.5286739815569244e-16,
+      "param_rel": 1.7790693810014787e-15,
+      "se_rel": 1.2643369907784622e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "xtdidregress (y) (treated), group(unit) time(period)",
@@ -413,8 +414,8 @@
     {
       "name": "xtdidregress two-period, covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.9305532509311738e-15,
-      "se_rel": 8.85803879280427e-16,
+      "param_rel": 2.0790573471566487e-15,
+      "se_rel": 1.0629646551365124e-15,
       "tier": "A",
       "se_tier": "A",
       "command": "xtdidregress (y x1) (treated), group(unit) time(period)",

@@ -1,17 +1,17 @@
 {
   "total": 386,
   "status_counts": {
-    "pass": 285,
+    "pass": 286,
     "fail": 86,
     "skip": 11,
-    "error": 4
+    "error": 3
   },
   "tier_counts": {
-    "A": 249,
+    "A": 250,
     "B": 57,
     "D": 10,
     "C": 21,
-    "NA": 31,
+    "NA": 30,
     "E": 7
   },
   "per_domain": {
@@ -87,15 +87,15 @@
     },
     "systems_causal": {
       "counts": {
-        "pass": 40,
-        "error": 2,
+        "pass": 41,
         "fail": 12,
+        "error": 1,
         "skip": 2
       },
       "tiers": {
-        "A": 45,
-        "NA": 4,
+        "A": 46,
         "B": 5,
+        "NA": 3,
         "D": 1,
         "E": 1
       },
@@ -14035,24 +14035,44 @@
       },
       {
         "domain": "systems_causal",
-        "name": "sureg vce(robust) (westata unsupported)",
+        "name": "sureg 2eq vce(robust)",
         "stata_command": "sureg (price weight mpg) (mpg weight foreign), vce(robust)",
-        "status": "error",
+        "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": NaN,
-        "se_rel": NaN,
-        "n_params": 0,
+        "param_rel": 5.754719914040546e-13,
+        "se_rel": 2.0453160168309753e-14,
+        "n_params": 6,
         "mismatched": [],
         "scalars": {},
-        "extra": {},
+        "extra": {
+          "westata_names": [
+            "price:weight",
+            "price:mpg",
+            "price:_cons",
+            "mpg:weight",
+            "mpg:foreign",
+            "mpg:_cons"
+          ],
+          "stata_names": [
+            "weight",
+            "mpg",
+            "_cons",
+            "weight",
+            "foreign",
+            "_cons"
+          ],
+          "e(V)_rel": 2.643126745704323e-13,
+          "e(V)_tier": "A"
+        },
         "notes": [
-          "westata implements only cov_type='nonrobust' for sureg. Stata's vce(robust) standard errors [0.75993745, 91.70326703, 4053.05585619, 0.00053137, 1.0926504, 1.74656612] therefore have no westata counterpart; the exception is the recorded evidence."
+          "稳健 VCE 在 Stata 侧由 _reg3robust.GetSandwich 计算：",
+          "meat 的每个观测得分是 Omega 加权后的残差，不是裸残差"
         ],
-        "error": "RuntimeError: UnsupportedError: sureg: cov_type='robust' is not implemented; only the unadjusted VCE (cov_type='nonrobust') is verified against Stata for this command",
+        "error": "",
         "stata_version": "19.5",
         "seconds": 0.0,
-        "param_tier": "NA",
-        "se_tier": "NA"
+        "param_tier": "A",
+        "se_tier": "A"
       },
       {
         "domain": "systems_causal",
@@ -14948,8 +14968,8 @@
         "stata_command": "didregress (y x1) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.9305532509311738e-15,
-        "se_rel": 8.693087415410873e-16,
+        "param_rel": 2.0790573471566487e-15,
+        "se_rel": 9.934957046183854e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {
@@ -14985,7 +15005,7 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 0.0,
+        "param_rel": 1.8117423043136117e-16,
         "se_rel": 0.0,
         "n_params": 1,
         "mismatched": [],
@@ -15022,7 +15042,7 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 0.0,
+        "param_rel": 1.8117423043136117e-16,
         "se_rel": NaN,
         "n_params": 0,
         "mismatched": [],
@@ -15031,7 +15051,7 @@
           "inferred_covariates": [],
           "warnings": [],
           "rel_by_label": {
-            "ATET": 0.0
+            "ATET": 1.8117423043136117e-16
           }
         },
         "notes": [
@@ -15049,7 +15069,7 @@
         "stata_command": "didregress (y x1) (treated), group(unit) time(period) vce(robust)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.9305532509311738e-15,
+        "param_rel": 2.0790573471566487e-15,
         "se_rel": 1.058216995018265e-15,
         "n_params": 2,
         "mismatched": [],
@@ -15107,8 +15127,8 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.6678775446888861e-15,
-        "se_rel": 3.391858149167986e-16,
+        "param_rel": 1.7790693810014787e-15,
+        "se_rel": 1.1306193830559953e-16,
         "n_params": 1,
         "mismatched": [],
         "scalars": {
@@ -15144,8 +15164,8 @@
         "stata_command": "xtdidregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.6678775446888861e-15,
-        "se_rel": 2.5286739815569244e-16,
+        "param_rel": 1.7790693810014787e-15,
+        "se_rel": 1.2643369907784622e-16,
         "n_params": 1,
         "mismatched": [],
         "scalars": {
@@ -15181,8 +15201,8 @@
         "stata_command": "xtdidregress (y x1) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.9305532509311738e-15,
-        "se_rel": 8.85803879280427e-16,
+        "param_rel": 2.0790573471566487e-15,
+        "se_rel": 1.0629646551365124e-15,
         "n_params": 2,
         "mismatched": [],
         "scalars": {

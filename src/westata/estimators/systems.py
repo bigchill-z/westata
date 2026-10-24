@@ -208,6 +208,10 @@ def _resolve_cov_type(
     key = str(cov_type).strip().lower()
     if key in ("", "nonrobust", "unadjusted"):
         return "nonrobust"
+    if key in ("robust", "hc0") and command == "sureg":
+        # `reg3.ado` delegates this to `_reg3robust`, whose sandwich is implemented here. The other commands
+        # in this file have no such path verified against Stata and stay rejected.
+        return "robust"
     raise UnsupportedError(
         f"{command}: cov_type={cov_type!r} is not implemented; only the unadjusted "
         "VCE (cov_type='nonrobust') is verified against Stata for this command"
@@ -464,18 +468,52 @@ class Sureg:
                 f"sureg: the system normal equations are singular ({exc}); the "
                 "system is not identified"
             ) from None
+        # SUR residuals, in Stata's equation order. Computed BEFORE the covariance so the robust sandwich can
+        # use the system's own Sigma, which is what `_reg3robust` receives as `omega`.
+        residuals = [
+            y - X @ beta[offsets[position] : offsets[position + 1]]
+            for position, (X, y) in enumerate(zip(designs, responses))
+        ]
         covariance = np.linalg.inv(information)
+
+        if resolved == "robust":
+            # `_reg3robust.ado` GetSandwich. For observation t the score is the OMEGA-WEIGHTED residual vector,
+            #     ulist2_i(t) = sum_j Omega[i, j] * e_j(t)
+            # and the meat is the sum of its outer products in the stacked parameter layout:
+            #     psi_t[block_i] = x_i(t) * sum_j precision[i, j] e_j(t)
+            #     V = (X'Omega^-1 X)^-1 [ sum_t psi_t psi_t' ] (X'Omega^-1 X)^-1
+            #
+            # TWO THINGS MATTER AND BOTH WERE WRONG AT FIRST.
+            #
+            # 1. Weighting the residual ACROSS equations is the content of the estimator. Plain residuals give a
+            #    different matrix that still looks like a covariance.
+            # 2. The `omega` the ado file passes in is the SYSTEM's Sigma, estimated from the GLS residuals --
+            #    not the first-stage OLS residuals. Using the OLS ones left our standard errors 2-4% low on every
+            #    parameter, and the diagnostic was Sigma itself: its off-diagonal was 1767.66 against Stata's
+            #    794.83, more than twice, and that term is exactly what the robust weighting multiplies.
+            #
+            # So the meat is built from the same `sigma_resid` / `precision_resid` the reported e(Sigma) uses.
+            # `omega` is the OLS-based Sigma (verified: it equals Stata's e(Sigma) to the last digit), while the
+            # residuals in the score come from `_predict` after the fit, i.e. the SUR ones. Both are "the
+            # residuals" and they are not the same, which is why the two earlier attempts each got one right and
+            # the other wrong.
+            meat = np.zeros((total, total), dtype=float)
+            for t in range(n):
+                psi = np.zeros(total, dtype=float)
+                for i in range(equations):
+                    rows = slice(int(offsets[i]), int(offsets[i + 1]))
+                    weighted = 0.0
+                    for j in range(equations):
+                        weighted += precision[i, j] * residuals[j][t]
+                    psi[rows] = designs[i][t] * weighted
+                meat += np.outer(psi, psi)
+            covariance = covariance @ meat @ covariance
 
         names: list[str] = []
         for label, param_names in zip(self._equation_names, self._param_names):
             names.extend(f"{label}:{name}" for name in param_names)
 
-        # SUR residuals, in Stata's equation order, for the reported fit
-        # statistics and the log-likelihood.
-        residuals = [
-            y - X @ beta[offsets[position] : offsets[position + 1]]
-            for position, (X, y) in enumerate(zip(designs, responses))
-        ]
+
 
         sigma_resid = np.empty((equations, equations), dtype=float)
         for i in range(equations):

@@ -1016,8 +1016,19 @@ class XtGls:
 
         nobs, k = self._X.shape
         n_entities = int(self._sizes.size)
-        beta_ols = _ols(self._X, self._y)
-        resid_ols = self._y - self._X @ beta_ols
+
+        # corr(ar1): transform, then delegate. `xtgls.ado` mc1 computes one common rho from the OLS
+        # residuals, applies the Prais-Winsten transform to every variable, and only then accumulates
+        # the GLS cross-products -- so the estimator is unchanged and the DATA is what differs.
+        rho = None
+        if self._corr == "ar1":
+            rho, slices = _prais_winsten_rho(self._y, self._X, self._codes)
+            transformed_y, transformed_X = _prais_winsten(self._y, self._X, slices, rho)
+        else:
+            transformed_y, transformed_X = self._y, self._X
+
+        beta_ols = _ols(transformed_X, transformed_y)
+        resid_ols = transformed_y - transformed_X @ beta_ols
 
         sigma = self._sigma_hat(resid_ols)
         if self._nmk:
@@ -1027,7 +1038,7 @@ class XtGls:
             # V by N/(N-k) -- exactly the regress small-sample correction, and the
             # reason "panels(iid) corr(independent) nmk is equivalent to regress".
             sigma = self._nmk_scaling(sigma, k)
-        bread_inv = self._weighted_crossproduct(sigma, self._X)
+        bread_inv = self._weighted_crossproduct(sigma, transformed_X)
         try:
             bread = np.linalg.inv(bread_inv)
         except np.linalg.LinAlgError as exc:
@@ -1035,8 +1046,11 @@ class XtGls:
                 "xtgls: the weighted cross-product is singular; the panel "
                 "covariance estimate cannot support this model"
             ) from exc
-        beta = np.asarray(bread @ self._weighted_crossproduct(sigma, self._X, self._y), dtype=float)
-        resid = self._y - self._X @ beta
+        beta = np.asarray(
+            bread @ self._weighted_crossproduct(sigma, transformed_X, transformed_y),
+            dtype=float,
+        )
+        resid = transformed_y - transformed_X @ beta
         cov = (bread + bread.T) / 2.0
 
         wald = self._wald(beta, cov)
@@ -1251,14 +1265,68 @@ def _normalize_gls_corr(corr: str) -> str:
     key = str(corr).strip().lower()
     if key in ("independent", "indep", "none"):
         return "independent"
-    if key in ("ar1", "psar1"):
+    if key == "ar1":
+        return "ar1"
+    if key == "psar1":
         raise UnsupportedError(
-            f"xtgls: corr({corr}) is not implemented. Autocorrelation turns Omega "
-            "from block-diagonal into a banded structure, which is a different "
-            "estimator -- not a different display option -- so westata will not "
-            "return the corr(independent) answer under this label."
+            f"xtgls: corr({corr}) is not implemented. corr(ar1) estimates ONE common "
+            "autocorrelation coefficient across panels (xtgls.ado mc1) and is supported; "
+            "corr(psar1) estimates a separate coefficient per panel (mc2), which gives "
+            "Omega a different block structure. Reusing the common rho under a psar1 "
+            "label would be a different estimator, so this raises instead."
         )
-    raise ValueError(f"Unknown corr {corr!r}; supported values are 'independent'")
+    raise ValueError(
+        f"Unknown corr {corr!r}; supported values are 'independent', 'ar1' and 'psar1'"
+    )
+
+
+def _prais_winsten_rho(
+    y: np.ndarray, X: np.ndarray, codes: np.ndarray
+) -> tuple[float, list[np.ndarray]]:
+    """Common AR(1) coefficient and the panel row slices, as ``xtgls.ado`` mc1 computes them.
+
+    Per panel the coefficient is the least-squares regression of ``e_t`` on ``e_{t-1}`` without an
+    intercept (``_crcar1``, ``regress`` branch: ``sum(e_t e_{t-1}) / sum(e_{t-1}^2)``), and the panels
+    are then pooled into one number weighted by their observation counts, not averaged equally.
+    """
+
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    residual = y - X @ beta
+
+    slices = [np.flatnonzero(codes == code) for code in np.unique(codes)]
+    weighted = 0.0
+    total = 0
+    for index in slices:
+        panel_residual = residual[index]
+        if panel_residual.size < 2:
+            continue
+        numerator = float(np.sum(panel_residual[1:] * panel_residual[:-1]))
+        denominator = float(np.sum(panel_residual[:-1] ** 2))
+        if denominator <= 0:
+            continue
+        weighted += (numerator / denominator) * index.size
+        total += index.size
+    rho = weighted / total if total else 0.0
+    return rho, slices
+
+
+def _prais_winsten(
+    y: np.ndarray, X: np.ndarray, slices: list[np.ndarray], rho: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Transform every variable as ``xtgls.ado`` mc1 lines 793-808 does."""
+
+    scale = np.sqrt(max(1.0 - rho * rho, 0.0))
+    transformed_y = y.copy()
+    transformed_X = X.copy()
+    for index in slices:
+        first = index[0]
+        rest = index[1:]
+        transformed_y[first] = scale * y[first]
+        transformed_X[first] = scale * X[first]
+        if rest.size:
+            transformed_y[rest] = y[rest] - rho * y[rest - 1]
+            transformed_X[rest] = X[rest] - rho * X[rest - 1]
+    return transformed_y, transformed_X
 
 
 # -------------------------------------------------------------------- xtpcse

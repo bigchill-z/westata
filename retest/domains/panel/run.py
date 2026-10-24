@@ -598,21 +598,15 @@ with Stata() as st:
                "实际建议：panels(correlated) 只应在 m<T 时使用"],
     ))
 
-    try:
-        ws.XtGls.from_formula("y ~ x1 + x2", df, entity="id", time="t", corr="ar1").fit()
-        rec.error("xtgls, corr(ar1)", RuntimeError("未按预期抛 UnsupportedError"),
-                  command="xtgls y x1 x2, panels(heteroskedastic) corr(ar1)")
-    except Exception as exc:  # noqa: BLE001
-        cap_ar = st.estimate("xtgls y x1 x2, panels(heteroskedastic) corr(ar1)")
-        rec.error(
-            "xtgls, corr(ar1)", exc,
-            command="xtgls y x1 x2, panels(heteroskedastic) corr(ar1)",
-            notes=[f"Stata 侧成功且给出完全不同的估计：b={np.round(cap_ar.b, 8).tolist()}，"
-                   f"se={np.round(se_of(cap_ar), 8).tolist()}（相对 independent 口径，"
-                   f"x1 从 .887996 变 .839671）；westata 抛 UnsupportedError 明确拒绝",
-                   "处理方式可接受：没有把 corr(independent) 的数套上 ar1 标签。但功能缺口真实存在——"
-                   "Stata 能估的 xtgls 变体里，ar1/psar1 是常用项（动态面板/TSCS 数据）"],
-        )
+    cap_ar = st.estimate("xtgls y x1 x2, panels(heteroskedastic) corr(ar1)")
+    res_ar = ws.XtGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
+                                   panels="heteroskedastic", corr="ar1").fit()
+    rec.add(compare(
+        "xtgls, corr(ar1)", cap_ar, res_ar, domain=DOMAIN,
+        tolerance=EXACT, scalars=("N", "N_g", "chi2"),
+        notes=["共同 rho 按面板样本量加权合并（xtgls.ado mc1），Prais-Winsten 变换后走 GLS；"
+               "实测系数 6.6e-16、标准误 1.3e-16"],
+    ))
 
     # ---- 13. xtpcse
     cap = st.estimate("xtpcse y x1 x2")

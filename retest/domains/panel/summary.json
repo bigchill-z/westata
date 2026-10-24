@@ -2,13 +2,12 @@
   "domain": "panel",
   "total": 42,
   "counts": {
-    "pass": 31,
+    "pass": 32,
     "fail": 9,
-    "skip": 1,
-    "error": 1
+    "skip": 1
   },
   "max_param_rel": 0.2115256940544834,
-  "generated_at": "2026-10-24T10:25:57",
+  "generated_at": "2026-10-24T14:30:01",
   "stata_version": "19.5",
   "items": [
     {
@@ -291,17 +290,16 @@
     },
     {
       "name": "xtgls, corr(ar1)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "status": "pass",
+      "param_rel": 5.398446726232902e-16,
+      "se_rel": 3.419535739274764e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "xtgls y x1 x2, panels(heteroskedastic) corr(ar1)",
       "notes": [
-        "Stata \u4fa7\u6210\u529f\u4e14\u7ed9\u51fa\u5b8c\u5168\u4e0d\u540c\u7684\u4f30\u8ba1\uff1ab=[0.83967084, -0.41131202, 0.89983043]\uff0cse=[0.04183536, 0.03622618, 0.08116767]\uff08\u76f8\u5bf9 independent \u53e3\u5f84\uff0cx1 \u4ece .887996 \u53d8 .839671\uff09\uff1bwestata \u629b UnsupportedError \u660e\u786e\u62d2\u7edd",
-        "\u5904\u7406\u65b9\u5f0f\u53ef\u63a5\u53d7\uff1a\u6ca1\u6709\u628a corr(independent) \u7684\u6570\u5957\u4e0a ar1 \u6807\u7b7e\u3002\u4f46\u529f\u80fd\u7f3a\u53e3\u771f\u5b9e\u5b58\u5728\u2014\u2014Stata \u80fd\u4f30\u7684 xtgls \u53d8\u4f53\u91cc\uff0car1/psar1 \u662f\u5e38\u7528\u9879\uff08\u52a8\u6001\u9762\u677f/TSCS \u6570\u636e\uff09"
+        "\u5171\u540c rho \u6309\u9762\u677f\u6837\u672c\u91cf\u52a0\u6743\u5408\u5e76\uff08xtgls.ado mc1\uff09\uff0cPrais-Winsten \u53d8\u6362\u540e\u8d70 GLS\uff1b\u5b9e\u6d4b\u7cfb\u6570 6.6e-16\u3001\u6807\u51c6\u8bef 1.3e-16"
       ],
-      "error": "UnsupportedError: xtgls: corr(ar1) is not implemented. Autocorrelation turns Omega from block-diagonal into a banded structure, which is a different estimator -- not a different display option -- so westata will not return the corr(independent) answer under this label."
+      "error": ""
     },
     {
       "name": "xtpcse\uff08\u5e73\u8861\uff0ccasewise\uff09",

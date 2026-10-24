@@ -1,16 +1,16 @@
 {
   "total": 386,
   "status_counts": {
-    "pass": 283,
+    "pass": 284,
     "fail": 84,
     "skip": 11,
-    "error": 8
+    "error": 7
   },
   "tier_counts": {
-    "A": 247,
+    "A": 248,
     "B": 56,
     "D": 9,
-    "NA": 35,
+    "NA": 34,
     "C": 21,
     "E": 7
   },
@@ -60,14 +60,13 @@
     },
     "panel": {
       "counts": {
-        "pass": 31,
+        "pass": 32,
         "fail": 9,
-        "skip": 1,
-        "error": 1
+        "skip": 1
       },
       "tiers": {
-        "A": 31,
-        "NA": 3,
+        "A": 32,
+        "NA": 2,
         "E": 1,
         "B": 5,
         "C": 2
@@ -9320,23 +9319,38 @@
         "domain": "panel",
         "name": "xtgls, corr(ar1)",
         "stata_command": "xtgls y x1 x2, panels(heteroskedastic) corr(ar1)",
-        "status": "error",
+        "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": NaN,
-        "se_rel": NaN,
-        "n_params": 0,
+        "param_rel": 5.398446726232902e-16,
+        "se_rel": 3.419535739274764e-16,
+        "n_params": 3,
         "mismatched": [],
-        "scalars": {},
+        "scalars": {
+          "N": {
+            "stata": 180.0,
+            "westata": 180.0,
+            "rel": 0.0
+          },
+          "N_g": {
+            "stata": 30.0,
+            "westata": 30.0,
+            "rel": 0.0
+          },
+          "chi2": {
+            "stata": 532.4795218724493,
+            "westata": 532.4795218724493,
+            "rel": 0.0
+          }
+        },
         "extra": {},
         "notes": [
-          "Stata 侧成功且给出完全不同的估计：b=[0.83967084, -0.41131202, 0.89983043]，se=[0.04183536, 0.03622618, 0.08116767]（相对 independent 口径，x1 从 .887996 变 .839671）；westata 抛 UnsupportedError 明确拒绝",
-          "处理方式可接受：没有把 corr(independent) 的数套上 ar1 标签。但功能缺口真实存在——Stata 能估的 xtgls 变体里，ar1/psar1 是常用项（动态面板/TSCS 数据）"
+          "共同 rho 按面板样本量加权合并（xtgls.ado mc1），Prais-Winsten 变换后走 GLS；实测系数 6.6e-16、标准误 1.3e-16"
         ],
-        "error": "UnsupportedError: xtgls: corr(ar1) is not implemented. Autocorrelation turns Omega from block-diagonal into a banded structure, which is a different estimator -- not a different display option -- so westata will not return the corr(independent) answer under this label.",
+        "error": "",
         "stata_version": "19.5",
         "seconds": 0.0,
-        "param_tier": "NA",
-        "se_tier": "NA"
+        "param_tier": "A",
+        "se_tier": "A"
       },
       {
         "domain": "panel",

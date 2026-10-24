@@ -475,9 +475,55 @@ def test_xtgls_reports_panel_counts() -> None:
     assert result.e["n_cr"] == 0
 
 
-def test_xtgls_rejects_autocorrelation() -> None:
-    with pytest.raises(UnsupportedError, match="corr"):
-        XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year", corr="ar1")
+def test_xtgls_implements_common_ar1() -> None:
+    """corr(ar1) estimates one common rho by Prais-Winsten, as xtgls.ado mc1 does.
+
+    Reference values from a live Stata session on a panel with a persistent error component
+    (25 panels x 8 periods, rho near 0.6). A wrong pooling of the per-panel rho, or a transform applied to
+    the wrong lag, moves these by percent rather than by rounding.
+    """
+
+    rng = np.random.default_rng(20261024)
+    rows = []
+    for unit in range(25):
+        previous = 0.0
+        for period in range(8):
+            x1 = rng.normal()
+            x2 = rng.normal()
+            previous = 0.6 * previous + rng.normal()
+            rows.append(
+                {
+                    "id": unit + 1,
+                    "t": period + 1,
+                    "y": 1.0 + 0.9 * x1 - 0.5 * x2 + previous,
+                    "x1": x1,
+                    "x2": x2,
+                }
+            )
+    frame = pd.DataFrame(rows)
+
+    result = XtGls.from_formula(
+        "y ~ x1 + x2", frame, entity="id", time="t", panels="heteroskedastic", corr="ar1"
+    ).fit()
+
+    # Stata order is [x1, x2, _cons]; ours is [Intercept, x1, x2].
+    order = [1, 2, 0]
+    expected_b = np.array([1.00324383, -0.50042969, 0.7543882])
+    expected_se = np.array([0.05702042, 0.05539722, 0.09195306])
+    np.testing.assert_allclose(np.asarray(result.params, dtype=float)[order], expected_b, rtol=1e-6)
+    np.testing.assert_allclose(np.asarray(result.bse, dtype=float)[order], expected_se, rtol=1e-6)
+
+
+def test_xtgls_rejects_panel_specific_ar1() -> None:
+    """corr(psar1) is still unimplemented, and must say so rather than reuse the common rho.
+
+    `xtgls.ado` mc2 estimates a separate coefficient per panel, which gives Omega a different block
+    structure. Returning the ar1 answer under a psar1 label would be a wrong estimate wearing a right name --
+    the failure mode this module's rejections exist to prevent.
+    """
+
+    with pytest.raises(UnsupportedError, match="psar1"):
+        XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year", corr="psar1")
 
 
 def test_xtgls_rejects_unknown_panel_specification() -> None:

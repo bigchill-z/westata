@@ -15,6 +15,20 @@ Nothing yet.
 
 ## [0.0.1] — first release
 
+> **发布事实。** 这一版确实上传到了 PyPI 正式渠道，但**并非按计划发布**：执行者本意是发
+> TestPyPI 做流程验证，而手上的 token 属于 pypi.org 而非 test.pypi.org，认证通过后 twine 直接
+> 传到了正式渠道。更关键的是，首次收到 403 之后改用正式端点做"认证试探"——twine 没有 dry-run，
+> 任何调用都是真实上传。
+>
+> **影响。** `0.0.1` 这个版本号被永久占用（PyPI 不允许删除或覆盖）。**内容本身没有问题**：
+> README 顶部就是实测偏差表，许可证、依赖声明、测试与 CI 均完整。因此保留 `0.0.1`，后续修复走
+> `0.0.2`。
+>
+> **为什么记在这里。** 发布记录应当说明"这一版是怎么出去的"。让后来看到 `0.0.1` 的人自己猜，
+> 不如直接写明。同时这也是一条流程备忘：**在确认渠道之前，不要用真实 token 调用 twine。**
+
+
+
 The first tagged version. Everything below is the initial state of the library,
 not a diff against an earlier release.
 

@@ -1,3 +1,9 @@
 include CHANGELOG.md
 include LICENSE
 include README.md
+include README.zh-CN.md
+include docs/GUIDE.md
+include docs/GUIDE.zh-CN.md
+include docs/comparison.json
+include docs/data/*.csv
+recursive-include docs *.py

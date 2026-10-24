@@ -1,0 +1,753 @@
+[
+  {
+    "command": "regress",
+    "dataset": "auto",
+    "stata_command": "regress price weight mpg foreign",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": 3.464705829621025,
+        "ours_b": 3.464705829621019,
+        "stata_se": 0.630748957649892,
+        "ours_se": 0.6307489576498965
+      },
+      {
+        "name": "mpg",
+        "stata_b": 21.853603820183753,
+        "ours_b": 21.85360382018307,
+        "stata_se": 74.22113859357229,
+        "ours_se": 74.22113859357283
+      },
+      {
+        "name": "foreign",
+        "stata_b": 3673.0603782488915,
+        "ours_b": 3673.060378248886,
+        "stata_se": 683.9782706935642,
+        "ours_se": 683.9782706935648
+      },
+      {
+        "name": "Intercept",
+        "stata_b": -5853.6956555757715,
+        "ours_b": -5853.695655575733,
+        "stata_se": 3376.9874248149486,
+        "ours_se": 3376.9874248149745
+      }
+    ],
+    "rel_b": 3.1213205471387586e-14,
+    "rel_se": 7.675657543186986e-15,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "regress vce(robust)",
+    "dataset": "auto",
+    "stata_command": "regress price weight mpg, vce(robust)",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": 1.7465591583457596,
+        "ours_b": 1.7465591583457538,
+        "stata_se": 0.7778369564253469,
+        "ours_se": 0.7778369564253396
+      },
+      {
+        "name": "mpg",
+        "stata_b": -49.51222066635521,
+        "ours_b": -49.512220666356015,
+        "stata_se": 95.80740087209246,
+        "ours_se": 95.80740087209236
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1946.0686679648543,
+        "ours_b": 1946.0686679648934,
+        "stata_se": 4213.792651430828,
+        "ours_se": 4213.792651430813
+      }
+    ],
+    "rel_b": 2.009603916861489e-14,
+    "rel_se": 9.420318618184978e-15,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "regress i.foreign",
+    "dataset": "auto",
+    "stata_command": "regress price weight i.foreign",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": 3.320736770752476,
+        "ours_b": 3.320736770752319,
+        "stata_se": 0.3958784154184261,
+        "ours_se": 0.3958784154184263
+      },
+      {
+        "name": "C(foreign)[T.1]",
+        "stata_b": 3637.0012958780367,
+        "ours_b": 3637.001295878037,
+        "stata_se": 668.5829516355919,
+        "ours_se": 668.5829516355919
+      },
+      {
+        "name": "Intercept",
+        "stata_b": -4942.843953597976,
+        "ours_b": -4942.84395360133,
+        "stata_se": 1345.5909353847046,
+        "ours_se": 1345.590935384705
+      }
+    ],
+    "rel_b": 6.786005165501878e-13,
+    "rel_se": 4.206681829767226e-16,
+    "nobs_stata": 74,
+    "nobs_ours": 74,
+    "note": "Stata labels the level `1.foreign`; the CSV stores 0/1 so our label is `C(foreign)[T.1]`. The estimates agree."
+  },
+  {
+    "command": "qreg median",
+    "dataset": "auto",
+    "stata_command": "qreg price weight length, q(.5)",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": 1.2311393805309723,
+        "ours_b": 1.2311393805309547,
+        "stata_se": 1.53529588155849,
+        "ours_se": 1.5352958814523638
+      },
+      {
+        "name": "length",
+        "stata_b": -8.129977876106167,
+        "ours_b": -8.129977876105615,
+        "stata_se": 53.58860450573733,
+        "ours_se": 53.588604501369026
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 2982.599557522122,
+        "ours_b": 2982.5995575220704,
+        "stata_se": 5893.313893557088,
+        "ours_se": 5893.313893091458
+      }
+    ],
+    "rel_b": 6.795184260920412e-14,
+    "rel_se": 8.151552168423593e-11,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "rreg",
+    "dataset": "auto",
+    "stata_command": "rreg price weight length, nolog",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": -0.6670513483475301,
+        "ours_b": -0.6670513483475207,
+        "stata_se": 0.5687771336475582,
+        "ours_se": 0.5687771336329693
+      },
+      {
+        "name": "length",
+        "stata_b": 37.72364883512863,
+        "ours_b": 37.72364883512828,
+        "stata_se": 19.852833081272518,
+        "ours_se": 19.852833080735756
+      },
+      {
+        "name": "Intercept",
+        "stata_b": -93.82767292304288,
+        "ours_b": -93.82767292301033,
+        "stata_se": 2183.280906518225,
+        "ours_se": 2183.280906466756
+      }
+    ],
+    "rel_b": 3.4698791026428825e-13,
+    "rel_se": 2.703703516592346e-11,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "sureg",
+    "dataset": "auto",
+    "stata_command": "sureg (price weight mpg) (mpg weight foreign)",
+    "rows": [
+      {
+        "name": "price:weight",
+        "stata_b": 1.3352509834462527,
+        "ours_b": 1.335250983445929,
+        "stata_se": 0.626362621532964,
+        "ours_se": 0.6263626215329628
+      },
+      {
+        "name": "price:mpg",
+        "stata_b": -117.96447783477942,
+        "ours_b": -117.9644778348473,
+        "stata_se": 84.00853314592578,
+        "ours_se": 84.00853314592527
+      },
+      {
+        "name": "price:_cons",
+        "stata_b": 4645.845099005136,
+        "ours_b": 4645.845099007579,
+        "stata_se": 3509.114600326026,
+        "ours_se": 3509.114600326009
+      },
+      {
+        "name": "mpg:weight",
+        "stata_b": -0.006746266877007079,
+        "ours_b": -0.006746266877006995,
+        "stata_se": 0.000623070875730692,
+        "ours_se": 0.000623070875730691
+      },
+      {
+        "name": "mpg:foreign",
+        "stata_b": -2.1012249512425,
+        "ours_b": -2.101224951242406,
+        "stata_se": 1.0491741348785735,
+        "ours_se": 1.0491741348785733
+      },
+      {
+        "name": "mpg:_cons",
+        "stata_b": 42.29206513413237,
+        "ours_b": 42.29206513413211,
+        "stata_se": 2.116824119113547,
+        "ours_se": 2.1168241191135433
+      }
+    ],
+    "rel_b": 5.754719914040546e-13,
+    "rel_se": 6.089747679067565e-15,
+    "nobs_stata": 74,
+    "nobs_ours": 148,
+    "note": "Stata repeats each name once per equation, so positions are used."
+  },
+  {
+    "command": "sureg vce(robust)",
+    "dataset": "auto",
+    "stata_command": "sureg (price weight mpg) (mpg weight foreign), vce(robust)",
+    "rows": [
+      {
+        "name": "price:weight",
+        "stata_b": 1.3352509834462527,
+        "ours_b": 1.335250983445929,
+        "stata_se": 0.7599374481423559,
+        "ours_se": 0.7599374481423714
+      },
+      {
+        "name": "price:mpg",
+        "stata_b": -117.96447783477942,
+        "ours_b": -117.9644778348473,
+        "stata_se": 91.70326702558535,
+        "ours_se": 91.70326702558658
+      },
+      {
+        "name": "price:_cons",
+        "stata_b": 4645.845099005136,
+        "ours_b": 4645.845099007579,
+        "stata_se": 4053.055856185272,
+        "ours_se": 4053.0558561853463
+      },
+      {
+        "name": "mpg:weight",
+        "stata_b": -0.006746266877007079,
+        "ours_b": -0.006746266877006995,
+        "stata_se": 0.000531370128943495,
+        "ours_se": 0.0005313701289434844
+      },
+      {
+        "name": "mpg:foreign",
+        "stata_b": -2.1012249512425,
+        "ours_b": -2.101224951242406,
+        "stata_se": 1.0926504005239666,
+        "ours_se": 1.0926504005239526
+      },
+      {
+        "name": "mpg:_cons",
+        "stata_b": 42.29206513413237,
+        "ours_b": 42.29206513413211,
+        "stata_se": 1.7465661169338826,
+        "ours_se": 1.74656611693386
+      }
+    ],
+    "rel_b": 5.754719914040546e-13,
+    "rel_se": 2.0453160168309753e-14,
+    "nobs_stata": 74,
+    "nobs_ours": 148
+  },
+  {
+    "command": "logit",
+    "dataset": "auto",
+    "stata_command": "logit hi weight length",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": -0.0007593003302096569,
+        "ours_b": -0.0007593003307169871,
+        "stata_se": 0.001423994446612812,
+        "ours_se": 0.0014239944601817437
+      },
+      {
+        "name": "length",
+        "stata_b": -0.10054784279086795,
+        "ours_b": -0.10054784466884752,
+        "stata_se": 0.051865486171532534,
+        "ours_se": 0.05186548672650857
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 21.109310766701487,
+        "ours_b": 21.109311126074918,
+        "stata_se": 6.462645890345379,
+        "ours_se": 6.462645974351015
+      }
+    ],
+    "rel_b": 1.8677472448920915e-08,
+    "rel_se": 1.2998644463951244e-08,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "probit",
+    "dataset": "auto",
+    "stata_command": "probit hi weight length",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": -0.00031371403036996553,
+        "ours_b": -0.00031371403037329853,
+        "stata_se": 0.0007026668138880118,
+        "ours_se": 0.0007026668138887648
+      },
+      {
+        "name": "length",
+        "stata_b": -0.057869104004994495,
+        "ours_b": -0.057869104005204126,
+        "stata_se": 0.026270423409739244,
+        "ours_se": 0.026270423409778386
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 11.816156703576787,
+        "ours_b": 11.816156703629371,
+        "stata_se": 3.2495906342476304,
+        "ours_se": 3.24959063425536
+      }
+    ],
+    "rel_b": 1.0624325933448622e-11,
+    "rel_se": 2.3787047836688067e-12,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "poisson",
+    "dataset": "auto",
+    "stata_command": "poisson gear_ratio weight",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": -0.00014941958997144835,
+        "ours_b": -0.00014941958997162507,
+        "stata_se": 8.774112833181004e-05,
+        "ours_se": 8.774112833182332e-05
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1.5481140199984411,
+        "ours_b": 1.5481140199986874,
+        "stata_se": 0.2657715183943349,
+        "ours_se": 0.265771518394366
+      }
+    ],
+    "rel_b": 1.1827428662393363e-12,
+    "rel_se": 1.513711627085642e-13,
+    "nobs_stata": 74,
+    "nobs_ours": 74
+  },
+  {
+    "command": "tobit",
+    "dataset": "auto",
+    "stata_command": "tobit rep78 weight length, ll(0)",
+    "rows": [
+      {
+        "name": "weight",
+        "stata_b": -0.0007198789353365499,
+        "ours_b": -0.0007198789353365503,
+        "stata_se": 0.00043118193537737104,
+        "ours_se": 0.00043118193537727156
+      },
+      {
+        "name": "length",
+        "stata_b": 0.008090822231788206,
+        "ours_b": 0.008090822231788215,
+        "stata_se": 0.015028673654035984,
+        "ours_se": 0.015028673654032078
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 4.065071154005322,
+        "ours_b": 4.065071154005322,
+        "stata_se": 1.6478420331890586,
+        "ours_se": 1.6478420331886536
+      }
+    ],
+    "rel_b": 1.0720316342887962e-15,
+    "rel_se": 2.599429169752877e-13,
+    "nobs_stata": 74,
+    "nobs_ours": 69,
+    "note": "Stata stores var(e.rep78) = 0.807583; our /sigma = 0.898656 and 0.898656^2 = 0.807583. Slopes match to 1e-15.",
+    "sigma_stata_variance": 0.807583,
+    "sigma_ours_stddev": 0.8986562876965507
+  },
+  {
+    "command": "logit vce(robust) [convention]",
+    "dataset": "auto",
+    "stata_command": "logit hi weight, vce(robust)",
+    "convention_note": true,
+    "stata_se_weight": 0.0009007456261767262,
+    "ours_hc1_se_weight": 0.000906979235574961,
+    "ours_hc0_se_weight": 0.0008946388070130641,
+    "rel_hc1": 0.006920499214294012,
+    "rel_hc0": 0.006779737792991464,
+    "predicted_ratio": 1.0069204977995476,
+    "observed_ratio": 1.006920499214294
+  },
+  {
+    "command": "ivregress 2sls",
+    "dataset": "sim",
+    "stata_command": "ivregress 2sls y_iv w (x_endog = z1 z2)",
+    "rows": [
+      {
+        "name": "x_endog",
+        "stata_b": 2.0928272295987074,
+        "ours_b": 2.092827229598706,
+        "stata_se": 0.051987304547622744,
+        "ours_se": 0.051987304547622744
+      },
+      {
+        "name": "w",
+        "stata_b": 0.5002117913265458,
+        "ours_b": 0.500211791326546,
+        "stata_se": 0.0364442317587349,
+        "ours_se": 0.03644423175873494
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1.0301269543228546,
+        "ours_b": 1.0301269543228475,
+        "stata_se": 0.03853989339757531,
+        "ours_se": 0.038539893397575076
+      }
+    ],
+    "rel_b": 6.897622984995763e-15,
+    "rel_se": 6.121511294779256e-15,
+    "nobs_stata": 600,
+    "nobs_ours": 600
+  },
+  {
+    "command": "heckman twostep",
+    "dataset": "sim",
+    "stata_command": "heckman y_sel w, select(observed = z1 z2) twostep",
+    "rows": [
+      {
+        "name": "y:w",
+        "stata_b": 1.159484099253924,
+        "ours_b": 1.1594840992539241,
+        "stata_se": 0.056716988491860465,
+        "ours_se": 0.056716988493073744
+      },
+      {
+        "name": "y:Intercept",
+        "stata_b": 1.0615865342858632,
+        "ours_b": 1.061586534285866,
+        "stata_se": 0.10898786145603104,
+        "ours_se": 0.10898786191223529
+      },
+      {
+        "name": "select:z1",
+        "stata_b": 0.8260395336785286,
+        "ours_b": 0.8260395336785367,
+        "stata_se": 0.07739636535898452,
+        "ours_se": 0.07739637074723042
+      },
+      {
+        "name": "select:z2",
+        "stata_b": -0.528089243384931,
+        "ours_b": -0.5280892433849357,
+        "stata_se": 0.06525157615656611,
+        "ours_se": 0.06525157928951712
+      },
+      {
+        "name": "select:Intercept",
+        "stata_b": 0.39406013466943446,
+        "ours_b": 0.3940601346694387,
+        "stata_se": 0.060827575550624326,
+        "ours_se": 0.06082757746126024
+      },
+      {
+        "name": "lambda",
+        "stata_b": 0.6310222149620305,
+        "ours_b": 0.6310222149620264,
+        "stata_se": 0.1786437027744887,
+        "ours_se": 0.17864370349190173
+      }
+    ],
+    "rel_b": 1.0706100725247589e-14,
+    "rel_se": 6.961884941265063e-08,
+    "nobs_stata": 600,
+    "nobs_ours": 354,
+    "note": "Stata reports a Mills-ratio coefficient and two `_cons`; positions are used."
+  },
+  {
+    "command": "etregress twostep",
+    "dataset": "sim",
+    "stata_command": "etregress y_treat w, treat(treated = z1 z2) twostep",
+    "rows": [
+      {
+        "name": "y:w",
+        "stata_b": 0.8854505560473456,
+        "ours_b": 0.8854505560473456,
+        "stata_se": 0.04264076704108019,
+        "ours_se": 0.042640767041080455
+      },
+      {
+        "name": "y:treated",
+        "stata_b": 1.3594996161972066,
+        "ours_b": 1.359499616197205,
+        "stata_se": 0.1868684707284004,
+        "ours_se": 0.18686847072819449
+      },
+      {
+        "name": "y:Intercept",
+        "stata_b": 1.14523925016214,
+        "ours_b": 1.1452392501621398,
+        "stata_se": 0.12438933578902941,
+        "ours_se": 0.1243893357889468
+      },
+      {
+        "name": "treat:z1",
+        "stata_b": 0.8247960006376698,
+        "ours_b": 0.8247960006376831,
+        "stata_se": 0.07556662354480574,
+        "ours_se": 0.07556662354361715
+      },
+      {
+        "name": "treat:z2",
+        "stata_b": -0.4380828094394436,
+        "ours_b": -0.43808280943941746,
+        "stata_se": 0.06418698054789217,
+        "ours_se": 0.06418698054963101
+      },
+      {
+        "name": "treat:Intercept",
+        "stata_b": 0.46625764002800885,
+        "ours_b": 0.46625764002801223,
+        "stata_se": 0.061243203452528136,
+        "ours_se": 0.0612432034534377
+      }
+    ],
+    "rel_b": 5.968221456435984e-14,
+    "rel_se": 2.709030965646241e-11,
+    "nobs_stata": 600,
+    "nobs_ours": 600
+  },
+  {
+    "command": "nbreg",
+    "dataset": "sim",
+    "stata_command": "nbreg count w",
+    "rows": [
+      {
+        "name": "w",
+        "stata_b": 0.6634965543055414,
+        "ours_b": 0.6634965530514864,
+        "stata_se": 0.04272214975535807,
+        "ours_se": 0.042722149719582096
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 0.4538139093406505,
+        "ours_b": 0.4538139112166256,
+        "stata_se": 0.045784441035471225,
+        "ours_se": 0.04578444100604912
+      }
+    ],
+    "rel_b": 4.13379814693844e-09,
+    "rel_se": 8.374103987547145e-10,
+    "nobs_stata": 600,
+    "nobs_ours": 600,
+    "note": "e(b) is on the lnalpha scale in both; alpha = exp(lnalpha)."
+  },
+  {
+    "command": "nbreg dispersion(constant)",
+    "dataset": "sim",
+    "stata_command": "nbreg count w, dispersion(constant)",
+    "rows": [
+      {
+        "name": "w",
+        "stata_b": 0.5952741930142404,
+        "ours_b": 0.5952741930148349,
+        "stata_se": 0.038095704605916055,
+        "ours_se": 0.03809570460555071
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 0.4996785731490991,
+        "ours_b": 0.49967857314851255,
+        "stata_se": 0.048636329272490036,
+        "ours_se": 0.04863632927473741
+      }
+    ],
+    "rel_b": 1.1738162399340171e-12,
+    "rel_se": 4.6207761360858926e-11,
+    "nobs_stata": 600,
+    "nobs_ours": 600,
+    "note": "NB1: Var = mu(1 + delta*mu). Both sides store lndelta."
+  },
+  {
+    "command": "xtreg, fe",
+    "dataset": "panel",
+    "stata_command": "xtreg y x1 x2, fe",
+    "rows": [
+      {
+        "name": "x1",
+        "stata_b": 1.4872570916734216,
+        "ours_b": 1.487257091673421,
+        "stata_se": 0.03864462640888261,
+        "ours_se": 0.03864462640888261
+      },
+      {
+        "name": "x2",
+        "stata_b": -0.7551388425166677,
+        "ours_b": -0.7551388425166674,
+        "stata_se": 0.022868423382657304,
+        "ours_se": 0.02286842338265731
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1.842559819441306,
+        "ours_b": 1.8425598194413064,
+        "stata_se": 0.021762330240045157,
+        "ours_se": 0.021762330240045164
+      }
+    ],
+    "rel_b": 4.478941929438562e-16,
+    "rel_se": 3.1884884694649457e-16,
+    "nobs_stata": 1600,
+    "nobs_ours": 1600
+  },
+  {
+    "command": "xtreg, re",
+    "dataset": "panel",
+    "stata_command": "xtreg y x1 x2, re",
+    "rows": [
+      {
+        "name": "x1",
+        "stata_b": 1.4843809771878003,
+        "ours_b": 1.484380977187802,
+        "stata_se": 0.035526916208687045,
+        "ours_se": 0.035526916208687045
+      },
+      {
+        "name": "x2",
+        "stata_b": -0.7584868077519759,
+        "ours_b": -0.758486807751976,
+        "stata_se": 0.022700731097627103,
+        "ours_se": 0.022700731097627103
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1.8425314080475106,
+        "ours_b": 1.8425314080475106,
+        "stata_se": 0.07229521854081643,
+        "ours_se": 0.07229521854081636
+      }
+    ],
+    "rel_b": 1.1966987361732473e-15,
+    "rel_se": 9.597998379366775e-16,
+    "nobs_stata": 1600,
+    "nobs_ours": 1600
+  },
+  {
+    "command": "xtreg, be",
+    "dataset": "panel",
+    "stata_command": "xtreg y x1 x2, be",
+    "rows": [
+      {
+        "name": "x1",
+        "stata_b": 1.4640776301480902,
+        "ours_b": 1.4640776301480902,
+        "stata_se": 0.0904402740209294,
+        "ours_se": 0.09044027402092937
+      },
+      {
+        "name": "x2",
+        "stata_b": -0.991183900259502,
+        "ours_b": -0.9911839002595023,
+        "stata_se": 0.18985872808314597,
+        "ours_se": 0.18985872808314594
+      },
+      {
+        "name": "Intercept",
+        "stata_b": 1.8385288611587292,
+        "ours_b": 1.8385288611587298,
+        "stata_se": 0.07239053302943177,
+        "ours_se": 0.07239053302943177
+      }
+    ],
+    "rel_b": 3.623189327336773e-16,
+    "rel_se": 3.068939796578437e-16,
+    "nobs_stata": 1600,
+    "nobs_ours": 200
+  },
+  {
+    "command": "xtlogit, fe",
+    "dataset": "panel",
+    "stata_command": "xtlogit binary x1 x2, fe",
+    "rows": [
+      {
+        "name": "x1",
+        "stata_b": 0.9643481997762734,
+        "ours_b": 0.9643482478466538,
+        "stata_se": 0.1122940975212194,
+        "ours_se": 0.11229048927590218
+      },
+      {
+        "name": "x2",
+        "stata_b": -0.6155301523481742,
+        "ours_b": -0.6155301905159071,
+        "stata_se": 0.06679084261563654,
+        "ours_se": 0.06678999359535669
+      }
+    ],
+    "rel_b": 6.200790118490792e-08,
+    "rel_se": 3.2132101302397755e-05,
+    "nobs_stata": 1600,
+    "nobs_ours": 1488,
+    "note": "Conditional logit: the intercept is conditioned out, so only slopes compare."
+  },
+  {
+    "command": "xtpoisson, fe",
+    "dataset": "panel",
+    "stata_command": "xtpoisson count x1 x2, fe",
+    "rows": [
+      {
+        "name": "x1",
+        "stata_b": 0.4878093781028949,
+        "ours_b": 0.4878093600351763,
+        "stata_se": 0.03574819113438547,
+        "ours_se": 0.035746119279829416
+      },
+      {
+        "name": "x2",
+        "stata_b": -0.2964989704682144,
+        "ours_b": -0.2964989666013381,
+        "stata_se": 0.0215753918904899,
+        "ours_se": 0.02157489697257562
+      }
+    ],
+    "rel_b": 3.703848144389928e-08,
+    "rel_se": 5.795690607845526e-05,
+    "nobs_stata": 1600,
+    "nobs_ours": 1592,
+    "note": "Conditional Poisson: only slopes compare."
+  }
+]

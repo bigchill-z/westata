@@ -77,7 +77,8 @@
   notes: "Coefficients agree to ~1e-7. The limit is the optimiser path, not the formula: Stata's Newton and statsmodels' converge to the same optimum but stop at slightly different points on a flat likelihood."
 
 - command: probit
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'probit (default)' param_rel 1.7893627582559776e-09 se_rel 3.2455261118284266e-10
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -86,8 +87,10 @@
   date: 2026-10-22
   notes: "Measured 1.5e-7; same optimiser-path limit as logit."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: poisson
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'poisson (default)' param_rel 2.908420092415673e-08 se_rel 5.259343426552272e-09
   tolerance: 1.0e-9
   sources:
     - type: r_crosscheck
@@ -96,6 +99,7 @@
   date: 2026-10-22
   notes: "Coefficients and standard errors match at 3.9e-13."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: test
   level: E3
   tolerance: 1.0e-12
@@ -119,7 +123,8 @@
   date: 2026-10-23
   notes: "Was E2 because the comparison used Stata's printed estimate and standard error, which show six decimals. Against full-precision r(estimate) and r(se) the agreement is at the 1e-12 level for both a single coefficient and a linear combination with two terms. Reproduces [R] lincom semantics including level() and eform. Same under-grading pattern as test: the reference was the bottleneck, not the arithmetic."
 - command: tobit
-  level: E3
+  level: E2
+  # retest: worst tier B over 3 row(s); example 'tobit ul(2.5)' param_rel 4.925193387779237e-09 se_rel 6.847302660765614e-10
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -130,8 +135,10 @@
   date: 2026-10-22
   notes: "Slopes 8.5e-8, standard errors 6.4e-7. Stata reports var(e.y) = sigma^2 in e(b); westata reports /sigma, so that parameter is compared squared. The self-implemented likelihood is confirmed correct against real Stata, which is the outcome that mattered most for this estimator."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 3 rows; see retest/REPORT.md"
 - command: arima
-  level: E3
+  level: E1
+  # retest: worst tier D over 5 row(s); example 'arima: ARIMA(1,0,0) with constant' param_rel 0.002735324020059039 se_rel 6.678050578344794e-05
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -145,8 +152,10 @@
 
 # --- P5: postestimation completion -----------------------------------------
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 5 rows; see retest/REPORT.md"
 - command: nlcom
-  level: E3
+  level: E2
+  # retest: worst tier C over 4 row(s); example 'nlcom: ratio _b[weight]/_b[foreign] (z interval after regress)' param_rel 1.3358048350376703e-05 se_rel nan
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -157,6 +166,7 @@
   date: 2026-10-23
   notes: "Delta method G V G' with central differences. Stata's nlcom reports z / P>|z| and a NORMAL interval even after regress -- the fixture's [6.652973, 7.943221] is est -/+ 1.959964*se, while a t(196) interval would be [6.648965, 7.947229]. westata follows Stata, so nlcom and lincom agree on the estimate and standard error but not on the p-value or interval. An earlier draft used the model's t distribution and was wrong for this reason."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 4 rows; see retest/REPORT.md"
 - command: testnl
   level: E3
   tolerance: 1.0e-6
@@ -227,7 +237,8 @@
 # --- P6: limited dependent variables ---------------------------------------
 
 - command: truncreg
-  level: E3
+  level: E2
+  # retest: worst tier C over 3 row(s); example 'truncreg ll(0)' param_rel 1.050389859181819e-07 se_rel 6.7444680034730514e-06
   tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
@@ -236,8 +247,10 @@
   date: 2026-10-23
   notes: "Self-implemented truncated likelihood; verified against Stata's coefficients and scale. With very wide limits it reduces to OLS, which is pinned by a unit test."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 3 rows; see retest/REPORT.md"
 - command: intreg
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'intreg interval model' param_rel 2.8756986788692447e-09 se_rel 2.01359421059846e-06
   tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
@@ -246,8 +259,10 @@
   date: 2026-10-23
   notes: "Reports /lnsigma like Stata, not /sigma. With point intervals (lo == hi == y) it reduces to OLS."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: heckman
-  level: E3
+  level: E1
+  # retest: worst tier E over 1 row(s); example 'heckman twostep' param_rel 1.335456767496874e-09 se_rel 0.0681304934971832
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
@@ -256,8 +271,10 @@
   date: 2026-10-23
   notes: "TWO-STEP estimator with the Heckman correction applied to the standard errors (e(se_corrected) = 1). The corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. The correction is validated independently against a 400-rep row bootstrap. e(lambda) follows Stata's definition rho*sigma (verified: .2849988 * 1.003876 = .2861035); westata reports .287883, 0.6% from Stata, and keeps the generated-regressor coefficient in e(lam_coef). rho itself remains a plug-in value rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md"
 - command: etregress
-  level: E3
+  level: E1
+  # retest: worst tier E over 1 row(s); example 'etregress twostep' param_rel 3.843095865258807e-11 se_rel 0.06768776946288786
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -265,8 +282,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Control-function (two-step) only; method='ml' raises UnsupportedError. THE FIRST COMPARISON HERE WAS MISLEADING: I diffed against Stata's DEFAULT, which is maximum likelihood, and the treatment effect came out 5.3e-2 apart. That measured the difference between two estimators, not a defect. Stata exposes the two-step version as 'etregress, twostep', and against that the agreement is 1e-9 on every parameter including lambda. Recording the near-miss because a gap of that size looks like a bug and the temptation is to go tune the implementation."
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md"
 - command: zip
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'zip, inflate(x1 x2)' param_rel 2.456636982346205e-08 se_rel 5.776027223519115e-08
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -275,8 +294,10 @@
   date: 2026-10-23
   notes: "All four coefficients match Stata to 1e-4. With inflate=None the model reduces exactly to Poisson, which is pinned by a unit test."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: zinb
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'zinb, inflate(x1 x2)' param_rel 5.920331184243938e-06 se_rel 3.7340996171523396e-07
   tolerance: 1.0e-2
   sources:
     - type: r_crosscheck
@@ -285,8 +306,10 @@
   date: 2026-10-23
   notes: "chi2 and ll reproduce Stata exactly. The dispersion is reported as /lnalpha. The inflation intercept is weakly identified in this DGP (westata -13.24 vs Stata -14.07, both with SE in the hundreds), so only finiteness is asserted for it."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: ztp
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'ztp (zero-truncated Poisson)' param_rel 3.601383762698406e-08 se_rel 1.59508038325381e-08
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
@@ -295,8 +318,10 @@
   date: 2026-10-23
   notes: "Self-implemented zero-truncated likelihood; log-likelihood is also asserted against the closed form."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: tnbreg
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'tnbreg (truncated NB2)' param_rel 8.980830333363245e-07 se_rel 2.153191628376676e-07
   tolerance: 5.0e-2
   sources:
     - type: r_crosscheck
@@ -308,8 +333,10 @@
 
 # --- P8: quantile and robust regression ------------------------------------
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: qreg
-  level: E3
+  level: E2
+  # retest: worst tier B over 2 row(s); example 'qreg median' param_rel 4.56416242764477e-09 se_rel 5.146118833326171e-09
   tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
@@ -320,8 +347,10 @@
   date: 2026-10-23
   notes: "Coefficients, standard errors and Pseudo R2 all reproduce Stata to the printed precision at all four quantiles. The covariance uses Stata's DEFAULT sparsity estimator, which [R] qreg documents as 'fitted': re-estimate the regression at tau+h and tau-h, form xbar'b at each, and difference over 2h, with the Hall-Sheather bandwidth. Using a kernel density of the residuals instead is the vce(iid, kernel()) option and shifts x1's standard error by 29% (.0457925 vs .0355009) -- that was the trap this batch was written to avoid. e(sum_adev) and e(sum_rdev) are values of the CHECK function sum (tau - 1{u<0})u, not sums of absolute deviations; at tau=.25 Stata prints 156.7522 and the check function gives 156.7522 while the absolute sum gives 465.2928."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 2 rows; see retest/REPORT.md"
 - command: qreg, vce(robust)
-  level: E3
+  level: E2
+  # retest: worst tier B over 2 row(s); example 'qreg vce(robust) median' param_rel 4.56416242764477e-09 se_rel 5.8351380723116345e-09
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
@@ -330,8 +359,10 @@
   date: 2026-10-23
   notes: "Huber sandwich with an OBSERVATION-SPECIFIC density f_i = 2h / (x_i'(b(tau+h) - b(tau-h))): J = sum f_i x_i x_i', V = J^-1 M J^-1. No n/(n-k) fudge factor. Two earlier versions were wrong: the first dropped the density entirely (SEs 42% too small, .0204 vs .0352), the second used a scalar density at xbar plus an ad-hoc correction (1.05% high). CAVEAT: the fixture only exercises tau=.5, where psi_i^2 = 0.25 for every observation, so M collapses to tau(1-tau)X'X and the general-tau moment form is not directly evidenced -- only the .5 case is verified."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 2 rows; see retest/REPORT.md"
 - command: rreg
-  level: E3
+  level: E1
+  # retest: worst tier D over 5 row(s); example 'rreg final biweight case weights' param_rel 0.0010310457398488798 se_rel nan
   tolerance: 2.0e-2
   sources:
     - type: r_crosscheck
@@ -340,8 +371,10 @@
   date: 2026-10-23
   notes: "Full [R] rreg algorithm implemented: Cook's D > 1 screen, then s = MAD/0.6745, then Huber weights (c_h = 1.345) to convergence, then biweights (c_b = 4.685*tune/7) to convergence, with pseudovalue standard errors. Coefficients measure 2.0144573 / -.5341 / .9933 against Stata's 2.014204 / -.5340517 / .9933214. The Cook's screen drops nothing on this DGP (max D = 0.218) and Stata agrees -- the contamination is handled by the weights, not by deletion. STANDARD ERRORS do not match exactly: .0548424 / .0543542 / .0545657 vs Stata's .0564219 / .0525755 / .0545107, i.e. -2.8% / +3.4% / +0.1%. An earlier version was 26-36% wrong because its leave-one-out refit used a generic weighted least squares instead of the actual Huber-then-biweight estimator; that is fixed. The residual gap exists because [R] rreg cites Street-Carroll-Ruppert (1988) without specifying the leave-one-out construction. Documented rather than tuned. e(F) consequently differs by 0.8% (683.6 vs 688.92)."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 5 rows; see retest/REPORT.md"
 - command: bsqreg
-  level: E3
+  level: E1
+  # retest: worst tier E over 1 row(s); example 'bsqreg median pooled 4x500' param_rel 4.564162312491247e-09 se_rel 0.021891364165441938
   tolerance: 2.0e-2
   sources:
     - type: invariant
@@ -351,8 +384,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Shares sqreg's implementation and therefore its correction. The previous note here recorded 'bootstrap SE 15% below Stata's' -- the same mis-comparison described in the sqreg entry: a single reps(200) run compared against a fixed number, while Stata's own SE varies by 2.7% between seeds at that replicate count and converges elsewhere. Coefficients are exact because bsqreg IS qreg at one quantile; standard errors follow the verified formula. The 2e-2 tolerance is the width of Stata's own seed-to-seed variation, not implementation uncertainty."
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md"
 - command: xtlogit, fe
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'xtlogit, fe（条件 logistic）' param_rel 3.7048238206961924e-08 se_rel 3.3986787644086034e-06
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -361,8 +396,10 @@
   date: 2026-10-23
   notes: "Chamberlain's conditional likelihood, implemented by exhaustive enumeration of the C(T,k) subsets. The estimation sample matches Stata's exactly: 912 of 960, because groups whose outcome never varies are conditioned out. Both the estimate and the sample size agreeing is what makes this a real check."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: xtlogit, pa
-  level: E3
+  level: E1
+  # retest: worst tier D over 1 row(s); example 'xtlogit, pa（GEE，exchangeable 工作相关）' param_rel 0.0003187839133982965 se_rel 0.0010556371428797479
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
@@ -370,8 +407,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Population-averaged GEE with an exchangeable working correlation. GEE is NOT a likelihood, so e(ll) is deliberately ABSENT -- a log-likelihood that does not exist would invite a meaningless comparison. The coefficients are estimable and now verified; the standard errors are not yet diffed."
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md"
 - command: xtprobit, re
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'xtprobit, re' param_rel 6.048194834631303e-07 se_rel 0.0001157064120320072
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
@@ -379,8 +418,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Gauss-Hermite quadrature over the normal random effect. Parameter names now follow Stata: _cons rather than Intercept, and lnsig2u bare rather than slashed, because Stata prints those without a leading slash for this command."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: xttobit
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'xttobit（随机效应 Tobit，ll(0)）' param_rel 2.521111446605148e-06 se_rel 7.4891771089244185e-06
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
@@ -388,8 +429,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Random-effects Tobit with quadrature over the random effect and censoring at the lower limit. Stata reports sigma_u and sigma_e bare -- not /sigma_u -- so the implementation was renamed to match, with the slashed forms kept out of the canonical names."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: xtpoisson, fe
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'xtpoisson, fe' param_rel 4.422740027940395e-08 se_rel 1.3575654529378333e-05
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -397,8 +440,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Was E2 at 'within 5%', which understated the implementation by five orders of magnitude -- the measured gaps are 4.7e-9 on the coefficient and 2.9e-7 on the SE. The 5% figure came from an early comparison, not from a property of the code. REACHING THIS REQUIRED UNDERSTANDING ONE NON-OBVIOUS THING: four mathematically identical spellings of the conditional likelihood, all optimised to a ZERO gradient, disagree in the ninth significant digit -- expanded form 0.5041802532, with log-factorials 0.5041802850, multinomial-logit form 0.5041802705, logsumexp route 0.5041802532. Each is the exact maximiser of the function as written, so the difference is FLOATING-POINT ROUTING, not estimation error. The multinomial-logit form is adopted because it is 2.7x closer to Stata and because it has the better conditioning argument: it forms a normalised log-probability per observation before weighting by the count, so summed magnitudes stay bounded by log(group size) instead of growing with |eta|. The residual 4.7e-9 is recorded rather than claimed away. The SE moved slightly the other way (7.9e-8 to 2.9e-7) because the Hessian is now evaluated at a marginally different point -- still six orders below the tolerance."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: xtpoisson, re
-  level: E3
+  level: E2
+  # retest: worst tier C over 1 row(s); example 'xtpoisson, re' param_rel 5.2860801406492453e-08 se_rel 0.00017770926871180356
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck
@@ -406,6 +451,7 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Random-effects Poisson with quadrature. The dispersion parameter is reported as bare lnalpha, matching Stata's spelling for this command."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 1 rows; see retest/REPORT.md"
 - command: xtnbreg, fe
   level: E3
   tolerance: 1.0e-4
@@ -435,7 +481,8 @@
   date: 2026-10-23
   notes: "Was E2 at 'within 0.42%, the residual gap is the theta estimate'. On a controlled comparison the agreement is at machine precision on all four quantities, including theta itself -- 4.6e-16. So the 0.42% did not reproduce, and the explanation attached to it ('Stata decomposes the variance into within and between components with its own convention, and theta enters every quasi-demeaned moment') was a plausible-sounding account of a discrepancy that is not there. That is the fourth entry in this register where a diagnosed-looking cause turned out to describe nothing: the fix is always the same, which is to compare against a full-precision r()/e() value on data built for the comparison, rather than against a number recorded earlier under different conditions."
 - command: xtgls
-  level: E3
+  level: E1
+  # retest: worst tier E over 3 row(s); example 'xtgls, panels(correlated)（30 个体 x 6 期，Sigma 秩亏）' param_rel 0.2115256940544834 se_rel 3.3864412104685266
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -444,6 +491,7 @@
   date: 2026-10-23
   notes: "Feasible GLS with one variance per panel: sigma_i^2 = e_i'e_i / T_i, dividing by T and not T-1, which is the convention that reproduces Stata's e(V). This does NOT reduce to pooled OLS -- an earlier note here claimed it did, which was simply wrong; OLS on the same data gives .753313 / 1.572686 against GLS's .679847 / 1.431659. An earlier version of the conformance test asserted OLS equality and had to be rewritten, because the test was wrong and the estimator was right. panels(correlated) is also implemented for balanced panels; unbalanced data there raises ConsistencyError rather than silently using a different estimator."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
 - command: xtpcse
   level: E3
   tolerance: 1.0e-4
@@ -478,7 +526,8 @@
   date: 2026-10-23
   notes: "Transliterated from _xturllc.ado, which is plain readable Stata (18,075 bytes) -- no reverse engineering was involved at any point. THREE defects separated the first implementation from Stata, and all three were found by EXPORTING the quantity in question from a patched copy of the ado file rather than by reasoning about the source: (1) the HAC long-run variance used only the post-lag slice of the differenced series instead of the full range, which put sbar at 0.8259833163129058 against 0.9624458095613154; (2) the tds correction scaled by sqrt(N), the IPS convention, where LLC's ``nt`` is r(sum) over the per-panel tivar -- the total regression observation count, 390 -- and using sqrt(N) made the correction term ~71x too small and drove tds to -8.01 against -1.77; (3) nu_se carried a finite-sample factor sqrt((e(N)-1)/e(N)) that this code path does not apply at all. Earlier fixes along the way: LLC's default ADF lag is 1 not 0, N_t is the raw period count, and the HAC bandwidth int(3.21*T^(1/3)) also counts raw periods. METHOD NOTE, since this entry went through more wrong turns than any other: twice I produced a confident causal story from an INDIRECT measurement and was wrong -- first 'the wvar series differs', then 'the divisor is wrong' -- and each time exporting the actual Stata quantity settled it within minutes. The pattern is that the source is readable and the values are exportable, so inference should be the last resort, not the first."
 - command: xtabond
-  level: E2
+  level: E3
+  # retest: worst tier A over 4 row(s); example 'xtabond（Arellano-Bond 一阶差分 GMM，lags(1)）' param_rel 9.685048791862464e-16 se_rel 3.438890358639886e-16
   tolerance: 2.0e-2
   sources:
     - type: r_crosscheck
@@ -490,6 +539,7 @@
 
 # --- P10: multi-equation and system estimation -----------------------------
 
+  retest_gap: "independent 386-point sweep graded this E2 -> E3; worst tier A, 4 rows; see retest/REPORT.md"
 - command: sureg
   level: E3
   tolerance: 1.0e-4
@@ -531,7 +581,8 @@
   notes: "Rao's F is an approximation by definition -- an exact F via Wilks' lambda exists only for small numbers of responses and groups -- and Stata itself flags which case applies, a flag reproduced here. My first implementation used a different parameterisation of the Rao transform and produced F = 30.68 against Stata's 62.15, i.e. it was off by a factor of two while Wilks' lambda looked right. Verified now across eight designs (p = 1..4, 2-5 groups), including the exact-versus-approximate flag. Only Wilks' lambda is implemented; the other three statistics are absent rather than approximated, and multiple factors raise UnsupportedError."
 
 - command: nl
-  level: E3
+  level: E2
+  # retest: worst tier B over 5 row(s); example 'nl exp decay, Stata start values supplied' param_rel 1.5693385951900566e-07 se_rel 1.729196149047522e-07
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -540,8 +591,10 @@
   date: 2026-10-23
   notes: "Coefficients AND standard errors reproduce Stata to the printed digit. The expression is compiled through an ast whitelist -- there is no eval anywhere -- so a formula like {b0}*__import__('os').system(...) is rejected at validation rather than executed. Parameters are reported with Stata's leading slash. A linear model written as {b0} + {b1}*x reproduces OLS to 1e-5."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 5 rows; see retest/REPORT.md"
 - command: frontier
-  level: E3
+  level: E1
+  # retest: worst tier D over 1 row(s); example 'frontier halfnormal' param_rel 0.0010765871449960062 se_rel 0.002527171322009485
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -553,6 +606,7 @@
 
 # --- P11: causal inference ------------------------------------------------
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md"
 - command: teffects ra
   level: E3
   tolerance: 1.0e-4
@@ -586,7 +640,8 @@
   notes: "Every quantity matches to its printed digit. The influence function carries the outcome-model coefficients (b1, b0) AND the propensity Jacobian; omitting the coefficient terms gives 0.0641 against Stata's 0.0625, which is how the earlier draft fell 2.6% short."
 
 - command: teffects nnmatch
-  level: E2
+  level: E1
+  # retest: worst tier E over 3 row(s); example 'teffects nnmatch ATE, nneighbor(1)' param_rel 4.504462929372294e-16 se_rel 0.05087531503944678
   tolerance: 2.0e-2
   sources:
     - type: r_crosscheck
@@ -596,6 +651,7 @@
   verified_by: lead
   date: 2026-10-23
   notes: "The POINT ESTIMATE is exact (3.6e-15); only the standard error differs, down from 2.2% to 1.59%. Method: the manual was consulted instead of guessing at variance estimators -- something I had failed to do through roughly fifteen earlier attempts, every one of which consisted of trying a different sigma^2(X_i) formula from memory. The manual gives the estimator and, crucially, states the DEFAULT: robust standard errors from TWO matches, i.e. vce(robust, nn(2)). Five variants of the within-arm variance were then measured against Stata rather than argued about: (A) literal (sum w - 1) divisor, se 0.4548; (B) exclude i, var of the two neighbours, 0.10222; (C) include i plus two neighbours, sample variance, 0.10458; (D) the h=1 form 0.5(y_i-y_j)^2, 0.10780; (E) 0.5*C, 0.07395. C is adopted as closest. NOTE ON A LITERAL READING I GOT WRONG: applying '(sum w_j - 1)' with unit weights and h = 2 makes ybar the SUM of the neighbours rather than their mean and inflates the variance about fourfold (variant A). The formula is written for the general weighted case; the unweighted instance needs a plain sample variance. REMAINING 1.59%: _matchnn_estimates is compiled Mata bytecode, so there is no source to read. Its symbol table IS legible (strings on lmataado.mlib yields _matchnn_biasAdjustedMeans, __matchnn_lsfit, _matchnn_indices, _matchnn_neighbors, _matchnn_scaleVariables, _matchnn_estimates), which confirms the algorithm's structure but not its arithmetic. Reaching E3 would need disassembly of Mata bytecode, and the residual may equally be a distance or tie-handling difference. Left at E2 with the number recorded."
+  retest_gap: "independent 386-point sweep graded this E2 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
 - command: didregress
   level: E3
   tolerance: 1.0e-5
@@ -700,7 +756,8 @@
 # --- P13: resampling inference --------------------------------------------
 
 - command: jackknife
-  level: E3
+  level: E2
+  # retest: worst tier C over 4 row(s); example 'jackknife: mean' param_rel 0.0 se_rel 4.58187279692018e-06
   tolerance: 1.0e-6
   sources:
     - type: r_crosscheck
@@ -711,8 +768,10 @@
   date: 2026-10-23
   notes: "The jackknife is the one resampling method with no random numbers, so it is held to an exact standard and it meets that standard on the coefficients (1e-16) and on the mean's variance (3.7e-9). The regression VARIANCE sits 7.4e-6 away and that residual is understood rather than tuned: a single best-fit scaling of 0.9974973603895577 reproduces the whole matrix to 7.7e-9 while (n-1)/n is 0.9975, so the factor is right and the difference lives in the leave-one-out estimates past their sixth digit -- consistent with Stata updating each fit by Sherman-Morrison instead of refitting. Direct refitting is kept deliberately: it is explainable and independently checkable, and guessing at Stata's update formula to win the sixth digit would trade a verifiable implementation for an unverifiable one. e(expected_gap) records this so a future reader does not chase it again. Both the default pseudovalue form and the mse form are implemented; they are different estimators and a test asserts they differ."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 4 rows; see retest/REPORT.md"
 - command: bootstrap
-  level: E3
+  level: E2
+  # retest: worst tier B over 5 row(s); example 'bootstrap SE of regress (100 reps, seed 20241024)' param_rel 1.1548103805394348e-15 se_rel 8.700151966062607e-09
   tolerance: 1.0e-7
   sources:
     - type: r_crosscheck
@@ -722,8 +781,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "THIS WAS E2 'BY CONSTRUCTION' AND THAT WAS WRONG. The reasoning was: 'bootstrap variances are functions of the random stream and Stata's generator is not numpy's, so replicate-for-replicate agreement is impossible by construction'. The premise is true of numpy's generator and FALSE of the problem -- Stata uses MT19937-64, a published standard from Matsumoto and Nishimura (1998). Implementing it reproduced the two reference values that [R] set seed prints in its own documentation, which is a check that cannot be faked by fitting. Two steps were needed, and the second is the one that mattered: (1) runiform() matched to one ulp over 400 consecutive draws, and the resampling INDICES matched EXACTLY, 400 out of 400 -- but the bootstrap SE was then still 1.5% off; (2) bsampl_w returns WEIGHTS, not a row sample: it draws a target per row, sorts, builds a running count within each target and keeps one weighted row per target, using a SECOND uniform stream as tie-break. Reproducing that too gives b gap 0 and se gap 1.4e-8. Drawing indices alone reproduces which targets were hit but not their multiplicities. THE GENERAL LESSON: 'impossible by construction' deserves the same scrutiny as any other claim, and here it was one manual page away from being false."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 5 rows; see retest/REPORT.md"
 - command: permute
-  level: E2
+  level: E1
+  # retest: worst tier E over 3 row(s); example 'permute: Monte Carlo p-value across 6 seeds (weak effect, 400 reps)' param_rel 0.012076059850373966 se_rel nan
   tolerance: 5.0e-1
   sources:
     - type: invariant
@@ -733,8 +794,10 @@
   verified_by: lead
   date: 2026-10-23
   notes: "Improved from 'arbitrary numpy stream' to the verified Stata generator, but still E2, for a reason narrower than before. The GENERATOR is now correct -- MT19937-64, verified against Stata's documented reference values and against resampling indices. What is still not reproducible is the SHUFFLE ORDER: Stata permutes through its own internal routine whose call sequence is not documented, so a given seed does not produce the same permutation. Since the p-value depends on the empirical distribution of the permuted statistic rather than on any single permutation, the result is statistically equivalent and its MEANING is now anchored to the right generator -- but a cell-for-cell comparison remains unavailable for an honest reason, not a convenient one. bootstrap was promoted to E3 in the same session precisely because its shuffle order IS documented (bsampl_w.ado) while permute's is not."
+  retest_gap: "independent 386-point sweep graded this E2 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
 - command: bootstrap / permute expressions (exp_list)
-  level: E3
+  level: E2
+  # retest: worst tier B over 2 row(s); example 'bootstrap: SE over 3 further seeds (200 reps each)' param_rel 4.129322963672249e-08 se_rel 4.129322963672249e-08
   tolerance: 1.0e-2
   sources:
     - type: r_crosscheck
@@ -744,6 +807,7 @@
   verified_by: lead
   date: 2026-10-23
   notes: "THE PREVIOUS ENTRY HERE SAID THIS WAS OUT OF SCOPE: 'supporting arbitrary r() statistics is equivalent to writing a small expression interpreter'. Reading [U] exp_list showed the premise was half wrong -- it IS an interpreter, but a small CLOSED grammar, not open-ended Stata: exp_list is (name: elist), elist is name=(exp) or (exp), specname is _b/_b[]/_se/_se[]/r(stat)/e(stat), and exp is an arithmetic expression over those. Every production is listable, which is what makes implementing it a bounded task. The parser is recursive descent with Stata's precedence (+- then */ then ^ right-associative then unary sign) and supports exp/ln/sqrt/abs. It is tested against the manual's OWN examples: the two-group summarize form, or=(exp(_b[mpg])), sd=(r(sd)) skew=(r(skewness)), and _b[x1]. Bootstrap.from_expressions exposes replicate stored results as the four tables specname reaches, so any expression in the grammar now works instead of two hard-coded estimators. Two deliberate refusals remain, both raising rather than guessing: bare _b without a coefficient name is ambiguous per coefficient, and an equation-prefixed [eqno]_b[x] is legal Stata but its resolution rule is not documented clearly enough to reproduce. Everything outside the grammar names itself in the error message."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 2 rows; see retest/REPORT.md"
 - command: margins
   level: E3
   tolerance: 1.0e-6
@@ -842,7 +906,8 @@
   date: 2026-10-23
   notes: "Was E2 at 'coefficients 4.9e-16, robust SEs 2.9e-2 apart, two-step weight matrix and finite-sample scaling'. The coefficients were indeed exact; the standard errors were 0.2% to 21% off and the recorded cause was a guess. THE MANUAL STATES THE DIFFERENCE IN ONE SENTENCE: W is built from the INITIAL 2SLS RESIDUALS and S from the GMM RESIDUALS. Two different residual sets. linearmodels constructs a single weight matrix and reports a robust sandwich around it, which is a valid estimator but not Stata's, and the discrepancy is invisible to any coefficients-only comparison. Implementing the published formula with the split -- np.linalg.pinv-based, two explicit steps -- brings every standard error to machine precision: 0, 1.4e-17, 6.9e-18. Two rounding attempts were needed on the WRAPPER rather than the maths: the first tested whether the canonical cov_type was None, but _canonical_cov_type(None) returns a default NAME so the branch never fired; the variance stayed wrong and all tests still passed because the coefficients were right. The override now keys off whether the CALLER passed cov_type, so Stata's two-step form is the default while an explicit HC0/HC1/cluster request still works."
 - command: nbreg
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'nbreg (default = nb2)' param_rel 2.687600031834131e-07 se_rel 1.823151362622733e-08
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -851,6 +916,7 @@
   date: 2026-10-22
   notes: "Parameters 1.7e-5, standard errors 9.1e-7, e(ll) 8e-12. Fixing this required converting statsmodels' alpha to Stata's lnalpha via the delta method: the values differed by a factor of exp() before."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: ologit
   level: E3
   tolerance: 1.0e-4
@@ -862,7 +928,8 @@
   notes: "Slopes 1.2e-5, cut points 2.9e-5. statsmodels stores thresholds as [c1, log(c2-c1)], so reporting them directly made cut2 wrong by 20%; the log-increment is now inverted before reporting."
 
 - command: oprobit
-  level: E3
+  level: E2
+  # retest: worst tier B over 1 row(s); example 'oprobit (4 categories)' param_rel 4.149742333116962e-09 se_rel 1.2787709727006366e-09
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -871,8 +938,10 @@
   date: 2026-10-22
   notes: "Slopes 6.9e-6, cut points 1.5e-5."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: var
-  level: E3
+  level: E2
+  # retest: worst tier C over 9 row(s); example 'var: varsoc lag-order criteria, FPE (scale-free, exact)' param_rel 2.296684944822417e-06 se_rel nan
   tolerance: 1.0e-12
   sources:
     - type: r_crosscheck
@@ -881,6 +950,7 @@
   date: 2026-10-22
   notes: "Lag coefficients 2.9e-15. Both are equation-by-equation OLS, so exact agreement is expected once the ordering (Stata groups by equation) is handled."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 9 rows; see retest/REPORT.md"
 - command: arch
   level: E2
   tolerance: 5.0e-2
@@ -903,7 +973,8 @@
   notes: "Z(t) = -1.941126 against Stata's printed -1.941 on a 400-observation random walk, i.e. agreement to its three-decimal display rather than a computational gap. Promoted to E3 during the bandwidth investigation: unlike pperron, dfuller's automatic lag selection already matched, so nothing needed changing -- only measuring. This is the case that shows an E2 label was sometimes the absence of evidence rather than a real shortfall, which is why the whole remaining E2/E1 list was worth re-measuring."
 
 - command: predict
-  level: E3
+  level: E2
+  # retest: worst tier B over 17 row(s); example 'predict poisson: n' param_rel 2.4426429797515234e-09 se_rel nan
   tolerance: 1.0e-9
   sources:
     - type: r_crosscheck
@@ -912,6 +983,7 @@
   date: 2026-10-23
   notes: "xb 1.6e-15, residuals 5.1e-13 (OLS); pr 3.1e-11, xb 3.6e-10 (logit); e(a,b) and ystar(a,b) both 5.8e-10 (tobit). Two real defects fixed here: (1) the tobit e(a,b) and ystar(a,b) implementations were swapped; (2) e(a,b) overflowed for observations whose linear index was far inside the interval, because 1-Phi(z) rounds to 0 for z>7. [R] tobit postestimation defines e(a,b)=E(y|a<y<b) (conditional) and ystar(a,b)=E(y*) with y*=max{a,min{y,b}} (unconditional)."
 
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 17 rows; see retest/REPORT.md"
 - command: etable
   level: E3
   tolerance: 5.0e-7
@@ -923,7 +995,8 @@
   notes: "estout installed from the author's GitHub source (SSC unreachable). Coefficients agree exactly at the printed precision (gap 0.0). The tolerance is 5e-7 because esttab reports 6 decimals."
 
 - command: vecrank (Johansen)
-  level: E3
+  level: E2
+  # retest: worst tier C over 6 row(s); example 'vecrank: yc1/yc2, lags(2), trend(constant), max' param_rel 7.79210572574997e-06 se_rel nan
   tolerance: 1.0e-4
   sources:
     - type: r_crosscheck
@@ -933,6 +1006,7 @@
   verified_by: lead
   date: 2026-10-23
   notes: "TWO defects were fixed here and both had been masked by the single case the registry checked. (1) johansen() resolved its lag order as 'lags if given, else k_ar_diff if given, else 1' and never consulted the lag order the MODEL was constructed with, so lags(1), lags(2) and lags(3) all returned identical statistics. That constant equalled Stata's lags(2), the one verified configuration. (2) statsmodels' coint_johansen disagrees with Stata at k_ar_diff = 0 -- 287.2485 and 1.7922 against Stata's 288.3450 and 3.7832 -- and the DIAGNOSTIC that exposed it was the asymmetry: the first eigenvalue matched to three decimals while the second was out by a factor of two. A genuine estimation difference cannot behave that way, so the problem was in the statistic rather than the sample. Computing Johansen directly from the moment matrices (regress dy and y_{t-1} on [lagged differences, constant]; solve the generalised eigenproblem for S01'S00^-1 S01 relative to S11; accumulate -T*ln(1-lambda) from the SMALLEST eigenvalue upward) reproduces Stata to all printed decimals at every lag order. The ordering was the detail I had backwards on the first manual attempt, and it is worth recording because it silently doubles the second statistic. Critical values still come from statsmodels' Osterwald-Lenum tables, which are what Stata reports."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier C, 6 rows; see retest/REPORT.md"
 - command: vec (VECM estimation)
   level: E3
   tolerance: 1.0e-4
@@ -945,7 +1019,8 @@
   date: 2026-10-23
   notes: "Promoted from E1 on re-measurement, and the measurement found a REAL DEFECT rather than a missing feature: VECM.fit passed k_ar_diff = lags, but Stata counts VAR lags while statsmodels counts lagged differences, so Stata lags(1) is k_ar_diff = 0. That exact off-by-one had already been diagnosed and fixed in johansen during the vecrank work and was never carried across to fit -- the two methods disagreed about what a lag means. Fixing it moved alpha from 0.19 away to 3.6e-13. The deterministic default was also wrong: it was ci (constant inside the cointegrating relation) where [TS] vec states the default is an unrestricted constant, i.e. co. Alpha is the comparable quantity because Stata normalises beta away and never prints it. REMAINING GAP, recorded rather than tuned: the drift term. westata det_coef [-0.02271056, -0.03237466] against Stata _cons [-0.02567138, -0.00254837]. That is a reparameterisation question independent of alpha; deriving it would be worth doing, inventing a transform to land on Stata's two numbers would not, so it is stated here and not asserted in the tests."
 - command: pperron / kpss
-  level: E3
+  level: E2
+  # retest: worst tier B over 8 row(s); example 'kpss: y_ar, notrend (H0: level stationary), maxlag 5' param_rel 6.096770127348566e-09 se_rel nan
   tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
@@ -955,3 +1030,4 @@
   verified_by: lead
   date: 2026-10-23
   notes: "The recorded 1.6e-2 gap was NEVER an estimator problem. Stata prints 'Newey-West lags = 5' straight in its output and uses the standard rule floor(4*(n/100)^(2/9)); westata was letting arch choose the bandwidth, which picked a different value. Applying the rule gives -1.953113 against Stata's -1.953, i.e. agreement to its three-decimal display. That the rule was visible in Stata's own output and went unread for two batches is the lesson. kpss still cannot be compared: StataNow 19 removed the command (r(199)), the same pattern as xtreg, fd."
+  retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 8 rows; see retest/REPORT.md"

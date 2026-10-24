@@ -18,9 +18,10 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **1247 passing** |
+| Tests | **1379 passing** |
 | Commands covered | 87 registry entries |
-| Evidence | **83 × E3**, 4 × E2, **0 × E1** |
+| Evidence | **49 × E3**, 28 × E2, 10 × E1 |
+| Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
 committed so the comparison replays without a licence.
@@ -110,9 +111,14 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Compared against full-precision `e(b)`/`e(V)` captured from real Stata | 83 |
-| E2 | Measured, understood, and not fully matched -- see the comparison guide | 4 |
-| E1 | Implemented from the manual, unit-tested, **not** contrasted with Stata | 0 |
+| E3 | Agrees with full-precision `e(b)`/`e(V)` from real Stata, on every invocation the independent sweep exercised | 49 |
+| E2 | Approximate, or exact only on a subset of invocations: real but bounded differences | 28 |
+| E1 | Materially differs on at least one measured invocation, or not covered by the sweep | 10 |
+
+**These levels come from the independent 386-point sweep, not from the library's own
+tests.** That distinction matters: the library's tests passed at 1247 while the sweep
+found 24 defects, because a test written from the same understanding as the code cannot
+detect a misunderstanding shared by both.
 
 Measured relative agreement with StataNow 19.5:
 
@@ -150,37 +156,27 @@ Measured relative agreement with StataNow 19.5:
 | `ivregress gmm` | 4.9e-16 | 6.9e-18 |
 | `arch` | 1.4e-04 | z values not comparable |
 
-The linear and panel models agree to machine precision. Maximum-likelihood
-models stop near 1e-7 because Stata's Newton and statsmodels' optimiser reach
-the same optimum but halt at slightly different points; that is a real limit,
-not slack.
+The linear, panel-linear, multi-equation and complex-survey families agree to
+machine precision (1e-15). **Non-linear maximum-likelihood models are where the
+differences live**, and almost always in the second-order quantities rather than the
+coefficients: an exact point estimate with a standard error that is 5% off still gives a
+wrong z, a wrong p, and a wrong confidence interval.
 
-Four commands are **E2**: measured, understood, and not fully matched. Each is
-comparable in some respects and not others, which is the part that matters when
-you are checking one against the other.
+What was measured wrong, and then fixed:
 
-| Command | Coefficients | z / p | Decision |
-|---|---|---|---|
-| `arch` | to ~4 digits | **not comparable** | agree |
-| `teffects nnmatch` | exact | to ~2 digits | agree |
-| `xtabond` | to ~3 digits | to ~3 digits | agree |
-| `permute` | exact | not replicate-for-replicate | agree (distribution) |
+- `ologit`/`oprobit` `e(V)`: a numpy view alias let `exp()` act on the cut points, and the
+  slope-by-cut block was never transformed — `e(V)` off by 20x, all cut-point z and CI wrong.
+- `nl` covariance: `pinv` truncation made standard errors wrong by **6–7 orders of
+  magnitude**, so every t statistic was inflated.
+- `xtreg, fe vce(robust)` was mapped to HC1; Stata defines it as `vce(cluster panelvar)`
+  (verified: the two are identical in Stata, `max|V_robust − V_cluster| = 0`). The constant's
+  SE was 18x off.
+- `tobit` `se(/sigma)` lacked the delta-method Jacobian; `margins` used a fixed numerical
+  step; `podiscrete` VCEs silently accepted and ignored `vce(robust)`.
 
-The two that matter most:
-
-- **`arch`** — Stata runs `bhhh bfgs` with `nrtolerance(1e-5)` and stops before
-  the likelihood is flat. Measured: westata's maximum is `ll = -1025.4148259782`,
-  Stata reports `-1025.4176185349`, **2.8e-03 lower**. So the difference is a
-  stopping rule, not an error, and westata's estimates are the ML ones. But the
-  z statistics are computed at different points: `z(garch)` is 16.942 here against
-  9.755 in Stata, and `p(omega)` 1.5e-03 against 4.97e-02. **Do not quote an
-  `arch` z or p value as Stata's.**
-- **`teffects nnmatch`** — the ATE is exact to 3.6e-15; the standard error is
-  1.59% high because the within-arm variance lives in compiled Mata. The
-  significance verdict agreed across every effect size tested.
-
-See [`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md) for the full comparison
-guidance, including what to quote and what to verify in Stata.
+What remains approximate is listed per command in
+[`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md), which is organised around the
+question a user actually has: **can I quote this number as Stata's?**
 
 Two commands could not be compared at all because StataNow 19 removed them:
 `xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are

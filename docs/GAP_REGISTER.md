@@ -22,61 +22,47 @@
 
 ## 1. 已实现（87 条命令条目）
 
-**83 条 E3、4 条 E2、0 条 E1。**
-证据等级定义见 `tests/conformance/registry.yml`，每条都记录了实测差距与定级理由。
+**49 条 E3、28 条 E2、10 条 E1。**
+
+等级来自 **386 点独立复测**（`retest/REPORT.md`、`retest/FIX_REPORT.md`），
+不是来自本库自己的测试。这两个来源差别很大：库自身的测试在 1247 条时全绿，
+而复测同时找出了 24 个缺陷——**由与代码同一套理解写出的测试，无法发现那套理解本身的错**。
 
 ### 按族分类
 
-| 族 | 已实现 | 等级 |
+| 族 | 命令 | 等级分布 |
 |---|---|---|
-| 线性与 IV | `regress`（4 种权重、`i.` 因子）、`ivregress 2sls/liml/gmm`、`areg`、`reghdfe` | 全部 E3 |
-| 面板线性 | `xtreg fe/re/be/fd`、`xtgls`、`xtpcse`、`xtivreg fe/re` | 全部 E3 |
-| 面板非线性 | `xtlogit fe/pa`、`xtprobit re`、`xttobit`、`xtpoisson fe/re`、`xtnbreg fe` | 全部 E3 |
-| 面板动态 | `xtabond` | E2 |
-| 面板单位根 | `xtunitroot ips`、`xtunitroot llc` | 全部 E3 |
-| 二元与计数 | `logit`、`probit`、`poisson`、`nbreg`、`zip`、`zinb`、`ztp`、`tnbreg` | 全部 E3 |
-| 有序 | `ologit`、`oprobit` | 全部 E3 |
-| 受限因变量 | `tobit`、`truncreg`、`intreg`、`heckman`、`etregress` | 全部 E3 |
-| 分位数与稳健 | `qreg`、`qreg vce(robust)`、`rreg`、`bsqreg` | 全部 E3 |
-| 多方程 | `sureg`、`mvreg`、`eivreg`、`manova`、`nl`、`frontier` | 全部 E3 |
-| 因果推断 | `teffects ra/ipw/aipw`、`didregress`、`xtdidregress` | 除 `nnmatch` 全 E3 |
-| 复杂抽样 | `svyset`、`svy: mean/total/proportion/regress/logit` | 全部 E3 |
-| 重抽样 | `jackknife`、`bootstrap`、`exp_list` 表达式、`permute` | 除 `permute` 全 E3 |
-| 时间序列 | `arima`、`var`、`vec`、`vecrank`、`dfuller`、`pperron`、`arch` | 除 `arch` 全 E3 |
-| 后估计 | `test`、`lincom`、`nlcom`、`testnl`、`lrtest`、`hausman`、`contrast`、`pwcompare`、`margins`、`predict` | 全部 E3 |
-| 成表 | `etable` | E3 |
-
-### 类名对照（Python API）
-
-Stata 命令名与 westata 类名不完全相同，容易凭名字猜错。以下经实际 dir(westata) 核验：
-
-| westata | Stata |
-|---|---|
-| RobustRegression | 
-reg |
-| Nl | 
-l |
-| Didregress / Xtdidregress | didregress / xtdidregress |
-| ZeroInflatedPoisson | zip |
-| ZeroInflatedNegativeBinomial | zinb |
-| TruncatedPoisson | ztp / 	poisson |
-| TruncatedNegativeBinomial | 	nbreg / ztnb |
-| im_pesaran_shin / levin_lin_chu | xtunitroot ips / llc |
-| parse_exp_list | exp_list 文法 |
+| 线性与 IV | `regress`, `regress, vce(robust)`, `regress, cluster`, `regress, i.factor`, `ivregress 2sls`, `etregress`, `didregress`, `xtdidregress`, `svy: regress`, `areg`, `reghdfe`, `ivregress liml`, `ivregress gmm` | 12 E3, 1 E1 |
+| 面板线性 | `xtivreg, fe`, `xtivreg, re`, `xtgls`, `xtpcse`, `xtreg, fe`, `xtreg, re`, `xtreg, be`, `xtreg, fd` | 7 E3, 1 E1 |
+| 面板非线性 | `xtlogit, fe`, `xtlogit, pa`, `xtprobit, re`, `xttobit`, `xtpoisson, fe`, `xtpoisson, re`, `xtnbreg, fe` | 1 E3, 5 E2, 1 E1 |
+| 面板动态 | `xtabond` | 1 E3 |
+| 面板单位根 | `xtunitroot ips`, `xtunitroot llc` | 2 E3 |
+| 二元与计数 | `logit`, `probit`, `poisson`, `zip`, `zinb`, `ztp`, `tnbreg`, `svy: logit`, `nbreg`, `ologit`, `oprobit` | 3 E3, 8 E2 |
+| 受限因变量 | `tobit`, `truncreg`, `intreg`, `heckman` | 3 E2, 1 E1 |
+| 分位数与稳健 | `qreg`, `qreg, vce(robust)`, `rreg`, `bsqreg` | 2 E2, 2 E1 |
+| 多方程 | `nlcom`, `testnl`, `sureg`, `mvreg`, `eivreg`, `manova`, `nl`, `frontier` | 5 E3, 2 E2, 1 E1 |
+| 因果推断 | `teffects ra`, `teffects ipw`, `teffects aipw`, `teffects nnmatch` | 3 E3, 1 E1 |
+| 复杂抽样 | `svyset / svy: mean`, `svy: total`, `svy: proportion`, `svyset fpc / singleunit` | 4 E3 |
+| 重抽样 | `jackknife`, `bootstrap`, `permute`, `bootstrap / permute expressions (exp_list)` | 3 E2, 1 E1 |
+| 时间序列 | `arima`, `var`, `arch`, `dfuller`, `vecrank (Johansen)`, `vec (VECM estimation)`, `pperron / kpss` | 2 E3, 4 E2, 1 E1 |
+| 后估计 | `test`, `lincom`, `lrtest`, `hausman`, `contrast`, `pwcompare`, `predict, stdp/stdf`, `margins`, `predict` | 8 E3, 1 E2 |
+| 成表 | `etable` | 1 E3 |
 
 ### 数值一致性最好的部分
 
-线性与面板线性模型全部达到**机器精度**（`regress` 系数差 5.1e-15，`sureg` 全 6×6 `e(V)` 达
-rtol 1e-10，`svy: mean` 的 V 差 8.7e-19）。
+线性、面板线性、多方程与复杂抽样达到**机器精度**（1e-15）。
+非线性 ML 的**系数**通常精确，**二阶量**（SE / z / p / CI）才是差异所在。
 
-### 4 条 E2
+### 4 类使用风险
 
-| 命令 | 系数 | z / p | 详见 |
-|---|---|---|---|
-| `arch` | ~4 位 | **不可比** | `docs/USING_WITH_STATA.md` |
-| `teffects nnmatch` | 精确 | ~2 位 | 同上 |
-| `xtabond` | ~3 位 | ~3 位 | 同上 |
-| `permute` | 精确 | 不可逐次复现 | 同上 |
+| 风险 | 命令 | 说明 |
+|---|---|---|
+| 可直接引用 | 上表 E3 项 | 系数与 SE 均 1e-15 |
+| 需注明来源 | E2 中的非线性 ML | 系数精确，SE 差 3–4 位 |
+| 不可引用 z/p | `arch` | Stata 提前停止，统计量在不同点计算 |
+| 不可比较 | E1 的 10 项 | 至少一个实测调用存在实质差异 |
+
+详见 `docs/USING_WITH_STATA.md`。
 
 ## 2. 后估计（P5 已完成）
 

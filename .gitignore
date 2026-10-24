@@ -1,3 +1,4 @@
+# Python
 .venv/
 __pycache__/
 *.py[cod]
@@ -11,34 +12,30 @@ build/
 *.log
 .DS_Store
 
-# æœ¬åœ°ä¸‹è½½çš„ Stata ç¤ºä¾‹æ•°æ®é›†ï¼ˆä¸éšä»“åº“åˆ†å‘ï¼‰
+# Downloaded Stata example datasets -- not redistributed with the repository.
 tests/data/*.dta
 tests/data/*.csv
 tests/data/raw/
 
-# æœ¬åœ°ä¸‹è½½çš„ Stata å®˜æ–¹æ‰‹å†Œï¼ˆç‰ˆæƒå½’ StataCorpï¼Œä»…ä½œæŸ¥è¯ç”¨ï¼Œä¸å…¥åº“ï¼‰
+# EXCEPTION: auto.dta (6.4 KB) is needed by 12 test modules. Without it a fresh clone fails 34 tests with
+# FileNotFoundError, which is exactly what CI does on checkout. The negation must come AFTER the pattern it
+# overrides -- placed before, it has no effect.
+!tests/data/auto.dta
+
+# Downloaded Stata manuals (copyright StataCorp; used only for cross-checking, never committed).
 docs/reference/
 
-# å­æ™ºèƒ½ä½“ä¸´æ—¶æ¢æŸ¥è„šæœ¬
+# Throwaway probe scripts from investigation rounds.
 probe*.py
-
-# Scratch files from PDF/manual extraction during development
 scratch_*
-
-# Commit message scratch files
-commit_msg.txt
-
-# Throwaway scratch from development
 tmp_*
 
-# Commit message scratch
+# Commit-message scratch files.
+commit_msg.txt
 p11_msg.txt
+
+# Agent-team runtime state.
 .agent-teams/
 
-# retest ÖĞ¼ä²úÎï£ºÃ¿´ÎÔËĞĞÖØĞÂÉú³É£¬²»ÄÉÈë°æ±¾¿ØÖÆ
+# retest intermediate output: regenerated on every run, different bytes each time.
 retest/domains/*/_tmp/
-
-# ¹¹½¨²úÎï
-dist/
-build/
-*.egg-info/

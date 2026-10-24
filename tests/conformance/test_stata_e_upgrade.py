@@ -23,6 +23,8 @@ prints "Newey-West lags = 5" and uses ``floor(4*(n/100)^(2/9))``; westata previo
 
 from __future__ import annotations
 
+import importlib.util
+
 from pathlib import Path
 
 import numpy as np
@@ -163,6 +165,12 @@ def test_xtlogit_pa_matches_stata():
     assert "ll" not in result.e
 
 
+requires_arch = pytest.mark.skipif(
+    importlib.util.find_spec("arch") is None,
+    reason="needs the optional `arch` dependency (pip install westata[arch])",
+)
+
+@requires_arch
 def test_pperron_default_bandwidth_follows_newwey_west():
     """The 1.6e-2 gap was a bandwidth rule, not an estimator difference.
 

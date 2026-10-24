@@ -53,3 +53,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.setuptools]
+# sdist 需要显式包含这些顶层文件，否则 CHANGELOG 不会被打包
+include-package-data = true

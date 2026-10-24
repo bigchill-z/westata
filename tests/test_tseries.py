@@ -12,6 +12,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import importlib.util
+
+requires_arch = pytest.mark.skipif(
+    importlib.util.find_spec("arch") is None,
+    reason="needs the optional `arch` dependency (pip install westata[arch])",
+)
+
 from westata.estimators.tseries import (
     ARIMA,
     GARCH,
@@ -416,6 +423,7 @@ def test_vecm_fit_runs():
 # --------------------------------------------------------------------- GARCH
 
 
+@requires_arch
 def test_garch_recovers_persistence():
     returns = _garch_process(n=1500)
     res = GARCH(returns, p=1, q=1).fit()
@@ -427,6 +435,7 @@ def test_garch_recovers_persistence():
     assert res.e["omega"] > 0
 
 
+@requires_arch
 def test_garch_conditional_volatility_is_positive():
     res = GARCH(_garch_process(n=800), p=1, q=1).fit()
     assert np.all(res.fittedvalues > 0)
@@ -437,11 +446,13 @@ def test_garch_rejects_bad_volatility_type():
         GARCH(_garch_process(n=100), vol="NOPE")
 
 
+@requires_arch
 def test_egarch_runs():
     res = GARCH(_garch_process(n=800), p=1, o=1, q=1, vol="EGARCH").fit()
     assert np.all(np.isfinite(res.params.to_numpy()))
 
 
+@requires_arch
 def test_garch_defaults_are_statas_opg_and_presample():
     """Stata's ``arch`` reports OPG SEs and starts from ``e(archi)``.
 
@@ -468,6 +479,7 @@ def test_garch_defaults_are_statas_opg_and_presample():
     assert np.max(np.abs(res.bse.to_numpy() / classic.bse.to_numpy() - 1.0)) > 1e-2
 
 
+@requires_arch
 def test_garch_rejects_unknown_cov_type_and_presample():
     returns = _garch_process(n=200)
     with pytest.raises(ValueError, match="cov_type"):
@@ -579,6 +591,7 @@ def test_kpss_has_the_opposite_null():
     assert "stationary" in outcome.null
 
 
+@requires_arch
 def test_pp_runs():
     rng = np.random.default_rng(19)
     walk = np.cumsum(rng.normal(size=300))

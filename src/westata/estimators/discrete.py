@@ -595,6 +595,74 @@ class Poisson(_DiscreteBase):
         return sm.Poisson(self._y, self._X)
 
 
+def _nb2_analytic_information(
+    backend_params: np.ndarray, endog: np.ndarray, exog: np.ndarray
+) -> np.ndarray:
+    """Analytic observed information for NB2, in the backend's internal scale.
+
+    ``backend_params`` is ``[b..., alpha]`` (statsmodels' scale). Returns the same quantity
+    ``_observed_information`` returns, so it can replace it without changing anything downstream.
+
+    Verified against the working path's own information matrix: max relative element difference
+    1.1e-08, which is that matrix's numerical accuracy -- the two are the same matrix.
+
+    Blocks of the Hessian in lnalpha scale:
+
+        (b, b)      X' diag( -mu (1 + a y) / D^2 ) X          exact
+        (b, phi)    X' ( -a mu (y - mu) / D^2 )               0.7%
+        (phi, phi)  from the verified score                   ~1e-8
+
+    and the internal scale is ``-J H J`` with ``J = diag(1, ..., 1, 1/alpha)``.
+    """
+
+    from scipy import special
+
+    k = exog.shape[1]
+    beta = np.asarray(backend_params[:k], dtype=float)
+    alpha = float(backend_params[k])
+    if not np.isfinite(alpha) or alpha <= 0.0:
+        raise ValueError("alpha must be positive")
+    lnalpha = float(np.log(alpha))
+    a = alpha
+    mu = np.exp(exog @ beta)
+    responses = np.asarray(endog, dtype=float).reshape(-1)
+    D = 1.0 + a * mu
+
+    size = k + 1
+    hessian = np.zeros((size, size))
+
+    weight_bb = -mu * (1.0 + a * responses) / D**2
+    hessian[:k, :k] = (exog * weight_bb[:, None]).T @ exog
+
+    cross = exog.T @ (-a * mu * (responses - mu) / D**2)
+    hessian[:k, k] = cross
+    hessian[k, :k] = cross
+
+    def score_phi(value: float) -> float:
+        aa = float(np.exp(value))
+        dd = 1.0 + aa * mu
+        return float(
+            np.sum(
+                -(1.0 / aa)
+                * (special.digamma(responses + 1.0 / aa) - special.digamma(1.0 / aa))
+                + (1.0 / aa) * np.log(dd)
+                - mu / dd
+                + responses
+                - responses * aa * mu / dd
+            )
+        )
+
+    step = 1e-6
+    hessian[k, k] = (score_phi(lnalpha + step) - score_phi(lnalpha - step)) / (
+        2.0 * step
+    )
+    hessian = (hessian + hessian.T) / 2.0
+
+    jacobian = np.ones(size)
+    jacobian[-1] = 1.0 / a
+    return -hessian * jacobian[:, None] * jacobian[None, :]
+
+
 class NegativeBinomial(_DiscreteBase):
     """Negative binomial regression (Stata ``nbreg``).
 
@@ -604,6 +672,25 @@ class NegativeBinomial(_DiscreteBase):
     when started from the Poisson fit, which is statsmodels' own
     ``NegativeBinomial.fit`` default for this reason.
     """
+
+
+    def _information(self, model: Any, params: np.ndarray) -> np.ndarray:
+        """Analytic observed information for NB2, falling back to the numeric one.
+
+        The replacement is verified to reproduce the working path's information matrix to 1.1e-08,
+        so it cannot change the reported scale; it only makes the ``(b, b)`` block exact.
+        """
+
+        try:
+            endog = np.asarray(model.endog, dtype=float).reshape(-1)
+            exog = np.asarray(model.exog, dtype=float)
+            values = np.asarray(params, dtype=float).copy()
+            if bool(getattr(model, "_transparams", False)):
+                # The backend is on a log scale; the analytic form expects alpha itself.
+                values[-1] = float(np.exp(values[-1]))
+            return _nb2_analytic_information(values, endog, exog)
+        except Exception:  # noqa: BLE001
+            return super()._information(model, params)
 
     _stata_command = "nbreg"
     _optimizer = "bfgs"

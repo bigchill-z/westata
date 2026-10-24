@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from westata.errors import ConsistencyError, ConvergenceError
+from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.results.base import StataResults
 
 __all__ = [
@@ -1192,7 +1192,13 @@ class GARCH:
             package's exponentially weighted backcast.
         """
 
-        from arch import arch_model
+        try:
+            from arch import arch_model
+        except ImportError:  # pragma: no cover - exercised only without the extra
+            raise UnsupportedError(
+                "ARCH/GARCH estimation needs the optional `arch` dependency, which is not installed; "
+                "install it with `pip install westata[arch]` (or `pip install arch`)"
+            ) from None
 
         covariance = self._COV_TYPES.get(str(cov_type).strip().lower())
         if covariance is None:
@@ -1543,7 +1549,13 @@ def unitroot(
         )
 
     if test == "pp":
-        from arch.unitroot import PhillipsPerron
+        try:
+            from arch.unitroot import PhillipsPerron
+        except ImportError:  # pragma: no cover - exercised only without the extra
+            raise UnsupportedError(
+                "the Phillips-Perron unit-root test needs the optional `arch` dependency, which is not "
+                "installed; install it with `pip install westata[arch]` (or `pip install arch`)"
+            ) from None
 
         # Stata's pperron prints "Newey-West lags = k" and uses the standard rule
         #     k = floor(4 * (n/100)^(2/9))

@@ -509,8 +509,23 @@ class Sureg:
                 meat += np.outer(psi, psi)
             covariance = covariance @ meat @ covariance
 
+        # Two equations can share an outcome name -- `sureg (y x1) (y x2)` is a valid system, and both would be
+        # labelled `y`, making every parameter name collide (`y:_cons` twice). Stata avoids this because its
+        # equation names come from the dependent variable and it rejects a duplicate outright; we keep the call
+        # working and disambiguate the LATER one, so the first equation keeps the plain name and any existing
+        # expectations are untouched.
+        labels: list[str] = []
+        for label in self._equation_names:
+            if label in labels:
+                suffix = 2
+                while f"{label}#{suffix}" in labels:
+                    suffix += 1
+                labels.append(f"{label}#{suffix}")
+            else:
+                labels.append(label)
+
         names: list[str] = []
-        for label, param_names in zip(self._equation_names, self._param_names):
+        for label, param_names in zip(labels, self._param_names):
             names.extend(f"{label}:{name}" for name in param_names)
 
 

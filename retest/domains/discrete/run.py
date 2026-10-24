@@ -458,15 +458,11 @@ def main() -> None:
                 "failure_code": "silent_wrong_answer"} if same else {}))
         # 权重与子样本
         cap_w = st.estimate("logit yb x1 x2 [fweight=w]")
-        try:
-            ws.Logit.from_formula("yb ~ x1 + x2", df).fit(weights=df.w)
-        except Exception as exc:  # noqa: BLE001
-            rec.error("logit [fweight=w]", exc, command=cap_w.command,
-                      notes=["westata's discrete estimators take no weights: neither "
-                             "_DiscreteBase.from_formula nor .fit has a weights/fweight "
-                             "parameter (Poisson/Logit/Probit/nbreg/zip/ologit alike)",
-                             f"Stata accepted it and reports N={cap_w.scalars['N']:g} "
-                             "(sum of weights), b=" + str(np.round(cap_w.b, 8).tolist())])
+        res_w = ws.Logit.from_formula("yb ~ x1 + x2", df, freq_weights="w").fit()
+        compare_by_position("logit [fweight=w]", cap_w, res_w, perm=[2, 0, 1],
+                            extra={"westata_N": res_w.e.get("N"),
+                                   "stata_N": cap_w.scalars.get("N"),
+                                   "note": "fweight 在本包按行展开实现；e(N) 是权重和"})
         cap_s = st.estimate("logit yb x1 x2 if x1 > 0")
         res_s = ws.Logit.from_formula("yb ~ x1 + x2", df, subset=df.x1 > 0).fit()
         assert int(cap_s.scalars["N"]) == int(res_s.nobs), (cap_s.scalars["N"], res_s.nobs)

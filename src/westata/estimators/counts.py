@@ -759,6 +759,7 @@ class _ZeroInflatedBase(_CountBase):
         *,
         inflate: str | None = None,
         subset: Any = None,
+        freq_weights: str | None = None,
     ) -> "_ZeroInflatedBase":
         """Build the model from a formula (Stata ``zip y x, inflate(z)``).
 
@@ -766,7 +767,18 @@ class _ZeroInflatedBase(_CountBase):
         pure Poisson/NB model.  ``inflate="_cons"`` is Stata's spelling for a
         constant-only inflation equation and is translated to ``~ 1`` so patsy
         does not go looking for a column named ``_cons``.
+
+        ``freq_weights`` is accepted only so the rejection is explicit: this model does not implement
+        weighting, and fitting unweighted while a caller asked for weights would report valid-looking numbers
+        for the wrong sample.
         """
+
+        if freq_weights is not None:
+            raise ConsistencyError(
+                f"{cls._stata_command}: frequency weights are not implemented for this model. "
+                "Fitting unweighted and returning it under a weighted call would report numbers for the "
+                "wrong sample."
+            )
 
         model = super().from_formula(formula, data, subset=subset)
         if inflate is not None:

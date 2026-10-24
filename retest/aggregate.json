@@ -1,31 +1,31 @@
 {
   "total": 386,
   "status_counts": {
-    "pass": 284,
+    "pass": 285,
     "fail": 84,
     "skip": 11,
-    "error": 7
+    "error": 6
   },
   "tier_counts": {
-    "A": 248,
+    "A": 249,
     "B": 56,
     "D": 9,
-    "NA": 34,
+    "NA": 33,
     "C": 21,
     "E": 7
   },
   "per_domain": {
     "discrete": {
       "counts": {
-        "pass": 29,
+        "pass": 30,
         "fail": 30,
         "skip": 4,
-        "error": 2
+        "error": 1
       },
       "tiers": {
-        "A": 21,
+        "A": 22,
         "B": 31,
-        "NA": 6,
+        "NA": 5,
         "D": 1,
         "C": 6
       },
@@ -166,7 +166,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 5.929802656173706,
+        "seconds": 2.8574602603912354,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -1060,23 +1060,46 @@
         "domain": "discrete",
         "name": "logit [fweight=w]",
         "stata_command": "logit yb x1 x2 [fweight=w]",
-        "status": "error",
+        "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": NaN,
-        "se_rel": NaN,
-        "n_params": 0,
+        "param_rel": 2.5268924243741914e-13,
+        "se_rel": 8.471798366300941e-14,
+        "n_params": 3,
         "mismatched": [],
         "scalars": {},
-        "extra": {},
+        "extra": {
+          "westata_N": 1207,
+          "stata_N": 1207.0,
+          "note": "fweight 在本包按行展开实现；e(N) 是权重和",
+          "stata_b": [
+            0.42618210553744107,
+            0.8115834971297984,
+            -0.4046847004631413
+          ],
+          "westata_b": [
+            0.42618210553754876,
+            0.8115834971299972,
+            -0.4046847004632181
+          ],
+          "stata_se": [
+            0.06398317638923054,
+            0.07207710065111636,
+            0.06448828720374546
+          ],
+          "westata_se": [
+            0.06398317638923337,
+            0.07207710065112247,
+            0.0644882872037481
+          ]
+        },
         "notes": [
-          "westata's discrete estimators take no weights: neither _DiscreteBase.from_formula nor .fit has a weights/fweight parameter (Poisson/Logit/Probit/nbreg/zip/ologit alike)",
-          "Stata accepted it and reports N=1207 (sum of weights), b=[0.8115835, -0.4046847, 0.42618211]"
+          "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
         ],
-        "error": "TypeError: _DiscreteBase.fit() got an unexpected keyword argument 'weights'",
+        "error": "",
         "stata_version": "19.5",
         "seconds": 0.0,
-        "param_tier": "NA",
-        "se_tier": "NA"
+        "param_tier": "A",
+        "se_tier": "A"
       },
       {
         "domain": "discrete",
@@ -1128,12 +1151,12 @@
         "status": "fail",
         "tolerance": 1e-09,
         "param_rel": 2.687600031834131e-07,
-        "se_rel": 1.823151362622733e-08,
+        "se_rel": 1.822822604646551e-08,
         "n_params": 4,
         "mismatched": [],
         "scalars": {},
         "extra": {
-          "seconds_to_fit": 0.42929959297180176,
+          "seconds_to_fit": 0.15805315971374512,
           "stata_b": [
             0.23305931212995862,
             0.6083609760894072,
@@ -1153,10 +1176,10 @@
             0.15583309895753444
           ],
           "westata_se": [
-            0.04856905495936146,
-            0.04965911417372368,
-            0.04730224243823847,
-            0.15583309954648594
+            0.048569054959346145,
+            0.04965911417356042,
+            0.04730224243820033,
+            0.15583309709625023
           ]
         },
         "notes": [
@@ -1269,7 +1292,7 @@
         "status": "fail",
         "tolerance": 1e-09,
         "param_rel": 2.6869980139363696e-08,
-        "se_rel": 3.779373590213366e-09,
+        "se_rel": 1.1944087761477478e-08,
         "n_params": 2,
         "mismatched": [],
         "scalars": {},
@@ -1277,7 +1300,7 @@
           "stata_lnalpha": -0.7059149703610638,
           "westata_lnalpha": -0.7059149513931425,
           "stata_lnalpha_se": 0.15583309895753444,
-          "westata_lnalpha_se": 0.15583309954648594,
+          "westata_lnalpha_se": 0.15583309709625023,
           "stata_alpha": 0.4936566863191099,
           "westata_alpha": 0.4936566956827511
         },
@@ -1394,7 +1417,7 @@
         "status": "fail",
         "tolerance": 1e-09,
         "param_rel": 2.687600031834131e-07,
-        "se_rel": 3.7241098121221897e-08,
+        "se_rel": 3.725560375599035e-08,
         "n_params": 4,
         "mismatched": [],
         "scalars": {},
@@ -1418,10 +1441,10 @@
             0.14850868309809034
           ],
           "westata_se": [
-            0.048178807178325664,
-            0.05010949136582677,
-            0.04746664494973191,
-            0.1485086854299208
+            0.04817880717786466,
+            0.05010949136655364,
+            0.04746664495047233,
+            0.1485086807597797
           ]
         },
         "notes": [
@@ -1439,7 +1462,7 @@
         "stata_command": "nbreg y_nb x1 x2, vce(robust)",
         "status": "fail",
         "tolerance": 1e-09,
-        "param_rel": 3.5926305117901092e-09,
+        "param_rel": 3.5872797057496137e-09,
         "se_rel": NaN,
         "n_params": 9,
         "mismatched": [],
@@ -1476,13 +1499,13 @@
           },
           "chi2": {
             "stata": 163.94465710968234,
-            "westata": 163.94465769867492,
-            "rel": 3.5926305117901092e-09
+            "westata": 163.94465769779768,
+            "rel": 3.5872797057496137e-09
           },
           "p": {
             "stata": 2.5111348763853028e-36,
-            "westata": 2.511134136865478e-36,
-            "rel": 7.395198246538832e-35
+            "westata": 2.5111341379669258e-36,
+            "rel": 7.384183769804718e-35
           },
           "r2_p": {
             "stata": 0.07932044589180731,
@@ -1513,7 +1536,7 @@
           ]
         },
         "notes": [
-          "worst common scalar e(chi2) rel=3.593e-09",
+          "worst common scalar e(chi2) rel=3.587e-09",
           "Stata-only e(): alpha, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rank0, rc",
           "westata-only e(): aic, bic, chi2type, df_r",
           "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
@@ -1531,7 +1554,7 @@
         "status": "fail",
         "tolerance": 1e-09,
         "param_rel": 2.687600031834131e-07,
-        "se_rel": 7.999905006278025e-08,
+        "se_rel": 8.001367431053723e-08,
         "n_params": 4,
         "mismatched": [],
         "scalars": {},
@@ -1555,10 +1578,10 @@
             0.20160543503377373
           ],
           "westata_se": [
-            0.04859822383413887,
-            0.04474381843450925,
-            0.041979250005982544,
-            0.20160543874383277
+            0.04859822383063181,
+            0.0447438184351636,
+            0.0419792500092068,
+            0.2016054324039622
           ]
         },
         "notes": [
@@ -3545,7 +3568,7 @@
         "stata_command": "logit/poisson/nbreg with vce(robust) and vce(cluster g)",
         "status": "pass",
         "tolerance": 1e-06,
-        "param_rel": 3.592630415383269e-09,
+        "param_rel": 3.5872798065383904e-09,
         "se_rel": NaN,
         "n_params": 5,
         "mismatched": [],
@@ -3593,7 +3616,7 @@
             "slopes_only_wald": 163.94465710968234,
             "all_params_wald": 272.1565038432817,
             "rel_slopes_wald_vs_e_chi2": 0.0,
-            "westata_e_chi2": 163.94465769867492,
+            "westata_e_chi2": 163.94465769779768,
             "westata_chi2type": "Wald"
           },
           "rel_westata_vs_stata": {
@@ -3601,7 +3624,7 @@
             "logit, vce(cluster g)": 5.484501741648273e-14,
             "poisson, vce(robust)": 6.339709868186105e-10,
             "poisson, vce(cluster g)": 7.661882239773377e-11,
-            "nbreg, vce(robust)": 3.592630415383269e-09
+            "nbreg, vce(robust)": 3.5872798065383904e-09
           },
           "slopes_only_wald_matches_stata": 2.1857850157323982e-16
         },

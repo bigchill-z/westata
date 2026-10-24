@@ -290,6 +290,9 @@ class _DiscreteBase:
     #: Number of auxiliary (non-regressor) parameters, reported as ``e(k_aux)``
     #: and excluded from ``e(df_m)``.
     _aux_count = 0
+    #: Whether ``freq_weights`` is implemented. False unless a subclass opts in, so an unsupported model
+    #: refuses a weighted call instead of quietly fitting unweighted.
+    _supports_freq_weights = False
 
     def __init__(
         self,
@@ -297,6 +300,7 @@ class _DiscreteBase:
         exog: Any,
         *,
         param_names: list[str] | None = None,
+        freq_weights: Any = None,
     ) -> None:
         self._y = np.asarray(endog, dtype=float).reshape(-1)
         X = np.asarray(exog, dtype=float)
@@ -315,10 +319,22 @@ class _DiscreteBase:
             )
         #: Estimation-sample covariates, retained for margins(over=...).
         self._model_data: pd.DataFrame | None = None
+        #: Frequency weights, or None. Stata's fweight for these commands means each observation counts
+        #: that many times -- which is the one place in this package where fweight IS replication. Note
+        #: the contrast with `qreg`, whose fweight is scale-invariant and does NOT correspond to row
+        #: expansion (GAP_REGISTER 8.18); assuming otherwise there cost a whole bootstrap.
+        self._freq_weights = (
+            None if freq_weights is None else np.asarray(freq_weights, dtype=float).reshape(-1)
+        )
 
     @classmethod
     def from_formula(
-        cls, formula: str, data: pd.DataFrame, *, subset: Any = None
+        cls,
+        formula: str,
+        data: pd.DataFrame,
+        *,
+        subset: Any = None,
+        freq_weights: str | None = None,
     ) -> "_DiscreteBase":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -334,13 +350,58 @@ class _DiscreteBase:
                 f"name, got {lhs!r}"
             )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
-        model = cls(y, X, param_names=names)
+        weights = None
+        if freq_weights is not None:
+            if not cls._supports_freq_weights:
+                raise ConsistencyError(
+                    f"{cls._stata_command}: frequency weights are not implemented for this model. "
+                    "Fitting unweighted and returning it under a weighted call would report numbers for "
+                    "the wrong sample."
+                )
+            if freq_weights not in data.columns:
+                raise ConsistencyError(
+                    f"{cls._stata_command}: freq_weights names {freq_weights!r}, which is not a column"
+                )
+            weights = data.loc[kept_index, freq_weights].to_numpy(dtype=float)
+            if np.any(weights < 0):
+                raise ConsistencyError(
+                    f"{cls._stata_command}: frequency weights must be non-negative"
+                )
+        if weights is None:
+            model = cls(y, X, param_names=names)
+        else:
+            model = cls(y, X, param_names=names, freq_weights=weights)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
         return model
 
     # ------------------------------------------------------------------ fit
     def _make_sm_model(self) -> Any:
         raise NotImplementedError
+
+    def _weighted(self, factory: Any) -> Any:
+        """Build a statsmodels model on the rows EXPANDED by their frequency weights.
+
+        Stata's ``fweight`` for ``logit``/``probit``/``poisson`` means each observation counts that many
+        times, so the faithful implementation is row expansion.
+
+        statsmodels' own ``freq_weights=`` argument is NOT that estimator in this version: measured on the
+        same data it gives different coefficients from expansion ([-0.11801, 0.02925] against
+        [-0.152591, 0.021677]), and statsmodels warns ``unknown kwargs ['freq_weights']`` through
+        ``_check_kwargs``, so it is not a documented path either.
+
+        A helper rather than eight copies of the same call: a subclass that forgot the weights would return
+        an UNWEIGHTED estimate under a weighted invocation, with no error to reveal it.
+        """
+
+        if self._freq_weights is None:
+            return factory(self._y, self._X)
+        counts = np.rint(self._freq_weights).astype(int)
+        if np.any(counts < 0):
+            raise ConsistencyError(
+                f"{self._stata_command}: frequency weights must be non-negative"
+            )
+        rows = np.repeat(np.arange(self._y.size), counts)
+        return factory(self._y[rows], self._X[rows])
 
     def _extra_param_names(self, count: int) -> list[str]:
         """Names for backend parameters beyond the regressors.
@@ -566,33 +627,36 @@ class Logit(_DiscreteBase):
     """Logistic regression (Stata ``logit``)."""
 
     _stata_command = "logit"
+    _supports_freq_weights = True
 
     def _make_sm_model(self) -> Any:
         import statsmodels.api as sm
 
-        return sm.Logit(self._y, self._X)
+        return self._weighted(sm.Logit)
 
 
 class Probit(_DiscreteBase):
     """Probit regression (Stata ``probit``)."""
 
     _stata_command = "probit"
+    _supports_freq_weights = True
 
     def _make_sm_model(self) -> Any:
         import statsmodels.api as sm
 
-        return sm.Probit(self._y, self._X)
+        return self._weighted(sm.Probit)
 
 
 class Poisson(_DiscreteBase):
     """Poisson regression (Stata ``poisson``)."""
 
     _stata_command = "poisson"
+    _supports_freq_weights = True
 
     def _make_sm_model(self) -> Any:
         import statsmodels.api as sm
 
-        return sm.Poisson(self._y, self._X)
+        return self._weighted(sm.Poisson)
 
 
 def _nb2_analytic_information(
@@ -1024,8 +1088,9 @@ class _Ordered(_DiscreteBase):
         exog: Any,
         *,
         param_names: list[str] | None = None,
+        freq_weights: Any = None,
     ) -> None:
-        super().__init__(endog, exog, param_names=param_names)
+        super().__init__(endog, exog, param_names=param_names, freq_weights=freq_weights)
         self._codes, self._categories = _category_codes(self._y)
         n_cuts = int(self._categories.size) - 1
         if n_cuts < 1:
@@ -1038,9 +1103,16 @@ class _Ordered(_DiscreteBase):
 
     @classmethod
     def from_formula(
-        cls, formula: str, data: pd.DataFrame, *, subset: Any = None
+        cls,
+        formula: str,
+        data: pd.DataFrame,
+        *,
+        subset: Any = None,
+        freq_weights: str | None = None,
     ) -> "_Ordered":
-        model = super().from_formula(formula, data, subset=subset)
+        model = super().from_formula(
+            formula, data, subset=subset, freq_weights=freq_weights
+        )
         names = model._param_names
         if "Intercept" in names:
             position = names.index("Intercept")
@@ -1280,6 +1352,7 @@ class OrderedLogit(_Ordered):
     """Ordered logistic regression (Stata ``ologit``)."""
 
     _stata_command = "ologit"
+    _supports_freq_weights = True
     _distribution = "logit"
 
 
@@ -1287,4 +1360,5 @@ class OrderedProbit(_Ordered):
     """Ordered probit regression (Stata ``oprobit``)."""
 
     _stata_command = "oprobit"
+    _supports_freq_weights = True
     _distribution = "probit"

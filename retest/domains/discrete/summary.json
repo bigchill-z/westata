@@ -2,13 +2,13 @@
   "domain": "discrete",
   "total": 65,
   "counts": {
-    "pass": 29,
+    "pass": 30,
     "fail": 30,
     "skip": 4,
-    "error": 2
+    "error": 1
   },
   "max_param_rel": 0.0025094142341710543,
-  "generated_at": "2026-10-24T10:21:00",
+  "generated_at": "2026-10-24T14:51:18",
   "stata_version": "19.5",
   "items": [
     {
@@ -249,17 +249,16 @@
     },
     {
       "name": "logit [fweight=w]",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "status": "pass",
+      "param_rel": 2.5268924243741914e-13,
+      "se_rel": 8.471798366300941e-14,
+      "tier": "A",
+      "se_tier": "A",
       "command": "logit yb x1 x2 [fweight=w]",
       "notes": [
-        "westata's discrete estimators take no weights: neither _DiscreteBase.from_formula nor .fit has a weights/fweight parameter (Poisson/Logit/Probit/nbreg/zip/ologit alike)",
-        "Stata accepted it and reports N=1207 (sum of weights), b=[0.8115835, -0.4046847, 0.42618211]"
+        "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
       ],
-      "error": "TypeError: _DiscreteBase.fit() got an unexpected keyword argument 'weights'"
+      "error": ""
     },
     {
       "name": "logit subset (if x1 > 0)",
@@ -279,7 +278,7 @@
       "name": "nbreg (default = nb2)",
       "status": "fail",
       "param_rel": 2.687600031834131e-07,
-      "se_rel": 1.823151362622733e-08,
+      "se_rel": 1.822822604646551e-08,
       "tier": "B",
       "se_tier": "B",
       "command": "nbreg y_nb x1 x2",
@@ -309,7 +308,7 @@
       "name": "nbreg /lnalpha + alpha (value and SE)",
       "status": "fail",
       "param_rel": 2.6869980139363696e-08,
-      "se_rel": 3.779373590213366e-09,
+      "se_rel": 1.1944087761477478e-08,
       "tier": "B",
       "se_tier": "B",
       "command": "nbreg y_nb x1 x2",
@@ -367,7 +366,7 @@
       "name": "nbreg vce(robust) [Stata ML robust]",
       "status": "fail",
       "param_rel": 2.687600031834131e-07,
-      "se_rel": 3.7241098121221897e-08,
+      "se_rel": 3.725560375599035e-08,
       "tier": "B",
       "se_tier": "B",
       "command": "nbreg y_nb x1 x2, vce(robust)",
@@ -379,13 +378,13 @@
     {
       "name": "nbreg vce(robust) e() scalars",
       "status": "fail",
-      "param_rel": 3.5926305117901092e-09,
+      "param_rel": 3.5872797057496137e-09,
       "se_rel": NaN,
       "tier": "B",
       "se_tier": "NA",
       "command": "nbreg y_nb x1 x2, vce(robust)",
       "notes": [
-        "worst common scalar e(chi2) rel=3.593e-09",
+        "worst common scalar e(chi2) rel=3.587e-09",
         "Stata-only e(): alpha, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rank0, rc",
         "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
@@ -396,7 +395,7 @@
       "name": "nbreg vce(cluster g)",
       "status": "fail",
       "param_rel": 2.687600031834131e-07,
-      "se_rel": 7.999905006278025e-08,
+      "se_rel": 8.001367431053723e-08,
       "tier": "B",
       "se_tier": "B",
       "command": "nbreg y_nb x1 x2, vce(cluster g)",
@@ -888,7 +887,7 @@
     {
       "name": "e(chi2) LR -> Wald switch under vce(robust)/vce(cluster)",
       "status": "pass",
-      "param_rel": 3.592630415383269e-09,
+      "param_rel": 3.5872798065383904e-09,
       "se_rel": NaN,
       "tier": "B",
       "se_tier": "NA",

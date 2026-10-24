@@ -1,0 +1,51 @@
+fix(heckman): take the selection block's covariance from the probit, and use the observed information
+
+Two defects in the same file, both found by measuring rather than reading, both confirmed by the
+independent sweep afterwards.
+
+1. `_probit_fit` REPORTED THE EXPECTED INFORMATION; STATS REPORTS THE OBSERVED ONE.
+
+For a probit the expected information is Z' diag(pdf^2/(Phi(1-Phi))) Z. That is what the function used,
+and it is correct only asymptotically. Stata's `probit` reports the observed information:
+
+    expected  se [0.06449711, 0.07793239, 0.06549953]   max rel 7.373e-03
+    observed  se [0.06424488, 0.07851124, 0.06579817]   max rel 1.770e-11
+    Stata     se [0.06424488, 0.07851124, 0.06579817]
+
+The 0.4-0.7% error, in different directions per parameter, propagated into every two-step selection
+covariance in the package.
+
+An analytic second derivative of the probit score was attempted FIRST and was wrong by 6.3% -- worse
+than the approximation it replaced. So the observed information is differenced from the verified
+closed-form score instead. That is the second time in this session that a correct first derivative did
+not survive being hand-differentiated; the numerical route is used deliberately, not lazily.
+
+2. THE SELECTION BLOCK CAME FROM THE JOINT SANDWICH; STATS LEAVES THE FIRST STAGE ALONE.
+
+Stata's two-step heckman does not touch the first stage's inference, because the selection equation was
+estimated on its own. Measured:
+
+    z1     heckman 0.0785112048   probit 0.0785112404   ratio 0.99999955
+    z2     heckman 0.0657981521   probit 0.0657981707   ratio 0.99999972
+    _cons  heckman 0.0642448607   probit 0.0642448773   ratio 0.99999974
+
+westata used the joint sandwich's block, which put select:z1 3.95% away and select:z2 1.41% away in
+opposite directions. Taking the probit block:
+
+    select:z1    3.948e-02 -> 4.531e-07
+    select:z2    1.414e-02 -> 2.826e-07
+    select:_cons 3.688e-02 -> 2.574e-07
+
+and the coefficients were already at 4.878e-13.
+
+Independent confirmation from re-running the domain against a live Stata:
+`heckman twostep` se_rel 6.81e-02 -> 3.06e-02.
+
+STILL OPEN, and documented rather than papered over: the outcome block and lambda remain 1.6% to 5.9%
+off. `_two_step_covariance` builds an M-estimator sandwich; Stata reports Heckman's two-step corrected
+VCE, which is a different quantity. The correction was pursued by fitting candidate structures to Stata's
+own V -- the closest, `(A'A)^-1 A' diag(dlambda/dw) A (A'A)^-1`, still left a 6.3e-3 residual, and its
+fitted scalar grew with rho in a way `rho^2` does not explain, so the structure is not yet right and no
+formula was adopted on a hunch. That is why the gap is 3.06e-02 instead of closed.
+
+Suite: 1403 passing.

@@ -7,7 +7,7 @@
     "error": 3
   },
   "max_param_rel": 0.0010765871449960062,
-  "generated_at": "2026-10-24T13:10:14",
+  "generated_at": "2026-10-24T13:27:56",
   "stata_version": "19.5",
   "items": [
     {
@@ -123,7 +123,7 @@
       "name": "heckman twostep",
       "status": "fail",
       "param_rel": 1.335456767496874e-09,
-      "se_rel": 0.0681304934971832,
+      "se_rel": 0.0305937605318881,
       "tier": "B",
       "se_tier": "E",
       "command": "heckman y_sel x1, select(s = z1 z2) twostep",

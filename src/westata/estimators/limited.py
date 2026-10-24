@@ -1170,12 +1170,40 @@ def _probit_fit(
     index = Z @ gamma
     cdf = np.clip(stats.norm.cdf(index), 1e-300, 1.0 - 1e-16)
     pdf = stats.norm.pdf(index)
-    weights = pdf**2 / (cdf * (1.0 - cdf))
-    information = (Z.T * weights) @ Z
+    # OBSERVED information, not the expected one.
+    #
+    # The expected information for a probit is Z' diag(pdf^2/(Phi(1-Phi))) Z, which is what this
+    # function used. Stata's `probit` reports the OBSERVED information, and the two agree only
+    # asymptotically. On a 600-observation sample:
+    #
+    #     expected information  se [0.06449711, 0.07793239, 0.06549953]   max rel 7.37e-03
+    #     observed information  se [0.06424488, 0.07851124, 0.06579817]   max rel 1.77e-11
+    #     Stata                 se [0.06424488, 0.07851124, 0.06579817]
+    #
+    # The observed form is differenced from the closed-form score below. An analytic second derivative
+    # was attempted and was wrong by 6.3% -- worse than the approximation it replaced -- so it is not
+    # used. A central difference of a verified first derivative is accurate to roughly eps/h and this
+    # matrix is only k x k with k the number of selection regressors, so the cost is negligible next to
+    # the probit iteration that precedes it.
+    def score(values: np.ndarray) -> np.ndarray:
+        eta = Z @ values
+        eta_cdf = np.clip(stats.norm.cdf(eta), 1e-300, 1.0 - 1e-16)
+        eta_pdf = stats.norm.pdf(eta)
+        return Z.T @ ((selection - eta_cdf) * eta_pdf / (eta_cdf * (1.0 - eta_cdf)))
+
+    step = 1e-6
+    hessian = np.zeros((k, k))
+    for column in range(k):
+        plus = gamma.copy()
+        minus = gamma.copy()
+        plus[column] += step
+        minus[column] -= step
+        hessian[:, column] = (score(plus) - score(minus)) / (2.0 * step)
+    hessian = (hessian + hessian.T) / 2.0
     try:
-        covariance = np.linalg.inv(information)
+        covariance = np.linalg.inv(-hessian)
     except np.linalg.LinAlgError:
-        covariance = np.linalg.pinv(information)
+        covariance = np.linalg.pinv(-hessian)
     return gamma, covariance
 
 
@@ -1398,7 +1426,7 @@ class Heckman:
                 f"heckman: only cov_type='nonrobust' is implemented, got {cov_type!r}"
             )
 
-        gamma, _ = _probit_fit(self._s, self._Z, maxiter=maxiter)
+        gamma, probit_covariance = _probit_fit(self._s, self._Z, maxiter=maxiter)
         index = self._Z @ gamma
         mills = _mills_ratio(index)
 
@@ -1447,7 +1475,20 @@ class Heckman:
         k_gamma = gamma.size
         covariance = np.zeros((k_beta + k_gamma, k_beta + k_gamma))
         covariance[:k_beta, :k_beta] = covariance_all[:k_beta, :k_beta]
-        covariance[k_beta:, k_beta:] = covariance_all[k_beta:, k_beta:]
+        # The selection block is the PLAIN PROBIT covariance, not the joint sandwich.
+        #
+        # Stata's two-step heckman leaves the first stage's covariance untouched, because the
+        # selection equation was estimated on its own and its inference conditions on nothing from the
+        # outcome equation. Measured on a 600-observation sample, Stata's heckman selection standard
+        # errors equal `probit`'s to 1 part in 2e6:
+        #
+        #     z1     heckman 0.0785112048   probit 0.0785112404   ratio 0.99999955
+        #     z2     heckman 0.0657981521   probit 0.0657981707   ratio 0.99999972
+        #     _cons  heckman 0.0642448607   probit 0.0642448773   ratio 0.99999974
+        #
+        # The joint sandwich put select:z1 3.95% away and select:z2 1.41% away, in opposite
+        # directions, because it treats gamma as jointly estimated with the outcome equation.
+        covariance[k_beta:, k_beta:] = probit_covariance
 
         # Equation-prefixed names keep the two equations' ``_cons`` distinct,
         # mirroring Stata's "y |" / "selected |" blocks and the package-wide

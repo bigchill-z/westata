@@ -514,10 +514,57 @@ def test_heckman_standard_errors_are_heckman_corrected():
     assert not np.allclose(reported, naive, rtol=1e-8)
 
 
-def test_heckman_ml_is_refused():
-    model = Heckman.from_formula("y ~ x + select(selected ~ z)", _selection())
-    with pytest.raises(UnsupportedError, match="maximum likelihood"):
-        model.fit(method="ml")
+def test_heckman_ml_matches_stata():
+    """Stata's DEFAULT for `heckman` is ML; the two-step is the option.
+
+    Pinned after implementing `method='ml'` from `heck_d2.ado`. The likelihood was verified separately at STAT'S
+    estimates (relative difference 0.0), which is what caught the parameterisation question; this test checks the
+    estimator converges to the same place.
+
+    A subtlety worth recording because it cost a debugging round: `model._y` stores the censored rows as ZEROS, not
+    NaN (the two-step path masks them out). The ML likelihood branches on `np.isfinite(y)`, so feeding `_y`
+    unchanged made every row take the observed branch and the selection term never ran -- the fit then landed 5x
+    away while the same likelihood, given a proper NaN array, matched Stata exactly.
+    """
+
+    import numpy as np
+    import pandas as pd
+
+    import westata as ws
+
+    rng = np.random.default_rng(20261024)
+    n = 600
+    z1 = rng.normal(size=n)
+    z2 = rng.normal(size=n)
+    x1 = 0.4 * z1 + rng.normal(size=n)
+    latent = 0.5 + 0.8 * z1 - 0.5 * z2 + rng.normal(size=n)
+    selected = latent > 0
+    y_full = 1.0 + 1.2 * x1 + 0.6 * rng.normal(size=n) + 0.7 * (
+        latent - (0.5 + 0.8 * z1 - 0.5 * z2)
+    )
+    frame = pd.DataFrame(
+        {
+            "y": np.where(selected, y_full, np.nan),
+            "x1": x1,
+            "z1": z1,
+            "z2": z2,
+            "s": selected.astype(float),
+        }
+    )
+
+    result = ws.Heckman.from_formula("y ~ x1 + select(s ~ z1 + z2)", frame).fit(method="ml")
+
+    # Stata order [x1, _cons, z1, z2, _cons, athrho, lnsigma]; ours puts each block's intercept first.
+    order = [1, 0, 3, 4, 2, 5, 6]
+    expected_b = np.array(
+        [1.20662108, 1.05583258, 1.01055822, -0.66613539, 0.53496061, 0.79722397, -0.09785539]
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float)[order], expected_b, rtol=1e-6
+    )
+    assert float(result.e["ll"]) == pytest.approx(-721.0595369593314, rel=1e-12)
+    assert float(result.e["rho"]) == pytest.approx(0.6624819556063586, rel=1e-7)
+    assert float(result.e["sigma"]) == pytest.approx(0.9067800194953135, rel=1e-7)
 
 
 def test_heckman_requires_a_selection_equation():

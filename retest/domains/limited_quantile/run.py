@@ -445,24 +445,21 @@ with Stata() as st:
     ))
 
     cap_ml_h = st.estimate("heckman y_sel x1, select(s = z1 z2)")
-    try:
-        ws.Heckman.from_formula("y ~ x1 + select(s ~ z1 + z2)", sel_df).fit(method="ml")
-        rec.skip("heckman ml", "westata unexpectedly accepted method='ml'")
-    except UnsupportedError as exc:
-        rec.error(
-            "heckman ml", exc, command="heckman y_sel x1, select(s = z1 z2)",
-            notes=[
-                "Stata ML works and is the default: b=" +
-                str(np.array2string(np.asarray(cap_ml_h.b), precision=8)),
-                "se=" + str(np.array2string(np.sqrt(np.diag(cap_ml_h.V)), precision=8)),
-                f"e(rho)={cap_ml_h.scalars.get('rho')} "
-                f"e(sigma)={cap_ml_h.scalars.get('sigma')} "
-                f"e(lambda)={cap_ml_h.scalars.get('lambda')} "
-                f"ll={cap_ml_h.scalars.get('ll')}",
-                "westata raises UnsupportedError (text above): the estimator is absent, "
-                "so the gap is coverage, not numerics.",
-            ],
-        )
+    res_ml_h = ws.Heckman.from_formula("y_sel ~ x1 + select(s ~ z1 + z2)", sel_df).fit(
+        method="ml")
+    rec.add(compare(
+        "heckman ml",
+        renamed(cap_ml_h, ["x1", "Intercept", "z1", "z2", "Intercept",
+                          "/athrho", "/lnsigma"]),
+        res_ml_h,
+        extra={"stata": {k: cap_ml_h.scalars.get(k) for k in
+                         ("rho", "sigma", "lambda", "ll")},
+               "westata": {k: res_ml_h.e.get(k) for k in
+                           ("rho", "sigma", "lambda", "ll")}},
+        notes=["似然与梯度取自 heck_d2.ado；在 Stata 系数处似然差 0.0",
+               "lnsigma 的 score 由已验证似然数值微分（解析版错了一个数量级）",
+               "注意 _y 把删失行填 0 而非 NaN，ML 似然需重新置回 NaN"],
+    ))
 
     # ============================================================== ETREGRESS
     cap = st.estimate("etregress y x1, treat(s = z1 z2) twostep")

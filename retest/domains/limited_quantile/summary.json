@@ -3,11 +3,11 @@
   "total": 25,
   "counts": {
     "pass": 11,
-    "fail": 12,
-    "error": 2
+    "fail": 13,
+    "error": 1
   },
-  "max_param_rel": 0.001516827415567701,
-  "generated_at": "2026-10-24T15:31:18",
+  "max_param_rel": 0.0015150590823206423,
+  "generated_at": "2026-10-24T16:47:49",
   "stata_version": "19.5",
   "items": [
     {
@@ -138,19 +138,19 @@
     },
     {
       "name": "heckman ml",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "status": "fail",
+      "param_rel": 9.672121164854131e-07,
+      "se_rel": 0.0002219348685277285,
+      "tier": "B",
+      "se_tier": "C",
       "command": "heckman y_sel x1, select(s = z1 z2)",
       "notes": [
-        "Stata ML works and is the default: b=[ 0.94936305  0.9878724   0.68493422 -0.34621549  0.48339523  0.63715466\n -0.02719471]",
-        "se=[0.04343817 0.08143272 0.07100291 0.05728226 0.05969308 0.16828703\n 0.04820686]",
-        "e(rho)=0.5629590789365696 e(sigma)=0.973171736540929 e(lambda)=0.5478558644501834 ll=-818.2496669528897",
-        "westata raises UnsupportedError (text above): the estimator is absent, so the gap is coverage, not numerics."
+        "\u4f3c\u7136\u4e0e\u68af\u5ea6\u53d6\u81ea heck_d2.ado\uff1b\u5728 Stata \u7cfb\u6570\u5904\u4f3c\u7136\u5dee 0.0",
+        "lnsigma \u7684 score \u7531\u5df2\u9a8c\u8bc1\u4f3c\u7136\u6570\u503c\u5fae\u5206\uff08\u89e3\u6790\u7248\u9519\u4e86\u4e00\u4e2a\u6570\u91cf\u7ea7\uff09",
+        "\u6ce8\u610f _y \u628a\u5220\u5931\u884c\u586b 0 \u800c\u975e NaN\uff0cML \u4f3c\u7136\u9700\u91cd\u65b0\u7f6e\u56de NaN",
+        "unmatched coefficients: y:Intercept, y:x1, select:Intercept, select:z1, select:z2, stata-only:x1, stata-only:Intercept, stata-only:z1, stata-only:z2, stata-only:Intercept"
       ],
-      "error": "UnsupportedError: heckman: only method='twostep' is implemented; 'ml' is not. The maximum likelihood variant requires a joint optimisation over beta, gamma and rho together with the bivariate normal probabilities, which has not been implemented or verified against Stata."
+      "error": ""
     },
     {
       "name": "etregress twostep",
@@ -186,25 +186,25 @@
     {
       "name": "frontier halfnormal",
       "status": "fail",
-      "param_rel": 0.0010765871449960062,
-      "se_rel": 0.002527171322009485,
+      "param_rel": 0.0010661669355540532,
+      "se_rel": 0.0025315128782276695,
       "tier": "D",
       "se_tier": "D",
       "command": "frontier y x1 x2",
       "notes": [
         "Stata's e(b) colnames are ['x1','x2','_cons','_cons','_cons']; the last two rows are /lnsig2v and /lnsig2u in the printed order",
         "DGP carries real inefficiency (u ~ |N(0, 0.7^2)|); without it both estimators sit on the sigma_u = 0 boundary and the /lnsig2u SE is meaningless, so the boundary case is not used",
-        "scalar e(chi2) rel diff 9.298e-06",
-        "scalar e(sigma_u) rel diff 1.751e-04",
-        "scalar e(sigma_v) rel diff 2.547e-05"
+        "scalar e(chi2) rel diff 9.370e-06",
+        "scalar e(sigma_u) rel diff 1.727e-04",
+        "scalar e(sigma_v) rel diff 2.522e-05"
       ],
       "error": ""
     },
     {
       "name": "frontier exponential",
       "status": "fail",
-      "param_rel": 0.001516827415567701,
-      "se_rel": 0.04318500191318106,
+      "param_rel": 0.0015150590823206423,
+      "se_rel": 0.043179127729471384,
       "tier": "D",
       "se_tier": "E",
       "command": "frontier y x1 x2, distribution(exponential)",

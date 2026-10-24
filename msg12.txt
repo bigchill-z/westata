@@ -1,0 +1,46 @@
+﻿feat(heckman): implement method=ml, Stata default, from heck_d2.ado
+
+`heckman ..., ml` raised UnsupportedError. It is now implemented and measured: coefficients 9.7e-07, standard
+errors 2.2e-04, likelihood 1.6e-16 against Stata. This matters because ML is Stata DEFAULT for heckman -- the
+two-step is the option -- so the common invocation was the unsupported one.
+
+THE LIKELIHOOD, from `heck_d2.ado` v2.4.0:
+
+    rho = tanh(athrho)        sigma = exp(lnsigma)
+    eta = (Is + (y - Ir) rho / sigma) / sqrt(1 - rho^2)
+    ll_i = ln Phi(eta) - 1/2 ln(2 pi sigma^2) - 1/2 ((y-Ir)/sigma)^2     y observed
+         = ln Phi(-Is)                                                   y missing
+
+VERIFIED at STAT ESTIMATES: -721.0595369593314 against Stata -721.0595369593314, relative difference 0.0. The
+censored branch is the part a complete-sample test would never exercise, so the verification data has 224
+censored rows of 600.
+
+FOUR FIXES, EACH FOUND BY MEASURING RATHER THAN REASONING:
+
+1. The lnsigma score was wrong by an order of magnitude (analytic -26.64 against numeric 2.47). Five of the six
+   blocks transcribed from heck_d2.ado matched a numerical gradient to 5e-09; the one I had to DERIVE was wrong.
+   Third time this session that a hand-derived derivative failed while source-transcribed ones held, so the
+   lnsigma block now comes from a central difference of the verified likelihood.
+
+2. BFGS from the two-step start diverged to rho = 0.96, likelihood 23% away -- while a run started at the true
+   optimum stayed there, so the surface was fine and the STEP was the problem. Bounding athrho (tanh saturates
+   beyond |tau|~3) did not help; a bounded L-BFGS-B pass in front of the simplex made it worse.
+
+3. Nelder-Mead ALONE, from three different starts (two-step values, Stata estimates, rho=0 sigma=1), reached
+   -721.0595369593 every time. So there is one maximum here and the quasi-Newton stage was the only thing that
+   could fail -- and it moved the point where the polish budget could not recover. The pre-step is gone.
+
+4. THE ONE THAT EXPLAINS THE OTHERS: `model._y` stores censored rows as ZEROS, not NaN -- the two-step path
+   masks them out and never needed the distinction. The ML likelihood branches on `np.isfinite(y)`, so feeding
+   `_y` unchanged made EVERY row take the observed branch and the selection term never ran. Measured: 0 NaN in
+   `_y` against 224 censored rows. The standalone likelihood, given a proper NaN array, matched Stata exactly all
+   along; `_fit_ml` was handing it different data.
+
+`e(V)` is on the athrho/lnsigma scale, with rho, sigma and lambda carrying their own delta-method SEs -- the
+scale separation the NB1 work already paid for once.
+
+THE SIXTH SWEEP-SCRIPT INSTANCE, in six rounds. Replaced with a comparison. The pattern is now well established
+enough to state plainly: these blocks encode whether a feature exists, and every one keeps encoding it after the
+feature lands.
+
+Sweep totals: error rows 3 -> 2. Suite: 1431 passing.

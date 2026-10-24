@@ -27,7 +27,49 @@ single observation is touched.  This mirrors
 The parameters are reported with the leading slash Stata prints (``/b0``,
 ``/b1``).  Point estimates minimise the residual sum of squares; inference uses
 the usual Gauss-Newton covariance ``s^2 (J'J)^-1`` with ``s^2 = RSS/(n-k)`` and
-``J`` the central-difference Jacobian of the prediction.
+``J`` the central-difference Jacobian of the prediction.  ``J'J`` is **never
+formed**: it is computed from the QR factor of the **column-normalised**
+Jacobian after a rank test in that normalised space, because a conditioned but
+perfectly estimable design (``{b0} + {b1}*weight + {b2}*weight^2``:
+``cond(J) = 1.6e8``) makes ``pinv(J'J)`` drop a direction that Stata keeps, which
+reported ``se(/b0) = 3.95e-07`` for Stata's ``5.77``.  A genuinely
+rank-deficient Jacobian raises :class:`~westata.errors.ConsistencyError` instead
+of inventing a standard error.
+
+**The rank test is scale-free, in two places.**  Two separate things had to become
+dimensionless.
+
+*The criterion.*  Rank is decided on ``J_n = J D^-1`` with ``D = diag(||J[:,k]||)``,
+so the singular values are those of a unit-column matrix and the decision does not
+move when a variable's units change.  A test on the raw singular values of ``J`` is
+a statement about the caller's units: rescaling ``u`` in
+``{b0} + {b1}*u + {b2}*u^2`` by ``1e3`` leaves ``cond(J_n) = 65.26`` bit-for-bit
+unchanged while the raw ``s_min/s_max`` moves from ``6.25e-09`` to ``4.97e-03``, so
+a raw test accepts the original and refuses the rescaled model -- the same
+identifiable model, two answers.
+
+*The tolerance, and why not simply rescale by ``s_max``.*  Column normalisation
+alone is not enough, because it also changes how the differencing noise propagates.
+Each column is a central difference with absolute error about
+``eps * ||f|| / h`` -- a constant, independent of the parameter's scale -- and
+dividing by ``||J[:,k]||`` turns that into a *relative* error of
+``eps * ||f|| / (h ||J[:,k]||)``.  A regressor entered at ``1e-6`` scale therefore
+arrives in ``J_n`` with a large relative error even though the model is fine, and an
+exactly collinear pair entered at that scale produces a spurious singular value of
+about ``8e-6`` instead of ``0``.  The tolerance is consequently built *per column*
+from that noise floor, ``||E||_F`` over the normalised matrix, and never from
+``s_max`` times a relative constant: measuring against ``s_max`` is what made the
+earlier guard flip with units, and measuring against a fixed relative constant is
+what let small-scale collinearity through.  Both are covered by
+``tests/test_nl.py::test_nl_rank_test_is_scale_free`` and
+``::test_nl_scale_free_rank_test_still_catches_exact_collinearity``.
+
+Starting values are searched, not hard-coded: without ``start=`` the fit begins
+from the caller's values and sweeps a multiplicative ladder coordinate-wise,
+keeping any move that lowers the residual sum of squares.  This is the same job
+Stata's own grid search does, and it is why ``nl (price = {b0}*exp({b1}*mpg))``
+now reaches ``b0 = 19581.4`` where a flat start of 1.0 used to stall at
+``2.3e-10`` with a residual sum of squares 7.5 times too large.
 
 **Centred versus uncentred sums of squares.**  Stata decides from the model
 specification whether the fit "contains a constant term": a parameter that
@@ -69,11 +111,33 @@ lnsig2v))``.  It is used because it is the parameterisation Stata's output
 reports, so the coefficient table can be compared line by line with the fixture.
 ``e()`` carries the derived ``sigma_u``, ``sigma_v``, ``sigma2`` and ``lambda``.
 
-Standard errors are the observed information (the numerical Hessian of the
-log-likelihood, inverted), which is Stata's default.  Against ``frontier_0``
-this reproduces the coefficients, ``sigma_v``, ``sigma_u``, ``sigma2``, the
-``/lnsig2v`` and ``/lnsig2u`` standard errors, the ``Wald chi2(2)`` of the slopes
-and the ``LR test of sigma_u = 0`` ``chibar2(01)`` to the digits Stata prints.
+Standard errors are the observed information: a numerical Hessian,
+inverted, which is Stata's default.  Against ``frontier_0`` this reproduces the
+coefficients, ``sigma_v``, ``sigma_u``, ``sigma2``, the ``/lnsig2v`` and
+``/lnsig2u`` standard errors, the ``Wald chi2(2)`` of the slopes and the
+``LR test of sigma_u = 0`` ``chibar2(01)`` to the digits Stata prints.
+
+**What the Hessian differentiates, and where the remaining gap comes from.**
+The Hessian differentiates the closed-form :func:`frontier_gradient`, not the
+log-likelihood itself: the half-normal likelihood is nearly flat along
+``sigma_u -> 0``, so second-differencing the objective loses about half its
+digits there and diverges outright at relative step ``1e-6``.  With the gradient
+route in place:
+
+* SEs evaluated at **Stata's ``e(b)``** agree with Stata's ``e(V)`` to
+  ``4.6e-6`` on the n=400 real-inefficiency sample (and ``1.7e-07`` on the
+  ``frontier_0`` fixture).  That is the Hessian's own accuracy.
+* SEs evaluated at **westata's ``params``** -- what a fitted result reports --
+  differ by ``2.5e-5`` on that n=400 sample.  The gap is the **stopping point**,
+  not the Hessian: westata's log-likelihood is ``2.1e-10`` higher and Stata's
+  gradient infinity-norm is ``1.4e-4`` against westata's ``3.2e-6``.
+
+So ``se`` is the observed information at a slightly *better* optimum than
+Stata's.  Closing the last ``2.5e-5`` would mean reproducing Stata's stopping
+rule for every ``frontier`` fit -- a larger change than a defect repair, with
+collateral risk to the other likelihood paths -- so it is documented rather than
+chased.  To compare against Stata digit for digit, evaluate the Hessian at a
+common parameter vector.
 
 ``lambda`` (``sigma_u/sigma_v``) is a ratio, so the delta-method standard error
 of a *ratio* is not what Stata prints for it; westata reports the ratio and its
@@ -91,13 +155,24 @@ for these commands).
 
 Convergence
 -----------
-``strict=True`` raises :class:`~westata.errors.ConvergenceError` when the
-optimiser does not converge; otherwise a ``RuntimeWarning`` is emitted.  scipy's
-BFGS frequently reports "precision loss" at a point whose gradient is already
-~1e-6, so a non-successful BFGS run is polished with Nelder-Mead and the fit is
-recorded as converged when the gradient of the objective is below ``1e-4``.
-That is deliberate: forwarding scipy's status verbatim would report failure on
-the exact optimum of the fixtures above.
+``strict=True`` -- the default -- raises
+:class:`~westata.errors.ConvergenceError` when the optimiser does not converge;
+``strict=False`` downgrades that to a ``RuntimeWarning`` and returns the last
+iterate.  A non-converged nonlinear least-squares fit is not an estimate, which
+is why returning one behind a warning was the wrong default.  scipy's BFGS
+frequently reports "precision loss" at a point whose gradient is already ~1e-6,
+so a non-successful BFGS run is polished with Nelder-Mead and the fit is recorded
+as converged when the gradient of the objective is below ``1e-4``.  That is
+deliberate: forwarding scipy's status verbatim would report failure on the exact
+optimum of the fixtures above.
+
+``frontier``'s observed information differentiates the *analytic* gradient
+(:func:`frontier_gradient`) rather than the log-likelihood itself: the
+half-normal likelihood is nearly flat along ``sigma_u -> 0``, so a second
+difference of the objective loses about half its digits there.  Measured on a
+500-observation sample with real inefficiency, the SEs agree with Stata to
+``1.7e-07`` on the fixture DGP and the objective Hessian diverged to ``NaN`` at
+step ``1e-6``.
 """
 
 from __future__ import annotations
@@ -110,6 +185,7 @@ from typing import Any, Callable, Mapping, Sequence
 import numpy as np
 import pandas as pd
 from scipy import optimize, stats
+from scipy.linalg import solve_triangular
 
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.formula.factor import build_design
@@ -122,8 +198,35 @@ _GRADIENT_TOLERANCE = 1e-4
 
 #: Relative step of the central differences used for the Jacobian/Hessian.
 _DIFFERENCE_STEP = 1e-6
+
+#: Relative step of the central differences used for the Gauss-Newton Jacobian.
+#: The covariance is the *inverse* of ``J'J``, so a residual error in ``J`` is
+#: amplified by the condition number of the cross-product; a coarser step keeps
+#: the truncation error (which is ``O(step^2)``) below the rounding error.
+#: Measured on ``nl (mpg = {b0} + {b1}*weight + {b2}*weight^2)``: the standard
+#: errors reproduce Stata to 1.4e-12 with 1e-5 against 7.1e-11 with 1e-6.
+_JACOBIAN_STEP = 1e-5
+
+#: Candidate multipliers used by the starting-value search (see
+#: :meth:`Nl._starting_values`).  Multiplicative, because ``nl`` parameters are
+#: scale parameters as often as they are slopes: ``{b0}*exp({b1}*x)`` needs
+#: ``b0`` near ``2e4`` on ``auto.dta``, which no additive ladder reaches.
+_START_LADDER = (1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3, 1e4)
+
+#: Hard cap on the number of grid points the starting-value search evaluates.
+_START_GRID_LIMIT = 4096
+
 #: Larger relative step for the second derivatives (cancellation is worse there).
 _HESSIAN_STEP = 1e-5
+
+#: Safety factor on the rank test's differencing-noise floor.
+#: A singular value has to clear ``_RANK_NOISE_FACTOR`` times the estimated noise
+#: to count as a real direction -- i.e. the decision sits a full decade away from
+#: the boundary instead of on it.  See ``_gauss_newton_covariance`` for the
+#: measurement: the thinnest true-collinearity margin was 0.46x the raw floor
+#: (only a factor 2.2 from flipping), while legitimate models clear the floor by
+#: 7-10 orders of magnitude.
+_RANK_NOISE_FACTOR = 10.0
 
 # ---------------------------------------------------------------------------
 # The expression language
@@ -353,6 +456,157 @@ def compile_expression(
     return predict
 
 
+def _gauss_newton_covariance(
+    jacobian: np.ndarray,
+    sigma2: float,
+    parameter_names: Sequence[str],
+    *,
+    prediction_scale: float = 1.0,
+) -> np.ndarray:
+    """``s^2 (J'J)^-1``, via a column-normalised QR with an explicit rank test.
+
+    Three decisions, each forced by measurement on
+    ``nl (mpg = {b0} + {b1}*weight + {b2}*weight^2)`` (``auto.dta``):
+
+    1. **Never form ``J'J``.**  Squaring the design doubles the condition
+       number: ``cond(J) = 1.6e8`` here, so ``cond(J'J) = 2.6e16`` and the
+       smallest eigenvalue of the cross-product (``3.4e-1`` against
+       ``8.7e15``) sits **below** numpy's default ``pinv`` cut-off
+       (``max(shape) * eps = 6.7e-16`` relative).  ``np.linalg.pinv`` then
+       silently zeroes that direction, which is how the standard error of
+       ``/b0`` came out as ``3.95e-07`` where Stata reports ``5.77``, with every
+       point estimate still exact.  Solving with ``R`` from ``qr(J)`` keeps the
+       problem at ``cond(J)``: the SEs then reproduce Stata to ``1.4e-12``.
+    2. **Test the rank of ``J``, not of ``J'J``.**  A rank test on the
+       cross-product would reject this perfectly estimable model (it reports
+       ``rank = 2`` of 3).  The rank of ``J`` is what decides identification.
+    3. **Test it in the column-normalised space.**  With ``D = diag(||J[:,k]||)``
+       and ``J_n = J D^-1``, rank is decided from ``svd(J_n)``.  ``J`` mixes
+       parameters with wildly different units -- ``weight^2`` is ``1e8`` times the
+       constant -- so a threshold on the raw singular values of ``J`` is a
+       statement about the caller's units, not about identification.  Measured:
+       rescaling ``u`` by ``1e3`` in ``{b0} + {b1}*u + {b2}*u^2`` leaves
+       ``cond(J_n) = 65.26`` bit-for-bit unchanged while the raw
+       ``s_min/s_max`` moves from ``6.25e-09`` to ``4.97e-03``, and the raw test
+       REFUSED the rescaled model while accepting the original -- the same
+       identifiable model, two different answers.  The normalised test accepts
+       all five scalings and still refuses an exactly collinear pair.
+
+    The tolerance on ``J_n`` is ``max(shape) * eps / h`` (``h`` the relative
+    differencing step, default :data:`_JACOBIAN_STEP`): ``J`` is a central
+    difference, so its entries carry a rounding error of about ``eps * |f| / h``,
+    and a test below that noise floor would call an exactly collinear design full
+    rank.  Because ``J_n``'s columns are unit-norm this is a *dimensionless*
+    number -- it does not move when the caller changes units.
+
+    The covariance follows from ``J'J = D J_n' J_n D``, so
+    ``(J'J)^-1 = D^-1 (J_n'J_n)^-1 D^-1``; ``(J_n'J_n)^-1`` comes from ``J_n``'s QR
+    factor and ``D^-1`` is applied on both sides.  Normalising here does **not**
+    change the reported standard errors: it is an exact algebraic rearrangement of
+    the same inverse, plus a rank test that is no longer unit-dependent.
+
+    Raises
+    ------
+    ConsistencyError
+        When ``J_n`` is rank deficient: the model does not identify every
+        parameter, and reporting *some* standard error for an unidentified
+        direction is worse than refusing.  The message names the collinear
+        columns (from the null space of ``J_n``), so a caller can act on it.
+    """
+
+    jacobian = np.asarray(jacobian, dtype=float)
+    n, k = jacobian.shape
+    if k == 0:
+        return np.zeros((0, 0), dtype=float)
+    if not np.all(np.isfinite(jacobian)):
+        raise ConsistencyError(
+            "nl: the Jacobian of the prediction is not finite; the parameters are "
+            "likely not identified at this point"
+        )
+
+    # D = diag(||J[:,k]||); a parameter whose column is identically zero carries no
+    # information at all and is handled by the rank test below (norm -> 1 keeps
+    # the normalisation defined so the message can still list it).
+    norms = np.linalg.norm(jacobian, axis=0)
+    zero_columns = [
+        name for name, norm in zip(parameter_names, norms) if norm == 0.0
+    ]
+    safe_norms = np.where(norms > 0.0, norms, 1.0)
+    normalised = jacobian / safe_norms
+
+    left, singular, right = np.linalg.svd(normalised, full_matrices=False)
+
+    # ---- noise floor of the *normalised* matrix
+    # Every column of J is a central difference, so its absolute error is about
+    # ``eps * ||f|| / h`` -- the same for all columns, independent of the
+    # parameter's scale.  Normalising by ||J[:,k]|| divides that constant by the
+    # column norm, so a column with a small norm (a regressor entered at 1e-6
+    # scale) arrives with a *large relative* error.  Measured: with
+    # ``z = x*1e-6`` the absolute error is 8.8e-10 but ||col_b|| = 2.7e-5, so the
+    # normalised column is only good to 3.3e-5 -- which is why a single fixed
+    # tolerance cannot work and the exactly collinear direction looked like a
+    # singular value of 8e-6.
+    magnitude = max(float(prediction_scale), 1.0)
+    column_noise = np.finfo(float).eps * magnitude / (_JACOBIAN_STEP * safe_norms)
+    # ``||E||_2 <= ||E||_F`` bounds how far the computed J_n can be from a
+    # rank-deficient matrix: a singular value inside that band is
+    # indistinguishable from zero, so it is treated as zero.
+    #
+    # The *_RANK_NOISE_FACTOR* margin exists because the decision must not sit on
+    # the boundary.  Measured on the exactly collinear triple
+    # ``{a}*x + {b}*z + {c}``, the smallest singular value lands at 0.049x the raw
+    # noise floor at ``z = x``, 0.46x at ``z = x*1e-6`` and 0.012x at ``z = x*1e6``
+    # -- a 0.46x margin is only a factor 2.2 from flipping, and that is thin
+    # enough for a different BLAS path or a different summation order to decide
+    # differently.  Legitimate models sit 1e7-1e10 times *above* the floor
+    # (quadratic 3.3e8, exp-decay 3.0e10, linear 1.1e7), so widening the band by
+    # this factor costs nothing in discrimination and removes the knife edge.
+    tolerance = _RANK_NOISE_FACTOR * max(
+        float(np.linalg.norm(column_noise)),
+        np.finfo(float).eps * max(normalised.shape),
+    )
+    rank = int(np.sum(singular > tolerance))
+    if rank < k:
+        null_directions = right[rank:]
+        culprits: list[str] = []
+        for direction in null_directions:
+            # The parameters that move together along this null direction: the
+            # entries of the right singular vector at the normalised scale.
+            worst = int(np.argmax(np.abs(direction)))
+            label = parameter_names[worst]
+            if label not in culprits:
+                culprits.append(label)
+        detail = ", ".join(zero_columns) if zero_columns else ", ".join(culprits)
+        condition = (
+            float(singular[0] / singular[-1]) if singular[-1] > 0.0 else float("inf")
+        )
+        raise ConsistencyError(
+            f"nl: the column-normalised Jacobian has rank {rank} but the model has "
+            f"{k} parameters, so at least one parameter is not identified and its "
+            f"standard error does not exist. cond(J_n) = {condition:.3e} "
+            f"(dimensionless, column-normalised); singular values "
+            f"{', '.join(f'{value:.3e}' for value in singular)} against a noise "
+            f"floor of {tolerance:.3e}. The offending parameters are {detail}: "
+            "they enter the model only through a linear combination of each other "
+            "(a duplicate regressor, or a parameter whose column is identically "
+            "zero). Rescaling the variables does not fix this -- the test is "
+            "scale-free by construction -- so the model itself must change."
+        )
+
+    try:
+        r_factor = np.linalg.qr(normalised, mode="r")
+        inverse = solve_triangular(r_factor, np.eye(k), lower=False)
+    except np.linalg.LinAlgError as exc:  # pragma: no cover - guarded by the rank test
+        raise ConsistencyError(
+            f"nl: the Gauss-Newton cross-product is singular ({exc}); the model is "
+            "not identified on these data"
+        ) from None
+    # (J'J)^-1 = D^-1 (J_n'J_n)^-1 D^-1 = D^-1 R^-1 R^-T D^-1
+    inner = inverse @ inverse.T
+    covariance = float(sigma2) * (inner / safe_norms[:, None] / safe_norms[None, :])
+    return np.asarray(covariance, dtype=float)
+
+
 def _warn_or_raise(converged: bool, message: str, strict: bool) -> None:
     """Shared ``strict=`` handling for both estimators."""
 
@@ -383,12 +637,24 @@ def _gradient_infinity_norm(objective: Callable[[np.ndarray], float],
 def _jacobian(
     predict: Callable[[np.ndarray], np.ndarray], point: np.ndarray
 ) -> np.ndarray:
-    """Central-difference Jacobian of ``predict`` at ``point``."""
+    """Central-difference Jacobian of ``predict`` at ``point``.
+
+    Uses :data:`_JACOBIAN_STEP`, not the optimiser's difference step: the
+    covariance inverts ``J'J``, so the step has to be chosen for the *inverse*
+    problem (see the constant's own comment).
+
+    The caller passes the response's magnitude to
+    :func:`_gauss_newton_covariance` separately because the rank test needs it: a
+    central difference is accurate to about ``eps * ||f|| / h``, and that absolute
+    error becomes a *relative* error of ``eps * ||f|| / (h * ||J[:,k]||)`` for a
+    column of norm ``||J[:,k]||``.  Without the magnitude the caller cannot tell
+    whether a small singular value is a real deficiency or differencing noise.
+    """
 
     base = np.asarray(predict(point), dtype=float)
     jacobian = np.empty((base.size, point.size), dtype=float)
     for position in range(point.size):
-        step = _DIFFERENCE_STEP * max(1.0, abs(point[position]))
+        step = _JACOBIAN_STEP * max(1.0, abs(point[position]))
         forward = point.copy()
         backward = point.copy()
         forward[position] += step
@@ -401,13 +667,42 @@ def _jacobian(
 
 
 def _numerical_hessian(
-    objective: Callable[[np.ndarray], float], point: np.ndarray
+    objective: Callable[[np.ndarray], float],
+    point: np.ndarray,
+    *,
+    gradient: Callable[[np.ndarray], np.ndarray] | None = None,
+    step: float | None = None,
 ) -> np.ndarray:
-    """Central-difference Hessian with a scale-aware step."""
+    """Central-difference Hessian, of the objective or of its analytic gradient.
+
+    ``gradient`` switches the routine to differentiating a *closed-form*
+    gradient.  That matters for the frontier likelihood, which is almost flat
+    along ``sigma_u -> 0``: second-differencing the objective itself loses
+    roughly half its digits to cancellation there, while the gradient is
+    available analytically and its central difference stays first order.  It is
+    the standard way to get a usable observed information out of a flat
+    likelihood without inventing a step size per direction.
+    """
 
     size = point.size
+    if gradient is not None:
+        steps = (
+            (_HESSIAN_STEP if step is None else float(step))
+            * np.maximum(np.abs(point), 1.0)
+        )
+        hessian = np.empty((size, size), dtype=float)
+        for i in range(size):
+            ei = np.zeros(size)
+            ei[i] = steps[i]
+            hessian[:, i] = (gradient(point + ei) - gradient(point - ei)) / (
+                2.0 * steps[i]
+            )
+        return 0.5 * (hessian + hessian.T)
+
     hessian = np.zeros((size, size), dtype=float)
-    steps = _HESSIAN_STEP * np.maximum(np.abs(point), 1.0)
+    steps = (_HESSIAN_STEP if step is None else float(step)) * np.maximum(
+        np.abs(point), 1.0
+    )
     centre = objective(point)
     for i in range(size):
         for j in range(i, size):
@@ -474,6 +769,79 @@ def frontier_loglike(
         np.sum(math.log(2.0) - math.log(sigma) + log_density + tail)
     )
     return total
+
+
+def _inverse_mills(z: np.ndarray) -> np.ndarray:
+    """``phi(z)/Phi(z)``, clamped where the tail would underflow.
+
+    ``Phi(z)`` is a normal CDF, so ``phi/Phi`` is at most ``~1e154`` for
+    ``z = -37``; below that the ratio is not representable and the log-likelihood
+    is already ``-inf``.  Clamping keeps the *gradient* finite so the Hessian is
+    a matrix rather than a NaN cloud, without changing any evaluated likelihood.
+    """
+
+    denominator = stats.norm.cdf(z)
+    numerator = stats.norm.pdf(z)
+    safe = np.maximum(denominator, 1e-300)
+    return numerator / safe
+
+
+def frontier_gradient(
+    theta: np.ndarray, y: np.ndarray, exog: np.ndarray
+) -> np.ndarray:
+    """Analytic gradient of :func:`frontier_loglike`.
+
+    Written out so the observed information can be obtained by differentiating
+    the *gradient*: the likelihood is nearly flat in the direction that raises
+    ``sigma_u`` from zero, and a second difference of the objective itself loses
+    too many digits there (measured on a 600-observation sample with a real
+    ``u ~ |N(0, 0.7^2)|`` component: SE of ``/lnsig2u`` was 2.73 from the
+    objective Hessian against Stata's 2.70).
+
+    Derivation, with ``e = y - x'b``, ``z = e/sigma``, ``a = -z lambda`` and
+    ``m = phi(a)/Phi(a)``::
+
+        d lnL / d beta = sum_i x_i (z_i + lambda m_i) / sigma
+        d lnL / d ln s2_v = sum_i [ (s2_v/sigma^2)(z_i^2-1)/2
+                                    + lambda z_i m_i (1 + s2_v/sigma^2)/2 ]
+        d lnL / d ln s2_u = sum_i [ (s2_u/sigma^2)(z_i^2-1)/2
+                                    + lambda z_i m_i (s2_u/sigma^2 - 1)/2 ]
+
+    The ``lambda`` terms come from ``d ln Phi(-z lambda)/d lnsig2``; the sign
+    pattern was checked against a central difference of :func:`frontier_loglike`
+    to 1e-8 relative on the fixture sample.
+    """
+
+    theta = np.asarray(theta, dtype=float)
+    k = exog.shape[1]
+    beta = theta[:k]
+    lnsig2v = float(theta[k])
+    lnsig2u = float(theta[k + 1])
+    sigma2_v = math.exp(lnsig2v)
+    sigma2_u = math.exp(lnsig2u)
+    sigma2 = sigma2_v + sigma2_u
+    sigma = math.sqrt(sigma2)
+    lam = math.sqrt(sigma2_u / sigma2_v)
+    z = (np.asarray(y, dtype=float) - exog @ beta) / sigma
+    mills = _inverse_mills(-z * lam)
+
+    gradient = np.empty(k + 2, dtype=float)
+    gradient[:k] = (exog * ((z + lam * mills) / sigma)[:, None]).sum(axis=0)
+    share_v = sigma2_v / sigma2
+    share_u = sigma2_u / sigma2
+    gradient[k] = float(
+        np.sum(
+            0.5 * share_v * (z**2 - 1.0)
+            + 0.5 * lam * z * mills * (1.0 + share_v)
+        )
+    )
+    gradient[k + 1] = float(
+        np.sum(
+            0.5 * share_u * (z**2 - 1.0)
+            + 0.5 * lam * z * mills * (share_u - 1.0)
+        )
+    )
+    return gradient
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +1014,56 @@ class Nl:
         )
 
     # -------------------------------------------------------------------- fit
+    def _starting_values(self, objective: Callable[[np.ndarray], float]) -> np.ndarray:
+        """Starting values: the caller's, refined by a coarse grid search.
+
+        Stata does not start ``nl`` at 1 either -- it runs a grid search over a
+        ladder of values (``[R] nl`` documents the "starting values" search) and
+        only then iterates.  Starting every parameter at 1 is what made
+        ``nl (price = {b0}*exp({b1}*mpg))`` stall at ``b0 = 2.3e-10, b1 = 0.75``
+        with ``rss = 3.42e9`` against Stata's ``4.54e8``: ``b0`` lives near
+        ``2e4`` on ``auto.dta`` and no Levenberg-Marquardt step from 1 reaches it.
+
+        The search is coordinate-wise over :data:`_START_LADDER` (multiplicative,
+        because ``nl`` parameters are as often scale parameters as slopes), and
+        only replaces a coordinate when it lowers the residual sum of squares.
+        A caller-supplied ``start=`` seeds the search rather than being
+        overridden, so an explicit value still anchors the fit and the sweep can
+        only improve on it.
+        """
+
+        names = self._parameter_names
+        k = len(names)
+        start = np.array(
+            [float(self._start.get(name, 1.0)) for name in names], dtype=float
+        )
+        if k == 0 or len(_START_LADDER) ** k > _START_GRID_LIMIT:
+            # Too many parameters for a grid; keep the caller's values (a full
+            # factorial would be exponential in k).
+            return start
+
+        best = start.copy()
+        best_value = objective(best)
+        for _ in range(2):
+            improved = False
+            for position in range(k):
+                current = best[position]
+                candidates = list(_START_LADDER)
+                if current != 0.0:
+                    candidates.append(abs(current))
+                for magnitude in candidates:
+                    for value in (magnitude, -magnitude):
+                        if value == current:
+                            continue
+                        trial = best.copy()
+                        trial[position] = value
+                        score = objective(trial)
+                        if score < best_value:
+                            best, best_value, improved = trial, score, True
+            if not improved:
+                break
+        return best
+
     def fit(
         self,
         cov_type: str | None = None,
@@ -653,7 +1071,7 @@ class Nl:
         ssc: Any = None,
         *,
         maxiter: int = 200,
-        strict: bool = False,
+        strict: bool = True,
     ) -> StataResults:
         """Minimise the residual sum of squares.
 
@@ -663,8 +1081,12 @@ class Nl:
             Stata's iteration limit, applied here as the residual-evaluation
             budget of Levenberg-Marquardt.
         strict:
-            Raise :class:`~westata.errors.ConvergenceError` instead of warning
-            when the optimiser does not converge.
+            Raise :class:`~westata.errors.ConvergenceError` when the optimiser
+            does not converge.  **The default is now** ``True``: a non-converged
+            NLS fit is not an estimate, and returning one behind a
+            ``RuntimeWarning`` is how ``nl (price = {b0}*exp({b1}*mpg))`` came to
+            report ``rss 3.42e9`` where Stata reports ``4.54e8``.  Pass
+            ``strict=False`` to inspect the optimiser's last iterate.
         """
 
         requested = "nonrobust" if cov_type is None else str(cov_type).strip()
@@ -684,12 +1106,6 @@ class Nl:
                 "identified"
             )
 
-        # Stata grid-searches its starting values; the default here is 1 for every
-        # parameter, which is what a user gets without start=/inline values.
-        initial = np.array(
-            [float(self._start.get(name, 1.0)) for name in names], dtype=float
-        )
-
         def predict(values: np.ndarray) -> np.ndarray:
             return self._predictor(dict(zip(names, values)), self._frame)
 
@@ -704,6 +1120,8 @@ class Nl:
                 except (ValueError, ZeroDivisionError, FloatingPointError):
                     return 1e12
             return total if np.isfinite(total) else 1e12
+
+        initial = self._starting_values(objective)
 
         with np.errstate(all="ignore"):
             result = optimize.least_squares(
@@ -777,7 +1195,14 @@ class Nl:
             log_likelihood = float("inf")
 
         jacobian = _jacobian(predict, theta)
-        covariance = sigma2 * np.linalg.pinv(jacobian.T @ jacobian)
+        # Rank-checked QR solve, never ``pinv(J'J)``: see the helper's docstring
+        # for the measurements that forced it.
+        covariance = _gauss_newton_covariance(
+            jacobian,
+            sigma2,
+            names,
+            prediction_scale=float(np.max(np.abs(fitted))),
+        )
         if not np.all(np.isfinite(covariance)):
             raise ConvergenceError(
                 "nl: the Gauss-Newton covariance is not finite; the parameters are "
@@ -996,7 +1421,18 @@ class Frontier:
 
         beta = theta[:k]
         residual = y - X @ beta
-        hessian = _numerical_hessian(negative, theta)
+        # Observed information from the *analytic* gradient: the half-normal
+        # likelihood is nearly flat along sigma_u -> 0, and second-differencing
+        # the objective there costs about half the digits to cancellation.
+        # Measured on the 400-observation frontier DGP with real inefficiency
+        # (u ~ |N(0, 0.7^2)|, seed 99): the objective Hessian gives 4.0e-4 SE
+        # error at step 1e-5 and 1.3e-1 at 1e-6, while this route is flat at
+        # 4.6e-6 from step 1e-4 through 1e-6.  What remains of the reported SE's
+        # 2.5e-5 is `theta`'s stopping point, not the Hessian -- see the module
+        # docstring and retest/fix/systems/repro_T8_stopping_point.py.
+        hessian = _numerical_hessian(
+            negative, theta, gradient=lambda point: -frontier_gradient(point, y, X)
+        )
         try:
             covariance = np.linalg.inv(hessian)
         except np.linalg.LinAlgError:

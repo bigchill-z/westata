@@ -352,12 +352,18 @@ class StataResults:
 
         return lrtest(self, restricted)
 
-    def hausman(self, efficient: Any) -> Any:
-        """Hausman specification test (Stata `hausman`)."""
+    def hausman(self, efficient: Any, **kwargs: Any) -> Any:
+        """Hausman specification test (Stata `hausman`).
+
+        Keyword arguments are forwarded to
+        :func:`westata.postestimation.modeltests.hausman`, so the Stata
+        ``hausman ..., constant`` option is reachable from a result object too:
+        ``fe.hausman(re, constant=True)``.
+        """
 
         from westata.postestimation.modeltests import hausman
 
-        return hausman(self, efficient)
+        return hausman(self, efficient, **kwargs)
 
     def contrast(self, term: str, method: str = "r", **kwargs: Any) -> Any:
         """ANOVA-style contrast of a factor's levels (Stata `contrast`)."""

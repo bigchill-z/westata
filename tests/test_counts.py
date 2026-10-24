@@ -25,7 +25,7 @@ import pytest
 from scipy import stats
 from scipy.special import expit, gammaln
 
-from westata.errors import ConsistencyError, ConvergenceError
+from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.estimators.counts import (
     TruncatedNegativeBinomial,
     TruncatedPoisson,
@@ -559,6 +559,182 @@ def test_fitted_values_are_positive_and_finite():
     ).fit()
     assert np.all(np.isfinite(result.fittedvalues))
     assert np.all(result.fittedvalues > 0)
+
+
+# ------------------------------------------- predict: Stata's own definitions
+#
+# StataNow 19.5 (MP), captured 2026-10-24.  The three types these models expose
+# are the ones Stata actually accepts; ``stdf``/``residuals`` are rejected there
+# with ``option ... not allowed`` r(198), so westata raises instead of guessing.
+
+
+def test_zip_predict_n_is_the_conditional_mean_and_pr_is_pi():
+    """``zip``: ``n = (1-pi)*mu`` and ``pr = pi`` -- not ``P(y = 0)``.
+
+    StataNow 19.5 (MP), captured 2026-10-24, on ``count_frame(n=400)``::
+
+        . zip y x1, inflate(x1)
+        . predict double v_n, n      → head 1.3999846394, 1.7717686145, 0.8787082077
+        . predict double v_pr, pr    → head 0.1909625463, 0.2225383305, 0.1403379277
+        . predict double v_xb, xb    → head 0.5483713314, 0.8236992008, 0.0219135103
+
+    with ``e(b) = .6344708429, .3934148304, .4443678744, -1.5522956429`` (main
+    ``x1 _cons``, then inflate ``x1 _cons``).  ``pr`` being ``pi`` rather than
+    the zero-mass is the counter-intuitive part: the zero probability is
+    ``pi + (1-pi)f(0)``, which differs by 0.77 on this data.
+    """
+
+    frame = count_frame(n=400)
+    result = ZeroInflatedPoisson.from_formula("y ~ x1", frame, inflate="x1").fit()
+    params = result.params.to_numpy()
+    design = np.column_stack([np.ones(len(frame)), frame["x1"].to_numpy()])
+
+    mu = np.exp(design @ params[:2])
+    pi = 1.0 / (1.0 + np.exp(-(design @ params[2:])))
+
+    np.testing.assert_allclose(result.predict(kind="n"), (1.0 - pi) * mu, rtol=1e-12)
+    np.testing.assert_allclose(result.predict(kind="pr"), pi, rtol=1e-12)
+    np.testing.assert_allclose(result.predict(kind="xb"), design @ params[:2], rtol=1e-12)
+
+    # And the numbers line up with Stata's own predictions to the optimiser's
+    # tolerance (captured above; the coefficients match to ~1e-7).
+    head = result.predict(kind="n")[:3]
+    np.testing.assert_allclose(head, [1.3999846394, 1.7717686145, 0.8787082077], rtol=1e-5)
+    head_pr = result.predict(kind="pr")[:3]
+    np.testing.assert_allclose(
+        head_pr, [0.1909625463, 0.2225383305, 0.1403379277], rtol=1e-5
+    )
+
+
+def test_ztp_predict_n_is_exp_xb_not_the_truncated_mean():
+    """``ztp predict, n`` is ``exp(xb)``; the truncation does **not** enter it.
+
+    StataNow 19.5 (MP), captured 2026-10-24: after ``ztp y x1``, ``predict, n``
+    equals ``exp(xb)`` for every observation (verified to 1.8e-15), while the
+    truncated mean ``mu / (1 - e^-mu)`` is a different quantity entirely.  The
+    old ``fittedvalues`` reported the truncated mean under the ``n`` label,
+    which is an 8.7e-01 relative difference -- a definition mismatch, not a
+    numerical one, so both are now available under their own names.
+    """
+
+    frame = positive(count_frame())
+    result = TruncatedPoisson.from_formula("y ~ x1", frame, lower=1).fit()
+
+    design = np.column_stack([np.ones(len(frame)), frame["x1"].to_numpy()])
+    mu = np.exp(design @ result.params.to_numpy())
+    np.testing.assert_allclose(result.predict(kind="n"), mu, rtol=1e-12)
+    np.testing.assert_allclose(result.predict(kind="xb"), design @ result.params.to_numpy(),
+                               rtol=1e-12)
+
+    # The truncated mean is genuinely different and is NOT what ``n`` reports.
+    truncated = mu / (1.0 - np.exp(-mu))
+    assert not np.allclose(truncated, result.predict(kind="n"), rtol=1e-3)
+
+
+def test_truncated_models_refuse_pr_like_stata():
+    """Stata rejects ``predict, pr`` after ``ztp``/``tnbreg`` (r(198)).
+
+    Two layers refuse it and either message is fine: the postestimation
+    dispatcher checks ``_predict_types`` first and names the alternatives, and
+    the model hook would raise the same error if it were reached first.
+    """
+
+    frame = positive(count_frame())
+    result = TruncatedPoisson.from_formula("y ~ x1", frame, lower=1).fit()
+    with pytest.raises(UnsupportedError, match="ztp|predict type"):
+        result.predict(kind="pr")
+
+
+def test_zip_exposes_the_predict_hook_postestimation_delegates_to():
+    """The model-owned hook ``postestimation.predict`` calls, by name.
+
+    ``predict.py`` looks for ``_predict_dispatch`` on the result and returns
+    ``None`` from it to mean "use the generic implementation"; ``_predict_types``
+    is the authoritative whitelist used in the error message.
+    """
+
+    result = ZeroInflatedPoisson.from_formula(
+        "y ~ x1", count_frame(n=300), inflate="x1"
+    ).fit()
+
+    dispatch = getattr(result, "_predict_dispatch", None)
+    assert callable(dispatch)
+    assert set(getattr(result, "_predict_types")) == {"xb", "n", "pr", "stdp"}
+
+    design = np.column_stack([np.ones(300), count_frame(n=300)["x1"].to_numpy()])
+    assert dispatch(kind="stdp", exog=design) is None  # generic x'Vx is correct
+    assert dispatch(kind="n", exog=design) is not None
+
+    truncated = TruncatedPoisson.from_formula(
+        "y ~ x1", positive(count_frame(n=300)), lower=1
+    ).fit()
+    assert set(getattr(truncated, "_predict_types")) == {"xb", "n", "stdp"}
+
+
+def test_count_model_test_switches_to_a_slope_block_wald():
+    """``e(chi2)`` is a slope-block Wald under a robust VCE, LR otherwise.
+
+    StataNow 19.5 (MP), captured 2026-10-24, on ``count_frame(n=400)``::
+
+        . zip y x1, inflate(x1)                       → LR chi2(1), e(chi2type)=LR
+        . zip y x1, inflate(x1), vce(robust)          → Wald chi2(1), chi2type=Wald
+
+    The Wald excludes the constant and both inflation coefficients: including
+    them would be off by 11%-70% depending on which block is folded in.
+    """
+
+    frame = count_frame(n=400)
+    plain = ZeroInflatedPoisson.from_formula("y ~ x1", frame, inflate="x1").fit()
+    robust = ZeroInflatedPoisson.from_formula("y ~ x1", frame, inflate="x1").fit(
+        cov_type="robust"
+    )
+
+    assert plain.e["chi2type"] == "LR"
+    assert robust.e["chi2type"] == "Wald"
+
+    # Recompute the slope-block Wald straight from the reported (b, V).
+    params = robust.params.to_numpy()
+    cov = robust.cov_params()
+    slope = params[1]  # the only main-equation regressor
+    variance = cov[1, 1]
+    assert robust.e["chi2"] == pytest.approx(float(slope**2 / variance), rel=1e-10)
+
+    # Folding in every parameter would give a materially different statistic.
+    everything = float(params @ np.linalg.solve(cov, params))
+    assert not np.isclose(everything, robust.e["chi2"], rtol=1e-2)
+
+
+def test_zip_e_p_uses_rank_minus_one_degrees_of_freedom():
+    """``zip``'s ``e(p)`` is ``chi2.sf(e(chi2), e(rank)-1)``, not ``e(df_m)``.
+
+    StataNow 19.5 (MP), captured 2026-10-24, on ``count_frame()``::
+
+        . zip y x1, inflate(x1)
+          e(df_m) = 1, e(rank) = 4, e(chi2) = 248.04159086422897,
+          e(p)    = 1.7353842226580317e-53
+
+    ``chi2.sf(248.04, 3)`` reproduces ``e(p)``; using ``e(df_m) = 1`` gives
+    8.9e-56, i.e. two orders of magnitude off.  Under ``vce(robust)`` both sides
+    switch to ``e(df_m)``, which is asserted too.
+    """
+
+    from scipy import stats as sps
+
+    frame = count_frame()
+    result = ZeroInflatedPoisson.from_formula("y ~ x1", frame, inflate="x1").fit()
+    assert result.e["df_m"] == 1
+    assert result.e["rank"] == 4
+    assert result.e["chi2"] == pytest.approx(248.04159086422897, rel=1e-6)
+    assert result.e["p"] == pytest.approx(
+        sps.chi2.sf(result.e["chi2"], result.e["rank"] - 1), rel=1e-12
+    )
+
+    robust = ZeroInflatedPoisson.from_formula("y ~ x1", frame, inflate="x1").fit(
+        cov_type="robust"
+    )
+    assert robust.e["p"] == pytest.approx(
+        sps.chi2.sf(robust.e["chi2"], robust.e["df_m"]), rel=1e-12
+    )
 
 
 # -------------------------------------------------------------- guard rails

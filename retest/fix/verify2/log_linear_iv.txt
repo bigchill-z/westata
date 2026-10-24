@@ -1,0 +1,74 @@
+====================================================================================================
+F. LINEAR-IV
+====================================================================================================
+stata 19.5
+
+[F1] L1 IV vce(robust) == HC0 ; vce(robust) small == HC1
+       HC0 vs vce(robust)        se rel=4.241e-14 (A)
+       HC1 vs vce(robust) small  se rel=4.253e-14 (A)
+       Stata small/default ratio = 1.000766185785 ; sqrt(N/(N-K)) = 1.000766185785
+
+[F2] L2 IVLIML vce(cluster) is CR0 (Stata default), not CR1
+       default (CR0) se rel=1.337e-15 (A)
+       small   (CR1) se rel=1.331e-15 (A)
+       Stata small/default = 1.004103365860 ; sqrt(G/(G-1)*(N-1)/(N-K)) = 1.004103365860
+       2SLS cluster (regression guard) se rel=4.160e-14 (A)
+
+[F3] L3 IVGMM vce(cluster): Stata clusters W too (point ESTIMATE moves)
+  GMM cluster b/se                             b=1.124e-15 (A)  se=1.614e-16 (A)
+       e(V) full rel=2.499e-14 (A)
+       GMM default (guard) b rel=1.234e-15 se rel=6.096e-16
+
+[F4] L4 OLS e(F) follows the VCE; L5 e(df_r)=G-1; L6 e() coverage
+(1978 automobile data)
+       regress mpg weight foreign                       e(F) rel=1.222e-15(A) e(df_r) 71.0/71.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg weight foreign, vce(robust)          e(F) rel=4.621e-15(A) e(df_r) 71.0/71.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg weight foreign, vce(cluster gid)     e(F) rel=4.162e-15(A) e(df_r) 11.0/11.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg weight foreign [pweight=w]           e(F) rel=3.464e-14(A) e(df_r) 71.0/71.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg weight foreign [aweight=w]           e(F) rel=9.121e-15(A) e(df_r) 71.0/71.0 match=True
+           e() coverage: missing=[] wrong=['ll:-193.177/-197.728', 'll_0:-235.636/-240.188']
+       regress mpg weight foreign [fweight=w]           e(F) rel=1.615e-15(A) e(df_r) 180.0/180.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg weight foreign, noconstant           e(F) rel=2.620e-16(A) e(df_r) 72.0/72.0 match=True
+           e() coverage: missing=[] wrong=[]
+       regress mpg                                      e(F) rel=0.000e+00(A) e(df_r) 73.0/73.0 match=True
+           e() coverage: missing=[] wrong=[]
+
+---- summary ----
+  L6 regress mpg weight foreign [aweight=w]        2.000e+00  E
+  L1 HC1 small                                     4.253e-14  A
+  L1 HC0                                           4.241e-14  A
+  L2 2sls cluster                                  4.160e-14  A
+  L4 regress mpg weight foreign [pweight=w]        3.464e-14  A
+  L3 gmm cluster V                                 2.499e-14  A
+  L4 regress mpg weight foreign [aweight=w]        9.121e-15  A
+  L4 regress mpg weight foreign, vce(robust)       4.621e-15  A
+  L4 regress mpg weight foreign, vce(cluster gid)  4.162e-15  A
+  L4 regress mpg weight foreign [fweight=w]        1.615e-15  A
+  L2 CR0                                           1.337e-15  A
+  L2 CR1                                           1.331e-15  A
+  L3 gmm default                                   1.234e-15  A
+  L4 regress mpg weight foreign                    1.222e-15  A
+  L3 gmm cluster b                                 1.124e-15  A
+  L4 regress mpg weight foreign, noconstant        2.620e-16  A
+  L3 gmm cluster se                                1.614e-16  A
+  L5 regress mpg weight foreign                    0.000e+00  A
+  L6 regress mpg weight foreign                    0.000e+00  A
+  L5 regress mpg weight foreign, vce(robust)       0.000e+00  A
+  L6 regress mpg weight foreign, vce(robust)       0.000e+00  A
+  L5 regress mpg weight foreign, vce(cluster gid)  0.000e+00  A
+  L6 regress mpg weight foreign, vce(cluster gid)  0.000e+00  A
+  L5 regress mpg weight foreign [pweight=w]        0.000e+00  A
+  L6 regress mpg weight foreign [pweight=w]        0.000e+00  A
+  L5 regress mpg weight foreign [aweight=w]        0.000e+00  A
+  L5 regress mpg weight foreign [fweight=w]        0.000e+00  A
+  L6 regress mpg weight foreign [fweight=w]        0.000e+00  A
+  L5 regress mpg weight foreign, noconstant        0.000e+00  A
+  L6 regress mpg weight foreign, noconstant        0.000e+00  A
+  L4 regress mpg                                   0.000e+00  A
+  L5 regress mpg                                   0.000e+00  A
+  L6 regress mpg                                   0.000e+00  A

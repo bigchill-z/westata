@@ -975,17 +975,46 @@ class AIPW(IPW):
             influence1 = (augmented1 - mean1) + psi_theta @ grad1.mean(axis=0)
             influence0 = (augmented0 - mean0) + psi_theta @ grad0.mean(axis=0)
         else:
+            # Stata's ATET potential-outcome means are NOT the ATE ones restricted
+            # to the treated.  For the ATET the reported population is the treated,
+            # so both means are normalised by n1 = sum(t) and the control
+            # augmentation only runs over the controls:
+            #
+            #   PO(1) = (1/n1) sum_i t_i y_i                    (the treated mean)
+            #   PO(0) = (1/n1) sum_i [ t_i m0_i
+            #                          + (1-t_i) odds_i (y_i - m0_i) ]
+            #
+            # Both were reconstructed from westata's own propensity scores and
+            # outcome regressions in retest/domains/systems_causal/run.py and match
+            # Stata's e(b) to 4.4e-16.  Two structural errors made the old branch
+            # wrong: PO(1) averaged m1 + t*r1/p over the treated (a spurious 1/p;
+            # the treated-side augmentation collapses to y algebraically), and
+            # PO(0) averaged m0 over the treated, so the (1-t) factor in
+            # augmented0 removed every control contribution instead of reweighting
+            # it by the odds.  Measured: ATET 6.3e-3, SE 2.9e-2 in the retest.
             share = float(arm.mean())
-            mean1 = float(augmented1[arm].mean())
-            mean0 = float(augmented0[arm].mean())
-            influence1 = (
-                treated * (augmented1 - mean1)
-                + psi_theta @ (treated[:, None] * grad1).mean(axis=0)
-            ) / share
+            odds = p / (1.0 - p)
+            mean1 = float(y[arm].mean())
+            augmented0_atet = (
+                treated * fitted0
+                + (1.0 - treated) * odds * residual0
+            )
+            mean0 = float(augmented0_atet.sum() / share / float(n))
+            influence1 = treated * (y - mean1) / share
+            # theta = (beta, b1, b0); a0_i = t m0_i + (1-t) odds (y - m0) so
+            #   d a0/dbeta = (1-t) residual0 odds x
+            #   d a0/db0   = (t - (1-t) odds) x
+            # and dividing by n1 (random) adds -mu0 * t_i to the direct part.
+            grad0_atet = np.zeros((n, 3 * k), dtype=float)
+            grad0_atet[:, :k] = (
+                (1.0 - treated) * residual0 * odds
+            )[:, None] * x
+            grad0_atet[:, 2 * k :] = (
+                treated - (1.0 - treated) * odds
+            )[:, None] * x
             influence0 = (
-                treated * (augmented0 - mean0)
-                + psi_theta @ (treated[:, None] * grad0).mean(axis=0)
-            ) / share
+                augmented0_atet - treated * mean0
+            ) / share + psi_theta @ (grad0_atet.mean(axis=0) / share)
 
         potential = _potential_means(
             mean0, influence0, mean1, influence1, self._command
@@ -1201,30 +1230,59 @@ class NearestNeighbourMatching:
         effect_treated = y[treated_index] - imputed0
         effect_control = imputed1 - y[control_index]
 
+        n1 = float(treated_index.size)
+        n0 = float(control_index.size)
+
         if self._estimand == "atet":
             estimate = float(effect_treated.mean())
             mean0 = float(imputed0.mean())
             mean1 = float(y[treated_index].mean())
-            share0 = 1.0
-            share1 = 1.0
         else:
             estimate = float((effect_treated.sum() + effect_control.sum()) / n)
             mean0 = float((y[control_index].sum() + imputed0.sum()) / n)
             mean1 = float((y[treated_index].sum() + imputed1.sum()) / n)
-            share0 = float(control_index.size / n)
-            share1 = float(treated_index.size / n)
 
         # How often each observation is reused as a match; fractional when
         # nneighbor > 1, because each of the k matches carries weight 1/k.
-        reuse = np.zeros(n, dtype=float)
-        np.add.at(reuse, neighbours0.ravel(), 1.0 / neighbours0.shape[1])
-        np.add.at(reuse, neighbours1.ravel(), 1.0 / neighbours1.shape[1])
+        reuse0 = np.zeros(n, dtype=float)   # a CONTROL reused by the treated
+        reuse1 = np.zeros(n, dtype=float)   # a TREATED unit reused by the controls
+        np.add.at(reuse0, neighbours0.ravel(), 1.0 / neighbours0.shape[1])
+        np.add.at(reuse1, neighbours1.ravel(), 1.0 / neighbours1.shape[1])
 
         sigma2 = np.empty(n, dtype=float)
         sigma2[treated_index] = self._same_arm_sigma(distances, treated_index, y)
         sigma2[control_index] = self._same_arm_sigma(distances, control_index, y)
 
-        variance = float(np.sum((1.0 + reuse) ** 2 * sigma2) / n**2)
+        # The variance of the two estimands is NOT the same expression.  Writing
+        # the estimators as linear combinations of the observations (the
+        # Abadie-Imbens form, with sigma^2_i the conditional variance):
+        #
+        #   ATE : alpha_i = (2 t_i - 1)(1 + K_i)/n   with K_i the reuse count of
+        #         observation i as a match for the OTHER arm, so
+        #         V = (1/n^2) sum_i (1 + K_i)^2 sigma^2_i.
+        #   ATET: alpha_i = t_i a_i / n1 - (1 - t_i) K_i a_i / n1, i.e. the
+        #         treated enter with weight 1/n1 and no reuse (a treated unit is
+        #         never its own counterfactual), while a control reused K_i times
+        #         enters K_i times:
+        #         V = (1/n1^2) [ sum_treated sigma^2_i
+        #                        + sum_control K_i^2 sigma^2_i ].
+        #
+        # The old code applied the ATE formula to both estimands, which is why the
+        # ATET standard error was bit-for-bit the ATE's (share0 = share1 = 1 in
+        # the potential-outcome rescaling below was the symptom, not the cause).
+        if self._estimand == "atet":
+            variance = float(
+                (np.sum(sigma2[treated_index])
+                 + np.sum(reuse0[control_index] ** 2 * sigma2[control_index]))
+                / n1**2
+            )
+            share0 = 1.0 / np.sqrt(n1)   # PO(0) lives on the treated mean: se/n1
+            share1 = 1.0 / np.sqrt(n1)
+        else:
+            reuse = reuse0 + reuse1
+            variance = float(np.sum((1.0 + reuse) ** 2 * sigma2) / n**2)
+            share0 = float(control_index.size / n)
+            share1 = float(treated_index.size / n)
         if not np.isfinite(variance) or variance <= 0.0:
             raise ConsistencyError(
                 f"{self._command}: the matching variance is not positive "

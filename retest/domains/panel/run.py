@@ -469,14 +469,19 @@ with Stata() as st:
     ))
 
     # ---- 9. 归因 A：westata 的 cluster 恰好等于 Stata 的 dfadj
+    # The attribution used to prove "westata == Stata's dfadj variant".  After the
+    # repair westata matches Stata's DEFAULT cluster VCE, so that is what is
+    # asserted; the dfadj variant is kept as the contrast.
     rec.add(compare(
-        "归因 A：westata 的 vce(cluster) == Stata 的 vce(cluster id) dfadj",
-        cap_dfadj, res_cl, domain=DOMAIN, tolerance=EXACT,
-        extra={"stata_dfadj_se": se_of(cap_dfadj).tolist(),
+        "归因 A：westata 的 vce(cluster) == Stata 的 vce(cluster id)（默认口径）",
+        cap_cl, res_cl, domain=DOMAIN, tolerance=EXACT,
+        extra={"stata_default_se": se_of(cap_cl).tolist(),
+               "stata_dfadj_se": se_of(cap_dfadj).tolist(),
                "westata_se": res_cl.bse.to_list()},
-        notes=["Stata `dfadj` = 用 (N-1)/(N-P)（P 含被吸收的面板效应）而不是 (N-1)/(N-K)；"
-               "westata 的结果与 dfadj 逐位相同（2.1e-15）→ westata 用的是 dfadj 口径，"
-               "而 Stata 的默认口径不含被吸收效应"],
+        notes=["Stata 的 `vce(cluster id)` 默认口径与 `dfadj` 口径不同：默认按 K=3（不把被吸收效应"
+               "计入自由度），dfadj 按 (N-1)/(N-P)（P 含被吸收效应）。修好后 westata 与默认口径"
+               "逐位一致，与 dfadj 相比则差 (N-1)/(N-P) 那个因子——这一条正是当年把错误口径"
+               "固化成『正确』的证据，现在反过来用。"],
     ))
 
     # ---- 10. 归因 B：手工 CR1 与 linearmodels auto_df=True 都能复现 Stata 默认
@@ -813,10 +818,28 @@ with Stata() as st:
     cap_po = st.estimate("xtpoisson yc x1 x2, fe")
     res_nb = ws.XtNbreg.from_formula("yc ~ x1 + x2", df, entity="id", method="fe").fit()
     cap_nb_s = restrict(cap_nb, {"x1", "x2"})
+    assert "_cons" not in cap_nb_s.names, cap_nb_s.names
     _cons_i = cap_nb.names.index("_cons")
+    # westata reports [Intercept, x1, x2] while Stata reports [x1, x2, _cons]; the
+    # runner aligns by name, so only the scalars can still fail here.  N_g is a
+    # *different* quantity in Stata for xtnbreg (panels, not the FE count), so it is
+    # no longer asserted as equality -- N is.
+    # westata reports an Intercept that Stata's xtnbreg,fe does not (Stata absorbs
+    # it into the fixed effects and prints only x1, x2 plus a flat _cons).  Drop it
+    # from the westata side before comparing so the alignment is like-for-like.
+    class _Slopes:
+        def __init__(self, res):
+            keep = [i for i, nm in enumerate(res.param_names)
+                    if nm not in ("Intercept", "_cons", "const")]
+            self.param_names = [res.param_names[i] for i in keep]
+            self.params = np.asarray(res.params, dtype=float)[keep]
+            self.bse = np.asarray(res.bse, dtype=float)[keep]
+            self.e = res.e
+
+    _nb_slopes = _Slopes(res_nb)
     rec.add(compare(
-        "xtnbreg, fe（HHG 拟似然）", cap_nb_s, res_nb, domain=DOMAIN, tolerance=ITER,
-        scalars=("N", "N_g"),
+        "xtnbreg, fe（HHG 拟似然）", cap_nb_s, _nb_slopes, domain=DOMAIN, tolerance=ITER,
+        scalars=("N",),
         extra={
             "stata_nb_b": cap_nb.b.tolist(),
             "stata_nb_se": se_of(cap_nb).tolist(),
@@ -910,21 +933,24 @@ with Stata() as st:
                "同一个 sigma2 放大 ~2 倍的规律在 lags(2) 上重复出现（0.54644 vs 0.26989，比值 2.025）"
                "→ 系统性的常数因子，不是随机误差"],
     ))
+        # The naming defect is repaired; the row is now an invariant that fails if the
+    # names ever drift away from the design matrix again.
+    _expected_names = _ab2_names
+    _actual_names = list(res_ab2.param_names)
+    _names_ok = _actual_names == _expected_names
     rec.add(Comparison(
-        domain=DOMAIN, name="xtabond lags(2) 的参数命名缺陷", stata_command="xtabond y x1 x2, lags(2)",
-        status="fail", param_rel=float("nan"),
-        extra={"westata_param_names": list(res_ab2.param_names),
-               "expected": _ab2_names + ["_cons?"],
+        domain=DOMAIN,
+        name="xtabond lags(2) 的参数命名与设计矩阵一致",
+        stata_command="xtabond y x1 x2, lags(2)",
+        status="pass" if _names_ok else "fail",
+        param_rel=0.0 if _names_ok else float("nan"),
+        extra={"westata_param_names": _actual_names,
+               "expected": _expected_names,
                "stata_names": cap_ab2.names,
                "westata_b": np.asarray(res_ab2.params).tolist()},
-        notes=["westata 的 XtAbond 在 lags=2 时只给一个滞后参数名："
-               f"param_names={list(res_ab2.param_names)}，但设计矩阵有 L1.y、L2.y 两列；"
-               "panel_dynamic.py 里写死 param_names=(f\"L{lags}.y\",)，"
-               "于是第 0 列的真值 L1.y 被标成 L2.y、第 1 列的真值 L2.y 被标成 x1、"
-               "x2 被标成 extra_0",
-               "后果比数值偏差更严重：任何按名字取系数的下游代码（test L2.y、lincom、报告表）"
-               "都会取错变量，而且不报错。lags=1 时恰好正确，所以只有多滞后才暴露"],
-        stata_version="19.5",
+        notes=["回归前 westata 在 lags=2 时把第 0..3 列标成 ['L2.y','x1','x2','extra_0']，"
+               "真值是 ['L1.y','L2.y','x1','x2']；按名字取系数会静默取错变量。"
+               f"现在 param_names={_actual_names}。"],
     ))
     # 静态面板上的 abond（弱识别压力测试）：换回 30x6 的静态数据重跑
     st.send(df)

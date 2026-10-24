@@ -2,11 +2,11 @@
   "domain": "tseries",
   "total": 56,
   "counts": {
-    "fail": 21,
-    "pass": 35
+    "fail": 7,
+    "pass": 49
   },
-  "max_param_rel": 0.017064846416393366,
-  "generated_at": "2026-10-24T02:17:35",
+  "max_param_rel": 0.38534795462124927,
+  "generated_at": "2026-10-24T10:17:59",
   "stata_version": "19.5",
   "items": [
     {
@@ -50,14 +50,13 @@
       "notes": [
         "Stata's e(b) contains TWO rows named '_cons'; the second is /sigma. The pairing is positional and listed in extra['pairing'].",
         "Stata's arima reports OPG standard errors, statsmodels uses the analytic Hessian; the observed SE gap is 1e-5..2e-4 relative, consistent with that.",
-        "ll/aic/bic agree to ~1e-10, and evaluating statsmodels' ll AT Stata's estimates reproduces Stata's ll (see extra), so both maximise the same likelihood: the coefficient gap is an optimiser stopping point on a flat surface, not a formula difference.",
-        "scalar N rel diff 3.344e-03"
+        "ll/aic/bic agree to ~1e-10, and evaluating statsmodels' ll AT Stata's estimates reproduces Stata's ll (see extra), so both maximise the same likelihood: the coefficient gap is an optimiser stopping point on a flat surface, not a formula difference."
       ],
       "error": ""
     },
     {
       "name": "arima: ARIMA(0,1,1) with drift / e(N) convention",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -65,8 +64,7 @@
       "command": "arima y_rw, arima(0,1,1)",
       "notes": [
         "Stata's e(N) for a DIFFERENCED model is the number of usable observations after differencing (tmax - tmin + 1 - d), while statsmodels reports the length of the series it was handed. With d=1 and a tsset sample of 300 that is 299 vs 300 = exactly d.",
-        "This changes any per-observation quantity a user computes from e(N) (and it is why ll/aic/bic still agree: they are evaluated on the same differenced innovations). It is a reporting convention, not an estimation difference -- but a script that computes, say, a variance from e(N) will be slightly off.",
-        "scalar N rel diff 3.344e-03"
+        "This changes any per-observation quantity a user computes from e(N) (and it is why ll/aic/bic still agree: they are evaluated on the same differenced innovations). It is a reporting convention, not an estimation difference -- but a script that computes, say, a variance from e(N) will be slightly off."
       ],
       "error": ""
     },
@@ -81,14 +79,13 @@
       "notes": [
         "Stata's e(b) contains TWO rows named '_cons'; the second is /sigma. The pairing is positional and listed in extra['pairing'].",
         "Stata's arima reports OPG standard errors, statsmodels uses the analytic Hessian; the observed SE gap is 1e-5..2e-4 relative, consistent with that.",
-        "ll/aic/bic agree to ~1e-10, and evaluating statsmodels' ll AT Stata's estimates reproduces Stata's ll (see extra), so both maximise the same likelihood: the coefficient gap is an optimiser stopping point on a flat surface, not a formula difference.",
-        "scalar N rel diff 3.344e-03"
+        "ll/aic/bic agree to ~1e-10, and evaluating statsmodels' ll AT Stata's estimates reproduces Stata's ll (see extra), so both maximise the same likelihood: the coefficient gap is an optimiser stopping point on a flat surface, not a formula difference."
       ],
       "error": ""
     },
     {
       "name": "arima: ARIMA(1,1,1) with drift / e(N) convention",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -96,8 +93,7 @@
       "command": "arima y_111, arima(1,1,1)",
       "notes": [
         "Stata's e(N) for a DIFFERENCED model is the number of usable observations after differencing (tmax - tmin + 1 - d), while statsmodels reports the length of the series it was handed. With d=1 and a tsset sample of 300 that is 299 vs 300 = exactly d.",
-        "This changes any per-observation quantity a user computes from e(N) (and it is why ll/aic/bic still agree: they are evaluated on the same differenced innovations). It is a reporting convention, not an estimation difference -- but a script that computes, say, a variance from e(N) will be slightly off.",
-        "scalar N rel diff 3.344e-03"
+        "This changes any per-observation quantity a user computes from e(N) (and it is why ll/aic/bic still agree: they are evaluated on the same differenced innovations). It is a reporting convention, not an estimation difference -- but a script that computes, say, a variance from e(N) will be slightly off."
       ],
       "error": ""
     },
@@ -132,11 +128,11 @@
     },
     {
       "name": "var: VAR(1) standard errors (as reported)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 8.450674447969636e-14,
-      "se_rel": 0.00505479210595065,
+      "se_rel": 2.8993984376647596e-16,
       "tier": "A",
-      "se_tier": "D",
+      "se_tier": "A",
       "command": "var y1 y2, lags(1)",
       "notes": [
         "Stata's var uses the ML residual variance per equation (divide by T); statsmodels' cov_params() uses the unbiased one (divide by T-k_eq), where k_eq = 3 is the number of regressors PER EQUATION, with T=299. SE ratio sqrt((T-k_eq)/T) = 0.9949706303 is exactly what is observed for every coefficient, so this is a DOF convention."
@@ -144,24 +140,24 @@
       "error": ""
     },
     {
-      "name": "var: VAR(1) standard errors after per-equation ML normalisation",
+      "name": "var: VAR(1) standard errors: internal DOF factor (diagnostic)",
       "status": "pass",
-      "param_rel": 2.8993984376647596e-16,
+      "param_rel": 0.005029369687754869,
       "se_rel": NaN,
-      "tier": "A",
+      "tier": "D",
       "se_tier": "NA",
       "command": "var y1 y2, lags(1)",
       "notes": [
-        "Multiplying westata's SEs by sqrt((T-k_eq)/T) reproduces Stata's ML-based e(V) to machine precision."
+        "This applies sqrt((T-k_eq)/T) a second time to SEs that already carry it; the residual is exactly that factor, so the row documents the normalisation rather than testing conformance. The 'standard errors' row above is the check."
       ],
       "error": ""
     },
     {
       "name": "var: VAR(1) e(Sigma) (as reported)",
-      "status": "fail",
-      "param_rel": 0.010135135135135304,
+      "status": "pass",
+      "param_rel": 3.251831392843132e-15,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "var y1 y2, lags(1)",
       "notes": [
@@ -170,34 +166,20 @@
       "error": ""
     },
     {
-      "name": "var: VAR(1) e(Sigma) after per-equation ML normalisation",
+      "name": "var: VAR(1) e(Sigma): internal DOF factor (diagnostic)",
       "status": "pass",
-      "param_rel": 3.251831392843132e-15,
-      "se_rel": NaN,
-      "tier": "A",
-      "se_tier": "NA",
-      "command": "var y1 y2, lags(1)",
-      "notes": [],
-      "error": ""
-    },
-    {
-      "name": "var: Granger causality, VAR(1) (Stata vargranger)",
-      "status": "fail",
-      "param_rel": 0.010033444816055448,
+      "param_rel": 0.010033444816056707,
       "se_rel": NaN,
       "tier": "E",
       "se_tier": "NA",
-      "command": "vargranger",
+      "command": "var y1 y2, lags(1)",
       "notes": [
-        "westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- an F statistic -- while Stata's vargranger reports a Wald chi2. A caller using it as-is compares an F to a chi2. The westata statistics above are kind='wald'; the F values are in extra.",
-        "The residual (T/(T-k_eq)) gap is the same DOF convention as the SEs.",
-        "scalar p_y2_to_y1 rel diff 1.157e-01",
-        "scalar p_y1_to_y2 rel diff 2.587e-01"
+        "Diagnostic: (T-k_eq)/T applied twice. The 'e(Sigma) (as reported)' row above is the conformance check."
       ],
       "error": ""
     },
     {
-      "name": "var: Granger causality, VAR(1) after ML normalisation",
+      "name": "var: Granger causality, VAR(1) (Stata vargranger)",
       "status": "pass",
       "param_rel": 2.057127843185939e-15,
       "se_rel": NaN,
@@ -205,7 +187,21 @@
       "se_tier": "NA",
       "command": "vargranger",
       "notes": [
-        "Scaling statsmodels' Wald statistic by T/(T-k_eq) reproduces Stata's vargranger chi2 to machine precision: same test, same df, only the residual-variance DOF convention differs."
+        "westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- an F statistic -- while Stata's vargranger reports a Wald chi2. A caller using it as-is compares an F to a chi2. The westata statistics above are kind='wald'; the F values are in extra.",
+        "The residual (T/(T-k_eq)) gap is the same DOF convention as the SEs."
+      ],
+      "error": ""
+    },
+    {
+      "name": "var: Granger causality, VAR(1) internal DOF factor (diagnostic)",
+      "status": "pass",
+      "param_rel": 0.01013513513513398,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "vargranger",
+      "notes": [
+        "Scaling westata's already-ML Wald statistic by T/(T-k_eq) a second time is off by exactly that factor, which is what this row records. The 'as reported' row above is the conformance check and is A."
       ],
       "error": ""
     },
@@ -225,11 +221,11 @@
     },
     {
       "name": "var: VAR(2) standard errors (as reported)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.0295196664024197e-14,
-      "se_rel": 0.008496329401541563,
+      "se_rel": 1.2437535800395236e-16,
       "tier": "A",
-      "se_tier": "D",
+      "se_tier": "A",
       "command": "var y1 y2, lags(1/2)",
       "notes": [
         "Stata's var uses the ML residual variance per equation (divide by T); statsmodels' cov_params() uses the unbiased one (divide by T-k_eq), where k_eq = 5 is the number of regressors PER EQUATION, with T=298. SE ratio sqrt((T-k_eq)/T) = 0.9915752500 is exactly what is observed for every coefficient, so this is a DOF convention."
@@ -237,24 +233,24 @@
       "error": ""
     },
     {
-      "name": "var: VAR(2) standard errors after per-equation ML normalisation",
+      "name": "var: VAR(2) standard errors: internal DOF factor (diagnostic)",
       "status": "pass",
-      "param_rel": 1.2239094063444225e-16,
+      "param_rel": 0.008424749950833565,
       "se_rel": NaN,
-      "tier": "A",
+      "tier": "D",
       "se_tier": "NA",
       "command": "var y1 y2, lags(1/2)",
       "notes": [
-        "Multiplying westata's SEs by sqrt((T-k_eq)/T) reproduces Stata's ML-based e(V) to machine precision."
+        "This applies sqrt((T-k_eq)/T) a second time to SEs that already carry it; the residual is exactly that factor, so the row documents the normalisation rather than testing conformance. The 'standard errors' row above is the check."
       ],
       "error": ""
     },
     {
       "name": "var: VAR(2) e(Sigma) (as reported)",
-      "status": "fail",
-      "param_rel": 0.017064846416393366,
+      "status": "pass",
+      "param_rel": 1.0837449305613128e-14,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "var y1 y2, lags(1/2)",
       "notes": [
@@ -263,34 +259,20 @@
       "error": ""
     },
     {
-      "name": "var: VAR(2) e(Sigma) after per-equation ML normalisation",
+      "name": "var: VAR(2) e(Sigma): internal DOF factor (diagnostic)",
       "status": "pass",
-      "param_rel": 1.0837449305613128e-14,
-      "se_rel": NaN,
-      "tier": "A",
-      "se_tier": "NA",
-      "command": "var y1 y2, lags(1/2)",
-      "notes": [],
-      "error": ""
-    },
-    {
-      "name": "var: Granger causality, VAR(2) (Stata vargranger)",
-      "status": "fail",
-      "param_rel": 0.016778523489931214,
+      "param_rel": 0.01677852348993296,
       "se_rel": NaN,
       "tier": "E",
       "se_tier": "NA",
-      "command": "vargranger",
+      "command": "var y1 y2, lags(1/2)",
       "notes": [
-        "westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- an F statistic -- while Stata's vargranger reports a Wald chi2. A caller using it as-is compares an F to a chi2. The westata statistics above are kind='wald'; the F values are in extra.",
-        "The residual (T/(T-k_eq)) gap is the same DOF convention as the SEs.",
-        "scalar p_y2_to_y1 rel diff 2.290e-01",
-        "scalar p_y1_to_y2 rel diff 3.991e-01"
+        "Diagnostic: (T-k_eq)/T applied twice. The 'e(Sigma) (as reported)' row above is the conformance check."
       ],
       "error": ""
     },
     {
-      "name": "var: Granger causality, VAR(2) after ML normalisation",
+      "name": "var: Granger causality, VAR(2) (Stata vargranger)",
       "status": "pass",
       "param_rel": 2.484816287301577e-15,
       "se_rel": NaN,
@@ -298,7 +280,21 @@
       "se_tier": "NA",
       "command": "vargranger",
       "notes": [
-        "Scaling statsmodels' Wald statistic by T/(T-k_eq) reproduces Stata's vargranger chi2 to machine precision: same test, same df, only the residual-variance DOF convention differs."
+        "westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- an F statistic -- while Stata's vargranger reports a Wald chi2. A caller using it as-is compares an F to a chi2. The westata statistics above are kind='wald'; the F values are in extra.",
+        "The residual (T/(T-k_eq)) gap is the same DOF convention as the SEs."
+      ],
+      "error": ""
+    },
+    {
+      "name": "var: Granger causality, VAR(2) internal DOF factor (diagnostic)",
+      "status": "pass",
+      "param_rel": 0.017064846416384897,
+      "se_rel": NaN,
+      "tier": "E",
+      "se_tier": "NA",
+      "command": "vargranger",
+      "notes": [
+        "Scaling westata's already-ML Wald statistic by T/(T-k_eq) a second time is off by exactly that factor, which is what this row records. The 'as reported' row above is the conformance check and is A."
       ],
       "error": ""
     },
@@ -421,7 +417,7 @@
         "vecrank stores NO r() statistics (only r(trendnumber)/r(ttext)), so the statistics were parsed from the printed table at 4 decimals. This is the only entry in this domain whose Stata evidence is printed output.",
         "Tolerance is 1e-4, not 1e-9: the Stata side is a 4-decimal print, which is a ~1e-5 relative floor for statistics of this size.",
         "The rank selection rule is applied identically to both sides (smallest r with statistic <= its 5% critical value), so a different selected rank can only come from a different statistic or a different critical value.",
-        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.4943, 3.8415] (Osterwald-Lenum)."
+        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.41, 3.76] (Osterwald-Lenum)."
       ],
       "error": ""
     },
@@ -448,7 +444,7 @@
         "vecrank stores NO r() statistics (only r(trendnumber)/r(ttext)), so the statistics were parsed from the printed table at 4 decimals. This is the only entry in this domain whose Stata evidence is printed output.",
         "Tolerance is 1e-4, not 1e-9: the Stata side is a 4-decimal print, which is a ~1e-5 relative floor for statistics of this size.",
         "The rank selection rule is applied identically to both sides (smallest r with statistic <= its 5% critical value), so a different selected rank can only come from a different statistic or a different critical value.",
-        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.4943, 3.8415] (Osterwald-Lenum)."
+        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.41, 3.76] (Osterwald-Lenum)."
       ],
       "error": ""
     },
@@ -465,7 +461,7 @@
     },
     {
       "name": "vecrank: borderline pair, lags(2), trend(constant), max",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.0050971120919904e-05,
       "se_rel": NaN,
       "tier": "C",
@@ -475,8 +471,7 @@
         "vecrank stores NO r() statistics (only r(trendnumber)/r(ttext)), so the statistics were parsed from the printed table at 4 decimals. This is the only entry in this domain whose Stata evidence is printed output.",
         "Tolerance is 1e-4, not 1e-9: the Stata side is a 4-decimal print, which is a ~1e-5 relative floor for statistics of this size.",
         "The rank selection rule is applied identically to both sides (smallest r with statistic <= its 5% critical value), so a different selected rank can only come from a different statistic or a different critical value.",
-        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.4943, 3.8415] (Osterwald-Lenum).",
-        "scalar selected_rank_5pct rel diff 5.000e-01"
+        "5% critical values differ: Stata [15.41, 3.76] (Johansen 1995 tables) vs statsmodels [15.41, 3.76] (Osterwald-Lenum)."
       ],
       "error": ""
     },
@@ -506,10 +501,10 @@
     },
     {
       "name": "dfuller: y_rw lags(2) / printed 1%-5%-10% critical values",
-      "status": "fail",
-      "param_rel": 0.0023622441643989635,
+      "status": "pass",
+      "param_rel": 1.2848911240251331e-16,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "dfuller y_rw, lags(2)",
       "notes": [
@@ -533,10 +528,10 @@
     },
     {
       "name": "dfuller: y_rw lags(2) trend / printed 1%-5%-10% critical values",
-      "status": "fail",
-      "param_rel": 0.001853378517682525,
+      "status": "pass",
+      "param_rel": 1.2954307604461414e-16,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "dfuller y_rw, lags(2) trend",
       "notes": [
@@ -560,10 +555,10 @@
     },
     {
       "name": "dfuller: y_rw lags(2) noconstant / printed 1%-5%-10% critical values",
-      "status": "fail",
-      "param_rel": 0.004132649572336315,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "dfuller y_rw, lags(2) noconstant",
       "notes": [
@@ -587,10 +582,10 @@
     },
     {
       "name": "dfuller: y_ar lags(4), stationary series / printed 1%-5%-10% critical values",
-      "status": "fail",
-      "param_rel": 0.002366812779590332,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "dfuller y_ar, lags(4)",
       "notes": [
@@ -614,10 +609,10 @@
     },
     {
       "name": "dfuller: y_rw lags(0), no augmentation / printed 1%-5%-10% critical values",
-      "status": "fail",
-      "param_rel": 0.0023573637874468602,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "dfuller y_rw, lags(0)",
       "notes": [
@@ -745,52 +740,46 @@
     {
       "name": "arch: GARCH(1,1)",
       "status": "fail",
-      "param_rel": 0.010678457396763775,
-      "se_rel": 0.2782334597070916,
-      "tier": "E",
-      "se_tier": "E",
+      "param_rel": 0.00017802031554249074,
+      "se_rel": 0.0001510706149606697,
+      "tier": "C",
+      "se_tier": "C",
       "command": "arch yg, arch(1) garch(1)",
       "notes": [
         "KNOWN DIVERGENCE (the one the old register flagged), reproduced from scratch and now attributed to TWO independent causes:",
         "(a) STANDARD ERRORS -- Stata's arch reports OPG (e(vcetype)='OPG'); westata's GARCH.fit() never passes cov_type, so arch the package's default 'robust' (Bollerslev-Wooldridge) is used. westata's SEs equal arch's robust SEs exactly (separate attribution entry). The SE gap is up to 2.8e-1 relative, which can move a z statistic across a significance boundary.",
         "(b) LIKELIHOOD / POINT ESTIMATES -- the GARCH recursion needs a presample h_0. Stata uses e(archi) = mean of squared demeaned residuals; the arch package uses an exponentially weighted backcast. Different h_0 means a slightly different OBJECTIVE, so the maximisers differ: omega moves most (it absorbs the presample level). extra['ll_at_stata_params_by_presample_h0'] shows that swapping h_0 to Stata's e(archi) reproduces Stata's ll to ~1e-4, while arch's own h_0 leaves a ~1.3e-2 gap at the same parameters.",
-        "Significance impact: for this series alpha and beta are significant under both, but the omega z statistic moves noticeably.",
-        "scalar ll rel diff 1.640e-05",
-        "scalar aic rel diff 1.633e-05",
-        "scalar bic rel diff 1.615e-05"
+        "Significance impact: for this series alpha and beta are significant under both, but the omega z statistic moves noticeably."
       ],
       "error": ""
     },
     {
       "name": "arch: ARCH(1) only (GARCH term omitted)",
       "status": "fail",
-      "param_rel": 0.00048558365085840086,
-      "se_rel": 0.10166409145247535,
+      "param_rel": 0.00044328859726496005,
+      "se_rel": 0.00031654776702439515,
       "tier": "C",
-      "se_tier": "E",
+      "se_tier": "C",
       "command": "arch yg, arch(1)",
       "notes": [
         "KNOWN DIVERGENCE (the one the old register flagged), reproduced from scratch and now attributed to TWO independent causes:",
         "(a) STANDARD ERRORS -- Stata's arch reports OPG (e(vcetype)='OPG'); westata's GARCH.fit() never passes cov_type, so arch the package's default 'robust' (Bollerslev-Wooldridge) is used. westata's SEs equal arch's robust SEs exactly (separate attribution entry). The SE gap is up to 2.8e-1 relative, which can move a z statistic across a significance boundary.",
         "(b) LIKELIHOOD / POINT ESTIMATES -- the GARCH recursion needs a presample h_0. Stata uses e(archi) = mean of squared demeaned residuals; the arch package uses an exponentially weighted backcast. Different h_0 means a slightly different OBJECTIVE, so the maximisers differ: omega moves most (it absorbs the presample level). extra['ll_at_stata_params_by_presample_h0'] shows that swapping h_0 to Stata's e(archi) reproduces Stata's ll to ~1e-4, while arch's own h_0 leaves a ~1.3e-2 gap at the same parameters.",
-        "Significance impact: for this series alpha and beta are significant under both, but the omega z statistic moves noticeably.",
-        "scalar ll rel diff 2.472e-06",
-        "scalar aic rel diff 2.463e-06",
-        "scalar bic rel diff 2.444e-06"
+        "Significance impact: for this series alpha and beta are significant under both, but the omega z statistic moves noticeably."
       ],
       "error": ""
     },
     {
-      "name": "arch: GARCH(1,1) SE convention attribution (robust vs classic/OPG)",
+      "name": "arch: GARCH(1,1) no longer inherits arch's default robust SE",
       "status": "pass",
-      "param_rel": NaN,
+      "param_rel": 0.38534795462124927,
       "se_rel": NaN,
-      "tier": "NA",
+      "tier": "E",
       "se_tier": "NA",
       "command": "arch yg, arch(1) garch(1)",
       "notes": [
-        "westata's reported SEs are identical to the arch package's DEFAULT (robust) SEs, proving westata inherits cov_type='robust'. Stata uses OPG, which is neither the robust nor the classic (inverse-Hessian) estimator, so even cov_type='classic' does not reproduce Stata -- see extra.",
-        "This is a convention/cov_type difference, not an arithmetic error, but it is a behavioural difference a user must know about."
+        "Invariant, not a Stata comparison: the library used to pass no cov_type, so it inherited arch's 'robust' default while Stata reports OPG. This row fails if that regression comes back (westata vs arch-robust rel = 3.853e-01; the old code was 0.0).",
+        "westata vs arch-classic rel = 1.809e-01: the implemented OPG is not the inverse-Hessian either, which is why 'classic' does not reproduce Stata."
       ],
       "error": ""
     }

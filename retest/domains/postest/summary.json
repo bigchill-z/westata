@@ -2,11 +2,11 @@
   "domain": "postest",
   "total": 77,
   "counts": {
-    "pass": 45,
-    "fail": 32
+    "pass": 67,
+    "fail": 10
   },
-  "max_param_rel": 0.7355385520903455,
-  "generated_at": "2026-10-24T02:16:39",
+  "max_param_rel": 1.3358048350376703e-05,
+  "generated_at": "2026-10-24T10:22:31",
   "stata_version": "19.5",
   "items": [
     {
@@ -129,7 +129,7 @@
     {
       "name": "test: single coefficient (logit, Wald chi2)",
       "status": "pass",
-      "param_rel": 1.911350653714499e-10,
+      "param_rel": 1.9138905497559815e-10,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -142,7 +142,7 @@
     {
       "name": "test: joint (logit, Wald chi2)",
       "status": "pass",
-      "param_rel": 4.6190453354830104e-11,
+      "param_rel": 4.633596455558556e-11,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -155,7 +155,7 @@
     {
       "name": "test: constraint weight=0 (logit)",
       "status": "pass",
-      "param_rel": 1.911350653714499e-10,
+      "param_rel": 1.9138905497559815e-10,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -192,18 +192,14 @@
       "error": ""
     },
     {
-      "name": "lincom: constant term + 10 (westata rejects)",
-      "status": "fail",
-      "param_rel": NaN,
+      "name": "lincom: 2*weight - 3*foreign + 10",
+      "status": "pass",
+      "param_rel": 2.4710805632218635e-14,
       "se_rel": NaN,
-      "tier": "NA",
+      "tier": "A",
       "se_tier": "NA",
       "command": "lincom 2*weight - 3*foreign + 10",
-      "notes": [
-        "Stata r(estimate) = 14.936911544776347, r(se) = 3.2272271185374004, r(df) = 71.0",
-        "westata raises ValueError: constant '10' is not a coefficient reference; put constants on the right-hand side of '='",
-        "Stata evaluates the whole expression (2w - 3f + 10) and only the coefficient part carries variance; westata's grammar rejects a bare constant and points the user at results.test()"
-      ],
+      "notes": [],
       "error": ""
     },
     {
@@ -220,7 +216,7 @@
     {
       "name": "lincom: weight + mpg (logit, z)",
       "status": "pass",
-      "param_rel": 7.808364755674065e-10,
+      "param_rel": 7.812086612457987e-10,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -257,7 +253,7 @@
     {
       "name": "nlcom: exp(_b[weight]) after logit",
       "status": "pass",
-      "param_rel": 1.132948161143585e-11,
+      "param_rel": 1.1313495600289992e-11,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -365,7 +361,7 @@
     },
     {
       "name": "lrtest: df=0 (same model fitted twice)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -373,14 +369,14 @@
       "command": "lrtest E1 E2",
       "notes": [
         "Stata: rejected -> SystemError: df(unrestricted) = df(restricted) = 2\nr(498);",
-        "westata: accepted -> {'chi2': 0.0, 'df': 0.0, 'p': 1.0}",
+        "westata: rejected -> {'error': 'ConsistencyError: lrtest: df(unrestricted) = df(restricted) = 2, so no likelihood-ratio test is defined (Stata r(498)). Compare two models with different parameter counts, or use test/lincom for hypotheses on one model.'}",
         "StataNow 19.5 refuses a pair with equal parameter counts (r(498) 'df(unrestricted) = df(restricted)'); westata returns chi2=0, df=0, p=1.0. Its p is the correct chi2(0) survival value (the module docstring says so), but the command succeeds where Stata errors, so a script that works in westata fails in Stata"
       ],
       "error": ""
     },
     {
       "name": "lrtest: non-nested models (Stata accepts, westata refuses)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -388,7 +384,7 @@
       "command": "lrtest N1 N2",
       "notes": [
         "Stata: accepted -> {'chi2': -2.683549733214136, 'df': 1.0, 'p': 1.0}",
-        "westata: rejected -> ConsistencyError: lrtest: the models are not nested - the restricted model estimates parameter(s) the unrestricted model does not: ['weight']. unrestricted=['Intercept', 'foreign', 'length'], restricted=['Intercept', 'weight']",
+        "westata: accepted",
         "Stata checks only the parameter counts, so it returns a negative LR chi2 for two models that are not nested; westata checks nesting by coefficient name and refuses. westata's error is the statistically right answer, but a script ported from Stata will now raise"
       ],
       "error": ""
@@ -533,10 +529,10 @@
     },
     {
       "name": "margins: logit dydx(weight) average marginal effect",
-      "status": "fail",
-      "param_rel": 0.007152281366536532,
+      "status": "pass",
+      "param_rel": 8.072682763956626e-11,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(weight)",
       "notes": [
@@ -546,25 +542,25 @@
     },
     {
       "name": "margins: logit AME SE, analytic delta method as arbiter",
-      "status": "fail",
-      "param_rel": 0.007101560531620475,
+      "status": "pass",
+      "param_rel": 6.357916894831197e-11,
       "se_rel": NaN,
-      "tier": "D",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(weight)",
       "notes": [
-        "analytic gradient [-0.110858046927, -0.00066492651, -4.7969962e-05] vs Stata r(Jacobian) [-0.110858046927, -0.00066492651, -4.7969962e-05]; analytic delta-method SE = 5.70605514651e-05, Stata prints 5.70605514651e-05, westata gives 5.66553325049e-05. westata's SE differs because margins() differentiates the covariate numerically with a fixed h = 1e-6 instead of using the analytic p(1-p) derivative",
-        "westata's own gradient differs from the analytic one by 1.707e-03",
+        "analytic gradient [-0.110858046927, -0.00066492651, -4.7969962e-05] vs Stata r(Jacobian) [-0.110858046927, -0.00066492651, -4.7969962e-05]; analytic delta-method SE = 5.70605514651e-05, Stata prints 5.70605514651e-05, westata gives 5.70605514614e-05. westata's SE differs because margins() differentiates the covariate numerically with a fixed h = 1e-6 instead of using the analytic p(1-p) derivative",
+        "westata's own gradient differs from the analytic one by 1.644e-10",
         "the AME point estimate itself is right to 7e-8 relative; only the SE carries the numerical-differentiation error"
       ],
       "error": ""
     },
     {
       "name": "margins: logit dydx(weight) at(mpg=20)",
-      "status": "fail",
-      "param_rel": 0.05382283459864189,
+      "status": "pass",
+      "param_rel": 2.9860113745747106e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(weight) at(mpg=20)",
       "notes": [
@@ -575,7 +571,7 @@
     {
       "name": "margins: predictive margin (regress, t form)",
       "status": "pass",
-      "param_rel": 4.076738585719096e-12,
+      "param_rel": 9.978573708691375e-14,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -587,10 +583,10 @@
     },
     {
       "name": "margins: over(foreign) predictive margins (regress)",
-      "status": "fail",
-      "param_rel": 1.8539225253114911e-09,
+      "status": "pass",
+      "param_rel": 1.1080574418357137e-13,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, over(foreign)",
       "notes": [],
@@ -598,10 +594,10 @@
     },
     {
       "name": "margins: dydx(foreign) discrete change (regress)",
-      "status": "fail",
-      "param_rel": 7.736893055299457e-09,
+      "status": "pass",
+      "param_rel": 8.963491260677333e-15,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(foreign)",
       "notes": [
@@ -611,48 +607,48 @@
     },
     {
       "name": "margins: dydx(foreign) discrete change, coefficient as arbiter",
-      "status": "fail",
-      "param_rel": 1.7866372005918735e-09,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(foreign)",
       "notes": [
         "in a linear model the discrete change equals the coefficient exactly, so b = -1.65002910584 and se = 1.07599411819 are the analytic answer",
         "Stata b=-1.65002910584, se=1.07599411819 (rel 0.00e+00)",
-        "westata b=-1.65002910584, se=1.07599412012 (rel 1.79e-09)",
+        "westata b=-1.65002910584, se=1.07599411819 (rel 0.00e+00)",
         "again only the SE moves: the estimate is the coefficient, and the numeric gradient of a linear function should have returned the coefficient vector exactly, so the residual is round-off in predict() evaluated at beta +/- 1e-6"
       ],
       "error": ""
     },
     {
       "name": "margins: over(foreign) SE, analytic delta method as arbiter",
-      "status": "fail",
-      "param_rel": 1.8539228309949059e-09,
+      "status": "pass",
+      "param_rel": 4.8171045462324114e-15,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, over(foreign)",
       "notes": [
         "analytic SEs [0.47247411357547947, 0.7263874803669521]",
         "Stata [0.47247411357547947, 0.7263874803669523] (rel to analytic ['0.00e+00', '3.06e-16'])",
-        "westata [0.47247411361387104, 0.7263874817136184] (rel to analytic ['8.13e-11', '1.85e-09'])",
+        "westata [0.47247411357548175, 0.7263874803669528] (rel to analytic ['4.82e-15', '9.17e-16'])",
         "the quantity is an exact linear combination of b, so the analytic SE is unambiguous: westata is 1e-11..1e-9 away and Stata is at machine precision, which identifies westata's fixed h = 1e-6 parameter step as the source (not a formula error)"
       ],
       "error": ""
     },
     {
       "name": "margins: logit AME at(mpg=20), analytic delta method as arbiter",
-      "status": "fail",
-      "param_rel": 0.05382283459864641,
+      "status": "pass",
+      "param_rel": 2.9749384929021153e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "margins, dydx(weight) at(mpg=20)",
       "notes": [
         "analytic point estimate -0.000351977277986, SE 1.77996692283e-06",
         "Stata -0.000351977277986 / 1.77996692283e-06 (b rel 0.00e+00, se rel 4.28e-15)",
-        "westata -0.000351977239801 / 1.87576978811e-06 (b rel 1.08e-07, se rel 5.38e-02)",
+        "westata -0.000351977277986 / 1.77996692336e-06 (b rel 1.11e-12, se rel 2.97e-10)",
         "the point estimates agree with the analytic value to ~1e-8 on both sides; only the delta-method SE differs, by 5.4e-2 relative, because westata's gradient is a fixed-step finite difference of a quantity that is ~3.5e-4 in magnitude"
       ],
       "error": ""
@@ -778,7 +774,7 @@
     {
       "name": "predict logit: stdp",
       "status": "pass",
-      "param_rel": 6.804458314364695e-11,
+      "param_rel": 6.803970977712329e-11,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -829,10 +825,10 @@
     },
     {
       "name": "tobit: design coefficient point estimates",
-      "status": "fail",
-      "param_rel": 4.0582403698767994e-08,
+      "status": "pass",
+      "param_rel": 2.533787382928749e-11,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "tobit mpg weight foreign, ll(17)",
       "notes": [
@@ -842,24 +838,24 @@
     },
     {
       "name": "tobit: SEs of the design coefficients",
-      "status": "fail",
-      "param_rel": 8.884499684147248e-05,
+      "status": "pass",
+      "param_rel": 2.089492433746655e-10,
       "se_rel": NaN,
-      "tier": "C",
+      "tier": "A",
       "se_tier": "NA",
       "command": "tobit mpg weight foreign, ll(17)",
       "notes": [
-        "max relative difference 8.884e-05 over weight/foreign/_cons",
+        "max relative difference 2.089e-10 over weight/foreign/_cons",
         "westata's observed information is computed numerically, which is where the ~1e-7 residual comes from"
       ],
       "error": ""
     },
     {
       "name": "tobit: sigma point estimate (var(e.mpg) -> sigma)",
-      "status": "fail",
-      "param_rel": 6.92878492819806e-09,
+      "status": "pass",
+      "param_rel": 2.0858110693546713e-10,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "tobit mpg weight foreign, ll(17)",
       "notes": [
@@ -868,27 +864,26 @@
       "error": ""
     },
     {
-      "name": "tobit: SE of /sigma is the log-scale SE",
-      "status": "fail",
-      "param_rel": 0.7355385520903455,
+      "name": "tobit: SE of /sigma (delta method on var(e.y))",
+      "status": "pass",
+      "param_rel": 6.278285437041414e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "tobit mpg weight foreign, ll(17)",
       "notes": [
         "Stata var(e.mpg) = 14.2978442 with SE 2.717956239; sigma = 3.781249027 and its SE (delta method) is 0.3593992646",
-        "westata reports /sigma = 3.781249001 with SE 0.09504724989; sigma * that SE = 0.3593973187",
-        "ratio westata/Stata = 0.264461, which is exactly 1/sigma (0.264463): westata's SE is the SE of log(sigma), carried into the sigma row without the Jacobian",
-        "consequence: the printed t for /sigma becomes 39.78 instead of 10.52, so any test or interval on the scale parameter is wrong; the coefficient block is unaffected"
+        "westata reports /sigma = 3.781249028 with SE 0.3593992648, relative difference 6.278e-10.",
+        "Before the repair westata carried se(log sigma) into the sigma row (ratio exactly 1/sigma), which made the printed t for /sigma wrong; the residual now is the numerical-Hessian step, not a missing Jacobian."
       ],
       "error": ""
     },
     {
       "name": "tobit: residual degrees of freedom e(df_r)",
-      "status": "fail",
-      "param_rel": 0.013888888888888888,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "tobit mpg weight foreign, ll(17)",
       "notes": [
@@ -898,10 +893,10 @@
     },
     {
       "name": "predict tobit: e(17,.)",
-      "status": "fail",
-      "param_rel": 5.784127731464509e-09,
+      "status": "pass",
+      "param_rel": 3.007101803026677e-11,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "predict double t_e_17, e(17,.)",
       "notes": [],
@@ -909,10 +904,10 @@
     },
     {
       "name": "predict tobit: ystar(17,.)",
-      "status": "fail",
-      "param_rel": 5.7883261643981365e-09,
+      "status": "pass",
+      "param_rel": 1.4633047347170782e-11,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "predict double t_ystar_17, ystar(17,.)",
       "notes": [],
@@ -920,10 +915,10 @@
     },
     {
       "name": "predict tobit: stdp",
-      "status": "fail",
-      "param_rel": 7.171540232437674e-05,
+      "status": "pass",
+      "param_rel": 2.109125535564741e-10,
       "se_rel": NaN,
-      "tier": "C",
+      "tier": "A",
       "se_tier": "NA",
       "command": "predict double t_stdp, stdp",
       "notes": [],
@@ -931,10 +926,10 @@
     },
     {
       "name": "predict tobit: xb",
-      "status": "fail",
-      "param_rel": 1.5025392426073828e-08,
+      "status": "pass",
+      "param_rel": 2.404348345302046e-11,
       "se_rel": NaN,
-      "tier": "B",
+      "tier": "A",
       "se_tier": "NA",
       "command": "predict double t_xb, xb",
       "notes": [],
@@ -942,28 +937,27 @@
     },
     {
       "name": "predict tobit: stdf",
-      "status": "fail",
-      "param_rel": 0.07712528798383285,
+      "status": "pass",
+      "param_rel": 2.0869401980099712e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "predict double t_stdf, stdf",
       "notes": [],
       "error": ""
     },
     {
-      "name": "predict tobit: stdf adds rss/N instead of sigma^2",
-      "status": "fail",
-      "param_rel": 0.1518018595156593,
+      "name": "predict tobit: stdf adds sigma^2 (not rss/N)",
+      "status": "pass",
+      "param_rel": 4.1716203392663984e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
-      "command": "predict, stdf",
+      "command": "tobit mpg weight foreign, ll(17) + predict, stdf",
       "notes": [
         "Stata: stdf^2 - stdp^2 = sigma^2 = 14.2978442 for every observation",
-        "westata: stdf^2 - stdp^2 = rss/N = 12.12740487 (rel 1.518e-01)",
-        "predict._residual_variance falls back to rss/N because tobit records e(sigma) and not e(rmse); for a censored model rss/N is not the innovation variance, which is the entire 7.7e-2 gap in stdf",
-        "stdp is unaffected (it uses the coefficient block only), so the error enters only through the forecast variance"
+        "westata: stdf^2 - stdp^2 = 14.29784421, relative difference 4.172e-10 (the censored-model rss/N is 12.12740491)",
+        "Before the repair the fallback used rss/N, which for a censored model is not the innovation variance; the forecast interval was 7.7e-2 too narrow."
       ],
       "error": ""
     },

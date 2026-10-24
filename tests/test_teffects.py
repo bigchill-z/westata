@@ -364,6 +364,66 @@ def test_aipw_atet_is_reported():
     assert np.isfinite(atet.std_err) and atet.std_err > 0.0
 
 
+# Stata reference values for the ATET branch, captured 2026-10-24 by
+# retest/fix/systems/capture_aipw_tests.py on THIS module's sample
+# (treatment_frame(), n=1200, seed=211):
+#   teffects aipw (y x1 x2) (treated x1 x2), atet
+#     ATET      2.046425868899699     se .06553792047575811
+#     POmean(1) 3.539389746575276     se .07160377318609237
+#     POmean(0) 1.4929638776755771    se .07777389087146738
+STATA_AIPW_ATET = 2.046425868899699
+STATA_AIPW_ATET_SE = 0.06553792047575811
+STATA_AIPW_ATET_PO1 = 3.539389746575276
+STATA_AIPW_ATET_SE1 = 0.07160377318609237
+STATA_AIPW_ATET_PO0 = 1.4929638776755771
+STATA_AIPW_ATET_SE0 = 0.07777389087146738
+
+
+def test_aipw_atet_matches_stata_on_the_po_means_and_the_effect():
+    """The ATET branch: an extra 1/p and a vanished augmentation used to live here.
+
+    Stata stores only ``r1vs0.treated`` and ``0.treated`` in ``e(b)``;
+    ``POmean(1)`` is their sum and its standard error is
+    ``sqrt(V11 + V22 + 2 V12)``.  Before the fix westata averaged
+    ``m1 + t*r1/p`` over the treated (a spurious 1/p) and ``m0`` over the treated
+    (the ``(1-t)`` factor in augmented0 removed every control contribution), so
+    the ATET came out 6.3e-3 off with a 2.9e-2 standard-error error.
+    """
+
+    atet = AIPW.from_formula("y", "treated", treatment_frame(),
+                             estimand="atet").fit()
+
+    assert atet.estimate == pytest.approx(STATA_AIPW_ATET, rel=1e-12)
+    assert atet.std_err == pytest.approx(STATA_AIPW_ATET_SE, rel=1e-9)
+    po1, se1 = atet.potential_outcomes["1"]
+    po0, se0 = atet.potential_outcomes["0"]
+    assert po1 == pytest.approx(STATA_AIPW_ATET_PO1, rel=1e-12)
+    assert se1 == pytest.approx(STATA_AIPW_ATET_SE1, rel=1e-9)
+    assert po0 == pytest.approx(STATA_AIPW_ATET_PO0, rel=1e-12)
+    assert se0 == pytest.approx(STATA_AIPW_ATET_SE0, rel=1e-9)
+
+
+def test_aipw_ate_is_unaffected_by_the_atet_repair():
+    """The ATE branch was already exact (1e-16); pin it so a fix cannot move it.
+
+    ``teffects aipw (y x1 x2) (treated x1 x2)``, captured 2026-10-24:
+      ATE 2.0188360574679662 (se .06250843751655079),
+      PO(1) 2.9989821296280583 (se .06389270615544881),
+      PO(0) 0.9801460721600921 (se .061550089230236575).
+    """
+
+    ate = AIPW.from_formula("y", "treated", treatment_frame()).fit()
+
+    assert ate.estimate == pytest.approx(2.0188360574679662, rel=1e-12)
+    assert ate.std_err == pytest.approx(0.06250843751655079, rel=1e-9)
+    po1, se1 = ate.potential_outcomes["1"]
+    po0, se0 = ate.potential_outcomes["0"]
+    assert po1 == pytest.approx(2.9989821296280583, rel=1e-12)
+    assert se1 == pytest.approx(0.06389270615544881, rel=1e-9)
+    assert po0 == pytest.approx(0.9801460721600921, rel=1e-12)
+    assert se0 == pytest.approx(0.061550089230236575, rel=1e-9)
+
+
 # ------------------------------------------------------------------ nnmatch
 
 
@@ -396,6 +456,41 @@ def test_nearest_neighbour_matching_uses_the_mahalanobis_metric():
     # Euclidean gives 2.046771; assert we are much closer to Stata than that.
     assert abs(result.estimate - 2.051839) < 0.001
     assert abs(result.estimate - 2.046771) > abs(result.estimate - 2.051839)
+
+
+def test_nearest_neighbour_matching_gives_the_atet_its_own_variance():
+    """The ATET SE must not be the ATE SE under a different label.
+
+    ``teffects nnmatch`` on the 400-observation retest sample, captured
+    2026-10-24 (``retest/fix/systems/repro_S4.py``): ATE se .1199330971,
+    ATET se .1359368418 -- a ratio of 1.1334.  westata used to report one shared
+    ``sum((1+reuse)^2 sigma^2)/n^2`` for both, so the two numbers were bit-for-bit
+    identical.  The ATET variance now uses its own weights: treated units enter
+    once with 1/n1, re-used controls enter K_i times.
+    """
+
+    from westata.estimators.treatreg_effects import NearestNeighbourMatching as NN
+
+    rng = np.random.default_rng(7)
+    n = 400
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    propensity = 1.0 / (1.0 + np.exp(-(0.6 * x1 - 0.4 * x2)))
+    treated = (rng.uniform(size=n) < propensity).astype(int)
+    y = 2.0 * treated + 1.0 * x1 + 0.5 * x2 + rng.normal(size=n)
+    import pandas as pd
+
+    frame = pd.DataFrame(dict(y=y, t=treated, x1=x1, x2=x2))
+
+    ate = NN.from_formula("y", "t", frame, covariates=["x1", "x2"],
+                          nneighbor=1, estimand="ate").fit()
+    atet = NN.from_formula("y", "t", frame, covariates=["x1", "x2"],
+                           nneighbor=1, estimand="atet").fit()
+
+    assert ate.std_err != atet.std_err
+    # Stata's own ratio is 1.133439; the weights are now the same shape, so the
+    # ratio is within the sigma^2 estimator's documented residual.
+    assert atet.std_err / ate.std_err == pytest.approx(1.133439, rel=5e-2)
 
 
 def test_nearest_neighbour_matching_labels_its_standard_error_approximate():

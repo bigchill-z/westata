@@ -1,0 +1,57 @@
+logit yb x1 x2                   b      8.051e-08
+logit yb x1 x2                   V      1.311e-07
+logit yb x1 x2                   se     1.958e-08
+logit yb x1 x2, vce(robust)      westata-fail:ValueError nan
+logit yb x1 x2, vce(cluster g)   b      8.051e-08
+logit yb x1 x2, vce(cluster g)   V      3.350e-03
+logit yb x1 x2, vce(cluster g)   se     1.674e-03
+logit yb x1 x2                   chi2   5.777e-10
+logit yb x1 x2                   df_m   0.000e+00
+probit yb x1 x2                  b      3.602e-10
+probit yb x1 x2                  V      3.472e-10
+probit yb x1 x2                  se     3.889e-11
+probit yb x1 x2, vce(robust)     westata-fail:ValueError nan
+probit yb x1 x2, vce(cluster g)  b      3.602e-10
+probit yb x1 x2, vce(cluster g)  V      3.350e-03
+probit yb x1 x2, vce(cluster g)  se     1.674e-03
+probit yb x1 x2                  chi2   4.776e-10
+probit yb x1 x2                  df_m   0.000e+00
+poisson y_c x1 x2                b      3.904e-08
+poisson y_c x1 x2                V      3.263e-08
+poisson y_c x1 x2                se     8.112e-09
+poisson y_c x1 x2, vce(robust)   westata-fail:ValueError nan
+poisson y_c x1 x2, vce(cluster g) b      3.904e-08
+poisson y_c x1 x2, vce(cluster g) V      3.352e-03
+poisson y_c x1 x2, vce(cluster g) se     1.674e-03
+poisson y_c x1 x2                chi2   2.086e-15
+poisson y_c x1 x2                df_m   0.000e+00
+nbreg y_nb x1 x2                 b      1.421e-04
+nbreg y_nb x1 x2                 V      1.733e-03
+nbreg y_nb x1 x2                 se     2.161e-05
+nbreg y_nb x1 x2, vce(robust)    westata-fail:ValueError nan
+nbreg y_nb x1 x2, vce(cluster g) b      1.421e-04
+nbreg y_nb x1 x2, vce(cluster g) V      5.138e-03
+nbreg y_nb x1 x2, vce(cluster g) se     2.516e-03
+nbreg y_nb x1 x2                 chi2   3.099e-09
+nbreg y_nb x1 x2                 df_m   nan
+ologit ycat x1 x2                b      3.176e-05
+ologit ycat x1 x2                V      5.866e+01
+ologit ycat x1 x2                se     1.470e+00
+ologit ycat x1 x2, vce(robust)   westata-fail:ValueError nan
+ologit ycat x1 x2, vce(cluster g) westata-fail:ValueError nan
+ologit ycat x1 x2                chi2   1.005e-09
+ologit ycat x1 x2                df_m   nan
+oprobit ycat x1 x2               b      5.029e-05
+oprobit ycat x1 x2               V      1.808e+01
+oprobit ycat x1 x2               se     1.212e+00
+oprobit ycat x1 x2, vce(robust)  westata-fail:ValueError nan
+oprobit ycat x1 x2, vce(cluster g) westata-fail:ValueError nan
+oprobit ycat x1 x2               chi2   2.245e-09
+oprobit ycat x1 x2               df_m   nan
+zip                              b      2.438e-07
+zip                              V      1.665e-04
+zip                              chi2   4.631e-09
+zip                              p      9.948e-01
+ztp                              b      1.887e-08
+ztp                              V      3.628e-07
+ztp                              chi2   0.000e+00

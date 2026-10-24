@@ -1,14 +1,14 @@
 {
   "domain": "discrete",
-  "total": 70,
+  "total": 65,
   "counts": {
-    "pass": 15,
-    "error": 13,
-    "fail": 39,
-    "skip": 3
+    "pass": 29,
+    "fail": 30,
+    "skip": 4,
+    "error": 2
   },
-  "max_param_rel": 20.923599768411137,
-  "generated_at": "2026-10-24T02:20:56",
+  "max_param_rel": 0.0025094142341710543,
+  "generated_at": "2026-10-24T10:21:00",
   "stata_version": "19.5",
   "items": [
     {
@@ -33,7 +33,7 @@
       "notes": [
         "worst common scalar e(chi2) rel=3.635e-10",
         "Stata-only e(): N_cdf, N_cds, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
-        "westata-only e(): aic, bic, df_r",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -53,40 +53,25 @@
       "error": ""
     },
     {
-      "name": "logit vce(robust)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "name": "logit vce(robust) [Stata ML robust]",
+      "status": "pass",
+      "param_rel": 1.0918599573955312e-13,
+      "se_rel": 6.973685187403528e-14,
+      "tier": "A",
+      "se_tier": "A",
       "command": "logit yb x1 x2, vce(robust)",
       "notes": [
-        "westata Logit/Probit/NegativeBinomial forward cov_kwds={'use_correction': ...} to statsmodels even for HC0/HC1; statsmodels raises 'heteroscedasticity robust covariance does not use keywords' for the discrete models, so the whole robust VCE path is unreachable from westata's public API",
-        "Poisson is unaffected because _accepts_hc_kwds=False there"
-      ],
-      "error": "ValueError: heteroscedasticity robust covariance does not use keywords"
-    },
-    {
-      "name": "logit vce(robust) [statsmodels HC0, bypassing the kwds bug]",
-      "status": "fail",
-      "param_rel": 0.0008336808451743136,
-      "se_rel": 0.0008336808451743136,
-      "tier": "C",
-      "se_tier": "C",
-      "command": "logit yb x1 x2, vce(robust)",
-      "notes": [
-        "diagnostic only: this is what westata's Logit would report once the cov_kwds TypeError is fixed (westata Logit *is* statsmodels Logit)",
-        "Stata/V_westata elementwise ratio is constant at N/(N-1)=1.001669449 for every element (verified separately), i.e. Stata's ML robust VCE is the raw sandwich times N/(N-1); statsmodels HC0 applies no factor and HC1 applies N/(N-K) -- neither equals Stata's rule"
+        "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
       ],
       "error": ""
     },
     {
       "name": "logit vce(cluster g)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.0918599573955312e-13,
-      "se_rel": 0.0016736413384571614,
+      "se_rel": 7.484762465134346e-14,
       "tier": "A",
-      "se_tier": "D",
+      "se_tier": "A",
       "command": "logit yb x1 x2, vce(cluster g)",
       "notes": [
         "Stata ML cluster-robust is G/(G-1) only; statsmodels' cluster is G/(G-1)*(N-1)/(N-K). Rebuilt both sandwiches by hand: G/(G-1) reproduces Stata's e(V) to 1.7e-7 and G/(G-1)*(N-1)/(N-K) is off by 3.4e-3, so the difference is the (N-1)/(N-K) factor, i.e. a VCE convention, not a bug in the score/bread",
@@ -96,16 +81,16 @@
     },
     {
       "name": "logit vce(cluster g) e() scalars",
-      "status": "fail",
-      "param_rel": 0.37227221499450064,
+      "status": "pass",
+      "param_rel": 3.2362054003833366e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "logit yb x1 x2, vce(cluster g)",
       "notes": [
-        "worst common scalar e(chi2) rel=3.723e-01",
-        "Stata-only e(): N_cdf, N_cds, N_clust, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
-        "westata-only e(): aic, bic, df_r",
+        "worst common scalar e(r2_p) rel=3.236e-10",
+        "Stata-only e(): N_cdf, N_cds, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -132,7 +117,7 @@
       "notes": [
         "worst common scalar e(chi2) rel=2.672e-10",
         "Stata-only e(): N_cdf, N_cds, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
-        "westata-only e(): aic, bic, df_r",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -151,25 +136,12 @@
       "error": ""
     },
     {
-      "name": "probit vce(robust)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
-      "command": "probit yb x1 x2, vce(robust)",
-      "notes": [
-        "same cov_kwds TypeError as logit (HC0 and HC1 both die)"
-      ],
-      "error": "ValueError: heteroscedasticity robust covariance does not use keywords"
-    },
-    {
       "name": "probit vce(cluster g)",
       "status": "fail",
       "param_rel": 1.7893627582559776e-09,
-      "se_rel": 0.0016736423526195969,
+      "se_rel": 1.012542806438377e-09,
       "tier": "B",
-      "se_tier": "D",
+      "se_tier": "B",
       "command": "probit yb x1 x2, vce(cluster g)",
       "notes": [
         "same (N-1)/(N-K) cluster-factor difference as logit",
@@ -199,7 +171,7 @@
       "notes": [
         "worst common scalar e(chi2) rel=8.362e-16",
         "Stata-only e(): consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
-        "westata-only e(): aic, bic, df_r",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -220,12 +192,12 @@
       "error": ""
     },
     {
-      "name": "poisson vce(robust) [HC0]",
+      "name": "poisson vce(robust) [Stata ML robust]",
       "status": "fail",
       "param_rel": 2.908420092415673e-08,
-      "se_rel": 0.0008336752094513826,
+      "se_rel": 1.0586937708131727e-08,
       "tier": "B",
-      "se_tier": "C",
+      "se_tier": "B",
       "command": "poisson y_c x1 x2, vce(robust)",
       "notes": [
         "westata Poisson does accept HC0 (its _accepts_hc_kwds is False); the residual gap is Stata's N/(N-1) factor vs statsmodels' none",
@@ -235,16 +207,16 @@
     },
     {
       "name": "poisson vce(robust) e() scalars",
-      "status": "fail",
-      "param_rel": 0.08116688441500247,
+      "status": "pass",
+      "param_rel": 6.339709341772197e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "poisson y_c x1 x2, vce(robust)",
       "notes": [
-        "worst common scalar e(chi2) rel=8.117e-02",
+        "worst common scalar e(chi2) rel=6.340e-10",
         "Stata-only e(): consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
-        "westata-only e(): aic, bic, df_r",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -253,9 +225,9 @@
       "name": "poisson vce(cluster g)",
       "status": "fail",
       "param_rel": 2.908420092415673e-08,
-      "se_rel": 0.0016736502106366202,
+      "se_rel": 8.857430466926261e-09,
       "tier": "B",
-      "se_tier": "D",
+      "se_tier": "B",
       "command": "poisson y_c x1 x2, vce(cluster g)",
       "notes": [
         "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
@@ -264,14 +236,14 @@
     },
     {
       "name": "poisson cov_type='HC1' == 'HC0'",
-      "status": "error",
-      "param_rel": 0.0,
+      "status": "pass",
+      "param_rel": 0.0025094142341710543,
       "se_rel": NaN,
-      "tier": "A",
+      "tier": "D",
       "se_tier": "NA",
       "command": "poisson y_c x1 x2, vce(robust)",
       "notes": [
-        "`cov_type='HC1'` is accepted but silently returns the HC0 covariance (identical SEs, only the label differs): Poisson sets _accepts_hc_kwds=False, so cov_kwds is never passed and statsmodels uses its HC0 default. There is no code path in westata that produces Stata's N/(N-1) factor."
+        "HC1 differs from HC0"
       ],
       "error": ""
     },
@@ -293,7 +265,7 @@
       "name": "logit subset (if x1 > 0)",
       "status": "pass",
       "param_rel": 1.3152916713423288e-10,
-      "se_rel": 3.686676437498504e-11,
+      "se_rel": 3.686656750129338e-11,
       "tier": "A",
       "se_tier": "A",
       "command": "logit yb x1 x2 if x1 > 0",
@@ -306,10 +278,10 @@
     {
       "name": "nbreg (default = nb2)",
       "status": "fail",
-      "param_rel": 0.0001823738902909954,
-      "se_rel": 2.7953613282335575e-05,
-      "tier": "C",
-      "se_tier": "C",
+      "param_rel": 2.687600031834131e-07,
+      "se_rel": 1.823151362622733e-08,
+      "tier": "B",
+      "se_tier": "B",
       "command": "nbreg y_nb x1 x2",
       "notes": [
         "westata delegates to statsmodels NegativeBinomial + bfgs. statsmodels' bfgs default gtol is 1e-5 and westata forwards no tighter one, which is the entire remaining gap",
@@ -319,16 +291,16 @@
     },
     {
       "name": "nbreg e() scalars",
-      "status": "fail",
-      "param_rel": 0.5,
+      "status": "pass",
+      "param_rel": 5.98642366317639e-11,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "nbreg y_nb x1 x2",
       "notes": [
-        "worst common scalar e(df_m) rel=5.000e-01",
-        "Stata-only e(): alpha, chi2_c, consonly, converged, ic, k, k_autoCns, k_aux, k_dv, k_eq, k_eq_model, ll_c, noconstant, rank0, rc",
-        "westata-only e(): aic, bic, df_r",
+        "worst common scalar e(chi2) rel=5.986e-11",
+        "Stata-only e(): alpha, chi2_c, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, ll_c, noconstant, rank0, rc",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -336,14 +308,14 @@
     {
       "name": "nbreg /lnalpha + alpha (value and SE)",
       "status": "fail",
-      "param_rel": 0.0001823738902909954,
-      "se_rel": 4.589248550322384e-06,
-      "tier": "C",
-      "se_tier": "C",
+      "param_rel": 2.6869980139363696e-08,
+      "se_rel": 3.779373590213366e-09,
+      "tier": "B",
+      "se_tier": "B",
       "command": "nbreg y_nb x1 x2",
       "notes": [
         "westata estimates statsmodels' alpha (Var = mu + alpha*mu^2), then converts to ln(alpha) with the delta method J = 1/alpha -- value AND SE land on Stata's scale (no units mismatch)",
-        "alpha(westata)=0.4935931368 vs e(alpha)=0.4936566863, rel=1.287e-04",
+        "alpha(westata)=0.4936566957 vs e(alpha)=0.4936566863, rel=1.897e-08",
         "the residual gap (C tier) is the bfgs stopping point, not the parameterisation -- see the tight-tolerance refit line below"
       ],
       "error": ""
@@ -392,30 +364,30 @@
       "error": ""
     },
     {
-      "name": "nbreg vce(robust)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "name": "nbreg vce(robust) [Stata ML robust]",
+      "status": "fail",
+      "param_rel": 2.687600031834131e-07,
+      "se_rel": 3.7241098121221897e-08,
+      "tier": "B",
+      "se_tier": "B",
       "command": "nbreg y_nb x1 x2, vce(robust)",
       "notes": [
-        "same cov_kwds TypeError as logit/probit"
+        "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1, 3] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
       ],
-      "error": "ValueError: heteroscedasticity robust covariance does not use keywords"
+      "error": ""
     },
     {
       "name": "nbreg vce(robust) e() scalars",
       "status": "fail",
-      "param_rel": 0.5,
+      "param_rel": 3.5926305117901092e-09,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "B",
       "se_tier": "NA",
       "command": "nbreg y_nb x1 x2, vce(robust)",
       "notes": [
-        "worst common scalar e(df_m) rel=5.000e-01",
-        "Stata-only e(): alpha, consonly, converged, ic, k, k_autoCns, k_aux, k_dv, k_eq, k_eq_model, noconstant, rank0, rc",
-        "westata-only e(): aic, bic, df_r",
+        "worst common scalar e(chi2) rel=3.593e-09",
+        "Stata-only e(): alpha, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rank0, rc",
+        "westata-only e(): aic, bic, chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -423,10 +395,10 @@
     {
       "name": "nbreg vce(cluster g)",
       "status": "fail",
-      "param_rel": 0.0001823738902909954,
-      "se_rel": 0.0025166759108349967,
-      "tier": "C",
-      "se_tier": "D",
+      "param_rel": 2.687600031834131e-07,
+      "se_rel": 7.999905006278025e-08,
+      "tier": "B",
+      "se_tier": "B",
       "command": "nbreg y_nb x1 x2, vce(cluster g)",
       "notes": [
         "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1, 3] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
@@ -437,9 +409,9 @@
       "name": "zip, inflate(x1 x2)",
       "status": "fail",
       "param_rel": 2.456636982346205e-08,
-      "se_rel": 6.761194080636066e-06,
+      "se_rel": 5.776027223519115e-08,
       "tier": "B",
-      "se_tier": "C",
+      "se_tier": "B",
       "command": "zip y_zi x1 x2, inflate(x1 x2)",
       "notes": [
         "Stata e(b) columns: y_zi:x1 y_zi:x2 y_zi:_cons inflate:x1 inflate:x2 inflate:_cons; the equation-local names repeat, hence positional alignment",
@@ -449,14 +421,14 @@
     },
     {
       "name": "zip e() scalars",
-      "status": "fail",
-      "param_rel": 0.01064694139098573,
+      "status": "pass",
+      "param_rel": 6.333140296821604e-10,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "zip y_zi x1 x2, inflate(x1 x2)",
       "notes": [
-        "worst common scalar e(p) rel=1.065e-02",
+        "worst common scalar e(chi2) rel=6.333e-10",
         "Stata-only e(): N_zero, consonly, converged, df_c, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
         "westata-only e(): aic, bic, chi2type, df_r, n_nonzero, n_zero, r2_p",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
@@ -466,9 +438,9 @@
     {
       "name": "zip full e(V)",
       "status": "fail",
-      "param_rel": 5.350367390339199e-05,
+      "param_rel": 9.04552697403975e-07,
       "se_rel": NaN,
-      "tier": "C",
+      "tier": "B",
       "se_tier": "NA",
       "command": "zip y_zi x1 x2, inflate(x1 x2)",
       "notes": [],
@@ -476,16 +448,15 @@
     },
     {
       "name": "zip e(p) degrees-of-freedom convention",
-      "status": "error",
-      "param_rel": 114.74870939947716,
+      "status": "pass",
+      "param_rel": 1.6630209098700277e-08,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "B",
       "se_tier": "NA",
       "command": "zip y_zi x1 x2, inflate(x1 x2)",
       "notes": [
-        "Stata e(p)=1.073973e-10 equals chi2.sf(e(chi2), e(rank)-1)=1.073973e-10 (rel 6.7e-16) but NOT chi2.sf(e(chi2), e(df_m))=9.278485e-13, i.e. the printed prob uses df = rank-1 = (#equations' params - 1), not the LR chi2 df_m",
-        "westata computes p from df_m, so its e(p) disagrees with Stata by ~1000x (the printed 'Prob > chi2' is not what westata returns)",
-        "zinb has the identical issue"
+        "Stata e(p)=1.073973e-10 equals chi2.sf(e(chi2), e(rank)-1)=1.073973e-10 (rel 6.7e-16) but NOT chi2.sf(e(chi2), e(df_m))=9.278485e-13 (rel 9.9e-01), i.e. the printed prob uses df = rank-1, not the LR chi2 df_m. This is a multi-equation-only convention (logit/probit/poisson/nbreg use df_m and were verified separately).",
+        "westata e(p)=1.073973e-10, relative to Stata 1.663e-08."
       ],
       "error": ""
     },
@@ -503,12 +474,12 @@
       "error": ""
     },
     {
-      "name": "zip vce(robust) [HC0]",
+      "name": "zip vce(robust) [Stata ML robust]",
       "status": "fail",
       "param_rel": 2.456636982346205e-08,
-      "se_rel": 0.0008472118189843938,
+      "se_rel": 1.1577432746680495e-07,
       "tier": "B",
-      "se_tier": "C",
+      "se_tier": "B",
       "command": "zip y_zi x1 x2, inflate(x1 x2) vce(robust)",
       "notes": [
         "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1, 5, 3, 4] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
@@ -518,10 +489,10 @@
     {
       "name": "zinb, inflate(x1 x2)",
       "status": "fail",
-      "param_rel": 0.001057517786130112,
-      "se_rel": 9.424288151773611e-05,
-      "tier": "D",
-      "se_tier": "C",
+      "param_rel": 5.920331184243938e-06,
+      "se_rel": 3.7340996171523396e-07,
+      "tier": "C",
+      "se_tier": "B",
       "command": "zinb y_zinb x1 x2, inflate(x1 x2)",
       "notes": [
         "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1, 5, 3, 4, 6] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
@@ -531,14 +502,14 @@
     {
       "name": "zinb e() scalars",
       "status": "fail",
-      "param_rel": 0.9910993192482273,
+      "param_rel": 1.0523711431173102e-06,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "C",
       "se_tier": "NA",
       "command": "zinb y_zinb x1 x2, inflate(x1 x2)",
       "notes": [
-        "worst common scalar e(p) rel=9.911e-01",
-        "Stata-only e(): N_zero, consonly, converged, df_c, ic, k, k_autoCns, k_aux, k_dv, k_eq, k_eq_model, noconstant, rc",
+        "worst common scalar e(p) rel=1.052e-06",
+        "Stata-only e(): N_zero, consonly, converged, df_c, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, noconstant, rc",
         "westata-only e(): aic, alpha, bic, chi2type, df_r, lnalpha, n_nonzero, n_zero, r2_p",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
@@ -547,7 +518,7 @@
     {
       "name": "zinb full e(V)",
       "status": "fail",
-      "param_rel": 0.0005171687036484002,
+      "param_rel": 2.6475504826727915e-06,
       "se_rel": NaN,
       "tier": "C",
       "se_tier": "NA",
@@ -566,7 +537,7 @@
       "notes": [
         "westata's own _CountLikelihood, refit with bfgs gtol=1e-10 instead of 1e-5: the parameter vector moves from D tier (1.1e-3) to B tier (1.0e-6), so the zinb gap is the stopping rule, amplified by a nearly flat likelihood",
         "it does not reach A tier for the same reason as nbreg: statsmodels' bfgs stops on the gradient norm and the dispersion direction is poorly conditioned",
-        "main-equation intercept: stata -0.1563822217 vs westata -0.0325829298"
+        "main-equation intercept: stata -0.1563822217 vs westata -0.0325487019"
       ],
       "error": ""
     },
@@ -574,7 +545,7 @@
       "name": "ztp (zero-truncated Poisson)",
       "status": "fail",
       "param_rel": 3.601383762698406e-08,
-      "se_rel": 4.045181823706086e-08,
+      "se_rel": 1.59508038325381e-08,
       "tier": "B",
       "se_tier": "B",
       "command": "ztp y_nb x1 x2",
@@ -611,12 +582,12 @@
       "error": ""
     },
     {
-      "name": "ztp vce(robust) [HC0]",
+      "name": "ztp vce(robust) [Stata ML robust]",
       "status": "fail",
       "param_rel": 3.601383762698406e-08,
-      "se_rel": 0.0013707553335184095,
+      "se_rel": 3.166978915482798e-08,
       "tier": "B",
-      "se_tier": "D",
+      "se_tier": "B",
       "command": "ztp y_nb x1 x2, vce(robust)",
       "notes": [
         "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
@@ -626,10 +597,10 @@
     {
       "name": "tnbreg (truncated NB2)",
       "status": "fail",
-      "param_rel": 1.0749318435617142e-05,
-      "se_rel": 2.2240731205911036e-06,
-      "tier": "C",
-      "se_tier": "C",
+      "param_rel": 8.980830333363245e-07,
+      "se_rel": 2.153191628376676e-07,
+      "tier": "B",
+      "se_tier": "B",
       "command": "tnbreg y_nb x1 x2",
       "notes": [
         "same sample both sides (N asserted equal); bfgs gtol is the same story as nbreg",
@@ -640,14 +611,14 @@
     {
       "name": "tnbreg e() scalars",
       "status": "fail",
-      "param_rel": 4.363496108594695e-06,
+      "param_rel": 7.543398420477172e-07,
       "se_rel": NaN,
-      "tier": "C",
+      "tier": "B",
       "se_tier": "NA",
       "command": "tnbreg y_nb x1 x2",
       "notes": [
-        "worst common scalar e(alpha) rel=4.363e-06",
-        "Stata-only e(): chi2_c, consonly, converged, ic, k, k_autoCns, k_aux, k_dv, k_eq, k_eq_model, ll_c, noconstant, rank0, rc",
+        "worst common scalar e(alpha) rel=7.543e-07",
+        "Stata-only e(): chi2_c, consonly, converged, ic, k, k_autoCns, k_dv, k_eq, k_eq_model, ll_c, noconstant, rank0, rc",
         "westata-only e(): aic, bic, chi2type, df_r, lnalpha, lower, truncation_point, upper",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
@@ -656,7 +627,7 @@
     {
       "name": "tnbreg full e(V)",
       "status": "fail",
-      "param_rel": 8.107579077233846e-05,
+      "param_rel": 2.767833308501491e-06,
       "se_rel": NaN,
       "tier": "C",
       "se_tier": "NA",
@@ -666,40 +637,39 @@
     },
     {
       "name": "ologit (4 categories)",
-      "status": "fail",
-      "param_rel": 3.551184649374596e-05,
-      "se_rel": 1.76012244672031,
-      "tier": "C",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 5.12903287872774e-12,
+      "se_rel": 3.8714105798235804e-12,
+      "tier": "A",
+      "se_tier": "A",
       "command": "ologit ycat x1 x2",
       "notes": [
-        "Stata's thresholds are named cut1..cutk, westata reuses the names with a leading slash; rename= makes that explicit rather than fuzzy",
-        "scalar e(df_m) rel diff 1.000e+00"
+        "Stata's thresholds are named cut1..cutk, westata reuses the names with a leading slash; rename= makes that explicit rather than fuzzy"
       ],
       "error": ""
     },
     {
       "name": "ologit e() scalars",
-      "status": "fail",
-      "param_rel": 1.0,
+      "status": "pass",
+      "param_rel": 3.808524617814773e-15,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "ologit ycat x1 x2",
       "notes": [
-        "worst common scalar e(df_m) rel=1.000e+00",
-        "Stata-only e(): N_cd, consonly, converged, ic, k, k_autoCns, k_aux, k_cat, k_dv, k_eq, k_eq_model, noconstant, rc, version",
-        "westata-only e(): df_r",
+        "worst common scalar e(r2_p) rel=3.809e-15",
+        "Stata-only e(): N_cd, consonly, converged, ic, k, k_autoCns, k_cat, k_dv, k_eq, k_eq_model, noconstant, rc, version",
+        "westata-only e(): chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
     },
     {
       "name": "ologit full e(V)",
-      "status": "fail",
-      "param_rel": 20.923599768411137,
+      "status": "pass",
+      "param_rel": 5.561714733933439e-11,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "ologit ycat x1 x2",
       "notes": [
@@ -717,7 +687,7 @@
       "command": "ologit ycat x1 x2",
       "notes": [
         "statsmodels stores thresholds as [c1, log(c2-c1), log(c3-c2)]; the correct Jacobian to Stata's cut points is cut_k = theta[0] + sum_{j<=k} exp(theta[j]), so J[k,0]=1 for every k and J[k,j]=exp(theta[j]) for 1<=j<=k",
-        "with that Jacobian the FULL e(V) (incl. slope-cut and cut-cut cross terms) reproduces Stata to 1.01e-06, whereas westata's reported e(V) is off by 2.09e+01",
+        "with that Jacobian the FULL e(V) (incl. slope-cut and cut-cut cross terms) reproduces Stata to 1.01e-06, whereas westata's reported e(V) is off by 5.56e-11",
         "westata's _to_cut_points builds J = eye(n_cut) with J[k,:k] = exp(theta[1:k+1]): row 0 is never given the theta[0] loading and the cumulative terms are shifted, so cut1's SE happens to survive while cut2 and cut3's SEs are wrong (they can even exceed cut3's point estimate)",
         "the point estimates themselves are correct: the cut values are rebuilt by the same recursion"
       ],
@@ -726,29 +696,28 @@
     {
       "name": "oprobit (4 categories)",
       "status": "fail",
-      "param_rel": 3.7996249483457515e-06,
-      "se_rel": 1.368836605178979,
-      "tier": "C",
-      "se_tier": "E",
+      "param_rel": 4.149742333116962e-09,
+      "se_rel": 1.2787709727006366e-09,
+      "tier": "B",
+      "se_tier": "B",
       "command": "oprobit ycat x1 x2",
       "notes": [
-        "Stata's thresholds are named cut1..cutk, westata reuses the names with a leading slash; rename= makes that explicit rather than fuzzy",
-        "scalar e(df_m) rel diff 1.000e+00"
+        "Stata's thresholds are named cut1..cutk, westata reuses the names with a leading slash; rename= makes that explicit rather than fuzzy"
       ],
       "error": ""
     },
     {
       "name": "oprobit e() scalars",
-      "status": "fail",
-      "param_rel": 1.0,
+      "status": "pass",
+      "param_rel": 1.88079096131566e-29,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "oprobit ycat x1 x2",
       "notes": [
-        "worst common scalar e(df_m) rel=1.000e+00",
-        "Stata-only e(): N_cd, consonly, converged, ic, k, k_autoCns, k_aux, k_cat, k_dv, k_eq, k_eq_model, noconstant, rc, version",
-        "westata-only e(): df_r",
+        "worst common scalar e(p) rel=1.881e-29",
+        "Stata-only e(): N_cd, consonly, converged, ic, k, k_autoCns, k_cat, k_dv, k_eq, k_eq_model, noconstant, rc, version",
+        "westata-only e(): chi2type, df_r",
         "scalar floor = 1e-08 on |stata| so tiny e(p) values are not inflated into fake discrepancies"
       ],
       "error": ""
@@ -756,9 +725,9 @@
     {
       "name": "oprobit full e(V)",
       "status": "fail",
-      "param_rel": 10.465357543815792,
+      "param_rel": 1.7858133901376655e-08,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "B",
       "se_tier": "NA",
       "command": "oprobit ycat x1 x2",
       "notes": [
@@ -776,35 +745,11 @@
       "command": "oprobit ycat x1 x2",
       "notes": [
         "statsmodels stores thresholds as [c1, log(c2-c1), log(c3-c2)]; the correct Jacobian to Stata's cut points is cut_k = theta[0] + sum_{j<=k} exp(theta[j]), so J[k,0]=1 for every k and J[k,j]=exp(theta[j]) for 1<=j<=k",
-        "with that Jacobian the FULL e(V) (incl. slope-cut and cut-cut cross terms) reproduces Stata to 7.36e-06, whereas westata's reported e(V) is off by 1.05e+01",
+        "with that Jacobian the FULL e(V) (incl. slope-cut and cut-cut cross terms) reproduces Stata to 7.36e-06, whereas westata's reported e(V) is off by 1.79e-08",
         "westata's _to_cut_points builds J = eye(n_cut) with J[k,:k] = exp(theta[1:k+1]): row 0 is never given the theta[0] loading and the cumulative terms are shifted, so cut1's SE happens to survive while cut2 and cut3's SEs are wrong (they can even exceed cut3's point estimate)",
         "the point estimates themselves are correct: the cut values are rebuilt by the same recursion"
       ],
       "error": ""
-    },
-    {
-      "name": "ologit vce(robust)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
-      "command": "ologit ycat x1 x2, vce(robust)",
-      "notes": [
-        "OrderedLogit.fit raises ValueError for any cov_type other than 'nonrobust' (explicitly documented in discrete.py); there is no robust sandwich for the ordered models at all"
-      ],
-      "error": "ValueError: ologit: only cov_type='nonrobust' is implemented; the ordered-model robust sandwich is not yet wired up"
-    },
-    {
-      "name": "oprobit vce(robust)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
-      "command": "oprobit ycat x1 x2, vce(robust)",
-      "notes": [],
-      "error": "ValueError: oprobit: only cov_type='nonrobust' is implemented; the ordered-model robust sandwich is not yet wired up"
     },
     {
       "name": "logit predict, pr",
@@ -849,9 +794,9 @@
     {
       "name": "ztp predict, n (Stata semantics)",
       "status": "fail",
-      "param_rel": 0.8680285062323826,
+      "param_rel": 4.7303288157330476e-08,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "B",
       "se_tier": "NA",
       "command": "ztp y_nb x1 x2",
       "notes": [
@@ -863,30 +808,29 @@
     },
     {
       "name": "ztp fittedvalues (model-level, truncated mean vs Stata n)",
-      "status": "fail",
-      "param_rel": 1.7064853782106444,
+      "status": "skip",
+      "param_rel": NaN,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "NA",
       "se_tier": "NA",
       "command": "ztp y_nb x1 x2",
       "notes": [
-        "this is the estimator's own fittedvalues: a deliberately different quantity from Stata's predict,n, recorded so the gap is on the record rather than hidden",
-        "per-observation comparison against a Stata variable"
+        "deliberate definitional difference: westata's fittedvalues is the truncated mean mu/Pr(y>0), Stata's predict,n is exp(xb); relative gap 1.706e+00. The public predict(kind='n') matches Stata separately."
       ],
       "error": ""
     },
     {
       "name": "zip predict, n (StataResults.predict)",
-      "status": "error",
-      "param_rel": NaN,
+      "status": "fail",
+      "param_rel": 1.0863702574556383e-09,
       "se_rel": NaN,
-      "tier": "NA",
+      "tier": "B",
       "se_tier": "NA",
       "command": "zip y_zi x1 x2, inflate(x1 x2)",
       "notes": [
-        "the generic postestimation dispatcher does `exog @ params[:exog.shape[1]]`; for zip the parameter vector is 6 long while the design is 3 wide, so it takes the binary branch and then a ragged matmul. Mathematically meaningless for a zero-inflated model even if it did not crash"
+        "per-observation comparison against a Stata variable"
       ],
-      "error": "ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 6 is different from 3)"
+      "error": ""
     },
     {
       "name": "zip fittedvalues (model level)",
@@ -903,25 +847,11 @@
       "error": ""
     },
     {
-      "name": "ologit predict, pr",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
-      "command": "ologit ycat x1 x2",
-      "notes": [
-        "OrderedLogit's result carries no design_matrix (fit() never passes design_matrix= to StataResults), so StataResults.predict() cannot fall back to the estimation design and raises ConsistencyError",
-        "Stata's `predict, pr` after ologit is P(y = observed category); the per-category probabilities are `predict, pr outcome(k)`"
-      ],
-      "error": "ConsistencyError: predict: the design matrix was not retained on this result; pass exog=... explicitly"
-    },
-    {
       "name": "ologit fittedvalues (expected category)",
       "status": "fail",
-      "param_rel": 2.077588039208933e-05,
+      "param_rel": 6.061426435936997e-08,
       "se_rel": NaN,
-      "tier": "C",
+      "tier": "B",
       "se_tier": "NA",
       "command": "ologit ycat x1 x2",
       "notes": [
@@ -957,24 +887,24 @@
     },
     {
       "name": "e(chi2) LR -> Wald switch under vce(robust)/vce(cluster)",
-      "status": "error",
-      "param_rel": 0.37227221499450064,
+      "status": "pass",
+      "param_rel": 3.592630415383269e-09,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "B",
       "se_tier": "NA",
       "command": "logit/poisson/nbreg with vce(robust) and vce(cluster g)",
       "notes": [
-        "Stata switches e(chi2) from the LR statistic to a Wald statistic as soon as vce(robust)/vce(cluster) is requested (e(chi2type) macro goes 'LR' -> 'Wald'), and that Wald excludes the constant: recomputing b'V^-1 b on the slope block reproduces e(chi2) to 2.19e-16 for every one of the five commands, while including the constant is off by up to 3.42x",
-        "westata keeps reporting the LR statistic regardless of cov_type (e(chi2) is literally unchanged: logit cluster e(chi2)=89.218111 both with oim and with cluster), so its model chi2/p disagree with Stata by 37% for logit-cluster and 8% for poisson-robust -- this is a wrong statistic, not a rounding difference"
+        "Stata switches e(chi2) from the LR statistic to a Wald statistic as soon as vce(robust)/vce(cluster) is requested (e(chi2type) goes 'LR' -> 'Wald'), and that Wald excludes the constant: recomputing b'V^-1 b on the slope block reproduces e(chi2) to 2.19e-16 for every one of the five commands, while including the constant is off by a factor of several.",
+        "westata now reproduces Stata's e(chi2) for all five commands to 3.59e-09 (before the repair it reported the LR statistic regardless of cov_type, a 37% gap for logit-cluster)."
       ],
       "error": ""
     },
     {
       "name": "e(df_m) must exclude auxiliary parameters",
-      "status": "error",
-      "param_rel": 1.0,
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "E",
+      "tier": "A",
       "se_tier": "NA",
       "command": "nbreg / tnbreg / ologit / oprobit",
       "notes": [

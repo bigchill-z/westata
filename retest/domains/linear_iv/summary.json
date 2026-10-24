@@ -2,12 +2,12 @@
   "domain": "linear_iv",
   "total": 65,
   "counts": {
-    "pass": 46,
-    "fail": 15,
+    "pass": 56,
+    "fail": 5,
     "skip": 4
   },
-  "max_param_rel": 0.035832159221055496,
-  "generated_at": "2026-10-24T02:09:43",
+  "max_param_rel": 1.1783525559347011e-13,
+  "generated_at": "2026-10-24T10:06:35",
   "stata_version": "19.5",
   "items": [
     {
@@ -56,15 +56,14 @@
     },
     {
       "name": "3b regress vce(robust)\uff1ae(F) \u8bed\u4e49",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 5.113664333116265e-15,
       "se_rel": 4.570464733189402e-15,
       "tier": "A",
       "se_tier": "A",
       "command": "regress mpg weight foreign, vce(robust)",
       "notes": [
-        "Stata e(F) \u5728 vce(robust) \u4e0b = \u7528\u7a33\u5065 e(V) \u91cd\u7b97\u7684 Wald/k\uff1b\u628a westata \u81ea\u5df1\u7684 V \u4ee3\u8fdb\u540c\u4e00\u4e2a\u4e8c\u6b21\u578b\u5f97 73.80592553\uff0c\u4e0e Stata e(F) \u76f8\u5bf9\u5dee 4.62e-15\uff08\u5373\u4e24\u8fb9 V \u4e00\u81f4\u3001F \u5b9a\u4e49\u4e0d\u540c\uff09\u3002westata OLS \u7684 e(F) \u6052\u4e3a\u7ecf\u5178 R2 \u578b F=(r2/df_m)/((1-r2)/df_r)\uff0c\u4e0d\u968f cov_type \u53d8",
-        "scalar e(F) rel diff 5.497e-02"
+        "Stata e(F) \u5728 vce(robust) \u4e0b = \u7528\u7a33\u5065 e(V) \u91cd\u7b97\u7684 Wald/k\uff1b\u628a westata \u81ea\u5df1\u7684 V \u4ee3\u8fdb\u540c\u4e00\u4e2a\u4e8c\u6b21\u578b\u5f97 73.80592553\uff0c\u4e0e Stata e(F) \u76f8\u5bf9\u5dee 4.62e-15\uff08\u5373\u4e24\u8fb9 V \u4e00\u81f4\u3001F \u5b9a\u4e49\u4e0d\u540c\uff09\u3002westata OLS \u7684 e(F) \u6052\u4e3a\u7ecf\u5178 R2 \u578b F=(r2/df_m)/((1-r2)/df_r)\uff0c\u4e0d\u968f cov_type \u53d8"
       ],
       "error": ""
     },
@@ -83,15 +82,14 @@
     },
     {
       "name": "4b regress cluster\uff1a\u5b58\u4e0b\u6765\u7684 e(df_r) \u8bed\u4e49",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 3.5367642703450246e-16,
       "se_rel": 1.1037684193161843e-15,
       "tier": "A",
       "se_tier": "A",
       "command": "regress y x1 x2, vce(cluster gid)",
       "notes": [
-        "westata OLS \u628a e(df_r) \u5b58\u6210 N-K\uff0cStata \u5b58 G-1\uff1b\u63a8\u65ad\u7528\u7684 results.df_resid \u4e24\u4fa7\u4e00\u81f4\uff084a\uff09\uff0c\u56e0\u6b64\u53ea\u5f71\u54cd\u8bfb e('df_r') \u7684\u4e0b\u6e38\u4ee3\u7801",
-        "scalar e(df_r) rel diff 9.538e+00"
+        "westata OLS \u628a e(df_r) \u5b58\u6210 N-K\uff0cStata \u5b58 G-1\uff1b\u63a8\u65ad\u7528\u7684 results.df_resid \u4e24\u4fa7\u4e00\u81f4\uff084a\uff09\uff0c\u56e0\u6b64\u53ea\u5f71\u54cd\u8bfb e('df_r') \u7684\u4e0b\u6e38\u4ee3\u7801"
       ],
       "error": ""
     },
@@ -110,15 +108,14 @@
     },
     {
       "name": "4d regress cluster\uff1ae(F) \u8bed\u4e49",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 3.5367642703450246e-16,
       "se_rel": 1.1037684193161843e-15,
       "tier": "A",
       "se_tier": "A",
       "command": "regress y x1 x2, vce(cluster gid)",
       "notes": [
-        "Stata e(F) \u5728 vce(cluster) \u4e0b = \u7528 CR1 \u7684 e(V) \u7b97\u7684 Wald/k\uff1b\u628a westata \u81ea\u5df1\u7684 V \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 474.89190646\uff0c\u4e0e Stata e(F)=474.89190646 \u76f8\u5bf9\u5dee 1.92e-15 \u2014\u2014 \u8bf4\u660e\u4e24\u4fa7 V \u4e00\u81f4\uff0c\u53ea\u662f westata \u7684 e(F) \u4e0d\u968f cov_type \u6539\u4e3a Wald \u5b9a\u4e49",
-        "scalar e(F) rel diff 3.747e-01"
+        "Stata e(F) \u5728 vce(cluster) \u4e0b = \u7528 CR1 \u7684 e(V) \u7b97\u7684 Wald/k\uff1b\u628a westata \u81ea\u5df1\u7684 V \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 474.89190646\uff0c\u4e0e Stata e(F)=474.89190646 \u76f8\u5bf9\u5dee 1.92e-15 \u2014\u2014 \u8bf4\u660e\u4e24\u4fa7 V \u4e00\u81f4\uff0c\u53ea\u662f westata \u7684 e(F) \u4e0d\u968f cov_type \u6539\u4e3a Wald \u5b9a\u4e49"
       ],
       "error": ""
     },
@@ -168,15 +165,14 @@
     },
     {
       "name": "5e regress [pweight=w]\uff1ae(F) \u8bed\u4e49\uff08pw \u9690\u542b robust\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.0591002437568473e-15,
       "se_rel": 8.860104840845565e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "regress y x1 x2 [pweight=w]",
       "notes": [
-        "Stata e(F)=311.96818338 \u7b49\u4e8e\u7a33\u5065 Wald/k=311.96818338\uff08\u76f8\u5bf9\u5dee 2.73e-15\uff09\uff1bwestata \u62a5\u7ecf\u5178 R2 \u578b F",
-        "scalar e(F) rel diff 2.912e-02"
+        "Stata e(F)=311.96818338 \u7b49\u4e8e\u7a33\u5065 Wald/k=311.96818338\uff08\u76f8\u5bf9\u5dee 2.73e-15\uff09\uff1bwestata \u62a5\u7ecf\u5178 R2 \u578b F"
       ],
       "error": ""
     },
@@ -341,7 +337,7 @@
       "name": "8c reghdfe absorb(gid t) vce(robust)",
       "status": "pass",
       "param_rel": 1.0821005589695823e-15,
-      "se_rel": 3.3616625336952625e-16,
+      "se_rel": 0.0,
       "tier": "A",
       "se_tier": "A",
       "command": "reghdfe y x1 x2, absorb(gid t) vce(robust)",
@@ -352,7 +348,7 @@
       "name": "8d reghdfe absorb(gid t) vce(cluster gid)",
       "status": "pass",
       "param_rel": 1.0821005589695823e-15,
-      "se_rel": 2.103464551463332e-16,
+      "se_rel": 4.967303270196211e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "reghdfe y x1 x2, absorb(gid t) vce(cluster gid)",
@@ -365,7 +361,7 @@
       "name": "9 FEOLS(gid+t, HC1) vs areg absorb(gid)+i.t",
       "status": "pass",
       "param_rel": 9.42675768269063e-16,
-      "se_rel": 7.843879245288943e-16,
+      "se_rel": 4.482216711593682e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "areg y x1 x2 i.t, absorb(gid) vce(robust)",
@@ -504,11 +500,11 @@
     },
     {
       "name": "11e ivregress liml vce(cluster gid) vs westata cluster",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.5469797304163085e-15,
-      "se_rel": 0.045296408534763646,
+      "se_rel": 9.072756720571424e-16,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "ivregress liml yiv x1 (e1 = z1 z2), vce(cluster gid)",
       "notes": [
         "\u7cfb\u6570\u4e00\u81f4\uff1bSE \u7cfb\u7edf\u6027\u5927 4.53%\u3002\u5f52\u56e0\uff1aStata liml/2sls \u7684 cluster \u9ed8\u8ba4\u662f CR0\uff0c\u800c westata \u7684 IVLIML \u8d70 _backend_vce \u2192 _backend_fit \u5bf9 cluster \u65e0\u6761\u4ef6 debiased=True\uff0clinearmodels \u7684 clustered \u65b9\u5dee\u56e0\u6b64\u4e58\u4e86 n/(n-k)*(G/(G-1))*((n-1)/n)\uff08CR1\uff09\uff1b\u5b9e\u6d4b\u6bd4\u503c 1.045296 \u4e0e\u504f\u5dee\u543b\u5408"
@@ -517,11 +513,11 @@
     },
     {
       "name": "11f ivregress liml vce(cluster gid) small vs westata cluster",
-      "status": "pass",
+      "status": "fail",
       "param_rel": 1.5469797304163085e-15,
-      "se_rel": 8.67960192582034e-16,
+      "se_rel": 0.04333355416217195,
       "tier": "A",
-      "se_tier": "A",
+      "se_tier": "E",
       "command": "ivregress liml yiv x1 (e1 = z1 z2), vce(cluster gid) small",
       "notes": [
         "Stata \u52a0\u4e0a small \u540e\u624d\u662f CR1\uff0c\u6b64\u65f6\u4e0e westata cluster \u7684\u7cfb\u6570/SE \u5b8c\u5168\u4e00\u81f4 \u2192 11e \u7684\u504f\u5dee 100% \u6765\u81ea\u300cStata \u9ed8\u8ba4\u4e0d\u52a0\u5c0f\u6837\u672c\u56e0\u5b50 vs westata \u6052\u52a0\u300d\u3002e(rmse) \u4e0d\u6bd4\u8f83\uff1asmall \u628a Stata \u7684 rmse \u6362\u6210 sqrt(rss/(N-K))\uff080.68993385\uff09\uff0cwestata \u6052\u4e3a sqrt(rss/N)\uff080.68250167\uff09"
@@ -580,16 +576,14 @@
     },
     {
       "name": "12d ivregress gmm vce(cluster gid)",
-      "status": "fail",
-      "param_rel": 0.035832159221055496,
-      "se_rel": 0.12054778808882385,
-      "tier": "E",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 4.574823611225951e-16,
+      "se_rel": 6.361807525871046e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "ivregress gmm yiv x1 (e1 = z1 z2), vce(cluster gid)",
       "notes": [
-        "Stata \u7684 ivregress gmm \u5728 vce(cluster) \u4e0b\u628a W \u4e5f\u6362\u6210\u805a\u7c7b\u6743\u91cd\u77e9\u9635\uff0c\u70b9\u4f30\u8ba1\u56e0\u6b64\u4e0e hetero-GMM \u4e0d\u540c\uff1bwestata \u7684 IVGMM \u65e0\u8bba cov_type \u90fd\u7528 heteroskedastic W\uff08linearmodels \u9ed8\u8ba4\uff09\u2192 \u7cfb\u6570\u5dee 3.58e-2\u3001SE \u5dee 1.21e-1\u3002\u624b\u7b97\u590d\u73b0\uff1a\u7528 cluster meat \u9020 W\u3001\u518d\u7528 cluster meat \u9020 S\uff0c\u4e24\u6b65 GMM \u7684\u7cfb\u6570\u4e0e Stata \u76f8\u5bf9\u5dee 1.5e-15\u3001SE \u76f8\u5bf9\u5dee 1.9e-15 \u2192 \u786e\u8ba4\u5206\u6b67\u5728 W \u7684\u9009\u62e9\uff0c\u4e0d\u662f\u6570\u503c\u5b9e\u73b0\u3002\u5c5e\u300c\u4f30\u8ba1\u91cf\u9009\u62e9\u300d\u5dee\u5f02\uff0c\u4e0d\u53ea\u662f VCE \u5dee\u5f02",
-        "scalar e(r2) rel diff 1.465e-04",
-        "scalar e(rmse) rel diff 7.351e-04"
+        "Stata \u7684 ivregress gmm \u5728 vce(cluster) \u4e0b\u628a W \u4e5f\u6362\u6210\u805a\u7c7b\u6743\u91cd\u77e9\u9635\uff0c\u70b9\u4f30\u8ba1\u56e0\u6b64\u4e0e hetero-GMM \u4e0d\u540c\uff1bwestata \u7684 IVGMM \u65e0\u8bba cov_type \u90fd\u7528 heteroskedastic W\uff08linearmodels \u9ed8\u8ba4\uff09\u2192 \u7cfb\u6570\u5dee 3.58e-2\u3001SE \u5dee 1.21e-1\u3002\u624b\u7b97\u590d\u73b0\uff1a\u7528 cluster meat \u9020 W\u3001\u518d\u7528 cluster meat \u9020 S\uff0c\u4e24\u6b65 GMM \u7684\u7cfb\u6570\u4e0e Stata \u76f8\u5bf9\u5dee 1.5e-15\u3001SE \u76f8\u5bf9\u5dee 1.9e-15 \u2192 \u786e\u8ba4\u5206\u6b67\u5728 W \u7684\u9009\u62e9\uff0c\u4e0d\u662f\u6570\u503c\u5b9e\u73b0\u3002\u5c5e\u300c\u4f30\u8ba1\u91cf\u9009\u62e9\u300d\u5dee\u5f02\uff0c\u4e0d\u53ea\u662f VCE \u5dee\u5f02"
       ],
       "error": ""
     },
@@ -643,35 +637,35 @@
     },
     {
       "name": "15a OLS e() \u8986\u76d6\u5ea6\uff08rss/mss/sum_w/rank/tss\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
       "se_tier": "NA",
       "command": "regress mpg weight foreign",
       "notes": [
-        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1all_0, mss, rss, sum_w",
+        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1a\uff08\u65e0\uff09",
         "westata e() \u591a\u51fa\uff1aaic, bic, sigma"
       ],
       "error": ""
     },
     {
       "name": "15b \u52a0\u6743 OLS e() \u8986\u76d6\u5ea6\uff08sum_w\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
       "se_tier": "NA",
       "command": "regress y x1 x2 [fweight=w]",
       "notes": [
-        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1all_0, mss, rss, sum_w",
+        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1a\uff08\u65e0\uff09",
         "westata e() \u591a\u51fa\uff1aaic, bic, sigma"
       ],
       "error": ""
     },
     {
       "name": "15c cluster OLS e() \u8986\u76d6\u5ea6\uff08N_clust\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -679,14 +673,14 @@
       "command": "regress y x1 x2, vce(cluster gid)",
       "notes": [
         "Stata \u5b58 e(N_clust)=14\uff1bwestata \u7684 OLS e \u8bcd\u5178\u91cc\u6ca1\u6709 N_clust",
-        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1aN_clust, ll_0, mss, rss, sum_w",
+        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1a\uff08\u65e0\uff09",
         "westata e() \u591a\u51fa\uff1aaic, bic, sigma"
       ],
       "error": ""
     },
     {
       "name": "15d 2SLS e() \u8986\u76d6\u5ea6\uff08rss/mss/kappa/k_endog/iterations\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -694,14 +688,14 @@
       "command": "ivregress 2sls yiv x1 (e1 = z1 z2)",
       "notes": [
         "westata IV \u591a\u5b58 df_r\uff08Stata \u7f3a\u5931\uff09\u3001F/F_first/chi2/ll\uff1b\u8fd9\u4e9b\u5dee\u5f02\u5199\u8fdb NOTES \u9010\u9879\u8bf4\u660e",
-        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1aiterations, k_endog, kappa, mss, rss, tss",
+        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1a\uff08\u65e0\uff09",
         "westata e() \u591a\u51fa\uff1aF, F_first, ll"
       ],
       "error": ""
     },
     {
       "name": "15e GMM e() \u8986\u76d6\u5ea6\uff08Stata \u7684 e(J) \u65e0\u5bf9\u5e94\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": NaN,
       "se_rel": NaN,
       "tier": "NA",
@@ -709,8 +703,8 @@
       "command": "ivregress gmm yiv x1 (e1 = z1 z2)",
       "notes": [
         "Stata \u5b58 e(J)\uff08Hansen J\uff09\uff1bwestata \u7684 IVGMM \u4e0d\u5b58 J",
-        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1aJ, iterations, k_endog, mss, rss",
-        "westata e() \u591a\u51fa\uff1aF, F_first, ll"
+        "Stata e() \u6709\u800c westata e() \u6ca1\u6709\uff1a\uff08\u65e0\uff09",
+        "westata e() \u591a\u51fa\uff1aF, F_first, ll, tss"
       ],
       "error": ""
     },
@@ -802,7 +796,7 @@
       "se_tier": "NA",
       "command": "regress y x1 x2, vce(robust)",
       "notes": [
-        "Stata e(F)=314.61888822\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 314.61888822\uff0c\u76f8\u5bf9\u5dee 1.81e-16 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=296.96502390\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 5.61e-02"
+        "Stata e(F)=314.61888822\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 314.61888822\uff0c\u76f8\u5bf9\u5dee 1.81e-16 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=314.61888822\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 1.81e-16"
       ],
       "error": ""
     },
@@ -815,7 +809,7 @@
       "se_tier": "NA",
       "command": "regress y x1 x2, vce(cluster gid)",
       "notes": [
-        "Stata e(F)=474.89190646\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 474.89190646\uff0c\u76f8\u5bf9\u5dee 1.92e-15 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=296.96502390\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 3.75e-01"
+        "Stata e(F)=474.89190646\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 474.89190646\uff0c\u76f8\u5bf9\u5dee 1.92e-15 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=474.89190646\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 1.92e-15"
       ],
       "error": ""
     },
@@ -828,7 +822,7 @@
       "se_tier": "NA",
       "command": "regress y x1 x2 [pweight=w]",
       "notes": [
-        "Stata e(F)=311.96818338\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 311.96818338\uff0c\u76f8\u5bf9\u5dee 2.73e-15 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=321.05202773\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 2.91e-02"
+        "Stata e(F)=311.96818338\uff1b\u628a westata \u81ea\u5df1\u7684 e(V) \u4ee3\u5165\u540c\u4e00\u4e8c\u6b21\u578b\u5f97 311.96818338\uff0c\u76f8\u5bf9\u5dee 2.73e-15 \u2192 \u4e24\u4fa7 V \u76f8\u540c\uff0ce(F) \u7684\u5dee\u522b\u7eaf\u7cb9\u662f\u5b9a\u4e49\uff08westata \u6052\u7528\u7ecf\u5178 R\u00b2 \u578b F\uff09\uff1bwestata \u81ea\u5df1\u7684 e(F)=311.96818338\uff0c\u4e0e Stata \u76f8\u5bf9\u5dee 2.73e-15"
       ],
       "error": ""
     }

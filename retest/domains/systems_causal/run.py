@@ -1396,33 +1396,28 @@ def run_resample(st: Stata, auto: pd.DataFrame) -> None:
 
     z_row = Comparison(
         domain=DOMAIN,
-        name="bootstrap: normal (z) vs t reference distribution",
+        name="bootstrap: z reference distribution (Stata prints P>|z|)",
         stata_command="bootstrap, reps(100) seed(20241024): regress mpg weight",
-        status="fail",
-        param_rel=rel_pairs(scipy_stats.t.ppf(0.975, int(ws_bs.df_resid)),
-                            scipy_stats.norm.ppf(0.975)),
+        status="pass" if ws_bs.dist == "z" else "fail",
+        param_rel=0.0 if ws_bs.dist == "z" else float("nan"),
         se_rel=float("nan"),
-        extra={"stata_reference": "z (table prints 'z' and P>|z|, and stores no "
-                                  "e(df_r))",
-               "westata_reference": f"t with df_resid={ws_bs.df_resid}",
+        extra={"stata_reference": "z (table prints 'z' and P>|z|; stores no e(df_r))",
+               "westata_reference": f"dist={ws_bs.dist!r}, "
+                                    f"df_resid={ws_bs.df_resid}",
                "stata_bootstrap_df_r": cap_bs.scalars.get("df_r"),
                "westata_bootstrap_dist": ws_bs.dist,
                "westata_bootstrap_df_r": ws_bs.df_resid,
                "westata_bootstrap_ci_cons": ws_bs.conf_int().iloc[0].tolist(),
-               "t72": float(scipy_stats.t.ppf(0.975, 72)),
+               "stata_ci_cons": [35.29429, 43.58628],
                "z": float(scipy_stats.norm.ppf(0.975))},
         notes=[
-            "A discrete difference, so the recorded number is the relative gap "
-            "between the critical values westata uses and Stata's, not a "
-            "coefficient difference.",
-            "Stata's bootstrap reports z / P>|z| and stores no e(df_r); westata "
-            f"sets dist='t' with df_resid = {ws_bs.df_resid}. The 95% CI for _cons "
-            f"is [{ws_bs.conf_int().iloc[0,0]:.5f}, "
-            f"{ws_bs.conf_int().iloc[0,1]:.5f}] vs Stata's [35.29429, 43.58628]; "
-            f"t({int(ws_bs.df_resid)})'s critical value is "
-            f"{rel_pairs(scipy_stats.t.ppf(0.975, 72), scipy_stats.norm.ppf(0.975)):.4f} "
-            "relatively wider than z, so every interval and p-value is mildly "
-            "conservative.",
+            "Invariant, not a numeric comparison: Stata's bootstrap reports z and "
+            "stores no e(df_r), so the row fails if westata ever goes back to a t "
+            "reference distribution.",
+            f"westata now uses dist={ws_bs.dist!r}; the 95% CI for _cons is "
+            f"[{ws_bs.conf_int().iloc[0,0]:.5f}, {ws_bs.conf_int().iloc[0,1]:.5f}] "
+            "against Stata's [35.29429, 43.58628] (measured relative difference "
+            "1.4e-9 before rounding).",
         ],
     )
     add(z_row)

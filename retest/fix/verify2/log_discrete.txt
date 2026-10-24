@@ -1,0 +1,95 @@
+====================================================================================================
+A. DISCRETE
+====================================================================================================
+stata 19.5
+
+[A1] D1 ologit/oprobit e(V) FULL matrix + lincom mixing slope & cut
+  ologit e(V) full 5x5                                 b=8.201e-12 (A)  se=3.664e-12 (A)
+D:\myCodeProject\statapy\src\westata\estimators\discrete.py:743: RuntimeWarning: invalid value encountered in multiply
+  return density, -value * density
+       full-matrix rel = 5.354e-11 (A)   cuts se westata=[0.10944997 0.09490836 0.11300542]
+  oprobit e(V) full 5x5                                b=7.466e-10 (A)  se=2.712e-10 (A)
+       full-matrix rel = 1.661e-08 (B)   cuts se westata=[0.06332717 0.0583184  0.06511965]
+       lincom 2*x1 + /cut1             Stata b=+0.27922946 se=0.18358592 | westata b=+0.27922946 se=0.18358592 rel b=2.982e-13(A) se=1.229e-12(A)
+       lincom 2*x1 - 1*x2 + 3*/cut2    Stata b=+2.15815605 se=0.34508046 | westata b=+2.15815605 se=0.34508046 rel b=6.459e-12(A) se=2.472e-12(A)
+       lincom /cut1 - /cut3            Stata b=-2.54390727 se=0.13925437 | westata b=-2.54390727 se=0.13925437 rel b=7.158e-12(A) se=6.287e-12(A)
+
+[A2] D2 vce(robust) / vce(cluster) for logit / probit / nbreg / ologit
+  logit robust                                         b=1.074e-10 (A)  se=9.622e-11 (A)
+       e(V) full rel = 7.125e-10 (A) ; e(chi2type)=Wald chi2 rel=1.115e-11
+  logit cluster                                        b=1.074e-10 (A)  se=1.005e-10 (A)
+       e(V) full rel = 4.975e-10 (A) ; e(chi2type)=Wald chi2 rel=9.897e-12
+  probit robust                                        b=1.124e-11 (A)  se=8.304e-12 (A)
+       e(V) full rel = 8.153e-11 (A) ; e(chi2type)=Wald chi2 rel=1.909e-12
+  probit cluster                                       b=1.124e-11 (A)  se=8.942e-12 (A)
+D:\myCodeProject\statapy\src\westata\estimators\discrete.py:743: RuntimeWarning: invalid value encountered in multiply
+  return density, -value * density
+       e(V) full rel = 4.375e-11 (A) ; e(chi2type)=Wald chi2 rel=2.689e-12
+       nbreg robust: SE rel = 9.176e-09 (B)
+
+[A3] D3 Poisson HC1 must not equal HC0
+       poisson: array_equal=False ratio min/max=1.002865329513/1.002865329513 N/(N-K)=1.002865329513 exact_rel=0.000e+00
+
+[A4] D4 e(chi2) switches LR -> slope-block Wald
+       logit default    Stata chi2=202.5656410084 (LR) westata=202.5656410556 (LR) rel=2.333e-10(A)
+       logit robust     Stata chi2=158.5815613535 (Wald) westata=158.5815613518 (Wald) rel=1.115e-11(A)
+       logit cluster    Stata chi2=152.6822384865 (Wald) westata=152.6822384850 (Wald) rel=9.897e-12(A)
+       poisson default  Stata chi2=809.5245329466 (LR) westata=809.5245329466 (LR) rel=0.000e+00(A)
+       poisson robust   Stata chi2=900.9687946168 (Wald) westata=900.9687946007 (Wald) rel=1.790e-11(A)
+
+[A5] D5 e(df_m) / e(k_aux) / e(rank)
+       nbreg      Stata {'df_m': 1.0, 'rank': 3.0, 'k_aux': 1.0} | westata {'df_m': 1, 'rank': 3, 'k_aux': 1} | match=True
+       poisson    Stata {'df_m': 1.0, 'rank': 2.0, 'k_aux': None} | westata {'df_m': 1, 'rank': 2, 'k_aux': None} | match=True
+       ologit     Stata {'df_m': 2.0, 'rank': 5.0, 'k_aux': 3.0} | westata {'df_m': 2, 'rank': 5, 'k_aux': 3} | match=True
+       oprobit    Stata {'df_m': 2.0, 'rank': 5.0, 'k_aux': 3.0} | westata {'df_m': 2, 'rank': 5, 'k_aux': 3} | match=True
+       logit      Stata {'df_m': 2.0, 'rank': 3.0, 'k_aux': None} | westata {'df_m': 2, 'rank': 3, 'k_aux': None} | match=True
+
+[A6] M3 zip / ztp predict semantics
+       zip predict,n     rel=1.164e-08 (B) head stata=[0.7848556 0.4474833 0.108758 ] westata=[0.7848556 0.4474833 0.108758 ]
+       zip predict,pr    rel=1.068e-08 (B) head stata=[0.65747903 0.71792533 0.47215685] westata=[0.65747903 0.71792532 0.47215685]
+       zip predict,xb    rel=6.498e-06 (C) head stata=[ 0.82916688  0.46146738 -1.57967392] westata=[ 0.82916688  0.46146737 -1.57967392]
+       zip predict,stdp  rel=1.911e-09 (B) head stata=[0.05541327 0.07259697 0.21486176] westata=[0.05541327 0.07259697 0.21486176]
+       ztp predict,n     rel=3.033e-10 (A) head stata=[2.49899486 4.34565674 3.30151673] westata=[2.49899486 4.34565673 3.30151673]
+
+[A7] regression probes: plain logit path, plain poisson path
+  logit default (b/se)                                 b=1.074e-10 (A)  se=4.928e-11 (A)
+       logit e(V) full rel=2.569e-10 (A) ; e(ll) rel=0.000e+00 ; e(N)=800 vs 800.0
+  poisson default (b/se)                               b=5.639e-11 (A)  se=9.623e-12 (A)
+
+[A8] regression probes: ologit/oprobit marginal path via margins
+       ologit margins dydx(x1) Stata b=-0.1283055116 se=0.0137567765 | rel b=1.920e-12(A) se=1.607e-12(A)
+       ologit margins dydx(x2) Stata b=0.0411833728 se=0.0136431919 | rel b=2.023e-12(A) se=2.735e-12(A)
+
+---- summary (max rel per item) ----
+  zip_xb                           6.498e-06  C
+  oprobit_V                        1.661e-08  B
+  zip_n                            1.164e-08  B
+  zip_pr                           1.068e-08  B
+  nbreg_robust                     9.176e-09  B
+  zip_stdp                         1.911e-09  B
+  logit robust                     7.125e-10  A
+  logit cluster                    4.975e-10  A
+  ztp_n                            3.033e-10  A
+  oprobit_se                       2.712e-10  A
+  logit_plain                      2.569e-10  A
+  chi2_logit default               2.333e-10  A
+  probit robust                    8.153e-11  A
+  poisson_plain                    5.639e-11  A
+  ologit_V                         5.354e-11  A
+  probit cluster                   4.375e-11  A
+  chi2_poisson robust              1.790e-11  A
+  chi2_logit robust                1.115e-11  A
+  chi2_logit cluster               9.897e-12  A
+  lincom_/cut1 - /cut3             7.158e-12  A
+  lincom_2*x1 - 1*x2 + 3*/cut2     6.459e-12  A
+  ologit_se                        3.664e-12  A
+  ologit_margins_x2                2.735e-12  A
+  ologit_margins_x1                1.920e-12  A
+  lincom_2*x1 + /cut1              1.229e-12  A
+  poisson_hc1                      0.000e+00  A
+  chi2_poisson default             0.000e+00  A
+  dfm_nbreg                        0.000e+00  A
+  dfm_poisson                      0.000e+00  A
+  dfm_ologit                       0.000e+00  A
+  dfm_oprobit                      0.000e+00  A
+  dfm_logit                        0.000e+00  A

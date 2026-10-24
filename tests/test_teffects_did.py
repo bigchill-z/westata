@@ -149,26 +149,51 @@ def test_matching_rejects_a_nonpositive_neighbour_count():
 
 
 def test_didregress_matches_stata():
+    """``didregress (y x1) (treated)``: ATET 1.18613 on the P11 panel.
+
+    The explicit ``(y x1)`` block is the specification the fixture's reference
+    value belongs to.  The bare ``(y)`` spelling is a *different* specification --
+    Stata reports ATET 1.1543177866493608 for it on the same data (captured
+    2026-10-24 by ``retest/fix/systems/capture_did_tests.py``) -- and has its own
+    test below.
+    """
+
     result = Didregress.from_formula(
-        "y", "treated", _did(), group="unit", time="period"
+        "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     assert float(result.params["treated"]) == pytest.approx(1.18613, rel=1e-4)
     assert int(result.e["N"]) == 1600
 
 
-def test_didregress_standard_error_is_the_right_order():
-    """Point estimate exact; the standard error is ~7% below Stata's.
+def test_didregress_bare_outcome_uses_no_covariate():
+    """``(y)`` names no covariate: Stata ATET 1.1543177866493608, se .07809416.
 
-    Measured 0.05511 against Stata's 0.0590465. Every plausible cluster correction
-    (G/(G-1), with and without the (N-1)/(N-k) factor) lands near 0.055, so Stata's
-    DID variance accounts for something more than unit clustering -- most likely the
-    sampling of the treatment arm itself. [R] didregress could not be downloaded to
-    confirm, so the gap is recorded rather than tuned, and the registry keeps this
-    at E2.
+    Captured from StataNow 19.5 on the P11 panel:
+    ``didregress (y) (treated), group(unit) time(period)``.
+    """
+
+    model = Didregress.from_formula(
+        "y", "treated", _did(), group="unit", time="period"
+    )
+    assert model.covariates == []
+    assert model.inferred_covariates == []
+    result = model.fit()
+    assert float(result.params["treated"]) == pytest.approx(1.1543177866493608, rel=1e-12)
+    assert float(result.bse["treated"]) == pytest.approx(0.07809416248412232, rel=1e-12)
+
+
+def test_didregress_standard_error_is_the_right_order():
+    """Measured 0.05511 against Stata's 0.0590465 on the fixture's DGP.
+
+    Every plausible cluster correction (G/(G-1), with and without the
+    (N-1)/(N-k) factor) lands near 0.055, so Stata's DID variance accounts for
+    something more than unit clustering -- most likely the sampling of the
+    treatment arm itself. [R] didregress could not be downloaded to confirm, so
+    the gap is recorded rather than tuned, and the registry keeps this at E2.
     """
 
     result = Didregress.from_formula(
-        "y", "treated", _did(), group="unit", time="period"
+        "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     assert float(result.bse["treated"]) == pytest.approx(0.0590465, rel=1.5e-1)
 
@@ -204,7 +229,7 @@ def test_didregress_absorbs_rather_than_dummies():
     """The design must not carry one column per unit."""
 
     result = Didregress.from_formula(
-        "y", "treated", _did(), group="unit", time="period"
+        "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     design, names = result.design_matrix
     # Two columns: the treatment and x1. A dummyed model would have ~200 more.

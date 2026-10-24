@@ -493,11 +493,24 @@ class _MLLimitedBase(_DiscreteBase):
         return {}
 
     def _stata_scalars(
-        self, result: Any, params: np.ndarray, llf: float, nobs: int
+        self,
+        result: Any,
+        params: np.ndarray,
+        cov: np.ndarray,
+        names: list[str],
+        llf: float,
+        nobs: int,
+        canonical: str = "nonrobust",
+        groups: np.ndarray | None = None,
     ) -> dict[str, Any]:
-        names = list(self._param_names) + [self._scale_name]
-        cov = np.asarray(result.cov_params(), dtype=float)
-        chi2type, statistic, df = self._model_test(params, cov, names, llf)
+        """Stata's ``e()`` block for the truncated/interval models.
+
+        The signature follows :meth:`westata.estimators.discrete._DiscreteBase
+        ._stata_scalars` -- the base class builds the covariance and the names,
+        so the rescaled ``/sigma`` column is already in ``cov`` here.
+        """
+
+        chi2type, statistic, df = self._model_test(params, np.asarray(cov), names, llf)
         ll0 = self._null_loglike()
         sigma = self._sigma(params)
         k = len(params)
@@ -1396,13 +1409,29 @@ class Heckman:
         n_selected = int(selected.sum())
         k_augmented = augmented.shape[1]
         dof = max(n_selected - k_augmented, 1)
-        sigma2 = float(residual @ residual) / dof
+
+        # Stata's two-step scale (heckman.ado:743-746):
+        #     rss     = e(rss) of the second-stage augmented regression
+        #     deltbar = mean over the selected rows of lambda*(lambda + w)
+        #     sigma   = sqrt(rss/m + b_lambda^2 * deltbar)      m = e(N) = m_sel
+        #     rho     = b_lambda / sigma
+        # Note the divisor is m, *not* m - k: this is Heckman's two-step
+        # consistent estimate, not the OLS residual variance.  Using
+        # sqrt(rss/(m-k)) was wrong by 6.7% on the reference DGP.
+        lam_coef = float(beta[-1])
+        m = n_selected
+        rss = float(residual @ residual)
+        delta_bar = float(np.mean((mills * (mills + index))[selected]))
+        sigma2 = rss / m + lam_coef**2 * delta_bar
         sigma = float(np.sqrt(sigma2)) if sigma2 > 0 else float("nan")
 
-        # The generated regressor's coefficient is rho * sigma in Stata's
-        # parameterisation, so rho = b_lambda / sigma.
-        lam_coef = float(beta[-1])
         rho = lam_coef / sigma if np.isfinite(sigma) and sigma > 0 else float("nan")
+        # Stata's default rhometh=2: truncate an out-of-range rho to +/-1 and
+        # then report sigma = b_lambda * rho, so e(lambda) = rho*sigma stays
+        # equal to the coefficient on the inverse Mills ratio.
+        if np.isfinite(rho) and abs(rho) > 1.0:
+            rho = float(np.sign(rho))
+            sigma = abs(lam_coef)
 
         covariance_all = _two_step_covariance(
             outcome=self._y,
@@ -1638,9 +1667,29 @@ class Etregress:
         n = self._y.size
         k_augmented = augmented.shape[1]
         dof = max(n - k_augmented, 1)
-        sigma2 = float(residual @ residual) / dof
+
+        # Stata's control-function scale (etregress.ado:490-492), identical in
+        # form to heckman's but with mtao = mean(lambda*(lambda + w)) over the
+        # FULL sample (the treatment equation is estimated on all rows):
+        #     rss   = e(rss) of the augmented regression
+        #     sigma = sqrt(rss/m + mtao * b_ctrl^2),   rho = b_ctrl / sigma
+        # and e(lambda) = rho*sigma = b_ctrl is the control-function
+        # coefficient itself -- with the SIGN OF b_ctrl, which is what the old
+        # `rho = -b_ctrl/sigma` got backwards (both DGPs were exact mirrors).
+        control_coef = float(beta[-1])
+        m = n
+        rss = float(residual @ residual)
+        index = self._Z @ gamma
+        mtao = float(np.mean(control * (control + index)))
+        sigma2 = rss / m + mtao * control_coef**2
         sigma = float(np.sqrt(sigma2)) if sigma2 > 0 else float("nan")
 
+        rho = control_coef / sigma if np.isfinite(sigma) and sigma > 0 else float("nan")
+        # Stata truncates |rho| > 1 (etregress.ado:495-497) but does not then
+        # redefine sigma for the control-function case.
+        if np.isfinite(rho) and abs(rho) > 1.0:
+            rho = float(np.sign(rho))
+        k_beta = beta.size
         covariance_all = _two_step_covariance(
             outcome=self._y,
             A=augmented,
@@ -1651,7 +1700,6 @@ class Etregress:
             selected=np.ones(n, dtype=bool),
             generated=lambda g: self._control_function(g, self._t),
         )
-        k_beta = beta.size
         covariance = np.zeros((k_beta + gamma.size, k_beta + gamma.size))
         covariance[:k_beta, :k_beta] = covariance_all[:k_beta, :k_beta]
         covariance[k_beta:, k_beta:] = covariance_all[k_beta:, k_beta:]
@@ -1665,11 +1713,6 @@ class Etregress:
             + [f"treat:{name}" for name in self._treatment_names]
         )
         params = np.concatenate([beta, gamma])
-
-        # The control-function coefficient is -rho*sigma in Stata's
-        # parameterisation, so rho = -b_control / sigma.
-        control_coef = float(beta[-1])
-        rho = -control_coef / sigma if np.isfinite(sigma) and sigma > 0 else float("nan")
 
         r2_p, llf, ll0 = _gaussian_pseudo_r2(
             self._y, augmented @ beta, nobs=n, k=k_augmented

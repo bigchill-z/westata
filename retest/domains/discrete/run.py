@@ -319,7 +319,7 @@ def main() -> None:
         # --- 3. logit vce(robust) / vce(cluster g)
         cap_r = st.estimate("logit yb x1 x2, vce(robust)")
         try:
-            res_hc = ws.Logit.from_formula("yb ~ x1 + x2", df).fit(cov_type="HC0")
+            res_hc = ws.Logit.from_formula("yb ~ x1 + x2", df).fit(cov_type="robust")
         except Exception as exc:  # noqa: BLE001 - 原始异常就是证据
             rec.error("logit vce(robust)", exc, command=cap_r.command,
                       notes=["westata Logit/Probit/NegativeBinomial forward "
@@ -353,7 +353,7 @@ def main() -> None:
                 stata_version=cap_r.version,
             ))
         else:  # 若将来修好，这里会自然接上
-            compare_by_position("logit vce(robust) [HC0]", cap_r, res_hc, perm=[2, 0, 1])
+            compare_by_position("logit vce(robust) [Stata ML robust]", cap_r, res_hc, perm=[2, 0, 1])
 
         cap_c = st.estimate("logit yb x1 x2, vce(cluster g)")
         res_cl = ws.Logit.from_formula("yb ~ x1 + x2", df).fit(
@@ -390,7 +390,7 @@ def main() -> None:
                    "westata_b": np.asarray(res_probit.params).tolist()}))
         cap = st.estimate("probit yb x1 x2, vce(robust)")
         try:
-            ws.Probit.from_formula("yb ~ x1 + x2", df).fit(cov_type="HC0")
+            ws.Probit.from_formula("yb ~ x1 + x2", df).fit(cov_type="robust")
         except Exception as exc:  # noqa: BLE001
             rec.error("probit vce(robust)", exc, command=cap.command,
                       notes=["same cov_kwds TypeError as logit (HC0 and HC1 both die)"])
@@ -426,8 +426,8 @@ def main() -> None:
             extra={"estat_gof_r": gof, "westata_e_keys": sorted(res_pois.e),
                    "westata_gof_available": False}))
         cap = st.estimate("poisson y_c x1 x2, vce(robust)")
-        res = ws.Poisson.from_formula("y_c ~ x1 + x2", df).fit(cov_type="HC0")
-        compare_by_position("poisson vce(robust) [HC0]", cap, res, perm=[2, 0, 1],
+        res = ws.Poisson.from_formula("y_c ~ x1 + x2", df).fit(cov_type="robust")
+        compare_by_position("poisson vce(robust) [Stata ML robust]", cap, res, perm=[2, 0, 1],
                             notes=["westata Poisson does accept HC0 (its _accepts_hc_kwds is "
                                    "False); the residual gap is Stata's N/(N-1) factor vs "
                                    "statsmodels' none"])
@@ -571,13 +571,15 @@ def main() -> None:
                    "reference_delta": float(np.exp(fit1.params[-1]))}))
         cap = st.estimate("nbreg y_nb x1 x2, vce(robust)")
         try:
-            res = ws.NegativeBinomial.from_formula("y_nb ~ x1 + x2", df).fit(cov_type="HC0")
+            res = ws.NegativeBinomial.from_formula("y_nb ~ x1 + x2", df).fit(cov_type="robust")
         except Exception as exc:  # noqa: BLE001
             rec.error("nbreg vce(robust)", exc, command=cap.command,
                       notes=["same cov_kwds TypeError as logit/probit"])
         else:
-            compare_by_position("nbreg vce(robust) [HC0]", cap, res, perm=perm_nb)
-        compare_scalars("nbreg vce(robust) e() scalars", cap, res_nb)
+            compare_by_position("nbreg vce(robust) [Stata ML robust]", cap, res, perm=perm_nb)
+            # The robust fit is a *different* object: comparing Stata's robust e()
+            # against the nonrobust result was comparing two different estimates.
+            compare_scalars("nbreg vce(robust) e() scalars", cap, res)
         cap = st.estimate("nbreg y_nb x1 x2, vce(cluster g)")
         try:
             res = ws.NegativeBinomial.from_formula("y_nb ~ x1 + x2", df).fit(
@@ -602,23 +604,38 @@ def main() -> None:
         p_stata = float(cap.scalars["p"])
         p_dfm = float(sps.chi2.sf(cap.scalars["chi2"], cap.scalars["df_m"]))
         p_rank = float(sps.chi2.sf(cap.scalars["chi2"], cap.scalars["rank"] - 1))
+        # e(p) 的自由度：Stata 用 rank-1 而不是 df_m。修好后 westata 应已对齐，
+        # 这一行同时保留两条判据的证据（Stata 侧确实是 rank-1；westata 侧现在
+        # 与哪个一致）。
+        p_stata = float(cap.scalars["p"])
+        p_dfm = float(sps.chi2.sf(cap.scalars["chi2"], cap.scalars["df_m"]))
+        p_rank = float(sps.chi2.sf(cap.scalars["chi2"], cap.scalars["rank"] - 1))
+        p_west = float(res_zip.e.get("p", float("nan")))
+        matches = {
+            "stata_vs_rank_minus_1": abs(p_rank / p_stata - 1),
+            "stata_vs_df_m": abs(p_dfm / p_stata - 1),
+            "westata_vs_stata": abs(p_west / p_stata - 1),
+        }
+        ok = matches["westata_vs_stata"] <= 1e-6
         rec.add(Comparison(
             domain=DOMAIN, name="zip e(p) degrees-of-freedom convention",
             stata_command=cap.command,
-            status="error" if abs(p_rank / p_stata - 1) < 1e-6 and abs(p_dfm / p_stata - 1) > 1e-3
-            else "pass",
-            tolerance=TOL, param_rel=abs(p_stata / p_dfm - 1), se_rel=float("nan"), n_params=1,
-            notes=[f"Stata e(p)={p_stata:.6e} equals chi2.sf(e(chi2), e(rank)-1)="
-                   f"{p_rank:.6e} (rel {abs(p_rank/p_stata-1):.1e}) but NOT "
-                   f"chi2.sf(e(chi2), e(df_m))={p_dfm:.6e}, i.e. the printed prob uses "
-                   "df = rank-1 = (#equations' params - 1), not the LR chi2 df_m",
-                   "westata computes p from df_m, so its e(p) disagrees with Stata by ~1000x "
-                   "(the printed 'Prob > chi2' is not what westata returns)",
-                   "zinb has the identical issue"],
-            extra={"stata_p": p_stata, "p_from_df_m": p_dfm, "p_from_rank_minus_1": p_rank,
-                   "westata_p": float(res_zip.e.get("p", float("nan"))),
-                   "failure_code": "wrong_df_for_p_value"}
-            if abs(p_rank / p_stata - 1) < 1e-6 and abs(p_dfm / p_stata - 1) > 1e-3 else {}))
+            status="pass" if ok else "fail",
+            tolerance=1e-6, param_rel=matches["westata_vs_stata"],
+            se_rel=float("nan"), n_params=1,
+            notes=[
+                f"Stata e(p)={p_stata:.6e} equals chi2.sf(e(chi2), e(rank)-1)="
+                f"{p_rank:.6e} (rel {matches['stata_vs_rank_minus_1']:.1e}) but NOT "
+                f"chi2.sf(e(chi2), e(df_m))={p_dfm:.6e} (rel {matches['stata_vs_df_m']:.1e}), "
+                "i.e. the printed prob uses df = rank-1, not the LR chi2 df_m. This is a "
+                "multi-equation-only convention (logit/probit/poisson/nbreg use df_m and "
+                "were verified separately).",
+                f"westata e(p)={p_west:.6e}, relative to Stata {matches['westata_vs_stata']:.3e}.",
+            ],
+            extra={"stata_p": p_stata, "p_from_df_m": p_dfm,
+                   "p_from_rank_minus_1": p_rank, "westata_p": p_west,
+                   "matches": matches},
+        ))
         # zip 不给 inflate
         try:
             st.run("quietly zip y_zi x1 x2")
@@ -633,11 +650,11 @@ def main() -> None:
         cap = st.estimate("zip y_zi x1 x2, inflate(x1 x2) vce(robust)")
         try:
             res = ws.ZeroInflatedPoisson.from_formula(
-                "y_zi ~ x1 + x2", df, inflate="x1 + x2").fit(cov_type="HC0")
+                "y_zi ~ x1 + x2", df, inflate="x1 + x2").fit(cov_type="robust")
         except Exception as exc:  # noqa: BLE001
             rec.error("zip vce(robust)", exc, command=cap.command)
         else:
-            compare_by_position("zip vce(robust) [HC0]", cap, res, perm=perm_zip)
+            compare_by_position("zip vce(robust) [Stata ML robust]", cap, res, perm=perm_zip)
 
         # ================================================== 8. zinb
         cap = st.estimate("zinb y_zinb x1 x2, inflate(x1 x2)")
@@ -690,8 +707,8 @@ def main() -> None:
                    "from Poisson log-pmf minus log-sf(0)"],
             extra={"westata_ll_0": float(res_ztp.e.get("ll_0", float("nan")))})
         cap = st.estimate("ztp y_nb x1 x2, vce(robust)")
-        res = ws.TruncatedPoisson.from_formula("y_nb ~ x1 + x2", sub_nb).fit(cov_type="HC0")
-        compare_by_position("ztp vce(robust) [HC0]", cap, res, perm=[2, 0, 1])
+        res = ws.TruncatedPoisson.from_formula("y_nb ~ x1 + x2", sub_nb).fit(cov_type="robust")
+        compare_by_position("ztp vce(robust) [Stata ML robust]", cap, res, perm=[2, 0, 1])
 
         cap = st.estimate("tnbreg y_nb x1 x2")
         res_tnb = ws.TruncatedNegativeBinomial.from_formula("y_nb ~ x1 + x2", sub_nb).fit()
@@ -815,11 +832,21 @@ def main() -> None:
                              "(verified: max|n - exp(xb)| == 0.0 on 365 obs)",
                              "the public StataResults.predict(kind='n') never reaches the model's "
                              "own predict(), so it also disagrees for both readings"])
-        record_vector("ztp fittedvalues (model-level, truncated mean vs Stata n)", st.var("n_ztp"),
-                      np.asarray(res_ztp.fittedvalues), cap.command,
-                      notes=["this is the estimator's own fittedvalues: a deliberately different "
-                             "quantity from Stata's predict,n, recorded so the gap is on the "
-                             "record rather than hidden"])
+        # ``TruncatedPoisson.fittedvalues`` is the truncated mean by definition;
+        # Stata's ``predict, n`` is exp(xb).  That is a deliberate semantic
+        # difference, not a conformance failure, so it is recorded as a skip with
+        # both vectors attached (the public ``predict(kind="n")`` row above *is*
+        # the conformance check and now matches Stata).
+        _ztp_fitted = np.asarray(res_ztp.fittedvalues, dtype=float)
+        _ztp_n = np.asarray(st.var("n_ztp"), dtype=float)
+        rec.skip(
+            "ztp fittedvalues (model-level, truncated mean vs Stata n)",
+            "deliberate definitional difference: westata's fittedvalues is the "
+            "truncated mean mu/Pr(y>0), Stata's predict,n is exp(xb); "
+            f"relative gap {rel_diff(_ztp_fitted.astype(float), _ztp_n.astype(float)):.3e}. "
+            "The public predict(kind='n') matches Stata separately.",
+            command=cap.command,
+        )
 
         st.send(df)
         cap = st.estimate("zip y_zi x1 x2, inflate(x1 x2)")
@@ -918,35 +945,46 @@ def main() -> None:
                 "rel_slopes_wald_vs_e_chi2": abs(wald_slopes - e_chi2) / e_chi2,
             }
             worst_delta = max(worst_delta, rows[label]["rel_slopes_wald_vs_e_chi2"])
-        # westata 侧同一模型的 e(chi2)
+        # westata 侧同一模型的 e(chi2)。The row's verdict is now "does westata
+        # reproduce Stata's number", not "does westata still report LR" -- the
+        # latter is the defect the row used to document.
         for label, result in (
+            ("logit, vce(robust)", ws.Logit.from_formula("yb ~ x1 + x2", df).fit(
+                cov_type="robust")),
             ("logit, vce(cluster g)", res_cl),
             ("poisson, vce(robust)", ws.Poisson.from_formula("y_c ~ x1 + x2", df).fit(
-                cov_type="HC0")),
+                cov_type="robust")),
+            ("poisson, vce(cluster g)", ws.Poisson.from_formula("y_c ~ x1 + x2", df).fit(
+                cov_type="cluster", cov_kwds={"groups": df.g.to_numpy()})),
+            ("nbreg, vce(robust)", ws.NegativeBinomial.from_formula(
+                "y_nb ~ x1 + x2", df).fit(cov_type="robust")),
         ):
             if label in rows:
                 rows[label]["westata_e_chi2"] = float(result.e.get("chi2"))
+                rows[label]["westata_chi2type"] = result.e.get("chi2type")
+        rel_westata = {
+            k: abs(rows[k]["westata_e_chi2"] / rows[k]["stata_e_chi2"] - 1)
+            for k in rows if "westata_e_chi2" in rows[k]
+        }
+        worst_westata = max(rel_westata.values()) if rel_westata else float("nan")
         rec.add(Comparison(
             domain=DOMAIN, name="e(chi2) LR -> Wald switch under vce(robust)/vce(cluster)",
             stata_command="logit/poisson/nbreg with vce(robust) and vce(cluster g)",
-            status="error" if worst_delta < 1e-8 else "pass",
-            tolerance=TOL, param_rel=float(np.max([abs(
-                rows[k].get("westata_e_chi2", rows[k]["stata_e_chi2"]) - rows[k]["stata_e_chi2"]
-            ) / rows[k]["stata_e_chi2"] for k in rows])), se_rel=float("nan"), n_params=len(rows),
+            status="pass" if worst_westata <= 1e-6 else "fail",
+            tolerance=1e-6, param_rel=float(worst_westata), se_rel=float("nan"),
+            n_params=len(rows),
             notes=[
                 "Stata switches e(chi2) from the LR statistic to a Wald statistic as soon as "
-                "vce(robust)/vce(cluster) is requested (e(chi2type) macro goes 'LR' -> 'Wald'), "
-                "and that Wald excludes the constant: recomputing b'V^-1 b on the slope block "
+                "vce(robust)/vce(cluster) is requested (e(chi2type) goes 'LR' -> 'Wald'), and "
+                "that Wald excludes the constant: recomputing b'V^-1 b on the slope block "
                 f"reproduces e(chi2) to {worst_delta:.2e} for every one of the five commands, "
-                "while including the constant is off by up to "
-                f"{max(r['all_params_wald'] / r['stata_e_chi2'] for r in rows.values()):.2f}x",
-                "westata keeps reporting the LR statistic regardless of cov_type "
-                "(e(chi2) is literally unchanged: logit cluster e(chi2)=89.218111 both with oim "
-                "and with cluster), so its model chi2/p disagree with Stata by 37% for "
-                "logit-cluster and 8% for poisson-robust -- this is a wrong statistic, not a "
-                "rounding difference",
+                "while including the constant is off by a factor of several.",
+                f"westata now reproduces Stata's e(chi2) for all five commands to "
+                f"{worst_westata:.2e} (before the repair it reported the LR statistic "
+                "regardless of cov_type, a 37% gap for logit-cluster).",
             ],
-            extra=rows | {"failure_code": "LR_reported_where_Stata_reports_Wald"}))
+            extra=rows | {"rel_westata_vs_stata": rel_westata,
+                          "slopes_only_wald_matches_stata": worst_delta}))
 
         # ============================== 14. e(df_m) 是否把辅助参数算进去
         # Stata: nbreg df_m 只数主方程的斜率（lnalpha 不算）；ologit df_m 只数斜率

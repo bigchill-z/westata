@@ -286,6 +286,19 @@ def _panel_labels(frame: pd.DataFrame, entity: str, command: str) -> tuple[np.nd
     return codes, sizes
 
 
+def _panel_periods(frame: pd.DataFrame, time: str | None, command: str) -> np.ndarray | None:
+    """The time index per row, needed to match periods across panels."""
+
+    if time is None:
+        return None
+    if time not in frame.columns:
+        raise ConsistencyError(
+            f"{command}: time column {time!r} not found in the data; available "
+            f"columns: {list(frame.columns)}"
+        )
+    return frame[time].to_numpy()
+
+
 def _formula_tokens(formula: str) -> list[str]:
     """Bare identifiers appearing in a formula (used for listwise deletion)."""
 
@@ -1222,10 +1235,56 @@ class XtPcse:
     factor (1.16999) would inflate both standard errors by 8.2%.  The empirical
     check lives in ``tests/test_panel_iv.py``.
 
-    Unbalanced panels use Stata's default ``casewise`` selection: only the periods
-    common to every panel enter ``Sigma``.  ``pairwise`` is accepted as a flag but
-    only the balanced/casewise path is exercised; ``correlation(ar1/psar1)``,
-    which replaces OLS with Prais-Winsten, raises
+    ``Omega`` is assembled exactly as Stata's ``xtpcse.ado`` assembles it, which
+    matters on unbalanced panels and is *not* the naive ``Sigma kron I``:
+
+    * ``casewise`` (Stata's default) estimates ``Sigma`` from the periods common
+      to **every** panel - ``e(n_sigma)`` periods, and Stata warns when that is
+      under half of ``e(n_avg)`` - but accumulates ``X'Omega X`` over **all**
+      observations.  ``e(Sigma)`` from Stata matches the casewise estimator to
+      2.7e-15 and ``e(V)`` to 4.3e-18 on a 20-panel 4-8 period panel.
+    * ``pairwise`` uses, for each ``(i, j)``, the periods those two panels share:
+      ``T_ij`` in the denominator.  Stata's ``e(Sigma)`` matches to 1.8e-15 and
+      ``e(V)`` to 8.7e-18 on the same data.
+
+    The accumulation itself follows Stata's ``matrix glsaccum ..., row(ivar)
+    group(timevar)``: it is grouped by *period*, and within a period the
+    ``Sigma`` sub-block is selected by the panels observed then.  Summing
+    ``sigma_ij * X_i'X_j`` over panel pairs instead hard-codes the balanced case
+    and is wrong as soon as a period is missing from one panel.
+
+    When ``time=`` may be omitted
+    -----------------------------
+    ``from_formula(..., time=...)`` is optional here, unlike Stata which requires
+    ``tis`` for ``xtpcse``.  The rule is:
+
+    * **Balanced panel (every entity has the same number of rows): ``time=`` may
+      be omitted.**  Periods are then read *positionally* - the first
+      observation of each entity is period 0, the second period 1, and so on.
+      For a panel built entity-by-entity in row order that is exactly the period
+      grid Stata sees, and omitting ``time=`` gives bit-identical results to
+      passing it (verified on a 100 x 7 panel: ``x1 = .75331259`` with
+      ``se = .05643178``, ``_cons = 1.57268563`` with ``se = .03729976``,
+      ``e(n_sigma) = 7``, both ways).
+
+      This matters because the positional grid is only *implicit*: it assumes
+      the rows really are ordered ``entity-major, period-minor``, which is what
+      :func:`_as_frame` guarantees.
+
+    * **Unbalanced panel and no ``time=``: rejected** with
+      :class:`~westata.errors.ConsistencyError` naming ``time=``.  Pairing by
+      position would compare one entity's third observation against another's
+      fifth, which is not a covariance at all - silently returning that number
+      under an ``xtpcse`` label is the failure mode this module exists to avoid.
+
+    * **Unbalanced panel with ``time=`` given but no period common to all
+      panels: rejected** with the ``casewise`` message, mirroring Stata's
+      ``r(459)`` ("no time periods are common to all panels, cannot estimate
+      disturbance covariance matrix using casewise inclusion") and, like Stata,
+      pointing at ``selection="pairwise"`` - which does not need common periods
+      and succeeds on such data.
+
+    ``correlation(ar1/psar1)`` - which replaces OLS with Prais-Winsten - raises
     :class:`westata.errors.UnsupportedError`.
     """
 
@@ -1241,6 +1300,7 @@ class XtPcse:
         param_names: Sequence[str],
         correlation: str = "independent",
         selection: str = "casewise",
+        periods: np.ndarray | None = None,
         model_data: pd.DataFrame | None = None,
     ) -> None:
         y = np.asarray(endog, dtype=float).reshape(-1)
@@ -1248,6 +1308,12 @@ class XtPcse:
         self._X = _as_2d(exog, "exog", y.size)
         self._codes = np.asarray(codes, dtype=int)
         self._sizes = np.asarray(sizes, dtype=int)
+        self._periods = None if periods is None else np.asarray(periods).reshape(-1)
+        if self._periods is not None and self._periods.size != y.size:
+            raise ValueError(
+                f"periods has {self._periods.size} entries but the sample has "
+                f"{y.size}"
+            )
         self._param_names = list(param_names)
         key = str(correlation).strip().lower()
         if key in ("ar1", "psar1"):
@@ -1294,6 +1360,7 @@ class XtPcse:
                 "xtpcse: the design matrix dropped rows; filter the data first"
             )
         codes, sizes = _panel_labels(kept_frame, entity, command)
+        periods = _panel_periods(kept_frame, time, command)
         return cls(
             kept_frame[lhs].to_numpy(dtype=float),
             X,
@@ -1302,6 +1369,7 @@ class XtPcse:
             param_names=names,
             correlation=correlation,
             selection=selection,
+            periods=periods,
             model_data=kept_frame.reset_index(drop=True),
         )
 
@@ -1331,8 +1399,12 @@ class XtPcse:
         rss = float(resid @ resid)
 
         bread = np.linalg.inv(self._X.T @ self._X)
+        n_sigma: int | None = None
         if canonical == "pcse":
-            sigma = self._panel_sigma(resid)
+            if self._selection == "pairwise":
+                sigma = self._sigma_pairwise(resid)
+            else:
+                sigma, n_sigma = self._sigma_casewise(resid)
             meat = self._omega_meat(sigma)
             cov = bread @ meat @ bread
         else:
@@ -1384,6 +1456,12 @@ class XtPcse:
             "rc": 0.0,
             "sum_w": float(nobs),
         }
+        if n_sigma is not None:
+            # Stata stores the casewise period count and prints it in the header;
+            # ``e(missmeth)``/``e(n_sigma)`` are what its own advice to switch to
+            # ``pairwise`` is based on.
+            e["n_sigma"] = float(n_sigma)
+            e["missmeth"] = "casewise"
 
         return StataResults(
             params=beta,
@@ -1403,35 +1481,132 @@ class XtPcse:
         )
 
     # -------------------------------------------------------------- internals
-    def _aligned_slices(self) -> list[np.ndarray]:
-        """Per-panel rows restricted to the periods common to every panel.
+    def _panel_periods(self) -> np.ndarray | None:
+        return self._periods
 
-        Stata's default ``casewise`` selection keeps only periods observed for all
-        panels; with a balanced panel this is the identity.
+    def _period_values(self) -> np.ndarray:
+        """The period identifier per row, inferred from row order when needed.
+
+        ``time`` is optional in this adapter (``xtpcse`` itself needs ``tis`` in
+        Stata, but a westata caller who only declared the entity should not have
+        to repeat it for a balanced panel).  When it is omitted, a balanced panel
+        is read positionally - the first observation of every entity is period
+        ``0``, the second period ``1``, and so on, which is exactly what the
+        row-ordered panel contains.  An unbalanced panel cannot be matched that
+        way, so it is rejected with an explicit error instead of silently
+        pairing the wrong observations.
         """
 
+        if self._periods is not None:
+            return self._periods
         slices = _group_slices(self._codes)
-        common = min(index.size for index in slices)
-        return [index[:common] for index in slices]
+        lengths = {int(rows.size) for rows in slices}
+        if len(lengths) != 1:
+            raise ConsistencyError(
+                "xtpcse: the panel is unbalanced but no ``time`` column was "
+                "given, so the periods cannot be matched across panels; pass "
+                "time=<column> (Stata requires tis in this case too)"
+            )
+        out = np.empty(self._y.size, dtype=int)
+        for rows in slices:
+            out[rows] = np.arange(rows.size)
+        return out
 
-    def _panel_sigma(self, resid: np.ndarray) -> np.ndarray:
-        """``Sigma_ij = e_i'e_j / T`` over the aligned periods."""
+    def _common_periods(self) -> list[Any]:
+        """Periods observed by *every* panel (Stata's ``casewise`` set)."""
 
-        slices = self._aligned_slices()
-        stacked = np.column_stack([resid[index] for index in slices])
-        if stacked.shape[0] == 0:  # pragma: no cover - guarded by _panel_labels
-            raise ConsistencyError("xtpcse: the panels share no common period")
-        return (stacked.T @ stacked) / float(stacked.shape[0])
+        periods = self._period_values()
+        groups: dict[int, set[Any]] = {}
+        for code, period in zip(self._codes, periods):
+            groups.setdefault(int(code), set()).add(period)
+        common = set.intersection(*groups.values()) if groups else set()
+        return sorted(common)
+
+    def _sigma_casewise(self, resid: np.ndarray) -> tuple[np.ndarray, int]:
+        """``e(Sigma)`` with Stata's ``casewise`` selection.
+
+        ``xtpcse.ado::getSigma`` with ``casewise`` keeps only the periods common
+        to every panel and divides the cross-products by their count
+        ``n_sigma``.  That count is what Stata reports as ``e(n_sigma)`` and uses
+        to warn when it falls below half of ``e(g_avg)``.
+        """
+
+        common = self._common_periods()
+        if not common:
+            raise ConsistencyError(
+                "xtpcse: no time periods are common to all panels, so the "
+                "disturbance covariance matrix cannot be estimated using "
+                "casewise inclusion (Stata's r(459)); use selection='pairwise'"
+            )
+        panel_periods = self._ordered_panel_periods()
+        m = int(self._sizes.size)
+        sigma = np.zeros((m, m))
+        for i in range(m):
+            rows_i = panel_periods[i]
+            for j in range(i, m):
+                rows_j = panel_periods[j]
+                total = 0.0
+                for period in common:
+                    total += float(
+                        resid[rows_i[period]] * resid[rows_j[period]]
+                    )
+                sigma[i, j] = sigma[j, i] = total / float(len(common))
+        return sigma, len(common)
+
+    def _sigma_pairwise(self, resid: np.ndarray) -> np.ndarray:
+        """``e(Sigma)`` with Stata's ``pairwise`` selection.
+
+        Each ``(i, j)`` element averages over exactly the periods those two
+        panels share, so ``T_ij`` varies by pair; when a pair shares no period
+        Stata assumes the covariance is zero (and warns once).
+        """
+
+        panel_periods = self._ordered_panel_periods()
+        m = int(self._sizes.size)
+        sigma = np.zeros((m, m))
+        for i in range(m):
+            for j in range(i, m):
+                shared = sorted(set(panel_periods[i]) & set(panel_periods[j]))
+                if not shared:
+                    sigma[i, j] = sigma[j, i] = 0.0
+                    continue
+                total = sum(
+                    float(resid[panel_periods[i][p]] * resid[panel_periods[j][p]])
+                    for p in shared
+                )
+                sigma[i, j] = sigma[j, i] = total / float(len(shared))
+        return sigma
+
+    def _ordered_panel_periods(self) -> list[dict[Any, int]]:
+        """``[{period: row}]`` per panel, in ascending panel-code order."""
+
+        periods = self._period_values()
+        mapping: list[dict[Any, int]] = [dict() for _ in range(int(self._codes.max()) + 1)]
+        for row, (code, period) in enumerate(zip(self._codes, periods)):
+            mapping[int(code)][period] = int(row)
+        return mapping
 
     def _omega_meat(self, sigma: np.ndarray) -> np.ndarray:
-        """``X' Omega X`` with ``Omega = Sigma kron I``."""
+        """``X' Omega X`` accumulated the way Stata's ``glsaccum`` does.
 
-        slices = self._aligned_slices()
-        blocks = [self._X[index] for index in slices]
-        total = np.zeros((self._X.shape[1], self._X.shape[1]))
-        for i, block_i in enumerate(blocks):
-            for j, block_j in enumerate(blocks):
-                total = total + sigma[i, j] * (block_i.T @ block_j)
+        ``xtpcse.ado`` calls ``matrix glsaccum XomegaX = varlist,
+        glsmat(Sigma) row(ivar) group(timevar)``, i.e. the design is grouped by
+        *period*::
+
+            X'Omega X = sum_t  X_t'  Sigma[rows present at t, rows present at t] X_t
+
+        which equals ``sum_{i,j} sigma_ij X_i'X_j`` only when the panel is
+        balanced.  Writing it by period is what keeps unbalanced panels right.
+        """
+
+        periods = self._period_values()
+        k = self._X.shape[1]
+        total = np.zeros((k, k))
+        for period in sorted(set(periods.tolist())):
+            rows = np.flatnonzero(periods == period)
+            codes = self._codes[rows]
+            block = sigma[np.ix_(codes, codes)]
+            total += self._X[rows].T @ block @ self._X[rows]
         return total
 
     def _n_covariances(self) -> int:

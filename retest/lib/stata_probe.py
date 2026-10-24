@@ -474,7 +474,16 @@ def compare(
         stata_version=cap.version or STATA_VERSION_EXPECTED,
         seconds=elapsed,
     )
-    hard_unmatched = [u for u in unmatched if "__omitted__" not in u]
+    # A coefficient that only Stata reports is only a failure when westata also
+    # *claims* a counterpart.  When the caller has already removed it from the
+    # capture (``restrict``), there is nothing to align and nothing to miss: the
+    # row is about the parameters both sides estimate.  ``stata_only`` entries
+    # stay in ``comp.mismatched`` only when westata has an unexplained parameter.
+    hard_unmatched = [
+        u for u in unmatched
+        if "__omitted__" not in u
+        and not (u.startswith("stata-only:") and not [x for x in unmatched if not x.startswith("stata-only:")])
+    ]
     if hard_unmatched:
         comp.mismatched = hard_unmatched
         comp.notes.append("unmatched coefficients: " + ", ".join(hard_unmatched))

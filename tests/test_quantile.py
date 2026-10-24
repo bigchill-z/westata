@@ -523,3 +523,319 @@ def test_rreg_documents_huber_only_vs_full_scheme():
         huber_only, full.params.to_numpy(), rtol=5e-3
     ), "the biweight stage must change the estimates"
 
+
+# ------------------------------------- Stata conformance, captured 2026-10-24
+#
+# Every number below comes from a live StataNow 19.5 MP session in this repo's
+# verification run (`retest/fix/limited/repro_qreg.py`,
+# `repro_rreg.py`), which prints the westata/Stata pair side by side.
+#
+# qreg DGPs (n = 400, seed in the helper below):
+#   hetero: y = 1 + 0.8 x1 - 0.4 x2 + N(0,1) * (1 + 0.4|x1|)
+#   homo:   y = 1 + 0.8 x1 - 0.4 x2 + N(0,1)
+#
+# The row order is (Intercept, x1, x2) to match westata's parameter order.
+
+def _qreg_hetero(n: int = 400, seed: int = 31) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    y = 1.0 + 0.8 * x1 - 0.4 * x2 + rng.normal(size=n) * (1.0 + 0.4 * np.abs(x1))
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+
+
+def _qreg_homo(n: int = 400, seed: int = 77) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    y = 1.0 + 0.8 * x1 - 0.4 * x2 + rng.normal(size=n)
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+
+
+QREG_STATA = {
+    ("hetero", 0.25, "iid"): (
+        (-0.003881409205964026, 0.8557389284566097, -0.47363887525253257),
+        (0.09528485940052442, 0.1009805419135872, 0.0857565395878686),
+    ),
+    ("hetero", 0.25, "robust"): (
+        (-0.003881409205964026, 0.8557389284566097, -0.47363887525253257),
+        (0.09471935466185526, 0.09707325188713943, 0.08136205789693532),
+    ),
+    ("hetero", 0.5, "iid"): (
+        (0.9641242295889249, 0.9852053875671986, -0.40589126048329904),
+        (0.08062979231172564, 0.08544946356895426, 0.07256695365711024),
+    ),
+    ("hetero", 0.5, "robust"): (
+        (0.9641242295889249, 0.9852053875671986, -0.40589126048329904),
+        (0.07994507700152723, 0.08224834623273646, 0.06947292696003815),
+    ),
+    ("hetero", 0.75, "iid"): (
+        (1.8692236512569003, 1.0358823474202146, -0.47550343893006164),
+        (0.09478367114570825, 0.10044939497281957, 0.08530546928472155),
+    ),
+    ("hetero", 0.75, "robust"): (
+        (1.8692236512569003, 1.0358823474202146, -0.47550343893006164),
+        (0.09758432532166438, 0.09827913273179806, 0.084232908965219),
+    ),
+    ("homo", 0.25, "iid"): (
+        (0.3261243075540123, 0.8383730881996156, -0.4176017413599201),
+        (0.06902391069043111, 0.0691995835734422, 0.06613640368491634),
+    ),
+    ("homo", 0.25, "robust"): (
+        (0.3261243075540123, 0.8383730881996156, -0.4176017413599201),
+        (0.06957554995776781, 0.06753241461389359, 0.06491743410984092),
+    ),
+    ("homo", 0.5, "iid"): (
+        (1.0436364830076825, 0.8377408618029389, -0.3942173392728379),
+        (0.06821332543747044, 0.06838693529845208, 0.0653597279942085),
+    ),
+    ("homo", 0.5, "robust"): (
+        (1.0436364830076825, 0.8377408618029389, -0.3942173392728379),
+        (0.0688071449785925, 0.06580961375118034, 0.06268796943609274),
+    ),
+    ("homo", 0.75, "iid"): (
+        (1.784449920453022, 0.8030325774130878, -0.4924448523989313),
+        (0.05980594037449168, 0.05995815258416925, 0.05730405269418842),
+    ),
+    ("homo", 0.75, "robust"): (
+        (1.784449920453022, 0.8030325774130878, -0.4924448523989313),
+        (0.06086150861590202, 0.05924392358817859, 0.05605319510973606),
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "dataset,tau,cov_type",
+    sorted(QREG_STATA),
+    ids=lambda value: str(value),
+)
+def test_qreg_standard_errors_match_stata_at_every_quantile(dataset, tau, cov_type):
+    """``vce(robust)`` and the iid default, tau = .25/.5/.75, both DGPs.
+
+    The old robust VCE used ``sum psi_i^2 x x'`` as the meat.  That coincides
+    with Stata's ``tau(1-tau) X'X`` only at ``tau = .5``, where ``psi^2 == .25``
+    for every observation -- so a median-only check could not see the 4.6% /
+    128% error at other quantiles.  The bread also keeps the per-observation
+    density ``fi_i``; replacing the meat alone is not enough (it still missed by
+    15%-147% on heteroskedastic data).  Verified to 1.5e-8.
+    """
+
+    frame = _qreg_hetero() if dataset == "hetero" else _qreg_homo()
+    expected_b, expected_se = QREG_STATA[(dataset, tau, cov_type)]
+    result = QuantileRegression.from_formula(
+        "y ~ x1 + x2", frame, quantile=tau
+    ).fit(cov_type=cov_type)
+
+    ours_b = np.asarray(result.params, dtype=float)[[0, 1, 2]]
+    ours_se = np.asarray(result.bse, dtype=float)[[0, 1, 2]]
+    np.testing.assert_allclose(ours_b, expected_b, rtol=1e-6)
+    np.testing.assert_allclose(ours_se, expected_se, rtol=1e-6)
+
+
+def test_qreg_robust_meat_is_tau_one_minus_tau_xpx():
+    """The meat is ``tau(1-tau) X'X``; the bread keeps the per-observation density.
+
+    Checked structurally rather than by a number: at ``tau != .5`` the two
+    candidate meats differ, and the resulting SEs must still land on Stata's.
+    """
+
+    frame = _qreg_hetero()
+    model = QuantileRegression.from_formula("y ~ x1 + x2", frame, quantile=0.25)
+    result = model.fit(cov_type="robust")
+
+    X = np.column_stack([np.ones(len(frame)), frame["x1"], frame["x2"]])
+    tau = 0.25
+    h = float(result.e["bwidth"])
+    difference = X @ (model._sparsity["beta_upper"] - model._sparsity["beta_lower"])
+    density = np.where(difference > np.sqrt(np.finfo(float).eps),
+                       (2.0 * h) / difference, 0.0)
+    meat = tau * (1.0 - tau) * (X.T @ X)
+    jacobian = (X.T * density) @ X
+    expected = np.linalg.inv(jacobian) @ meat @ np.linalg.inv(jacobian)
+
+    np.testing.assert_allclose(
+        np.asarray(result.cov_params(), dtype=float), expected, rtol=1e-12
+    )
+
+    # And it must NOT equal the psi^2 meat at tau = .25.
+    residual = np.asarray(result.resid, dtype=float)
+    psi = tau - (residual < 0).astype(float)
+    wrong_meat = (X.T * psi**2) @ X
+    wrong = np.linalg.inv(jacobian) @ wrong_meat @ np.linalg.inv(jacobian)
+    assert not np.allclose(expected, wrong, rtol=1e-3)
+
+
+# ---------------------------------------------- rreg conformance (T7)
+#
+# DGP captured live on 2026-10-24 from StataNow 19.5 MP:
+# n=400, seed=67, x1,x2 ~ N(0,1), y = 1 + 2x1 - 0.5x2 + N(0,1), then 5% of y
+# shifted by N(0, 30^2).  `rreg y x1 x2` (Stata's default tolerance(.01)).
+
+RREG_OUTLIER_STATA_B = (0.9933213931008713, 2.0142039005277788,
+                        -0.5340516956105767)
+RREG_OUTLIER_STATA_SE = (0.05451065486338324, 0.05642189005277947,
+                         0.052575518969933524)
+RREG_OUTLIER_STATA = {
+    "rss": 471.32198880778736,
+    "mss": 1635.793503558607,
+    "rmse": 1.089591226019237,
+    "r2": 0.7763188631495137,
+    "F": 688.9239589218558,
+    "df_r": 397.0,
+    "N": 400.0,
+}
+
+
+def _rreg_outlier_frame():
+    rng = np.random.default_rng(67)
+    n = 400
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    y = 1.0 + 2.0 * x1 - 0.5 * x2 + rng.normal(size=n)
+    contaminated = rng.random(size=n) < 0.05
+    y = np.where(contaminated, y + rng.normal(scale=30.0, size=n), y)
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+
+
+def test_rreg_standard_errors_are_rmse_times_the_ols_law():
+    """T7: ``se(b) = e(rmse) sqrt(diag((X'X)^-1))``, not the STR pseudovalues.
+
+    The Street-Carroll-Ruppert pseudovalue variance that westata used to report
+    is 15-30% away from Stata's on four datasets.  Stata's ``rreg`` reports the
+    plain ``regress`` law evaluated on the adjusted response, which reproduces
+    ``e(V)`` to 3e-11.
+    """
+
+    frame = _rreg_outlier_frame()
+    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float), RREG_OUTLIER_STATA_B, rtol=1e-9
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.bse, dtype=float), RREG_OUTLIER_STATA_SE, rtol=1e-6
+    )
+
+    X = np.column_stack([np.ones(len(frame)), frame["x1"], frame["x2"]])
+    law = float(result.e["rmse"]) * np.sqrt(np.diag(np.linalg.inv(X.T @ X)))
+    np.testing.assert_allclose(np.asarray(result.bse, dtype=float), law, rtol=1e-12)
+
+
+def test_rreg_reported_sum_of_squares_match_stata():
+    """``rss/mse/rmse/r2/F`` come from the unweighted regression on ``y_adj``.
+
+    The old values were *weighted* sums using the final biweights, which is a
+    different quantity: ``e(rss)`` was 330.3 against Stata's 471.3.
+    """
+
+    frame = _rreg_outlier_frame()
+    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+
+    for key, expected in RREG_OUTLIER_STATA.items():
+        assert float(result.e[key]) == pytest.approx(expected, rel=1e-9), key
+    # The constraint the reported block has to satisfy.
+    assert float(result.e["rmse"]) ** 2 * float(result.e["df_r"]) == pytest.approx(
+        float(result.e["rss"]), rel=1e-12
+    )
+    assert float(result.e["mse"]) == pytest.approx(
+        float(result.e["rss"]) / float(result.e["df_r"]), rel=1e-12
+    )
+
+
+def test_rreg_lambda_uses_the_nonzero_weight_count():
+    """Stata's ``lambda`` divides by ``e(N)`` of the last *weighted* regression.
+
+    Zero-biweight rows are dropped by ``regress [aw=...]``, so that ``e(N)`` is
+    the count of non-zero weights (386 here), not the sample size (400).  Using
+    the full N moves ``e(rss)`` by 1.7e-4 and every standard error with it.
+    """
+
+    frame = _rreg_outlier_frame()
+    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+
+    assert int(result.e["N"]) == 400
+    assert int(result.e["N_weighted"]) == 386
+    assert float(result.e["df_r"]) == 397.0
+
+
+# ------------------------------- approved behaviour changes (documented in
+# estimators/quantile.py, section "Deviations from the previous westata
+# behaviour").  These are NOT regressions: each one is what Stata does.  The
+# tests exist so that a future "cleanup" cannot silently undo them.
+
+def test_rreg_default_tolerance_is_statas_not_machine_precision():
+    """Change 1: the default stopping rule is Stata's ``tolerance(.01)``.
+
+    Iterating to machine precision lands on a *different point* (1.9e-4 relative
+    in the coefficients) because Stata stops early.  Both answers are legitimate
+    fits of different stopping rules; neither may be produced silently by the
+    other's setting.
+    """
+
+    frame = _rreg_outlier_frame()
+    model = RobustRegression.from_formula("y ~ x1 + x2", frame)
+
+    default = model.fit()                 # Stata's tolerance(.01)
+    tight = model.fit(tolerance=1e-9)     # fully converged
+
+    assert float(default.e["tolerance"]) == 0.01
+    assert int(default.e["iterations"]) < int(tight.e["iterations"])
+
+    gap = np.max(
+        np.abs(np.asarray(default.params, dtype=float)
+               - np.asarray(tight.params, dtype=float))
+        / np.abs(np.asarray(tight.params, dtype=float))
+    )
+    assert 1e-5 < gap < 1e-3, gap
+
+    # The default is the one that matches Stata.
+    np.testing.assert_allclose(
+        np.asarray(default.params, dtype=float), RREG_OUTLIER_STATA_B, rtol=1e-9
+    )
+
+
+def test_rreg_sums_of_squares_describe_the_adjusted_regression():
+    """Change 2: ``e(rss)`` is the unweighted adjusted regression's, not a
+    weighted sum over the final biweights.
+
+    On this DGP the weighted version gives 330.3 where Stata reports 471.3, so
+    the distinction is not cosmetic.  ``e(mse)`` is new and the identity
+    ``rmse^2 * (n-k) == rss`` holds exactly.
+    """
+
+    frame = _rreg_outlier_frame()
+    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+
+    assert float(result.e["rss"]) == pytest.approx(471.32198880778736, rel=1e-9)
+    assert float(result.e["rss"]) > 400.0          # not the weighted 330.3
+    assert float(result.e["mse"]) == pytest.approx(
+        float(result.e["rss"]) / float(result.e["df_r"]), rel=1e-12
+    )
+    assert float(result.e["rmse"]) ** 2 * float(result.e["df_r"]) == pytest.approx(
+        float(result.e["rss"]), rel=1e-12
+    )
+
+
+def test_rreg_huber_threshold_is_two_mad_not_1345():
+    """Change 3: the Huber threshold is ``2*median(|e - median(e)|)``.
+
+    ``1.345 / 0.6745 = 1.9941``, so the old ``1.345 * scale`` is a *different*
+    threshold -- not the same rule written differently.  Verified against
+    StataNow 19.5: the 2*MAD version reproduces ``rreg y x1 x2`` exactly
+    (``RREG_OUTLIER_STATA_B``); the 1.345 version is 7.9e-3 away.
+    """
+
+    frame = _rreg_outlier_frame()
+    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+
+    # If someone reverts the threshold to 1.345 * (mad/0.6745), the coefficients
+    # move to these values and this assertion fails.
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float), RREG_OUTLIER_STATA_B, rtol=1e-9
+    )
+    old_threshold_coefficients = (1.00117213, 2.00018639, -0.53027182)
+    assert not np.allclose(
+        np.asarray(result.params, dtype=float),
+        old_threshold_coefficients,
+        rtol=1e-4,
+    )

@@ -516,6 +516,53 @@ def test_xtpcse_coefficients_equal_ols() -> None:
     )
 
 
+def test_xtpcse_balanced_without_time_matches_stata() -> None:
+    """A balanced panel needs no ``time`` column: periods come from row order.
+
+    Captured with StataNow 19.5 on 2026-10-24 on this 100-firm x 7-year panel::
+
+        xtset firm year
+        xtpcse y x1        x1 .75331259 (se .05643178)
+                           _cons 1.57268563 (se .03729976)
+                           e(n_sigma) = 7
+
+    Stata itself requires ``tis``, but a caller who only declared the entity
+    should not have to repeat the period name for a panel that is balanced by
+    construction.  The *unbalanced* case still raises, because there the
+    positional pairing would be wrong - see
+    ``test_xtpcse_unbalanced_without_time_is_rejected``.  This test is the
+    regression for a fix that briefly raised r(459) here.
+    """
+
+    frame = count_panel()
+    without_time = XtPcse.from_formula("y ~ x1", frame, entity="firm").fit()
+    with_time = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+
+    np.testing.assert_allclose(
+        without_time.bse.to_numpy(), with_time.bse.to_numpy(), rtol=0.0, atol=0.0
+    )
+    assert float(without_time.params["x1"]) == pytest.approx(0.75331259, rel=1e-6)
+    assert float(without_time.params["Intercept"]) == pytest.approx(1.57268563, rel=1e-6)
+    assert float(without_time.bse["x1"]) == pytest.approx(0.05643178, rel=1e-6)
+    assert float(without_time.bse["Intercept"]) == pytest.approx(0.03729976, rel=1e-6)
+    assert int(without_time.e["n_sigma"]) == 7
+
+
+def test_xtpcse_unbalanced_without_time_is_rejected() -> None:
+    """Without a period column an unbalanced panel cannot be matched up.
+
+    Pairing rows by position would compare entity 1's year 3 against entity 2's
+    year 5, which is not a covariance at all.  Refusing is the honest option;
+    the error says so and points at ``time=``.
+    """
+
+    frame = count_panel()
+    dropped = frame.drop(index=[5, 40, 300]).reset_index(drop=True)
+    assert dropped.groupby("firm").size().nunique() > 1  # genuinely unbalanced
+    with pytest.raises(ConsistencyError, match="time"):
+        XtPcse.from_formula("y ~ x1", dropped, entity="firm").fit()
+
+
 def test_xtpcse_standard_errors_match_stata_vce() -> None:
     """Stata: x1 .7533126 (se .0564318), _cons 1.572686 (se .0372998).
 

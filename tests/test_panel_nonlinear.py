@@ -495,44 +495,78 @@ def test_xtpoisson_re_alpha_is_exp_lnalpha(poisson_re_result):
 
 # ---------------------------------------------------------------- xtnbreg fe
 def test_xtnbreg_fe_matches_stata(nbreg_fe_result):
-    """p9_outputs.txt line 325: .5041909 (se .0344353).
+    """Stata ``xtnbreg y x1, fe``: x1 .5041909 (se .0344353), ll -775.44069.
 
-    Stata's ``xtnbreg, fe`` stops after 12 iterations and prints ``.5041909``;
-    the conditional kernel is actually the Poisson one, so a fully converged fit
-    lands on ``.5041803`` -- 1.1e-5 away, which is Stata's optimiser tolerance
-    rather than a different model.
+    Captured with StataNow 19.5 on 2026-10-24 on this exact 100x7 fixture panel
+    (``xtset firm year``), together with its tighter-tolerance rerun::
+
+        xtnbreg y x1, fe                     x1 .50419085  se .034435259
+        xtnbreg y x1, fe ltolerance(1e-8)    x1 .50418027  se .034435192
+                                             ll -775.440679
+
+    The previous version of this test claimed the conditional kernel *is* the
+    Poisson one and that ``.5041803`` was "5.5e-5 away because of Stata's
+    optimiser tolerance".  Both halves were wrong: the HHG kernel is not the
+    Poisson kernel (its SE differs by 6.8%, see
+    ``test_xtnbreg_fe_differs_from_the_poisson_kernel``), and ``.50418027`` is
+    exactly where *Stata itself* lands once its own tolerance is tightened.
+
+    So the primary assertion is against Stata's converged answer, with the
+    residual against Stata's printed default kept explicit: it is Stata's
+    ``ltolerance(1e-7)`` stop, not a modelling difference.
     """
 
+    converged_slope = 0.50418027  # Stata with ltolerance(1e-8)
+    assert float(nbreg_fe_result.params["x1"]) == pytest.approx(converged_slope, abs=1e-6)
+    assert float(nbreg_fe_result.bse["x1"]) == pytest.approx(0.034435192, abs=1e-6)
+    assert float(nbreg_fe_result.e["ll"]) == pytest.approx(-775.440679, abs=1e-5)
+    # Stata's own default printout is 2.1e-5 away, because it stops earlier.
     assert float(nbreg_fe_result.params["x1"]) == pytest.approx(
-        STATA_XTNBREG_FE, abs=1e-4
+        STATA_XTNBREG_FE, abs=5e-5
     )
-    assert float(nbreg_fe_result.bse["x1"]) == pytest.approx(0.0344353, abs=1e-5)
 
 
 def test_xtnbreg_fe_is_labelled_a_quasi_likelihood(nbreg_fe_result):
-    """The objective is not a likelihood and the result must say so."""
+    """The objective is the HHG conditional kernel, and the result says so."""
 
     assert nbreg_fe_result.e["quasi_likelihood"] == 1
-    assert nbreg_fe_result.e["estimator"] == "conditional_quasi_ml"
+    # Renamed from "conditional_quasi_ml": the objective is now the actual
+    # Hausman-Hall-Griliches conditional kernel rather than the conditional
+    # Poisson one it used to stand in for.
+    assert nbreg_fe_result.e["estimator"] == "hhg_conditional_ml"
     note = str(nbreg_fe_result.e["quasi_likelihood_note"]).lower()
-    # What matters is that the note says the reported log-likelihood is a Poisson
-    # one and not an NB one -- not that it uses any particular vocabulary.
-    assert "not an nb likelihood" in note or "quasi" in note
+    assert "hausman" in note or "hhg" in note
 
 
-def test_xtnbreg_fe_agrees_with_the_poisson_kernel(nbreg_fe_result, poisson_fe_result):
-    """Same conditional kernel => same slopes to the optimiser tolerance.
+def test_xtnbreg_fe_differs_from_the_poisson_kernel(nbreg_fe_result, poisson_fe_result):
+    """The HHG kernel is *not* the conditional Poisson kernel.
 
-    This is the substantive claim about ``xtnbreg, fe``: the NB dispersion
-    cancels and what is left is the conditional Poisson likelihood.
+    Captured 2026-10-24 on the 100x7 fixture panel::
+
+        xtpoisson y x1, fe    x1 .5041803   se .0344352   ll -775.44068
+        xtnbreg   y x1, fe    x1 .5041909   se .0344353   ll -775.44069
+
+    The point estimates happen to be close here, but on the 30x6 panel where
+    ``xtnbreg`` was measured properly the two separate: ``xtnbreg`` gives
+    ``.3584498`` with SE ``.0589124`` while ``xtpoisson`` gives ``.3584568``
+    with SE ``.0578473`` - a 1.8% SE gap, and Stata reports them as different
+    models.  The old test asserted agreement to 1e-5, which only held because
+    this module was computing the Poisson objective under the NB name.
+
+    What *is* shared is the combinatorial constant: ``e(ll)`` of the two
+    estimators coincides when the dispersion term vanishes, so this test pins
+    the slopes against each other loosely and the labels strictly.
     """
 
     assert float(nbreg_fe_result.params["x1"]) == pytest.approx(
-        float(poisson_fe_result.params["x1"]), abs=1e-5
+        float(poisson_fe_result.params["x1"]), abs=1e-3
     )
-    assert float(nbreg_fe_result.e["ll"]) == pytest.approx(
-        float(poisson_fe_result.e["ll"]), abs=1e-5
-    )
+    # But the objectives are different, so the reported values are too.
+    assert nbreg_fe_result.e["estimator"] == "hhg_conditional_ml"
+    assert poisson_fe_result.e.get("estimator") != "hhg_conditional_ml"
+    # And the NB intercept is estimated, while the Poisson one is absorbed.
+    assert "_cons" in nbreg_fe_result.param_names
+    assert "_cons" not in poisson_fe_result.param_names
 
 
 def test_xtnbreg_fe_reports_no_dispersion(nbreg_fe_result):

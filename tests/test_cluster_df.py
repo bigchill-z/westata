@@ -1,22 +1,31 @@
 """Documented behaviour of the cluster-robust degrees of freedom.
 
-Stata ``[R] regress`` -> "Degrees of freedom" (p. 26 of the reference manual):
+Stata ``[R] regress`` -> "Degrees of freedom":
 
     For one-way cluster-robust variance estimators, p-values and confidence
     intervals are derived from a t distribution with G - 1 degrees of freedom,
     where G is the total number of clusters.
 
-That sentence governs *inference* (t tests, confidence intervals and the
-model F test).  It does not redefine ``e(df_r)``, which Stata documents as
-"residual degrees of freedom" (``e(N) - rank(e(V))``).
+Stata also stores that same number in ``e(df_r)``: live capture on StataNow
+19.5 (MP), 2026-10-24, ``sysuse auto`` + ``gen byte gid = mod(_n, 12)``
+(G = 12 clusters, N = 74, K = 3)::
 
-westata therefore keeps the two concepts separate and explicit:
+    regress mpg weight foreign, vce(cluster gid)
+    ereturn list  ->  e(N) = 74   e(df_r) = 11   e(N_clust) = 12
+                      e(rmse) = 3.4070592856515844 (= sqrt(rss/(N-K)))
+
+so ``e(df_r) = G - 1 = 11``, *not* ``N - K = 71``.  An earlier version of this
+file asserted ``e(df_r) = N - K``, which was wrong: Stata never reports that
+number under clustering (``e(rmse)`` is the quantity that keeps ``N - K``).
+
+westata therefore keeps the two concepts aligned but explicit:
 
 ``results.df_resid``
     The reference-distribution degrees of freedom -- ``G - 1`` under clustering,
     ``N - K`` otherwise.  Used for t/p/CI and for the displayed ``F(df_m, .)``.
 ``results.e["df_r"]``
-    The residual degrees of freedom ``N - K``, matching Stata's scalar.
+    Stata's stored scalar, which is the same ``G - 1`` under clustering and
+    ``N - K`` otherwise.
 
 These tests pin the split so a future refactor cannot silently collapse it.
 """
@@ -42,7 +51,7 @@ def _cluster_data(n_clusters: int = 6, per_cluster: int = 8, seed: int = 3):
     return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "g": g})
 
 
-def test_cluster_uses_g_minus_1_for_inference_and_n_minus_k_for_e_df_r():
+def test_cluster_stores_g_minus_1_in_e_df_r_like_stata():
     df = _cluster_data()
     res = OLS.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": df["g"]}
@@ -52,14 +61,16 @@ def test_cluster_uses_g_minus_1_for_inference_and_n_minus_k_for_e_df_r():
     n = len(df)
     k = 3  # Intercept, x1, x2
 
-    # Inference uses G - 1 (Stata [R] regress, "Degrees of freedom").
+    # Stata: e(df_r) = e(N_clust) - 1 under vce(cluster id).
+    assert res.e["df_r"] == n_groups - 1
+    assert res.e["N_clust"] == n_groups
+    # results.df_resid carries the same reference-distribution df.
     assert res.df_resid == n_groups - 1
-    # e(df_r) stays the residual degrees of freedom N - K.
-    assert res.e["df_r"] == n - k
-
-    # The two must not accidentally coincide in this test, otherwise it proves
-    # nothing about which quantity is used where.
-    assert res.df_resid != res.e["df_r"]
+    # ... and it really is not N - K, otherwise this test proves nothing.
+    assert res.e["df_r"] != n - k
+    # e(rmse) keeps the N - K denominator; only the inference df changes.
+    rss = float(np.sum(np.asarray(res.resid) ** 2))
+    assert res.e["rmse"] == pytest.approx(np.sqrt(rss / (n - k)), rel=1e-12)
 
 
 def test_cluster_pvalues_use_g_minus_1_not_n_minus_k():
@@ -74,7 +85,7 @@ def test_cluster_pvalues_use_g_minus_1_not_n_minus_k():
     expected = 2.0 * stats.t.sf(np.abs(t), res.df_resid)
     np.testing.assert_allclose(res.pvalues.to_numpy(), expected, rtol=1e-12)
 
-    wrong = 2.0 * stats.t.sf(np.abs(t), res.e["df_r"])
+    wrong = 2.0 * stats.t.sf(np.abs(t), len(df) - 3)
     # Sanity check that the two reference distributions actually differ here,
     # so the assertion above is not vacuous.
     assert not np.allclose(res.pvalues.to_numpy(), wrong, rtol=1e-6)
@@ -90,10 +101,36 @@ def test_cluster_summary_reports_g_minus_1_in_the_f_test():
     assert f"F(2, {int(n_groups)})" in text
 
 
+def test_cluster_e_f_is_the_wald_statistic_of_that_vce():
+    """Stata's e(F) under clustering is the CR1 Wald/k, not the R^2-form F.
+
+    Live capture (StataNow 19.5, 2026-10-24, auto.dta)::
+
+        regress mpg weight foreign, vce(cluster gid)   ->  e(F) = 81.951329431322
+        regress mpg weight foreign, vce(robust)        ->  e(F) = 73.805925525261
+        regress mpg weight foreign                     ->  e(F) = 69.748462620003
+    """
+
+    df = _cluster_data()
+    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+        cov_type="cluster", cov_kwds={"groups": df["g"]}
+    )
+    names = list(res.param_names)
+    slopes = [i for i, nm in enumerate(names) if nm != "Intercept"]
+    b = np.asarray(res.params, dtype=float)[slopes]
+    V = res.cov[np.ix_(slopes, slopes)]
+    expected = float(b @ np.linalg.solve(V, b) / len(slopes))
+    assert res.e["F"] == pytest.approx(expected, rel=1e-12)
+
+    plain = OLS.from_formula("y ~ x1 + x2", df).fit()
+    assert res.e["F"] != pytest.approx(plain.e["F"], rel=1e-6)
+
+
 def test_nonrobust_keeps_df_resid_equal_to_e_df_r():
     df = _cluster_data()
     res = OLS.from_formula("y ~ x1 + x2", df).fit()
     assert res.df_resid == res.e["df_r"] == len(df) - 3
+    assert "N_clust" not in res.e
 
 
 @pytest.mark.parametrize("cov_type", ["HC0", "HC1", "HC2", "HC3"])

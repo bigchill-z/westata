@@ -332,13 +332,21 @@ class _ResampleBase:
         covariance: np.ndarray,
         *,
         extra: Mapping[str, Any] | None = None,
+        df_resid: float | None = None,
+        dist: str | None = None,
     ) -> StataResults:
         names = self._names()
         n = self._y.size
+        degrees = (
+            float(max(n - len(names), 1)) if df_resid is None else float(df_resid)
+        )
+        distribution = dist
+        if distribution is None:
+            distribution = "t" if self._estimator == "regress" else "z"
         e: dict[str, Any] = {
             "N": n,
             "df_m": float(len(names) - 1),
-            "df_r": float(max(n - len(names), 1)),
+            "df_r": degrees,
             "rank": len(names),
             "estimator": self._estimator,
             "vce": self._stata_command,
@@ -376,9 +384,9 @@ class _ResampleBase:
             resid=residual,
             fittedvalues=fitted,
             nobs=n,
-            df_resid=float(max(n - len(names), 1)),
+            df_resid=degrees,
             df_model=float(len(names) - 1),
-            dist="t" if self._estimator == "regress" else "z",
+            dist=distribution,
             model_name=self._stata_command,
             cov_type=self._stata_command,
             e=e,
@@ -454,9 +462,18 @@ class Jackknife(_ResampleBase):
             note = "pseudovalue form"
 
         covariance = np.atleast_2d(variance)
+        # Stata's jackknife reports e(df_r) = N - 1, not N - k: the reference
+        # distribution has one degree of freedom per replication, independent of
+        # how many coefficients were estimated.  Measured on
+        # ``jackknife: regress mpg weight`` (auto.dta, N=74): Stata e(df_r) = 73
+        # for both the 2-parameter and the 3-parameter model, and for the
+        # ``mean`` estimator too; westata reported 72/71/73 respectively, so
+        # t(72) = 1.99346 was used where Stata uses t(73) = 1.99300.
         return self._results(
             observed,
             covariance,
+            df_resid=float(max(n - 1, 1)),
+            dist="t",
             extra={
                 "note": note,
                 "expected_gap": (
@@ -572,9 +589,15 @@ class Bootstrap(_ResampleBase):
 
         # Percentile-based covariance: the sample covariance of the replicates.
         covariance = np.atleast_2d(np.cov(replicates, rowvar=False, ddof=1))
+        # Stata's bootstrap tests with the *normal* distribution and stores no
+        # e(df_r): ``bootstrap, reps(100): regress mpg weight`` prints a
+        # "Normal-based" table with ``P>|z|``, while westata used t(72) and was
+        # therefore systematically conservative (interval width +1.7%,
+        # 35.2234-43.6571 against Stata's 35.2943-43.5863 for _cons).
         return self._results(
             observed,
             covariance,
+            dist="z",
             extra={
                 "reps": self._reps,
                 "seed": self._seed,

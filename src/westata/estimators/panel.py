@@ -36,20 +36,36 @@ linearmodels counts the absorbed effect columns in its model rank::
     Stata:        df_r     = N - K - n_entities + 1                  = 13
 
 so ``N - K - (n_entities - 1)`` and ``N - K - n_entities + 1`` are the same
-number once the intercept is present.  Two consequences matter:
+number once the intercept is present.
 
-* ``auto_df`` does **not** change ``df_resid`` here - both settings report 13.
-  What ``auto_df`` changes is the *covariance*: with ``cov_type="clustered"`` and
-  a single effect nested in the cluster variable, ``auto_df=True`` (the backend
-  default) stops counting the effects, so the standard errors differ from
-  Stata's ``vce(cluster id)``.  westata always passes ``auto_df=False`` plus
-  ``group_debias=True``, which reproduces Stata's
-  ``G/(G-1) * (N-1)/(N-K)`` CR1 exactly (see
-  ``test_auto_df_off_reproduces_stata_clustered_standard_errors``).
-* Without a constant (``"y ~ x1 + x2 - 1"``) the ``+1`` disappears from both
-  spellings and both report 13 - i.e. ``N - K - n_entities``.  westata derives
-  the effect count from whether the fitted model actually carries an intercept,
-  so this case stays conformant instead of assuming a constant exists.
+``auto_df`` does **not** change ``df_resid`` (both settings report 13); what it
+changes is the *small-sample factor inside the clustered covariance*.  Its
+correct setting was measured, not assumed, because an earlier version of this
+module had it backwards:
+
+* ``auto_df=True`` counts only the *reported* coefficients in that factor, i.e.
+  ``K = 3``.  That is Stata's convention: on a 30-entity x 6-period panel,
+  ``xtreg y x1 x2, fe vce(cluster id)`` reproduces linearmodels' clustered
+  standard errors **to 9.4e-15** with ``auto_df=True``.
+* ``auto_df=False`` also counts the 29 absorbed entity effects (``K = 32``) and
+  therefore reproduces Stata's ``vce(cluster id) dfadj`` - an *undocumented*
+  Stata option - with the same 2.1e-15 agreement.  It is 9.36% too large
+  (``sqrt(177/148)``) against Stata's default.
+
+westata therefore passes ``auto_df=True`` plus ``group_debias=True``, which is
+Stata's ``G/(G-1) * (N-1)/(N-K)`` CR1 with Stata's ``K`` (see
+``test_auto_df_on_reproduces_stata_clustered_standard_errors``).
+
+Without a constant (``"y ~ x1 + x2 - 1"``) the ``+1`` disappears from both
+spellings and both report 13 - i.e. ``N - K - n_entities``.  westata derives
+the effect count from whether the fitted model actually carries an intercept,
+so this case stays conformant instead of assuming a constant exists.
+
+Under a clustered VCE Stata also reports ``e(df_r) = G - 1`` (29, not 148), and
+that number - not ``N - K`` - is the reference distribution of the reported
+t statistics.  westata recomputes it here for the same reason it recomputes the
+rest of the ``e()`` block: so the p-values and confidence intervals cannot
+silently disagree with Stata.
 
 westata never forwards the backend's ``df_resid``; :meth:`PanelOLS._stata_df_resid`
 recomputes ``N - K - sum(levels - 1)`` (a constant absorbs one base level per
@@ -63,18 +79,82 @@ the between regression actually runs on the group means.
 Covariance mapping
 ------------------
 ===========================  ===================================================
-westata ``cov_type``         linearmodels
+westata ``cov_type``         Stata
 ===========================  ===================================================
-``None`` / ``"nonrobust"``   ``cov_type="unadjusted"``
-``"HC1"``                    ``cov_type="robust", debiased=True`` (Stata's
-                             ``vce(robust)`` is HC1)
-``"cluster"``                ``cov_type="clustered"``, ``cov_kwds["clusters"]``,
-                             ``group_debias=True``
+``None`` / ``"nonrobust"``   (no ``vce()``) -> ``cov_type="unadjusted"``
+``"robust"`` / ``"HC1"``     ``vce(robust)`` -> **``vce(cluster panelvar)``**
+``"cluster"``                ``vce(cluster clustvar)``
 ===========================  ===================================================
 
-``HC0``/``HC2``/``HC3`` are rejected with :class:`UnsupportedError` instead of
-being folded into Stata's ``vce(robust)``: returning an HC2 number under the
-label "robust" would be a quiet numerical lie.
+``[XT] xtreg`` states it outright: "Specifying ``vce(robust)`` is equivalent to
+specifying ``vce(cluster panelvar)``".  Measured on a 30-entity x 6-period
+panel, ``max|V_robust - V_cluster(id)| = 0.0`` for ``xtreg, fe`` (and 6.9e-18
+for ``xtreg, re``), while ``areg y x1 x2, absorb(id) vce(robust)`` gives a
+*different* matrix (constants' SE ``.0372797`` vs ``.0020300``, i.e. 18.4x).
+So the HC1 mapping belongs to ``areg``/``FEOLS`` and **not** to ``xtreg``:
+``cov_type="robust"`` here is Stata's clustered ``vce(robust)``, never a
+heteroskedasticity-only sandwich.  ``HC1`` is kept as an accepted alias
+because that is the spelling older westata code used, but it now names the
+same covariance Stata's ``vce(robust)`` returns for this estimator.
+
+Because the two are the same thing in Stata, ``xtreg`` has no way to ask for a
+non-clustered heteroskedasticity-robust covariance at all; ``HC0``/``HC2``/
+``HC3`` are rejected with :class:`UnsupportedError` rather than being folded
+into a number Stata cannot produce.
+
+Known deviations: ``e(df_m)`` and ``e(rank)`` under a clustered VCE
+--------------------------------------------------------------------
+Deliberate, and approved by the Lead: **westata does not reproduce Stata's
+``e(df_m)``/``e(rank)`` when the covariance is clustered**, because Stata's own
+``e()`` block is self-contradictory there.
+
+Measured with StataNow 19.5 on 2026-10-24, 30 entities x 6 periods,
+``xtset id t``::
+
+    command                                  e(df_m) e(df_b) e(rank)  prints
+    xtreg y x1,     fe vce(cluster id)          0      1       1      F(1, 29) = 211.29
+    xtreg y x1 x2,  fe vce(cluster id)          1      2       2      F(2, 29) = 303.80
+    xtreg y x1 x2 z, fe vce(cluster id)         2      3       3      F(3, 29) = 254.47
+
+So Stata stores ``e(df_m) = slopes - 1`` and ``e(rank) = slopes`` - both defined
+against the *free parameters of the clustered problem*, not against the model's
+columns - while the F it prints and the ``e(p)`` it stores use
+``F(e(df_b), e(df_r))``.  They disagree on every clustered ``xtreg, fe``: with
+two slopes, ``e(df_m)`` says 1, ``e(rank)`` says 2, and the printed test is
+``F(2, 29)``.  Stata keeps the unclustered values in ``e(df_r_mb) = 148`` and
+``e(rank_mb) = 3``, which shows the shift is a convention and not an accident.
+
+westata stores the parameter vector's own quantities: ``e(df_m)`` = the number
+of slopes (2), ``e(rank)`` = ``len(e(b))`` = slopes + 1 (3, constant included),
+plus ``e(df_b)`` = 2.  So ``e(df_m)`` is +1 and ``e(rank)`` is +1 against
+Stata's clustered values, everything else matches:
+
+=========================  =========  =========  =======
+quantity                   Stata      westata    delta
+=========================  =========  =========  =======
+``e(df_m)`` (2 slopes)           1          2      +1
+``e(rank)``  (2 slopes)          2          3      +1
+``e(df_b)``                      2          2       0
+``e(df_r)``                     29         29       0
+``e(F)``                    303.80     303.80       0  (6.5e-16 relative)
+=========================  =========  =========  =======
+
+Copying Stata's ``e(df_m)`` would make
+:mod:`westata.results.summary` print ``F(1, 29) = 303.80`` - a coefficient block
+whose degrees of freedom contradict its own p-value.  A wrong *label* baked into
+a downstream CI is the lesser evil only because it is visible; a wrong *number*
+is not.  ``e(rank)`` stays at the honest rank of the fitted model for the same
+class of reason: it is the size of ``e(b)``/``e(V)`` that
+:class:`westata.results.StataResults` and the postestimation code rely on, and
+shrinking it to Stata's clustered convention would quietly change unrelated
+scalars that read it.  The real fix, if bit-for-bit ``e()`` equality is ever
+wanted, is to store Stata's values and teach ``results/summary.py`` to label F
+tests from ``e(df_b)`` - that needs a file outside this module's ownership.
+
+Everything else about a clustered ``xtreg, fe`` *is* reproduced, including
+``e(df_r) = G - 1``:
+``xtreg y x1 x2, fe vce(cluster id)`` on that panel gives ``e(df_r) = 29`` with
+``e(df_r_mb) = 148`` for the model-based value.
 
 Known gaps (documented, not silently approximated)
 --------------------------------------------------
@@ -94,6 +174,7 @@ from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.protocols import SSC
@@ -107,19 +188,25 @@ __all__ = [
     "FirstDifferenceOLS",
 ]
 
-#: ``cov_type`` (lower-case) -> linearmodels covariance name.
+#: ``cov_type`` (lower-case) -> the covariance Stata actually produces here.
+#:
+#: ``xtreg``'s ``vce(robust)`` *is* ``vce(cluster panelvar)`` (``[XT] xtreg``,
+#: verified: ``max|V_robust - V_cluster| = 0.0``), so both spellings map onto the
+#: clustered backend estimator.  The heteroskedasticity-only HC1 sandwich that
+#: ``areg``/``FEOLS`` use is a *different* matrix and must not be substituted
+#: here: on a 30x6 panel its constant SE is 18.4x Stata's.
 _BACKEND_COV_TYPES: dict[str, str] = {
     "nonrobust": "unadjusted",
     "unadjusted": "unadjusted",
-    "hc1": "robust",
-    "robust": "robust",
+    "hc1": "clustered",
+    "robust": "clustered",
     "cluster": "clustered",
     "clustered": "clustered",
 }
 
 #: ``cov_type`` values Stata can express for ``xtreg`` but this adapter cannot.
 _UNSUPPORTED_COV_TYPES: dict[str, str] = {
-    "hc0": "HC0 is not Stata's vce(robust) (Stata applies the HC1 factor N/(N-K))",
+    "hc0": "HC0 has no xtreg counterpart (Stata's vce(robust) is a cluster VCE)",
     "hc2": "panel HC2 has no Stata xtreg counterpart",
     "hc3": "panel HC3 has no Stata xtreg counterpart",
     "hac": "vce(HAC) needs newey/xtscc, not xtreg",
@@ -127,6 +214,9 @@ _UNSUPPORTED_COV_TYPES: dict[str, str] = {
 }
 
 _CONSTANT_NAMES = frozenset({"intercept", "const", "_cons"})
+
+#: ``cov_type`` values that request Stata's clustered ``vce(robust)``.
+_ROBUST_COV_TYPES = frozenset({"robust", "hc1"})
 
 
 def _normalize_cov_type(cov_type: str | None) -> str:
@@ -145,7 +235,8 @@ def _normalize_cov_type(cov_type: str | None) -> str:
     except KeyError:
         raise ValueError(
             f"Unknown cov_type {cov_type!r}; supported cov_type values for the "
-            "xtreg family are: nonrobust, HC1, cluster"
+            "xtreg family are: nonrobust, robust (Stata's vce(robust), i.e. "
+            "vce(cluster panelvar)), cluster"
         ) from None
 
 
@@ -155,8 +246,8 @@ def _cov_label(cov_type: str | None) -> str:
     if cov_type is None:
         return "nonrobust"
     key = str(cov_type).strip().lower()
-    if key in ("robust",):
-        return "HC1"
+    if key in _ROBUST_COV_TYPES:
+        return "robust"
     if key in ("clustered",):
         return "cluster"
     return key.upper() if key.startswith("hc") else key
@@ -185,6 +276,68 @@ class PanelOLS:
     Rows with missing values are dropped listwise *before* estimation, and the
     retained sample is what ``e(N)`` counts, so ``e(N)`` can be smaller than
     ``len(data)`` - the same behaviour as Stata's ``regress``/``xtreg``.
+
+    Known deviations: ``e(df_m)``, ``e(rank)`` and ``e(df_b)`` under clustering
+    ---------------------------------------------------------------------------
+    Deliberate, and approved by the Lead.  Stata's own ``e()`` block disagrees
+    with itself here, so westata does not copy it.
+
+    Measured with StataNow 19.5 on 2026-10-24, 30 entities x 6 periods,
+    ``xtset id t``::
+
+        command                                  e(df_m) e(df_b) e(rank)  prints
+        xtreg y x1,     fe vce(cluster id)          0      1       1      F(1, 29) = 211.29
+        xtreg y x1 x2,  fe vce(cluster id)          1      2       2      F(2, 29) = 303.80
+        xtreg y x1 x2 z, fe vce(cluster id)         2      3       3      F(3, 29) = 254.47
+
+    Stata's clustered ``xtreg, fe`` redefines both scalars relative to the
+    *reported* model, not to the parameter vector:
+
+    * ``e(df_m) = slopes - 1`` (the reported rank minus one),
+    * ``e(rank)  = slopes``,
+
+    while the F it prints and the ``e(p)`` it stores are
+    ``F(e(df_b), e(df_r))``.  With two slopes, ``e(df_m)`` says 1, ``e(rank)``
+    says 2, and the printed test is ``F(2, 29)``.  Stata also keeps the
+    unclustered values in ``e(df_r_mb) = 148`` and ``e(rank_mb) = 3``, which is
+    what shows the redefinition is deliberate: under clustering both scalars
+    shift down by one because Stata counts the *free* parameters of the
+    clustered problem (the slopes alone) rather than the model's columns.
+
+    westata reports the parameter vector's own quantities - ``e(df_m)`` = the
+    number of slopes (2), ``e(rank)`` = ``len(e(b))`` = slopes + 1 (3, the
+    constant included) - plus ``e(df_b)`` = 2.  So against Stata's clustered
+    values, ``e(df_m)`` is +1 and ``e(rank)`` is +1:
+
+    =====================  =========  =========  =======
+    quantity               Stata      westata    delta
+    =====================  =========  =========  =======
+    ``e(df_m)`` (2 slopes)       1          2      +1
+    ``e(rank)``  (2 slopes)      2          3      +1
+    ``e(df_b)``                  2          2       0
+    ``e(df_r)``                 29         29       0
+    ``e(F)``                 303.80     303.80       0  (6.5e-16 relative)
+    =====================  =========  =========  =======
+
+    Copying Stata's ``e(df_m)`` would make the summary read ``F(1, 29) = 303.80``
+    - a degrees-of-freedom label contradicting its own p-value - so a visibly
+    wrong *label* is the lesser evil than a wrong *number*.  ``e(rank)`` is kept
+    as the honest rank of the fitted model for the same class of reason: it is
+    what :class:`westata.results.StataResults` and the postestimation machinery
+    use for the size of ``e(b)``/``e(V)``, and shrinking it to Stata's
+    clustered-scalar convention would silently change unrelated scalars
+    (``aic``/``bic``-style counts, ``/sigma`` handling) that read it.  Changing
+    either number is therefore out of scope for a documentation fix; only the
+    F statistic has to match, and it does.
+
+    The real fix, if the Lead ever wants bit-for-bit ``e()`` equality, is to
+    store Stata's values and teach :mod:`westata.results.summary` to label F
+    tests from ``e(df_b)`` - that needs a file outside this module's ownership.
+
+    Everything else about a clustered ``xtreg, fe`` is reproduced, including
+    ``e(df_r) = G - 1`` (``29`` on that panel, with the model-based ``148`` in
+    ``e(df_r_mb)``) and the ``N - rank`` denominator Stata uses for
+    ``e(rmse)``/``e(r2_a)`` under clustering.
     """
 
     _stata_command = "xtreg, fe"
@@ -294,7 +447,13 @@ class PanelOLS:
         rank = len(param_names)
         effect_df = self._effect_df(model, has_constant)
         df_model = self._stata_df_model(rank, has_constant)
-        df_resid = self._stata_df_resid(nobs, rank, effect_df)
+        model_df = self._stata_df_resid(nobs, rank, effect_df)
+        df_b = rank - (1 if has_constant else 0)
+        df_resid = model_df
+        scalar_df = model_df
+        if n_clust is not None:
+            df_resid = self._stata_clustered_df_resid(n_clust, nobs, rank, model_df)
+            scalar_df = self._stata_clustered_scalar_df(nobs, rank, model_df)
 
         e = self._stata_scalars(
             ref,
@@ -302,6 +461,8 @@ class PanelOLS:
             resid=resid,
             df_model=df_model,
             df_resid=df_resid,
+            scalar_df=scalar_df,
+            df_b=df_b,
             rank=rank,
             n_clust=n_clust,
         )
@@ -399,12 +560,20 @@ class PanelOLS:
         from linearmodels.panel import PanelOLS as _BackendPanelOLS
 
         if not isinstance(model, _BackendPanelOLS):
+            # ``RandomEffects``/``BetweenOLS``/``FirstDifferenceOLS`` reject
+            # ``auto_df`` outright, and their clustered covariance already
+            # matches Stata without it.
             return {}
         return {
-            # Stata always counts the absorbed effects in the covariance
-            # correction; ``auto_df=True`` (the backend default) does not when
-            # an effect is nested in the clusters, so pin it off.
-            "auto_df": False,
+            # ``auto_df=True`` (the backend default) counts only the *reported*
+            # coefficients in the clustered small-sample factor, i.e. Stata's
+            # K.  Measured on 30 entities x 6 periods: auto_df=True reproduces
+            # ``xtreg, fe vce(cluster id)`` to 9.4e-15, auto_df=False counts the
+            # 29 absorbed effects too (K=32) and reproduces the undocumented
+            # ``dfadj`` variant, i.e. 9.36% = sqrt(177/148) too large against
+            # Stata's default.  Pin it explicitly rather than relying on the
+            # backend's default, which has changed between releases.
+            "auto_df": True,
         }
 
     def _resolve_cov(
@@ -412,21 +581,50 @@ class PanelOLS:
     ) -> tuple[str, np.ndarray | None, int | None]:
         backend_cov = _normalize_cov_type(cov_type)
         kwds = {} if cov_kwds is None else dict(cov_kwds)
+        wants_cluster = backend_cov == "clustered"
+        key = "" if cov_type is None else str(cov_type).strip().lower()
 
-        if backend_cov != "clustered":
-            unused = set(kwds) - {"clusters", "groups"}
-            if unused:
+        clusters = kwds.pop("clusters", kwds.pop("groups", None))
+        if key in _ROBUST_COV_TYPES:
+            # ``vce(robust)`` == ``vce(cluster panelvar)``: the panel variable is
+            # the cluster variable, so callers must not pass their own labels --
+            # doing so would silently give a different estimator than Stata's.
+            if clusters is not None:
+                raise ValueError(
+                    "cov_type='robust' is Stata's vce(robust), which for xtreg "
+                    "clusters on the panel variable; do not pass cov_kwds -- use "
+                    "cov_type='cluster' with cov_kwds={'clusters': ...} to "
+                    "cluster on a different variable"
+                )
+            if not wants_cluster:  # pragma: no cover - guarded by the mapping
+                return backend_cov, None, None
+            labels = self._data.index.get_level_values(self._entity).to_numpy()
+            n_clust = int(pd.unique(labels).size)
+            if n_clust < 2:
+                raise ConsistencyError(
+                    f"{self._stata_command}: Stata's vce(robust) clusters on the "
+                    f"panel variable, so at least 2 panels are required; got "
+                    f"{n_clust}"
+                )
+            return backend_cov, labels, n_clust
+
+        if not wants_cluster:
+            if kwds:
                 raise ValueError(
                     "cov_kwds is only consumed for cov_type='cluster'; got "
-                    f"unexpected key(s) {sorted(unused)}"
+                    f"unexpected key(s) {sorted(kwds)}"
                 )
             return backend_cov, None, None
 
-        clusters = kwds.get("clusters", kwds.get("groups"))
         if clusters is None:
             raise ValueError(
                 "cov_type='cluster' requires cov_kwds['clusters']; pass the "
                 "cluster labels as cov_kwds={'clusters': ...}"
+            )
+        if kwds:
+            raise ValueError(
+                "cov_kwds is only consumed for cov_type='cluster'; got "
+                f"unexpected key(s) {sorted(kwds)}"
             )
         labels = _cluster_labels(clusters, self._full_index, self._kept_index)
         n_clust = int(pd.unique(labels).size)
@@ -478,6 +676,33 @@ class PanelOLS:
             )
         return df_resid
 
+    def _stata_clustered_df_resid(
+        self, n_clust: int, nobs: int, rank: int, df_resid: float
+    ) -> float:
+        """``e(df_r)`` under a clustered VCE: Stata reports ``G - 1``.
+
+        Measured on 30 entities x 6 periods, ``xtreg y x1 x2, fe vce(cluster id)``
+        reports ``e(df_r) = 29`` while the model-based value stays in
+        ``e(df_r_mb) = 148``, and the reported t statistics use the clustered
+        value.  Keeping ``N - K`` here would give Stata's standard errors with
+        the wrong p-values and confidence intervals.
+        """
+
+        if n_clust < 2:  # pragma: no cover - guarded by _resolve_cov
+            return df_resid
+        return float(n_clust - 1)
+
+    def _stata_clustered_scalar_df(self, nobs: int, rank: int, model_df: float) -> float:
+        """Denominator Stata uses for ``e(rmse)``/``e(r2_a)`` under clustering.
+
+        Measured: Stata divides by the *unadjusted* ``N - rank`` there
+        (``rss/rmse^2 = 177.0000`` for ``xtreg y x1 x2, fe vce(robust)`` on
+        30 x 6), not by the effects-adjusted ``N - K - n + 1 = 148`` it uses
+        when the VCE is conventional and not by the clustered ``G - 1 = 29``.
+        """
+
+        return float(nobs - rank)
+
     def _residual_response(self, y: pd.Series) -> pd.Series:
         """Response aligned with the residuals (levels for FE/RE/pooled)."""
 
@@ -492,20 +717,36 @@ class PanelOLS:
         resid: np.ndarray,
         df_model: float,
         df_resid: float,
+        df_b: float,
+        scalar_df: float | None = None,
         rank: int,
         n_clust: int | None,
     ) -> dict[str, Any]:
+        """``e()`` scalars, including Stata's clustered-VCE convention.
+
+        Measured on 30 entities x 6 periods, ``xtreg y x1 x2, fe vce(robust)``
+        reports ``e(df_r) = G - 1 = 29`` for the reference distribution but
+        divides ``e(rmse)``/``e(r2_a)`` by a *model-based* ``N - rank = 177``
+        (``rss/rmse^2 = 177.0000``; plain ``xtreg, fe`` uses the effects-adjusted
+        ``df_r = 148``).  ``e(df_b)`` is the number of reported slopes, which
+        ``xtreg, fe`` keeps separate from ``e(df_m)`` because the latter also
+        counts the absorbed effects when the VCE is conventional.
+        """
+
+        scalar_df = (df_resid if scalar_df is None else scalar_df)
         rss = float(resid @ resid)
         r2 = float(getattr(ref, "rsquared", float("nan")))
-        r2_a = self._stata_r2_adjusted(r2, nobs, df_resid)
+        f_stat = self._stata_f(ref, df_model)
+        r2_a = self._stata_r2_adjusted(r2, nobs, scalar_df)
         e: dict[str, Any] = {
             "N": nobs,
             "df_m": df_model,
             "df_r": df_resid,
+            "df_b": float(df_b),
             "r2": r2,
             "r2_a": r2_a,
-            "rmse": float(np.sqrt(rss / df_resid)) if df_resid > 0 else float("nan"),
-            "F": self._stata_f(ref, df_model),
+            "rmse": float(np.sqrt(rss / scalar_df)) if scalar_df > 0 else float("nan"),
+            "F": f_stat,
             "ll": _gaussian_loglik(rss, nobs),
             "rank": rank,
             "n_entities": int(self._data.index.get_level_values(self._entity).nunique()),
@@ -591,6 +832,19 @@ class RandomEffects(PanelOLS):
                 f"{self._stata_command}: no residual degrees of freedom "
                 f"(N={nobs}, K={rank})"
             )
+        return df_resid
+
+    def _stata_clustered_df_resid(
+        self, n_clust: int, nobs: int, rank: int, df_resid: float
+    ) -> float:
+        """``xtreg, re`` keeps ``N - K``: Stata reports no ``e(df_r)`` at all.
+
+        ``xtreg, re`` is a GLS estimator whose inference is normal-based, so
+        unlike ``xtreg, fe`` it has no ``e(df_r)`` to replace with ``G - 1``
+        (measured: the key is absent from ``e()`` under every VCE).  Only the
+        covariance changes when the VCE is clustered, which this class inherits.
+        """
+
         return df_resid
 
     def _reject_effects(self, entity_effects: bool, time_effects: bool) -> None:

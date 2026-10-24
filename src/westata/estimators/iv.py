@@ -26,32 +26,50 @@ of rows with missing values (linearmodels emits its own
 
 Degrees of freedom (``e(df_r)``)
 --------------------------------
-Stata's ``ivregress`` reports ``e(df_r) = N - K`` where ``K`` is the number of
-*estimated parameters* (exogenous plus endogenous regressors, i.e. the columns
-of the regressor matrix), and ``e(rank) = K``.  **Excluded instruments are not
-estimated parameters and consume no degree of freedom**: they only serve to
-identify the endogenous regressors, so ``N - K`` is unchanged by
-over-identification.  This is the convention in ``[R] ivregress`` (Method and
-formulas): the residual variance is ``s^2 = u'u / (N - K)`` with ``K`` the
-columns of ``X``, not ``N`` minus the number of instruments.  Consequently
-``e(df_m) = K - 1`` when the model contains a constant (``K`` otherwise), and
-adding a second instrument to an exactly identified model leaves both
-``e(df_r)`` and ``e(df_m)`` untouched.
+Stata's ``ivregress`` leaves ``e(df_r)`` **missing** by default and reports
+``N - K`` (or ``G - 1`` under ``vce(cluster)``) only when the ``small`` option
+is given, where ``K`` is the number of *estimated parameters* (exogenous plus
+endogenous regressors, i.e. the columns of the regressor matrix), and
+``e(rank) = K``.  **Excluded instruments are not estimated parameters and
+consume no degree of freedom**: they only serve to identify the endogenous
+regressors, so ``N - K`` is unchanged by over-identification.  This is the
+convention in ``[R] ivregress`` (Method and formulas): the residual variance is
+``s^2 = u'u / (N - K)`` with ``K`` the columns of ``X``, not ``N`` minus the
+number of instruments.  Consequently ``e(df_m) = K - 1`` when the model
+contains a constant (``K`` otherwise), and adding a second instrument to an
+exactly identified model leaves both ``e(df_r)`` and ``e(df_m)`` untouched.
+
+westata cannot store a missing there (see ``e(df_r)`` under "Known deviations
+from Stata" below), so it stores ``N``; the *inference* degrees of freedom it
+uses are the same ``N`` for nonrobust/HC and ``G - 1`` under clustering.
 
 Covariance estimators
 ---------------------
 ``cov_type`` is validated against :data:`westata.vce.dispatch.
 SUPPORTED_COV_TYPES` and mapped as follows:
 
-======================  ==============================================
-``cov_type``            action
-======================  ==============================================
-``None``/``nonrobust``  linearmodels ``"unadjusted"``
-``HC1``                 linearmodels ``"robust"`` with ``debiased=True``
-``HC0``                 linearmodels ``"robust"`` with ``debiased=False``
-``cluster``             linearmodels ``"clustered"`` with ``clusters=``
+======================  ==========================================================
+westata ``cov_type``    Stata option / linearmodels call
+======================  ==========================================================
+``None``/``nonrobust``  (default) ``"unadjusted"``, ``debiased=False`` = ESS/N
+``HC0``                 ``vce(robust)``: ``"robust"``, ``debiased=False``
+``HC1``                 ``vce(robust) small``: ``"robust"``, ``debiased=True``
+``cluster``             ``vce(cluster g)``: ``"clustered"``, ``debiased=False``
+                        (CR0); ``ssc=SSC(adj=True)`` adds ``small`` -> CR1
 ``HC2``, ``HC3``        rejected (:class:`westata.errors.UnsupportedError`)
-======================  ==============================================
+======================  ==========================================================
+
+**``HC0`` is Stata's plain ``vce(robust)``; ``HC1`` is ``vce(robust) small``.**
+This is the opposite of OLS/``regress``, where ``vce(robust)`` *is* HC1, so the
+mapping is spelled out here and pinned by ``tests/test_iv.py``.  Verified live
+on StataNow 19.5 (2026-10-24, 140x14 panel, ``ivregress 2sls y x1 (e1 = z1
+z2)``): westata ``HC0`` matches ``vce(robust)`` to 6.1e-15 whereas ``HC1`` is
+larger by exactly ``sqrt(N/(N-K))`` = 1.0109, and ``HC1`` matches
+``vce(robust) small`` to 6.0e-15.
+
+Likewise ``vce(cluster g)`` is CR0 for **all three** estimators: Stata adds
+``G/(G-1)`` and ``(N-1)/(N-K)`` only under ``small``.  westata's default
+``ssc`` for IV is therefore ``SSC(adj=False)`` and 2SLS/LIML/GMM share it.
 
 Why the 2SLS/GMM split
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -90,6 +108,19 @@ Known deviations from Stata
   westata therefore uses ``dist="z"`` for IV, unlike OLS/panel which use t.
   ``e(chi2)`` records the undivided Wald statistic and ``e(df_m)`` its degrees
   of freedom.
+* ``e(df_r)``: Stata stores missing (``.``) for ``ivregress`` unless ``small``
+  is given, and ``N - K`` (or ``G - 1`` under clustering) with ``small``.
+  **westata stores ``N`` instead, because that slot is also the inference
+  degrees of freedom (``results.df_resid``).  A missing value there silently
+  turns every ``pvalues`` and ``conf_int`` entry into NaN** -- measured on this
+  very result object, ``df_resid=nan`` yields ``pvalues=[nan, nan]`` and
+  ``conf_int()`` with all-NaN bounds.  Reproducing Stata's missingness
+  bit-for-bit would therefore require the results layer to separate the two
+  concepts (``e(df_r)`` as reported data vs ``df_resid`` as the reference
+  distribution), which is a ``results/base.py`` change outside this round's
+  scope.  The current value is the pre-existing convention, now documented
+  rather than silently wrong.  ``e(rmse)`` follows the same ``small`` rule as
+  Stata.
 * ``e(ll)`` is the Gaussian log-likelihood evaluated at the reported estimates,
   which is Stata's ``e(ll)`` definition for ``ivregress 2sls``.  Stata's
   ``ivregress liml`` instead stores the concentrated *LIML* likelihood, which
@@ -98,7 +129,9 @@ Known deviations from Stata
   its degrees of freedom (the same statistic linearmodels reports as
   ``f_statistic``); ``e(F_first)`` is the smallest first-stage F over the
   endogenous regressors (``estat firststage`` analogue).  A first-stage F below
-  10 emits a ``UserWarning`` rather than an error.
+  10 emits a ``UserWarning`` rather than an error.  Stata itself stores only
+  ``e(chi2)`` (or ``e(F)`` under ``small``), so ``e(F)`` is a westata
+  convenience that is *derived* from ``e(chi2)`` and ``e(df_m)``.
 * Weighted IV is out of scope for P1: passing ``weights``/``weight_type``
   raises :class:`westata.errors.UnsupportedError`.
 """
@@ -203,7 +236,12 @@ def _as_2d(value: Any, name: str, nobs: int) -> np.ndarray:
 
 
 def _canonical_cov_type(cov_type: str | None) -> str:
-    """Map a user ``cov_type`` to the canonical IV spelling."""
+    """Map a user ``cov_type`` to the canonical IV spelling.
+
+    For IV the Stata correspondence is ``HC0`` == ``vce(robust)`` and ``HC1`` ==
+    ``vce(robust) small`` (see the module docstring); the names themselves are
+    kept because they are the package-wide vocabulary shared with OLS.
+    """
 
     if cov_type is None:
         return "nonrobust"
@@ -295,6 +333,9 @@ class IV2SLS:
     _backend_cls = _LMIV2SLS
     _stata_command = "ivregress 2sls"
     _uses_shared_vce = True
+    #: ``ivregress 2sls`` stores ``e(rank_mb)`` when ``vce(robust)``/``cluster``
+    #: is used; LIML and GMM do not (see :meth:`_stata_scalars`).
+    _stores_rank_mb = True
 
     def __init__(
         self,
@@ -429,12 +470,16 @@ class IV2SLS:
         cov_type:
             ``None``/``"nonrobust"``, ``"HC0"``, ``"HC1"`` or ``"cluster"``.
             ``None`` selects Stata's default for ``ivregress`` (unadjusted).
+            ``"HC0"`` corresponds to Stata's ``vce(robust)`` and ``"HC1"`` to
+            ``vce(robust) small``; ``"cluster"`` is CR0 unless ``ssc.adj`` is on
+            (Stata's ``small``).  See the module docstring.
         cov_kwds:
             ``{"clusters": labels}`` for ``cov_type="cluster"``; must be empty
             otherwise.
         ssc:
             Stata small-sample settings; ``None`` uses
-            ``SSC(adj=True, cluster_adj=True, df="stata")``.
+            ``SSC(adj=False, cluster_adj=True)``, i.e. ``ivregress`` without
+            ``small``.
         """
 
         canonical = _canonical_cov_type(cov_type)
@@ -469,7 +514,16 @@ class IV2SLS:
             resid = y - X @ params
             cov, df_t = self._backend_vce(ref, canonical, clusters, settings)
 
-        scalars = self._stata_scalars(Y=y, X=X, params=params, resid=resid, cov=cov, ref=ref)
+        scalars = self._stata_scalars(
+            Y=y,
+            X=X,
+            params=params,
+            resid=resid,
+            cov=cov,
+            ref=ref,
+            clusters=clusters,
+            canonical=canonical,
+        )
 
         return StataResults(
             params=params,
@@ -487,14 +541,31 @@ class IV2SLS:
         )
 
     # -------------------------------------------------------------- internals
-    def _backend_model(self) -> Any:
+    def _backend_kwargs(
+        self, canonical: str, clusters: np.ndarray | None
+    ) -> dict[str, Any]:
+        """Extra constructor keyword arguments for the linearmodels backend.
+
+        ``ivregress`` has no estimator-selecting option here: 2SLS/LIML are
+        fully determined by the data, so they pass nothing.  GMM additionally
+        chooses a weight matrix, and *that* choice follows ``vce()`` -- see
+        :class:`IVGMM`.
+        """
+
+        return {}
+
+    def _backend_model(
+        self, canonical: str = "nonrobust", clusters: np.ndarray | None = None
+    ) -> Any:
         """Instantiate the linearmodels backend for these data."""
 
         exog = self._X_exog if self._X_exog.shape[1] else None
         endog = self._X_endog if self._X_endog.shape[1] else None
         instruments = self._Z_instr if self._Z_instr.shape[1] else None
         y = self._y.reshape(-1, 1)
-        return self._backend_cls(y, exog, endog, instruments)
+        return self._backend_cls(
+            y, exog, endog, instruments, **self._backend_kwargs(canonical, clusters)
+        )
 
     def _check_rank(self, X: np.ndarray, Z_instr: np.ndarray) -> None:
         k_params = X.shape[1]
@@ -619,15 +690,21 @@ class IV2SLS:
 
         # ``[R] ivregress`` "Methods and formulas": s^2 = ESS/(N-k) only when the
         # ``small`` option is given; the default is s^2 = ESS/N.  linearmodels'
-        # ``debiased`` flag means "divide by N-k", so the default must be
-        # debiased=False for the nonrobust VCE.  Robust variants keep their own
-        # convention: HC0 has no correction, HC1 always has N/(N-K).
+        # ``debiased`` flag means "divide by N-k" (and, for the clustered and
+        # heteroskedastic VCEs, "apply the Stata small-sample factors"), so the
+        # default must be debiased=False for every ivregress VCE -- including
+        # ``vce(cluster)``, which is CR0 by default and only becomes CR1 with
+        # ``small``.  Verified against StataNow 19.5 for 2SLS/LIML/GMM.
         if canonical == "nonrobust":
             debiased = bool(settings.adj)
         elif canonical == "HC0":
             debiased = False
-        else:
+        elif canonical == "HC1":
             debiased = True
+        else:
+            # ``cluster``: CR0 by default.  ``ssc.adj=True`` is the caller asking
+            # for the ``small`` variant, which is exactly ``debiased=True``.
+            debiased = bool(settings.adj)
         config: dict[str, Any] = {}
         if canonical == "cluster":
             n_groups = int(np.unique(np.asarray(clusters)).size)
@@ -637,7 +714,7 @@ class IV2SLS:
                     f"got {n_groups}"
                 )
             config["clusters"] = clusters
-        return self._backend_model().fit(
+        return self._backend_model(canonical, clusters).fit(
             cov_type=_LM_COV_TYPES[canonical], debiased=debiased, **config
         )
 
@@ -678,6 +755,8 @@ class IV2SLS:
         resid: np.ndarray,
         cov: np.ndarray,
         ref: Any,
+        clusters: np.ndarray | None = None,
+        canonical: str = "nonrobust",
     ) -> dict[str, Any]:
         """Build the ``e()`` scalars for the fitted model."""
 
@@ -727,7 +806,7 @@ class IV2SLS:
 
         f_first = self._first_stage_f(ref, nobs)
 
-        return {
+        e: dict[str, Any] = {
             "N": nobs,
             "df_m": df_m,
             "df_r": df_r,
@@ -739,7 +818,40 @@ class IV2SLS:
             "chi2": wald,
             "ll": ll,
             "rank": k_params,
+            # Sums of squares: Stata stores e(rss)/e(mss) for every ivregress
+            # estimator (and e(tss) for 2sls) with rss + mss = tss, verified on
+            # the 140x14 panel to 8.9e-16.
+            "rss": rss,
+            "mss": tss - rss,
+            "tss": tss,
+            "k_endog": int(self._X_endog.shape[1]),
         }
+        e.update(self._extra_estimator_scalars(ref, canonical))
+        if clusters is not None:
+            # Stata stores e(N_clust) for every vce(cluster var) fit, including
+            # the IV estimators (verified: G = 14 -> e(N_clust) = 14).
+            e["N_clust"] = float(np.unique(np.asarray(clusters)).size)
+        if self._stores_rank_mb and canonical != "nonrobust":
+            # ``ivregress 2sls, vce(robust|cluster)`` additionally stores
+            # e(rank_mb), which equals e(rank) = K.  LIML and GMM never store it,
+            # and neither does any estimator with ``vce(unadjusted)`` (verified
+            # across vce() options on StataNow 19.5).
+            e["rank_mb"] = float(k_params)
+        return e
+
+    def _extra_estimator_scalars(self, ref: Any, canonical: str) -> dict[str, Any]:
+        """``e()`` scalars Stata stores for this estimator only.
+
+        ``ivregress 2sls``/``liml`` store ``e(kappa)`` (1 for 2SLS, the LIML
+        kappa otherwise) and ``e(iterations) = 0``; ``ivregress gmm`` stores
+        ``e(J)`` and ``e(iterations)`` instead and stores no ``kappa`` at all.
+        """
+
+        out: dict[str, Any] = {"iterations": 0.0}
+        kappa = getattr(ref, "kappa", None)
+        if kappa is not None:
+            out["kappa"] = float(kappa)
+        return out
 
     def _first_stage_f(self, ref: Any, nobs: int) -> float:
         """Smallest first-stage F over the endogenous regressors (NaN if none)."""
@@ -778,21 +890,56 @@ class IVLIML(IV2SLS):
     _backend_cls = _LMIVLIML
     _stata_command = "ivregress liml"
     _uses_shared_vce = False
+    _stores_rank_mb = False
 
 
 class IVGMM(IV2SLS):
     """Generalized method of moments (Stata ``ivregress gmm``).
 
-    Uses ``linearmodels.iv.IVGMM`` with its default heteroskedasticity-robust
-    weight matrix (the same default as Stata's ``ivregress gmm``).  The
-    covariance is the GMM weight-matrix sandwich from the backend; it cannot be
-    expressed through :func:`westata.vce.dispatch.compute_cov`, which assumes
-    an OLS-shaped bread.
+    ``ivregress gmm`` has *two* choices tied to ``vce()``, not one:
+
+    * the covariance of ``e(b)`` (as for every IV estimator), and
+    * the GMM weight matrix ``W``, which ``ivregress`` sets from the same
+      moment covariance the ``vce()`` implies.
+
+    So ``ivregress gmm, vce(cluster gid)`` clusters ``W`` too, and the *point
+    estimates* move (3.58e-2 on the 140x14 panel of the retest).  westata
+    therefore picks the backend weight matrix from ``cov_type``: the default
+    heteroskedastic ("robust") one, or ``weight_type="clustered"`` when
+    ``cov_type="cluster"``.  Verified against StataNow 19.5: coefficients and
+    ``e(V)`` both agree to <= 5e-14 (140x14 and 240x24 panels, 2 and 3
+    instruments).
+
+    The covariance is the GMM weight-matrix sandwich from the backend; it
+    cannot be expressed through :func:`westata.vce.dispatch.compute_cov`, which
+    assumes an OLS-shaped bread.
     """
 
     _backend_cls = _LMIVGMM
     _stata_command = "ivregress gmm"
     _uses_shared_vce = False
+    _stores_rank_mb = False
+
+    def _backend_kwargs(
+        self, canonical: str, clusters: np.ndarray | None
+    ) -> dict[str, Any]:
+        """Pick the GMM weight matrix that matches ``vce()``.
+
+        Stata's ``ivregress gmm`` documents ``W`` as ``S^-1`` where ``S`` is the
+        moment covariance implied by the requested ``vce()``; with
+        ``vce(cluster g)`` that is the one-way clustered covariance.  Passing
+        nothing (linearmodels' default ``weight_type="robust"``) reproduces the
+        heteroskedastic default and ``vce(robust)``.
+        """
+
+        if canonical == "cluster":
+            if clusters is None:  # pragma: no cover - guarded by _prepare_cov_kwds
+                raise ValueError(
+                    "cov_type='cluster' requires cluster labels for the GMM "
+                    "weight matrix as well as the covariance"
+                )
+            return {"weight_type": "clustered", "clusters": clusters}
+        return {}
 
     def _stata_two_step_covariance(self) -> np.ndarray:
         """Two-step GMM covariance exactly as ``[R] ivregress`` defines it.
@@ -872,3 +1019,19 @@ class IVGMM(IV2SLS):
             return result
         _, df_t = result
         return self._stata_two_step_covariance(), df_t
+
+    def _extra_estimator_scalars(self, ref: Any, canonical: str) -> dict[str, Any]:
+        """``e(J)`` and ``e(iterations)``; ``ivregress gmm`` stores no ``e(kappa)``.
+
+        Stata reports ``e(iterations) = 1`` for its two-step GMM and the Hansen
+        J statistic in ``e(J)``.  Verified on the 140x14 panel: default and
+        ``vce(cluster gid)`` give J = 0.8351609988436951 and 1.1097180436518659,
+        both matched by the backend's own J at <= 3e-14.
+        """
+
+        out: dict[str, Any] = {"iterations": 1.0}
+        try:
+            out["J"] = float(np.asarray(ref.j_stat.stat))
+        except (AttributeError, TypeError, ValueError):
+            pass
+        return out

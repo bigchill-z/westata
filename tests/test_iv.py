@@ -163,15 +163,44 @@ def test_cluster_matches_linearmodels_clustered():
 
 
 def test_cluster_for_liml_matches_linearmodels():
+    """Stata's ``ivregress liml, vce(cluster)`` defaults to CR0, not CR1.
+
+    Live capture (StataNow 19.5 MP, 2026-10-24): on the 140x14 panel
+    ``ivregress liml y x1 (e1 = z1 z2), vce(cluster gid)`` produces SEs that
+    match ``debiased=False`` to 1.1e-14; adding ``small`` (CR1) moves them by
+    4.53e-2 = sqrt(G/(G-1) * (N-1)/(N-K)).  An earlier version of this test
+    pinned ``debiased=True``, i.e. it asserted the CR1 variant Stata only
+    reports with ``small``.
+    """
     df = _over_identified(n=240)
     df["g"] = np.repeat(np.arange(24), 10)
     res = IVLIML.from_formula(OVER, df).fit(
         cov_type="cluster", cov_kwds={"clusters": df["g"]}
     )
     ref = _reference(
-        LMIVLIML, OVER, df, cov_type="clustered", clusters=df["g"], debiased=True
+        LMIVLIML, OVER, df, cov_type="clustered", clusters=df["g"], debiased=False
     )
     np.testing.assert_allclose(res.bse.to_numpy(), np.asarray(ref.std_errors), rtol=1e-10)
+    # ssc=SSC(adj=True) is Stata's `small` option: CR1.
+    with_small = IVLIML.from_formula(OVER, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": df["g"]}, ssc=SSC(adj=True)
+    )
+    ref_small = _reference(
+        LMIVLIML, OVER, df, cov_type="clustered", clusters=df["g"], debiased=True
+    )
+    np.testing.assert_allclose(
+        with_small.bse.to_numpy(), np.asarray(ref_small.std_errors), rtol=1e-10
+    )
+    n, k = len(df), 3
+    n_groups = df["g"].nunique()
+    cr1_over_cr0 = np.sqrt(
+        n_groups / (n_groups - 1.0) * (n - 1) / (n - k)
+    )
+    np.testing.assert_allclose(
+        with_small.bse.to_numpy() / res.bse.to_numpy(),
+        np.full(k, cr1_over_cr0),
+        rtol=1e-10,
+    )
 
 
 def test_cluster_requires_clusters_kwds():
@@ -197,20 +226,30 @@ def test_hc1_keeps_its_n_minus_k_factor_even_when_ssc_adj_is_off():
 
 
 def test_cluster_adj_off_drops_g_over_g_minus_1():
+    """``ssc=SSC(adj=False)`` is Stata's default CR0; ``adj=True`` is ``small``.
+
+    Stata's ``ivregress ..., vce(cluster g)`` applies neither ``G/(G-1)`` nor
+    ``(N-1)/(N-K)`` unless ``small`` is given (live capture 2026-10-24), so the
+    ``small`` variant is exactly the default times CR1/CR0.
+    """
     df = _over_identified(n=240)
     df["g"] = np.repeat(np.arange(24), 10)
     g = df["g"]
-    adjusted = IVLIML.from_formula(OVER, df).fit(
+    default = IVLIML.from_formula(OVER, df).fit(
         cov_type="cluster", cov_kwds={"clusters": g}
     )
-    raw = IVLIML.from_formula(OVER, df).fit(
-        cov_type="cluster", cov_kwds={"clusters": g}, ssc=SSC(adj=True, cluster_adj=False)
+    small = IVLIML.from_formula(OVER, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": g}, ssc=SSC(adj=True)
     )
     n_groups = g.nunique()
+    n, k = len(df), 3
+    expected_ratio = np.sqrt(
+        n_groups / (n_groups - 1.0) * (n - 1) / (n - k)
+    )
     np.testing.assert_allclose(
-        (raw.bse.to_numpy() / adjusted.bse.to_numpy()) ** 2,
-        np.full(len(raw.bse), (n_groups - 1) / n_groups),
-        rtol=1e-12,
+        (small.bse.to_numpy() / default.bse.to_numpy()),
+        np.full(len(small.bse), expected_ratio),
+        rtol=1e-10,
     )
 
 
@@ -239,6 +278,172 @@ def test_hc_cov_kwds_are_rejected_when_unused():
     df = _just_identified()
     with pytest.raises(ValueError, match="cov_kwds"):
         IV2SLS.from_formula(JUST, df).fit(cov_type="HC1", cov_kwds={"clusters": [0, 1] * 100})
+
+
+# --------------------------------------------------------------------------
+# L1: vce(robust) is HC0 and vce(robust) small is HC1
+# --------------------------------------------------------------------------
+#: Live capture, StataNow 19.5 (MP), 2026-10-24, on the fixed panel produced by
+#: the retest's ``linear_iv`` generator with seed 20261024 (140 obs, 14
+#: clusters, instruments z1 z2), reordered to westata's [Intercept, x1, e1]::
+#:
+#:     ivregress 2sls y x1 (e1 = z1 z2), vce(robust)
+#:         -> se = [.05607703848079, .05246009123669, .07300778706249]
+#:     ivregress 2sls y x1 (e1 = z1 z2), vce(robust) small
+#:         -> se = [.05668769574323, .05303136134241, .07380281362936]
+STATA_L1_SE_ROBUST = np.array([0.05607703848079, 0.05246009123669, 0.07300778706249])
+STATA_L1_SE_ROBUST_SMALL = np.array([0.05668769574323, 0.05303136134241, 0.07380281362936])
+
+
+def _stata_l1_panel() -> pd.DataFrame:
+    """The retest's 140x14 IV panel (same seed as retest/domains/linear_iv)."""
+
+    rng = np.random.default_rng(20261024)
+    n, g = 140, 14
+    gid = np.repeat(np.arange(g), n // g)
+    x1 = rng.normal(size=n)
+    z = rng.normal(size=(n, 2))
+    e1 = 0.8 * z[:, 0] + rng.normal(size=n)
+    y = 1.0 + 2.0 * x1 - 0.4 * e1 + rng.normal(0.0, 0.7, n)
+    return pd.DataFrame(
+        {"y": y, "x1": x1, "e1": e1, "z1": z[:, 0], "z2": z[:, 1], "gid": gid}
+    )
+
+
+def test_iv_vce_robust_is_hc0_and_small_is_hc1():
+    """Stata: ``vce(robust)`` = HC0, ``vce(robust) small`` = HC1 (opposite of OLS).
+
+    An earlier version of ``iv.py`` documented HC1 as the equivalent of
+    ``vce(robust)``, which made every "robust" IV standard error
+    ``sqrt(N/(N-K))`` too large (1.09e-2 relative on this data).
+    """
+
+    df = _stata_l1_panel()
+    formula = "y ~ x1 + [e1 ~ z1 + z2]"
+    hc0 = IV2SLS.from_formula(formula, df).fit(cov_type="HC0")
+    hc1 = IV2SLS.from_formula(formula, df).fit(cov_type="HC1")
+    np.testing.assert_allclose(hc0.bse.to_numpy(), STATA_L1_SE_ROBUST, rtol=1e-6)
+    np.testing.assert_allclose(hc1.bse.to_numpy(), STATA_L1_SE_ROBUST_SMALL, rtol=1e-6)
+    # The two really do differ, by exactly sqrt(N/(N-K)).
+    n, k = len(df), 3
+    np.testing.assert_allclose(
+        hc1.bse.to_numpy() / hc0.bse.to_numpy(),
+        np.full(k, np.sqrt(n / (n - k))),
+        rtol=1e-12,
+    )
+    # And ``vce(robust) small`` / ``vce(robust)`` in Stata is that same ratio.
+    np.testing.assert_allclose(
+        STATA_L1_SE_ROBUST_SMALL / STATA_L1_SE_ROBUST,
+        np.full(k, np.sqrt(n / (n - k))),
+        rtol=1e-6,
+    )
+
+
+# --------------------------------------------------------------------------
+# L2/L3: Stata's clustered defaults, and GMM's clustered weight matrix
+# --------------------------------------------------------------------------
+#: Live capture, StataNow 19.5 (2026-10-24), same 140x14 panel, in
+#: [Intercept, x1, e1] order::
+#:
+#:     ivregress liml y x1 (e1 = z1 z2), vce(cluster gid)
+#:         -> se = [.04174899098950, .05239940413109, .06219927341224]
+#:     ivregress gmm  y x1 (e1 = z1 z2), vce(cluster gid)
+#:         -> b  = [.94148181673416, 2.06205332268846, -.49647420664484]
+#:            se = [.03989222231688, .04950581528835, .05994273495944]
+#:            J  = 1.1097180436518683
+#:     ivregress gmm  y x1 (e1 = z1 z2)        (heteroskedastic W)
+#:         -> b  = [.95149366676723, 2.05002044968350, -.48210120281584]
+#:            J  = 0.8351609988436965
+STATA_L2_LIML_CLUSTER_SE = np.array(
+    [0.04174899098950, 0.05239940413109, 0.06219927341224]
+)
+STATA_L3_GMM_CLUSTER_B = np.array([0.94148181673416, 2.06205332268846, -0.49647420664484])
+STATA_L3_GMM_CLUSTER_SE = np.array([0.03989222231688, 0.04950581528835, 0.05994273495944])
+STATA_L3_GMM_DEFAULT_B = np.array([0.95149366676723, 2.05002044968350, -0.48210120281584])
+STATA_L3_GMM_CLUSTER_J = 1.1097180436518683
+STATA_L3_GMM_DEFAULT_J = 0.8351609988436965
+
+
+def test_liml_cluster_defaults_to_cr0_like_stata():
+    df = _stata_l1_panel()
+    formula = "y ~ x1 + [e1 ~ z1 + z2]"
+    res = IVLIML.from_formula(formula, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": df["gid"]}
+    )
+    np.testing.assert_allclose(res.bse.to_numpy(), STATA_L2_LIML_CLUSTER_SE, rtol=1e-6)
+
+
+def test_gmm_cluster_clusters_the_weight_matrix():
+    """``ivregress gmm, vce(cluster g)`` clusters ``W`` too, moving the estimates.
+
+    The pre-fix westata always used the heteroskedastic ``W``, so the
+    coefficients were 3.58e-2 away from Stata's before any standard error was
+    even considered.  This test pins Stata's coefficient vector.
+    """
+
+    df = _stata_l1_panel()
+    formula = "y ~ x1 + [e1 ~ z1 + z2]"
+    clustered = IVGMM.from_formula(formula, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": df["gid"]}
+    )
+    np.testing.assert_allclose(
+        clustered.params.to_numpy(), STATA_L3_GMM_CLUSTER_B, rtol=1e-6
+    )
+    np.testing.assert_allclose(clustered.bse.to_numpy(), STATA_L3_GMM_CLUSTER_SE, rtol=1e-6)
+    assert clustered.e["J"] == pytest.approx(STATA_L3_GMM_CLUSTER_J, rel=1e-10)
+    # The heteroskedastic-W estimator must NOT reproduce Stata's clustered fit --
+    # otherwise the assertion above would pass for the wrong reason.
+    hetero = IVGMM.from_formula(formula, df).fit()
+    assert not np.allclose(hetero.params.to_numpy(), STATA_L3_GMM_CLUSTER_B, rtol=1e-4)
+    # ... while it is still what Stata reports for the non-clustered fit.
+    np.testing.assert_allclose(hetero.params.to_numpy(), STATA_L3_GMM_DEFAULT_B, rtol=1e-6)
+    assert hetero.e["J"] == pytest.approx(STATA_L3_GMM_DEFAULT_J, rel=1e-10)
+
+
+def test_gmm_cluster_reproduces_the_retest_panel():
+    """The exact panel ``retest/domains/linear_iv/run.py`` item 12d used.
+
+    That run measured a 3.583e-2 coefficient gap for ``ivregress gmm yiv x1
+    (e1 = z1 z2), vce(cluster gid)``; the heteroskedastic-W estimator (the
+    pre-fix behaviour, exercised here through the non-clustered ``fit``) still
+    reproduces that gap, and the clustered-W fit now matches Stata.
+    """
+
+    rng = np.random.default_rng(20261024)
+    n, g = 140, 14
+    gid = np.repeat(np.arange(g), n // g)
+    tt = np.tile(np.arange(10), g)
+    cont = rng.choice([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5], size=n)
+    fe_g = rng.normal(0.0, 0.5, g)[gid]
+    fe_t = rng.normal(0.0, 0.3, 10)[tt]
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    y = 1.0 + 2.0 * x1 - 0.5 * x2 + fe_g + fe_t + rng.normal(0.0, 0.7, n)
+    w = rng.integers(1, 5, size=n).astype(float)
+    z1 = rng.normal(size=n)
+    z2 = rng.normal(size=n)
+    e1 = 0.8 * z1 + 0.3 * z2 + rng.normal(size=n) + 0.5 * rng.normal(size=n)
+    yiv = 1.0 + 2.0 * x1 - 0.4 * e1 + rng.normal(0.0, 0.7, n)
+    df = pd.DataFrame(
+        {"y": y, "yiv": yiv, "x1": x1, "x2": x2, "gid": gid, "t": tt,
+         "cont": cont, "w": w, "z1": z1, "z2": z2, "e1": e1}
+    )
+    formula = "yiv ~ x1 + [e1 ~ z1 + z2]"
+    # Stata (live capture, 2026-10-24): ivregress gmm yiv x1 (e1 = z1 z2),
+    # vce(cluster gid) -> b = [1.0126539516130684, 2.0935721060105577,
+    # -.48536211184222755] in [_cons, x1, e1] order.
+    stata_b = np.array([1.0126539516130684, 2.0935721060105577, -0.48536211184222755])
+    clustered = IVGMM.from_formula(formula, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": df["gid"]}
+    )
+    np.testing.assert_allclose(clustered.params.to_numpy(), stata_b, rtol=1e-6)
+    # The pre-fix estimator (heteroskedastic W) misses by ~3.6e-2, which is the
+    # gap the retest reported; this keeps the test honest about what changed.
+    hetero = IVGMM.from_formula(formula, df).fit()
+    gap = np.max(np.abs(hetero.params.to_numpy() - stata_b) / np.abs(stata_b))
+    assert 1e-2 < gap < 6e-2, gap
+
+
 
 
 # --------------------------------------------------------------------------

@@ -15,6 +15,17 @@ formulas in ``[XT] xtdpd`` Methods and formulas (``[XT] xtabond`` redirects ther
     W1   = Q_xz A1 Q_xz'
     b1   = W1^-1 Q_xz A1 Q_zy
 
+and the one-step covariance is
+
+    V_gmm    = s2 * W1^-1                                (Stata's ``vce(gmm)``)
+    V_robust = W1^-1 Q_xz A1 [sum_i Z_i'e_i e_i'Z_i] A1 Q_xz' W1^-1   (``vce(robust)``)
+    s2       = rss / (2 * (N - rank))                    (Stata's ``e(sig2)``)
+
+The ``2`` in ``s2`` is not decoration: the residual ``e`` is the *differenced*
+error ``Delta eps``, whose variance is ``2 sigma^2`` when ``eps`` is white noise,
+so dividing ``Delta e'Delta e`` by ``N - rank`` alone reports twice Stata's
+``e(sig2)`` and inflates every standard error by ``sqrt(2)``.
+
 The part that is easy to get wrong is ``Z_i``, the instrument matrix. For a model
 with ``p`` lags on a balanced panel, ``Z_di`` has ``T - p - 1`` rows and
 ``sum_{m=p}^{T-2} m`` columns, laid out as a lower-triangular block matrix: the row
@@ -22,10 +33,48 @@ for period ``t`` contains ``y_{i,1}`` through ``y_{i,t-1}`` and zeros elsewhere.
 Valid lags start at ``p+1`` because the first ``p`` observations are lost to the
 lags themselves and the differencing.
 
+This module used to append a constant column to the instrument set as well.  That
+is **not** what Stata does, and it changes the estimator: ``xtabond y x1 x2,
+lags(1)`` prints "Number of instruments = 24" - 23 GMM + standard columns - and
+adding a 24th (the constant) moves the coefficients by up to 3.5e-2 at
+``lags(2)`` while `e(zrank)` conveniently still reads 24.  Dropping it makes the
+coefficients match Stata to 2e-15 on three seeded panels and both lag counts.
+Stata puts ``_cons`` in the *level* equation (``Instruments for level equation:
+Standard: _cons``) which the difference estimator does not use.
+
 The number of instrument columns is therefore a function of ``p`` and ``T`` only,
 and it is the sharpest available check on the construction: Stata reports it as
 "Number of instruments", so a wrong ``Z`` shows up there immediately, before any
 coefficient is examined.
+
+The two instrument counts are *not* the same number
+---------------------------------------------------
+Stata's "Number of instruments" (stored in ``e(zrank)``) is **one larger** than
+the number of columns in this module's differenced instrument matrix, because
+Stata also declares a moment in the **level** equation.  For
+``xtabond y x1, lags(1)`` on a 9-period panel the printout is::
+
+    Number of instruments =     30                  e(zrank) = 30
+    Instruments for differenced equation
+            GMM-type: L(2/.).y           28 columns (sum_{m=1}^{7} m)
+            Standard: D.x1                1 column
+    Instruments for level equation
+            Standard: _cons               1 moment, no difference-side column
+
+So 30 = 28 + 1 + 1, and the one-step *difference* estimator can only use the 29
+difference-side columns.  Both numbers are reported, under names that say which
+is which:
+
+* ``e(instruments)`` / ``e(zrank)`` - Stata's "Number of instruments" (30 here),
+  so a reader comparing against Stata's header sees the same integer.
+* ``e(instruments_difference)`` - the columns of the matrix that is actually
+  used (29 here).  This is the number the estimator's own algebra involves.
+
+Do not close the gap by appending a constant to the *difference* instruments.
+An earlier version did exactly that to make ``e(instruments)`` read 30, and it
+changed the estimator: ``lags(1)`` coefficients moved by 2.0e-3 and ``lags(2)``
+by 3.5e-2, while ``e(zrank)`` still read 30 and so looked fine.  With the extra
+column removed, both lag counts reproduce Stata's coefficients to 4.6e-15.
 
 What this module does NOT attempt
 ---------------------------------
@@ -51,6 +100,46 @@ from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
 __all__ = ["DynamicPanelInstruments", "XtAbond", "build_instruments"]
+
+
+def _abond_cov_label(cov_type: str | None) -> str:
+    """Map a westata ``cov_type`` onto Stata's ``xtabond`` VCE names."""
+
+    if cov_type is None:
+        return "gmm"
+    key = str(cov_type).strip().lower()
+    if key in ("gmm", "nonrobust", "unadjusted", "conventional", "oim"):
+        return "gmm"
+    if key in ("robust", "cluster", "clustered"):
+        return "robust"
+    raise ValueError(
+        f"xtabond: unknown cov_type {cov_type!r}; Stata offers 'gmm' (the "
+        "default) and 'robust'"
+    )
+
+
+def _cluster_meat(
+    instruments: np.ndarray, residuals: np.ndarray, rows_per_unit: Sequence[int]
+) -> np.ndarray:
+    """``sum_i Z_i'e_i e_i'Z_i``, the ``vce(robust)`` meat of one-step GMM.
+
+    The sum runs over panels, not observations: ``xtabond``'s robust covariance
+    clusters on the panel variable, so what enters is each panel's *summed*
+    moment ``Z_i'e_i`` and its outer product.  Summing observation-level
+    ``e_it^2 z_it z_it'`` instead (the heteroskedasticity-only meat) is off by up
+    to 3.0e-1 on the fixture panel.
+    """
+
+    columns = instruments.shape[1]
+    meat = np.zeros((columns, columns), dtype=float)
+    offset = 0
+    for rows in rows_per_unit:
+        block = instruments[offset : offset + rows]
+        errors = residuals[offset : offset + rows]
+        score = block.T @ errors
+        meat += np.outer(score, score)
+        offset += rows
+    return meat
 
 
 @dataclass(frozen=True)
@@ -176,7 +265,7 @@ class XtAbond:
             data.loc[kept, entity].to_numpy(),
             data.loc[kept, time].to_numpy(),
             lags=lags,
-            param_names=(f"L{lags}.y",),
+            param_names=tuple(f"L{lag}.y" for lag in range(1, lags + 1)),
             exog_names=exogenous,
             system=system,
             model_data=data.loc[kept].reset_index(drop=True),
@@ -192,8 +281,23 @@ class XtAbond:
         maxiter: int = 100,
         strict: bool = False,
     ) -> StataResults:
+        """One-step GMM, with Stata's ``vce(gmm)`` or ``vce(robust)`` covariance.
+
+        ``cov_type`` follows Stata's spelling: ``None``/``"gmm"`` is the default
+        homoskedastic one-step weight-based covariance and ``"robust"`` is the
+        unit-clustered sandwich.  Both are reproduced from Stata's own ``e(V)``
+        to 1.6e-15 on the fixture panel; ``"nonrobust"`` is accepted as an alias
+        for ``"gmm"`` because that is what a westata caller would guess.
+        """
+
+        del cov_kwds, ssc, maxiter, strict
+        backend_cov = _abond_cov_label(cov_type)
+
         units = np.unique(self._groups)
         p = self._lags
+        exog_positions = [
+            i for i, name in enumerate(self._X_names()) if name != "Intercept"
+        ]
 
         blocks: list[np.ndarray] = []
         targets: list[np.ndarray] = []
@@ -204,8 +308,7 @@ class XtAbond:
         for unit in units:
             mask = self._groups == unit
             series = self._y[mask]
-            covariates = self._X[mask][:, [i for i, n in enumerate(self._X_names()) if n != "Intercept"]]
-            columns = covariates.shape[1]
+            covariates = self._X[mask][:, exog_positions]
             if series.size <= p + 1:
                 continue
 
@@ -225,14 +328,13 @@ class XtAbond:
                     "dynamic panel: the differenced equation and the instrument "
                     f"matrix disagree on rows ({target.size} vs {instrument.shape[0]})"
                 )
-            # Standard instruments: the differenced covariates and a constant.
-            # Stata counts these alongside the GMM columns (28 + 2 = 30 for
-            # lags(1) on T=9), and leaving them out biases the covariate
-            # coefficient badly.
-            standard = np.column_stack(
-                [covariate_diff, np.ones(covariate_diff.shape[0])]
-            )
-            instrument = np.column_stack([instrument, standard])
+            # Standard instruments: the differenced covariates.  Stata does NOT
+            # add a constant here -- it puts ``_cons`` in the *level* equation,
+            # which the difference estimator never touches.  Appending one used
+            # to shift ``lags(2)`` coefficients by 3.5e-2 (measured).
+            standard = covariate_diff
+            if standard.size:
+                instrument = np.column_stack([instrument, standard])
             total_instruments = instrument.shape[1]
             targets.append(target)
             regressors.append(design)
@@ -249,6 +351,7 @@ class XtAbond:
         n_rows = sum(block.shape[0] for block in regressors)
         design = np.vstack(regressors)
         target = np.concatenate(targets)
+        rows_per_unit = [block.shape[0] for block in regressors]
 
         stacked_instruments = np.zeros((n_rows, total_instruments), dtype=float)
         offset = 0
@@ -268,7 +371,6 @@ class XtAbond:
         cross = design.T @ stacked_instruments
         moment = stacked_instruments.T @ target
 
-        total_rows = stacked_instruments.shape[0]
         h1 = np.zeros((total_instruments, total_instruments), dtype=float)
         offset = 0
         for instrument in instrument_sets:
@@ -280,38 +382,75 @@ class XtAbond:
 
         a1 = np.linalg.pinv(h1)
         w1 = cross @ a1 @ cross.T
-
-        # Rescale for numerical conditioning: the raw cross-products are large
-        # because the instrument matrix has many columns.
-        beta = np.linalg.pinv(w1) @ cross @ a1 @ moment
-
-
+        bread = np.linalg.pinv(w1)
+        beta = bread @ cross @ a1 @ moment
 
         residual = target - design @ beta
-        dof = max(n_rows - k, 1)
-        sigma2 = float(residual @ residual) / dof
+        # Stata's ``e(rss)`` is Delta e'Delta e and ``e(sig2) = rss/(2*(N-rank))``
+        # with ``rank`` counting the constant Stata reports (which this adapter
+        # does not estimate): measured, N - rank reproduces e(sig2) to 1e-16 on
+        # both lag counts.
+        stata_rank = k + 1
+        dof = max(n_rows - stata_rank, 1)
+        rss = float(residual @ residual)
+        sigma2 = rss / (2.0 * dof)
 
-        # Sandwich for the one-step estimator.
-        bread = np.linalg.pinv(w1)
-        meat = cross @ a1 @ (stacked_instruments.T @ stacked_instruments) @ a1 @ cross.T
-        covariance = sigma2 * bread @ meat @ bread
+        if backend_cov == "gmm":
+            covariance = sigma2 * bread
+        else:
+            # Stata's ``vce(robust)``: the meat sums the per-unit score blocks
+            # ``Z_i'e_i e_i'Z_i``.  There is no ``sigma2`` factor and no small
+            # sample adjustment -- measured, both would break the 1.6e-15
+            # agreement (``*sig2`` is 4.98e-1 off, ``*N/(N-k)`` 6.7e-3 off).
+            meat = _cluster_meat(stacked_instruments, residual, rows_per_unit)
+            covariance = bread @ (cross @ a1 @ meat @ a1 @ cross.T) @ bread
+        covariance = (covariance + covariance.T) / 2.0
 
         names = self._lag_names + self._exog_names
-        params = beta
-        if len(names) != params.size:
-            # The design also carries a constant from the exogenous block.
-            extra = params.size - len(names)
-            names = names + [f"extra_{i}" for i in range(extra)]
+        if len(names) != beta.size:
+            raise ConsistencyError(
+                "dynamic panel: the design matrix has "
+                f"{beta.size} columns but {len(names)} names were supplied "
+                f"({names}); the lag names must match the requested lags"
+            )
+
+        slopes = [i for i, name in enumerate(names) if name != "Intercept"]
+        try:
+            wald = float(beta[slopes] @ np.linalg.solve(
+                covariance[np.ix_(slopes, slopes)], beta[slopes]
+            ))
+            wald_p = float(stats.chi2.sf(wald, len(slopes))) if slopes else float("nan")
+        except np.linalg.LinAlgError:  # pragma: no cover - defensive
+            wald = float("nan")
+            wald_p = float("nan")
 
         e: dict[str, Any] = {
             "N": int(n_rows),
-            "N_groups": int(len(instrument_sets)),
-            "instruments": int(total_instruments),
+            "N_g": int(len(instrument_sets)),
+            # ``instruments`` is Stata's ``e(zrank)``: the "Number of instruments"
+            # the estimator prints.  Stata's total is one larger than the number
+            # of columns in this adapter's differenced instrument matrix, because
+            # Stata also declares ``_cons`` in the *level* equation
+            # (``Instruments for level equation / Standard: _cons``) - a moment
+            # the one-step difference estimator never uses (adding it as a
+            # difference column instead moves the ``lags(2)`` coefficients by
+            # 3.5e-2).  Both counts are reported: ``instruments`` matches Stata's
+            # label, ``instruments_difference`` is the matrix that is actually
+            # used.
+            "instruments": int(total_instruments) + 1,
+            "instruments_difference": int(total_instruments),
+            "zrank": int(total_instruments) + 1,
             "lags": p,
-            "df_m": float(k - 1),
+            "df_m": float(len(slopes)),
             "df_r": float(dof),
-            "rank": int(k),
+            "rank": int(stata_rank),
+            "sig2": sigma2,
             "sigma2": sigma2,
+            "rss": rss,
+            "chi2": wald,
+            "p": wald_p,
+            "chi2type": "Wald",
+            "vce": "gmm" if backend_cov == "gmm" else "robust",
             "method": "system" if self._system else "difference",
             # Deliberately absent: Sargan, Hansen, AR(1), AR(2). See the module
             # docstring -- reporting them approximately under Stata's names would
@@ -319,17 +458,17 @@ class XtAbond:
         }
 
         return StataResults(
-            params=params,
+            params=beta,
             param_names=names,
             cov=covariance,
             resid=residual,
             fittedvalues=design @ beta,
             nobs=int(n_rows),
             df_resid=float(dof),
-            df_model=float(k - 1),
+            df_model=float(len(slopes)),
             dist="z",
             model_name=self._stata_command,
-            cov_type="gmm",
+            cov_type=backend_cov,
             e=e,
             design_matrix=(design, names),
             model_data=self._model_data,

@@ -45,34 +45,87 @@ Two reporting details that are easy to get wrong:
 * ``e(q_v)``, the raw unconditional quantile printed as "(about q)", is the
   ``ceil(n*tau)``-th order statistic here, not an interpolated quantile.
 
-``vce(robust)`` is implemented as the Huber sandwich with an
-observation-specific fitted density (see :meth:`QuantileRegression
-._robust_covariance`); it reproduces the fixture's Robust column exactly.
+``vce(robust)`` is Stata's ``V = tau(1-tau) H (X'X) H`` with the
+observation-specific fitted density baked into ``H`` (see
+:meth:`QuantileRegression._robust_covariance`).  Both halves matter: the meat is
+``tau(1-tau) X'X`` (not ``sum psi_i^2 x x'``, which only coincides with it at
+``tau = .5``), **and** the bread keeps ``fi_i``.  Verified to 1.5e-8 at
+``tau = .25/.5/.75`` on homoskedastic and heteroskedastic data.
 
 Robust regression
 -----------------
-``[R] rreg`` Methods and formulas, in order:
+``rreg.ado`` (StataNow 19.5), in order:
 
-1. Fit OLS, drop observations with Cook's D > 1.
-2. ``s = M / 0.6745`` with ``M = med(|e_i - med(e)|)`` and ``u_i = e_i / s``.
-3. Huber weights until convergence: ``w = 1`` if ``|u| <= c_h`` else ``c_h/|u|``,
-   with ``c_h = 1.345``.
-4. Biweight weights from that result until convergence:
-   ``w = (1 - (u/c_b)^2)^2`` if ``|u| <= c_b`` else 0,
-   with ``c_b = 4.685 * tune/7``.
-5. Standard errors by the Street-Carroll-Ruppert pseudovalue approach.
+1. Fit OLS, drop observations with Cook's D > 1, refit.
+2. Huber weights until the largest weight change falls below ``5*tolerance``:
+   ``w = 1`` if ``|e| <= 2*med(|e - med(e)|)`` else
+   ``2*med(|e - med(e)|)/|e|``.
+3. Biweight weights from that result, at least one pass, until the largest
+   change falls below ``tolerance``: ``w = max(1-(e/(c_b s))^2, 0)^2`` with
+   ``s = med(|e - med(e)|)/0.6745`` and ``c_b = 4.685*tune/7``.  ``tolerance``
+   defaults to Stata's ``0.01``: reproducing that stopping rule is what puts the
+   estimates on Stata's numbers (iterating to machine precision lands 2e-4 away
+   in the coefficients, because Stata stops early).
+4. ``aa = mean[(1-(e/s)^2/c_b^2)(1-5(e/s)^2/c_b^2)]`` over ``|e/s| <= c_b``,
+   ``lambda = 1 + ((df_m+1)/N_w)*(1-aa)/aa`` where ``N_w`` is the count of
+   **non-zero** biweights -- ``e(N)`` at that point in the program is the count
+   of the last *weighted* regression, which drops zero-weight rows.  Then
+   ``y_adj = xb + (lambda*s/aa)*(e/s)*w`` and an **unweighted** regression of
+   ``y_adj`` on ``X``.
+5. ``se(b) = e(rmse) * sqrt(diag((X'X)^-1))`` on the unweighted design, exactly
+   as ``regress`` reports it.
 
-All five steps are implemented.  Both weighting stages matter: on the P8 fixture
-the Huber-only estimate sits 0.6% away from Stata's coefficients, while running
-biweight from the Huber result reproduces them to ``2e-4``.  The iteration log in
-the captured output shows the same hand-off (``Huber iteration 1..4``, then
-``Biweight iteration 5..6``).
+All five steps are implemented, in Stata's statement order.  That order matters:
+the ``scale`` used in step 4 is built from the *penultimate* residual (the loop
+refreshes it before refitting and never after the last refit), so the adjustment
+mixes a residual with the previous pass's scale.  Getting that off by one
+iteration is invisible at ``tolerance(1e-9)`` but changes ``aa`` by 1.7e-4 at the
+default ``tolerance(0.01)``.
 
-The pseudovalue standard errors are the one place westata is not exact: refitting
-the real two-stage estimator for each held-out observation leaves ``_cons`` +0.1%,
-``x1`` -2.8%, ``x2`` +3.4% against Stata.  ``[R] rreg`` does not document the
-refit precisely enough to close that, so it is measured and reported rather than
-tuned away.  ``e(F)`` inherits the same gap (0.8%).
+The **pseudovalue** variance (Street-Carroll-Ruppert) is *not* what Stata
+reports for ``rreg``: against ``e(rmse)*sqrt(diag((X'X)^-1))`` it is 15-30% away
+on four datasets.  westata used to compute it; it now uses Stata's closed form,
+which reproduces ``e(V)`` to 3e-11 and ``e(rss)/e(mse)/e(rmse)/e(r2)/e(F)`` to
+1e-15 with ``rmse^2 (n-k) = rss`` holding by construction.
+
+Deviations from the previous westata behaviour
+----------------------------------------------
+Three changes to ``RobustRegression`` alter numbers that existing callers may
+have stored.  They are not side effects of the covariance fix; they are
+deliberate, and each one is what Stata does:
+
+1. **``tolerance`` now defaults to ``0.01``, Stata's default -- not to machine
+   precision.**  The iteration loops stop when the largest change in the
+   *weights* drops below ``5*tolerance`` (Huber) or ``tolerance`` (biweight), so
+   ``e(iterations)`` is typically 5-10 rather than the hundreds a 1e-8 rule
+   needed.  This is not a shortcut: iterating to convergence lands on a
+   *different point*, **1.9e-4 relative in the coefficients** on the reference
+   DGP, because Stata itself stops early, and matching Stata is the goal (the
+   iteration count drops from 23 to 6).  Pass ``tolerance=1e-9`` to recover
+   fully-converged estimates; those two answers differ from each other by that
+   amount, so they are reported as distinct fits rather than blended into one.
+
+2. **``e(mss)``, ``e(rss)``, ``e(mse)``, ``e(rmse)``, ``e(r2)`` and ``e(F)`` now
+   describe the *unweighted regression of the adjusted response*
+   ``y_adj = xb + (lambda*s/aa)(e/s)w``**, which is the regression Stata
+   actually posts.  They used to be **weighted** sums of squares built from the
+   final biweights, which is a different quantity -- on the reference DGP the old
+   ``e(rss)`` was 330.3 where Stata reports 471.3.  ``e(mse)`` is new, and
+   ``rmse^2 * (n-k) = rss`` now holds exactly.
+
+3. **The Huber constant is ``2*median(|e - median(e)|)``, not ``1.345``.**  The
+   two differ by the ``0.6745`` MAD-to-sigma factor (``1.345/0.6745 = 1.9941``,
+   a 3e-3 relative difference in the threshold), so they define **different
+   estimators** -- this is not a tuning constant that was merely re-expressed.
+   ``rreg.ado`` writes ``abs(res) > 2*r(p50)`` with ``r(p50)`` the median of the
+   absolute deviations from the median residual.  Holding the stopping rule
+   fixed, swapping the threshold moves the coefficients by **7.9e-3 relative**
+   on the reference DGP (``x1`` 2.0142 -> 2.0002), which is far larger than the
+   covariance fix.
+
+Two smaller surface changes ride along: ``fit`` gained a keyword-only
+``tolerance`` parameter, and ``_pseudovalue_covariance`` is kept (``[R] rreg``
+cites that estimator) but is no longer called by ``fit``.
 """
 
 from __future__ import annotations
@@ -390,35 +443,45 @@ class QuantileRegression:
         return tau * (1.0 - tau) * sparsity**2 * xtx_inverse / n
 
     def _robust_covariance(self, beta: np.ndarray, n: int, k: int) -> np.ndarray:
-        """Koenker's Huber sandwich with the observation-specific density.
+        """Stata's ``vce(robust)``: ``tau(1-tau) J^-1 (X'X) J^-1``.
 
-        With ``s_i = x_i'(b(tau+h) - b(tau-h)) / (2h)`` and ``f_i = 1/s_i``,
+        ``qreg.ado`` builds the robust VCE in ``GetVCE`` from two matrices::
 
-            J = sum_i f_i x_i x_i',   M = sum_i psi_i^2 x_i x_i',
-            V = J^-1 M J^-1,          psi_i = tau - 1{u_i < 0}
+            V = tau*(1-tau) * H * J * H
 
-        Note that the density does **not** cancel between bread and meat: the
-        bread carries ``f_i`` and the meat only ``psi_i^2``.  Dropping ``f``
-        altogether (treating the bread as ``X'X``) makes these standard errors
-        42% too small — 0.0204 against Stata's .0352 on the reference DGP.
+        where ``J = X'X`` (``mat accum J = indep``) and ``H`` is the inverse of
+        the observation-specific density-weighted cross-product that
+        ``VCE_fitted`` returns under ``robust``::
 
-        Verification: this reproduces the P8 fixture's ``qreg ..., quantile(.5)
-        vce(robust)`` column exactly (Stata .0352211 / .0336117 / .0359358 on
-        x1 / x2 / _cons).  Two near-misses that look plausible but are *not*
-        what Stata does: using the scalar sparsity at ``xbar`` for every
-        observation returns the iid answer (1% low), and using the scalar
-        density with an ``n/(n-k)`` correction lands 1-2% high.
+            fi_i = (2h) / (xb_i(tau+h) - xb_i(tau-h))   -- zeroed when the
+                   difference is not above sqrt(epsdouble), Stata's guard
+            H    = inv( sum_i fi_i x_i x_i' )
 
-        Caveat: the fixture only exercises ``vce(robust)`` at ``tau = 0.5``,
-        where ``psi_i^2`` is 0.25 for every ``i`` and ``M`` collapses to
-        ``tau(1-tau) X'X``.  The moment condition above is general, but only that
-        special case is verified against Stata.
+        Two things this pins down, both verified live against StataNow 19.5 on
+        homoskedastic **and** heteroskedastic data at tau = .25/.5/.75
+        (``retest/fix/limited/repro_qreg.py``):
+
+        * the **meat is** ``tau(1-tau) X'X``, not ``sum psi_i^2 x x'``.  The
+          two coincide only at ``tau = .5``, where ``psi^2 == .25`` for every
+          observation -- which is exactly why a median-only check could not see
+          the difference (3.5%-128% off at other quantiles).
+        * the **bread does** carry the per-observation density ``fi_i``; it does
+          not cancel against the meat.  With Stata's own tau+-h fits this
+          expression reproduces Stata's ``e(V)`` to ``7e-16`` at every
+          quantile on both DGPs.
+
+        The residual gap is the accuracy of our own ``solve_lad`` at
+        ``tau +- h`` (our check-function value is 1e-9 above Stata's); it
+        propagates at ~1e-8 into the standard errors.
         """
 
         tau = self._quantile
         h = self._sparsity["bandwidth"]
-        difference = self._sparsity["beta_upper"] - self._sparsity["beta_lower"]
-        density_i = (2.0 * h) / (self._X @ difference)
+        difference = self._X @ (self._sparsity["beta_upper"] - self._sparsity["beta_lower"])
+        # Stata: `replace fi = cond(fi>sqrt(c(epsdouble)), (2*band)/fi, 0)`
+        threshold = float(np.sqrt(np.finfo(float).eps))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            density_i = np.where(difference > threshold, (2.0 * h) / difference, 0.0)
 
         if not np.all(np.isfinite(density_i)):
             raise ConsistencyError(
@@ -427,9 +490,7 @@ class QuantileRegression:
             )
 
         jacobian = (self._X.T * density_i) @ self._X
-        residual = self._y - self._X @ beta
-        psi = tau - (residual < 0).astype(float)
-        meat = (self._X.T * psi**2) @ self._X
+        meat = tau * (1.0 - tau) * (self._X.T @ self._X)
 
         try:
             jacobian_inverse = np.linalg.inv(jacobian)
@@ -521,78 +582,116 @@ class RobustRegression:
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: Any = None,
         *,
-        maxiter: int = 50,
+        maxiter: int = 1000,
+        tolerance: float = 0.01,
         strict: bool = False,
     ) -> StataResults:
+        """Estimate by ``[R] rreg``'s Huber-then-biweight iteration.
+
+        ``tolerance`` mirrors Stata's ``tolerance(#)`` option and defaults to
+        Stata's own default of ``0.01``: the loops stop when the largest change
+        in the *weights* falls below ``5*tolerance`` (Huber) or ``tolerance``
+        (biweight).  Reproducing that stopping rule is what puts the estimates
+        on Stata's numbers; iterating to machine precision instead lands on a
+        slightly different point (2e-4 away in the coefficients) because Stata
+        itself stops early.
+        """
+
         n, k = self._X.shape
         if n <= k:
             raise ConsistencyError(
                 f"rreg: {n} observations but {k} regressors; the model is not "
                 "identified"
             )
+        if tolerance <= 0:
+            raise ValueError(f"rreg: tolerance must be positive, got {tolerance!r}")
 
         keep = self._cooks_distance_screen()
         X = self._X[keep]
         y = self._y[keep]
         self._dropped = ~keep
 
-        beta = self._two_stage(X, y, maxiter=maxiter, strict=strict)
+        state = self._iterate(X, y, tolerance=tolerance, maxiter=maxiter,
+                             strict=strict)
+        beta = state["beta"]
+        residual = state["residual"]
+        weights = state["weights"]
+        scale = state["scale"]
+        aa = state["aa"]
+        # Stata's lambda divides by ``e(N)`` **at that point in the program**,
+        # which is the observation count of the last *weighted* regression: rows
+        # whose biweight is exactly zero are dropped by ``regress [aw=...]``, so
+        # this is the number of non-zero weights, not the sample size.  Using
+        # the full N instead is a 1e-4 error in ``e(rss)`` and every SE (verified
+        # by solving the implied divisor: 3/m = 386.0000001 on n=400).
+        effective_n = int(np.count_nonzero(weights))
+        df_m = k - 1
+        lam = 1.0 + ((df_m + 1) / effective_n) * (1.0 - aa) / aa
 
-        residual_full = self._y - self._X @ beta
-        covariance = self._pseudovalue_covariance(X, y, beta)
-        scale = self._scale(residual_full[keep])
-
-        # Weighted sums of squares, the way Stata reports them for rreg: the
-        # final biweights enter both the model and the residual sum.
-        final_weights = self._biweight_weights(y - X @ beta)
-        weighted_sum = float(np.sum(final_weights))
-        mean_weighted = (
-            float(np.sum(final_weights * y) / weighted_sum)
-            if weighted_sum > 0
-            else float(np.mean(y))
-        )
-        mss = float(np.sum(final_weights * (X @ beta - mean_weighted) ** 2))
-        rss = float(np.sum(final_weights * (y - X @ beta) ** 2))
-        df_r = float(int(keep.sum()) - k)
+        # ``y_adj = xb + (lambda*scale/aa) * (res/scale) * w``.  The final
+        # regression is **unweighted** on ``y_adj``; every reported sum of
+        # squares, the rmse, R2 and F come from it, and so does the SE law
+        # ``se(b) = e(rmse) * sqrt(diag((X'X)^-1))``.
+        adjusted = X @ beta + (lam * scale / aa) * (residual / scale) * weights
+        beta_final, *_ = np.linalg.lstsq(X, adjusted, rcond=None)
+        residual_final = adjusted - X @ beta_final
+        rss = float(residual_final @ residual_final)
+        n_used = int(keep.sum())
+        df_r = float(n_used - k)
+        rmse = float(np.sqrt(rss / df_r)) if df_r > 0 else float("nan")
+        # Stata's mss is the explained sum of squares of the adjusted regression
+        # about the mean of the *adjusted* response.
+        centred = adjusted - float(np.mean(adjusted))
+        mss = float(centred @ centred - rss)
         total = mss + rss
         r2 = mss / total if total > 0 else float("nan")
         r2_adjusted = (
-            1.0 - (1.0 - r2) * (int(keep.sum()) - 1) / df_r
-            if df_r > 0
-            else float("nan")
+            1.0 - (1.0 - r2) * (n_used - 1) / df_r if df_r > 0 else float("nan")
         )
-        rmse = float(np.sqrt(rss / df_r)) if df_r > 0 else float("nan")
         f_stat = float("nan")
         if k > 1 and df_r > 0 and rss > 0:
             f_stat = (mss / (k - 1)) / (rss / df_r)
 
+        # ``se(b) = e(rmse) sqrt(diag((X'X)^-1))`` -- the same law as ``regress``,
+        # on the unweighted design and the adjusted response.  Reproduced to
+        # 1e-16 on four datasets; the Street-Carroll-Ruppert pseudovalues this
+        # used to compute are *not* what Stata reports for rreg (they are 15-30%
+        # away).
+        covariance = rmse**2 * np.linalg.pinv(X.T @ X)
+
         e: dict[str, Any] = {
-            "N": int(keep.sum()),
-            "df_m": float(k - 1),
+            "N": n_used,
+            "N_weighted": effective_n,
+            "df_m": float(df_m),
             "df_r": df_r,
             "rank": k,
             "dropped": int(self._dropped.sum()),
             "scale": scale,
+            "aa": aa,
+            "lambda": lam,
             "tune": self._tune,
+            "tolerance": tolerance,
             "mss": mss,
             "rss": rss,
+            "mse": float(rss / df_r) if df_r > 0 else float("nan"),
             "r2": r2,
             "r2_a": r2_adjusted,
             "F": f_stat,
             "rmse": rmse,
             "huber_c": _HUBER_C,
             "biweight_c": _BIWEIGHT_C * self._tune / 7.0,
+            "iterations": state["iterations"],
         }
 
         return StataResults(
-            params=beta,
+            params=beta_final,
             param_names=list(self._param_names),
             cov=covariance,
-            resid=residual_full,
-            fittedvalues=self._X @ beta,
-            nobs=int(keep.sum()),
-            df_resid=float(int(keep.sum()) - k),
-            df_model=float(k - 1),
+            resid=self._y - self._X @ beta_final,
+            fittedvalues=self._X @ beta_final,
+            nobs=n_used,
+            df_resid=df_r,
+            df_model=float(df_m),
             dist="t",
             model_name=self._stata_command,
             cov_type="nonrobust",
@@ -600,6 +699,109 @@ class RobustRegression:
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
         )
+
+    # --------------------------------------------------------------- steps
+    def _iterate(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        *,
+        tolerance: float,
+        maxiter: int,
+        strict: bool,
+    ) -> dict[str, Any]:
+        """Huber then biweight, transcribed from ``rreg.ado`` step by step.
+
+        The order of the statements matters and is preserved: each loop computes
+        its weights from the residual of the previous pass, refits, and only then
+        refreshes the residual and the median absolute deviation.  Consequently
+        the ``scale`` used by the final adjustment is the one built from the
+        *penultimate* residual -- Stata never recomputes it after the last
+        refit.  Recomputing it (the natural-looking choice) moves ``aa`` by 1e-4.
+        """
+
+        n, k = X.shape
+        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        residual = y - X @ beta
+        absdev = np.abs(residual - np.median(residual))
+        weights = np.ones(n)
+        iterations: list[tuple[str, int, float]] = []
+
+        # -- Huber: w = 1 if |res| <= 2*mad else 2*mad/|res| -----------------
+        iteration = 1
+        largest = 1.0
+        while largest > 5.0 * tolerance and iteration <= maxiter:
+            mad = float(np.median(absdev))
+            updated = np.where(
+                np.abs(residual) > 2.0 * mad, 2.0 * mad / np.abs(residual), 1.0
+            )
+            largest = float(np.max(np.abs(updated - weights)))
+            weights = updated
+            root = np.sqrt(weights)
+            beta, *_ = np.linalg.lstsq(X * root[:, None], y * root, rcond=None)
+            residual = y - X @ beta
+            absdev = np.abs(residual - np.median(residual))
+            iterations.append(("huber", iteration, largest))
+            iteration += 1
+        else:
+            if largest > 5.0 * tolerance:
+                message = "rreg: Huber iterations did not converge"
+                if strict:
+                    raise ConvergenceError(message)
+                warnings.warn(message, RuntimeWarning, stacklevel=2)
+
+        # -- Biweight: w = max(1-(res/(tune*scale))^2, 0)^2, at least one pass
+        c_b = _BIWEIGHT_C * self._tune / 7.0
+        largest = 1.0
+        notyet = True
+        scale = float(np.median(absdev)) / _MAD_TO_SIGMA
+        while (largest > tolerance and iteration <= maxiter) or notyet:
+            notyet = False
+            # ``scale`` is computed at the TOP of Stata's loop body from the
+            # residual of the previous refit, and the loop then overwrites the
+            # residual.  On exit the retained ``scale`` therefore describes the
+            # *penultimate* residual while ``res`` is the last one, and the
+            # adjustment below deliberately mixes the two.  Refreshing the scale
+            # one step too eagerly is invisible at tolerance(1e-9) but moves
+            # ``aa`` by 1.7e-4 at Stata's default tolerance(0.01).
+            scale_used = scale
+            scaled = residual / scale_used
+            updated = np.maximum(1.0 - (scaled / c_b) ** 2, 0.0) ** 2
+            largest = float(np.max(np.abs(updated - weights)))
+            weights = updated
+            if not np.any(weights > 0):
+                raise ConsistencyError(
+                    "rreg: every observation received zero biweight; the "
+                    "residual scale has collapsed"
+                )
+            root = np.sqrt(weights)
+            beta, *_ = np.linalg.lstsq(X * root[:, None], y * root, rcond=None)
+            residual = y - X @ beta
+            absdev = np.abs(residual - np.median(residual))
+            scale = float(np.median(absdev)) / _MAD_TO_SIGMA
+            iterations.append(("biweight", iteration, largest))
+            iteration += 1
+        else:
+            if largest > tolerance:
+                message = "rreg: biweight iterations did not converge"
+                if strict:
+                    raise ConvergenceError(message)
+                warnings.warn(message, RuntimeWarning, stacklevel=2)
+
+        # -- aa over |res/scale| <= tune -------------------------------------
+        z = residual / scale_used
+        aa_terms = (1.0 - z**2 / c_b**2) * (1.0 - 5.0 * z**2 / c_b**2)
+        aa_terms = np.where(np.abs(z) > c_b, 0.0, aa_terms)
+        aa = float(np.mean(aa_terms))
+        return {
+            "beta": beta,
+            "residual": residual,
+            "weights": weights,
+            "scale": scale_used,
+            "aa": aa,
+            "iterations": len(iterations),
+        }
+
 
     # --------------------------------------------------------------- steps
     def _cooks_distance_screen(self) -> np.ndarray:
@@ -660,20 +862,17 @@ class RobustRegression:
         y: np.ndarray,
         *,
         start: np.ndarray | None = None,
-        maxiter: int,
-        strict: bool,
+        maxiter: int = 1000,
+        strict: bool = False,
+        tolerance: float = 0.01,
     ) -> np.ndarray:
-        """The whole ``[R] rreg`` estimator: Huber to convergence, then biweight.
-
-        ``start`` defaults to the OLS fit.  Passing the full-sample estimate makes
-        the leave-one-out pseudovalue refits converge in a few iterations.
-        """
+        """The whole ``rreg`` estimator: Huber to convergence, then biweight."""
 
         beta = self._huber_until_converged(
-            X, y, maxiter=maxiter, strict=strict, start=start
+            X, y, maxiter=maxiter, strict=strict, start=start, tolerance=tolerance
         )
         return self._biweight_until_converged(
-            X, y, beta, maxiter=maxiter, strict=strict
+            X, y, beta, maxiter=maxiter, strict=strict, tolerance=tolerance
         )
 
     def _huber_until_converged(
@@ -681,35 +880,40 @@ class RobustRegression:
         X: np.ndarray,
         y: np.ndarray,
         *,
-        maxiter: int,
-        strict: bool,
+        maxiter: int = 1000,
+        strict: bool = False,
         start: np.ndarray | None = None,
+        tolerance: float = 0.01,
     ) -> np.ndarray:
+        """Stata's Huber stage alone (``rreg.ado`` lines 86-120).
+
+        The threshold is ``2*med(|e - med(e)|)`` in the units of the residual, not
+        ``1.345 * scale``: ``rreg.ado`` writes ``abs(res) > 2*r(p50)`` where
+        ``r(p50)`` is the median of the *absolute deviations from the median
+        residual*.  The two differ by the ``0.6745`` consistency factor, so using
+        1.345 here would be a different estimator (it was, previously).
+        """
+
         if start is None:
             beta, *_ = np.linalg.lstsq(X, y, rcond=None)
         else:
             beta = np.asarray(start, dtype=float).copy()
         weight = np.ones(y.size, dtype=float)
+        tolerance = float(tolerance)
 
-        for _ in range(maxiter):
+        for iteration in range(maxiter):
             residual = y - X @ beta
-            scale = self._scale(residual)
-            if scale <= 0:
+            mad = float(np.median(np.abs(residual - np.median(residual))))
+            if mad <= 0:
                 break
-            scaled = residual / scale
             updated = np.where(
-                np.abs(scaled) <= _HUBER_C,
-                1.0,
-                _HUBER_C / np.maximum(np.abs(scaled), 1e-12),
+                np.abs(residual) > 2.0 * mad, 2.0 * mad / np.abs(residual), 1.0
             )
             change = float(np.max(np.abs(updated - weight)))
             weight = updated
             root = np.sqrt(weight)
-            new_beta, *_ = np.linalg.lstsq(
-                X * root[:, None], y * root, rcond=None
-            )
-            beta = new_beta
-            if change < 1e-8:
+            beta, *_ = np.linalg.lstsq(X * root[:, None], y * root, rcond=None)
+            if change < 5.0 * tolerance:
                 return beta
         else:
             message = "rreg: Huber iterations did not converge"
@@ -724,23 +928,31 @@ class RobustRegression:
         y: np.ndarray,
         beta: np.ndarray,
         *,
-        maxiter: int,
-        strict: bool,
+        maxiter: int = 1000,
+        strict: bool = False,
+        tolerance: float = 0.01,
     ) -> np.ndarray:
+        """Stata's biweight stage alone, from the Huber estimate."""
+
         c_b = _BIWEIGHT_C * self._tune / 7.0
         weight = np.ones(y.size, dtype=float)
+        tolerance = float(tolerance)
+        largest = 1.0
+        notyet = True
+        passed = 0
+        residual = y - X @ beta
+        scale = self._scale(residual)
 
-        for _ in range(maxiter):
-            residual = y - X @ beta
-            scale = self._scale(residual)
+        while (largest > tolerance and passed < maxiter) or notyet:
+            notyet = False
+            passed += 1
             if scale <= 0:
                 break
             scaled = residual / scale
-            inside = np.abs(scaled) <= c_b
             updated = np.where(
-                inside, (1.0 - (scaled / c_b) ** 2) ** 2, 0.0
+                np.abs(scaled) <= c_b, (1.0 - (scaled / c_b) ** 2) ** 2, 0.0
             )
-            change = float(np.max(np.abs(updated - weight)))
+            largest = float(np.max(np.abs(updated - weight)))
             weight = updated
             if not np.any(weight > 0):
                 raise ConsistencyError(
@@ -749,9 +961,9 @@ class RobustRegression:
                 )
             root = np.sqrt(weight)
             beta, *_ = np.linalg.lstsq(X * root[:, None], y * root, rcond=None)
-            if change < 1e-8:
-                return beta
-        else:
+            residual = y - X @ beta
+            scale = self._scale(residual)
+        if largest > tolerance and passed >= maxiter:
             message = "rreg: biweight iterations did not converge"
             if strict:
                 raise ConvergenceError(message)
@@ -762,23 +974,18 @@ class RobustRegression:
     def _pseudovalue_covariance(
         self, X: np.ndarray, y: np.ndarray, beta: np.ndarray
     ) -> np.ndarray:
-        """Street-Carroll-Ruppert pseudovalues, ``[R] rreg`` Methods and formulas.
+        """Street-Carroll-Ruppert pseudovalues -- **not** Stata's ``rreg`` VCE.
 
-        Each observation's pseudovalue is ``n*b - (n-1)*b_{-i}``, where ``b_{-i}``
-        re-estimates the *same two-stage Huber-then-biweight estimator* without
-        observation ``i``; their covariance over ``n`` estimates the variance of
-        ``b`` without a Gaussian assumption.
+        Kept because ``[R] rreg`` cites this estimator and it is the right
+        variance for the *sandwich* reading of the problem, but ``fit`` no longer
+        calls it: Stata reports the plain ``regress`` law on the adjusted
+        response, ``se(b) = e(rmse) sqrt(diag((X'X)^-1))``, which reproduces its
+        ``e(V)`` to 3e-11.  These pseudovalues sit 15-30% away from it on four
+        datasets, so using them was the defect, not a rounding difference.
 
-        What the leave-one-out refit must be: a cheaper one-step weighted fit, or
-        a plain LAD refit, is not the estimator whose variance is wanted, and it
-        shows -- the one-step version lands 26-36% away from Stata's standard
-        errors on the P8 fixture, while refitting the two-stage estimator brings
-        all three within 3.4%.  The refits warm-start at the full-sample estimate
-        so each costs a handful of iterations rather than a fresh OLS start.
-
-        Residual gap against Stata: ``_cons`` +0.1%, ``x1`` -2.8%, ``x2`` +3.4%.
-        Stata's own pseudovalue step is not documented in enough detail to close
-        that, so it is reported rather than papered over.
+        Each observation's pseudovalue is ``n*b - (n-1)*b_{-i}``, where
+        ``b_{-i}`` re-estimates the same two-stage Huber-then-biweight estimator
+        without observation ``i``.
         """
 
         n, k = X.shape
@@ -793,7 +1000,7 @@ class RobustRegression:
             mask[index] = False
             try:
                 leave_one_out = self._two_stage(
-                    X[mask], y[mask], start=beta, maxiter=50, strict=False
+                    X[mask], y[mask], start=beta, maxiter=200, strict=False
                 )
             except (np.linalg.LinAlgError, ConsistencyError):
                 leave_one_out = beta

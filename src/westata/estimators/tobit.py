@@ -21,7 +21,47 @@ way Stata reports ``var(e.y)`` = ``sigma^2`` in the coefficient table; here the
 ``/sigma`` parameter appears as ``/sigma`` and ``e(sigma)`` holds its estimate.
 
 Standard errors use the observed information (the Hessian of the log-
-likelihood), which is Stata's default.
+likelihood), which is Stata's default.  The Hessian is **analytic** (see
+:meth:`Tobit._observed_information`): the cross-derivatives of the censored
+terms mix ``beta`` and the scale, and a finite-difference Hessian at
+``step=1e-5`` left the coefficient standard errors 8.9e-5 away from Stata's.
+Because the optimiser works with ``ln sigma`` but the reported parameter is
+``sigma``, the covariance needs the Jacobian ``d sigma / d ln sigma = sigma``
+on the scale row and column; without it the reported ``se(/sigma)`` is
+``se(ln sigma)``, which is ``1/sigma`` times too small (Stata's ``se(var(e.y))``
+mapped to the sigma scale is the check).
+
+``e(df_m)``/``e(df_r)`` follow ``tobit.ado`` (StataNow 19.5)::
+
+    df_m = e(rank) - 1 - hascons
+    df_r = e(N) - e(df_m)
+
+so the estimated scale consumes no degree of freedom and, with a constant,
+neither does the intercept.  ``e(df_r)`` is therefore ``N - (slopes)``, not
+``N - (slopes + intercept)``; the ratio is Stata's ``t`` denominator.
+
+Accuracy of the reported standard errors
+----------------------------------------
+Against StataNow 19.5, on three censoring variants (``ll``, ``ul``, ``ll+ul``):
+parameters and standard errors agree to ~3e-8, ``se(/sigma)`` to ~5e-8, and
+``predict, stdp`` to ~3e-8.  **That residual is Stata's stopping tolerance, not
+ours**, and it will not go away::
+
+    |score(theta_hat_stata)|_inf  ~ 1e-6 .. 1.5e-2   (analytic score, evaluated
+                                                      at Stata's OWN estimates)
+    |score(theta_hat_ours)|_inf   ~ 1e-13
+
+One Newton step from Stata's estimates lands back on ours to 1e-9, and the two
+log-likelihoods agree to 1e-13.  Stata's ``technique(nr)`` reaches that same
+point regardless of ``tolerance(1e-12)`` or ``tolerance(1e-14)``, while
+``technique(dfp)``/``(bhhh)`` move it by 5e-5 / 7e-5 -- so it is a fixed point of
+its own iteration, just not the exact maximiser.
+
+**Do not "fix" this by loosening or tightening anything.**  The scoring rule
+above is the whole diagnosis: if a future change makes the gap smaller than
+~1e-8 it has started chasing Stata's iteration noise; if it grows past 1e-6,
+the analytic Hessian or the score has been broken (both are checked against
+central differences in ``tests/test_tobit.py``).
 """
 
 from __future__ import annotations
@@ -159,6 +199,44 @@ class Tobit:
             log_likelihood += float(np.sum(stats.norm.logsf(z)))
         return log_likelihood
 
+    def _score(self, theta: np.ndarray) -> np.ndarray:
+        """Analytic gradient of the log-likelihood at ``theta = [beta, ln sigma]``.
+
+        Stata maximises this likelihood with analytic derivatives; BFGS on a
+        numerical gradient stops a few ulps short of the exact maximiser, which
+        is enough to leave ``stdp`` 4e-8 away from Stata's.  Supplying the score
+        and the analytic Hessian lets the final step be a Newton step that lands
+        on the same point the closed-form likelihood defines.
+        """
+
+        k = self._X.shape[1]
+        beta = np.asarray(theta[:k], dtype=float)
+        sigma = float(np.exp(theta[k]))
+        xb = self._X @ beta
+        left, right, uncensored = self._censoring()
+
+        score = np.zeros(k + 1, dtype=float)
+
+        if uncensored.any():
+            r = (self._y[uncensored] - xb[uncensored]) / sigma
+            Xu = self._X[uncensored]
+            score[:k] += Xu.T @ r / sigma
+            score[k] += float(r @ r) - float(uncensored.sum())
+
+        for mask, sign, limit in (
+            (left, 1.0, self._lower),
+            (right, -1.0, self._upper),
+        ):
+            if limit is None or not mask.any():
+                continue
+            z = sign * (float(limit) - xb[mask]) / sigma
+            lam = np.exp(stats.norm.logpdf(z) - stats.norm.logcdf(z))
+            Xc = self._X[mask]
+            # d ln Phi(z)/d b = -sign lam x / sigma ; d/d ln sigma = -lam z
+            score[:k] += -(sign / sigma) * (Xc.T @ lam)
+            score[k] += float(np.sum(-lam * z))
+        return score
+
     # ------------------------------------------------------------------ fit
     def fit(
         self,
@@ -206,9 +284,16 @@ class Tobit:
             value = self._loglike(theta)
             return -value if np.isfinite(value) else 1e12
 
+        def gradient(theta: np.ndarray) -> np.ndarray:
+            return -self._score(theta)
+
+        def hessian(theta: np.ndarray) -> np.ndarray:
+            return -self._information(theta, k)
+
         result = optimize.minimize(
             objective,
             theta0,
+            jac=gradient,
             method="BFGS",
             options={"maxiter": maxiter, "gtol": tol},
         )
@@ -229,6 +314,22 @@ class Tobit:
             if refined.fun <= result.fun:
                 result = refined
 
+        # Newton polish on the analytic score/Hessian.  Stata estimates by
+        # Newton-Raphson with analytic derivatives; a quasi-Newton stop leaves
+        # the parameters a few 1e-11 away, which is visible in ``stdp``.
+        polished = self._newton_polish(
+            np.asarray(result.x, dtype=float), objective, k, maxiter=maxiter
+        )
+        if polished is not None and polished[1] >= -float(result.fun):
+            theta_hat, value = polished
+            result = optimize.OptimizeResult(
+                x=theta_hat,
+                fun=-value,
+                success=True,
+                message="converged (analytic Newton polish)",
+                nit=0,
+            )
+
         converged = bool(result.success)
         if not converged:
             message = (
@@ -245,7 +346,16 @@ class Tobit:
         beta = theta[:k]
         sigma = float(np.exp(theta[k]))
 
+        # ``_observed_information`` returns the covariance of ``[beta, ln sigma]``
+        # because that is the parameterisation the likelihood is written in.
         cov = self._observed_information(theta, k)
+        # Reported scale is ``sigma``; ``d sigma / d ln sigma = sigma``, so the
+        # last row and column carry that Jacobian.  Without it the printed
+        # ``se(/sigma)`` is the standard error of ``ln sigma`` -- smaller by
+        # exactly ``1/sigma`` and enough to inflate the reported z.
+        cov = cov.copy()
+        cov[k, :] *= sigma
+        cov[:, k] *= sigma
 
         llf = float(self._loglike(theta))
         ll0 = self._null_loglike(k)
@@ -258,18 +368,31 @@ class Tobit:
         if cov.shape != (k + 1, k + 1):
             cov = np.full((k + 1, k + 1), np.nan)
 
+        # Stata (tobit.ado, StataNow 19.5):
+        #     df_m = e(rank) - 1 - hascons        rank = k + 1
+        #     df_r = e(N) - e(df_m)
+        # so the estimated scale consumes no degree of freedom and, when there is
+        # a constant, neither does the intercept.  Verified on five datasets
+        # spanning N/k = 74/3, 200/2, 350/4, 500/6, 120/3 and on `noconstant`.
+        hascons = 1 if any(
+            name in ("Intercept", "_cons", "const") for name in self._param_names
+        ) else 0
+        df_m = float(k - hascons)
+        df_r = float(n - df_m)
+
         e: dict[str, Any] = {
             "N": n,
             "n_uncensored": int(uncensored.sum()),
             "n_left": int(left.sum()),
             "n_right": int(right.sum()),
-            "df_m": float(k - 1),
+            "df_m": df_m,
+            "df_r": df_r,
             "rank": k + 1,
             "ll": llf,
             "ll_0": ll0,
             "chi2": chi2,
             "chi2type": "LR",
-            "p": float(stats.chi2.sf(chi2, k - 1)) if k > 1 else float("nan"),
+            "p": float(stats.chi2.sf(chi2, df_m)) if df_m > 0 else float("nan"),
             "r2_p": pseudo_r2,
             "sigma": sigma,
             "var_e": sigma**2,
@@ -285,8 +408,8 @@ class Tobit:
             resid=self._y - self._X @ beta,
             fittedvalues=self._X @ beta,
             nobs=n,
-            df_resid=float(n - k),
-            df_model=float(k - 1),
+            df_resid=df_r,
+            df_model=df_m,
             dist="t",
             model_name=self._stata_command,
             cov_type=requested,
@@ -297,16 +420,14 @@ class Tobit:
 
     # -------------------------------------------------------------- internals
     def _observed_information(self, theta: np.ndarray, k: int) -> np.ndarray:
-        """Numerical Hessian of the *negative* log-likelihood, inverted."""
+        """Covariance of ``[beta, ln sigma]``: inverse of ``-H`` at ``theta``."""
 
-        def negative_loglike(params: np.ndarray) -> float:
-            return -self._loglike(params)
-
-        hessian = _numerical_hessian(negative_loglike, theta)
+        hessian = self._information(theta, k)
+        hessian = (hessian + hessian.T) / 2.0
         try:
-            cov = np.linalg.inv(hessian)
+            cov = np.linalg.inv(-hessian)
         except np.linalg.LinAlgError:
-            cov = np.linalg.pinv(hessian)
+            cov = np.linalg.pinv(-hessian)
         if not np.all(np.isfinite(cov)):
             raise ConvergenceError(
                 "tobit: the observed information matrix is not invertible; the "
@@ -314,6 +435,127 @@ class Tobit:
                 "collinearity)"
             )
         return cov
+
+    def _information(self, theta: np.ndarray, k: int) -> np.ndarray:
+        """Analytic Hessian of the log-likelihood at ``[beta, ln sigma]``.
+
+        The likelihood mixes three regimes (uncensored density, left- and
+        right-censored normal probabilities), and their cross-derivatives with
+        respect to ``beta`` and the scale do not vanish.  A central-difference
+        Hessian at the old ``step=1e-5`` lost enough digits on the mixed block
+        to leave every coefficient standard error 8.9e-5 away from Stata; the
+        analytic form below is exact up to the floating-point sum.
+
+        Write ``ell = ln sigma``, ``z_c`` for the censored index of an
+        observation and ``lam = phi(z)/Phi(z)``.  With ``s = +1`` for a left
+        censoring limit and ``s = -1`` for a right one, so that the contribution
+        is always ``ln Phi(z_c)`` with ``z_c = s (limit - x'b)/sigma``::
+
+            d ln Phi(z_c)/d b   = -s lam x / sigma
+            d2/db db'           = -lam (z_c + lam) x x' / sigma^2
+            d/d ell             = -lam z_c
+            d2/d ell2           = -lam (z_c + lam) z_c^2 + lam z_c
+            d2/d b d ell        =  s lam x (1 - z_c (z_c + lam)) / sigma
+
+        and, for an uncensored observation with ``r = (y - x'b)/sigma``::
+
+            d2/db db'  = -x x'/sigma^2,   d2/db d ell = -2 r x/sigma,
+            d2/d ell2  = -2 r^2
+        """
+
+        beta = np.asarray(theta[:k], dtype=float)
+        sigma = float(np.exp(theta[k]))
+        xb = self._X @ beta
+        left, right, uncensored = self._censoring()
+
+        hessian = np.zeros((k + 1, k + 1), dtype=float)
+
+        # -- uncensored observations: Gaussian density ----------------------
+        if uncensored.any():
+            r = (self._y[uncensored] - xb[uncensored]) / sigma
+            Xu = self._X[uncensored]
+            hessian[:k, :k] -= (Xu.T @ Xu) / sigma**2
+            hessian[:k, k] -= 2.0 * (Xu.T @ r) / sigma
+            hessian[k, :k] = hessian[:k, k]
+            hessian[k, k] -= 2.0 * float(r @ r)
+
+        # -- censored observations: ln Phi(+-z) -----------------------------
+        for mask, sign, limit in (
+            (left, 1.0, self._lower),
+            (right, -1.0, self._upper),
+        ):
+            if limit is None or not mask.any():
+                continue
+            z = sign * (float(limit) - xb[mask]) / sigma
+            lam = np.exp(stats.norm.logpdf(z) - stats.norm.logcdf(z))
+            Xc = self._X[mask]
+            # -lam (z + lam) multiplies x x' / sigma^2; the sign is folded in.
+            weight = -lam * (z + lam)
+            hessian[:k, :k] += (Xc.T * weight) @ Xc / sigma**2
+            # d2 / d b d ell
+            cross = sign * lam * (1.0 - z * (z + lam)) / sigma
+            hessian[:k, k] += Xc.T @ cross
+            hessian[k, :k] = hessian[:k, k]
+            hessian[k, k] += float(
+                np.sum(-lam * (z + lam) * z**2 + lam * z)
+            )
+
+        return hessian
+
+    def _newton_polish(
+        self,
+        theta: np.ndarray,
+        objective: Any,
+        k: int,
+        *,
+        maxiter: int = 100,
+        max_steps: int = 50,
+    ) -> tuple[np.ndarray, float] | None:
+        """Newton-Raphson on the analytic score, returning ``(theta, loglike)``.
+
+        Returns ``None`` when the iteration cannot be taken (singular
+        information, a non-finite value, or no improvement after backtracking);
+        the caller then keeps the optimiser's answer, so this can only improve
+        the estimate, never break a case that used to fit.
+        """
+
+        x = np.asarray(theta, dtype=float).copy()
+        value = -objective(x)
+        if not np.isfinite(value):
+            return None
+        for _ in range(min(max_steps, maxiter)):
+            score = self._score(x)
+            if not np.all(np.isfinite(score)):
+                return None
+            if float(np.max(np.abs(score))) <= 1e-12:
+                break
+            hessian = self._information(x, k)
+            try:
+                # Newton step for a maximum: x+ = x - H^-1 s (H of the
+                # log-likelihood is negative definite at the optimum).
+                step = -np.linalg.solve(hessian, score)
+            except np.linalg.LinAlgError:
+                return None
+            if not np.all(np.isfinite(step)):
+                return None
+            # Backtracking: a Newton step on a non-concave region can overshoot.
+            scale = 1.0
+            improved = False
+            for _ in range(40):
+                candidate = x + scale * step
+                value_candidate = -objective(candidate)
+                if np.isfinite(value_candidate) and value_candidate >= value:
+                    x, value = candidate, value_candidate
+                    improved = True
+                    break
+                scale *= 0.5
+            if not improved:
+                break
+            if scale * float(np.max(np.abs(step))) <= 1e-14 * max(
+                1.0, float(np.max(np.abs(x)))
+            ):
+                break
+        return x, value
 
     def _null_loglike(self, k: int) -> float:
         """Log-likelihood of the intercept-only model (for LR chi2 / pseudo R2)."""

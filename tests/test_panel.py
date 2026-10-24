@@ -76,8 +76,19 @@ def demean(df: pd.DataFrame, columns: list[str], by: str) -> np.ndarray:
     return (df[columns] - df.groupby(by)[columns].transform("mean")).to_numpy()
 
 
-def cr1_cov(X: np.ndarray, resid: np.ndarray, groups: np.ndarray, *, df_resid: float) -> np.ndarray:
-    """Stata's cluster covariance: ``G/(G-1) * (N-1)/(N-K)`` on the sandwich."""
+def cr1_cov(
+    X: np.ndarray, resid: np.ndarray, groups: np.ndarray, *, df_resid: float
+) -> np.ndarray:
+    """Stata's cluster covariance: ``G/(G-1) * (N-1)/(N-K)`` on the sandwich.
+
+    ``df_resid`` is the **denominator of the second factor**, i.e. ``N - K`` with
+    Stata's ``K``.  For ``xtreg, fe`` under ``vce(cluster panelvar)`` Stata's
+    ``K`` is the number of *reported* coefficients (3 on the 5x4 test panel), so
+    pass ``N - 3`` - not the model's clustered ``e(df_r)``, which is ``G - 1``,
+    and not the effects-adjusted ``N - K - n + 1``.  Verified against
+    ``xtreg y x1 x2, fe vce(cluster firm)`` on 2026-10-24: it returns
+    ``.2024145 / .1204298``, Stata's printed values.
+    """
 
     X = np.asarray(X, dtype=float)
     labels = np.asarray(groups)
@@ -276,8 +287,27 @@ def test_backend_df_convention_observed() -> None:
         assert backend.df_resid == N_OBS - K_WITH_CONSTANT - N_ENTITIES + 1
 
 
-def test_auto_df_off_reproduces_stata_clustered_standard_errors() -> None:
-    """``auto_df=True`` would drop the effect count for nested clusters."""
+def test_auto_df_on_reproduces_stata_clustered_standard_errors() -> None:
+    """``auto_df`` must count only the reported coefficients, like Stata.
+
+    Captured with StataNow 19.5 on 2026-10-24 from this exact panel
+    (``make_panel()``, 5 firms x 4 years, ``xtset firm year``)::
+
+        xtreg y x1 x2, fe vce(cluster firm)
+            e(df_r) = 4   e(df_m) = 1
+            se(x1) = .2024145   se(x2) = .1204298   se(_cons) = .03893807
+
+    ``.2024145`` is ``sqrt(G/(G-1) * (N-1)/(N-3))`` applied to the within
+    sandwich: Stata's ``K`` is the *reported* coefficient count (3), not that
+    count plus the 4 absorbed firm effects (7).
+
+    The previous version of this test asserted the opposite - it required
+    ``auto_df=False`` (K = 7, factor 1.8269 instead of 1.3971) and claimed
+    ``auto_df=True`` "would drop the effect count for nested clusters".  That is
+    backwards: ``auto_df=True`` is the setting that matches Stata, and
+    ``auto_df=False`` reproduces Stata's *undocumented* ``dfadj`` option, 14.3%
+    higher.  Hence the renamed test and the new reference value.
+    """
 
     from linearmodels.panel import PanelOLS as BackendPanelOLS
 
@@ -288,22 +318,28 @@ def test_auto_df_off_reproduces_stata_clustered_standard_errors() -> None:
     )
     clusters = frame.index.get_level_values("firm").to_numpy()
     Xd, yd = fe_components(df)
-    df_r = FE_DF_R
-    _, resid, _ = ols(Xd, yd, df_resid=df_r)
-    expected = np.sqrt(np.diag(cr1_cov(Xd, resid, clusters, df_resid=df_r)))
+    _, resid, _ = ols(Xd, yd)
 
-    auto_off = BackendPanelOLS(frame["y"], exog, entity_effects=True).fit(
-        cov_type="clustered", clusters=clusters, group_debias=True, auto_df=False
+    # ``cr1_cov`` takes the *denominator* of the (N-1)/(N-K) factor, so passing
+    # N - K with Stata's K = 3 builds Stata's factor.
+    expected = np.sqrt(
+        np.diag(cr1_cov(Xd, resid, clusters, df_resid=N_OBS - K_WITH_CONSTANT))
     )
+    # Stata's printout, to six decimal places.
+    np.testing.assert_allclose(expected, [0.2024145, 0.1204298], rtol=1e-6)
+
     auto_on = BackendPanelOLS(frame["y"], exog, entity_effects=True).fit(
         cov_type="clustered", clusters=clusters, group_debias=True, auto_df=True
     )
+    auto_off = BackendPanelOLS(frame["y"], exog, entity_effects=True).fit(
+        cov_type="clustered", clusters=clusters, group_debias=True, auto_df=False
+    )
 
     np.testing.assert_allclose(
-        np.asarray(auto_off.std_errors)[1:], expected, rtol=0.0, atol=1e-10
+        np.asarray(auto_on.std_errors)[1:], expected, rtol=0.0, atol=1e-10
     )
-    # The default really is different: this is why westata pins auto_df=False.
-    assert not np.allclose(np.asarray(auto_on.std_errors)[1:], expected, rtol=1e-6)
+    # ... and the effect-counting setting is a different, larger number.
+    assert not np.allclose(np.asarray(auto_off.std_errors)[1:], expected, rtol=1e-6)
 
 
 # --------------------------------------------------------------------- unbalanced
@@ -451,43 +487,141 @@ def test_cluster_requires_labels() -> None:
 
 
 def test_cluster_standard_errors_match_stata_cr1() -> None:
+    """Stata's clustered SE uses ``K = reported coefficients``, not ``N - K``.
+
+    Captured from StataNow 19.5 on 2026-10-24, ``xtset firm year`` then
+    ``xtreg y x1 x2, fe vce(cluster firm)``::
+
+        e(df_r) = 4        (= G - 1, the reference distribution)
+        se(x1) = .2024145  se(x2) = .1204298  se(_cons) = .03893807
+
+    The old expectation used ``df_resid=FE_DF_R`` (13) inside the
+    ``(N-1)/(N-K)`` factor, i.e. ``K = 7`` = 3 reported + 4 absorbed effects.
+    That is Stata's undocumented ``dfadj`` option and it is 14.3% too large; the
+    default is ``K = 3``.  The reported ``e(df_r)`` meanwhile is ``G - 1 = 4``,
+    not the model-based 13.
+    """
+
     df = make_panel()
     res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
         cov_type="cluster", cov_kwds={"clusters": df["firm"].to_numpy()}
     )
 
     Xd, yd = fe_components(df)
-    _, resid, _ = ols(Xd, yd, df_resid=FE_DF_R)
-    expected = np.sqrt(np.diag(cr1_cov(Xd, resid, df["firm"].to_numpy(), df_resid=FE_DF_R)))
-
+    _, resid, _ = ols(Xd, yd)
+    expected = np.sqrt(
+        np.diag(cr1_cov(Xd, resid, df["firm"].to_numpy(), df_resid=N_OBS - K_WITH_CONSTANT))
+    )
+    np.testing.assert_allclose(expected, [0.2024145, 0.1204298], rtol=1e-6)
     np.testing.assert_allclose(
         res.bse[["x1", "x2"]].to_numpy(), expected, rtol=0.0, atol=1e-10
     )
-    # Clustering changes the covariance but not the t-distribution df, and
-    # e(df_r) keeps the xtreg, fe value.
-    assert res.df_resid == FE_DF_R
-    assert res.e["df_r"] == FE_DF_R
+
+    # Stata's e(df_r) under a clustered VCE is G - 1 = 4; the model-based value
+    # lives in e(df_r_mb) = 13.
+    assert res.df_resid == N_ENTITIES - 1  # 4 = G - 1
+    assert res.e["df_r"] == N_ENTITIES - 1
     assert res.cov_type == "cluster"
     assert res.e["N_clust"] == N_ENTITIES
 
 
-def test_robust_standard_errors_match_stata_hc1() -> None:
+def test_clustered_df_m_and_rank_are_documented_deviations() -> None:
+    """Pin ``e(df_m)``/``e(rank)``: deliberately Stata's + 1, and staying so.
+
+    Stata's clustered ``xtreg, fe`` redefines both scalars against the *free
+    parameters of the clustered problem* rather than the fitted model's columns.
+    Captured with StataNow 19.5 on 2026-10-24, 30 entities x 6 periods
+    (``xtset id t``), three slope counts::
+
+        command                                  e(df_m) e(df_b) e(rank)  prints
+        xtreg y x1,     fe vce(cluster id)          0      1       1      F(1, 29) = 211.29
+        xtreg y x1 x2,  fe vce(cluster id)          1      2       2      F(2, 29) = 303.80
+        xtreg y x1 x2 z, fe vce(cluster id)         2      3       3      F(3, 29) = 254.47
+
+    i.e. ``e(df_m) = slopes - 1`` and ``e(rank) = slopes``, while the F it prints
+    uses ``F(e(df_b), e(df_r))`` - so Stata's own ``e(df_m)`` contradicts the
+    degrees of freedom on its own test line.  Stata keeps the unclustered values
+    in ``e(rank_mb)`` (3 for two slopes), which is what shows the shift is a
+    convention.
+
+    westata stores ``e(df_m)`` = slopes and ``e(rank)`` = ``len(e(b))`` =
+    slopes + 1, so both are exactly +1 against Stata's clustered values and the
+    printed ``F(2, 29)`` label matches the statistic.  ``e(df_b)`` and ``e(df_r)``
+    match Stata.  This test exists so the +1 does not get "fixed" to match Stata
+    in isolation: shrinking ``e(rank)`` would silently change the size of
+    ``e(b)``/``e(V)`` that the results container and postestimation rely on.
+    See the "Known deviations" section of
+    :mod:`westata.estimators.panel` and ``retest/fix/panel/FIXES.md``.
+    """
+
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(cov_type="HC1")
+    clusters = df["firm"].to_numpy()
+    for formula, slopes, stata_df_m, stata_rank in (
+        ("y ~ x1", 1, 0, 1),
+        ("y ~ x1 + x2", 2, 1, 2),
+    ):
+        res = PanelOLS.from_formula(formula, df, entity="firm", time="year").fit(
+            cov_type="cluster", cov_kwds={"clusters": clusters}
+        )
+        # westata's own, self-consistent quantities.
+        assert res.e["df_m"] == slopes
+        assert res.e["rank"] == slopes + 1  # slopes + Intercept
+        assert res.e["df_b"] == slopes
+        # ... which are exactly Stata's clustered values plus one.
+        assert res.e["df_m"] == stata_df_m + 1
+        assert res.e["rank"] == stata_rank + 1
+        # The two that must match Stata do match it.
+        assert res.e["df_b"] == stata_df_m + 1
+        assert res.e["df_r"] == N_ENTITIES - 1
 
-    Xd, yd = fe_components(df)
-    _, resid, _ = ols(Xd, yd, df_resid=FE_DF_R)
-    bread = np.linalg.inv(Xd.T @ Xd)
-    meat = Xd.T @ (Xd * resid[:, None] ** 2)
-    # Stata's HC1 factor uses the same K as the covariance: 3 reported + 4 effect
-    # columns = N - (N - K - n_entities + 1).
-    expected = (N_OBS / FE_DF_R) * bread @ meat @ bread
+    # The unclustered path keeps the parameter-vector reading for both, and
+    # there e(rank) equals Stata's (no redefinition happens without clustering).
+    plain = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    assert plain.e["rank"] == K_WITH_CONSTANT
+    assert plain.e["df_m"] == 2  # slopes, not Stata's effects-inclusive 6
 
-    np.testing.assert_allclose(
-        res.bse[["x1", "x2"]].to_numpy(), np.sqrt(np.diag(expected)), rtol=0.0, atol=1e-10
+
+def test_robust_is_statas_clustered_vce_not_hc1() -> None:
+    """``xtreg, fe vce(robust)`` *is* ``vce(cluster panelvar)`` in Stata.
+
+    ``[XT] xtreg`` says so outright, and the live check agrees: on a 30x6 panel
+    ``max|V_robust - V_cluster(id)| = 0.0``, while ``areg ..., absorb(id)
+    vce(robust)`` returns a different matrix (constant SE ``.0372797`` vs
+    ``.0020300``, 18.4x).  So the HC1 sandwich belongs to ``areg``/``FEOLS`` and
+    not to this estimator.
+
+    Captured from StataNow 19.5 on 2026-10-24 on this 5x4 test panel,
+    ``xtreg y x1 x2, fe vce(robust)``::
+
+        e(df_r) = 4   e(df_m) = 1
+        se(x1) = .2024145  se(x2) = .1204298  se(_cons) = .03893807
+
+    The previous version of this test asserted the HC1 sandwich
+    ``(N / df_r) * (X'X)^-1 X'diag(e^2)X (X'X)^-1`` under the name "Stata HC1".
+    That number is ``areg``'s, not ``xtreg``'s; it was 1.01x off on x1 but 3.2x
+    off on the constant.
+    """
+
+    df = make_panel()
+    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    res = model.fit(cov_type="robust")
+    same = model.fit(
+        cov_type="cluster", cov_kwds={"clusters": df["firm"].to_numpy()}
     )
-    assert res.df_resid == FE_DF_R
-    assert res.cov_type == "HC1"
+
+    # Stata's vce(robust) and vce(cluster panelvar) are the same matrix.
+    np.testing.assert_allclose(res.cov_params(), same.cov_params(), rtol=0.0, atol=0.0)
+
+    # westata's parameter order is [Intercept, x1, x2]; Stata prints the
+    # constant last, so its own column order is (x1, x2, _cons).
+    expected = np.array([0.03893807, 0.2024145, 0.1204298])
+    np.testing.assert_allclose(res.bse.to_numpy(), expected, rtol=1e-6)
+    assert res.df_resid == N_ENTITIES - 1  # Stata's e(df_r) = G - 1
+    assert res.e["df_r"] == N_ENTITIES - 1
+    # ``HC1`` is accepted as an alias for the same spelling, not as HC1.
+    alias = model.fit(cov_type="HC1")
+    np.testing.assert_allclose(alias.cov_params(), res.cov_params(), rtol=0.0, atol=0.0)
+    assert res.cov_type == "robust"
 
 
 def test_nonrobust_is_the_default() -> None:
@@ -525,9 +659,14 @@ def test_ssc_always_applies_stata_defaults() -> None:
     without = model.fit(ssc=SSC(adj=False)).bse.to_numpy()
     assert np.all(without < model.fit().bse.to_numpy())
 
+    # The default clustered answer is exactly Stata's
+    # ``xtreg y x1 x2, fe vce(cluster firm)`` (captured 2026-10-24:
+    # se(x1) = .2024145, se(x2) = .1204298), i.e. the ``K = 3`` CR1 factor.
     Xd, yd = fe_components(df)
-    _, resid, _ = ols(Xd, yd, df_resid=FE_DF_R)
-    expected = np.sqrt(np.diag(cr1_cov(Xd, resid, clusters, df_resid=FE_DF_R)))
+    _, resid, _ = ols(Xd, yd)
+    expected = np.sqrt(
+        np.diag(cr1_cov(Xd, resid, clusters, df_resid=N_OBS - K_WITH_CONSTANT))
+    )
     np.testing.assert_allclose(
         model.fit(cov_type="cluster", cov_kwds={"clusters": clusters}).bse[["x1", "x2"]].to_numpy(),
         expected,
@@ -644,14 +783,25 @@ def test_cluster_labels_survive_listwise_deletion() -> None:
         atol=1e-12,
     )
 
-    # And that shared answer is Stata's CR1 on the retained sample.
+    # And that shared answer is Stata's CR1 on the retained sample.  Captured
+    # 2026-10-24 with ``xtreg y x1 x2, fe vce(cluster firm)`` on the same
+    # 19-observation panel (row 3's x1 set to missing): N = 19, e(df_r) = 4,
+    # se(x1) = .19931035, se(x2) = .12090296, se(_cons) = .0355033.  Stata's
+    # K in the (N-1)/(N-K) factor is again the reported 3.
     Xd, yd = fe_components(clean)
-    df_r = len(clean) - K_WITH_CONSTANT - N_ENTITIES + 1
-    _, resid, _ = ols(Xd, yd, df_resid=df_r)
-    expected = np.sqrt(np.diag(cr1_cov(Xd, resid, clean["firm"].to_numpy(), df_resid=df_r)))
+    _, resid, _ = ols(Xd, yd)
+    expected = np.sqrt(
+        np.diag(
+            cr1_cov(
+                Xd, resid, clean["firm"].to_numpy(), df_resid=len(clean) - K_WITH_CONSTANT
+            )
+        )
+    )
+    np.testing.assert_allclose(expected, [0.19931035, 0.12090296], rtol=1e-6)
     np.testing.assert_allclose(
         from_frame_with_na.bse[["x1", "x2"]].to_numpy(), expected, rtol=0.0, atol=1e-10
     )
+    assert from_frame_with_na.e["df_r"] == N_ENTITIES - 1  # 4 = G - 1
 
 
 def test_panel_indexed_cluster_series_is_aligned_by_index() -> None:

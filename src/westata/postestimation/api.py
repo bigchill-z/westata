@@ -21,8 +21,9 @@ from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-from westata.postestimation.lincom import run_lincom
+from westata.postestimation.lincom import LincomResult, run_lincom
 from westata.postestimation.tests import (
     WaldTest,
     build_contrast,
@@ -38,6 +39,26 @@ __all__ = [
 ]
 
 _NUMBER = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$")
+
+
+def _constraint_with_constant(expression: str, constant: float) -> str:
+    """Render ``expr + c`` the way Stata labels it: ``expr = -c``.
+
+    Stata moves the constant to the right-hand side and prints
+    ``( 1)  2*weight - 3*foreign = -10``; the ``+ 10`` disappears from the left
+    because it is folded into the right-hand side.  ``lincom 10`` (a constant
+    only) prints ``10 = 0``.
+    """
+
+    symbolic: list[str] = []
+    for sign, body in _split_signed_terms(expression):
+        if _NUMBER.match(body):
+            continue
+        symbolic.append(("- " if sign < 0 else "+ ") + body)
+    if not symbolic:
+        return f"{expression.strip()} = 0"
+    rendered = " ".join(symbolic).lstrip("+").strip()
+    return f"{rendered} = {-constant:g}"
 
 
 def _dist_and_df(result: Any) -> tuple[str, float]:
@@ -70,30 +91,81 @@ def _split_expansion_terms(side: str, names: Sequence[str]) -> list[str]:
     return references
 
 
-def _split_terms(side: str, names: Sequence[str]) -> dict[int, float]:
-    """Parse ``"a + b - 2*c"`` into ``{position: coefficient}``."""
+def _split_signed_terms(side: str) -> list[tuple[float, str]]:
+    """Split ``"2*x - 3*y + 10"`` into ``[(+2, "2*x"), (-3*? ...)]`` pairs.
 
-    side = side.strip()
-    if not side:
+    A ``+``/``-`` separates terms unless it belongs to a floating-point exponent
+    (``1e-3``) or sits inside brackets (``C(g)[T.1]``).  This matters because
+    Stata's expressions contain both: ``lincom 2*weight - 3*foreign + 1e3`` is a
+    single expression, not six.
+    """
+
+    compact = side.replace(" ", "")
+    if not compact:
         raise ValueError("empty side in hypothesis")
 
-    terms: dict[int, float] = {}
-    # Insert a space around signs that are not part of an exponent.
-    tokens = re.findall(r"[+-]?[^+-]+", side.replace(" ", ""))
+    tokens: list[tuple[float, str]] = []
+    sign = 1.0
+    body: list[str] = []
+    depth = 0
+
+    def flush() -> None:
+        nonlocal sign
+        text = "".join(body).strip()
+        if text:
+            tokens.append((sign, text))
+        body.clear()
+        sign = 1.0
+
+    for index, char in enumerate(compact):
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth = max(depth - 1, 0)
+
+        exponent_sign = (
+            char in "+-"
+            and depth == 0
+            and body
+            and body[-1] in "eE"
+            and index + 1 < len(compact)
+            and (compact[index + 1].isdigit() or compact[index + 1] == ".")
+        )
+        if char in "+-" and depth == 0 and not exponent_sign:
+            # A leading sign belongs to the first term; otherwise it starts a
+            # new one.
+            flush()
+            sign = -1.0 if char == "-" else 1.0
+            continue
+        body.append(char)
+    flush()
+
     if not tokens:
         raise ValueError(f"cannot parse {side!r}")
+    return tokens
 
-    for token in tokens:
-        sign = 1.0
-        body = token
-        if body[0] in "+-":
-            if body[0] == "-":
-                sign = -1.0
-            body = body[1:]
-        body = body.strip()
-        if not body:
-            raise ValueError(f"cannot parse {side!r}")
 
+def _split_linear_form(
+    side: str, names: Sequence[str]
+) -> tuple[dict[int, float], float]:
+    """Parse one side of a hypothesis into ``(coefficient weights, constant)``.
+
+    Stata's ``lincom``/``test`` accept a bare numeric constant anywhere in the
+    expression and move it to the right-hand side::
+
+        lincom 2*weight - 3*foreign + 10   ->   (1) 2*weight - 3*foreign = -10
+        test   weight + 10 = 0             ->   (1) weight = -10
+
+    The constant shifts the estimate but never touches the variance, which is
+    why ``lincom 2*weight - 3*foreign + 10`` has exactly the same standard error
+    as ``lincom 2*weight - 3*foreign`` (14.9369115 vs 4.9369115, both
+    ``se = 3.2272271``; verified on StataNow 19.5).
+    """
+
+    terms: dict[int, float] = {}
+    constant = 0.0
+
+    for sign, body in _split_signed_terms(side):
         if "*" in body:
             coefficient, variable = body.split("*", 1)
             # ``2*x`` is a weighted term; ``x*`` is a varlist wildcard (Stata
@@ -110,11 +182,8 @@ def _split_terms(side: str, names: Sequence[str]) -> dict[int, float]:
                 weight = sign * float(coefficient)
                 positions = resolve_names([variable], names)
         elif _NUMBER.match(body):
-            # A bare number is a constant term, handled by the caller.
-            raise ValueError(
-                f"constant {body!r} is not a coefficient reference; "
-                "put constants on the right-hand side of '='"
-            )
+            constant += sign * float(body)
+            continue
         else:
             weight = sign
             positions = resolve_names([body], names)
@@ -122,6 +191,24 @@ def _split_terms(side: str, names: Sequence[str]) -> dict[int, float]:
         for position in positions:
             terms[position] = terms.get(position, 0.0) + weight
 
+    return terms, constant
+
+
+def _split_terms(side: str, names: Sequence[str]) -> dict[int, float]:
+    """Parse ``"a + b - 2*c"`` into ``{position: coefficient}``.
+
+    Constants are rejected here: this is the path used by a bare ``test x1 x2``
+    list, where Stata treats each token as a coefficient name and answers a
+    constant with ``r(111) '<n>' not found``.  Expressions with an ``=`` go
+    through :func:`_split_linear_form`, which does accept constants.
+    """
+
+    terms, constant = _split_linear_form(side, names)
+    if constant != 0.0:
+        raise ValueError(
+            f"constant {constant:g} is not a coefficient reference; put it on the "
+            "right-hand side of '=' (Stata: r(111) '<n>' not found)"
+        )
     return terms
 
 
@@ -147,23 +234,16 @@ def _parse_hypothesis(
     rows: list[dict[int, float]] = []
     rhs: list[float] = []
 
-    def _terms_or_constant(side: str) -> tuple[dict[int, float], float]:
-        try:
-            return _split_terms(side, names), 0.0
-        except ValueError:
-            if _NUMBER.match(side):
-                return {}, float(side)
-            raise
-
-    left_terms, left_const = _terms_or_constant(sides[0])
+    left_terms, left_const = _split_linear_form(sides[0], names)
     for other in sides[1:]:
-        other_terms, other_const = _terms_or_constant(other)
+        other_terms, other_const = _split_linear_form(other, names)
         row: dict[int, float] = {}
         for position, weight in left_terms.items():
             row[position] = row.get(position, 0.0) + weight
         for position, weight in other_terms.items():
             row[position] = row.get(position, 0.0) - weight
         rows.append(row)
+        # ``a + c1 = b + c2`` tests ``a - b = c2 - c1``.
         rhs.append(other_const - left_const)
 
     return rows, rhs, ""
@@ -232,7 +312,15 @@ def lincom_as_stata(
     level: float = 0.95,
     eform: bool = False,
 ) -> Any:
-    """Evaluate one linear combination (Stata ``lincom``)."""
+    """Evaluate one linear combination (Stata ``lincom``).
+
+    Stata moves a bare constant to the right-hand side of the printed
+    constraint and leaves the variance untouched, so
+    ``lincom 2*weight - 3*foreign + 10`` reports ``14.9369115`` with the same
+    ``se = 3.2272271`` as ``lincom 2*weight - 3*foreign`` reports for
+    ``4.9369115``.  The constant is added to the estimate and never enters
+    :math:`L V L'`.
+    """
 
     names = list(result.param_names)
     if "=" in expression:
@@ -240,21 +328,69 @@ def lincom_as_stata(
             "lincom does not accept an equals sign; use results.test() for "
             "hypotheses"
         )
-    terms = _split_terms(expression, names)
+    terms, constant = _split_linear_form(expression, names)
     weights = np.zeros(len(names), dtype=float)
     for position, weight in terms.items():
         weights[position] = weight
 
     dist, df_resid = _dist_and_df(result)
-    return run_lincom(
-        np.asarray(result.params, dtype=float),
-        result.cov_params(),
+    params = np.asarray(result.params, dtype=float)
+    cov = result.cov_params()
+
+    # The standard error depends on the weights only, so it comes from the
+    # shared implementation; the constant is then applied to the point estimate
+    # and the interval, exactly as Stata prints the constraint
+    # ``2*weight - 3*foreign = -10`` with ``se`` unchanged.
+    unshifted = run_lincom(
+        params,
+        cov,
         weights,
         dist=dist,
         df_resid=df_resid,
         expression=f"{expression} = 0",
         level=level,
+        eform=False,
+    )
+    if constant == 0.0 and not eform:
+        return unshifted
+
+    linear = float(weights @ params) + constant
+    std_err = unshifted.std_err
+    alpha = 1.0 - level
+    if dist == "z":
+        critical = float(stats.norm.ppf(1.0 - alpha / 2.0))
+        statistic = linear / std_err if std_err > 0 else float("nan")
+        pvalue = float(2.0 * stats.norm.sf(abs(statistic)))
+        df_value: float | None = None
+    else:
+        critical = float(stats.t.ppf(1.0 - alpha / 2.0, df_resid))
+        statistic = linear / std_err if std_err > 0 else float("nan")
+        pvalue = float(2.0 * stats.t.sf(abs(statistic), df_resid))
+        df_value = float(df_resid)
+
+    estimate = linear
+    lower = linear - critical * std_err
+    upper = linear + critical * std_err
+    if eform:
+        estimate = float(np.exp(linear))
+        lower = float(np.exp(lower))
+        upper = float(np.exp(upper))
+
+    constraint = (
+        expression if constant == 0.0 else _constraint_with_constant(expression, constant)
+    )
+    return LincomResult(
+        estimate=estimate,
+        std_err=std_err,
+        statistic=statistic,
+        pvalue=pvalue,
+        ci_lower=lower,
+        ci_upper=upper,
+        distribution=dist,
+        df=df_value,
+        expression=constraint,
         eform=eform,
+        label="(1)",
     )
 
 

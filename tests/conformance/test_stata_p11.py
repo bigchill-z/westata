@@ -181,8 +181,12 @@ def test_nearest_neighbour_matching_is_close_to_stata():
 
 def test_didregress_matches_stata():
     Didregress = _require("Didregress")
+    # The fixture command is ``didregress (y x1) (treated)``: Stata's first
+    # block names the dependent variable *followed by covariates*, so the
+    # covariate has to be in the formula.  A bare "y" means "no covariates"
+    # (measured: ATET 1.1927931 vs 1.1543178 below), which is not this fixture.
     result = Didregress.from_formula(
-        "y", "treated", did_frame(), group="unit", time="period"
+        "y x1", "treated", did_frame(), group="unit", time="period"
     ).fit()
 
     # Stata: ATET 1.18613 (se .0590465), N = 1600
@@ -210,11 +214,12 @@ def test_the_two_did_spellings_share_the_atet_but_not_the_standard_error():
     Didregress = _require("Didregress")
     frame = did_frame()
 
+    # Same fixture as above: ``(y x1)``, not a bare ``(y)``.
     panel = Xtdidregress.from_formula(
-        "y", "treated", frame, group="unit", time="period"
+        "y x1", "treated", frame, group="unit", time="period"
     ).fit()
     pooled = Didregress.from_formula(
-        "y", "treated", frame, group="unit", time="period"
+        "y x1", "treated", frame, group="unit", time="period"
     ).fit()
 
     # The point estimate is the same estimator on the same data.

@@ -1,0 +1,32 @@
+====================================================================================================
+H1. nl rank guard: scale dependence (a capability regression)
+====================================================================================================
+Stata estimates it:  b = [ 5.15215777e+01 -1.46574591e-02  1.37389670e-06]
+                     SE = [2.56725779e+00 1.50302561e-03 2.11115573e-07]
+
+ westata, identical model, only the units of `weight` change:
+  weight x    cond(J)   smin/smax  normalised cond  verdict
+     1e+00  2.718e+08   3.680e-09        8.407e+01  REFUSED (ConsistencyError)
+     1e-01  2.718e+06   3.680e-07        8.407e+01  OK  b rel=7.290e-08 se rel=1.910e-11 (A)
+     1e-02  2.723e+04   3.672e-05        8.407e+01  OK  b rel=2.819e-08 se rel=2.573e-11 (A)
+     1e-03  3.252e+02   3.075e-03        8.407e+01  OK  b rel=2.349e-08 se rel=6.338e-12 (A)
+     1e-06  1.538e+06   6.503e-07        8.407e+01  OK  b rel=3.550e-08 se rel=1.046e-11 (A)
+
+ the guard still catches a genuinely unidentified model:
+  caught: nl: the Jacobian of the prediction has rank 1 but the model has 2 parameters (a, c), so at least one parameter
+  the estimable submodel still fits: bse=[0.15147189]
+
+ auto.dta passes, but only just (this is why the BRIEF's own check is green):
+  auto.dta  cond(J) = 1.600e+08 ; smin/smax = 6.250e-09 ; guard cut-off = 4.441e-09 -> margin = 1.4x
+
+====================================================================================================
+H2. panel e(df_m) / e(rank) under a clustered VCE
+====================================================================================================
+  xtreg y x1 x2, fe vce(cluster id)  (2 slopes)
+     Stata   {'df_m': 1.0, 'df_b': 2.0, 'rank': 2.0, 'df_r': 29.0, 'F': 32.7015694588795}
+     westata {'df_m': 2.0, 'df_b': 2.0, 'rank': 3, 'df_r': 29.0, 'F': 32.70156945887952}
+  xtreg y x1, fe vce(cluster id)  (1 slopes)
+     Stata   {'df_m': 0.0, 'df_b': 1.0, 'rank': 1.0, 'df_r': 29.0, 'F': 40.850116825196785}
+     westata {'df_m': 1.0, 'df_b': 1.0, 'rank': 2, 'df_r': 29.0, 'F': 40.85011682519682}
+
+  (the F statistic itself is correct to 6.5e-16 -- see b_panel.py B1)

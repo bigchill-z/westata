@@ -456,8 +456,20 @@ def test_stata_block_syntax_parses_covariates():
     assert model.formula == "y ~ treated + x1 + x2 | unit + period"
 
 
-def test_bare_outcome_infers_time_varying_covariates_with_a_warning(panel):
-    """A bare ``(y)`` block has no covariate; westata infers and warns."""
+def test_bare_outcome_adds_no_covariate(panel):
+    """A bare ``(y)`` block adjusts for nothing, exactly like Stata.
+
+    StataNow 19.5, captured 2026-10-24 on this panel::
+
+        didregress (y) (treated), group(unit) time(period)
+            ATET 1.1543177866493608   se .07809416
+        didregress (y x1) (treated), group(unit) time(period)
+            ATET 1.1861296209175876   se .05904651
+
+    The two differ, which is why the old default -- quietly treating every
+    time-varying numeric column as a covariate -- had to go: with ``x1`` present
+    in the frame, ``(y)`` used to mean ``(y x1)``.
+    """
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -465,12 +477,31 @@ def test_bare_outcome_infers_time_varying_covariates_with_a_warning(panel):
             "y", "treated", panel, group="unit", time="period"
         )
 
-    # ``x1`` varies within units, ``group`` does not, so only x1 is a covariate.
+    assert model.covariates == []
+    assert model.inferred_covariates == []
+    assert [str(record.message) for record in caught] == []
+    assert float(model.fit().params["treated"]) == pytest.approx(
+        1.1543177866493608, rel=1e-12
+    )
+
+
+def test_covariates_all_opts_into_the_old_inference_with_a_warning(panel):
+    """``covariates="all"`` is the old behaviour, now explicit and never default."""
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        model = Didregress.from_formula(
+            "y", "treated", panel, group="unit", time="period", covariates="all"
+        )
+
+    # ``x1`` varies within units, ``group`` does not, so only x1 is selected.
     assert model.covariates == ["x1"]
     assert model.inferred_covariates == ["x1"]
     messages = " ".join(str(record.message) for record in caught)
     assert "time-varying" in messages and "x1" in messages
-    assert float(model.fit().params["treated"]) == pytest.approx(STATA_ATET, abs=1e-3)
+    assert float(model.fit().params["treated"]) == pytest.approx(
+        1.1861296209175876, rel=1e-12
+    )
 
 
 def test_no_covariates_at_all_is_allowed():

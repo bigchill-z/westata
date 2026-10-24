@@ -79,8 +79,13 @@ from statsmodels.base.model import (
     GenericLikelihoodModelResults,
 )
 
-from westata.errors import ConsistencyError
-from westata.estimators.discrete import _DiscreteBase
+from westata.errors import ConsistencyError, UnsupportedError
+from westata.estimators.discrete import (
+    _DiscreteBase,
+    _chi2_pvalue,
+    _richardson_hessian,
+    _wald_statistic,
+)
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
@@ -414,6 +419,44 @@ class _CountLikelihood(GenericLikelihoodModel):
         return value
 
 
+# ------------------------------------------------------------ model-test helper
+def _count_model_test(
+    params: np.ndarray,
+    cov: np.ndarray,
+    names: list[str],
+    df_m: int,
+) -> tuple[str, float, int]:
+    """``(chi2type, statistic, df)`` for a count model under a robust VCE.
+
+    Stata switches the printed test from ``LR chi2`` to ``Wald chi2`` as soon as
+    ``vce(robust)`` or ``vce(cluster g)`` is requested.  The Wald statistic is
+    the main-equation *slope* block only: the inflation equation and the
+    dispersion parameter take no part.
+
+    Verified on StataNow 19.5 (2026-10-24) for ``zip``/``zinb``/``ztp``/
+    ``tnbreg``: ``b_main_slopes' V_ss^-1 b_main_slopes`` (constant excluded)
+    reproduces ``e(chi2)`` to 0.0e+00, while including the inflation slopes
+    would be off by 14%-35% and including everything by 70%-135%.
+    """
+
+    main = _main_slope_positions(names)
+    statistic = _wald_statistic(params, cov, main)
+    return "Wald", statistic, df_m
+
+
+def _main_slope_positions(names: list[str]) -> list[int]:
+    """Indices of the main-equation slopes (constant, inflate, dispersion out)."""
+
+    positions = []
+    for position, name in enumerate(names):
+        if name.startswith("inflate:") or name.startswith("/"):
+            continue
+        if name in ("Intercept", "_cons", "const"):
+            continue
+        positions.append(position)
+    return positions
+
+
 # ---------------------------------------------------------------- westata layer
 
 
@@ -421,7 +464,6 @@ class _CountBase(_DiscreteBase):
     """Shared Stata-facing behaviour for the count extensions."""
 
     _family = "poisson"
-    _accepts_hc_kwds = False
 
     def _main_count(self) -> int:
         """Regressors in the main equation (including the constant)."""
@@ -431,9 +473,11 @@ class _CountBase(_DiscreteBase):
     def _model_df(self) -> int:
         """``e(df_m)``: main-equation regressors *beyond* the constant.
 
-        Stata prints ``LR chi2(df_m)`` for these models and the inflation
-        equation does not contribute to it: ``zip y x1, inflate(x1)`` reports
-        ``LR chi2(1)`` with ``e(rank) = 4``.
+        Stata prints ``LR chi2(df_m)`` for these models and neither the
+        inflation equation nor the dispersion parameter contributes to it:
+        ``zip y x1, inflate(x1)`` reports ``LR chi2(1)`` with ``e(rank) = 4``,
+        and ``zinb``/``tnbreg`` report ``LR chi2(2)`` with ``e(rank) = 7``/``4``
+        and ``e(k_aux) = 1``.  Verified on StataNow 19.5.
         """
 
         return max(self._main_count() - 1, 0)
@@ -449,6 +493,21 @@ class _CountBase(_DiscreteBase):
             upper=getattr(self, "_upper", None),
         )
 
+    # -- derivatives -------------------------------------------------------
+    def _information(self, model: Any, params: np.ndarray) -> np.ndarray:
+        """Observed information from a Richardson-extrapolated Hessian.
+
+        The generic likelihood has no analytic Hessian.  ``approx_hess`` alone
+        leaves ``e(V)`` 2e-4 (zip) / 4e-7 (ztp) from Stata; one Richardson
+        extrapolation brings those to ~1e-7 / ~2e-8, which is the best this
+        numerical route can do -- stated as such in ``FIXES.md`` rather than
+        passed off as an A-tier match.
+        """
+
+        # ``_information`` is the *observed information*, i.e. minus the
+        # Hessian; the Richardson helper returns the Hessian itself.
+        return -_richardson_hessian(model.loglike, params)
+
     # -- helpers used by the tests and by postestimation -------------------
     def _loglike(self, theta: np.ndarray) -> float:
         """Log-likelihood at ``theta`` (kept public-ish for verification)."""
@@ -460,20 +519,45 @@ class _CountBase(_DiscreteBase):
 
     # -- Stata e() ---------------------------------------------------------
     def _stata_scalars(
-        self, result: Any, params: np.ndarray, llf: float, nobs: int
+        self,
+        result: Any,
+        params: np.ndarray,
+        cov: np.ndarray,
+        names: list[str],
+        llf: float,
+        nobs: int,
+        canonical: str,
+        groups: np.ndarray | None,
     ) -> dict[str, Any]:
         ll0 = getattr(result, "llnull", None)
         ll_null = float(ll0) if ll0 is not None else float("nan")
         df_m = self._model_df()
+        robust = canonical != "nonrobust"
 
-        if np.isfinite(ll_null):
-            chi2 = 2.0 * (llf - ll_null)
-            p_value = float(stats.chi2.sf(chi2, df_m)) if df_m > 0 else float("nan")
-            pseudo_r2 = 1.0 - llf / ll_null if ll_null != 0 else float("nan")
+        if robust:
+            chi2type, chi2, df_test = _count_model_test(params, cov, names, df_m)
         else:
-            chi2 = float("nan")
-            p_value = float("nan")
+            chi2type = "LR"
+            chi2 = 2.0 * (llf - ll_null) if np.isfinite(ll_null) else float("nan")
+            df_test = df_m
+
+        if np.isfinite(ll_null) and ll_null:
+            pseudo_r2 = 1.0 - llf / ll_null
+        else:
             pseudo_r2 = float("nan")
+
+        # Stata's ``e(p)`` for the multi-equation count commands is NOT
+        # ``chi2.sf`` on ``e(df_m)``: ``zip``/``zinb`` use ``e(rank) - 1``
+        # degrees of freedom (every parameter but the first), while the printed
+        # "LR chi2(df_m)" label uses ``df_m``.  Verified on StataNow 19.5: a zip
+        # with df_m=2, rank=6, chi2=3.566291547919718 reports
+        # e(p)=0.6133814699910781, which is chi2.sf(3.566..., 5) to 1.7e-15
+        # (chi2.sf(..., 2) = 0.1681 is what using df_m would give).  Under
+        # vce(robust) Stata switches to df_m, and ztp/tnbreg always use df_m.
+        if self._two_equation_p and not robust:
+            p_value = _chi2_pvalue(chi2, int(params.size) - 1)
+        else:
+            p_value = _chi2_pvalue(chi2, df_test)
 
         scalars: dict[str, Any] = {
             "N": nobs,
@@ -482,16 +566,19 @@ class _CountBase(_DiscreteBase):
             "ll": float(llf),
             "ll_0": ll_null,
             "chi2": chi2,
-            "chi2type": "LR",
+            "chi2type": chi2type,
             "p": p_value,
             "r2_p": pseudo_r2,
-            "aic": float(getattr(result, "aic", float("nan"))),
-            "bic": float(getattr(result, "bic", float("nan"))),
+            "aic": float(-2.0 * llf + 2.0 * params.size),
+            "bic": float(-2.0 * llf + params.size * np.log(nobs)),
         }
+        if groups is not None:
+            scalars["N_clust"] = int(np.unique(groups).size)
         if self._family == "nb":
             lnalpha = float(params[-1])
             scalars["lnalpha"] = lnalpha
             scalars["alpha"] = float(np.exp(np.clip(lnalpha, -_ETA_CLIP, _ETA_CLIP)))
+            scalars["k_aux"] = 1
         return scalars
 
     def _extra_scalars(self) -> dict[str, Any]:
@@ -528,11 +615,11 @@ class _CountBase(_DiscreteBase):
     ) -> StataResults:
         """Maximise the count likelihood.
 
-        ``_DiscreteBase.fit`` reuses every part of the estimation machinery but
-        reports ``df_model = len(params) - 1``, which counts inflation and
-        dispersion parameters.  Stata's ``e(df_m)`` does not, so the container
-        is restamped here with the corrected value rather than reimplementing
-        the fit.
+        ``_DiscreteBase.fit`` does the estimation, the VCE and the ``e()``
+        assembly; this override adjusts the optimiser tolerance, merges the
+        model-specific extra ``e()`` scalars, and restates ``df_model`` with
+        Stata's ``e(df_m)`` (main-equation slopes only -- the inflation and
+        dispersion parameters do not enter it).
         """
 
         if self._optimizer == "newton":
@@ -547,28 +634,98 @@ class _CountBase(_DiscreteBase):
         )
         extras = self._extra_scalars()
         df_m = float(self._model_df())
-        if not extras and df_m == result.df_model:
-            return result
+        final = result
+        if extras or df_m != result.df_model:
+            e = dict(result.e)
+            e.update(extras)
+            e["df_m"] = df_m
+            final = StataResults(
+                params=result.params.to_numpy(),
+                param_names=result.param_names,
+                cov=result.cov_params(),
+                resid=result.resid,
+                fittedvalues=result.fittedvalues,
+                nobs=result.nobs,
+                df_resid=result.df_resid,
+                df_model=df_m,
+                dist=result.dist,
+                model_name=result.model_name,
+                cov_type=result.cov_type,
+                e=e,
+                design_matrix=result.design_matrix,
+                model_data=result.model_data,
+            )
+        self._last_params = np.asarray(result.params, dtype=float)
+        self._attach_predict_dispatch(final)
+        return final
 
-        e = dict(result.e)
-        e.update(extras)
-        e["df_m"] = df_m
-        return StataResults(
-            params=result.params.to_numpy(),
-            param_names=result.param_names,
-            cov=result.cov_params(),
-            resid=result.resid,
-            fittedvalues=result.fittedvalues,
-            nobs=result.nobs,
-            df_resid=result.df_resid,
-            df_model=df_m,
-            dist=result.dist,
-            model_name=result.model_name,
-            cov_type=result.cov_type,
-            e=e,
-            design_matrix=result.design_matrix,
-            model_data=result.model_data,
+    # -- predict -----------------------------------------------------------
+    #: Stata's accepted ``predict`` types for this family (verified on
+    #: StataNow 19.5).  Exposed as ``_predict_types`` on the result so the
+    #: postestimation dispatcher can list the alternatives in its error message.
+    _predict_types: tuple[str, ...] = ("xb", "n", "stdp")
+
+    #: ``e(p)`` uses ``e(rank)-1`` rather than ``e(df_m)`` under the default VCE.
+    _two_equation_p = False
+
+    def _attach_predict_dispatch(self, result: StataResults) -> None:
+        """Install the prediction hook documented in ``postestimation.predict``.
+
+        ``postestimation.predict`` looks for ``_predict_dispatch`` on the result
+        and delegates to it before falling back to the generic implementations;
+        returning ``None`` means "use the generic path".  The model owns the
+        prediction here because the count families disagree with the generic
+        code on two points that are easy to get silently wrong: ``n`` on a
+        zero-inflated model is ``(1 - pi) * mu``, not ``mu``, and ``pr`` on
+        ``zip``/``zinb`` is the inflation probability ``pi``, not a category
+        probability.
+        """
+
+        result._predict_dispatch = self.predict_hook
+        result._predict_types = tuple(self._predict_types)
+
+    def predict_hook(
+        self,
+        *,
+        kind: str,
+        exog: Any,
+        lower: Any = None,
+        upper: Any = None,
+        params: Any = None,
+        **_: Any,
+    ) -> np.ndarray | None:
+        """Return the ``kind`` prediction, or ``None`` to let the generic path run."""
+
+        normalized = str(kind).strip()
+        if normalized not in self._predict_types:
+            raise UnsupportedError(
+                f"{self._stata_command}: predict type {kind!r} is not available; "
+                f"Stata accepts {self._predict_types}"
+            )
+        if normalized == "stdp":
+            return None  # the generic sqrt(x'Vx) implementation is exactly right
+        theta = (
+            np.asarray(params, dtype=float)
+            if params is not None
+            else getattr(self, "_last_params", None)
         )
+        if theta is None:  # pragma: no cover - only before a fit
+            return None
+        return self._predict_kind(normalized, np.asarray(exog, dtype=float), theta)
+
+    def _predict_kind(
+        self, kind: str, exog: np.ndarray, params: np.ndarray
+    ) -> np.ndarray:
+        """Model-specific prediction of ``kind`` at ``params``."""
+
+        linear = np.clip(exog @ params[: self._X.shape[1]], -_ETA_CLIP, _ETA_CLIP)
+        if kind == "xb":
+            return linear
+        return np.exp(linear)
+
+    #: Parameter vector of the last successful fit, used by ``predict_hook``
+    #: when the caller does not pass ``params``.
+    _last_params: np.ndarray | None = None
 
 
 class _ZeroInflatedBase(_CountBase):
@@ -654,6 +811,45 @@ class _ZeroInflatedBase(_CountBase):
             scalars["inflate"] = "none"
         return scalars
 
+    # -- predict -----------------------------------------------------------
+    #: ``zip``/``zinb`` accept ``n``, ``pr``, ``xb`` and ``stdp``; Stata rejects
+    #: ``stdf``/``residuals``/``mu`` with "option ... not allowed" r(198).
+    _predict_types = ("xb", "n", "pr", "stdp")
+
+    def _predict_kind(
+        self, kind: str, exog: np.ndarray, params: np.ndarray
+    ) -> np.ndarray:
+        """Stata's zero-inflated predictions.
+
+        ``n`` is the conditional mean of the *observed* count,
+        ``(1 - pi) * mu``, and ``pr`` is the inflation probability ``pi`` --
+        **not** ``P(y = 0) = pi + (1 - pi) f(0)``.  Both were verified against
+        ``predict, n``/``predict, pr`` after ``zip``/``zinb`` on StataNow 19.5:
+        ``max|n - (1-pi)mu| = 9.9e-16`` and ``max|pr - pi| = 2.2e-16``.
+
+        ``xb`` is the linear index of the count equation (the inflation
+        parameters do not enter it), which is what Stata reports.
+        """
+
+        k = self._X.shape[1]
+        linear = np.clip(exog @ params[:k], -_ETA_CLIP, _ETA_CLIP)
+        if kind == "xb":
+            return linear
+        mu = np.exp(linear)
+        if self._inflate_exog is None:
+            if kind == "pr":
+                raise UnsupportedError(
+                    f"{self._stata_command}: predict, pr needs an inflation "
+                    "equation; this model was fitted with inflate=None"
+                )
+            return mu
+        m = self._inflate_exog.shape[1]
+        gamma = np.clip(self._inflate_exog @ params[k : k + m], -_ETA_CLIP, _ETA_CLIP)
+        pi = 1.0 / (1.0 + np.exp(-gamma))
+        if kind == "pr":
+            return pi
+        return (1.0 - pi) * mu
+
 
 class ZeroInflatedPoisson(_ZeroInflatedBase):
     """Zero-inflated Poisson (Stata ``zip``).
@@ -668,6 +864,8 @@ class ZeroInflatedPoisson(_ZeroInflatedBase):
     #: Stata's ``ml`` default.  Newton converges in a handful of steps from the
     #: Poisson start and reproduces the Stata coefficients exactly.
     _optimizer = "newton"
+    #: ``zip``'s ``e(p)`` uses ``e(rank)-1`` under the default VCE.
+    _two_equation_p = True
 
 
 class ZeroInflatedNegativeBinomial(_ZeroInflatedBase):
@@ -681,6 +879,7 @@ class ZeroInflatedNegativeBinomial(_ZeroInflatedBase):
     _stata_command = "zinb"
     _family = "nb"
     _optimizer = "bfgs"
+    _two_equation_p = True
 
 
 class _TruncatedBase(_CountBase):
@@ -783,6 +982,28 @@ class _TruncatedBase(_CountBase):
             "lower": self._lower,
             "upper": self._upper,
         }
+
+    # -- predict -----------------------------------------------------------
+    #: ``ztp``/``tpoisson``/``tnbreg`` accept only ``n``, ``xb`` and ``stdp``;
+    #: Stata rejects ``pr``/``stdf``/``residuals`` with r(198).
+    _predict_types = ("xb", "n", "stdp")
+
+    def _predict_kind(
+        self, kind: str, exog: np.ndarray, params: np.ndarray
+    ) -> np.ndarray:
+        """Stata's truncated-count prediction: ``n`` is just ``exp(xb)``.
+
+        The truncation normalisation does **not** enter ``predict, n``: after
+        ``ztp y x``, Stata's ``n`` equals ``exp(xb)`` (verified to 1.8e-15), not
+        the truncated mean ``mu / (1 - e^-mu)`` that ``fittedvalues`` reports.
+        This is a definitional split -- the likelihood is unaffected -- so both
+        are available, under their own names.
+        """
+
+        linear = np.clip(exog @ params[: self._X.shape[1]], -_ETA_CLIP, _ETA_CLIP)
+        if kind == "xb":
+            return linear
+        return np.exp(linear)
 
 
 class TruncatedPoisson(_TruncatedBase):

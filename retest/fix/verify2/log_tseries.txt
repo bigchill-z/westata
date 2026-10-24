@@ -1,0 +1,65 @@
+
+====================================================================================================
+E3. TSERIES V1-V6
+====================================================================================================
+
+[E3a] V1 VAR SE / e(Sigma) / e(V) + V2 vargranger chi2
+  VAR(1)  b=5.112e-15(A) se=1.316e-16(A) e(Sigma)=7.981e-16(A) e(V)=7.181e-16(A)
+  VAR(2)  b=1.103e-14(A) se=3.778e-16(A) e(Sigma)=6.379e-16(A) e(V)=9.269e-15(A)
+  vargranger y1<-y2: method=Wald df=1 Stata(equiv test)=23.260492259500 westata=23.260492259500 rel=2.597e-15(A) p_rel=1.415e-06
+  vargranger y2<-y1: method=Wald df=1 Stata(equiv test)=40.743237194781 westata=40.743237194781 rel=6.976e-16(A) p_rel=1.736e-10
+  Stata vargranger prints:
+      |                y1                 y2 |   23.26     1    0.000    |
+      |                y1                ALL |   23.26     1    0.000    |
+      |                y2                 y1 |  40.743     1    0.000    |
+      |                y2                ALL |  40.743     1    0.000    |
+
+[E3b] V3 dfuller printed critical values + statistic unchanged
+  dfuller y_rw, lags(2)                  stat=-0.9142236030432268 westata_stat=-0.9142236030432267 cv_stata=[-3.45624, -2.87812, -2.57] cv_westata=[-3.45624 -2.87812 -2.57   ]
+       cv rel=1.285e-16 (A)
+  dfuller y_rw, lags(2) trend            stat=-2.754174778311942 westata_stat=-2.7541747783119908 cv_stata=[-3.98812, -3.42812, -3.13] cv_westata=[-3.98812 -3.42812 -3.13   ]
+       cv rel=1.295e-16 (A)
+  dfuller y_rw, lags(0) noconstant       stat=-1.080290101656986 westata_stat=-1.0802901016569861 cv_stata=[-2.58, -1.95, -1.62] cv_westata=[-2.58 -1.95 -1.62]
+       cv rel=0.000e+00 (A)
+  dfuller y_ar, lags(4)                  stat=-6.299279850333785 westata_stat=-6.299279850333783 cv_stata=[-3.4564, -2.8782, -2.57] cv_westata=[-3.4564 -2.8782 -2.57  ]
+       cv rel=0.000e+00 (A)
+  pperron y_rw                           stat=-1.041227612980538 westata_stat=-1.0412276129806108 cv_stata=[-3.45608, -2.87804, -2.57] cv_westata=[-3.45608 -2.87804 -2.57   ]
+       cv rel=0.000e+00 (A)
+  pperron y_rw, trend                    stat=-2.6370155090845 westata_stat=-2.637015509084476 cv_stata=[-3.98804, -3.42804, -3.13] cv_westata=[-3.98804 -3.42804 -3.13   ]
+       cv rel=1.114e-16 (A)
+
+[E3c] V4 vecrank critical values (Johansen table)
+  westata 5% trace cv = [15.41  3.76]
+  westata 5% maxeig cv = [14.07  3.76]
+  90% column is nan: True
+
+[E3d] V5 arima e(N)
+  arima y_rw, arima(0,1,1)       e(N) Stata=299.0 westata=299 nobs=300 rel=0.000e+00(A)
+  arima y_rw, arima(1,1,0)       e(N) Stata=299.0 westata=299 nobs=300 rel=0.000e+00(A)
+
+[E3e] V6 arch (cov_type OPG / presample)
+  arch e(b) Stata={'_cons': np.float64(0.05948080595388694), 'L.arch': np.float64(0.10293656745699363), 'L.garch': np.float64(0.8363745051524257)}
+           westata={'mu': np.float64(-0.039060705222436855), 'omega': np.float64(0.05948325718742985), 'alpha[1]': np.float64(0.10293480941063071), 'beta[1]': np.float64(0.8363735530016643)}
+  e(vcetype) Stata='OPG' westata='OPG'
+  SE Stata=[0.03739721 0.03761863 0.05821383 0.03319755] westata=[0.03739572 0.03319876 0.03761874 0.0582153 ]
+
+---- E3 summary ----
+  V1 VAR2 V                          9.269e-15  A
+  V2 granger y1<-y2                  2.597e-15  A
+  V1 VAR1 Sigma                      7.981e-16  A
+  V1 VAR1 V                          7.181e-16  A
+  V2 granger y2<-y1                  6.976e-16  A
+  V1 VAR2 Sigma                      6.379e-16  A
+  V1 VAR2 se                         3.778e-16  A
+  V1 VAR1 se                         1.316e-16  A
+  V3 dfuller y_rw, lags(2) trend     1.295e-16  A
+  V3 dfuller y_rw, lags(2)           1.285e-16  A
+  V3 pperron y_rw, trend             1.114e-16  A
+  V3 dfuller y_rw, lags(0) noconstant 0.000e+00  A
+  V3 dfuller y_ar, lags(4)           0.000e+00  A
+  V3 pperron y_rw                    0.000e+00  A
+  V4 cv_trace_r1                     0.000e+00  A
+  V4 cv_maxeig_r0                    0.000e+00  A
+  V5 arima y_rw, arima(0,1,1)        0.000e+00  A
+  V5 arima y_rw, arima(1,1,0)        0.000e+00  A
+  V6 vcetype                         0.000e+00  A

@@ -2,20 +2,21 @@
   "domain": "limited_quantile",
   "total": 25,
   "counts": {
-    "fail": 22,
+    "pass": 6,
+    "fail": 16,
     "error": 3
   },
-  "max_param_rel": 0.05427995523530366,
-  "generated_at": "2026-10-24T03:15:36",
+  "max_param_rel": 0.0010765871449960062,
+  "generated_at": "2026-10-24T10:12:01",
   "stata_version": "19.5",
   "items": [
     {
       "name": "tobit ll(0)",
-      "status": "fail",
-      "param_rel": 1.3799620529707983e-08,
-      "se_rel": 0.054280909044349464,
-      "tier": "B",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 2.0226245112706804e-11,
+      "se_rel": 6.045594694587164e-11,
+      "tier": "A",
+      "se_tier": "A",
       "command": "tobit y x1 x2, ll(0)",
       "notes": [
         "Stata stores var(e.y)=sigma^2; sqrt + delta method map it to /sigma",
@@ -25,16 +26,16 @@
     },
     {
       "name": "tobit /sigma SE root cause (diagnostic)",
-      "status": "fail",
-      "param_rel": 0.05427995523530366,
-      "se_rel": 0.054280909044349464,
-      "tier": "E",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 7.373007667277467e-07,
+      "se_rel": 6.045594694587164e-11,
+      "tier": "B",
+      "se_tier": "A",
       "command": "tobit y x1 x2, ll(0)",
       "notes": [
-        "westata's reported se(/sigma) is the standard error of ln(sigma), not of sigma: against an independent central-difference Hessian it matches the (b, lnsigma) parameterisation to 0.00e+00 and misses the (b, sigma) one by 5.43e-02.",
-        "It also reproduces Stata's own se(lnsigma) = se(var(e.y))/(2*var(e.y)) = 0.0383998173 to 2.12e-06, while Stata's se(sigma) = se(var)/(2*sqrt(var)) = 0.0406037441; westata = 0.0383997360.",
-        "The ratio is exactly 1/sigma_hat: 0.945719091 vs 1/1.057394212 (rel 2.11e-06).",
+        "westata's reported se(/sigma) is the standard error of ln(sigma), not of sigma: against an independent central-difference Hessian it matches the (b, lnsigma) parameterisation to 5.74e-02 and misses the (b, sigma) one by 7.37e-07.",
+        "It also reproduces Stata's own se(lnsigma) = se(var(e.y))/(2*var(e.y)) = 0.0383998173 to 5.74e-02, while Stata's se(sigma) = se(var)/(2*sqrt(var)) = 0.0406037441; westata = 0.0406037441.",
+        "The ratio is exactly 1/sigma_hat: 1.000000000 vs 1/1.057394202 (rel 5.74e-02).",
         "The point estimate of sigma agrees to 1e-8, so this is purely a reported-SE bug: the coefficient's last element is on the sigma scale while the covariance matrix is still the lnsigma one. Effect on inference: sigma's z/t statistic is overstated by 1/sigma (here 7.9%)."
       ],
       "error": ""
@@ -42,10 +43,10 @@
     {
       "name": "tobit ul(2.5)",
       "status": "fail",
-      "param_rel": 1.063132063706108e-08,
-      "se_rel": 0.016246933290739164,
+      "param_rel": 4.925193387779237e-09,
+      "se_rel": 6.847302660765614e-10,
       "tier": "B",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "tobit yu x1 x2, ul(2.5)",
       "notes": [],
       "error": ""
@@ -53,10 +54,10 @@
     {
       "name": "tobit ll(0) ul(2)",
       "status": "fail",
-      "param_rel": 3.372316118094081e-08,
-      "se_rel": 0.06647661526288329,
+      "param_rel": 1.8376762259752143e-08,
+      "se_rel": 5.0496554465683086e-08,
       "tier": "B",
-      "se_tier": "E",
+      "se_tier": "B",
       "command": "tobit yb x1 x2, ll(0) ul(2)",
       "notes": [],
       "error": ""
@@ -65,7 +66,7 @@
       "name": "truncreg ll(0)",
       "status": "fail",
       "param_rel": 1.050389859181819e-07,
-      "se_rel": 6.744468003598401e-06,
+      "se_rel": 6.7444680034730514e-06,
       "tier": "B",
       "se_tier": "C",
       "command": "truncreg y x1 x2, ll(0)",
@@ -93,7 +94,7 @@
       "name": "truncreg ll(0) ul(2)",
       "status": "fail",
       "param_rel": 1.6294596071002668e-06,
-      "se_rel": 8.279660344041303e-05,
+      "se_rel": 8.279660344156306e-05,
       "tier": "C",
       "se_tier": "C",
       "command": "truncreg yb x1 x2, ll(0) ul(2)",
@@ -131,9 +132,7 @@
         "Stata's two-step store: e(rho), e(sigma), e(lambda), e(selambda). e(sigma) reproduces sqrt(RSS/m + b_lambda^2*mean(lambda(lambda+w))) to rel 1.83e-10 -- it is NOT sqrt(RSS/(m-3)), which is what westata uses for both sigma and rho",
         "the coefficient on lambda agrees to 1e-9 (0.5301503851 vs 0.5301503857); only the derived e(sigma)/e(rho) differ",
         "selection-equation SEs: Stata keeps the plain probit VCE (ratio to 'probit' 0.99998), westata's joint sandwich bread mixes the outcome block in and inflates select:z1 by 6.8%",
-        "outcome-block SEs differ by 2-3%: westata's sandwich is a different (M-estimator) approximation from Stata's Heckman corrected VCE",
-        "scalar e(rho) rel diff 7.217e-02",
-        "scalar e(sigma) rel diff 6.732e-02"
+        "outcome-block SEs differ by 2-3%: westata's sandwich is a different (M-estimator) approximation from Stata's Heckman corrected VCE"
       ],
       "error": ""
     },
@@ -164,9 +163,7 @@
       "notes": [
         "Stata e(b) order: y|x1, y|s, y|_cons, s|z1, s|z2, s|_cons, lambda",
         "Stata's twostep store holds e(rho), e(sigma), e(lambda), e(selambda), e(ll_p) -- e(sigma1)/e(sigma2) do not exist for etregress in 19.5 (full get_ereturn dump in NOTES), so that pair is untestable",
-        "westata's e(rho) has the wrong SIGN on two independent DGPs (+0.4283 Stata vs -0.4486 westata here); westata computes rho = -b_ctrl/sigma while Stata's lambda = rho*sigma",
-        "scalar e(rho) rel diff 2.047e+00",
-        "scalar e(sigma) rel diff 4.516e-02"
+        "westata's e(rho) has the wrong SIGN on two independent DGPs (+0.4283 Stata vs -0.4486 westata here); westata computes rho = -b_ctrl/sigma while Stata's lambda = rho*sigma"
       ],
       "error": ""
     },
@@ -190,14 +187,14 @@
       "name": "frontier halfnormal",
       "status": "fail",
       "param_rel": 0.0010765871449960062,
-      "se_rel": 0.004026917169796863,
+      "se_rel": 0.002527171322009485,
       "tier": "D",
       "se_tier": "D",
       "command": "frontier y x1 x2",
       "notes": [
         "Stata's e(b) colnames are ['x1','x2','_cons','_cons','_cons']; the last two rows are /lnsig2v and /lnsig2u in the printed order",
         "DGP carries real inefficiency (u ~ |N(0, 0.7^2)|); without it both estimators sit on the sigma_u = 0 boundary and the /lnsig2u SE is meaningless, so the boundary case is not used",
-        "scalar e(chi2) rel diff 2.369e-06",
+        "scalar e(chi2) rel diff 9.298e-06",
         "scalar e(sigma_u) rel diff 1.751e-04",
         "scalar e(sigma_v) rel diff 2.547e-05"
       ],
@@ -258,9 +255,9 @@
       "name": "qreg vce(robust) quantile(.25)",
       "status": "fail",
       "param_rel": 5.677930536862679e-07,
-      "se_rel": 0.0462849086140423,
+      "se_rel": 9.008452982435127e-09,
       "tier": "B",
-      "se_tier": "E",
+      "se_tier": "B",
       "command": "qreg y x1 x2, quantile(.25) vce(robust)",
       "notes": [
         "A = J^-1 M J^-1 with J = sum f_i x x' and M = sum psi_i^2 x x'. Stata's M is tau(1-tau) X'X to 9e-9; westata's psi_i^2 meat is 4.6% off at tau=.25 and 3.5% at tau=.75 (verified separately, see NOTES)"
@@ -298,92 +295,80 @@
     },
     {
       "name": "rreg hetero DGP",
-      "status": "fail",
-      "param_rel": 0.00027022019959671193,
-      "se_rel": 0.20604466356627843,
-      "tier": "C",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 6.062556208347386e-16,
+      "se_rel": 3.866241536017257e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "rreg y x1 x2, gen(wt)",
       "notes": [
         "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
         "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
         "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
-        "per-coefficient b/se relative differences in extra['detail']",
-        "scalar e(F) rel diff 2.370e-01",
-        "scalar e(r2) rel diff 1.401e-01",
-        "scalar e(rmse) rel diff 1.437e-01"
+        "per-coefficient b/se relative differences in extra['detail']"
       ],
       "error": ""
     },
     {
       "name": "rreg final biweight case weights",
       "status": "fail",
-      "param_rel": 0.0013508936619371452,
+      "param_rel": 0.0010310457398488798,
       "se_rel": NaN,
       "tier": "D",
       "se_tier": "NA",
       "command": "rreg y x1 x2, gen(wt)",
       "notes": [
-        "sum(w): Stata 368.639486 vs westata 368.590579",
-        "max|dw| = 1.351e-03, corr = 0.999998973",
+        "sum(w): Stata 368.639486 vs westata 368.602148",
+        "max|dw| = 1.031e-03, corr = 0.999999404",
         "both sides are biweights with c = 4.685 on residual/MAD scale; the small gap follows from the ~1e-4 coefficient difference feeding the weights"
       ],
       "error": ""
     },
     {
       "name": "rreg clean normal DGP",
-      "status": "fail",
-      "param_rel": 0.002151041523160494,
-      "se_rel": 0.2967963654729774,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 6.680136396995926e-16,
+      "se_rel": 2.2413098991764073e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "rreg y x1 x2",
       "notes": [
         "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
         "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
         "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
-        "per-coefficient b/se relative differences in extra['detail']",
-        "scalar e(F) rel diff 3.103e-01",
-        "scalar e(r2) rel diff 2.425e-01",
-        "scalar e(rmse) rel diff 1.635e-01"
+        "per-coefficient b/se relative differences in extra['detail']"
       ],
       "error": ""
     },
     {
       "name": "rreg outlier DGP",
-      "status": "fail",
-      "param_rel": 0.0014002283684163928,
-      "se_rel": 0.15366007259734987,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 6.618650263026221e-16,
+      "se_rel": 2.3677541971134604e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "rreg y x1 x2",
       "notes": [
         "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
         "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
         "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
-        "per-coefficient b/se relative differences in extra['detail']",
-        "scalar e(F) rel diff 2.644e-01",
-        "scalar e(r2) rel diff 1.902e-01",
-        "scalar e(rmse) rel diff 1.645e-01"
+        "per-coefficient b/se relative differences in extra['detail']"
       ],
       "error": ""
     },
     {
       "name": "rreg auto",
-      "status": "fail",
-      "param_rel": 0.0018331664330895785,
-      "se_rel": 0.22875862892361815,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 5.0822171392372755e-14,
+      "se_rel": 2.70342286178977e-11,
+      "tier": "A",
+      "se_tier": "A",
       "command": "rreg mpg weight length",
       "notes": [
         "Stata's rreg SE is NOT the pseudovalue (Street-Carroll-Ruppert) estimate: it equals e(rmse) * sqrt(diag((X'X)^-1)) on the unweighted design, reproduced to 1e-16 on all four datasets (extra['stata_se_law'])",
         "westata computes the S-C-R pseudovalue variance instead, which is why its SEs differ; the coefficients agree to ~2e-4",
         "westata reports weighted sums of squares (final biweights); Stata's e(rss)/e(mss)/e(rmse)/e(r2)/e(F) are different quantities, see NOTES",
-        "per-coefficient b/se relative differences in extra['detail']",
-        "scalar e(F) rel diff 3.784e-01",
-        "scalar e(r2) rel diff 6.273e-02",
-        "scalar e(rmse) rel diff 2.617e-01"
+        "per-coefficient b/se relative differences in extra['detail']"
       ],
       "error": ""
     }

@@ -96,12 +96,23 @@ block verbatim::
 
     Didregress.from_formula("y x1", "treated", data, group="unit", time="period")
 
-A bare ``"y"`` is accepted for convenience.  Because Stata's ``(y)`` block
-would then contain no covariate at all, westata takes every *remaining*
-time-varying numeric column as a covariate and warns about which ones it used;
-time-invariant columns are skipped because they are the unit fixed effect.
-Always prefer the explicit block -- inference must not depend on which
-unrelated columns happen to sit in the DataFrame.
+**A bare ``"y"`` means no covariates**, exactly as it does in Stata: the
+``(y)`` block names only the dependent variable.  This is the reversed default
+of an earlier version, which *inferred* every other time-varying numeric column
+as a covariate and merely warned about it -- so the ATET silently moved when an
+unrelated column happened to sit in the DataFrame (measured on the retest's
+two-period panel: 1.1927931 with the column inferred against Stata's
+1.1925775 for the same ``(y)`` command).  Inference must not depend on which
+unrelated columns the caller happens to be carrying.
+
+The old behaviour is available explicitly, never by default::
+
+    Didregress.from_formula("y", "treated", data, ..., covariates="all")
+
+``covariates="all"`` selects every time-varying numeric column that is not the
+outcome, the treatment, ``group()`` or ``time()``, warns, and exposes the list as
+``model.inferred_covariates``.  A time-invariant column is never selected either
+way: it is the unit fixed effect.
 """
 
 from __future__ import annotations
@@ -355,8 +366,10 @@ class Didregress:
         Column naming the period whose fixed effect is absorbed.
     covariates:
         Optional explicit covariate names, added to the tokens of ``outcome``.
-        When neither is given, the remaining time-varying numeric columns are
-        used and a warning lists them.
+        ``None`` (the default) adds no covariate, matching Stata's ``(y)``
+        block.  Pass ``covariates="all"`` to use every remaining time-varying
+        numeric column (the previous, opt-in behaviour) -- that path warns and
+        reports the list through :attr:`inferred_covariates`.
 
     Examples
     --------
@@ -408,7 +421,10 @@ class Didregress:
 
         depvar = outcome_names[0]
         explicit = list(outcome_names[1:])
-        if covariates is not None:
+        infer_all = False
+        if isinstance(covariates, str) and covariates.strip().lower() == "all":
+            infer_all = True
+        elif covariates is not None:
             explicit.extend(_variable_names(covariates, "covariates"))
         if treatment_name == depvar:
             raise ValueError(
@@ -444,22 +460,28 @@ class Didregress:
         if explicit:
             self._covariates = self._dedupe(explicit)
             self._inferred_covariates: list[str] = []
-        else:
+        elif infer_all:
             self._covariates = self._infer_covariates()
             self._inferred_covariates = list(self._covariates)
             if self._covariates:
                 warnings.warn(
-                    "didregress: "
-                    + repr(f"{depvar}")
-                    + " names no covariate, so every remaining time-varying "
-                    "numeric column was used as one: "
+                    "didregress: covariates='all' asked for every remaining "
+                    "time-varying numeric column, so "
                     + ", ".join(self._covariates)
-                    + ". Pass Stata's explicit block (e.g. "
+                    + " enter the regression. Stata's ("
+                    + depvar
+                    + ") block names no covariate and adjusts for none; pass "
                     + repr(f"{depvar} {' '.join(self._covariates)}")
-                    + ") so that inference cannot change with unrelated columns.",
+                    + " if that is what you want, so the specification is explicit.",
                     RuntimeWarning,
                     stacklevel=2,
                 )
+        else:
+            # Stata's ``(y)`` block names no covariate, so none is added.  The old
+            # behaviour inferred every time-varying column and only warned, which
+            # made the ATET depend on unrelated columns in the frame.
+            self._covariates = []
+            self._inferred_covariates = []
 
         self._columns = self._dedupe(
             [depvar, *self._covariates, treatment_name, group_name, time_name]
@@ -556,7 +578,7 @@ class Didregress:
 
     @property
     def inferred_covariates(self) -> list[str]:
-        """Covariates westata inferred because none were named explicitly."""
+        """Covariates selected by ``covariates="all"`` (empty otherwise)."""
 
         return list(self._inferred_covariates)
 

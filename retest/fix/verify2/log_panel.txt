@@ -1,0 +1,78 @@
+====================================================================================================
+B. PANEL
+====================================================================================================
+stata 19.5
+
+[B1] P1/P2 xtreg,fe  vce(robust) == vce(cluster id) and == Stata
+       Stata max|V_robust - V_cluster| = 0.000e+00
+       westata max|V_robust - V_cluster| = 0.000e+00
+  xtreg fe robust: b/se                        b=4.416e-16 (A)  se=2.747e-14 (A)
+       e(V) full rel=5.496e-14 (A)
+       Stata fe SE  x1/x2 = [0.08789564 0.0776356 ]
+       e(df_r ) Stata=29.0                   westata=29.0                   rel=0.000e+00(A)
+       e(df_m ) Stata=1.0                    westata=2.0                    rel=1.000e+00(E)
+       e(df_b ) Stata=2.0                    westata=2.0                    rel=0.000e+00(A)
+       e(rmse ) Stata=1.0014701713286873     westata=1.0014701713286873     rel=0.000e+00(A)
+       e(r2   ) Stata=0.24696377345855458    westata=0.2469637734585547     rel=4.495e-16(A)
+       e(r2_a ) Stata=0.23845488954283212    westata=0.23845488954283212    rel=0.000e+00(A)
+       e(F    ) Stata=32.7015694588795       westata=32.70156945887952      rel=6.518e-16(A)
+       e(rss  ) Stata=177.5208232188165      westata=177.52082321881653     rel=1.601e-16(A)
+       e(N    ) Stata=180.0                  westata=180                    rel=0.000e+00(A)
+       e(rank ) Stata=2.0                    westata=3                      rel=5.000e-01(E)
+
+[B2] P3 xtpcse: balanced (must not regress), unbalanced casewise/pairwise
+  xtpcse balanced casewise                     b=6.748e-16 (A)  se=7.564e-16 (A)
+       e(V) full rel=5.592e-15 (A) ; e(n_sigma) s=6.0 w=6.0
+  xtpcse unbalanced casewise                   b=8.787e-16 (A)  se=3.914e-16 (A)
+       e(V) full rel=1.930e-15 (A) ; e(n_sigma) s=4.0 w=4.0
+  xtpcse unbalanced pairwise                   b=8.787e-16 (A)  se=5.453e-16 (A)
+       e(V) full rel=1.332e-15 (A) ; e(n_sigma) s=None w=None
+       balanced no-time vs time= : max abs coef diff=0.000e+00 max abs se diff=0.000e+00
+  xtpcse balanced no time= vs Stata            b=6.748e-16 (A)  se=7.564e-16 (A)
+       unbalanced without time=: ConsistencyError OK
+
+[B3] P4 xtabond e(sig2), param_names at lags(2), vce(robust)
+       lags=1 param_names=['L1.y', 'x1'] expected=['L1.y', 'x1'] match=True
+       Stata names=['L.y', 'x1', '_cons']
+  xtabond lags(1) b/se                         b=8.582e-16 (A)  se=5.910e-16 (A)
+       e(sig2) Stata=0.236268052813 westata=0.236268052813 rel=5.874e-16(A)
+       lags=2 param_names=['L1.y', 'L2.y', 'x1'] expected=['L1.y', 'L2.y', 'x1'] match=True
+       Stata names=['L.y', 'L2.y', 'x1', '_cons']
+  xtabond lags(2) b/se                         b=1.506e-14 (A)  se=6.424e-16 (A)
+       e(sig2) Stata=0.234982751923 westata=0.234982751923 rel=2.362e-16(A)
+  xtabond vce(robust) b/se                     b=8.582e-16 (A)  se=2.874e-16 (A)
+       e(V) full rel=5.581e-16 (A)
+
+[B4] P5 xtnbreg,fe -- vs Stata default AND vs ltolerance(1e-8)
+  xtnbreg fe vs Stata default                  b=2.657e-09 (B)  se=5.231e-08 (B)
+  xtnbreg fe vs Stata ltol 1e-8                b=2.657e-09 (B)  se=5.231e-08 (B)
+       Stata default b = {'x1': np.float64(0.43032931630492316), 'x2': np.float64(-0.3503352239768384), '_cons': np.float64(2.8836243566578807)}
+       Stata ltol1e-8 b = {'x1': np.float64(0.43032931630492316), 'x2': np.float64(-0.3503352239768384), '_cons': np.float64(2.8836243566578807)}
+       westata b       = {'_cons': np.float64(2.883625414417286), 'x1': np.float64(0.4303293151613914), 'x2': np.float64(-0.3503352231612336)}
+       Stata own two answers differ by 0.000e+00 (relative, across all params)
+       e(ll) Stata=-399.0300022691 westata=-399.0300022691 rel=5.128e-15
+
+---- summary ----
+  xtreg_e_df_m                 1.000e+00  E
+  xtreg_e_rank                 5.000e-01  E
+  xtnbreg_default              5.231e-08  B
+  xtnbreg_ltol 1e-8            5.231e-08  B
+  xtreg_fe_robust              5.496e-14  A
+  xtabond_lags2                1.506e-14  A
+  xtpcse_balanced_casewise     5.592e-15  A
+  xtpcse_unbalanced_casewise   1.930e-15  A
+  xtpcse_unbalanced_pairwise   1.332e-15  A
+  xtabond_lags1                8.582e-16  A
+  xtabond_robust               8.582e-16  A
+  xtpcse_balanced_notime       7.564e-16  A
+  xtreg_e_F                    6.518e-16  A
+  xtreg_e_r2                   4.495e-16  A
+  xtreg_e_rss                  1.601e-16  A
+  xtreg_e_df_r                 0.000e+00  A
+  xtreg_e_df_b                 0.000e+00  A
+  xtreg_e_rmse                 0.000e+00  A
+  xtreg_e_r2_a                 0.000e+00  A
+  xtreg_e_N                    0.000e+00  A
+  xtpcse_unbalanced_guard      0.000e+00  A
+  xtabond_names1               0.000e+00  A
+  xtabond_names2               0.000e+00  A

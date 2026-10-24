@@ -1,0 +1,90 @@
+====================================================================================================
+C. LIMITED
+====================================================================================================
+stata 19.5
+
+[C1] T1 tobit /sigma SE (ll / ul / both) + T2 e(df_r) + T3 coef SE & stdp
+  tobit ll(0) coefficients                     b=1.271e-10 (A)  se=1.916e-10 (A)
+       /sigma  Stata sigma=1.0626163304 se=0.0442387286 | westata se=0.0442387286 rel=4.664e-10(A)
+       e(df_r) Stata=498.0 westata=498.0 | e(df_m) Stata=2.0 westata=2.0
+       predict stdp rel=2.012e-10(A)  stdf rel=1.592e-10(A)
+  tobit ul(2.5) coefficients                   b=9.658e-09 (B)  se=1.201e-09 (B)
+       /sigma  Stata sigma=1.0301907815 se=0.0348239823 | westata se=0.0348239823 rel=1.145e-09(B)
+       e(df_r) Stata=498.0 westata=498.0 | e(df_m) Stata=2.0 westata=2.0
+       predict stdp rel=1.847e-09(B)  stdf rel=4.765e-10(A)
+  tobit ll(0) ul(2) coefficients               b=7.997e-09 (B)  se=1.442e-08 (B)
+       /sigma  Stata sigma=1.0534302701 se=0.0532704026 | westata se=0.0532704043 rel=3.052e-08(B)
+       e(df_r) Stata=498.0 westata=498.0 | e(df_m) Stata=2.0 westata=2.0
+       predict stdp rel=1.597e-08(B)  stdf rel=1.084e-08(B)
+
+[C2] T4 qreg, vce(robust) -- tau .25/.5/.75 x homoskedastic/heteroskedastic
+  qreg robust homo tau=0.25                    b=2.322e-08 (B)  se=2.471e-08 (B)
+       iid se rel=1.347e-08 (B)
+  qreg robust homo tau=0.5                     b=3.872e-09 (B)  se=5.726e-08 (B)
+       iid se rel=3.861e-08 (B)
+  qreg robust homo tau=0.75                    b=3.613e-09 (B)  se=1.591e-08 (B)
+       iid se rel=1.395e-08 (B)
+  qreg robust hetero tau=0.25                  b=5.389e-08 (B)  se=4.359e-09 (B)
+       iid se rel=2.614e-09 (B)
+  qreg robust hetero tau=0.5                   b=9.851e-09 (B)  se=1.023e-08 (B)
+       iid se rel=9.335e-09 (B)
+  qreg robust hetero tau=0.75                  b=9.286e-09 (B)  se=1.718e-08 (B)
+       iid se rel=1.643e-08 (B)
+
+[C3] T5 heckman e(sigma)/e(rho) ; T6 etregress e(rho) sign
+       heckman e(sigma) Stata=0.984328788847 westata=0.984328788859 rel=1.210e-11(A)
+       heckman e(rho  ) Stata=0.519005902936 westata=0.519005902983 rel=9.071e-11(A)
+       etregress e(sigma ) Stata=0.992848568847 westata=0.992848568847 rel=8.946e-15(A) sign_ok=True
+       etregress e(rho   ) Stata=0.691322859264 westata=0.691322859264 rel=2.441e-14(A) sign_ok=True
+       etregress e(lambda): Stata=0.6863789114311546 westata=None
+
+[C4] T7 rreg SE + rmse^2*(n-k)=rss
+  rreg b/se vs Stata default tolerance         b=6.653e-16 (A)  se=1.291e-16 (A)
+       self-consistency rmse^2*(n-k) vs rss: rel=0.000e+00(A) rss=457.9368502599 rmse=1.0740080659
+       e(rss  ) Stata=457.9368502599448        westata=457.9368502599448        rel=0.000e+00(A)
+       e(mse): Stata=None westata=1.1534933255918005
+       e(rmse ) Stata=1.0740080658876825       westata=1.0740080658876825       rel=0.000e+00(A)
+       e(r2   ) Stata=0.7804538740799388       westata=0.7804538740799389       rel=1.423e-16(A)
+       e(F    ) Stata=705.6380218764405        westata=705.6380218764407        rel=3.222e-16(A)
+       e(df_r ) Stata=397.0                    westata=397.0                    rel=0.000e+00(A)
+       e(df_m ) Stata=2.0                      westata=2.0                      rel=0.000e+00(A)
+       e(N    ) Stata=400.0                    westata=400                      rel=0.000e+00(A)
+
+---- summary ----
+  qreg_homo tau=0.5                5.726e-08  B
+  qreg_hetero tau=0.25             5.389e-08  B
+  qreg_iid_homo tau=0.5            3.861e-08  B
+  tobit_sigma_ll(0) ul(2)          3.052e-08  B
+  qreg_homo tau=0.25               2.471e-08  B
+  qreg_hetero tau=0.75             1.718e-08  B
+  qreg_iid_hetero tau=0.75         1.643e-08  B
+  tobit_stdp_ll(0) ul(2)           1.597e-08  B
+  qreg_homo tau=0.75               1.591e-08  B
+  qreg_iid_homo tau=0.75           1.395e-08  B
+  qreg_iid_homo tau=0.25           1.347e-08  B
+  tobit_stdf_ll(0) ul(2)           1.084e-08  B
+  qreg_hetero tau=0.5              1.023e-08  B
+  qreg_iid_hetero tau=0.5          9.335e-09  B
+  qreg_iid_hetero tau=0.25         2.614e-09  B
+  tobit_stdp_ul(2.5)               1.847e-09  B
+  tobit_sigma_ul(2.5)              1.145e-09  B
+  tobit_stdf_ul(2.5)               4.765e-10  A
+  tobit_sigma_ll(0)                4.664e-10  A
+  tobit_stdp_ll(0)                 2.012e-10  A
+  tobit_stdf_ll(0)                 1.592e-10  A
+  heckman_rho                      9.071e-11  A
+  heckman_sigma                    1.210e-11  A
+  etregress_rho                    2.441e-14  A
+  etregress_sigma                  8.946e-15  A
+  rreg_F                           3.222e-16  A
+  rreg_r2                          1.423e-16  A
+  rreg_se                          1.291e-16  A
+  tobit_df_ll(0)                   0.000e+00  A
+  tobit_df_ul(2.5)                 0.000e+00  A
+  tobit_df_ll(0) ul(2)             0.000e+00  A
+  rreg_identity                    0.000e+00  A
+  rreg_rss                         0.000e+00  A
+  rreg_rmse                        0.000e+00  A
+  rreg_df_r                        0.000e+00  A
+  rreg_df_m                        0.000e+00  A
+  rreg_N                           0.000e+00  A

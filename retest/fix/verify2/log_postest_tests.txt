@@ -1,0 +1,30 @@
+====================================================================================================
+E4. POSTEST M5 -- lrtest acceptance matrix vs Stata
+====================================================================================================
+(1978 automobile data)
+D:\myCodeProject\statapy\retest\fix\verify2\e2_postest_tests.py:129: RuntimeWarning: hausman: the difference V_consistent - V_efficient is not positive definite; using a generalised inverse as Stata does, so the test statistic may be unreliable
+  h = ws.hausman(fe, re_, **kw)
+D:\myCodeProject\statapy\src\westata\results\base.py:366: RuntimeWarning: hausman: the difference V_consistent - V_efficient is not positive definite; using a generalised inverse as Stata does, so the test statistic may be unreliable
+  return hausman(self, efficient, **kwargs)
+  B1 L1    [nested, k differs       ] chi2 Stata=2.411248402740 westata=2.411248402740 df 1/1 p rel=7.027e-15  -> OK
+  L1 B1    [arguments reversed      ] chi2 Stata=2.411248402740 westata=2.411248402740 df 1/1 p rel=7.027e-15  -> OK
+  L1 E2    [same model twice        ] both refuse (Stata rc=498); westata: lrtest: df(unrestricted) = df(restricted) = 2, so no likelihood-ratio   -> OK
+  N3 L1    [same k, different variables] chi2 Stata=0.590462660168 westata=0.590462660168 df 1/1 p rel=0.000e+00  -> OK
+  L2 L1    [non-nested, k differs   ] chi2 Stata=2.123853308191 westata=2.123853308191 df 1/1 p rel=3.062e-14  -> OK
+
+====================================================================================================
+E5. POSTEST M6 -- hausman constant switch
+====================================================================================================
+  default  Stata chi2=0.117268769902 df=2 p=0.943051499954 | westata=0.117268769902 df=2 p=0.943051499954 rel=3.471e-13(A) p_rel=2.037e-14
+           result-method path: same=True df=2.0
+  constant Stata chi2=0.117268769902 df=3 p=0.989687478018 | westata=0.117268769902 df=3 p=0.989687478018 rel=3.471e-13(A) p_rel=5.272e-15
+           result-method path: same=True df=3.0
+
+---- summary ----
+  M6 default                 3.471e-13  A
+  M6 constant                3.471e-13  A
+  M5 B1 L1                   0.000e+00  A
+  M5 L1 B1                   0.000e+00  A
+  M5 L1 E2                   0.000e+00  A
+  M5 N3 L1                   0.000e+00  A
+  M5 L2 L1                   0.000e+00  A

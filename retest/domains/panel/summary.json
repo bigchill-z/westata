@@ -2,13 +2,13 @@
   "domain": "panel",
   "total": 42,
   "counts": {
-    "pass": 22,
-    "fail": 18,
+    "pass": 31,
+    "fail": 9,
     "skip": 1,
     "error": 1
   },
   "max_param_rel": 0.2115256940544834,
-  "generated_at": "2026-10-24T02:15:50",
+  "generated_at": "2026-10-24T10:25:57",
   "stata_version": "19.5",
   "items": [
     {
@@ -166,11 +166,11 @@
     },
     {
       "name": "xtreg, fe vce(robust)\uff08Stata \u91cc\u5b83 = vce(cluster id)\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.2688459307379942e-16,
-      "se_rel": 17.364323362963788,
+      "se_rel": 9.186318846357731e-15,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "xtreg y x1 x2, fe vce(robust)",
       "notes": [
         "Stata \u6587\u6863\u4e0e\u5b9e\u6d4b\u4e00\u81f4\uff1axtreg, fe \u7684 vce(robust) \u5c31\u662f vce(cluster panelvar)\uff0c\u4e24\u8005 e(V) \u5b8c\u5168\u76f8\u540c\uff08max abs diff = 0\uff09",
@@ -180,11 +180,11 @@
     },
     {
       "name": "xtreg, fe vce(cluster id)",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 1.2688459307379942e-16,
-      "se_rel": 0.09359313546947007,
+      "se_rel": 9.186318846357731e-15,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "xtreg y x1 x2, fe vce(cluster id)",
       "notes": [
         "\u7cfb\u6570\u4e00\u81f4\u5230 1e-16\uff0c\u4f46\u6807\u51c6\u8bef\u7edf\u4e00\u653e\u5927 9.359%\uff08\u4e09\u6761\u5168\u662f\u540c\u4e00\u4e2a\u56e0\u5b50\uff09",
@@ -194,15 +194,15 @@
       "error": ""
     },
     {
-      "name": "\u5f52\u56e0 A\uff1awestata \u7684 vce(cluster) == Stata \u7684 vce(cluster id) dfadj",
+      "name": "\u5f52\u56e0 A\uff1awestata \u7684 vce(cluster) == Stata \u7684 vce(cluster id)\uff08\u9ed8\u8ba4\u53e3\u5f84\uff09",
       "status": "pass",
-      "param_rel": 2.5376918614759883e-16,
-      "se_rel": 2.148869141431379e-15,
+      "param_rel": 1.2688459307379942e-16,
+      "se_rel": 9.186318846357731e-15,
       "tier": "A",
       "se_tier": "A",
-      "command": "xtreg y x1 x2, fe vce(cluster id) dfadj",
+      "command": "xtreg y x1 x2, fe vce(cluster id)",
       "notes": [
-        "Stata `dfadj` = \u7528 (N-1)/(N-P)\uff08P \u542b\u88ab\u5438\u6536\u7684\u9762\u677f\u6548\u5e94\uff09\u800c\u4e0d\u662f (N-1)/(N-K)\uff1bwestata \u7684\u7ed3\u679c\u4e0e dfadj \u9010\u4f4d\u76f8\u540c\uff082.1e-15\uff09\u2192 westata \u7528\u7684\u662f dfadj \u53e3\u5f84\uff0c\u800c Stata \u7684\u9ed8\u8ba4\u53e3\u5f84\u4e0d\u542b\u88ab\u5438\u6536\u6548\u5e94"
+        "Stata \u7684 `vce(cluster id)` \u9ed8\u8ba4\u53e3\u5f84\u4e0e `dfadj` \u53e3\u5f84\u4e0d\u540c\uff1a\u9ed8\u8ba4\u6309 K=3\uff08\u4e0d\u628a\u88ab\u5438\u6536\u6548\u5e94\u8ba1\u5165\u81ea\u7531\u5ea6\uff09\uff0cdfadj \u6309 (N-1)/(N-P)\uff08P \u542b\u88ab\u5438\u6536\u6548\u5e94\uff09\u3002\u4fee\u597d\u540e westata \u4e0e\u9ed8\u8ba4\u53e3\u5f84\u9010\u4f4d\u4e00\u81f4\uff0c\u4e0e dfadj \u76f8\u6bd4\u5219\u5dee (N-1)/(N-P) \u90a3\u4e2a\u56e0\u5b50\u2014\u2014\u8fd9\u4e00\u6761\u6b63\u662f\u5f53\u5e74\u628a\u9519\u8bef\u53e3\u5f84\u56fa\u5316\u6210\u300e\u6b63\u786e\u300f\u7684\u8bc1\u636e\uff0c\u73b0\u5728\u53cd\u8fc7\u6765\u7528\u3002"
       ],
       "error": ""
     },
@@ -318,11 +318,11 @@
     },
     {
       "name": "xtpcse\uff08\u975e\u5e73\u8861\uff0ccasewise\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 6.161373404872528e-16,
-      "se_rel": 0.280944632295782,
+      "se_rel": 2.6240029145931473e-15,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "xtpcse y x1 x2",
       "notes": [
         "\u7cfb\u6570\u9010\u4f4d\u4e00\u81f4\uff086e-16\uff09\uff0c\u6807\u51c6\u8bef\u5168\u9519\u3002\u6309 westata \u7684\u53c2\u6570\u987a\u5e8f (Intercept, x1, x2)\uff1a\u5e38\u6570\u9879 0.030436 vs Stata 0.037021\uff08\u76f8\u5bf9\u5dee 0.178\uff09\u3001x1 0.040981 vs 0.048510\uff080.155\uff09\u3001x2 0.034256 vs 0.047641\uff080.281\uff09",
@@ -334,11 +334,11 @@
     },
     {
       "name": "xtpcse\uff08\u975e\u5e73\u8861\uff0cpairwise\uff09",
-      "status": "fail",
+      "status": "pass",
       "param_rel": 6.161373404872528e-16,
-      "se_rel": 0.419129439023833,
+      "se_rel": 4.6489678733070385e-16,
       "tier": "A",
-      "se_tier": "E",
+      "se_tier": "A",
       "command": "xtpcse y x1 x2, pairwise",
       "notes": [
         "westata \u63a5\u53d7 selection='pairwise'\uff0c\u4f46\u4e24\u6761\u8def\u5f84\u8fd4\u56de**\u5b8c\u5168\u76f8\u540c**\u7684\u7ed3\u679c\uff08bse \u9010\u4f4d\u76f8\u540c\uff09\u2014\u2014pairwise \u5206\u652f\u6839\u672c\u6ca1\u5b9e\u73b0\uff0c\u53ea\u662f\u628a\u6807\u7b7e\u6539\u4e86",
@@ -484,27 +484,27 @@
     },
     {
       "name": "xtnbreg, fe\uff08HHG \u62df\u4f3c\u7136\uff09",
-      "status": "fail",
-      "param_rel": 0.0013551571115609639,
-      "se_rel": 0.06791409140709483,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 6.955861633443035e-14,
+      "se_rel": 2.626023510138522e-13,
+      "tier": "A",
+      "se_tier": "A",
       "command": "xtnbreg yc x1 x2, fe",
       "notes": [
         "Stata \u7684 xtnbreg,fe \u4e0e xtpoisson,fe \u4f30\u7684\u4e0d\u662f\u540c\u4e00\u4e2a\u76ee\u6807\uff08HHG \u62df\u4f3c\u7136 vs \u6761\u4ef6 Poisson\uff09\uff0c\u7cfb\u6570\u76f8\u5bf9\u5dee 1.36e-3\uff08x1 0.385457 vs 0.384935\uff09\u3001SE \u76f8\u5bf9\u5dee 6.79e-2\uff080.070704 vs 0.065902\uff09",
         "westata \u7684 xtnbreg,fe \u4e0e\u5b83\u81ea\u5df1\u7684 xtpoisson,fe \u7ed9\u51fa**\u9010\u4f4d\u76f8\u540c**\u7684\u7cfb\u6570\u548c SE\uff0c\u800c Stata \u7684\u4e24\u4e2a\u547d\u4ee4\u4e0d\u540c \u2192 westata \u5b9e\u9645\u4e0a\u53ea\u5b9e\u73b0\u4e86\u6761\u4ef6 Poisson\uff0c\u628a\u5b83\u5f53\u4f5c xtnbreg \u7684\u7b54\u6848\u5728\u7cfb\u6570\u4e0a\u8fd8\u8fc7\u5f97\u53bb\uff081.4e-3\uff09\uff0cSE \u4e0a\u5dee 6.8%",
         "Stata \u62a5 _cons=2.628\uff08SE=1.101\uff09\uff0c\u90a3\u662f\u88ab\u56fa\u5b9a\u6548\u5e94\u5438\u6536\u7684\u5e73\u5766\u65b9\u5411\uff1bwestata \u9009\u62e9\u4e0d\u62a5\u2014\u2014\u8fd9\u4e2a\u5904\u7406\u662f\u6b63\u786e\u7684\uff0c\u5df2\u5728\u6bd4\u5bf9\u524d\u5254\u9664\uff0c\u4e0d\u8ba1\u5165\u5224\u5b9a",
-        "ll\uff1aStata \u5728\u201cLog likelihood\u201d\u6807\u7b7e\u4e0b\u7ed9 -216.43859\uff0cwestata \u7ed9 -216.94487\uff08\u6b63\u662f\u5b83\u81ea\u5df1 xtpoisson,fe \u7684\u503c -216.94487\uff09\u3002westata \u6587\u6863\u79f0\u4e8c\u8005\u51e0\u4e4e\u76f8\u540c\uff0c\u672c\u6570\u636e\u4e0a\u76f8\u5bf9\u5dee 2.3e-3 \u2014\u2014 \u6bd4\u7cfb\u6570/SE \u5c0f\u4e00\u4e2a\u91cf\u7ea7\uff0c\u4f46\u201c\u51e0\u4e4e\u76f8\u540c\u201d\u4ecd\u9700\u9650\u5b9a\u6761\u4ef6"
+        "ll\uff1aStata \u5728\u201cLog likelihood\u201d\u6807\u7b7e\u4e0b\u7ed9 -216.43859\uff0cwestata \u7ed9 -216.43859\uff08\u6b63\u662f\u5b83\u81ea\u5df1 xtpoisson,fe \u7684\u503c -216.94487\uff09\u3002westata \u6587\u6863\u79f0\u4e8c\u8005\u51e0\u4e4e\u76f8\u540c\uff0c\u672c\u6570\u636e\u4e0a\u76f8\u5bf9\u5dee 2.3e-3 \u2014\u2014 \u6bd4\u7cfb\u6570/SE \u5c0f\u4e00\u4e2a\u91cf\u7ea7\uff0c\u4f46\u201c\u51e0\u4e4e\u76f8\u540c\u201d\u4ecd\u9700\u9650\u5b9a\u6761\u4ef6"
       ],
       "error": ""
     },
     {
       "name": "xtabond\uff08Arellano-Bond \u4e00\u9636\u5dee\u5206 GMM\uff0clags(1)\uff09",
-      "status": "fail",
-      "param_rel": 0.002025449715641141,
-      "se_rel": 0.9075843439513647,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 9.685048791862464e-16,
+      "se_rel": 3.438890358639886e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "xtabond y x1 x2, lags(1)",
       "notes": [
         "\u5de5\u5177\u53d8\u91cf\u4e2a\u6570\u3001\u6837\u672c\u90fd\u5bf9\u4e0a\uff1aStata zrank=24\uff0cwestata instruments=24\uff1b\u4e24\u8fb9 N=360",
@@ -518,11 +518,11 @@
     },
     {
       "name": "xtabond lags(2)\uff08\u52a8\u6001\u9762\u677f\uff1b\u6309\u4f4d\u7f6e\u5bf9\u9f50\uff0c\u7ed5\u5f00 westata \u7684\u547d\u540d\u9519\u4f4d\uff09",
-      "status": "fail",
-      "param_rel": 0.03490013959120721,
-      "se_rel": 0.9403879747700237,
-      "tier": "E",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 4.633208485757398e-15,
+      "se_rel": 1.1537271381500236e-15,
+      "tier": "A",
+      "se_tier": "A",
       "command": "xtabond y x1 x2, lags(2)",
       "notes": [
         "\u5de5\u5177\u6570\uff0823\uff09\u4e0e\u6837\u672c\uff08300\uff09\u4ecd\u5bf9\u9f50\uff1b\u6309\u4f4d\u7f6e\u5bf9\u9f50\u540e L1.y 0.553997 vs 0.541664\uff082.3e-2\uff09\u3001L2.y 0.071296 vs 0.068892\uff083.5e-2\uff09\u3001x1 0.840295 vs 0.83053\uff081.2e-2\uff09\u3001x2 -0.398252 vs -0.398274\uff085e-5\uff09",
@@ -531,26 +531,25 @@
       "error": ""
     },
     {
-      "name": "xtabond lags(2) \u7684\u53c2\u6570\u547d\u540d\u7f3a\u9677",
-      "status": "fail",
-      "param_rel": NaN,
+      "name": "xtabond lags(2) \u7684\u53c2\u6570\u547d\u540d\u4e0e\u8bbe\u8ba1\u77e9\u9635\u4e00\u81f4",
+      "status": "pass",
+      "param_rel": 0.0,
       "se_rel": NaN,
-      "tier": "NA",
+      "tier": "A",
       "se_tier": "NA",
       "command": "xtabond y x1 x2, lags(2)",
       "notes": [
-        "westata \u7684 XtAbond \u5728 lags=2 \u65f6\u53ea\u7ed9\u4e00\u4e2a\u6ede\u540e\u53c2\u6570\u540d\uff1aparam_names=['L2.y', 'x1', 'x2', 'extra_0']\uff0c\u4f46\u8bbe\u8ba1\u77e9\u9635\u6709 L1.y\u3001L2.y \u4e24\u5217\uff1bpanel_dynamic.py \u91cc\u5199\u6b7b param_names=(f\"L{lags}.y\",)\uff0c\u4e8e\u662f\u7b2c 0 \u5217\u7684\u771f\u503c L1.y \u88ab\u6807\u6210 L2.y\u3001\u7b2c 1 \u5217\u7684\u771f\u503c L2.y \u88ab\u6807\u6210 x1\u3001x2 \u88ab\u6807\u6210 extra_0",
-        "\u540e\u679c\u6bd4\u6570\u503c\u504f\u5dee\u66f4\u4e25\u91cd\uff1a\u4efb\u4f55\u6309\u540d\u5b57\u53d6\u7cfb\u6570\u7684\u4e0b\u6e38\u4ee3\u7801\uff08test L2.y\u3001lincom\u3001\u62a5\u544a\u8868\uff09\u90fd\u4f1a\u53d6\u9519\u53d8\u91cf\uff0c\u800c\u4e14\u4e0d\u62a5\u9519\u3002lags=1 \u65f6\u6070\u597d\u6b63\u786e\uff0c\u6240\u4ee5\u53ea\u6709\u591a\u6ede\u540e\u624d\u66b4\u9732"
+        "\u56de\u5f52\u524d westata \u5728 lags=2 \u65f6\u628a\u7b2c 0..3 \u5217\u6807\u6210 ['L2.y','x1','x2','extra_0']\uff0c\u771f\u503c\u662f ['L1.y','L2.y','x1','x2']\uff1b\u6309\u540d\u5b57\u53d6\u7cfb\u6570\u4f1a\u9759\u9ed8\u53d6\u9519\u53d8\u91cf\u3002\u73b0\u5728 param_names=['L1.y', 'L2.y', 'x1', 'x2']\u3002"
       ],
       "error": ""
     },
     {
       "name": "xtabond \u9759\u6001\u9762\u677f\uff08\u65e0\u771f\u5b9e\u52a8\u6001\uff0c\u5f31\u8bc6\u522b\u538b\u529b\u6d4b\u8bd5\uff09",
-      "status": "fail",
-      "param_rel": 0.005055807729331701,
-      "se_rel": 0.19884609581350615,
-      "tier": "D",
-      "se_tier": "E",
+      "status": "pass",
+      "param_rel": 2.6135603890185175e-14,
+      "se_rel": 1.0207923278080618e-15,
+      "tier": "A",
+      "se_tier": "A",
       "command": "xtabond y x1 x2, lags(1)",
       "notes": [
         "\u540c\u4e00\u4efd\u6570\u636e\u4e0a y \u6ca1\u6709\u771f\u5b9e\u52a8\u6001\uff08AR \u7cfb\u6570\u771f\u503c \u2248 0\uff09\uff0c\u5dee\u5206 GMM \u5f31\u8bc6\u522b\uff1aStata L1.y=0.063417\u3001westata L1.y=0.050982\uff0c\u76f8\u5bf9\u5dee 0.196\uff1b\u5bf9\u6bd4\u52a8\u6001\u9762\u677f\u4e0a\u7684 3.1e-3\uff0c\u8bf4\u660e westata \u7684\u504f\u5dee\u5728\u5f31\u8bc6\u522b\u65f6\u88ab\u653e\u5927",

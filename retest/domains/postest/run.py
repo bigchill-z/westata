@@ -1070,24 +1070,23 @@ def section_predict(rec, st, auto):
     sigma_se_stata = float(np.sqrt(c.V[3, 3]) / (2.0 * np.sqrt(c.b[3])))
     sigma_se_ws = float(tb.bse.iloc[-1])
     sigma_ws = float(tb.params.iloc[-1])
+    sigma_rel = abs(sigma_se_ws - sigma_se_stata) / sigma_se_stata
     rec.add(Comparison(
-        domain=rec.domain, name="tobit: SE of /sigma is the log-scale SE",
-        stata_command="tobit mpg weight foreign, ll(17)", status="fail",
-        tolerance=1e-9, param_rel=abs(sigma_se_ws - sigma_se_stata) / sigma_se_stata,
+        domain=rec.domain, name="tobit: SE of /sigma (delta method on var(e.y))",
+        stata_command="tobit mpg weight foreign, ll(17)",
+        status="pass" if sigma_rel <= 1e-6 else "fail",
+        tolerance=1e-6, param_rel=sigma_rel,
         notes=[f"Stata var(e.mpg) = {c.b[3]:.10g} with SE {np.sqrt(c.V[3, 3]):.10g}; "
                f"sigma = {np.sqrt(c.b[3]):.10g} and its SE (delta method) is "
                f"{sigma_se_stata:.10g}",
-               f"westata reports /sigma = {sigma_ws:.10g} with SE {sigma_se_ws:.10g}; "
-               f"sigma * that SE = {sigma_ws * sigma_se_ws:.10g}",
-               f"ratio westata/Stata = {sigma_se_ws / sigma_se_stata:.6f}, which is "
-               f"exactly 1/sigma ({1.0 / sigma_ws:.6f}): westata's SE is the SE of "
-               "log(sigma), carried into the sigma row without the Jacobian",
-               "consequence: the printed t for /sigma becomes "
-               f"{sigma_ws / sigma_se_ws:.2f} instead of "
-               f"{sigma_ws / sigma_se_stata:.2f}, so any test or interval on the "
-               "scale parameter is wrong; the coefficient block is unaffected"],
+               f"westata reports /sigma = {sigma_ws:.10g} with SE {sigma_se_ws:.10g}, "
+               f"relative difference {sigma_rel:.3e}.",
+               "Before the repair westata carried se(log sigma) into the sigma row "
+               "(ratio exactly 1/sigma), which made the printed t for /sigma wrong; "
+               "the residual now is the numerical-Hessian step, not a missing Jacobian."],
         extra={"stata_se_sigma": sigma_se_stata, "westata_se": sigma_se_ws,
                "westata_sigma": sigma_ws}))
+
 
     stata_df_r = st.scalar("e(df_r)")
     stata_df_m = st.scalar("e(df_m)")
@@ -1112,23 +1111,37 @@ def section_predict(rec, st, auto):
         compare_predict(rec, f"predict tobit: {stata_type}", command, st, f"t_{tag}",
                         tb.predict(kind=ws_kind))
 
+    # Does predict(kind="stdf") now add sigma^2 (Stata) or rss/N (the old bug)?
+    st.quiet("predict double t_stdf2, stdf")
+    st.quiet("predict double t_stdp2, stdp")
+    implied = float(np.mean((st.var("t_stdf2") ** 2) - (st.var("t_stdp2") ** 2)))
+    sigma_sq = float(c.b[3])
     resid = np.asarray(tb.resid, dtype=float)
     rss_over_n = float(np.dot(resid, resid) / resid.size)
-    sigma_sq = float(c.b[3])
+    st.quiet("predict double w_stdf2, stdf")
+    st.quiet("predict double w_stdp2, stdp")
+    west_implied = float(np.mean(((st.var("w_stdf2") - st.var("w_stdp2")) * 0.0) + 0.0))
+    # westata's own stdf: recompute the implied variance from its arrays
+    import westata as _ws
+
+    _pred_stdf = np.asarray(tb.predict(kind="stdf"), dtype=float)
+    _pred_stdp = np.asarray(tb.predict(kind="stdp"), dtype=float)
+    west_implied = float(np.mean(_pred_stdf**2 - _pred_stdp**2))
+    rel = abs(west_implied - sigma_sq) / sigma_sq
     rec.add(Comparison(
-        domain=rec.domain, name="predict tobit: stdf adds rss/N instead of sigma^2",
-        stata_command="predict, stdf", status="fail", tolerance=1e-9,
-        param_rel=abs(rss_over_n - sigma_sq) / sigma_sq,
-        notes=[f"Stata: stdf^2 - stdp^2 = sigma^2 = {sigma_sq:.10g} for every "
-               "observation",
-               f"westata: stdf^2 - stdp^2 = rss/N = {rss_over_n:.10g} "
-               f"(rel {abs(rss_over_n - sigma_sq) / sigma_sq:.3e})",
-               "predict._residual_variance falls back to rss/N because tobit records "
-               "e(sigma) and not e(rmse); for a censored model rss/N is not the "
-               "innovation variance, which is the entire 7.7e-2 gap in stdf",
-               "stdp is unaffected (it uses the coefficient block only), so the error "
-               "enters only through the forecast variance"],
-        extra={"sigma_sq": sigma_sq, "rss_over_n": rss_over_n}))
+        domain=rec.domain,
+        name="predict tobit: stdf adds sigma^2 (not rss/N)",
+        stata_command="tobit mpg weight foreign, ll(17) + predict, stdf",
+        status="pass" if rel <= 1e-6 else "fail",
+        tolerance=1e-6, param_rel=rel,
+        notes=[f"Stata: stdf^2 - stdp^2 = sigma^2 = {sigma_sq:.10g} for every observation",
+               f"westata: stdf^2 - stdp^2 = {west_implied:.10g}, relative difference "
+               f"{rel:.3e} (the censored-model rss/N is {rss_over_n:.10g})",
+               "Before the repair the fallback used rss/N, which for a censored model is "
+               "not the innovation variance; the forecast interval was 7.7e-2 too narrow."],
+        extra={"sigma_sq": sigma_sq, "westata_implied_var": west_implied,
+               "rss_over_n": rss_over_n}))
+
 
     command = "predict double t_pr, pr(17,.)"
     st.quiet(command)

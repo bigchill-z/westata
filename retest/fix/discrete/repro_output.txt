@@ -1,0 +1,220 @@
+StataNow 19.5 / westata 0.0.1
+
+=== D1  ologit / oprobit 的 e(V)（verifier 参考数据，cut SE 应为 0.0874/0.0962）
+  [ologit ycat x1 x2] 缺陷②证据: 旧代码的交叉块与输入逐位相同 = True
+    cut SE（旧算法）                      before=目标 0.0874/0.0962   after=8.428e-01   E
+    cut SE（修复后）                      before=—                  after=4.495e-12   A
+    slope×cut 交叉块                    before=未变换(=源矩阵)          after=2.753e-11   A
+    e(V) 全矩阵                         before=2.09e+01 / 1.05e+01 after=2.753e-11   A
+    e(V) 全矩阵（旧算法复算）                  before=—                  after=3.944e+00   E
+    系数                               before=3.55e-05 / 3.80e-06 after=1.677e-11   A
+      cut SE westata=[0.10432381, 0.08740299, 0.09620776]
+      cut SE Stata  =[0.10432381, 0.08740299, 0.09620776]
+  [oprobit ycat x1 x2] 缺陷②证据: 旧代码的交叉块与输入逐位相同 = True
+    cut SE（旧算法）                      before=目标 0.0874/0.0962   after=1.153e+00   E
+    cut SE（修复后）                      before=—                  after=1.452e-09   B
+    slope×cut 交叉块                    before=未变换(=源矩阵)          after=1.539e-08   B
+    e(V) 全矩阵                         before=2.09e+01 / 1.05e+01 after=1.539e-08   B
+    e(V) 全矩阵（旧算法复算）                  before=—                  after=5.753e+00   E
+    系数                               before=3.55e-05 / 3.80e-06 after=1.234e-08   B
+      cut SE westata=[0.06006354, 0.05350367, 0.05700983]
+      cut SE Stata  =[0.06006354, 0.05350367, 0.05700983]
+  多数据集复核（另一 DGP——4 类有序、probit 生成）：
+    ologit y x1 x2         e(V) rel=3.340e-12 (A)
+    oprobit y x1 x2        e(V) rel=1.714e-09 (B)
+
+=== D2/D3  稳健 VCE 可用性与 HC0/HC1 的区分
+  --- logit yb x1 x2
+    e(V) 全矩阵                         before=1.31e-07           after=1.938e-13   A
+    SE（e(V) 对角开方）                    before=1.31e-07           after=3.558e-14   A
+    e(V) 全矩阵                         before=ValueError（不可用）    after=4.218e-13   A
+    SE（e(V) 对角开方）                    before=ValueError（不可用）    after=6.974e-14   A
+    e(V) 全矩阵                         before=3.35e-03           after=2.788e-13   A
+    SE（e(V) 对角开方）                    before=3.35e-03           after=7.485e-14   A
+    HC0 与 HC1 逐位相同? 改前=True（静默等价） 改后=False | HC1 / (N/(N-K)) vs HC0 = 0.000e+00 (A)
+    HC0 vs Stata vce(robust): 1.67e-03（HC0 不带 N/(N-1)，故与 Stata 的 ml robust 不同）
+  --- probit yb x1 x2
+    e(V) 全矩阵                         before=1.31e-07           after=2.399e-09   B
+    SE（e(V) 对角开方）                    before=1.31e-07           after=3.246e-10   A
+    e(V) 全矩阵                         before=ValueError（不可用）    after=6.626e-09   B
+    SE（e(V) 对角开方）                    before=ValueError（不可用）    after=8.551e-10   A
+    e(V) 全矩阵                         before=3.35e-03           after=3.468e-09   B
+    SE（e(V) 对角开方）                    before=3.35e-03           after=1.013e-09   B
+    HC0 与 HC1 逐位相同? 改前=True（静默等价） 改后=False | HC1 / (N/(N-K)) vs HC0 = 1.651e-16 (A)
+    HC0 vs Stata vce(robust): 1.67e-03（HC0 不带 N/(N-1)，故与 Stata 的 ml robust 不同）
+  --- poisson y_c x1 x2
+    e(V) 全矩阵                         before=1.31e-07           after=2.168e-08   B
+    SE（e(V) 对角开方）                    before=1.31e-07           after=5.259e-09   B
+    e(V) 全矩阵                         before=ValueError（不可用）    after=4.645e-08   B
+    SE（e(V) 对角开方）                    before=ValueError（不可用）    after=1.059e-08   B
+    e(V) 全矩阵                         before=3.35e-03           after=2.129e-08   B
+    SE（e(V) 对角开方）                    before=3.35e-03           after=8.857e-09   B
+    HC0 与 HC1 逐位相同? 改前=True（静默等价） 改后=False | HC1 / (N/(N-K)) vs HC0 = 0.000e+00 (A)
+    HC0 vs Stata vce(robust): 1.67e-03（HC0 不带 N/(N-1)，故与 Stata 的 ml robust 不同）
+  --- nbreg y_nb x1 x2
+    e(V) 全矩阵                         before=1.31e-07           after=1.179e-05   C
+    SE（e(V) 对角开方）                    before=1.31e-07           after=1.823e-08   B
+    e(V) 全矩阵                         before=ValueError（不可用）    after=1.637e-06   C
+    SE（e(V) 对角开方）                    before=ValueError（不可用）    after=3.724e-08   B
+    e(V) 全矩阵                         before=3.35e-03           after=3.878e-06   C
+    SE（e(V) 对角开方）                    before=3.35e-03           after=8.000e-08   B
+    HC0 与 HC1 逐位相同? 改前=True（静默等价） 改后=False | HC1 / (N/(N-K)) vs HC0 = 2.146e-16 (A)
+    HC0 vs Stata vce(robust): 1.67e-03（HC0 不带 N/(N-1)，故与 Stata 的 ml robust 不同）
+
+=== D4  e(chi2)/e(chi2type) 随 VCE 从 LR 切到斜率块 Wald
+  --- logit yb x1 x2
+    e(chi2) [type=LR]                before=—                  after=3.635e-10   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=5.798e-14   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=5.464e-14   A
+  --- probit yb x1 x2
+    e(chi2) [type=LR]                before=—                  after=2.672e-10   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=1.549e-09   B
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=1.345e-09   B
+  --- poisson y_c x1 x2
+    e(chi2) [type=LR]                before=—                  after=8.362e-16   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=6.340e-10   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=7.662e-11   A
+  --- nbreg y_nb x1 x2
+    e(chi2) [type=LR]                before=—                  after=5.986e-11   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=3.593e-09   B
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=2.010e-07   B
+  --- ologit ycat x1 x2
+    e(chi2) [type=LR]                before=—                  after=2.385e-15   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=8.247e-14   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=4.888e-13   A
+  --- oprobit ycat x1 x2
+    e(chi2) [type=LR]                before=—                  after=0.000e+00   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=2.525e-10   A
+    e(chi2) [type=Wald]              before=3.72e-01（未切换）      after=4.844e-10   A
+
+=== D5  e(df_m) / e(k_aux) / e(rank)
+    logit yb x1 x2         df_m 改前=2 改后=2 Stata=2 | rank 3/3 | k_aux None/None
+    probit yb x1 x2        df_m 改前=2 改后=2 Stata=2 | rank 3/3 | k_aux None/None
+    poisson y_c x1 x2      df_m 改前=2 改后=2 Stata=2 | rank 3/3 | k_aux None/None
+    nbreg y_nb x1 x2       df_m 改前=3 改后=2 Stata=2 | rank 4/4 | k_aux 1/1.0
+    ologit ycat x1 x2      df_m 改前=4 改后=2 Stata=2 | rank 5/5 | k_aux 3/3.0
+    oprobit ycat x1 x2     df_m 改前=4 改后=2 Stata=2 | rank 5/5 | k_aux 3/3.0
+
+=== predict  n / pr / xb（走 StataResults.predict，即 postest 的委托面）
+    predict, n                       before=崩溃 (matmul 维数)     after=1.086e-09   B
+    predict, pr                      before=崩溃 (matmul 维数)     after=5.198e-09   B
+    predict, xb                      before=崩溃 (matmul 维数)     after=1.105e-06   C
+    predict, stdp                    before=崩溃 (matmul 维数)     after=2.762e-08   B
+      注: zip 的 pr 是零膨胀概率 pi（不是 P(y=0)），n 是 (1-pi)*mu；两者的 Stata 对照已在上面两行给出
+    predict, n                       before=崩溃 (matmul 维数)     after=8.163e-07   B
+    predict, pr                      before=崩溃 (matmul 维数)     after=2.435e-06   C
+    predict, xb                      before=崩溃 (matmul 维数)     after=7.679e-05   C
+    predict, n                       before=语义错 (截断均值)         after=4.730e-08   B
+    predict, xb                      before=语义错 (截断均值)         after=4.201e-06   C
+    predict, stdp                    before=语义错 (截断均值)         after=1.638e-08   B
+    ztp      predict, pr 正确拒绝：UnsupportedError
+    predict, n                       before=语义错 (截断均值)         after=5.188e-07   B
+    predict, xb                      before=语义错 (截断均值)         after=5.947e-05   C
+    predict, stdp                    before=语义错 (截断均值)         after=2.651e-07   B
+    tnbreg   predict, pr 正确拒绝：UnsupportedError
+
+=== e() 派生标量（robust / cluster 下）
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=3.236e-10   A
+      N_clust westata=None Stata=None OK
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=3.236e-10   A
+      N_clust westata=10 Stata=10.0 OK
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=5.511e-11   A
+      N_clust westata=None Stata=None OK
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=5.511e-11   A
+      N_clust westata=10 Stata=10.0 OK
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=3.809e-15   A
+      N_clust westata=None Stata=None OK
+    e(ll)/e(ll_0)/e(r2_p)            before=—                  after=3.809e-15   A
+      N_clust westata=10 Stata=10.0 OK
+
+=== 汇总表（after=相对差；A ≤1e-9、B ≤1e-6、C ≤1e-3）===
+项                                      量                                改前                     改后           档
+ologit ycat x1 x2                      cut SE（旧算法）                      目标 0.0874/0.0962       8.428e-01    E
+ologit ycat x1 x2                      cut SE（修复后）                      —                      4.495e-12    A
+ologit ycat x1 x2                      slope×cut 交叉块                    未变换(=源矩阵)              2.753e-11    A
+ologit ycat x1 x2                      e(V) 全矩阵                         2.09e+01 / 1.05e+01    2.753e-11    A
+ologit ycat x1 x2                      e(V) 全矩阵（旧算法复算）                  —                      3.944e+00    E
+ologit ycat x1 x2                      系数                               3.55e-05 / 3.80e-06    1.677e-11    A
+oprobit ycat x1 x2                     cut SE（旧算法）                      目标 0.0874/0.0962       1.153e+00    E
+oprobit ycat x1 x2                     cut SE（修复后）                      —                      1.452e-09    B
+oprobit ycat x1 x2                     slope×cut 交叉块                    未变换(=源矩阵)              1.539e-08    B
+oprobit ycat x1 x2                     e(V) 全矩阵                         2.09e+01 / 1.05e+01    1.539e-08    B
+oprobit ycat x1 x2                     e(V) 全矩阵（旧算法复算）                  —                      5.753e+00    E
+oprobit ycat x1 x2                     系数                               3.55e-05 / 3.80e-06    1.234e-08    B
+logit yb x1 x2                         e(V) 全矩阵                         1.31e-07               1.938e-13    A
+logit yb x1 x2                         SE（e(V) 对角开方）                    1.31e-07               3.558e-14    A
+logit yb x1 x2, vce(robust)            e(V) 全矩阵                         ValueError（不可用）        4.218e-13    A
+logit yb x1 x2, vce(robust)            SE（e(V) 对角开方）                    ValueError（不可用）        6.974e-14    A
+logit yb x1 x2, vce(cluster g)         e(V) 全矩阵                         3.35e-03               2.788e-13    A
+logit yb x1 x2, vce(cluster g)         SE（e(V) 对角开方）                    3.35e-03               7.485e-14    A
+logit yb x1 x2                         HC0 == HC1（静默）                   True                   1.000e+00    pass
+logit yb x1 x2                         HC1 == N/(N-K) * HC0             无此因子                   0.000e+00    A
+probit yb x1 x2                        e(V) 全矩阵                         1.31e-07               2.399e-09    B
+probit yb x1 x2                        SE（e(V) 对角开方）                    1.31e-07               3.246e-10    A
+probit yb x1 x2, vce(robust)           e(V) 全矩阵                         ValueError（不可用）        6.626e-09    B
+probit yb x1 x2, vce(robust)           SE（e(V) 对角开方）                    ValueError（不可用）        8.551e-10    A
+probit yb x1 x2, vce(cluster g)        e(V) 全矩阵                         3.35e-03               3.468e-09    B
+probit yb x1 x2, vce(cluster g)        SE（e(V) 对角开方）                    3.35e-03               1.013e-09    B
+probit yb x1 x2                        HC0 == HC1（静默）                   True                   1.000e+00    pass
+probit yb x1 x2                        HC1 == N/(N-K) * HC0             无此因子                   1.651e-16    A
+poisson y_c x1 x2                      e(V) 全矩阵                         1.31e-07               2.168e-08    B
+poisson y_c x1 x2                      SE（e(V) 对角开方）                    1.31e-07               5.259e-09    B
+poisson y_c x1 x2, vce(robust)         e(V) 全矩阵                         ValueError（不可用）        4.645e-08    B
+poisson y_c x1 x2, vce(robust)         SE（e(V) 对角开方）                    ValueError（不可用）        1.059e-08    B
+poisson y_c x1 x2, vce(cluster g)      e(V) 全矩阵                         3.35e-03               2.129e-08    B
+poisson y_c x1 x2, vce(cluster g)      SE（e(V) 对角开方）                    3.35e-03               8.857e-09    B
+poisson y_c x1 x2                      HC0 == HC1（静默）                   True                   1.000e+00    pass
+poisson y_c x1 x2                      HC1 == N/(N-K) * HC0             无此因子                   0.000e+00    A
+nbreg y_nb x1 x2                       e(V) 全矩阵                         1.31e-07               1.179e-05    C
+nbreg y_nb x1 x2                       SE（e(V) 对角开方）                    1.31e-07               1.823e-08    B
+nbreg y_nb x1 x2, vce(robust)          e(V) 全矩阵                         ValueError（不可用）        1.637e-06    C
+nbreg y_nb x1 x2, vce(robust)          SE（e(V) 对角开方）                    ValueError（不可用）        3.724e-08    B
+nbreg y_nb x1 x2, vce(cluster g)       e(V) 全矩阵                         3.35e-03               3.878e-06    C
+nbreg y_nb x1 x2, vce(cluster g)       SE（e(V) 对角开方）                    3.35e-03               8.000e-08    B
+nbreg y_nb x1 x2                       HC0 == HC1（静默）                   True                   1.000e+00    pass
+nbreg y_nb x1 x2                       HC1 == N/(N-K) * HC0             无此因子                   2.146e-16    A
+logit yb x1 x2                         e(chi2) [type=LR]                —                      3.635e-10    A
+logit yb x1 x2, vce(robust)            e(chi2) [type=Wald]              3.72e-01（未切换）          5.798e-14    A
+logit yb x1 x2, vce(cluster g)         e(chi2) [type=Wald]              3.72e-01（未切换）          5.464e-14    A
+probit yb x1 x2                        e(chi2) [type=LR]                —                      2.672e-10    A
+probit yb x1 x2, vce(robust)           e(chi2) [type=Wald]              3.72e-01（未切换）          1.549e-09    B
+probit yb x1 x2, vce(cluster g)        e(chi2) [type=Wald]              3.72e-01（未切换）          1.345e-09    B
+poisson y_c x1 x2                      e(chi2) [type=LR]                —                      8.362e-16    A
+poisson y_c x1 x2, vce(robust)         e(chi2) [type=Wald]              3.72e-01（未切换）          6.340e-10    A
+poisson y_c x1 x2, vce(cluster g)      e(chi2) [type=Wald]              3.72e-01（未切换）          7.662e-11    A
+nbreg y_nb x1 x2                       e(chi2) [type=LR]                —                      5.986e-11    A
+nbreg y_nb x1 x2, vce(robust)          e(chi2) [type=Wald]              3.72e-01（未切换）          3.593e-09    B
+nbreg y_nb x1 x2, vce(cluster g)       e(chi2) [type=Wald]              3.72e-01（未切换）          2.010e-07    B
+ologit ycat x1 x2                      e(chi2) [type=LR]                —                      2.385e-15    A
+ologit ycat x1 x2, vce(robust)         e(chi2) [type=Wald]              3.72e-01（未切换）          8.247e-14    A
+ologit ycat x1 x2, vce(cluster g)      e(chi2) [type=Wald]              3.72e-01（未切换）          4.888e-13    A
+oprobit ycat x1 x2                     e(chi2) [type=LR]                —                      0.000e+00    A
+oprobit ycat x1 x2, vce(robust)        e(chi2) [type=Wald]              3.72e-01（未切换）          2.525e-10    A
+oprobit ycat x1 x2, vce(cluster g)     e(chi2) [type=Wald]              3.72e-01（未切换）          4.844e-10    A
+logit yb x1 x2                         e(df_m) vs Stata                 2                      2.000e+00    pass
+probit yb x1 x2                        e(df_m) vs Stata                 2                      2.000e+00    pass
+poisson y_c x1 x2                      e(df_m) vs Stata                 2                      2.000e+00    pass
+nbreg y_nb x1 x2                       e(df_m) vs Stata                 3                      2.000e+00    pass
+ologit ycat x1 x2                      e(df_m) vs Stata                 4                      2.000e+00    pass
+oprobit ycat x1 x2                     e(df_m) vs Stata                 4                      2.000e+00    pass
+zip                                    predict, n                       崩溃 (matmul 维数)         1.086e-09    B
+zip                                    predict, pr                      崩溃 (matmul 维数)         5.198e-09    B
+zip                                    predict, xb                      崩溃 (matmul 维数)         1.105e-06    C
+zip                                    predict, stdp                    崩溃 (matmul 维数)         2.762e-08    B
+zinb                                   predict, n                       崩溃 (matmul 维数)         8.163e-07    B
+zinb                                   predict, pr                      崩溃 (matmul 维数)         2.435e-06    C
+zinb                                   predict, xb                      崩溃 (matmul 维数)         7.679e-05    C
+ztp                                    predict, n                       语义错 (截断均值)             4.730e-08    B
+ztp                                    predict, xb                      语义错 (截断均值)             4.201e-06    C
+ztp                                    predict, stdp                    语义错 (截断均值)             1.638e-08    B
+tnbreg                                 predict, n                       语义错 (截断均值)             5.188e-07    B
+tnbreg                                 predict, xb                      语义错 (截断均值)             5.947e-05    C
+tnbreg                                 predict, stdp                    语义错 (截断均值)             2.651e-07    B
+logit yb x1 x2, vce(robust)            e(ll)/e(ll_0)/e(r2_p)            —                      3.236e-10    A
+logit yb x1 x2, vce(cluster g)         e(ll)/e(ll_0)/e(r2_p)            —                      3.236e-10    A
+nbreg y_nb x1 x2, vce(robust)          e(ll)/e(ll_0)/e(r2_p)            —                      5.511e-11    A
+nbreg y_nb x1 x2, vce(cluster g)       e(ll)/e(ll_0)/e(r2_p)            —                      5.511e-11    A
+ologit ycat x1 x2, vce(robust)         e(ll)/e(ll_0)/e(r2_p)            —                      3.809e-15    A
+ologit ycat x1 x2, vce(cluster g)      e(ll)/e(ll_0)/e(r2_p)            —                      3.809e-15    A
+
+全部断言通过。

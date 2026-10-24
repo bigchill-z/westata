@@ -21,6 +21,8 @@ Two pieces of Stata behaviour are deliberately encoded:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -124,39 +126,85 @@ def test_lrtest_matches_statsmodels_loglikelihood():
     assert outcome.statistic == pytest.approx(2.0 * (big.llf - small.llf), rel=1e-10)
 
 
-def test_lrtest_identical_models_is_degenerate_with_pvalue_one():
-    """``df == 0``: the statistic is 0 and the p-value is 1 by convention."""
+def test_lrtest_identical_models_is_refused_like_stata_r498():
+    """``df == 0`` is Stata's r(498), not a p-value.
+
+    Captured on StataNow 19.5 (2026-10-24), ``sysuse auto``::
+
+        . regress mpg weight
+        . estimates store L1
+        . regress mpg weight
+        . estimates store L2
+        . lrtest L1 L2
+        df(unrestricted) = df(restricted) = 2
+        r(498);
+
+    So the command *fails* in Stata.  The old westata convention (report
+    ``chi2 = 0, df = 0, p = 1``, justified by ``chi2(0)`` being a point mass at
+    0) made a ported script succeed where Stata errors; the repair raises
+    ``ConsistencyError`` mirroring r(498) instead.
+    """
 
     frame = _frame()
     first = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
     second = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
 
-    outcome = first.lrtest(second)
-
-    assert outcome.df == 0
-    assert outcome.statistic == pytest.approx(0.0, abs=1e-9)
-    assert outcome.pvalue == 1.0
-    # scipy alone would give nan here, which is why the convention exists.
-    assert np.isnan(stats.chi2.sf(0.0, 0))
+    with pytest.raises(ConsistencyError, match="r\\(498\\)"):
+        first.lrtest(second)
 
 
-def test_lrtest_rejects_non_nested_models():
+def test_lrtest_equal_parameter_counts_of_different_models_is_also_r498():
+    """Stata checks the *count* first: equal k means r(498) even if x differs.
+
+    Captured on StataNow 19.5 (2026-10-24), ``sysuse auto``::
+
+        . regress mpg weight
+        . estimates store N3
+        . regress mpg foreign
+        . estimates store L1
+        . lrtest N3 L1
+        df(unrestricted) = df(restricted) = 2
+        r(498);
+    """
+
     frame = _frame()
     left = ws.OLS.from_formula("y ~ x1", frame).fit()
     right = ws.OLS.from_formula("y ~ x2", frame).fit()
 
-    with pytest.raises(ConsistencyError, match="not nested"):
+    with pytest.raises(ConsistencyError, match="r\\(498\\)"):
         left.lrtest(right)
 
 
-def test_lrtest_names_the_parameters_that_break_nesting():
+def test_lrtest_swaps_the_arguments_the_way_stata_does():
+    """``lrtest`` accepts either order and relabels the pair.
+
+    Captured on StataNow 19.5 (2026-10-24), ``sysuse auto``::
+
+        . regress mpg weight
+        . estimates store L1
+        . regress mpg weight foreign
+        . estimates store B1
+        . lrtest L1 B1
+        Likelihood-ratio test                    LR chi2(1) =   2.41
+        Assumption: L1 nested within B1           Prob > chi2 = 0.1205
+        r(chi2) = 2.41124840273977   r(df) = 1   r(p) = .12046626248080883
+
+    ``L1`` is the *smaller* model and was passed first, so Stata silently treats
+    it as nested within ``B1``; the statistic is ``2*(ll_B1 - ll_L1)``.
+    """
+
     frame = _frame()
     small = ws.OLS.from_formula("y ~ x1", frame).fit()
-    other = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    big = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
 
-    # ``other`` carries x2, which ``small`` does not: not nested in this direction.
-    with pytest.raises(ConsistencyError, match="x2"):
-        small.lrtest(other)
+    forward = small.lrtest(big)
+    backward = big.lrtest(small)
+
+    assert forward.statistic == pytest.approx(backward.statistic, rel=1e-15)
+    assert forward.df == backward.df == 1
+    assert forward.ll_unrestricted == pytest.approx(big.llf, rel=1e-12)
+    assert forward.ll_restricted == pytest.approx(small.llf, rel=1e-12)
+    assert forward.statistic > 0.0
 
 
 def test_lrtest_rejects_different_sample_sizes():
@@ -410,3 +458,212 @@ def test_hausman_of_a_model_against_itself_is_zero():
     assert outcome.statistic == pytest.approx(0.0, abs=1e-10)
     assert outcome.pvalue == 1.0
     assert outcome.df == 2
+
+
+# ------------------------- Stata-captured regressions (M5 and M6)
+#
+# Captured from a live StataNow 19.5 (MP) session on 2026-10-24.
+#
+# lrtest (sysuse auto):
+#     . regress mpg weight ; estimates store L1
+#     . regress mpg weight foreign ; estimates store B1
+#     . lrtest B1 L1      r(chi2) = 2.41124840273977  r(df) = 1  r(p) = .12046626248080883
+#     . lrtest L1 B1      accepted, "Assumption: L1 nested within B1", same numbers
+#     . lrtest L1 E2      df(unrestricted) = df(restricted) = 2  r(498)
+#     . lrtest N3 L1      (mpg foreign vs mpg weight)              r(498)
+#     . lrtest N2 L1      (mpg foreign length vs mpg weight)
+#                         r(chi2) = -2.68354973321414  r(df) = 1  r(p) = 1
+#
+# hausman (40 entities x 8 periods, seed 4242, alpha uncorrelated with x1):
+#     . hausman FEm REm             chi2(2) = .9525460961317572  p = .6210938706123512
+#     . hausman FEm REm, constant   chi2(3) = .952546096131752   p = .8127322054037279
+#     . hausman FEm REm   (corr=0.15, indefinite)
+#           chi2(2) = -2.35424271822838   p = 1 (Stata prints the negative value)
+
+_AUTO = Path(__file__).parent / "data" / "auto.dta"
+
+
+def _hausman_panel(seed: int = 4242, corr: float = 0.0) -> pd.DataFrame:
+    """The panel the Stata capture used (40 entities x 8 periods).
+
+    Identical to ``retest/fix/postest/repro_M6_hausman_constant.py``, so the
+    captured ``chi2`` values are the right expectations for this frame.
+    """
+
+    rng = np.random.default_rng(seed)
+    n_entities, n_periods = 40, 8
+    entity = np.repeat(np.arange(1, n_entities + 1), n_periods)
+    time = np.tile(np.arange(1, n_periods + 1), n_entities)
+    effect = np.repeat(rng.normal(0.0, 1.5, n_entities), n_periods)
+    x1 = rng.normal(0.0, 1.0, n_entities * n_periods) + corr * effect
+    x2 = rng.normal(0.0, 1.0, n_entities * n_periods)
+    y = 1.0 + 0.8 * x1 - 0.5 * x2 + effect + rng.normal(
+        0.0, 0.7, n_entities * n_periods
+    )
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "firm": entity, "year": time})
+
+
+def _auto() -> pd.DataFrame:
+    return pd.read_stata(_AUTO, convert_categoricals=False)
+
+
+def test_lrtest_nested_logit_matches_stata():
+    """``lrtest LU LR`` on ``logit foreign weight mpg`` vs ``foreign weight``."""
+
+    frame = _auto()
+    big = ws.Logit.from_formula("foreign ~ weight + mpg", frame).fit()
+    small = ws.Logit.from_formula("foreign ~ weight", frame).fit()
+
+    outcome = ws.lrtest(big, small)
+    assert outcome.statistic == pytest.approx(3.7576914398801, rel=1e-9)
+    assert outcome.df == 1
+    assert outcome.pvalue == pytest.approx(0.0525651057695751, rel=1e-9)
+
+
+def test_lrtest_nested_regress_matches_stata():
+    """``lrtest RU RR``: chi2 = 2.41124840273977, df = 1, p = .12046626248080883."""
+
+    frame = _auto()
+    big = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    small = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+
+    outcome = ws.lrtest(big, small)
+    assert outcome.statistic == pytest.approx(2.41124840273977, rel=1e-9)
+    assert outcome.df == 1
+    assert outcome.pvalue == pytest.approx(0.12046626248080883, rel=1e-9)
+
+
+def test_lrtest_accepts_either_argument_order_like_stata():
+    """``lrtest L1 B1`` relabels the pair; Stata still reports the same numbers."""
+
+    frame = _auto()
+    big = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    small = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+
+    reversed_ = ws.lrtest(small, big)
+    assert reversed_.statistic == pytest.approx(2.41124840273977, rel=1e-9)
+    assert reversed_.df == 1
+    assert reversed_.ll_unrestricted == pytest.approx(big.llf, rel=1e-12)
+    assert reversed_.ll_restricted == pytest.approx(small.llf, rel=1e-12)
+
+
+def test_lrtest_non_nested_reports_the_negative_statistic_stata_reports():
+    """``lrtest N2 L1``: Stata accepts and prints ``LR chi2(1) = -2.6835``.
+
+    ``regress mpg foreign length`` vs ``regress mpg weight``: different
+    parameter counts, no nesting; the unrestricted model fits *worse*, so the
+    statistic is negative and ``Prob > chi2`` is 1.
+    """
+
+    frame = _auto()
+    other = ws.OLS.from_formula("mpg ~ foreign + length", frame).fit()
+    weight_only = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+
+    with pytest.warns(RuntimeWarning):
+        outcome = ws.lrtest(other, weight_only)
+
+    assert outcome.statistic == pytest.approx(-2.68354973321414, rel=1e-9)
+    assert outcome.df == 1
+    assert outcome.pvalue == 1.0
+
+
+def test_hausman_constant_option_matches_stata():
+    """``hausman ..., constant``: df goes 2 -> 3, statistic unchanged.
+
+    Stata: ``chi2(2) = .9525460961317572`` (default) and
+    ``chi2(3) = .952546096131752`` (with ``constant``); the constant's
+    difference is ~6e-5 with a negative variance difference, so the generalised
+    inverse leaves the quadratic form alone and only ``df`` moves.
+
+    Both the free function and the result's own method are exercised, so the
+    ``results/base.py`` forwarder (``def hausman(self, efficient, **kwargs)``)
+    cannot silently stop passing ``constant`` through again.
+    """
+
+    frame = _hausman_panel()
+    fe = _fe(frame)
+    re = _re(frame)
+
+    default = fe.hausman(re)
+    with pytest.warns(RuntimeWarning, match="not positive definite"):
+        with_constant = hausman(fe, re, constant=True)
+
+    assert default.df == 2
+    assert with_constant.df == 3
+    assert default.statistic == pytest.approx(0.9525460961317572, rel=1e-9)
+    assert with_constant.statistic == pytest.approx(0.952546096131752, rel=1e-9)
+    # The default must not change when the option is available but unused.
+    assert default.excluded == []
+
+
+def test_hausman_constant_is_reachable_through_the_result_method():
+    """``fe.hausman(re, constant=True)`` must work, not just ``ws.hausman(...)``.
+
+    The results object forwards keyword arguments to
+    :func:`westata.postestimation.modeltests.hausman`
+    (``results/base.py::StataResults.hausman(self, efficient, **kwargs)``).
+    Without that forwarding the Stata ``hausman ..., constant`` option would be
+    unreachable from the object a user actually holds, so this test pins the
+    instance-method path and checks it agrees with the free function to the
+    last bit.
+    """
+
+    frame = _hausman_panel()
+    fe = _fe(frame)
+    re = _re(frame)
+
+    with pytest.warns(RuntimeWarning, match="not positive definite"):
+        via_method = fe.hausman(re, constant=True)
+    with pytest.warns(RuntimeWarning, match="not positive definite"):
+        via_function = hausman(fe, re, constant=True)
+
+    assert isinstance(via_method, HausmanResult)
+    assert via_method.df == 3
+    assert via_method.statistic == pytest.approx(0.952546096131752, rel=1e-9)
+    # Forwarding must not perturb the number: identical to the free function.
+    assert via_method.statistic == pytest.approx(via_function.statistic, rel=0.0)
+    assert via_method.df == via_function.df
+    assert via_method.pvalue == pytest.approx(via_function.pvalue, rel=0.0)
+    # And the instance method still defaults to Stata's slopes-only comparison.
+    assert fe.hausman(re).df == 2
+
+
+def test_hausman_default_still_excludes_the_constant():
+    """``constant=False`` is the default and is a no-op vs the old signature."""
+
+    frame = _hausman_panel()
+    fe = _fe(frame)
+    re = _re(frame)
+
+    explicit = hausman(fe, re, constant=False)
+    default = fe.hausman(re)
+    assert explicit.statistic == pytest.approx(default.statistic, rel=0.0)
+    assert explicit.df == default.df == 2
+
+
+def test_hausman_documents_the_deliberate_clamp_on_an_indefinite_difference():
+    """Non-PD ``V_c - V_e``: Stata prints a negative statistic, westata floors at 0.
+
+    Measured on StataNow 19.5 (2026-10-24, 40x8 panel, effect correlated with
+    ``x1`` at 0.15): ``hausman FEm REm`` reports ``chi2(2) = -2.35424271822838``
+    with ``r(p) = 1``; ``hausman FEm REm, constant`` reports the same with
+    ``df = 3``.  westata reports ``0`` and the same ``p``, and says so in the
+    docstring -- the floor is deliberate, because a pseudo-inverse produces
+    ``-1e-18``-scale quadratic forms from round-off alone and reporting the sign
+    of those would manufacture spurious "negative statistics".
+    """
+
+    frame = _hausman_panel(corr=0.15)
+    fe = _fe(frame)
+    re = _re(frame)
+
+    with pytest.warns(RuntimeWarning, match="not positive definite"):
+        outcome = fe.hausman(re)
+
+    assert outcome.statistic == 0.0
+    assert outcome.pvalue == 1.0
+    assert outcome.df == 2
+    # The docstring is the contract for *why* 0 and not -2.3542.
+    docstring = hausman.__doc__ or ""
+    assert "-2.35424271822838" in docstring
+    assert "deliberate" in docstring

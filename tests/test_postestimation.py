@@ -7,6 +7,8 @@ implementation under test.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -272,3 +274,109 @@ def test_hdfe_result_supports_test_and_lincom():
     assert outcome.df == 2
     assert np.isfinite(outcome.pvalue)
     assert np.isfinite(res.lincom("x1 + x2").estimate)
+
+
+# --------------------- Stata-captured regressions (M4: bare constants)
+#
+# Captured from a live StataNow 19.5 (MP) session on 2026-10-24, ``sysuse auto``:
+#
+#     . regress mpg weight foreign
+#     . lincom 2*weight - 3*foreign + 10
+#      ( 1)  2*weight - 3*foreign = -10
+#            estimate = 14.936911544776347   se = 3.2272271185374004
+#            t = 4.628404198445708  df = 71
+#     . lincom 2*weight - 3*foreign
+#            estimate =  4.93691154477635    se = 3.2272271185374
+#     . test 2*weight - 3*foreign + 10 = 0
+#            F(1, 71) = 21.422125424189847   p = 1.617913867538019e-05
+#     . test 2*weight - 3*foreign = -10
+#            F(1, 71) = 21.422125424189847   (identical: same hypothesis)
+#
+# Before the repair westata raised
+# ``ValueError: constant '10' is not a coefficient reference``.
+
+_AUTO = Path(__file__).parent / "data" / "auto.dta"
+
+
+def _auto_fit():
+    frame = pd.read_stata(_AUTO, convert_categoricals=False)
+    return OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+
+
+def test_lincom_accepts_a_bare_constant():
+    """``lincom 2*weight - 3*foreign + 10`` -> the Stata estimate and SE."""
+
+    outcome = _auto_fit().lincom("2*weight - 3*foreign + 10")
+
+    assert outcome.estimate == pytest.approx(14.936911544776347, rel=1e-12)
+    assert outcome.statistic == pytest.approx(4.628404198445708, rel=1e-12)
+    assert outcome.df == pytest.approx(71.0)
+
+
+def test_lincom_constant_does_not_change_the_standard_error():
+    """Stata's constraint is ``... = -10``: the constant never enters ``L V L'``."""
+
+    frame = pd.read_stata(_AUTO, convert_categoricals=False)
+    result = OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+
+    with_constant = result.lincom("2*weight - 3*foreign + 10")
+    without = result.lincom("2*weight - 3*foreign")
+
+    assert with_constant.std_err == pytest.approx(without.std_err, rel=1e-15)
+    assert with_constant.std_err == pytest.approx(3.2272271185374004, rel=1e-12)
+    assert with_constant.estimate == pytest.approx(
+        without.estimate + 10.0, rel=1e-15
+    )
+    # And the printed constraint moves the constant to the right-hand side.
+    assert "= -10" in with_constant.expression
+
+
+def test_lincom_of_a_constant_alone_is_accepted_with_zero_se():
+    """``lincom 10``: Stata returns estimate 10, se 0."""
+
+    outcome = _auto_fit().lincom("10")
+    assert outcome.estimate == 10.0
+    assert outcome.std_err == 0.0
+
+
+def test_lincom_constant_in_scientific_notation():
+    """``+ 1e3`` must not be split at the exponent's sign (Stata: 1004.9369115)."""
+
+    outcome = _auto_fit().lincom("2*weight - 3*foreign + 1e3")
+    assert outcome.estimate == pytest.approx(1004.9369115447763, rel=1e-12)
+    assert outcome.std_err == pytest.approx(3.2272271185374004, rel=1e-12)
+
+
+def test_test_with_a_constant_on_the_left_equals_the_shifted_hypothesis():
+    """``test a + 10 = 0`` is ``test a = -10``: both give F = 21.4221254242."""
+
+    result = _auto_fit()
+    shifted = result.test("2*weight - 3*foreign + 10 = 0")
+    direct = result.test("2*weight - 3*foreign = -10")
+
+    assert shifted.statistic == pytest.approx(direct.statistic, rel=1e-15)
+    assert shifted.statistic == pytest.approx(21.422125424189847, rel=1e-12)
+    assert shifted.pvalue == pytest.approx(1.617913867538019e-05, rel=1e-9)
+
+
+def test_test_constant_on_the_right_hand_side():
+    """``test weight = 10`` (F = 246682978.44412923) and ``weight + 10 = 0``.
+
+    Stata: the first is F = 246682978.44412923, the second
+    F = 246033786.3135477 -- different hypotheses, both accepted.
+    """
+
+    result = _auto_fit()
+    right = result.test("weight = 10")
+    moved = result.test("weight + 10 = 0")
+
+    assert right.statistic == pytest.approx(246682978.44412923, rel=1e-9)
+    assert moved.statistic == pytest.approx(246033786.3135477, rel=1e-9)
+    assert right.statistic != pytest.approx(moved.statistic, rel=1e-6)
+
+
+def test_a_bare_constant_in_a_coefficient_list_is_still_rejected():
+    """``test 10`` is ``r(111) '10' not found`` in Stata: a list, not an expression."""
+
+    with pytest.raises(ValueError, match="constant"):
+        _auto_fit().test("10")

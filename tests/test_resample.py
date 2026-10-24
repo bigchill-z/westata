@@ -80,6 +80,32 @@ def test_jackknife_rejects_an_unknown_estimator():
         Jackknife.from_formula("y ~ x1", _frame(), estimator="logit")
 
 
+def test_jackknife_uses_n_minus_one_degrees_of_freedom():
+    """Stata's jackknife tests with t(N-1), not t(N-k).
+
+    Captured from StataNow 19.5 on ``sysuse auto`` (N=74):
+    ``jackknife: regress mpg weight`` stores ``e(df_r) = 73``; so does
+    ``jackknife: regress mpg weight foreign`` (still 73, not 71) and
+    ``jackknife: mean mpg``.  westata used N-k, so t(72)=1.99346 was used where
+    Stata uses t(73)=1.99300 and every interval was ~2.3e-4 relatively too wide.
+    """
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    n = len(auto)
+
+    for formula, mse in (
+        ("mpg ~ weight", False),
+        ("mpg ~ weight + foreign", False),
+        ("mpg ~ weight", True),
+    ):
+        result = Jackknife.from_formula(formula, auto).fit(mse=mse)
+        assert result.df_resid == float(n - 1)
+        assert float(result.e["df_r"]) == float(n - 1)
+
+    mean = Jackknife.from_formula("mpg ~ weight", auto, estimator="mean").fit()
+    assert mean.df_resid == float(n - 1)
+
+
 # --------------------------------------------------------------- bootstrap
 
 
@@ -134,6 +160,26 @@ def test_bootstrap_rejects_non_positive_reps():
 def test_bootstrap_rejects_an_unsupported_estimator():
     with pytest.raises(UnsupportedError, match="interpreter"):
         Bootstrap.from_formula("y ~ x1", _frame(), estimator="summarize")
+
+
+def test_bootstrap_uses_a_normal_reference_distribution():
+    """Stata's bootstrap prints "Normal-based" and stores no ``e(df_r)``.
+
+    Captured from StataNow 19.5 on ``sysuse auto``:
+    ``bootstrap, reps(100) seed(20241024) nodots: regress mpg weight`` has
+    e(df_r) absent, and its 95% CI for ``_cons`` is [35.29428573, 43.58628133],
+    which is ``b ± 1.959964 se`` -- not the t(72) interval
+    [35.2234, 43.6571] westata used to report (1.7% wider).
+    """
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    result = Bootstrap.from_formula(
+        "mpg ~ weight", auto, reps=100, seed=20241024).fit()
+
+    assert result.dist == "z"
+    lower, upper = result.conf_int().loc["Intercept"].tolist()
+    assert lower == pytest.approx(35.29428573, rel=1e-7)
+    assert upper == pytest.approx(43.58628133, rel=1e-7)
 
 
 # ----------------------------------------------------------------- permute

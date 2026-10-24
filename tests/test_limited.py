@@ -103,6 +103,109 @@ def _treatment(n: int = 2000, seed: int = 53) -> pd.DataFrame:
 REQUIRED_E_KEYS = ("N", "df_m", "ll", "chi2", "p", "r2_p", "rank")
 
 
+# ------------------------------------------- Stata conformance, 2026-10-24
+#
+# Captured live from StataNow 19.5 MP.  DGP (n=600, seed=7): z1,z2,x1 ~ N(0,1),
+# u ~ N(0,1); v = 0.6u + sqrt(1-0.36) N(0,1); t = 1[0.5 + 0.7 z1 - 0.4 z2 + u>0];
+# y = 1 + 0.9 x1 + v, observed only where t == 1.
+#
+# Stata's two-step stores (heckman.ado:743-746, etregress.ado:490-492):
+#     sigma = sqrt(rss/m + b_lambda^2 * mean(lambda*(lambda + w)))
+#     rho   = b_lambda / sigma        e(lambda) = rho*sigma = b_lambda
+# where w is the probit index and m = e(N) of the second-stage regression.
+# westata used sqrt(rss/(m-k)) -- 6.7% low -- and, for etregress, the wrong sign
+# on rho, which made both of its two DGPs exact mirrors of Stata's.
+
+HECKMAN_STATA = {
+    "rho": 0.5464969658888849,
+    "sigma": 0.9700884338404244,
+    "lambda": 0.5301503857376921,
+}
+ETREGRESS_STATA = {
+    "rho": 0.428345398964828,
+    "sigma": 0.9669867654390599,
+    "lambda": 0.4142043318357027,
+}
+
+
+def _two_step_frame(n: int = 600, seed: int = 7) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    z1 = rng.normal(size=n)
+    z2 = rng.normal(size=n)
+    x1 = rng.normal(size=n)
+    u = rng.normal(size=n)
+    v = 0.6 * u + np.sqrt(1.0 - 0.36) * rng.normal(size=n)
+    t = (0.5 + 0.7 * z1 - 0.4 * z2 + u > 0).astype(float)
+    y = 1.0 + 0.9 * x1 + v
+    frame = pd.DataFrame({"x1": x1, "z1": z1, "z2": z2, "t": t, "y": y})
+    frame["y_sel"] = np.where(t == 1, y, np.nan)
+    return frame
+
+
+def test_heckman_sigma_uses_the_two_step_formula():
+    """T5: ``sigma = sqrt(rss/m + b_lambda^2 * mean(lambda(lambda+w)))``.
+
+    The divisor is ``m`` (the selected-row count), not ``m - k``: this is
+    Heckman's two-step consistent scale, not an OLS residual variance.  ``rho``
+    then follows as ``b_lambda/sigma``, and ``e(lambda) = rho*sigma`` stays equal
+    to the coefficient on the inverse Mills ratio.
+    """
+
+    frame = _two_step_frame()
+    result = Heckman.from_formula("y ~ x1 + select(t ~ z1 + z2)", frame).fit()
+
+    assert float(result.e["sigma"]) == pytest.approx(
+        HECKMAN_STATA["sigma"], rel=1e-8
+    )
+    assert float(result.e["rho"]) == pytest.approx(HECKMAN_STATA["rho"], rel=1e-8)
+    assert float(result.e["lambda"]) == pytest.approx(
+        HECKMAN_STATA["lambda"], rel=1e-8
+    )
+    # The formula, recomputed here from the fit's own pieces.
+    probe = ws.Probit.from_formula("t ~ z1 + z2", frame).fit()
+    gamma = np.asarray(probe.params, dtype=float)
+    index = np.column_stack([np.ones(len(frame)), frame["z1"], frame["z2"]]) @ gamma
+    lam = np.exp(stats.norm.logpdf(index) - stats.norm.logcdf(index))
+    selected = frame["t"].to_numpy(dtype=float) > 0.5
+    X = np.column_stack([np.ones(len(frame)), frame["x1"]])
+    aug = np.column_stack([X, lam])
+    beta, *_ = np.linalg.lstsq(aug[selected], frame["y_sel"].to_numpy(dtype=float)[selected],
+                               rcond=None)
+    residual = frame["y_sel"].to_numpy(dtype=float)[selected] - aug[selected] @ beta
+    m = int(selected.sum())
+    expected = np.sqrt(
+        float(residual @ residual) / m
+        + beta[-1] ** 2 * float(np.mean((lam * (lam + index))[selected]))
+    )
+    assert float(result.e["sigma"]) == pytest.approx(expected, rel=1e-12)
+    # And it must not be the old sqrt(rss/(m-k)) number.
+    old = np.sqrt(float(residual @ residual) / (m - 3))
+    assert not abs(float(result.e["sigma"]) - old) < 1e-6
+
+
+def test_etregress_rho_has_stata_sign():
+    """T6: ``rho = +b_ctrl/sigma``.  westata used ``-b_ctrl/sigma``.
+
+    Stata's ``e(lambda) = rho*sigma`` is the control-function coefficient with
+    its own sign, so a minus there flips rho and lambda together.  Both of the
+    report's two DGPs were exact mirrors before this was fixed.
+    """
+
+    frame = _two_step_frame()
+    result = Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit()
+
+    assert float(result.e["rho"]) == pytest.approx(ETREGRESS_STATA["rho"], rel=1e-8)
+    assert float(result.e["sigma"]) == pytest.approx(
+        ETREGRESS_STATA["sigma"], rel=1e-8
+    )
+    # rho carries the same sign as the control-function coefficient.
+    lam_coef = float(result.params["lambda"])
+    assert np.sign(float(result.e["rho"])) == np.sign(lam_coef)
+    assert float(result.e["rho"]) == pytest.approx(
+        lam_coef / float(result.e["sigma"]), rel=1e-12
+    )
+
+
 # ----------------------------------------------------------------- truncreg
 
 

@@ -1,0 +1,63 @@
+====================================================================================================
+D. SYSTEMS
+====================================================================================================
+stata 19.5
+
+[D1] S1 nl covariance on a conditioned design + rank-deficient refusal
+       Stata b = [ 5.11830818e+01 -1.41580625e-02  1.32440109e-06] ; SE = [5.76788434e+00 3.88353577e-03 6.25759448e-07]
+  nl auto.dta quadratic (BRIEF's own check)    b=2.371e-11 (A)  se=3.165e-12 (A)
+       [FINDING] same model, same identifiability, different UNITS
+       Stata estimates it: b=[ 5.15215777e+01 -1.46574591e-02  1.37389670e-06] SE=[2.56725779e+00 1.50302561e-03 2.11115573e-07]
+         weight*1       cond(J)=2.718e+08  REFUSED ConsistencyError
+         weight*0.1     cond(J)=2.718e+06  OK   b rel=7.290e-08 se rel=1.910e-11 (A)
+         weight*0.01    cond(J)=2.723e+04  OK   b rel=2.819e-08 se rel=2.573e-11 (A)
+         weight*0.001   cond(J)=3.252e+02  OK   b rel=2.349e-08 se rel=6.338e-12 (A)
+
+       rank-deficient design must raise, not invent an SE
+       ConsistencyError: nl: the Jacobian of the prediction has rank 1 but the model has 2 parameters (a, c), so at least one parameter is not identified and its standard erro
+       estimable subset still fits: bse=[0.15147189]
+
+[D2] S2 nl start values / convergence on an exponential model
+       Stata b={'b0': np.float64(9115.681904567571), 'b1': np.float64(-0.09077650696470523)}
+       westata b={'/b0': np.float64(9115.682755978301), '/b1': np.float64(-0.09077651336708603)}
+       param rel=9.340e-08(B)  converged=1  Stata rss=749305.2354694068 westata rss=749305.2354690937
+
+[D3] S3 teffects aipw: ATET (repaired) AND ATE (must not regress)
+       ATET  Stata=1.399304628460 (se 0.060722728559) | westata=1.399304628460 (se 0.060722728559) rel b=6.189e-15(A) se=5.257e-15(A)
+       ATE   Stata=1.366413037099 (se 0.057016430543) | westata=1.366413037099 (se 0.057016430543) rel b=5.038e-15(A) se=5.963e-15(A)
+
+[D4] S5 didregress (y) vs (y x1)
+       bare (y)   Stata ATET=1.612756201072 se=0.164420329640 | westata=1.612756201072 se=0.164420329640 rel b=1.377e-16(A) se=0.000e+00(A)
+       (y x1)     Stata ATET=1.741283192781 se=0.118252463355 | westata=1.741283192781 se=0.118252463355 rel b=1.658e-15(A) se=1.174e-16(A)
+
+[D5] S6 jackknife df_r (t) ; S7 bootstrap uses z
+(1978 automobile data)
+       jackknife b rel=1.155e-15(A) se rel=5.113e-07(B) df_r Stata=73.0 westata=73.0
+       bootstrap Stata se=[6.15019267e-04 2.11534387e+00] | westata bse=[2.11534385e+00 6.15019271e-04]
+       bootstrap dist: westata=z  Stata prints P>|z| (normal-based) -> z
+       bootstrap b rel=1.155e-15(A) se rel=8.700e-09(B)
+
+[D6] T8 frontier SE
+       Stata  b=[ 0.79924181 -0.31679671  0.90568548  0.05660594 -0.99766713] se=[0.05261401 0.05618796 0.5584853  0.2960795  2.29285055]
+       westata b=[ 0.7992419  -0.31679685  0.90569581  0.05660032 -0.99762627] se=[0.05261401 0.05618799 0.55848654 0.29608692 2.29280877]
+  frontier b/se (westata params)               b=9.934e-05 (C)  se=2.505e-05 (C)
+
+---- summary ----
+  nl_units_1             inf        E
+  frontier_b             9.934e-05  C
+  frontier_se            2.505e-05  C
+  jackknife_se           5.113e-07  B
+  nl_start               9.340e-08  B
+  bootstrap_se           8.700e-09  B
+  nl_units_0.01          2.573e-11  A
+  nl_b                   2.371e-11  A
+  nl_units_0.1           1.910e-11  A
+  nl_units_0.001         6.338e-12  A
+  nl_se                  3.165e-12  A
+  aipw_ATET              6.189e-15  A
+  aipw_ATE               5.963e-15  A
+  did_(y x1)             1.658e-15  A
+  did_bare (y)           1.377e-16  A
+  nl_rank_guard          0.000e+00  A
+  jackknife_df           0.000e+00  A
+  bootstrap_dist         0.000e+00  A

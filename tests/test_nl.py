@@ -258,6 +258,132 @@ def test_nl_rejects_an_unparsable_expression():
         Nl.from_formula("y = {b0} * (x + )", nl_frame())
 
 
+def test_nl_gauss_newton_covariance_survives_a_conditioned_design():
+    """``nl (mpg = {b0} + {b1}*weight + {b2}*weight^2)`` SEs, StataNow 19.5.
+
+    Captured 2026-10-24 on ``sysuse auto`` (``retest/fix/systems/repro_S1_S2.py``):
+
+        nl (mpg = {b0} + {b1}*weight + {b2}*weight^2)
+        /b0  51.1830818  (se 5.767884)     <- se was 3.95e-07 before the fix
+        /b1  -.0141580626 (se .003883536)
+        /b2  1.32440109e-06 (se 6.25759e-07)
+
+    ``J`` has condition number 1.6e8, so ``J'J`` has 2.6e16 and its smallest
+    eigenvalue sits below numpy's default ``pinv`` cut-off; ``pinv(J'J)`` therefore
+    silently dropped that direction.  The covariance is now formed from ``J``'s QR
+    factor after an explicit rank test, and the SEs reproduce Stata to 1.8e-12.
+    The assertions are pinned to the full-precision values from that run (Stata
+    prints 7 digits, so the constants below are the westata/Stata agreement, not
+    a re-rounding of the printed table).
+    """
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    result = Nl.from_formula(
+        "mpg = {b0} + {b1}*weight + {b2}*weight**2", auto,
+        start={"b0": 40.0, "b1": -0.01, "b2": 0.0},
+    ).fit()
+
+    assert float(result.params["/b0"]) == pytest.approx(51.1830818, rel=1e-6)
+    assert float(result.params["/b1"]) == pytest.approx(-0.0141580626, rel=1e-6)
+    assert float(result.params["/b2"]) == pytest.approx(1.32440109e-06, rel=1e-6)
+    assert float(result.bse["/b0"]) == pytest.approx(5.767884338, rel=1e-8)
+    assert float(result.bse["/b1"]) == pytest.approx(0.003883535774, rel=1e-8)
+    assert float(result.bse["/b2"]) == pytest.approx(6.257594481e-07, rel=1e-8)
+
+
+def test_nl_refuses_an_unidentified_model_instead_of_inventing_a_standard_error():
+    """A rank-deficient Jacobian is not a number, it is a refusal."""
+
+    base = np.arange(1.0, 21.0)
+    frame = pd.DataFrame({"y": 2.0 * base + 3.0, "x": base, "z": base.copy()})
+    model = Nl.from_formula(
+        "y = {a}*x + {b}*z + {c}", frame, start={"a": 2.0, "b": 0.0, "c": 3.0}
+    )
+    with pytest.raises(ConsistencyError, match="rank"):
+        model.fit(strict=False)
+
+
+def test_nl_rank_test_is_scale_free():
+    """Rescaling a regressor must not change whether the model is identifiable.
+
+    ``{b0} + {b1}*u + {b2}*u^2`` is the same model for every positive ``u``
+    scaling: ``b1`` becomes ``b1/s`` and ``b2`` becomes ``b2/s^2``.  The rank test
+    therefore has to answer the same way for all of them.
+
+    Regression test for a real defect: with a rank test whose threshold scaled by
+    ``s_max`` of the *raw* Jacobian, the guard moved with the units.  Measured on
+    auto.dta, the raw ``s_min/s_max`` goes from ``6.25e-09`` at ``s=1`` to
+    ``4.97e-03`` at ``s=1e-3``, and ``s=1e3`` was refused outright, while the
+    column-normalised ``cond(J_n)`` stays at ``65.26`` bit-for-bit.  Standard
+    errors below are mapped back to ``u = weight`` so they are comparable.
+    """
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    start = {"b0": 40.0, "b1": -0.01, "b2": 0.0}
+
+    reference_se = None
+    for scale in (1.0, 0.1, 0.01, 0.001, 1e-6, 10.0, 1e3, 1e6):
+        u = auto["weight"].to_numpy(dtype=float) * scale
+        frame = pd.DataFrame({"mpg": auto["mpg"].to_numpy(dtype=float), "u": u})
+        result = Nl.from_formula(
+            "mpg = {b0} + {b1}*u + {b2}*u**2", frame,
+            start={"b0": start["b0"], "b1": start["b1"] * scale, "b2": start["b2"]},
+        ).fit()
+        se = result.bse.to_numpy()
+        # b0 is a level; b1 and b2 carry units of u, so map them back.
+        common = np.array([se[0], se[1] * scale, se[2] * scale**2])
+        if reference_se is None:
+            reference_se = common
+            assert float(result.bse["/b0"]) == pytest.approx(5.767884338, rel=1e-9)
+        else:
+            np.testing.assert_allclose(common, reference_se, rtol=1e-10)
+
+
+def test_nl_scale_free_rank_test_still_catches_exact_collinearity():
+    """Scale-freedom must not have been bought by dropping the check."""
+
+    base = np.arange(1.0, 21.0)
+    for scale in (1.0, 1e-6, 1e6):
+        # z is exactly x*scale, so {a}*x + {b}*z is one direction, not two.
+        frame = pd.DataFrame({"y": 2.0 * base + 3.0, "x": base, "z": base * scale})
+        model = Nl.from_formula(
+            "y = {a}*x + {b}*z + {c}", frame,
+            start={"a": 2.0, "b": 0.0, "c": 3.0},
+        )
+        with pytest.raises(ConsistencyError, match="rank"):
+            model.fit(strict=False)
+
+
+def test_nl_finds_stata_start_values_without_being_given_them():
+    """``nl (price = {b0}*exp({b1}*mpg))``: no ``start=`` must still converge.
+
+    Captured 2026-10-24 (``sysuse auto``): /b0 19581.4174, /b1 -.0569546212,
+    rss 453839393.06.  The old hard-coded start of 1.0 for every parameter left
+    Levenberg-Marquardt at b0 = 2.3e-10 with rss 3.42e9 and only warned.
+    """
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    result = Nl.from_formula("price = {b0}*exp({b1}*mpg)", auto).fit()
+
+    assert int(result.e["converged"]) == 1
+    assert float(result.params["/b0"]) == pytest.approx(19581.4174, rel=1e-6)
+    assert float(result.params["/b1"]) == pytest.approx(-0.0569546212, rel=1e-6)
+    assert float(result.e["rss"]) == pytest.approx(453839393.06173056, rel=1e-8)
+
+
+def test_nl_non_convergence_raises_by_default():
+    """A stalled fit is an error, not a result behind a warning."""
+
+    auto = pd.read_stata("tests/data/auto.dta", convert_categoricals=False)
+    with pytest.raises(ConvergenceError):
+        Nl.from_formula("price = {b0}*exp({b1}*mpg)", auto).fit(maxiter=2)
+    # ...and the escape hatch still exists for inspecting the last iterate.
+    lenient = Nl.from_formula("price = {b0}*exp({b1}*mpg)", auto).fit(
+        maxiter=2, strict=False
+    )
+    assert int(lenient.e["converged"]) == 0
+
+
 def test_nl_on_a_linear_model_reproduces_ols():
     rng = np.random.default_rng(11)
     n = 200
@@ -488,6 +614,63 @@ def test_frontier_standard_errors_match_stata():
     assert float(result.params["/lnsig2u"]) == pytest.approx(STATA_FR_LNSIG2U, rel=1e-4)
     assert float(result.bse["/lnsig2v"]) == pytest.approx(STATA_FR_SE_LNSIG2V, rel=1e-3)
     assert float(result.bse["/lnsig2u"]) == pytest.approx(STATA_FR_SE_LNSIG2U, rel=1e-3)
+
+
+def test_frontier_observed_information_comes_from_the_analytic_gradient():
+    """A real-inefficiency sample pins the SEs that the flat likelihood moved.
+
+    Captured 2026-10-24 (``retest/fix/systems/repro_T8.py``) on
+    ``u ~ |N(0, 0.7^2)|``, n=500, seed=99, with ``frontier y x1 x2``::
+
+        x1      .8575818596  (se .0471955063)     /lnsig2v  .0473143026
+        x2     -.3671225067  (se .0493030650)     /lnsig2u -1.2057823350
+        _cons   .8888412379  (se .5924029500)
+
+    Now that the observed information differentiates the closed-form gradient
+    instead of the objective itself, the SEs at westata's optimum agree with
+    Stata's at Stata's own optimum to 6.5e-4; the objective Hessian at step 1e-5
+    was 4.0e-3 away and diverged entirely at 1e-6 (``se(/lnsig2u) = NaN``).
+    """
+
+    rng = np.random.default_rng(99)
+    n = 500
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    v = rng.normal(size=n)
+    u = np.abs(rng.normal(scale=0.7, size=n))
+    frame = pd.DataFrame({"x1": x1, "x2": x2,
+                          "y": 1.0 + 0.8 * x1 - 0.4 * x2 + v - u})
+
+    result = Frontier.from_formula("y ~ x1 + x2", frame).fit()
+
+    assert float(result.params["x1"]) == pytest.approx(0.8575818596, rel=1e-6)
+    assert float(result.params["x2"]) == pytest.approx(-0.3671225067, rel=1e-6)
+    assert float(result.bse["x1"]) == pytest.approx(0.0471955063, rel=1e-4)
+    assert float(result.bse["x2"]) == pytest.approx(0.0493030650, rel=1e-4)
+    # /lnsig2u is the direction that the *objective* Hessian got wrong by 1.0%
+    # (2.7148 at step 1e-5, NaN at 1e-6) and the gradient Hessian gets to 2.3e-3.
+    # 2.7105 vs 2.7044 is the remaining optimiser-location gap, not a formula gap:
+    # evaluated at Stata's own e(b) the same Hessian gives 2.7026 (6.5e-4 away).
+    assert float(result.bse["/lnsig2u"]) == pytest.approx(2.7105387218, rel=1e-6)
+    assert float(result.bse["/lnsig2v"]) == pytest.approx(0.2866055534, rel=1e-6)
+    # The gradient itself must agree with a numerical derivative of the
+    # log-likelihood, or the whole observed information is built on sand.
+    from westata.estimators.nonlinear import frontier_gradient, frontier_loglike
+
+    theta = result.params.to_numpy()
+    design = np.asarray(result.design_matrix[0], dtype=float)
+    values = frame["y"].to_numpy()
+    analytic = frontier_gradient(theta, values, design)
+    numeric = np.empty_like(analytic)
+    for i in range(theta.size):
+        step = 1e-6 * max(1.0, abs(theta[i]))
+        offset = np.zeros_like(theta)
+        offset[i] = step
+        numeric[i] = (
+            frontier_loglike(theta + offset, values, design)
+            - frontier_loglike(theta - offset, values, design)
+        ) / (2.0 * step)
+    np.testing.assert_allclose(analytic, numeric, rtol=1e-6, atol=1e-6)
 
 
 def test_frontier_lr_test_of_no_inefficiency_matches_stata():

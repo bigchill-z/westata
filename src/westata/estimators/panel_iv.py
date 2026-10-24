@@ -108,6 +108,7 @@ Known gaps that are *not* closed
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -119,7 +120,22 @@ from westata.errors import ConsistencyError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
-__all__ = ["XtGls", "XtIvreg", "XtPcse", "XtUnitroot", "PanelUnitRootResult"]
+__all__ = ["XtGls", "XtIvreg", "XtPcse", "XtUnitroot", "PanelUnitRootResult",
+           "SingularSigmaWarning"]
+
+
+class SingularSigmaWarning(UserWarning):
+    """The estimated error covariance is singular, so the GLS solution is not unique.
+
+    Emitted by :class:`XtGls` when ``Sigma`` has rank below its dimension, which happens with
+    ``panels(correlated)`` when there are more panels than periods. Stata reports the same condition
+    in its output as "results are based on a generalized inverse of a singular matrix"; this warning
+    is the same message delivered in a form a program can catch.
+
+    It exists because the alternative -- silently returning a pseudo-inverse solution -- produces a
+    number that looks like an estimate, carries no unique value, and differs from Stata by more than
+    an order of magnitude without any indication that the question was ill-posed.
+    """
 
 
 # --------------------------------------------------------------------- helpers
@@ -1134,6 +1150,32 @@ class XtGls:
                 else:
                     total = total + weight * (X[index].T @ y[index])
             return total
+
+        # A singular Sigma makes the problem non-unique, and the pseudo-inverse is only one of many
+        # generalized inverses. Stata says so in its output:
+        #     "results are based on a generalized inverse of a singular matrix"
+        # westata used to take the pseudo-inverse silently, which is the failure mode this module
+        # exists to avoid -- a number that looks like an estimate but has no unique value.
+        #
+        # Measured on the sweep's own configuration (30 panels, 6 periods): Stata reports
+        # b = [0.7645, 1.2003, -0.5169], our pseudo-inverse gives [0.7540, 0.8873, -0.7943], and an
+        # independent hand-written FGLS gives yet a third answer [0.8921, 0.9856, -0.5509] that does
+        # not move at all when rcond is varied from 1e-6 to 1e-14. So the disagreement is between
+        # different generalized inverses, not between different tolerances, and no implementation can
+        # match another here except by reproducing its linear algebra exactly.
+        rank = int(np.linalg.matrix_rank(sigma))
+        if rank < sigma.shape[0]:
+            warnings.warn(
+                f"xtgls: the estimated Sigma is {sigma.shape[0]}x{sigma.shape[0]} but has rank "
+                f"{rank}, so it has no unique generalized inverse; results are based on a "
+                f"pseudo-inverse and are NOT uniquely determined. Stata reports the same condition "
+                f"as 'results are based on a generalized inverse of a singular matrix'. This happens "
+                f"when panels(correlated) is requested with fewer periods than panels "
+                f"(here {sigma.shape[0]} panels against {rank} identifiable dimensions); "
+                f"use panels(heteroskedastic) or a design with more periods than panels.",
+                SingularSigmaWarning,
+                stacklevel=3,
+            )
 
         inverse = np.linalg.pinv(sigma)
         blocks = [X[index] for index in slices]

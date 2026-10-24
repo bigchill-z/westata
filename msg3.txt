@@ -1,0 +1,57 @@
+fix(qreg): solve LAD exactly with an LP polish, and warn when xtgls's Sigma is singular
+
+Two defects, both found by measuring against a live Stata rather than by reading the code.
+
+1. qreg CONVERGED LINEARLY AND STOPPED SHORT.
+
+`solve_lad` uses iteratively reweighted least squares. That is a legitimate method, but on a
+piecewise-linear objective it converges linearly, so it halts at its tolerance rather than at the
+minimiser. The evidence is the objective itself, which for quantile regression is the whole estimator:
+
+    specification   our objective          Stata's                independent LP (HiGHS)
+    median          208.04731048896747     208.04731048707512     208.04731048707464
+    quantile(.25)   167.14892238760945     167.14892238457350     167.14892238457264
+
+An independent LP solver reaches Stata's value and we were 3e-9 above it. Exact-rational arithmetic
+reproduced both numbers to the last digit, so this was not summation order -- our point genuinely sat
+higher on the check function.
+
+The fix is a polish, not a different estimator: IRLS runs as before and its answer seeds the equivalent
+linear program
+
+    minimise tau*sum(u) + (1-tau)*sum(v)  s.t.  Xb + u - v = y,  u,v >= 0,  b free
+
+which is the same minimisation written out. IRLS stays because it is fast and warm-starts the LP; the
+polish is accepted only when it does not raise the objective, and falls back to the IRLS answer if the
+LP fails, so a slower answer degrades gracefully instead of raising.
+
+Measured after:
+
+    median        4.564e-09 -> 3.381e-16
+    quantile(.25) 5.678e-07 -> 3.129e-15
+    robust         --      -> 3.381e-16
+    standard errors 4e-09 -> 1.7e-16 .. 8.1e-16
+
+A factor of 1.8e8 on the worst parameter gap.
+
+2. xtgls RETURNED A PSEUDO-INVERSE SOLUTION FROM A SINGULAR Sigma WITHOUT SAYING SO.
+
+With `panels(correlated)` and more panels than periods, Sigma is m x m with rank at most T, so it has no
+unique generalized inverse and the GLS solution is not defined uniquely. Stata prints "results are based
+on a generalized inverse of a singular matrix"; westata silently returned a pseudo-inverse answer. On the
+sweep's configuration (30 panels, 6 periods) Stata reports b = [0.7645, 1.2003, -0.5169], westata gives
+[0.7540, 0.8873, -0.7943], and an independent hand-written FGLS gives a third answer [0.8921, 0.9856,
+-0.5509] that does not move when rcond is varied from 1e-6 to 1e-14 -- the disagreement is between
+different generalized inverses, not between tolerances.
+
+The numbers therefore cannot be reconciled and are not a defect to chase. What was a defect is the
+silence, so `SingularSigmaWarning` now fires in exactly that case, naming the rank and the cause. It does
+NOT fire for `panels(heteroskedastic)`, `panels(iid)`, or `panels(correlated)` with m < T -- the
+configurations the sweep measures at 1e-15 -- because a warning that always fires is ignored.
+
+tests/test_lad_exactness.py pins both fixes: the exact check-function minimum at two quantiles, the
+sample-quantile degeneracy, the non-degradation fallback, and the warning's presence and absence on the
+right inputs. The qreg assertions compare the OBJECTIVE, not a stored coefficient vector, because the
+optimal face can be flat and a coefficient comparison would test which point an LP happens to report.
+
+Suite: 1403 passing.

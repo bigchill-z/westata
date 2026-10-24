@@ -215,7 +215,67 @@ def solve_lad(
         if change <= tol * max(1.0, float(np.max(np.abs(beta)))):
             break
 
-    return beta
+    return _polish_with_lp(X, y, beta, quantile)
+
+
+def _polish_with_lp(
+    X: np.ndarray, y: np.ndarray, start: np.ndarray, tau: float
+) -> np.ndarray:
+    """Refine a check-function minimiser by solving the equivalent linear program.
+
+    IRLS converges linearly on a piecewise-linear objective, so it stops at its tolerance rather than
+    at the minimiser. Measured on the sweep's data the shortfall was 1.9e-09 (median) and 3.0e-09
+    (quantile .25) in the objective, with coefficient differences of 4.6e-09 and 5.7e-07 relative. An
+    independent LP solver reaches the exact minimum, so the problem is well posed and the gap is a
+    stopping point, not a property of the estimator.
+
+    The LP is the same estimator, written out:
+
+        minimise    tau * sum(u) + (1 - tau) * sum(v)
+        subject to  X b + u - v = y,   u >= 0,  v >= 0,  b free
+
+    Its solution is the exact check-function minimiser. If the solver is unavailable or fails, the IRLS
+    answer is returned unchanged -- a slower-converging estimate is better than an exception.
+    """
+
+    try:
+        from scipy.optimize import linprog
+    except Exception:  # noqa: BLE001
+        return start
+
+    n, k = X.shape
+    cost = np.concatenate([np.zeros(k), tau * np.ones(n), (1.0 - tau) * np.ones(n)])
+    equality = np.hstack([X, np.eye(n), -np.eye(n)])
+    try:
+        outcome = linprog(
+            cost,
+            A_eq=equality,
+            b_eq=y,
+            bounds=[(None, None)] * k + [(0.0, None)] * (2 * n),
+            method="highs",
+        )
+    except Exception:  # noqa: BLE001
+        return start
+
+    if not getattr(outcome, "success", False) or outcome.x is None:
+        return start
+    polished = np.asarray(outcome.x[:k], dtype=float)
+    if not np.all(np.isfinite(polished)):
+        return start
+
+    # Only accept the polish if it does not make the objective worse. Round-off in the LP's own
+    # arithmetic could in principle return a marginally higher value on a degenerate problem, and
+    # silently degrading the estimate would defeat the purpose.
+    def objective(beta: np.ndarray) -> float:
+        residual = y - X @ beta
+        return float(np.sum(np.where(residual >= 0.0, tau * residual, (tau - 1.0) * residual)))
+
+    try:
+        if objective(polished) <= objective(start):
+            return polished
+    except Exception:  # noqa: BLE001
+        return start
+    return start
 
 
 def _hall_sheather_bandwidth(quantile: float, nobs: int, alpha: float) -> float:

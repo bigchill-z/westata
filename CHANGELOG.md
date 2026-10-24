@@ -7,6 +7,26 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.0.2] — 修正 PyPI 页面上的安装说明
+
+**这一版没有功能变更。** 唯一的差别是项目描述里的安装说明。
+
+0.0.1 上传之后，四份文档（英文/中文 README、英文/中文指南）仍写着「尚未发布到 PyPI，请从仓库
+安装」。而 PyPI 把项目描述**冻结在上传的元数据里**，改文档不会更新已发布页面，所以 0.0.1 的
+PyPI 页面上一直是那句错误的话——它会让读者去克隆仓库，而其实 `pip install westata` 就能装。
+
+0.0.2 的内容与 0.0.1 完全一致，只把安装说明改成实际状态，并把「想改库本身」单独列为开发路径。
+两条命令在上传前都实测过：
+
+```
+pip install westata            -> 0.0.1
+pip install "westata[arch]"    -> arch 8.0.0 + westata 0.0.1
+```
+
+同时补了一个防回归测试 `tests/test_release_state.py`：它**直接问 PyPI**，而不是比对字符串——
+如果包已发布，任何文档都不得声称未发布，且必须给出 `pip install`；pyproject 的版本号可以领先于
+已发布版本，但不得落后。这样以后发新版本时测试自动跟着变。
+
 ## [Unreleased]
 
 Nothing yet.

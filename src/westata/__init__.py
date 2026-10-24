@@ -108,7 +108,22 @@ from westata.postestimation import (
 from westata.protocols import SSC
 from westata.report import etable, to_latex, to_markdown
 
-__version__ = "0.0.1"
+# The version is read from the INSTALLED package metadata, which is what pip writes and what
+# `pip show` reports. It used to be a hardcoded string maintained alongside `pyproject.toml`, and the two
+# drifted within minutes of the first release: `pip show` said 0.0.2 while `westata.__version__` said
+# 0.0.1. Anyone keying compatibility logic off `__version__` would have silently got the old number.
+#
+# The literal below is only a fallback for running from a source tree without installing (for example
+# `PYTHONPATH=src`), where no distribution metadata exists to read.
+try:  # pragma: no cover - the fallback is exercised only from an uninstalled tree
+    from importlib.metadata import PackageNotFoundError, version as _distribution_version
+
+    try:
+        __version__ = _distribution_version("westata")
+    except PackageNotFoundError:
+        __version__ = "0.0.2"
+except Exception:  # pragma: no cover - very old interpreters
+    __version__ = "0.0.2"
 
 
 def ssc(**kwargs: object) -> SSC:

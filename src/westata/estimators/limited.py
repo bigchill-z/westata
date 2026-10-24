@@ -1089,6 +1089,70 @@ def _heckman_two_step_covariance(
     return sigma**2 * cross_inverse @ (VBm + Q) @ cross_inverse
 
 
+def _etregress_ml_loglike(
+    theta: np.ndarray, y: np.ndarray, X: np.ndarray, Z: np.ndarray, treated: np.ndarray
+) -> float:
+    """Endogenous-treatment ML log-likelihood (Stata ``etregress`` ML).
+
+    ``theta = [b_outcome(k, including the treatment coefficient), g_treatment(m), athrho, lnsigma]``.
+
+        ll_i = -ln sigma - 1/2 ln(2 pi) - 1/2 (e_i/sigma)^2
+               + ln Phi( (2 t_i - 1)(z_i'g + rho e_i/sigma) / sqrt(1 - rho^2) )
+
+    Verified against Stata at Stata's own estimates: relative difference 2.0e-16.
+
+    NOT heckman's likelihood: there the outcome density applies only to selected rows and censored rows contribute
+    ``ln Phi(-z'g)`` alone. Here every row's outcome density is present, each multiplied by the conditional
+    probability of the arm actually observed.
+    """
+
+    from scipy import special
+
+    k = X.shape[1]
+    m = Z.shape[1]
+    b = np.asarray(theta[:k], dtype=float)
+    g = np.asarray(theta[k : k + m], dtype=float)
+    tau = float(theta[k + m])
+    lnsigma = float(theta[k + m + 1])
+
+    rho = float(np.tanh(tau))
+    sigma = float(np.exp(lnsigma))
+
+    residual = np.asarray(y, dtype=float) - X @ b
+    index = Z @ g
+    one_minus = max(1.0 - rho * rho, 1e-300)
+    shifted = (index + rho * residual / sigma) / np.sqrt(one_minus)
+    sign = 2.0 * np.asarray(treated, dtype=float) - 1.0
+
+    log_density = -lnsigma - 0.5 * np.log(2.0 * np.pi) - 0.5 * (residual / sigma) ** 2
+    return float(np.sum(log_density + special.log_ndtr(sign * shifted)))
+
+
+def _etregress_ml_gradient(
+    theta: np.ndarray, y: np.ndarray, X: np.ndarray, Z: np.ndarray, treated: np.ndarray
+) -> np.ndarray:
+    """Gradient by central differences of the verified likelihood.
+
+    Derived numerically rather than by hand: three hand-derived derivatives have failed in this session
+    (probit's second, NB2's cross term, the heckman lnsigma score) while source-transcribed and differenced ones
+    held.
+    """
+
+    size = theta.size
+    step = 1e-6 * np.maximum(np.abs(theta), 1.0)
+    gradient = np.empty(size)
+    for column in range(size):
+        plus = np.array(theta, dtype=float)
+        minus = np.array(theta, dtype=float)
+        plus[column] += step[column]
+        minus[column] -= step[column]
+        gradient[column] = (
+            _etregress_ml_loglike(plus, y, X, Z, treated)
+            - _etregress_ml_loglike(minus, y, X, Z, treated)
+        ) / (2.0 * step[column])
+    return gradient
+
+
 def _heckman_ml_loglike(
     theta: np.ndarray, y: np.ndarray, X: np.ndarray, Z: np.ndarray
 ) -> float:
@@ -1919,6 +1983,162 @@ class Etregress:
         )
 
     # ------------------------------------------------------------------- fit
+    # ------------------------------------------------------------------- fit
+    def _fit_ml(
+        self,
+        *,
+        cov_type: str | None,
+        maxiter: int,
+        strict: bool,
+    ) -> StataResults:
+        """Joint ML over ``beta``, ``gamma``, ``athrho`` and ``lnsigma`` (Stata's default for ``etregress``).
+
+        The outcome design already contains the treatment indicator, so its coefficient sits inside ``beta``,
+        which is also how Stata's first block is organised.
+
+        Nelder-Mead directly, with no quasi-Newton stage in front: that is what the heckman ML work established
+        by measurement, where a bounded L-BFGS-B pass moved the point outside the region the polish could recover
+        and made `athrho`'s tanh saturation silently wrong.
+        """
+
+        import warnings
+
+        from scipy import optimize
+
+        if cov_type not in (None, "nonrobust"):
+            raise ValueError(
+                f"etregress: only cov_type='nonrobust' is implemented for method='ml', "
+                f"got {cov_type!r}"
+            )
+
+        y = np.asarray(self._y, dtype=float)
+        X = np.asarray(self._X, dtype=float)
+        Z = np.asarray(self._Z, dtype=float)
+        treated = np.asarray(self._t, dtype=float)
+        k = X.shape[1]
+        m = Z.shape[1]
+
+        gamma, _probit_covariance = _probit_fit(treated, Z, maxiter=maxiter)
+        control = self._control_function(gamma, treated)
+        augmented = np.column_stack([X, control])
+        beta_cf, _resid = _augmented_regression(y, augmented)
+        start_b = np.asarray(beta_cf[:k], dtype=float)
+
+        n = y.size
+        residual = y - X @ start_b
+        rss = float(residual @ residual)
+        index = Z @ gamma
+        mtao = float(np.mean(control * (control + index)))
+        sigma2 = rss / n + float(beta_cf[-1]) ** 2 * mtao
+        sigma0 = float(np.sqrt(sigma2)) if sigma2 > 0 else 1.0
+        rho0 = float(np.clip(float(beta_cf[-1]) / sigma0, -0.99, 0.99))
+
+        start = np.concatenate(
+            [start_b, gamma, [float(np.arctanh(rho0)), float(np.log(sigma0))]]
+        )
+
+        def negative(theta: np.ndarray) -> float:
+            value = _etregress_ml_loglike(theta, y, X, Z, treated)
+            return -value if np.isfinite(value) else 1e12
+
+        result = optimize.minimize(
+            negative,
+            start,
+            method="Nelder-Mead",
+            options={
+                "maxiter": max(int(maxiter) * 200, 40000),
+                "maxfev": max(int(maxiter) * 200, 40000),
+                "xatol": 1e-10,
+                "fatol": 1e-12,
+            },
+        )
+        theta = np.asarray(result.x, dtype=float)
+        converged = float(
+            np.max(np.abs(_etregress_ml_gradient(theta, y, X, Z, treated)))
+        ) < 1e-4
+        if not converged:
+            message = (
+                f"etregress (method='ml'): the optimiser did not converge "
+                f"({getattr(result, 'message', '')})"
+            )
+            if strict:
+                from westata.errors import ConvergenceError
+
+                raise ConvergenceError(message)
+            warnings.warn(message, RuntimeWarning, stacklevel=3)
+
+        b = theta[:k]
+        g = theta[k : k + m]
+        tau = float(theta[k + m])
+        lnsigma = float(theta[k + m + 1])
+        rho = float(np.tanh(tau))
+        sigma = float(np.exp(lnsigma))
+
+        size = theta.size
+        step = 1e-6 * np.maximum(np.abs(theta), 1.0)
+        jacobian = np.zeros((size, size))
+        for column in range(size):
+            plus = theta.copy()
+            minus = theta.copy()
+            plus[column] += step[column]
+            minus[column] -= step[column]
+            jacobian[:, column] = (
+                _etregress_ml_gradient(plus, y, X, Z, treated)
+                - _etregress_ml_gradient(minus, y, X, Z, treated)
+            ) / (2.0 * step[column])
+        information = -(jacobian + jacobian.T) / 2.0
+        try:
+            covariance = np.linalg.inv(information)
+        except np.linalg.LinAlgError:
+            covariance = np.linalg.pinv(information)
+
+        llf = _etregress_ml_loglike(theta, y, X, Z, treated)
+        names = (
+            [f"y:{name}" for name in self._outcome_names]
+            + [f"treat:{name}" for name in self._treatment_names]
+            + ["/athrho", "/lnsigma"]
+        )
+
+        d_rho_d_tau = 1.0 - rho * rho
+        grad_lambda = np.zeros(size)
+        grad_lambda[k + m] = d_rho_d_tau * sigma
+        grad_lambda[k + m + 1] = rho * sigma
+
+        e: dict[str, Any] = {
+            "N": int(n),
+            "N_treated": int(treated.sum()),
+            "ll": llf,
+            "athrho": tau,
+            "lnsigma": lnsigma,
+            "rho": rho,
+            "sigma": sigma,
+            "lambda": rho * sigma,
+            "se_rho": float(abs(d_rho_d_tau) * np.sqrt(max(covariance[k + m, k + m], 0.0))),
+            "se_sigma": float(
+                abs(sigma) * np.sqrt(max(covariance[k + m + 1, k + m + 1], 0.0))
+            ),
+            "se_lambda": float(np.sqrt(max(float(grad_lambda @ covariance @ grad_lambda), 0.0))),
+            "converged": int(converged),
+            "method": "ml",
+        }
+
+        return StataResults(
+            params=theta.copy(),
+            param_names=names,
+            cov=covariance,
+            resid=y - X @ b,
+            fittedvalues=X @ b,
+            nobs=int(n),
+            df_resid=float(n - size),
+            df_model=float(k - 1),
+            dist="z",
+            model_name="Endogenous treatment-regression model",
+            cov_type="nonrobust",
+            e=e,
+            design_matrix=(X, list(self._outcome_names)),
+            model_data=self._model_data,
+        )
+
     def fit(
         self,
         method: str = "control",
@@ -1932,13 +2152,11 @@ class Etregress:
         """Estimate by the control-function (two-step) procedure."""
 
         normalized = str(method).strip().lower()
+        if normalized in ("ml", "mle", "maximumlikelihood"):
+            return self._fit_ml(cov_type=cov_type, maxiter=maxiter, strict=strict)
         if normalized not in ("control", "controlfunction", "control-function", "twostep", "two-step"):
             raise UnsupportedError(
-                f"etregress: only method='control' is implemented; {method!r} is "
-                "not. The maximum likelihood variant requires the joint likelihood "
-                "of the outcome and treatment equations with a bivariate normal "
-                "error term, which has not been implemented or verified against "
-                "Stata."
+                f"etregress: method={method!r} is not implemented; use 'control' or 'ml'"
             )
         if cov_type not in (None, "nonrobust"):
             raise ValueError(

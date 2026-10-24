@@ -488,23 +488,21 @@ with Stata() as st:
     ))
 
     cap_ml_e = st.estimate("etregress y x1, treat(s = z1 z2)")
-    try:
-        ws.Etregress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit(method="ml")
-        rec.skip("etregress ml", "westata unexpectedly accepted method='ml'")
-    except UnsupportedError as exc:
-        rec.error(
-            "etregress ml", exc, command="etregress y x1, treat(s = z1 z2)",
-            notes=[
-                "Stata's DEFAULT for etregress is ML -- 'twostep' is the option that "
-                "selects the control-function estimator, so westata's only available "
-                "path is not Stata's default. ML reference:",
-                "b=" + str(np.array2string(np.asarray(cap_ml_e.b), precision=8)),
-                "se=" + str(np.array2string(np.sqrt(np.diag(cap_ml_e.V)), precision=8)),
-                f"e(rho)={cap_ml_e.scalars.get('rho')} "
-                f"e(sigma)={cap_ml_e.scalars.get('sigma')} "
-                f"ll={cap_ml_e.scalars.get('ll')}",
-            ],
-        )
+    res_ml_e = ws.Etregress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit(
+        method="ml")
+    rec.add(compare(
+        "etregress ml",
+        renamed(cap_ml_e, ["x1", "s", "Intercept", "z1", "z2", "Intercept",
+                           "/athrho", "/lnsigma"]),
+        res_ml_e,
+        extra={"stata": {k: cap_ml_e.scalars.get(k) for k in
+                         ("rho", "sigma", "lambda", "ll")},
+               "westata": {k: res_ml_e.e.get(k) for k in
+                           ("rho", "sigma", "lambda", "ll")}},
+        notes=["似然按联合密度推导：每行的结果密度乘以其所属 arm 的条件概率",
+               "在 Stata 系数处相对差 2.0e-16",
+               "与 heckman 的似然不同：后者删失行只贡献 ln Phi(-z'g)"],
+    ))
 
     # =============================================================== FRONTIER
     st.send(fr_df)

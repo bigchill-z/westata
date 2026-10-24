@@ -2,16 +2,16 @@
   "total": 386,
   "status_counts": {
     "pass": 286,
-    "fail": 87,
+    "fail": 88,
     "skip": 11,
-    "error": 2
+    "error": 1
   },
   "tier_counts": {
     "A": 250,
     "B": 58,
     "D": 10,
-    "C": 21,
-    "NA": 29,
+    "C": 22,
+    "NA": 28,
     "E": 7
   },
   "per_domain": {
@@ -33,14 +33,12 @@
     "limited_quantile": {
       "counts": {
         "pass": 11,
-        "fail": 13,
-        "error": 1
+        "fail": 14
       },
       "tiers": {
         "A": 12,
         "B": 8,
-        "C": 1,
-        "NA": 1,
+        "C": 2,
         "D": 3
       },
       "max_param_rel": 0.0015150590823206423
@@ -4658,25 +4656,69 @@
         "domain": "limited_quantile",
         "name": "etregress ml",
         "stata_command": "etregress y x1, treat(s = z1 z2)",
-        "status": "error",
+        "status": "fail",
         "tolerance": 1e-09,
-        "param_rel": NaN,
-        "se_rel": NaN,
-        "n_params": 0,
-        "mismatched": [],
-        "scalars": {},
-        "extra": {},
-        "notes": [
-          "Stata's DEFAULT for etregress is ML -- 'twostep' is the option that selects the control-function estimator, so westata's only available path is not Stata's default. ML reference:",
-          "b=[ 0.92442027  0.14566395  0.90985491  0.69259854 -0.34114759  0.47796736\n  0.452679   -0.03440277]",
-          "se=[0.03582317 0.16585594 0.11143677 0.07053739 0.05784362 0.05983991\n 0.12554969 0.03640273]",
-          "e(rho)=0.4240986539296641 e(sigma)=0.9661822784535223 ll=-1124.693682764672"
+        "param_rel": 1.8160778771590941e-06,
+        "se_rel": 0.00238613313528113,
+        "n_params": 2,
+        "mismatched": [
+          "y:Intercept",
+          "y:x1",
+          "y:s",
+          "treat:Intercept",
+          "treat:z1",
+          "treat:z2",
+          "stata-only:x1",
+          "stata-only:s",
+          "stata-only:Intercept",
+          "stata-only:z1",
+          "stata-only:z2",
+          "stata-only:Intercept"
         ],
-        "error": "UnsupportedError: etregress: only method='control' is implemented; 'ml' is not. The maximum likelihood variant requires the joint likelihood of the outcome and treatment equations with a bivariate normal error term, which has not been implemented or verified against Stata.",
+        "scalars": {},
+        "extra": {
+          "stata": {
+            "rho": 0.4240986539296641,
+            "sigma": 0.9661822784535223,
+            "lambda": 0.40975660374283474,
+            "ll": -1124.693682764672
+          },
+          "westata": {
+            "rho": 0.42409877361767306,
+            "sigma": 0.9661823388187638,
+            "lambda": 0.4097567449840928,
+            "ll": -1124.6936827646703
+          },
+          "detail": {
+            "/athrho": {
+              "stata_b": 0.4526789985869257,
+              "westata_b": 0.45267914452294633,
+              "b_rel": 3.2238301558582115e-07,
+              "stata_se": 0.125549685691941,
+              "westata_se": 0.12525010742678733,
+              "se_rel": 0.00238613313528113
+            },
+            "/lnsigma": {
+              "stata_b": -0.03440276851883702,
+              "westata_b": -0.0344027060407302,
+              "b_rel": 1.8160778771590941e-06,
+              "stata_se": 0.036402729923727985,
+              "westata_se": 0.03636592877428193,
+              "se_rel": 0.0010109447704378907
+            }
+          }
+        },
+        "notes": [
+          "似然按联合密度推导：每行的结果密度乘以其所属 arm 的条件概率",
+          "在 Stata 系数处相对差 2.0e-16",
+          "与 heckman 的似然不同：后者删失行只贡献 ln Phi(-z'g)",
+          "unmatched coefficients: y:Intercept, y:x1, y:s, treat:Intercept, treat:z1, treat:z2, stata-only:x1, stata-only:s, stata-only:Intercept, stata-only:z1, stata-only:z2, stata-only:Intercept"
+        ],
+        "error": "",
         "stata_version": "19.5",
         "seconds": 0.0,
-        "param_tier": "NA",
-        "se_tier": "NA"
+        "param_tier": "C",
+        "se_tier": "D"
       },
       {
         "domain": "limited_quantile",
@@ -4872,9 +4914,9 @@
             "rel": 0.0
           },
           "sum_adev": {
-            "stata": 208.04731048707464,
+            "stata": 208.04731048707467,
             "westata": 208.04731048707464,
-            "rel": 0.0
+            "rel": 1.3661176087238946e-16
           },
           "sum_rdev": {
             "stata": 258.60347687093315,
@@ -4882,9 +4924,9 @@
             "rel": 0.0
           },
           "r2_p": {
-            "stata": 0.19549685485895718,
+            "stata": 0.19549685485895707,
             "westata": 0.19549685485895718,
-            "rel": 0.0
+            "rel": 5.678981513161102e-16
           },
           "q": {
             "stata": 0.5,

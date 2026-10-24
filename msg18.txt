@@ -1,0 +1,44 @@
+﻿docs: the sqreg "1.8x variance gap" was an INDEXING artifact -- corrected measurement in 8.18
+
+Aligned by NAME instead of by index:
+
+    reps  statistic     Stata            ours             rel
+     100         x1      0.049002338388   0.057881445137   1.8e-01
+     100         x2      0.017389717194   0.012257626173   3.0e-01
+     100  Intercept      0.032763586567   0.030847725297   5.8e-02
+     400         x1      0.054044288862   0.052543112373   2.8e-02
+     400         x2      0.014543903782   0.014795971245   1.7e-02
+     400  Intercept      0.028780064439   0.029569181761   2.7e-02
+
+    coefficients at every rep count: 1.8e-16 .. 4.2e-16
+
+`e(V)[0,0]` in Stata is the variance of x1, because Stata puts `_cons` LAST. `cov_params()[0,0]` here is the
+INTERCEPT, because the intercept comes first. Comparing them produced "our variance is 1.83x too small", and each
+of four rounds then explained that non-existent discrepancy in turn: fweight semantics (wrong), RNG consumption
+(wrong -- the uniform before and after qreg is byte-identical), sort persistence (real, but not this), LP vertex
+choice (wrong).
+
+The per-replicate work was not wasted: weights match Stata element for element, the fit matches to 3.5e-16, and the
+carried permutation genuinely helps (0.052543 with it, 0.049441 without, against Stata's 0.054044). But the
+magnitude that motivated it was an artifact.
+
+The remaining VCE difference is Monte-Carlo: Stata's OWN value moves 42% between rep counts for this estimator
+(0.037930 at reps=20, 0.054044 at reps=400), so neither side has converged and a pointwise standard is not
+well-defined. 8.18 now records that rather than a "3.9e-02 gap".
+
+ALSO CORRECTED THIS ROUND, and this one is about the tooling rather than the library: I raised bsqreg from E1 to E2
+on the reasoning that a difference which is within the reference's own sampling noise must be "measured and
+bounded". The sweep REJECTED it --
+
+    1 registry level(s) are better than measured:
+      bsqreg    declared E2, measured worst E
+    Each of these is a false claim ... Fix the entry or fix the code -- do not widen the level to hide it.
+
+and it is right: se_rel 3.0e-02 lands in tier E, and reclassifying the row because I believe the difference is
+benign is exactly the "widen the level to hide it" the checker exists to prevent. Reverted. The gap stays E1 until
+the measurement says otherwise, not until I have an argument that it should.
+
+That is the same failure mode as the four wrong cause attributions, in the tooling layer: preferring a coherent
+story over the measurement.
+
+Suite: 1431 passing.

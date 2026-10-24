@@ -6,7 +6,7 @@
     "fail": 14
   },
   "max_param_rel": 0.0015150590823206423,
-  "generated_at": "2026-10-24T17:09:18",
+  "generated_at": "2026-10-24T18:31:56",
   "stata_version": "19.5",
   "items": [
     {
@@ -267,7 +267,7 @@
       "name": "sqreg q(.25 .5) pooled 4x500",
       "status": "fail",
       "param_rel": 4.916244905696681e-15,
-      "se_rel": 0.03303564860904794,
+      "se_rel": 0.02080787437303659,
       "tier": "A",
       "se_tier": "E",
       "command": "sqreg y x1 x2, quantile(.25 .5) reps(500)",
@@ -282,7 +282,7 @@
       "name": "bsqreg median pooled 4x500",
       "status": "fail",
       "param_rel": 3.3806849981809426e-16,
-      "se_rel": 0.021198322970250632,
+      "se_rel": 0.029950956364322906,
       "tier": "A",
       "se_tier": "E",
       "command": "bsqreg y x1 x2, quantile(.5) reps(500)",

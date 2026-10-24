@@ -47,7 +47,29 @@ Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 
 ## 安装
 
-`westata` 尚未发布到 PyPI。请从仓库安装：
+`westata` 已发布到 PyPI：
+
+```bash
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install westata
+```
+
+Linux 或 macOS 上把第二行换成 `./.venv/bin/python -m pip install westata`。
+
+要求 Python ≥ 3.10。`numpy`、`pandas`、`scipy`、`statsmodels`、`patsy`、`pyfixest`（HDFE）、
+`linearmodels`（IV 与面板）与 `pyyaml` 会自动装好——**后三个不装就无法 import**。
+
+`arch` 是真正可选的，只有 GARCH 与 Phillips–Perron 检验需要：
+
+```bash
+.venv/Scripts/python.exe -m pip install "westata[arch]"
+```
+
+不装时那些命令会抛 `UnsupportedError` 并指出该装哪个 extra，对应测试跳过而不是失败。
+
+### 想改这个库本身
+
+`pip install westata` 装到的是已发布版本。要改源码，克隆后以可编辑模式安装，并带上测试依赖：
 
 ```bash
 git clone https://github.com/bigchill-z/westata.git
@@ -56,18 +78,8 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-Linux 或 macOS 上把最后一行换成 `./.venv/bin/python -m pip install -e ".[test]"`。
-
-要求 Python ≥ 3.10。`numpy`、`pandas`、`scipy`、`statsmodels`、`patsy`、`pyfixest`（HDFE）、
-`linearmodels`（IV 与面板）与 `pyyaml` 会自动装好——**后三个不装就无法 import**。
-
-`arch` 是真正可选的，只有 GARCH 与 Phillips–Perron 检验需要：
-
-```bash
-.venv/Scripts/python.exe -m pip install -e ".[test,arch]"
-```
-
-不装时那些命令会抛 `UnsupportedError` 并指出该装哪个 extra，对应测试跳过而不是失败。
+之后 `python -m pytest -q` 会跑 1455 个测试。**这一步不需要 Stata 授权**：对照结果已入库，
+测试重放它们即可。要重新对真实 Stata 跑对照（`retest/`、`docs/collect_comparison.py`）才需要授权。
 
 ## 快速开始
 

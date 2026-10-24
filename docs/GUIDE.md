@@ -25,13 +25,11 @@ their measured numbers in [Known deviations](#known-deviations).
 
 ## Install
 
-`westata` is not on PyPI yet. Install from the repository:
+`westata` is on PyPI:
 
 ```bash
-git clone https://github.com/bigchill-z/westata.git
-cd westata
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pip install westata
 ```
 
 On Linux or macOS use `./.venv/bin/python` instead.
@@ -42,7 +40,17 @@ and `pyyaml` install automatically — the package does not import without the l
 `arch` is optional, needed only for GARCH and the Phillips–Perron test:
 
 ```bash
-.venv/Scripts/python.exe -m pip install -e ".[test,arch]"
+.venv/Scripts/python.exe -m pip install "westata[arch]"
+```
+
+To modify the library itself, clone it and install in editable mode with the test extra; the suite
+then runs without a Stata licence, replaying the committed captures:
+
+```bash
+git clone https://github.com/bigchill-z/westata.git
+cd westata
+.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pytest -q
 ```
 
 ## The shape of the API
@@ -473,11 +481,13 @@ Dataset: `panel` — 1600 observations on the Stata side.
 > Conditional Poisson: only slopes compare.
 
 
-### Why some observation counts differ
-
-Some rows above show a different `N` on each side. None is a mistake, and each is one of four things.
-
-| Command | Stata `e(N)` | westata `nobs` |
+    "",
+    "### Why some observation counts differ",
+    "",
+    "Some rows above show a different `N` on each side. None is a mistake, and each is one of three",
+    "things:",
+    "",
+    "| Command | Stata `e(N)` | westata `nobs` |
 |---|---|---|
 | `xtreg, be` | 1600 | 200 |
 | `tobit` | 74 | 69 |
@@ -485,27 +495,21 @@ Some rows above show a different `N` on each side. None is a mistake, and each i
 | `sureg vce(robust)` | 74 | 148 |
 | `heckman twostep` | 600 | 354 |
 | `xtlogit, fe` | 1600 | 1488 |
-| `xtpoisson, fe` | 1600 | 1592 |
-
-The four causes:
-
-1. **What `e(N)` counts.** `sureg` is a system: Stata reports the *per-equation* sample size, westata the
-   length of the stacked residual vector (equations x rows), which is what its result object validates
-   `nobs` against. Two equations on 74 rows give 74 and 148.
-2. **Missing values are dropped.** `tobit` on `rep78` loses the 5 observations where `rep78` is missing,
-   so the estimation sample is 69, while Stata's `e(N)` still reports 74.
-3. **Conditioning and collapsing.** `xtlogit, fe` and `xtpoisson, fe` condition out entities whose outcome
-   never varies (1600 -> 1488 and 1592). `xtreg, be` collapses to one observation per entity, so its `N`
-   is the number of GROUPS rather than rows (1600 -> 200). We report what the estimator actually used;
-   Stata reports what entered.
-4. **Two samples in one model.** `heckman` has a full sample of 600 and a selected sample of 354. Both
-   numbers are defensible because they count different things. We report the full sample so that `nobs`
-   describes the model's own data, and `e.N_selected` carries the other.
-
-In every case the coefficients and standard errors agree to the precision shown in the table above, which
-is the check that matters. The counts are listed because a silent 148-versus-74 would otherwise read as a
-defect.
-
+| `xtpoisson, fe` | 1600 | 1592 |",
+    "",
+    "1. **What `e(N)` counts.** `sureg` is a system: Stata reports the *per-equation* sample size,",
+    "   westata the length of the stacked residual vector (equations x rows), which is what its result",
+    "   object validates `nobs` against. Two equations on 74 rows give 74 and 148.",
+    "2. **Missing values are dropped.** `tobit` on `rep78` loses the 5 observations where `rep78` is",
+    "   missing, so the estimation sample is 69, while Stata's `e(N)` still reports 74.",
+    "3. **Conditioning and collapsing.** `xtlogit, fe` and `xtpoisson, fe` condition out entities whose",
+    "   outcome never varies; `xtreg, be` collapses to one observation per entity. We report the rows that",
+    "   survived, Stata the rows that entered.",
+    "",
+    "In every case the coefficients and standard errors agree to the precision shown in the table above,",
+    "which is the check that matters. The counts are listed because a silent 148-versus-74 would read as",
+    "a defect.",
+    "",
 ## Known deviations
 
 Three kinds of difference exist in the tables above, and they are not the same thing.

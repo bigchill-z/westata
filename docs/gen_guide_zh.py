@@ -158,14 +158,14 @@ DOCUMENT = f"""# westata 使用指南
 
 ## 安装
 
-`westata` 尚未发布到 PyPI，从仓库安装：
+`westata` 已发布到 PyPI：
 
 ```bash
-git clone https://github.com/bigchill-z/westata.git
-cd westata
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pip install westata
 ```
+
+Linux 或 macOS 上把第二行换成 `./.venv/bin/python -m pip install westata`。
 
 Python ≥ 3.10。`numpy`、`pandas`、`scipy`、`statsmodels`、`patsy`、`pyfixest`、`linearmodels`、
 `pyyaml` 会自动装好——**后三个不装就无法 import**。
@@ -173,7 +173,16 @@ Python ≥ 3.10。`numpy`、`pandas`、`scipy`、`statsmodels`、`patsy`、`pyfi
 `arch` 可选，只有 GARCH 与 Phillips–Perron 需要：
 
 ```bash
-.venv/Scripts/python.exe -m pip install -e ".[test,arch]"
+.venv/Scripts/python.exe -m pip install "westata[arch]"
+```
+
+要改库本身，克隆后以可编辑模式安装并带上测试依赖；测试不需要 Stata 授权，重放已入库的捕获结果：
+
+```bash
+git clone https://github.com/bigchill-z/westata.git
+cd westata
+.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pytest -q
 ```
 
 ## API 的形态

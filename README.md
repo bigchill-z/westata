@@ -55,32 +55,44 @@ committed so the comparison replays without a licence.
 
 ## Install
 
-`westata` is **not on PyPI yet**. Install it from the repository:
+`westata` is on PyPI:
 
 ```bash
-git clone https://github.com/bigchill-z/westata.git
-cd westata
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pip install westata
 ```
 
-On Linux or macOS the last line is `./.venv/bin/python -m pip install -e ".[test]"`.
+On Linux or macOS the second line is `./.venv/bin/python -m pip install westata`.
 
 Requires Python ≥ 3.10. `numpy`, `pandas`, `scipy`, `statsmodels`, `patsy`,
 `pyfixest` (HDFE), `linearmodels` (IV, panel) and `pyyaml` come in
 automatically — the package does not import without the last three.
 
 `arch` is optional and only needed for GARCH, EGARCH and the Phillips–Perron
-test. Install it alongside the package:
+test:
 
 ```bash
-.venv\Scripts\python.exe -m pip install -e ".[test,arch]"
+.venv/Scripts/python.exe -m pip install "westata[arch]"
 ```
 
 Without it those commands raise an `UnsupportedError` naming the missing extra,
-and their tests skip rather than fail. Once the package is on PyPI, the
-equivalent commands will be `pip install westata` and `pip install
-"westata[arch]"`.
+and their tests skip rather than fail.
+
+### Working on the library itself
+
+The released version is what `pip install westata` gives you. To work on the
+source, clone and install it in editable mode with the test dependencies:
+
+```bash
+git clone https://github.com/bigchill-z/westata.git
+cd westata
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -e ".[test]"
+```
+
+`python -m pytest -q` then runs the 1455-test suite. It needs no Stata licence:
+the conformance captures are committed and replayed. Re-running the comparisons
+against live Stata (`retest/`, `docs/collect_comparison.py`) does need one.
 
 ## Quick start
 

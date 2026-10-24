@@ -166,13 +166,11 @@ their measured numbers in [Known deviations](#known-deviations).
 
 ## Install
 
-`westata` is not on PyPI yet. Install from the repository:
+`westata` is on PyPI:
 
 ```bash
-git clone https://github.com/bigchill-z/westata.git
-cd westata
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pip install westata
 ```
 
 On Linux or macOS use `./.venv/bin/python` instead.
@@ -183,7 +181,17 @@ and `pyyaml` install automatically — the package does not import without the l
 `arch` is optional, needed only for GARCH and the Phillips–Perron test:
 
 ```bash
-.venv/Scripts/python.exe -m pip install -e ".[test,arch]"
+.venv/Scripts/python.exe -m pip install "westata[arch]"
+```
+
+To modify the library itself, clone it and install in editable mode with the test extra; the suite
+then runs without a Stata licence, replaying the committed captures:
+
+```bash
+git clone https://github.com/bigchill-z/westata.git
+cd westata
+.venv/Scripts/python.exe -m pip install -e ".[test]"
+.venv/Scripts/python.exe -m pytest -q
 ```
 
 ## The shape of the API

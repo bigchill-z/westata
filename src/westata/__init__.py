@@ -72,6 +72,7 @@ from westata.estimators import (
     FirstDifferenceOLS,
     Logit,
     NegativeBinomial,
+    NegativeBinomialNB1,
     OrderedLogit,
     OrderedProbit,
     PanelOLS,

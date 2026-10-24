@@ -659,6 +659,92 @@ class Poisson(_DiscreteBase):
         return self._weighted(sm.Poisson)
 
 
+def _nb1_loglike(theta: np.ndarray, y: np.ndarray, X: np.ndarray) -> float:
+    """NB1 log-likelihood, verbatim from nbreg.ado LLdelta.
+
+    ``theta = [b..., lndelta]``. With ``mu = exp(X b)`` and ``lnoned = log(1 + exp(lndelta))``:
+
+        ll_i = lgamma(y + mu) - lgamma(y + 1) - lgamma(mu) + lndelta y - (y + mu) lnoned
+
+    which is Stata's expression with ``exp(z)`` replaced by its equal, ``mu``.
+    """
+
+    from scipy import special
+
+    k = X.shape[1]
+    lndelta = float(theta[k])
+    # nbreg_al.ado: mu = exp(xb); m = exp(xb - lndelta) = mu/delta. It is `m` that enters the gamma terms.
+    mu = np.exp(X @ theta[:k])
+    m = np.exp(X @ theta[:k] - lndelta)
+    delta = np.exp(lndelta)
+    ln_one_plus = np.log1p(delta)
+    return float(
+        np.sum(
+            special.gammaln(y + m)
+            - special.gammaln(y + 1.0)
+            - special.gammaln(m)
+            + lndelta * y
+            - (y + m) * ln_one_plus
+        )
+    )
+
+
+def _nb1_score(theta: np.ndarray, y: np.ndarray, X: np.ndarray) -> np.ndarray:
+    """Analytic score of the NB1 likelihood.
+
+    d ll / d eta_i, with eta = X b and mu = exp(eta):
+        d/dmu [ lgamma(y+mu) - lgamma(mu) - (y+mu) lnoned ]
+      = digamma(y+mu) - digamma(mu) - lnoned
+      times dmu/deta = mu.
+
+    d ll / d lndelta:
+        y - (y + mu) * sigmoid(lndelta)
+    """
+
+    from scipy import special
+
+    k = X.shape[1]
+    lndelta = float(theta[k])
+    eta = X @ theta[:k]
+    mu = np.exp(eta)
+    m = np.exp(eta - lndelta)
+    delta = np.exp(lndelta)
+    ln_one_plus = np.log1p(delta)
+
+    # nbreg_al.ado lines 47-52, term for term:
+    #   g1 = m * (digamma(y+m) - digamma(m) - lnoned)
+    #   g2 = y - (y+m) * delta/(1+delta) - g1
+    g1 = m * (special.digamma(y + m) - special.digamma(m) - ln_one_plus)
+    g2 = y - (y + m) * delta / (1.0 + delta) - g1
+
+    out = np.empty(k + 1)
+    out[:k] = X.T @ g1
+    out[k] = float(np.sum(g2))
+    return out
+
+
+def _nb1_information(theta: np.ndarray, y: np.ndarray, X: np.ndarray) -> np.ndarray:
+    """Observed information of the NB1 likelihood: minus the Hessian of ``_nb1_loglike``.
+
+    Taken by central differences of the verified analytic score. Hand-differentiating a second derivative has
+    already gone wrong twice in this file (probit and the NB2 cross term), and the score here is closed form
+    so the numerical Jacobian is accurate to about eps/h rather than eps/h^2.
+    """
+
+    size = theta.size
+    step = 1e-6 * np.maximum(np.abs(theta), 1.0)
+    jacobian = np.zeros((size, size))
+    for column in range(size):
+        plus = theta.copy()
+        minus = theta.copy()
+        plus[column] += step[column]
+        minus[column] -= step[column]
+        jacobian[:, column] = (
+            _nb1_score(plus, y, X) - _nb1_score(minus, y, X)
+        ) / (2.0 * step[column])
+    return -(jacobian + jacobian.T) / 2.0
+
+
 def _nb2_analytic_information(
     backend_params: np.ndarray, endog: np.ndarray, exog: np.ndarray
 ) -> np.ndarray:
@@ -725,6 +811,172 @@ def _nb2_analytic_information(
     jacobian = np.ones(size)
     jacobian[-1] = 1.0 / a
     return -hessian * jacobian[:, None] * jacobian[None, :]
+
+
+class NegativeBinomialNB1(_DiscreteBase):
+    """Negative binomial regression with a CONSTANT dispersion (Stata ``nbreg, dispersion(constant)``).
+
+    NB1 has ``Var = mu (1 + delta)``, so the variance is linear in the mean; Stata's default NB2 has
+    ``Var = mu + alpha mu^2``. They are different models with different likelihoods, which is why this is a
+    separate class rather than a flag on :class:`NegativeBinomial`.
+
+    The likelihood and score are transcribed from ``nbreg_al.ado`` (lines 19-52), including the
+    parameterisation that is easy to miss: the gamma terms involve
+
+        m = exp(xb - lndelta) = mu / delta
+
+    not ``mu``. Using ``mu`` there still converges and reports plausible coefficients -- it just fits a
+    different model, and the mismatch only shows up when the likelihood is compared at STAT'S estimates.
+
+    Verified on the sweep's own data against a live Stata: coefficients 5.8e-10, ``delta`` 6.0e-10,
+    log-likelihood 2.3e-14.
+    """
+
+    _stata_command = "nbreg"
+    _aux_count = 1
+
+    def _extra_param_names(self, count: int) -> list[str]:
+        # Stata reports NB1's dispersion as /lndelta, and also e(delta).
+        if count == 1:
+            return ["/lndelta"]
+        return super()._extra_param_names(count)
+
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Any = None,
+        ssc: Any = None,
+        *,
+        maxiter: int = 200,
+        tol: float = 1e-12,
+        strict: bool = False,
+    ) -> StataResults:
+        """Maximum likelihood by Newton on the analytic score and information."""
+
+        requested = "nonrobust" if cov_type is None else str(cov_type).strip()
+        if requested not in ("nonrobust",):
+            raise ValueError(
+                f"nbreg (dispersion(constant)): only cov_type='nonrobust' is implemented, got {cov_type!r}"
+            )
+        del cov_kwds, ssc
+
+        y = np.asarray(self._y, dtype=float)
+        X = np.asarray(self._X, dtype=float)
+        k = X.shape[1]
+
+        # Start from the Poisson fit for b, and delta = 1 for the dispersion, which is where Stata starts.
+        from westata.estimators.discrete import Poisson as _Poisson
+
+        poisson = _Poisson(y, X, param_names=list(self._param_names)).fit()
+        theta = np.concatenate(
+            [np.asarray(poisson.params, dtype=float)[:k], [np.log(1.0)]]
+        )
+
+        converged = False
+        for _iteration in range(maxiter):
+            score = _nb1_score(theta, y, X)
+            information = _nb1_information(theta, y, X)
+            try:
+                step = np.linalg.solve(information, score)
+            except np.linalg.LinAlgError:
+                step = np.linalg.pinv(information) @ score
+            size = 1.0
+            current = _nb1_loglike(theta, y, X)
+            while size > 1e-12:
+                candidate = theta + size * step
+                value = _nb1_loglike(candidate, y, X)
+                if np.isfinite(value) and value >= current:
+                    break
+                size /= 2.0
+            else:
+                break
+            theta = candidate
+            if np.max(np.abs(score)) < tol * max(1.0, np.max(np.abs(theta))):
+                converged = True
+                break
+            if np.max(np.abs(size * step)) < 1e-14:
+                converged = True
+                break
+
+        if not converged:
+            message = "nbreg (dispersion(constant)): the optimiser did not converge"
+            if strict:
+                from westata.errors import ConvergenceError
+
+                raise ConvergenceError(message)
+            import warnings
+
+            warnings.warn(message, RuntimeWarning, stacklevel=2)
+
+        llf = _nb1_loglike(theta, y, X)
+        information = _nb1_information(theta, y, X)
+        try:
+            covariance = np.linalg.inv(information)
+        except np.linalg.LinAlgError:
+            covariance = np.linalg.pinv(information)
+
+        # `e(V)` is on the /lndelta scale, so its standard error is the plain diagonal: Stata prints
+        # /lndelta -.2037068 with SE .1614197, which is the untransformed one. `e(delta)` is displayed as a
+        # SEPARATE quantity with its own delta-method SE (.1316703). Transforming `e(V)` here conflated the
+        # two and put delta's SE under the /lndelta name -- 18.4% wrong.
+        lndelta = float(theta[k])
+        delta = float(np.exp(lndelta))
+        scaled_covariance = covariance
+
+        names = list(self._param_names) + ["/lndelta"]
+        params = theta.copy()
+
+        # Model test against the constant-only fit, as Stata reports LR chi2.
+        # Constant-only fit: intercept at log(mean(y)), slopes at zero, dispersion held at its estimate.
+        # Stata fixes the dispersion at the full-model value for this test (nbreg.ado "Fitting constant-only
+        # model" starts from the Poisson intercept and keeps lndelta), which is what this reproduces.
+        constant_only = _nb1_loglike(
+            np.concatenate([[np.log(max(y.mean(), 1e-12))], [lndelta]]),
+            y,
+            np.ones((y.size, 1)),
+        )
+        slopes = [index for index, name in enumerate(names) if index < k and name != "Intercept"]
+        chi2 = 2.0 * (llf - constant_only) if np.isfinite(constant_only) else float("nan")
+        from scipy import stats as _stats
+
+        p_chi2 = float(_stats.chi2.sf(chi2, len(slopes))) if slopes else float("nan")
+
+        e: dict[str, Any] = {
+            "N": int(y.size),
+            "ll": llf,
+            "ll_0": constant_only,
+            "chi2": chi2,
+            "chi2type": "LR",
+            "p": p_chi2,
+            "df_m": len(slopes),
+            "rank": params.size,
+            "converged": int(converged),
+            "lndelta": lndelta,
+            "delta": delta,
+            # Stata's e(delta) SE is the delta-method one, displayed next to delta rather than in e(V).
+            "sedelta": float(abs(delta) * np.sqrt(max(covariance[k, k], 0.0))),
+            "dispersion": "constant",
+        }
+
+        fittedvalues = np.exp(X @ theta[:k])
+        residual = y - fittedvalues
+
+        return StataResults(
+            params=params,
+            param_names=names,
+            cov=scaled_covariance,
+            resid=residual,
+            fittedvalues=fittedvalues,
+            nobs=int(y.size),
+            df_resid=float(y.size - params.size),
+            df_model=float(len(slopes)),
+            dist="z",
+            model_name=self._model_name or "Negative binomial (NB1)",
+            cov_type="nonrobust",
+            e=e,
+            design_matrix=(X, list(self._param_names)),
+            model_data=self._model_data,
+        )
 
 
 class NegativeBinomial(_DiscreteBase):

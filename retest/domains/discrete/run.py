@@ -530,18 +530,17 @@ def main() -> None:
 
         # nbreg dispersion(constant) = NB1
         cap1 = st.estimate("nbreg y_nb x1 x2, dispersion(constant)")
-        try:
-            ws.NegativeBinomial.from_formula("y_nb ~ x1 + x2", df).fit(dispersion="constant")
-        except Exception as exc:  # noqa: BLE001
-            rec.error("nbreg, dispersion(constant) (NB1)", exc,
-                      command=cap1.command,
-                      notes=["westata NegativeBinomial.fit() has no dispersion= option at all; "
-                             "only Stata's NB2 (Var=mu+alpha*mu^2) is implemented, so "
-                             "dispersion(constant) / dispersion(mean) / nb1 cannot be requested",
-                             "Stata NB1 is a real, separate model: delta="
-                             + f"{cap1.scalars.get('delta')!r}, "
-                               f"lndelta={np.asarray(cap1.b)[3]:.10f}, "
-                               f"ll={cap1.scalars['ll']:.10f}"])
+        res_nb1 = ws.NegativeBinomialNB1.from_formula("y_nb ~ x1 + x2", df).fit()
+        compare_by_position(
+            "nbreg, dispersion(constant) (NB1)", cap1, res_nb1,
+            perm=[2, 0, 1, 3],
+            extra={"stata_delta": cap1.scalars.get("delta"),
+                   "westata_delta": res_nb1.e.get("delta"),
+                   "stata_sedelta": cap1.scalars.get("sedelta"),
+                   "westata_sedelta": res_nb1.e.get("sedelta"),
+                   "note": "m = mu/delta 的 gamma 参数化，from nbreg_al.ado；"
+                           "e(V) 在 /lndelta 尺度上，e(delta) 的 SE 单独报告"},
+        )
         fit1 = _fit_nb1(df.y_nb.to_numpy(float), X_nb)
         b1 = np.concatenate([fit1.params[:-1], [fit1.params[-1]]])[[2, 0, 1, 3]]
         se1 = np.concatenate([np.sqrt(np.diag(fit1.cov_params()))[:-1],

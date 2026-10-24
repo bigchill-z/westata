@@ -20,6 +20,7 @@ westata                    Stata
 from westata.estimators.discrete import (
     Logit,
     NegativeBinomial,
+    NegativeBinomialNB1,
     OrderedLogit,
     OrderedProbit,
     Poisson,

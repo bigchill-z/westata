@@ -3,12 +3,11 @@
   "total": 65,
   "counts": {
     "pass": 30,
-    "fail": 30,
-    "skip": 4,
-    "error": 1
+    "fail": 31,
+    "skip": 4
   },
   "max_param_rel": 0.0025094142341710543,
-  "generated_at": "2026-10-24T14:51:18",
+  "generated_at": "2026-10-24T15:07:03",
   "stata_version": "19.5",
   "items": [
     {
@@ -336,17 +335,16 @@
     },
     {
       "name": "nbreg, dispersion(constant) (NB1)",
-      "status": "error",
-      "param_rel": NaN,
-      "se_rel": NaN,
-      "tier": "NA",
-      "se_tier": "NA",
+      "status": "fail",
+      "param_rel": 2.927813378663956e-09,
+      "se_rel": 3.399933038790363e-10,
+      "tier": "B",
+      "se_tier": "A",
       "command": "nbreg y_nb x1 x2, dispersion(constant)",
       "notes": [
-        "westata NegativeBinomial.fit() has no dispersion= option at all; only Stata's NB2 (Var=mu+alpha*mu^2) is implemented, so dispersion(constant) / dispersion(mean) / nb1 cannot be requested",
-        "Stata NB1 is a real, separate model: delta=0.815701482684229, lndelta=-0.2037068210, ll=-936.9465087154"
+        "positional alignment: westata[i] <-> stata[perm[i]], perm=[2, 0, 1, 3] (Stata's e(b) column order is x1 x2 _cons [lnalpha] and zip/zinb repeat the equation-local names, so name matching is unsafe)"
       ],
-      "error": "TypeError: _DiscreteBase.fit() got an unexpected keyword argument 'dispersion'"
+      "error": ""
     },
     {
       "name": "nbreg dispersion(constant) [independent NB1 reference]",

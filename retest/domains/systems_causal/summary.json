@@ -8,7 +8,7 @@
     "skip": 2
   },
   "max_param_rel": 0.012076059850373966,
-  "generated_at": "2026-10-24T16:14:07",
+  "generated_at": "2026-10-24T18:57:17",
   "stata_version": "19.5",
   "items": [
     {
@@ -323,8 +323,8 @@
     {
       "name": "didregress two-period, covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 2.0790573471566487e-15,
-      "se_rel": 9.934957046183854e-16,
+      "param_rel": 1.9305532509311738e-15,
+      "se_rel": 8.693087415410873e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "didregress (y x1) (treated), group(unit) time(period)",
@@ -336,7 +336,7 @@
     {
       "name": "didregress two-period, no covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.8117423043136117e-16,
+      "param_rel": 0.0,
       "se_rel": 0.0,
       "tier": "A",
       "se_tier": "A",
@@ -349,7 +349,7 @@
     {
       "name": "didregress (y) with an unrelated numeric column present",
       "status": "pass",
-      "param_rel": 1.8117423043136117e-16,
+      "param_rel": 0.0,
       "se_rel": NaN,
       "tier": "A",
       "se_tier": "NA",
@@ -362,7 +362,7 @@
     {
       "name": "didregress two-period, vce(robust)",
       "status": "pass",
-      "param_rel": 2.0790573471566487e-15,
+      "param_rel": 1.9305532509311738e-15,
       "se_rel": 1.058216995018265e-15,
       "tier": "A",
       "se_tier": "A",
@@ -388,8 +388,8 @@
     {
       "name": "didregress five-period staggered, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.7790693810014787e-15,
-      "se_rel": 1.1306193830559953e-16,
+      "param_rel": 1.6678775446888861e-15,
+      "se_rel": 3.391858149167986e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "didregress (y) (treated), group(unit) time(period)",
@@ -401,8 +401,8 @@
     {
       "name": "xtdidregress five-period staggered, vce(cluster)",
       "status": "pass",
-      "param_rel": 1.7790693810014787e-15,
-      "se_rel": 1.2643369907784622e-16,
+      "param_rel": 1.6678775446888861e-15,
+      "se_rel": 2.5286739815569244e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "xtdidregress (y) (treated), group(unit) time(period)",
@@ -414,8 +414,8 @@
     {
       "name": "xtdidregress two-period, covariate, vce(cluster)",
       "status": "pass",
-      "param_rel": 2.0790573471566487e-15,
-      "se_rel": 1.0629646551365124e-15,
+      "param_rel": 1.9305532509311738e-15,
+      "se_rel": 8.85803879280427e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "xtdidregress (y x1) (treated), group(unit) time(period)",

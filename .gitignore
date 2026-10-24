@@ -34,3 +34,6 @@ tmp_*
 # Commit message scratch
 p11_msg.txt
 .agent-teams/
+
+# retest 中间产物：每次运行重新生成，不纳入版本控制
+retest/domains/*/_tmp/

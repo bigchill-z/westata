@@ -20,7 +20,7 @@ this in Python, do I get the same numbers Stata would print?*
 |---|---|
 | Tests | **1379 passing** |
 | Commands covered | 87 registry entries |
-| Evidence | **51 × E3**, 26 × E2, 10 × E1 |
+| Evidence | **52 × E3**, 26 × E2, 9 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
@@ -111,9 +111,9 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Agrees with full-precision `e(b)`/`e(V)` from real Stata, on every invocation the independent sweep exercised | 49 |
-| E2 | Approximate, or exact only on a subset of invocations: real but bounded differences | 28 |
-| E1 | Materially differs on at least one measured invocation, or not covered by the sweep | 10 |
+| E3 | Agrees with full-precision `e(b)`/`e(V)` from real Stata, on every invocation the independent sweep exercised | 52 |
+| E2 | Approximate, or exact only on a subset of invocations: real but bounded differences | 26 |
+| E1 | Materially differs on at least one measured invocation, or not covered by the sweep | 9 |
 
 **These levels come from the independent 386-point sweep, not from the library's own
 tests.** That distinction matters: the library's tests passed at 1247 while the sweep

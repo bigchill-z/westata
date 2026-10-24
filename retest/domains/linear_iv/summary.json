@@ -7,7 +7,7 @@
     "skip": 4
   },
   "max_param_rel": 1.1783525559347011e-13,
-  "generated_at": "2026-10-24T10:06:35",
+  "generated_at": "2026-10-24T18:47:36",
   "stata_version": "19.5",
   "items": [
     {
@@ -337,7 +337,7 @@
       "name": "8c reghdfe absorb(gid t) vce(robust)",
       "status": "pass",
       "param_rel": 1.0821005589695823e-15,
-      "se_rel": 0.0,
+      "se_rel": 3.3616625336952625e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "reghdfe y x1 x2, absorb(gid t) vce(robust)",
@@ -348,7 +348,7 @@
       "name": "8d reghdfe absorb(gid t) vce(cluster gid)",
       "status": "pass",
       "param_rel": 1.0821005589695823e-15,
-      "se_rel": 4.967303270196211e-16,
+      "se_rel": 2.103464551463332e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "reghdfe y x1 x2, absorb(gid t) vce(cluster gid)",
@@ -361,7 +361,7 @@
       "name": "9 FEOLS(gid+t, HC1) vs areg absorb(gid)+i.t",
       "status": "pass",
       "param_rel": 9.42675768269063e-16,
-      "se_rel": 4.482216711593682e-16,
+      "se_rel": 7.843879245288943e-16,
       "tier": "A",
       "se_tier": "A",
       "command": "areg y x1 x2 i.t, absorb(gid) vce(robust)",

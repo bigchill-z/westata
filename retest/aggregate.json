@@ -163,7 +163,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 3.140974283218384,
+        "seconds": 2.812319755554199,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -1153,7 +1153,7 @@
         "mismatched": [],
         "scalars": {},
         "extra": {
-          "seconds_to_fit": 0.1605517864227295,
+          "seconds_to_fit": 0.1530313491821289,
           "stata_b": [
             0.23305931212995862,
             0.6083609760894072,
@@ -5085,9 +5085,9 @@
             "rel": 0.0
           },
           "r2_p": {
-            "stata": 0.19549685485895707,
+            "stata": 0.19549685485895718,
             "westata": 0.19549685485895718,
-            "rel": 5.678981513161102e-16
+            "rel": 0.0
           }
         },
         "extra": {
@@ -6183,7 +6183,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 0.0448706999886781,
+        "seconds": 0.06156809999993129,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -6231,7 +6231,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 0.04610639996826649,
+        "seconds": 0.04676140000083251,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -6279,7 +6279,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 0.0620208999607712,
+        "seconds": 0.04799459999958344,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -6327,7 +6327,7 @@
         "notes": [],
         "error": "",
         "stata_version": "19.5",
-        "seconds": 0.04546459997072816,
+        "seconds": 0.044357499999023275,
         "param_tier": "A",
         "se_tier": "A"
       },
@@ -6982,8 +6982,8 @@
           },
           "F": {
             "stata": 397.30614699408545,
-            "westata": 397.3061469940852,
-            "rel": 5.722883402723112e-16
+            "westata": 397.30614699408534,
+            "rel": 2.861441701361556e-16
           }
         },
         "extra": {
@@ -7004,7 +7004,7 @@
         "status": "pass",
         "tolerance": 1e-09,
         "param_rel": 1.0821005589695823e-15,
-        "se_rel": 0.0,
+        "se_rel": 3.3616625336952625e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {
@@ -7044,7 +7044,7 @@
         "status": "pass",
         "tolerance": 1e-09,
         "param_rel": 1.0821005589695823e-15,
-        "se_rel": 4.967303270196211e-16,
+        "se_rel": 2.103464551463332e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {
@@ -7074,8 +7074,8 @@
           "stata_df_a": 9.0,
           "stata_N_clust": 14.0,
           "westata_df_resid": 13.0,
-          "V_diag_rel": 8.334170668017129e-16,
-          "V_full_matrix_rel": 8.334170668017129e-16
+          "V_diag_rel": 3.9852921630378703e-16,
+          "V_full_matrix_rel": 1.7098995275200614e-15
         },
         "notes": [
           "gid 嵌套于自身 → reghdfe 把 gid 的 14 个水平记为 df_a=0（全冗余），t 的 10 个水平保留 9 → df_a=9；FEOLS 侧 df_r / r2_a 一致"
@@ -7093,7 +7093,7 @@
         "status": "pass",
         "tolerance": 1e-09,
         "param_rel": 9.42675768269063e-16,
-        "se_rel": 4.482216711593682e-16,
+        "se_rel": 7.843879245288943e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {
@@ -15052,8 +15052,8 @@
         "stata_command": "didregress (y x1) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 2.0790573471566487e-15,
-        "se_rel": 9.934957046183854e-16,
+        "param_rel": 1.9305532509311738e-15,
+        "se_rel": 8.693087415410873e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {
@@ -15089,7 +15089,7 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.8117423043136117e-16,
+        "param_rel": 0.0,
         "se_rel": 0.0,
         "n_params": 1,
         "mismatched": [],
@@ -15126,7 +15126,7 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.8117423043136117e-16,
+        "param_rel": 0.0,
         "se_rel": NaN,
         "n_params": 0,
         "mismatched": [],
@@ -15135,7 +15135,7 @@
           "inferred_covariates": [],
           "warnings": [],
           "rel_by_label": {
-            "ATET": 1.8117423043136117e-16
+            "ATET": 0.0
           }
         },
         "notes": [
@@ -15153,7 +15153,7 @@
         "stata_command": "didregress (y x1) (treated), group(unit) time(period) vce(robust)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 2.0790573471566487e-15,
+        "param_rel": 1.9305532509311738e-15,
         "se_rel": 1.058216995018265e-15,
         "n_params": 2,
         "mismatched": [],
@@ -15211,8 +15211,8 @@
         "stata_command": "didregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.7790693810014787e-15,
-        "se_rel": 1.1306193830559953e-16,
+        "param_rel": 1.6678775446888861e-15,
+        "se_rel": 3.391858149167986e-16,
         "n_params": 1,
         "mismatched": [],
         "scalars": {
@@ -15248,8 +15248,8 @@
         "stata_command": "xtdidregress (y) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 1.7790693810014787e-15,
-        "se_rel": 1.2643369907784622e-16,
+        "param_rel": 1.6678775446888861e-15,
+        "se_rel": 2.5286739815569244e-16,
         "n_params": 1,
         "mismatched": [],
         "scalars": {
@@ -15285,8 +15285,8 @@
         "stata_command": "xtdidregress (y x1) (treated), group(unit) time(period)",
         "status": "pass",
         "tolerance": 1e-09,
-        "param_rel": 2.0790573471566487e-15,
-        "se_rel": 1.0629646551365124e-15,
+        "param_rel": 1.9305532509311738e-15,
+        "se_rel": 8.85803879280427e-16,
         "n_params": 2,
         "mismatched": [],
         "scalars": {

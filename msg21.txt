@@ -1,0 +1,47 @@
+﻿docs(readme): put the measured limitations at the top, where a PyPI visitor sees them
+
+PyPI renders the README as the project description and shows nothing else. A user who finds `westata` there reads
+"Stata-conformant econometrics" and has no way to discover that 9 of 87 commands measurably deviate, or that one
+feature raises UnsupportedError. That evidence exists in tests/conformance/registry.yml and the sweep, but it is
+invisible from the page a new user actually lands on.
+
+So the notice goes at the TOP, before the feature list. A caveat placed after the sales pitch is a caveat most
+readers never reach.
+
+Every figure is the worst measured relative difference for that command, taken from retest/aggregate.json rather
+than written from memory:
+
+    xtgls             3.4e+00    rank-deficient Sigma only (Stata warns too; no unique inverse)
+    teffects nnmatch  7.1e-02    standard error only -- the point estimate is exact, 3.6e-15
+    frontier          4.3e-02    distribution(exponential), sigma_u nearly unidentified
+    bsqreg            3.0e-02    bootstrap VCE; coefficients exact, a resampling estimator never converges
+    permute           1.2e-02    Stata's shuffle order is not reproducible from its output
+    arima             5.5e-03    optimiser stop point; our likelihood is HIGHER than Stata's
+    rreg              1.0e-03    final biweight case weights
+    xtlogit, pa       1.1e-03    GEE working-correlation handling
+    heckman           1.9e-05    two-step SEs (the ML path added later is exact and separate)
+
+Three of those needed a qualifier, and shipping the bare number would have misled:
+
+  * `xtgls` at 3.4e+00 applies only when the cross-equation Sigma is rank-deficient. Reporting "xtgls is off by
+    339%" with no context would be worse than reporting nothing, because it would discourage use of the case that
+    works perfectly.
+  * `teffects nnmatch` is exact on the point estimate; only the standard error differs.
+  * `bsqreg`'s coefficients are machine-precision; the spread is in a resampling VCE that has not converged on
+    either side.
+
+Also fixed two stale statements found while editing, both of which had become false:
+
+  * "Tests | 1379 passing" -> 1434.
+  * "Optional at runtime: linearmodels (IV, panel), pyfixest (HDFE)" -> the first two are REQUIRED dependencies
+    and always were; the package does not import without them. Calling them optional was the same
+    misunderstanding that produced an unimportable wheel two commits ago.
+
+VERIFIED
+    python -m build            wheel + sdist
+    twine check dist/*         PASSED on both
+    blockquote structure       11 table rows, all inside the blockquote, uniform 4 pipes -> one table
+    1434 tests passing
+
+The structural check matters because the whole notice is a quoted block containing a Markdown table, which is
+exactly the construct that silently degrades into raw text if one line loses its `>`.

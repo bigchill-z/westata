@@ -2,6 +2,33 @@
 
 Stata-conformant econometrics with a statsmodels-style API.
 
+> **Read this before relying on a number.** `westata` is a personal research
+> library at version 0.0.1. 52 of its 87 commands match Stata to machine
+> precision, but **9 do not**, and one feature is missing. The measured
+> deviation for each is listed below. They are graded, not hidden, and the
+> grading is reproducible from this repository.
+>
+> | Command | Worst measured relative difference | Why |
+> |---|---|---|
+> | `xtgls` | 3.4e+00 | **Only when the cross-equation Sigma is rank-deficient** (more equations than periods). No unique generalised inverse exists; Stata warns here too. On well-posed systems this is machine precision. |
+> | `teffects nnmatch` | 7.1e-02 | **Standard error only** — the point estimate is exact (3.6e-15). Uses compiled Mata internally. |
+> | `frontier` | 4.3e-02 | `distribution(exponential)` only, where `sigma_u` is nearly unidentified on the test data. The likelihood at Stata's estimates matches exactly. |
+> | `bsqreg` | 3.0e-02 | Bootstrap VCE. Coefficients are exact (3.4e-16); a resampling estimator has not converged at any finite replicate count. |
+> | `permute` | 1.2e-02 | Stata's shuffle order for the permutation draws is not reproducible from its output. |
+> | `arima` | 5.5e-03 | Optimiser stopping point; our likelihood is *higher* than Stata's. |
+> | `rreg` | 1.0e-03 | Final biweight case weights. |
+> | `xtlogit, pa` | 1.1e-03 | GEE working-correlation handling. |
+> | `heckman` | 1.9e-05 | Two-step standard errors. The ML path added later is a separate, exact estimate. |
+>
+> One capability is **absent rather than approximate**: `teffects nnmatch,
+> biasadj()` raises `UnsupportedError`.
+>
+> Each figure is the worst case across the invocations an independent
+> 386-point sweep exercised against live Stata. Most of the library is far
+> better than these bounds — 250 of 386 comparison points are at machine
+> precision — but these are the numbers that would bite you, so they come
+> first.
+
 `westata` is a personal research library that answers one question: *if I run
 this in Python, do I get the same numbers Stata would print?*
 
@@ -18,7 +45,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **1379 passing** |
+| Tests | **1434 passing** |
 | Commands covered | 87 registry entries |
 | Evidence | **52 × E3**, 26 × E2, 9 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
@@ -33,8 +60,17 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[test]"
 ```
 
-Requires Python ≥ 3.10. Optional at runtime: `linearmodels` (IV, panel),
-`pyfixest` (HDFE), `arch` (GARCH, Phillips–Perron).
+Requires Python ≥ 3.10. `numpy`, `pandas`, `scipy`, `statsmodels`, `patsy`,
+`pyfixest` (HDFE), `linearmodels` (IV, panel) and `pyyaml` are installed
+automatically — the package does not import without the last three.
+
+`arch` is genuinely optional and only needed for GARCH and the Phillips–Perron
+test; those commands raise a clear `UnsupportedError` naming the install command
+if it is absent:
+
+```bash
+python -m pip install "westata[arch]"
+```
 
 ## Quick start
 

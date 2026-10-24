@@ -20,7 +20,7 @@ this in Python, do I get the same numbers Stata would print?*
 |---|---|
 | Tests | **1379 passing** |
 | Commands covered | 87 registry entries |
-| Evidence | **49 × E3**, 28 × E2, 10 × E1 |
+| Evidence | **51 × E3**, 26 × E2, 10 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are

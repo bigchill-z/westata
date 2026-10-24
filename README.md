@@ -45,7 +45,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **1434 passing** |
+| Tests | **1448 passing** |
 | Commands covered | 87 registry entries |
 | Evidence | **52 × E3**, 26 × E2, 9 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |

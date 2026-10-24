@@ -31,6 +31,7 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError
+from westata.random.stata_rng import Mt19937_64
 from westata.estimators.quantile import QuantileRegression, solve_lad
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
@@ -176,13 +177,51 @@ class Sqreg:
         """
 
         n, k = self._X.shape
-        generator = np.random.default_rng(seed)
+        # Stata's generator. `sqreg.ado` stores c(seed) and every draw comes from MT19937-64, so numpy's default
+        # generator diverges from the first number.
+        generator = Mt19937_64(DEFAULT_SEED if seed is None else seed)
         replicates = np.empty((reps, k * len(self._quantiles)), dtype=float)
 
         for index in range(reps):
-            draw = generator.integers(0, n, size=n)
-            X_draw = self._X[draw]
-            y_draw = self._y[draw]
+            # `bsampl_w`, reproduced exactly. VERIFIED: the counts computed this way equal Stata's `w` after
+            # `bsampl_w` element for element, at n = 20, 40 and 200.
+            #
+            # The order of consumption matters: `bsampl_w.ado` fills the whole `r` column
+            # (`gen double r = int(uniform()*_N+1)`) before touching `w`, so the N target draws come first and the
+            # N tie-breaks second. Interleaving them produces a different sequence.
+            targets = np.fromiter(
+                (int(generator.runiform() * n + 1) for _ in range(n)), dtype=int, count=n
+            )
+            tiebreak = np.fromiter(
+                (generator.runiform() for _ in range(n)), dtype=float, count=n
+            )
+
+            # `sort r w`, then the running count within each target, then keep one row per drawn target.
+            order = np.lexsort((tiebreak, targets))
+            ordered_targets = targets[order]
+            running = np.ones(n, dtype=int)
+            for position in range(1, n):
+                if ordered_targets[position] == ordered_targets[position - 1]:
+                    running[position] = running[position - 1] + 1
+            keep = np.zeros(n, dtype=bool)
+            keep[-1] = True
+            for position in range(n - 1):
+                keep[position] = running[position + 1] == 1
+
+            # One row per drawn target, repeated by its count -- `qreg_c ..., wvar(bwt)` fits frequency weights,
+            # and fweight is replication (verified: qreg [fweight] equals the expanded fit to 3.5e-16).
+            #
+            # THE PAIRING GOES THROUGH `order`. `bsampl_w` sorts the dataset, so weight position i belongs to the
+            # i-th row of the SORTED data. `keep` marks retained positions in that sorted order, so the original
+            # row is `order[position]`. Using the target value directly (`ordered_targets[keep] - 1`) instead lands
+            # the right counts on the wrong observations: the counts still match Stata's `w` exactly, which is why
+            # checking them alone did not reveal it, while every replicate's spread came out different.
+            kept_positions = np.flatnonzero(keep)
+            drawn = order[kept_positions]
+            expanded = np.repeat(drawn, running[keep])
+            X_draw = self._X[expanded]
+            y_draw = self._y[expanded]
+
             for position, q in enumerate(self._quantiles):
                 # A degenerate resample can make a quantile fit singular; fall
                 # back to the full-sample estimate for that quantile.

@@ -1,0 +1,41 @@
+fix(arima): report e(sigma), which Stata reports and we did not; promote qreg to E3 on re-measurement
+
+Two corrections, both from measuring rather than reading.
+
+1. arima HAD NO e(sigma) AT ALL.
+
+Stata's arima reports `e(sigma)`, the STANDARD DEVIATION of the innovations, and does not report
+`e(sigma2)`. westata reported only `sigma2`, the VARIANCE. Reading `e("sigma")` returned nothing while
+the quantity existed under a different name in different units -- and the units cost 3.7%:
+
+    Stata e(sigma) = 0.9645733639      0.9645733639^2 = 0.9304017743
+    westata e(sigma2) = 0.9303359775   relative difference 7.1e-05
+
+Both keys are now provided and derived from one another, so a reader who takes either name from either
+library gets the right number. Measured after the change:
+
+    ARIMA(1,0,0) with constant   sigma 3.5e-05   likelihood 2.2e-09
+    ARIMA(1,0,0) noconstant      sigma 5.7e-05   likelihood 5.4e-09
+
+The likelihood agrees at 1e-09, so the objective is the same and the residual on sigma is Stata's
+stopping point -- the same pattern as arch, nbreg and the count family. Importantly, this does NOT make
+the coefficient C/D tier a defect: our likelihood at our own estimates is strictly HIGHER than Stata's
+(-415.14601812363446 against -415.14601904808495, and -427.5611887221345 against -427.56119101060136).
+
+2. qreg IS PROMOTED BACK TO E3, ON THE RE-MEASUREMENT.
+
+The registry had demoted it on a measured 5.68e-07 gap. Re-running the domain against a live Stata after
+the LP polish:
+
+    qreg median                 p 5.68e-07 -> 3.38e-16    se 5.15e-09 -> 1.72e-16
+    qreg quantile(.25)          p 5.68e-07 -> 3.13e-15    se 4.22e-09 -> 8.09e-16
+    qreg vce(robust) median     p 4.56e-09 -> 3.38e-16    se 5.84e-09 -> 5.99e-16
+    qreg vce(robust) quantile   p 5.68e-07 -> 3.13e-15    se 9.01e-09 -> 8.79e-16
+
+The level moved because the sweep said so, not because the code changed. That distinction is the whole
+point of having an independent sweep: a registry edited on the strength of "we fixed it" would be the
+same trust-the-author shortcut this project has already been burned by.
+
+Sweep totals across the round: A-tier 241 -> 247, B-tier 62 -> 56. Registry: 49 -> 51 E3.
+
+Suite: 1403 passing.

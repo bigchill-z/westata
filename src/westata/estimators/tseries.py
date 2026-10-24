@@ -193,6 +193,17 @@ class ARIMA:
             "sigma2": (
                 float(params[names.index("sigma2")]) if "sigma2" in names else float("nan")
             ),
+            # Stata's arima reports ``e(sigma)`` -- the STANDARD DEVIATION of the innovations -- and
+            # does NOT report ``e(sigma2)``. Both are provided here because the two are the same
+            # quantity in different units and confusing them costs 3.7% on the variance: on the sweep's
+            # AR(1) data Stata's e(sigma) = 0.9645733639, whose square is 0.9304017743, against our
+            # sigma2 of 0.9303359775 (7.1e-05 relative). A reader who reads e(sigma) from Stata and
+            # sigma2 from us, or the reverse, gets a materially wrong number without any error.
+            "sigma": (
+                float(np.sqrt(params[names.index("sigma2")]))
+                if "sigma2" in names and float(params[names.index("sigma2")]) >= 0.0
+                else float("nan")
+            ),
             "chi2type": "Wald",
             "chi2": chi2,
             "p": p_chi2,

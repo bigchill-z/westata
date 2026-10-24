@@ -2,12 +2,12 @@
   "domain": "limited_quantile",
   "total": 25,
   "counts": {
-    "pass": 6,
-    "fail": 16,
+    "pass": 10,
+    "fail": 12,
     "error": 3
   },
   "max_param_rel": 0.0010765871449960062,
-  "generated_at": "2026-10-24T11:50:38",
+  "generated_at": "2026-10-24T13:10:14",
   "stata_version": "19.5",
   "items": [
     {
@@ -216,11 +216,11 @@
     },
     {
       "name": "qreg median",
-      "status": "fail",
-      "param_rel": 4.56416242764477e-09,
-      "se_rel": 5.146118833326171e-09,
-      "tier": "B",
-      "se_tier": "B",
+      "status": "pass",
+      "param_rel": 3.3806849981809426e-16,
+      "se_rel": 1.7211737014230497e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "qreg y x1 x2",
       "notes": [
         "two independent LP solutions of the same check-function objective can differ when the optimum is not unique; Stata's 'alternate solutions' warning was not raised for this DGP"
@@ -229,22 +229,22 @@
     },
     {
       "name": "qreg quantile(.25)",
-      "status": "fail",
-      "param_rel": 5.677930536862679e-07,
-      "se_rel": 4.2216375601876325e-09,
-      "tier": "B",
-      "se_tier": "B",
+      "status": "pass",
+      "param_rel": 3.1285194854433484e-15,
+      "se_rel": 8.091387475817445e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "qreg y x1 x2, quantile(.25)",
       "notes": [],
       "error": ""
     },
     {
       "name": "qreg vce(robust) median",
-      "status": "fail",
-      "param_rel": 4.56416242764477e-09,
-      "se_rel": 5.8351380723116345e-09,
-      "tier": "B",
-      "se_tier": "B",
+      "status": "pass",
+      "param_rel": 3.3806849981809426e-16,
+      "se_rel": 5.992746418672052e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "qreg y x1 x2, vce(robust)",
       "notes": [
         "at tau=.5, (tau - 1{u<0})^2 == tau(1-tau) for every i, so this point cannot tell the two candidate sandwich meats apart; the .25 case below is the discriminating one"
@@ -253,11 +253,11 @@
     },
     {
       "name": "qreg vce(robust) quantile(.25)",
-      "status": "fail",
-      "param_rel": 5.677930536862679e-07,
-      "se_rel": 9.008452982435127e-09,
-      "tier": "B",
-      "se_tier": "B",
+      "status": "pass",
+      "param_rel": 3.1285194854433484e-15,
+      "se_rel": 8.790888318881184e-16,
+      "tier": "A",
+      "se_tier": "A",
       "command": "qreg y x1 x2, quantile(.25) vce(robust)",
       "notes": [
         "A = J^-1 M J^-1 with J = sum f_i x x' and M = sum psi_i^2 x x'. Stata's M is tau(1-tau) X'X to 9e-9; westata's psi_i^2 meat is 4.6% off at tau=.25 and 3.5% at tau=.75 (verified separately, see NOTES)"
@@ -267,9 +267,9 @@
     {
       "name": "sqreg q(.25 .5) pooled 4x500",
       "status": "fail",
-      "param_rel": 5.677930554739923e-07,
-      "se_rel": 0.033516987046630906,
-      "tier": "B",
+      "param_rel": 4.916244905696681e-15,
+      "se_rel": 0.03303564860904794,
+      "tier": "A",
       "se_tier": "E",
       "command": "sqreg y x1 x2, quantile(.25 .5) reps(500)",
       "notes": [
@@ -282,9 +282,9 @@
     {
       "name": "bsqreg median pooled 4x500",
       "status": "fail",
-      "param_rel": 4.564162312491247e-09,
-      "se_rel": 0.021891364165441938,
-      "tier": "B",
+      "param_rel": 3.3806849981809426e-16,
+      "se_rel": 0.021198322970250632,
+      "tier": "A",
       "se_tier": "E",
       "command": "bsqreg y x1 x2, quantile(.5) reps(500)",
       "notes": [

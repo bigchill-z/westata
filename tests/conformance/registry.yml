@@ -335,8 +335,8 @@
 
   retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 1 rows; see retest/REPORT.md"
 - command: qreg
-  level: E2
-  # retest: worst tier B over 2 row(s); example 'qreg median' param_rel 4.56416242764477e-09 se_rel 5.146118833326171e-09
+  level: E3
+  # retest: exact to 3.1e-15 after the LP polish; every standard error at 8.8e-16 or better (re-measured 2026-10-24)
   tolerance: 1.0e-3
   sources:
     - type: r_crosscheck
@@ -349,8 +349,8 @@
 
   retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 2 rows; see retest/REPORT.md"
 - command: qreg, vce(robust)
-  level: E2
-  # retest: worst tier B over 2 row(s); example 'qreg vce(robust) median' param_rel 4.56416242764477e-09 se_rel 5.8351380723116345e-09
+  level: E3
+  # retest: exact to 3.1e-15 after the LP polish; every standard error at 8.8e-16 or better (re-measured 2026-10-24)
   tolerance: 1.0e-5
   sources:
     - type: r_crosscheck

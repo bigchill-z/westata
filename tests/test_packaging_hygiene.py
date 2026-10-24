@@ -88,3 +88,39 @@ def test_pyproject_declares_the_required_runtime_dependencies() -> None:
     # exactly the situation the optional split avoids.
     dependencies_block = text.split('dependencies = [', 1)[1].split(']', 1)[0]
     assert 'arch>=' not in dependencies_block, "arch must not be a required dependency"
+
+
+def test_gitignore_is_valid_utf8_without_bom():
+    """.gitignore must be decodable, or git silently ignores parts of it.
+
+    It was once MIXED encoding: the head was UTF-8 and the tail GBK (bytes like \xd6\xd0 for
+    "\u4e2d\u95f4\u4ea7\u7269"), left by repeated Set-Content -Encoding utf8 over text that was already GBK.
+    The file decoded as neither, git never parsed the negation rule appended to it, and the file it was meant to
+    un-ignore stayed excluded -- with no error anywhere.
+
+    A rule that does not parse is worse than a missing rule, because it looks present.
+    """
+
+    raw = (REPO / ".gitignore").read_bytes()
+    assert not raw.startswith(b"\xef\xbb\xbf"), ".gitignore starts with a BOM"
+    raw.decode("utf-8")  # raises if any byte sequence is invalid
+
+
+def test_tracked_test_data_is_actually_tracked():
+    """The suite reads tests/data; a fresh clone must contain it.
+
+    Twelve test modules read that directory, and 	ests/data/*.dta is ignored on purpose (downloaded Stata
+    datasets). uto.dta is the one exception the suite needs, and it is un-ignored explicitly. When it was not,
+    a clean checkout reported 34 failures -- invisible locally, fatal in CI.
+    """
+
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "tests/data"], cwd=REPO, capture_output=True, text=True
+    )
+    if tracked.returncode != 0:
+        pytest.skip("not a git checkout")
+    assert "tests/data/auto.dta" in tracked.stdout, (
+        "tests/data/auto.dta is not tracked; a fresh clone will fail ~34 tests with FileNotFoundError"
+    )

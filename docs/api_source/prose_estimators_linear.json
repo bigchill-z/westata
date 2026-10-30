@@ -1,0 +1,180 @@
+{
+  "_readme": [
+    "Prose for the LINEAR + IV estimator classes: OLS family, panel estimators, IV,",
+    "panel IV/GLS/PCSE, dynamic panel, systems, quantile and robust regression, nl.",
+    "Every statement about behaviour here was checked by running the class against the",
+    "collector's base frame; every example is executed by collect_api_reference.py --check."
+  ],
+  "OLS": {
+    "stata": "regress y x1 x2",
+    "en": "Ordinary least squares -- Stata's `regress`. Prints coefficients, standard errors, t statistics, p-values and confidence intervals, plus the ANOVA and fit blocks (`N`, `F`, `R²`, adjusted `R²`, root MSE). This is the reference implementation for the linear family: the small-sample correction, the `df_r` convention and the sum-of-squares block follow `[R] regress`, and the estimators that wrap a backend reuse those conventions rather than re-deriving them.",
+    "zh": "普通最小二乘，即 Stata 的 `regress`。打印系数、标准误、t 值、p 值与置信区间，以及方差分析与拟合区块（`N`、`F`、`R²`、调整 `R²`、Root MSE）。它是整个线性族的参照实现：小样本修正、`df_r` 约定与平方和区块遵循 `[R] regress`，封装后端的各估计量沿用这些约定，而不另行推导。",
+    "example": "ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "`regress` stores no total sum of squares, so there is no `e(tss)`: the `SS_total` row is reconstructed as `mss + rss`. That is exact in a model with a constant, because the decomposition is additive there.",
+    "notes_zh": "`regress` 不存总平方和，因此没有 `e(tss)`：`SS_total` 行由 `mss + rss` 重构。在含常数项的模型中该分解可加，所以这一步是精确的。"
+  },
+  "FEOLS": {
+    "stata": "reghdfe y x1 x2, absorb(firm year)",
+    "en": "Fixed-effects OLS with high-dimensional fixed effects -- Stata's `reghdfe`. The fixed-effect block is written after a `|` in the formula (`'y ~ x1 + x2 | firm + year'`), and absorption is PyFixest's alternating projections. `cov_type` accepts `nonrobust`, `HC0`, `HC1` and `cluster` only: `HC2`/`HC3` need the leverage of the full dummy design, which the backend does not expose for absorbed models, so they are refused rather than approximated.",
+    "zh": "高维固定效应 OLS，即 Stata 的 `reghdfe`。固定效应区块写在公式中 `|` 之后（`'y ~ x1 + x2 | firm + year'`），吸收由 PyFixest 的交替投影完成。`cov_type` 只接受 `nonrobust`、`HC0`、`HC1` 与 `cluster`：`HC2`/`HC3` 需要完整虚拟变量设计的杠杆值，而后端对吸收模型不提供该量，因此直接拒绝，不做近似。",
+    "example": "ws.FEOLS.from_formula('y ~ x1 + x2 | firm + year', base).fit().summary(style='stata')",
+    "notes_en": "`e(rank)` counts every absorbed fixed-effect parameter, so it is larger than `len(results.params)`, while `e(df_m)` counts only reported slopes. With `weight_type='pweight'` and no explicit `cov_type`, `fit` selects HC1 -- Stata's `pweight` implies `vce(robust)`. `predict` registers no types for `reghdfe`, so predictions are not available through it.",
+    "notes_zh": "`e(rank)` 计入每一个被吸收的固定效应参数，因此大于 `len(results.params)`；`e(df_m)` 只计报告的斜率。当给出 `weight_type='pweight'` 而未显式指定 `cov_type` 时，`fit` 选择 HC1——Stata 的 `pweight` 意味着 `vce(robust)`。`predict` 没有为 `reghdfe` 注册任何类型，因此无法经由它做预测。"
+  },
+  "BetweenOLS": {
+    "stata": "xtreg ypanel x1 x2, be",
+    "en": "Between estimator -- Stata's `xtreg, be`. Runs one OLS on entity means, so a 200-row panel with 40 entities is estimated on 40 observations: `e(N)` is the number of group means actually consumed and `e(df_r) = n_entities - K`. `e()` stores the three panel R-squareds (`r2_b`, `r2_o`, `r2_w`), but there is no `sigma_u`/`sigma_e`/`rho` block: a regression on means has no within variation to decompose.",
+    "zh": "组间估计量，即 Stata 的 `xtreg, be`。在实体均值上做一次 OLS，因此 40 个实体、200 行的面板实际是在 40 个观测上估计：`e(N)` 是真正被消费的组均值个数，`e(df_r) = n_entities - K`。`e()` 存有三个面板 R²（`r2_b`、`r2_o`、`r2_w`），但没有 `sigma_u`/`sigma_e`/`rho` 区块：对均值做回归没有组内变异可供分解。",
+    "example": "ws.BetweenOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')"
+  },
+  "FirstDifferenceOLS": {
+    "stata": "xtreg ypanel x1 x2, fd",
+    "en": "First-difference estimator -- Stata's `xtreg, fd`. Every period is differenced against the immediately preceding one (`t` against `t - 1`, so a missing period is not bridged) and the model is fitted without a constant; the patsy intercept is therefore removed before the design reaches the backend, which rejects a constant in a first-difference regression. On a 40-entity, 5-period panel that leaves 160 usable observations, which is what `e(N)` reports.",
+    "zh": "一阶差分估计量，即 Stata 的 `xtreg, fd`。每期与紧邻的前一期作差（`t` 对 `t - 1`，因此缺失期不会被跨接），模型不含常数项；patsy 隐含的截距在进入后端之前被移除，因为后端拒绝含常数项的一阶差分回归。在 40 个实体、5 期的面板上，可用观测为 160 个，这正是 `e(N)` 报告的数值。",
+    "example": "ws.FirstDifferenceOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "The formula implies a constant the way every patsy formula does, and it is dropped silently: there is no option to keep one, and `e(b)` therefore holds slopes only.",
+    "notes_zh": "公式与所有 patsy 公式一样隐含一个常数项，而该常数项会被静默丢弃：没有保留它的选项，因此 `e(b)` 只含斜率。"
+  },
+  "PanelOLS": {
+    "stata": "xtreg ypanel x1 x2, fe",
+    "en": "Fixed-effects panel regression -- Stata's `xtreg, fe`. `fit(entity_effects=True)` is the default. The formula implies a constant exactly as in `OLS`, so `e(b)` includes `Intercept` even though the within transformation absorbs it; write `'ypanel ~ x1 + x2 - 1'` to follow Stata's `noconstant`. Rows with missing values are dropped listwise before estimation, so `e(N)` can be smaller than `len(data)`, and the summary prints the `sigma_u`/`sigma_e`/`rho` block and the F test that all `u_i` are zero.",
+    "zh": "固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。",
+    "example": "ws.PanelOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "One deliberate deviation, documented on the class: under `cov_type='cluster'`, westata stores `e(df_m)` as the number of slopes and `e(rank)` as `len(e(b))`, where clustered Stata stores both one lower (the class docstring records the StataNow 19.5 measurements). `e(F)`, `e(df_b)` and `e(df_r)` do agree -- only those two labels differ, and copying Stata's would print an F label that contradicts the p-value beside it.",
+    "notes_zh": "类文档中记录了一处刻意偏离：在 `cov_type='cluster'` 下，westata 把 `e(df_m)` 存为斜率个数、把 `e(rank)` 存为 `len(e(b))`，而聚类下的 Stata 两个值都小一（类文档字符串载有 StataNow 19.5 的实测数据）。`e(F)`、`e(df_b)` 与 `e(df_r)` 是一致的——只有这两个标签不同；若照抄 Stata，打印出的 F 标签会与其旁的 p 值自相矛盾。"
+  },
+  "RandomEffects": {
+    "stata": "xtreg ypanel x1 x2, re",
+    "en": "Random-effects GLS -- Stata's `xtreg, re`. Variance components come from the backend's default Swamy-Arora estimator; the optional small-sample refinement is deliberately left off so the estimator is exactly that documented default. The summary reports `sigma_u`, `sigma_e`, `rho` and the correlation of `u_i` with the linear index, with a Wald chi-square test in the header rather than the F that `xtreg, fe` prints; `e(theta)` holds the quasi-demeaning factor the fit applied.",
+    "zh": "随机效应 GLS，即 Stata 的 `xtreg, re`。方差成分来自后端默认的 Swamy-Arora 估计量；可选的小样本修正被刻意关闭，使估计量严格等于该文档化的默认式。汇总给出 `sigma_u`、`sigma_e`、`rho` 以及 `u_i` 与线性指数的相关系数，表头是 Wald 卡方检验而非 `xtreg, fe` 所打印的 F；`e(theta)` 保存拟合所用的准去均值系数。",
+    "example": "ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')"
+  },
+  "IV2SLS": {
+    "stata": "ivregress 2sls ytreat x1 (treat = x3)",
+    "en": "Two-stage least squares -- Stata's `ivregress 2sls`. The formula uses linearmodels' grammar, `'ytreat ~ x1 + [treat ~ x3]'`; Stata's `(endog = instrument)` spelling is rejected, because the grammar is delegated to the backend instead of reimplemented. Exogenous regressors, endogenous regressors and excluded instruments are named separately, and `e(b)` is reported in Stata's order -- endogenous first, included exogenous after, `_cons` last -- even though the design matrix is built the other way round.",
+    "zh": "两阶段最小二乘，即 Stata 的 `ivregress 2sls`。公式采用 linearmodels 的语法 `'ytreat ~ x1 + [treat ~ x3]'`；Stata 的 `(endog = instrument)` 写法会被拒绝，因为该语法交由后端解析，而非重新实现。外生回归元、内生回归元与被排除工具变量分别命名，且 `e(b)` 按 Stata 的顺序报告——内生在前、包含的外生在后、`_cons` 最后——尽管设计矩阵是按相反顺序构建的。",
+    "example": "ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit().summary(style='stata')",
+    "notes_en": "`HC0` is Stata's plain `vce(robust)` and `HC1` is `vce(robust) small` -- the opposite of `regress`, where `vce(robust)` is HC1. `HC2`/`HC3` are rejected, since `ivregress` has no leverage-corrected robust VCE to reproduce. `e(df_r)` stores `N`, because Stata leaves it missing unless `small` is given and a stored missing cannot be represented.",
+    "notes_zh": "`HC0` 对应 Stata 的 `vce(robust)`，`HC1` 对应 `vce(robust) small`——与 `regress` 相反，那里 `vce(robust)` 就是 HC1。`HC2`/`HC3` 被拒绝，因为 `ivregress` 没有可供复现的杠杆修正稳健 VCE。`e(df_r)` 存的是 `N`：除非给出 `small`，Stata 将其留作缺失，而缺失值无法被存下来。"
+  },
+  "IVGMM": {
+    "stata": "ivregress gmm ytreat x1 (treat = x3)",
+    "en": "Generalized method of moments -- Stata's `ivregress gmm`. `ivregress gmm` ties *two* things to `vce()`, not one: the covariance of `e(b)` and the GMM weight matrix `W`, which comes from the same moment covariance. So westata picks the backend weight matrix from `cov_type` as well. When the model is exactly identified that changes only the standard errors; when it is over-identified the *point estimates* move too, which is what Stata does and why GMM departs from 2SLS there. Measured on the fixture frame with two instruments: exactly identified, `cov_type='cluster'` leaves the coefficients untouched; with the second instrument added, clustering moves them by about 1.1e-2.",
+    "zh": "广义矩估计，即 Stata 的 `ivregress gmm`。`ivregress gmm` 把*两*件事都系于 `vce()`，而不是一件：`e(b)` 的协方差与 GMM 权重矩阵 `W`，后者来自同一个矩协方差。因此 westata 也依据 `cov_type` 选择后端的权重矩阵。模型恰好识别时，这只会改变标准误；过度识别时*点估计*也会变动，这正是 Stata 的行为，也是那里 GMM 与 2SLS 不同的原因。在 fixture 数据上用两个工具变量实测：恰好识别时 `cov_type='cluster'` 不改变系数；加入第二个工具变量后，聚类使系数变动约 1.1e-2。",
+    "example": "ws.IVGMM.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit().summary(style='stata')",
+    "notes_en": "The covariance is the backend's GMM weight-matrix sandwich, which cannot be expressed through the OLS-shaped `vce.compute_cov` path, so `cov_kwds` is forwarded to the backend verbatim rather than interpreted here.",
+    "notes_zh": "协方差是后端的 GMM 权重矩阵三明治，无法经由面向 OLS 的 `vce.compute_cov` 路径表达，因此 `cov_kwds` 原样转发给后端，而不是在此处解释。"
+  },
+  "IVLIML": {
+    "stata": "ivregress liml ytreat x1 (treat = x3)",
+    "en": "Limited-information maximum likelihood -- Stata's `ivregress liml`. Solves the k-class problem with the LIML `kappa`, reported as `e(kappa)`. Under exact identification that `kappa` is 1 and the estimates equal 2SLS; when the model is over-identified it departs from 1 and the estimates differ. Both were measured on the fixture frame: exactly identified, `e(kappa)` prints 1.0 and the coefficients coincide with `IV2SLS`; adding a second instrument gives `kappa` about 1.0183 and visibly different coefficients.",
+    "zh": "有限信息最大似然，即 Stata 的 `ivregress liml`。以 LIML 的 `kappa` 求解 k 类问题，`kappa` 由 `e(kappa)` 报告。恰好识别时该 `kappa` 为 1，估计值与 2SLS 相同；模型过度识别时 `kappa` 偏离 1，估计值随之不同。两者都在 fixture 数据上实测：恰好识别时 `e(kappa)` 打印 1.0，系数与 `IV2SLS` 一致；加入第二个工具变量后 `kappa` 约为 1.0183，系数明显不同。",
+    "example": "ws.IVLIML.from_formula('ytreat ~ x1 + [treat ~ x3 + x2]', base).fit().summary(style='stata')",
+    "notes_en": "`cov_type='HC2'`/`'HC3'` are rejected for the same reason as in `IV2SLS`: there is no leverage-corrected robust VCE in `ivregress` to reproduce.",
+    "notes_zh": "`cov_type='HC2'`/`'HC3'` 因与 `IV2SLS` 相同的原因被拒绝：`ivregress` 没有可供复现的杠杆修正稳健 VCE。"
+  },
+  "XtIvreg": {
+    "stata": "xtivreg ypanel x1 (x2 = x3), fe",
+    "en": "Panel instrumental variables -- Stata's `xtivreg`, with `method='fe'` (within 2SLS) or `method='re'` (G2SLS). The formula uses Stata's spelling, `'ypanel ~ x1 + (x2 = x3)'`, with the parenthesised instrument block split off textually so factor expansions and interactions keep working inside each piece. For `fe` the within transform is applied to the dependent variable, the exogenous regressors, the endogenous regressors *and the instruments* -- an undemeaned instrument still carries the entity effect, so the projection would re-absorb part of the effect the transform was meant to remove. The constant is recovered afterwards from the entity means.",
+    "zh": "面板工具变量，即 Stata 的 `xtivreg`，`method='fe'`（组内 2SLS）或 `method='re'`（G2SLS）。公式采用 Stata 写法 `'ypanel ~ x1 + (x2 = x3)'`，括号内的工具变量区块被文本拆出，使各部分内部的因子展开与交互项照常工作。对 `fe`，组内变换施于因变量、外生回归元、内生回归元*以及工具变量*——未去均值的工具变量仍携带实体效应，投影会把它本应移除的固定效应重新吸收一部分。常数项随后由实体均值反解得到。",
+    "example": "ws.XtIvreg.from_formula('ypanel ~ x1 + (x2 = x3)', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "Only `fe` and `re` are implemented. Stata's `be`, `fd` and Baltagi's `ec2sls` raise `UnsupportedError` rather than falling back to a nearby estimator, because the transformations differ, not just the display.",
+    "notes_zh": "只实现了 `fe` 与 `re`。Stata 的 `be`、`fd` 以及 Baltagi 的 `ec2sls` 会抛 `UnsupportedError`，而不是退回到某个相近的估计量，因为差别在变换本身，不在显示。"
+  },
+  "XtGls": {
+    "stata": "xtgls y x1 x2, panels(heteroskedastic)",
+    "en": "Panel GLS -- Stata's `xtgls`. `panels` accepts `iid`, `heteroskedastic` (the default) and `correlated`; `corr` accepts `independent` (the default) and `ar1`, which applies a Prais-Winsten transform with one common autocorrelation coefficient before the same GLS step. This is two-step feasible GLS, not pooled OLS: panel-specific variances reweight each panel, so the coefficients move whenever those variances correlate with the regressors. Measured on the fixture frame, `panels(heteroskedastic)` gives `x1 = .8398055` against `.8406445` from `OLS` on the same data.",
+    "zh": "面板 GLS，即 Stata 的 `xtgls`。`panels` 接受 `iid`、`heteroskedastic`（默认）与 `correlated`；`corr` 接受 `independent`（默认）与 `ar1`，后者以各面板共用的一个自相关系数做 Prais-Winsten 变换，再做同样的 GLS 步。这是两步可行 GLS，不是混合 OLS：各面板自身的方差为各自面板加权，因此当这些方差与回归元相关时系数会变动。在 fixture 数据上实测，`panels(heteroskedastic)` 给出 `x1 = .8398055`，而同一数据的 `OLS` 给出 `.8406445`。",
+    "example": "ws.XtGls.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "`panels(iid) corr(independent) nmk` is the combination that reproduces `regress`, because the only thing missing there is the `N/(N-k)` factor that `nmk` supplies. `corr(psar1)` (a separate coefficient per panel) and robust/cluster VCEs raise instead of returning the common-rho or conventional numbers under the wrong label. `igls` is mentioned in the module docstring but `fit` has no such parameter, so passing it fails as a `TypeError`, not a westata error.",
+    "notes_zh": "`panels(iid) corr(independent) nmk` 是能复现 `regress` 的组合，因为那里唯一缺少的就是 `nmk` 补上的 `N/(N-k)` 因子。`corr(psar1)`（每个面板单独一个系数）以及 robust/cluster 协方差会直接抛错，而不是把共用 rho 或常规数字挂在错误的标签下一并返回。模块文档字符串提到 `igls`，但 `fit` 并没有该参数，所以传入它会以 `TypeError` 失败，而不会抛 westata 的错误。"
+  },
+  "XtPcse": {
+    "stata": "xtpcse y x1 x2, corr(independent)",
+    "en": "Panel-corrected standard errors -- Stata's `xtpcse` (Beck-Katz). OLS point estimates with the panel-corrected VCE and no small-sample factor applied; `selection` is `casewise` (Stata's default, estimating the disturbance covariance from the periods every panel shares) or `pairwise` (from the periods each pair of panels shares). The summary prints the panel design block -- panels, estimated covariances, autocorrelations and coefficients -- and reports a Wald chi-square rather than an F.",
+    "zh": "面板校正标准误，即 Stata 的 `xtpcse`（Beck-Katz）。点估计为 OLS，协方差为面板校正 VCE 且不施加小样本因子；`selection` 为 `casewise`（Stata 默认，用所有面板共有的期估计扰动协方差）或 `pairwise`（用每一对面板共有的期）。汇总打印面板设计区块——panels、估计的协方差数、自相关数与系数数——并报告 Wald 卡方而非 F。",
+    "example": "ws.XtPcse.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "`time=` may be omitted on a balanced panel, where periods are read positionally from row order. On an unbalanced panel it is required: without it `ConsistencyError` is raised and the argument is named, because pairing rows by position would compute something that is not a covariance. `correlation='ar1'`/`'psar1'`, which replace OLS by Prais-Winsten, raise `UnsupportedError`.",
+    "notes_zh": "在平衡面板上 `time=` 可以省略，此时期数按行序位置读取。在非平衡面板上则必须给出：否则抛 `ConsistencyError` 并点明该参数，因为按位置配对行所算出的量并不是协方差。`correlation='ar1'`/`'psar1'` 会用 Prais-Winsten 取代 OLS，一律抛 `UnsupportedError`。"
+  },
+  "XtAbond": {
+    "stata": "xtabond ypanel x1, lags(1)",
+    "en": "Arellano-Bond / Blundell-Bond dynamic panel GMM -- Stata's `xtabond` family. One-step GMM on the first-differenced equation; `lags` sets how many lags of the dependent variable enter as regressors, and `cov_type` is `'gmm'` (the default) or `'robust'`. Only balanced panels are supported. The instrument count is reported both ways: `e(instruments)`/`e(zrank)` is Stata's \"Number of instruments\" (one more than the difference-side columns, because Stata also declares a level-equation moment the difference estimator cannot use), while `e(instruments_difference)` is the number of columns actually used.",
+    "zh": "Arellano-Bond / Blundell-Bond 动态面板 GMM，即 Stata 的 `xtabond` 家族。在一阶差分方程上做一步 GMM；`lags` 决定因变量的多少个滞后进入回归，`cov_type` 为 `'gmm'`（默认）或 `'robust'`。只支持平衡面板。工具变量个数以两种方式报告：`e(instruments)`/`e(zrank)` 是 Stata 的「Number of instruments」（比差分侧列数多一，因为 Stata 还声明了差分估计量用不到的水平方程矩），而 `e(instruments_difference)` 是实际使用的列数。",
+    "example": "ws.XtAbond.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit().summary(style='stata')",
+    "notes_en": "Sargan, Hansen, AR(1) and AR(2) are not reported at all rather than reported approximately: their exact constructions are not fully specified in the manual, and a wrong overidentification statistic looks more authoritative than its absence. `system=True` only labels the result as system GMM -- the level moments are not estimated, so the coefficients are still the difference estimator's.",
+    "notes_zh": "Sargan、Hansen、AR(1) 与 AR(2) 干脆不报告，而不是近似报告：手册并未完整给出它们的精确构造，而一个错误的过度识别统计量比它的缺席更像权威结论。`system=True` 只是把结果标记为系统 GMM——水平方程的矩并未估计，系数仍是差分估计量的。"
+  },
+  "Eivreg": {
+    "stata": "eivreg y x1 x2, reliab(x1 .9)",
+    "en": "Errors-in-variables regression -- Stata's `eivreg`. `reliab` is required and maps regressor names to assumed reliabilities; without it the call raises, since uncorrected attenuation would silently be OLS under another name. The estimator subtracts the measurement-error variance from the normalised cross-product (`A = X'X/n - S`), which undoes the attenuation instead of reweighting, and the standard errors come from the M-estimator sandwich including the derivative of `S` with respect to the coefficients -- dropping that term leaves the standard errors wrong even though the coefficients are unchanged.",
+    "zh": "含测量误差的回归，即 Stata 的 `eivreg`。`reliab` 是必填项，把回归元名字映射到假定的信度；缺少它会直接报错，因为未修正的衰减不过是换了个名字的 OLS。估计量从归一化交叉积中减去测量误差方差（`A = X'X/n - S`），这是消去衰减而不是重新加权；标准误来自 M 估计三明治，其中包含 `S` 对系数的导数——丢掉这一项会使标准误出错，尽管系数不变。",
+    "example": "ws.Eivreg.from_formula('y ~ x1 + x2', base, reliab={'x1': 0.9}).fit().summary(style='stata')",
+    "notes_en": "Only the unadjusted VCE is available: `cov_type='robust'` raises `UnsupportedError`. A `reliab` entry naming something that is not a regressor also raises, and the message lists the regressors it did find.",
+    "notes_zh": "只提供未调整的 VCE：`cov_type='robust'` 会抛 `UnsupportedError`。若 `reliab` 中给出的名字不是回归元，同样会报错，且消息会列出它实际找到的回归元。"
+  },
+  "Sureg": {
+    "stata": "sureg (y1 x1) (y2 x2)",
+    "en": "Seemingly unrelated regression -- Stata's `sureg`. It takes a *sequence* of two-sided formulas, `from_formula(['y1 ~ x1', 'y2 ~ x2'], data)`, not one string. Coefficients are prefixed with the equation label (`y1:x1`, `y2:_cons`) because a stacked coefficient vector would otherwise contain duplicate names. The cross-equation covariance is `Sigma_ij = e_i'e_j / n` -- the `n` divisor, not `n - k`, is what the standard errors depend on -- and the system is solved blockwise rather than by materialising the full Kronecker matrix.",
+    "zh": "似不相关回归，即 Stata 的 `sureg`。它接受一个双端公式的*序列*：`from_formula(['y1 ~ x1', 'y2 ~ x2'], data)`，而不是单个字符串。系数带方程标签前缀（`y1:x1`、`y2:_cons`），否则堆叠后的系数向量会含重复名字。跨方程协方差为 `Sigma_ij = e_i'e_j / n`——标准误取决于除数 `n` 而非 `n - k`——方程组按块求解，而不是把完整的 Kronecker 矩阵显式展开。",
+    "example": "ws.Sureg.from_formula(['y1 ~ x1', 'y2 ~ x2'], base).fit().summary(style='stata')",
+    "notes_en": "`iterate=True` (Stata's `isure`) is refused, because the convergence rule is not precisely documented and a wrong rule changes every standard error on the final iteration. `cov_type='robust'` follows the `reg3` robust sandwich and does change the reported standard errors, but `e(vce)` still reads `'unadjusted'` -- read the result's `cov_type` attribute instead if you need to know which VCE you got. `cov_type='cluster'` is refused, and all equations must use the same observations: a mismatch raises rather than fitting on unequal samples.",
+    "notes_zh": "`iterate=True`（Stata 的 `isure`）被拒绝，因为其收敛规则未被精确文档化，而错误的规则会改变最后一次迭代后的每一个标准误。`cov_type='robust'` 走 `reg3` 的稳健三明治，确实会改变所报告的标准误，但 `e(vce)` 仍读作 `'unadjusted'`——若要知道拿到的是哪种 VCE，请读结果对象的 `cov_type` 属性。`cov_type='cluster'` 被拒绝；所有方程必须使用相同的观测，样本不一致会报错，而不是在各样本不等的条件下强行拟合。"
+  },
+  "Mvreg": {
+    "stata": "mvreg y1 y2 = x1 x2",
+    "en": "Multivariate regression -- Stata's `mvreg`, spelled `'y1 y2 = x1 x2'` with the outcomes left of `=` and a shared regressor list right of it. Every equation uses every regressor, so the coefficients are exactly per-equation OLS; only the VCE uses the cross-equation residual covariance, `V = Sigma (x) (X'X)^-1` with `Sigma_ij = u_i'u_j / (n - k)`. Note the `n - k` divisor here against `n` for `sureg`: with different regressors in the equations the two commands therefore disagree on identical data, and that is a specification difference, not an inconsistency.",
+    "zh": "多元回归，即 Stata 的 `mvreg`，写作 `'y1 y2 = x1 x2'`，结果变量在 `=` 左侧，共用的回归元列表在右侧。每个方程都使用全部回归元，因此系数就是逐方程的 OLS；只有 VCE 用到跨方程残差协方差 `V = Sigma (x) (X'X)^-1`，其中 `Sigma_ij = u_i'u_j / (n - k)`。注意这里的除数是 `n - k`，而 `sureg` 用 `n`：当各方程含不同回归元时，两个命令在同一数据上因此结果不同，这是设定差异，不是不一致。",
+    "example": "ws.Mvreg.from_formula('y1 y2 = x1 x2', base).fit().summary(style='stata')",
+    "notes_en": "Only the unadjusted VCE is implemented; `cov_type='robust'` raises `UnsupportedError`, because only the unadjusted VCE is verified against Stata for this command.",
+    "notes_zh": "只实现了未调整的 VCE；`cov_type='robust'` 会抛 `UnsupportedError`，因为该命令只有未调整 VCE 经过与 Stata 的验证。"
+  },
+  "RobustRegression": {
+    "stata": "rreg y x1 x2",
+    "en": "Robust regression -- Stata's `rreg`, in Stata's statement order: fit OLS, drop observations with Cook's D above 1 and refit, iterate Huber weights, iterate biweight weights, then run one unweighted regression of the adjusted response. `tune` (default 7) scales the biweight constant `c_b = 4.685 * tune / 7`, and `tolerance` defaults to 0.01 -- Stata's own stopping rule. That default matters: iterating tighter lands on a different point, so `tolerance=1e-9` reproduces fully-converged estimates instead of Stata's.",
+    "zh": "稳健回归，即 Stata 的 `rreg`，按 Stata 的语句顺序执行：先拟合 OLS，剔除 Cook's D 大于 1 的观测后重拟合，迭代 Huber 权重，再迭代双权重，最后对调整后的响应变量做一次无权回归。`tune`（默认 7）缩放双权重常数 `c_b = 4.685 * tune / 7`，`tolerance` 默认为 0.01——即 Stata 自身的停止规则。该默认值有实质影响：迭代更紧会落到另一个点上，所以 `tolerance=1e-9` 得到的是完全收敛的估计，而非 Stata 的估计。",
+    "example": "ws.RobustRegression.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "The reported `mss`/`rss`/`mse`/`rmse`/`r2`/`F` describe the unweighted regression of the adjusted response -- the regression Stata actually posts -- not weighted sums of squares built from the final biweights, which are a different quantity.",
+    "notes_zh": "报告的 `mss`/`rss`/`mse`/`rmse`/`r2`/`F` 描述的是对调整后响应变量的无权回归——也就是 Stata 真正发布的那个回归——而不是由最终双权重构造的加权平方和，后者是另一个量。"
+  },
+  "QuantileRegression": {
+    "stata": "qreg y x1 x2, quantile(.5)",
+    "en": "Quantile regression -- Stata's `qreg`. Minimises the check function at `quantile`, solved by IRLS; because the objective is piecewise linear, several parameter vectors can attain the same minimum and the solver returns one of them. Standard errors use Stata's `fitted` sparsity estimator -- the regression is re-fitted at `quantile ± h` with the Hall-Sheather bandwidth -- not a kernel density of the residuals, which would move every standard error while leaving the coefficients alone. Two reporting details are easy to misread: `e(sum_adev)`/`e(sum_rdev)` are check-function sums rather than sums of absolute values, and `e(q_v)`, printed as \"(about q)\", is the `ceil(n*tau)`-th order statistic of the outcome, not an interpolated quantile.",
+    "zh": "分位数回归，即 Stata 的 `qreg`。在 `quantile` 处最小化检验函数，用 IRLS 求解；由于目标函数是分段线性的，可能有多个参数向量达到同一最小值，求解器返回其中之一。标准误使用 Stata 的 `fitted` 稀疏度估计量——在 `quantile ± h` 处以 Hall-Sheather 带宽重新拟合回归——而不是对残差做核密度估计；后者会改变每一个标准误，却不动系数。两个报告细节容易误读：`e(sum_adev)`/`e(sum_rdev)` 是检验函数之和，而非绝对值之和；`e(q_v)`（打印为「(about q)」）是结果变量的第 `ceil(n*tau)` 个次序统计量，而不是插值分位数。",
+    "example": "ws.QuantileRegression.from_formula('y ~ x1 + x2', base, quantile=0.5).fit().summary(style='stata')",
+    "notes_en": "`e(marginsnotok)` is `\"stdp stddp residuals\"`, so `predict` offers `xb`, `stdp` and `residuals` only; `stddp` is an `sqreg`-only type and raises after `qreg`.",
+    "notes_zh": "`e(marginsnotok)` 为 `\"stdp stddp residuals\"`，因此 `predict` 只提供 `xb`、`stdp` 与 `residuals`；`stddp` 是仅限 `sqreg` 的类型，在 `qreg` 之后调用会报错。"
+  },
+  "Bsqreg": {
+    "stata": "bsqreg y x1 x2, quantile(.5)",
+    "en": "Bootstrapped quantile regression -- Stata's `bsqreg`. The point estimates are the plain `qreg` ones and only the standard errors come from the bootstrap, which resamples rows and refits. `reps` defaults to 200, and `seed` makes the draw reproducible; with no seed a fresh one is drawn from the system entropy, mirroring Stata's use of the session's current `c(seed)` rather than a fixed constant -- but the drawn value is not stored on the result, so an unseeded fit cannot be reproduced afterwards. Structurally this is a one-quantile `Sqreg`, which is the equivalence `[R] qreg` states, so the two can never disagree about the resampling scheme.",
+    "zh": "自助法分位数回归，即 Stata 的 `bsqreg`。点估计就是普通的 `qreg` 估计，只有标准误来自自助法（对行重抽样并重拟合）。`reps` 默认为 200，`seed` 使抽样可复现；不给 seed 时会从系统熵中新抽一个种子，对应 Stata 使用会话当前的 `c(seed)` 而非固定常数——但抽到的值不会存到结果里，因此未给种子的拟合事后无法复现。结构上它就是单分位数的 `Sqreg`，这正是 `[R] qreg` 所述的等价关系，因此两者在重抽样方案上不可能不一致。",
+    "example": "ws.Bsqreg.from_formula('y ~ x1 + x2', base, quantile=0.5).fit(reps=50, seed=20261031).summary(style='stata')",
+    "notes_en": "The bootstrap seed is recorded in `e(seed)`, so even an UNSEEDED fit can be replayed: pass `seed=result.e['seed']` back to `fit()` and the replicates repeat exactly. Stata gives the same guarantee through `c(seed)` and `set seed`. Row order also carries between replicates, as it does in Stata's `bsampl_w`/`qreg_c` loop, so each replicate does not start from the original data order.",
+    "notes_zh": "bootstrap 种子记录在 `e(seed)` 中，因此**即使未指定种子**也可复现：把 `seed=result.e['seed']` 传回 `fit()`，各次重抽样会完全重复。Stata 通过 `c(seed)` 与 `set seed` 提供同样的保证。另外，行序在重抽样之间会延续（与 Stata 的 `bsampl_w`/`qreg_c` 循环一致），因此每次重抽样并非从原始数据顺序开始。"
+  },
+  "Sqreg": {
+    "stata": "sqreg y x1 x2, quantiles(.25 .5 .75)",
+    "en": "Simultaneous-quantile regression -- Stata's `sqreg`. Fits several quantiles at once and bootstraps the whole parameter vector: one resample is drawn per replicate and every quantile is fitted on it, which is what makes the covariance simultaneous -- the cross-quantile blocks then measure how the quantiles move together under the same resampling, which independent draws would destroy. Parameter names carry the quantile prefix (`q0.25:x1`). `predict(kind='stddp')` gives the standard error of the difference in linear predictions between the first two quantiles, using the cross-equation covariance rather than adding the two variances.",
+    "zh": "联合分位数回归，即 Stata 的 `sqreg`。一次拟合多个分位数，并对整个参数向量做自助法：每个重复抽一组样本，在该样本上拟合全部分位数，这正是协方差「联合」的含义——跨分位区块度量的是各分位数在同一次重抽样下如何一起变动，而独立抽样会破坏这一点。参数名带分位数前缀（`q0.25:x1`）。`predict(kind='stddp')` 给出前两个分位数线性预测之差的标差误，使用跨方程协方差，而不是把两个方差相加。",
+    "example": "ws.Sqreg.from_formula('y ~ x1 + x2', base, quantiles=(0.25, 0.75)).fit(reps=50, seed=20261031).summary(style='stata')",
+    "notes_en": "`stddp` needs an `sqreg` fit with at least two quantiles and both equations using the same regressors, and raises otherwise. The default `reps=200` makes a three-quantile fit take roughly twenty seconds on 200 rows, so the example passes a smaller `reps` and two quantiles. The seed is recorded in `e(seed)`, so an unseeded fit can be replayed by passing it back to `fit(seed=...)`.",
+    "notes_zh": "`stddp` 需要至少两个分位数、且两个方程使用相同回归元的 `sqreg` 结果，否则会报错。默认 `reps=200` 使三分位数的拟合在 200 行数据上耗时约二十秒，因此上例传入了更小的 `reps`，并只取两个分位数。 种子记录在 `e(seed)` 中，把该值传回 `fit(seed=...)` 即可复现未指定种子的拟合。"
+  },
+  "NeweyWestResult": {
+    "stata": "newey y x1 x2, lag(2)",
+    "en": "The object `newey` returns: `regress`'s point estimates behind `newey`'s narrower result surface. Two differences from a plain `StataResults` are visible to callers. `e()` holds only `newey`'s own scalars and macros, because `newey` posts a fresh `e()` rather than extending `regress`'s, so `r2`, `r2_a`, `rmse`, `sigma`, `rss`, `mss` and `ll` are absent. And `predict` accepts only `xb`, `index`, `stdp` and `residuals`. Constructing it directly takes a fitted result and a `lag`; normally one comes back from `ws.newey(formula, data, lag=...)`.",
+    "zh": "`newey` 返回的对象：`regress` 的点估计套在 `newey` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey` 自身的标量与宏，因为 `newey` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.newey(formula, data, lag=...)` 返回。",
+    "example": "ws.newey('y ~ x1 + x2', base, lag=2).summary(style='stata')",
+    "notes_en": "Requesting any other prediction type raises with `newey_p.ado`'s restriction quoted, rather than silently forwarding `regress`'s fifteen types.",
+    "notes_zh": "请求其他任何预测类型都会抛错，并在消息中引述 `newey_p.ado` 的限制，而不是静默转发 `regress` 的十五种类型。"
+  },
+  "Nl": {
+    "stata": "nl y = {b0} * exp({b1} * x1)",
+    "en": "Nonlinear least squares -- Stata's `nl`. The formula is Stata's `y = <expression>` shape with parameters in braces, as in `'y = {b0} + {b1} * x1'`, and the coefficient table shows them with Stata's `/` prefix (`/b0`). Starting values come from `start=` or inline as `{b0=4}`; when neither is given a coarse multiplicative grid search seeds the optimiser, which matters because a parameter living orders of magnitude away from 1 is otherwise unreachable. `has_constant` is inferred from where the parameters sit in the expression and decides whether the total sum of squares is centred and one model degree of freedom dropped.",
+    "zh": "非线性最小二乘，即 Stata 的 `nl`。公式采用 Stata 的 `y = <表达式>` 形式，参数置于花括号中，例如 `'y = {b0} + {b1} * x1'`；系数表按 Stata 的 `/` 前缀显示它们（`/b0`）。初值来自 `start=` 或内联写法 `{b0=4}`；两者都没给时，用粗略的乘法网格搜索为优化器提供初值——这很重要，因为若某个参数的量级远离 1，否则根本无法到达。`has_constant` 由参数在表达式中的位置推断，决定总平方和是否中心化以及是否少算一个模型自由度。",
+    "example": "ws.Nl.from_formula('y = {b0} + {b1} * x1', base).fit().summary(style='stata')",
+    "notes_en": "`fit(strict=True)` is the default and raises `ConvergenceError` when the optimiser does not converge, instead of returning an unconverged fit. The class retains no regressor matrix (`design_matrix` is `None`) and `predict` registers no types for `nl`, so prediction is not available through it even with an explicit `exog=`.",
+    "notes_zh": "`fit(strict=True)` 是默认值；优化器不收敛时它会抛 `ConvergenceError`，而不是返回未收敛的结果。该类不保留回归矩阵（`design_matrix` 为 `None`），且 `predict` 没有为 `nl` 注册任何类型，因此即使显式传入 `exog=` 也无法经由它做预测。"
+  }
+}

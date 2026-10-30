@@ -12,12 +12,23 @@ class WestataError(Exception):
     """Base class for all westata errors."""
 
 
-class ConsistencyError(WestataError):
+class ConsistencyError(WestataError, ValueError):
     """Raised when a result cannot be guaranteed to be Stata-conformant.
 
     This is deliberately loud: westata never silently returns a number that it
     knows may diverge from Stata.  The message must say what diverged and which
     evidence level the quantity has.
+
+    Also a ``ValueError`` for the same reason ``FormulaError`` is: the invalid input is a
+    value (too few clusters, a degenerate design) and callers legitimately write
+    ``except ValueError``.  Adopting both bases lets a caller catch the specific class OR
+    the broad one, and -- more importantly -- lets ``except WestataError`` finally catch
+    the VCE refusals, which it did not.
+
+    Why that mattered: a single-cluster clustered VCE raised this from the logit path but
+    a plain ``ValueError`` from OLS/IV, so one library inconsistency produced two
+    different exception types for the same user error.  With both bases in place the sites
+    could be unified without breaking ``except ValueError``.
     """
 
 

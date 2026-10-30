@@ -1,0 +1,187 @@
+{
+  "_readme": [
+    "Prose for the DISCRETE / COUNT / LIMITED-RESPONSE estimator classes.",
+    "Every behavioural claim below was checked by running the class against the collector's",
+    "base frame (or a deterministic variant derived from it); every example is executed by",
+    "collect_api_reference.py --check. Numbers quoted as measurements come from those runs,",
+    "not from memory of Stata's output.",
+    "Fields: stata = the Stata command as typed; en/zh = one paragraph, same content;",
+    "example = a runnable script (last line is what gets printed); notes_en/notes_zh = caveats."
+  ],
+  "Logit": {
+    "stata": "logit yb x1 x2",
+    "en": "Logistic regression by maximum likelihood -- Stata's `logit`. Reports an LR chi-square model test, an intercept-only log-likelihood and a pseudo R-squared in the header, then coefficients on the log-odds scale with z statistics. `e(aic)` is stored and equals `-2*e(ll) + 2*e(rank)`, which is what `estat_ic` prints. `predict` accepts `kind='xb'`, `'stdp'`, `'pr'`, `'residuals'` and `'score'`.",
+    "zh": "极大似然逻辑回归，即 Stata 的 `logit`。表头给出 LR 卡方模型检验、仅含常数项的对数似然与伪 R²，随后是对数几率尺度上的系数与 z 值。`e(aic)` 会被存下，且等于 `-2*e(ll) + 2*e(rank)`，与 `estat_ic` 打印的一致。`predict` 接受 `kind='xb'`、`'stdp'`、`'pr'`、`'residuals'` 与 `'score'`。",
+    "example": "ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "The prediction type is `score` (singular), the equation-level score; Stata reserves the plural `scores` for multi-equation models, so `predict(kind='scores')` raises instead of returning one column. Frequency weights are supported via `from_formula(..., freq_weights='w')` and are applied by row expansion, which is what Stata's `fweight` means here.",
+    "notes_zh": "预测类型写作单数 `score`，即方程级得分；复数 `scores` 在 Stata 中专用于多方程模型，因此 `predict(kind='scores')` 会报错而不是返回一列。频数权重经 `from_formula(..., freq_weights='w')` 支持，按行展开实现，这正是 Stata 此处 `fweight` 的含义。"
+  },
+  "Probit": {
+    "stata": "probit yb x1 x2",
+    "en": "Probit regression by maximum likelihood -- Stata's `probit`. The header block and the inference table have the same shape as `Logit`'s, but the link is the standard normal CDF, so coefficients are in latent-standard-deviation units and are smaller than the logit ones on the same data. `predict` offers `'xb'`, `'stdp'`, `'pr'`, `'residuals'` and `'score'`.",
+    "zh": "极大似然 probit 回归，即 Stata 的 `probit`。表头区块与推断表的结构与 `Logit` 相同，但连接函数是标准正态分布函数，因此系数以潜在变量的标准差为单位，在同一数据上小于 logit 的系数。`predict` 提供 `'xb'`、`'stdp'`、`'pr'`、`'residuals'` 与 `'score'`。",
+    "example": "ws.Probit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "`score` is singular, as for `logit`; the plural spelling is Stata's multi-equation form and is refused. As with `logit`, frequency weights are applied by row expansion.",
+    "notes_zh": "与 `logit` 一样，得分类型写作单数 `score`；复数拼法是 Stata 的多方程形式，会被拒绝。与 `logit` 相同，频数权重按行展开实现。"
+  },
+  "OrderedLogit": {
+    "stata": "ologit yord x1 x2",
+    "en": "Ordered logistic regression -- Stata's `ologit`. The ordered outcome's distinct values become the categories (`e(k_cat)` counts them) and the table reports slopes plus `e(k_cat) - 1` cut points labelled `/cut1`, `/cut2`, and so on, the same labels Stata prints. `predict(kind='pr')` returns the probability of one category; pass `outcome=` to choose which (it defaults to the first), and the probabilities over all categories sum to one.",
+    "zh": "有序逻辑回归，即 Stata 的 `ologit`。有序结果的不同取值即类别（`e(k_cat)` 为其个数），表中给出斜率以及 `e(k_cat) - 1` 个切点，标记为 `/cut1`、`/cut2` 等，与 Stata 打印的标签一致。`predict(kind='pr')` 返回某一类别的概率；用 `outcome=` 指定是哪一类（默认为第一类），各概率之和为一。",
+    "example": "d = base.assign(yord=base.ycnt.clip(0, 2))\nws.OrderedLogit.from_formula('yord ~ x1 + x2', d).fit().summary(style='stata')",
+    "notes_en": "The model assumes the outcome is categorical: passing a continuous variable makes every distinct value a category, so on a continuous response `e(k_cat)` equals the sample size and `k_cat - 1` cut points are estimated alongside the slopes. `predict` offers no `'score'` type -- only `'xb'`, `'stdp'`, `'pr'` and `'residuals'` -- because the score would be one variable per equation.",
+    "notes_zh": "模型假定结果是有序类别：若传入连续变量，每个不同取值都会成为一个类别，于是在连续响应上 `e(k_cat)` 等于样本量，并会与斜率一同估计 `k_cat - 1` 个切点。`predict` 不提供 `'score'` 类型——只有 `'xb'`、`'stdp'`、`'pr'` 和 `'residuals'`——因为得分会是每个方程一列。"
+  },
+  "OrderedProbit": {
+    "stata": "oprobit yord x1 x2",
+    "en": "Ordered probit regression -- Stata's `oprobit`. The same ordered-category machinery as `OrderedLogit` with the normal distribution in place of the logistic one, so it reports slopes and `e(k_cat) - 1` cut points and, on the same data, a comparable LR test and log-likelihood but systematically smaller coefficients (the logistic scale needs a factor of about 1.6 relative to the normal one). `predict(kind='pr')` takes the same optional `outcome=` argument.",
+    "zh": "有序 probit 回归，即 Stata 的 `oprobit`。它与 `OrderedLogit` 使用同一套有序类别机制，只是以正态分布代替逻辑分布，因此同样给出斜率与 `e(k_cat) - 1` 个切点；在同一数据上，LR 检验与对数似然处于可比量级，但系数系统性地更小（逻辑尺度相对正态尺度约需乘 1.6）。`predict(kind='pr')` 接受同样的可选参数 `outcome=`。",
+    "example": "d = base.assign(yord=base.ycnt.clip(0, 2))\nws.OrderedProbit.from_formula('yord ~ x1 + x2', d).fit().summary(style='stata')",
+    "notes_en": "The outcome must be discrete for the fit to be meaningful: a continuous column produces one category per distinct value and `k_cat - 1` cut points, which is an unidentifiable model. No `'score'` prediction type is registered; the available kinds are `'xb'`, `'stdp'`, `'pr'` and `'residuals'`.",
+    "notes_zh": "只有离散结果才有意义：连续列会每个不同取值生成一个类别和 `k_cat - 1` 个切点，这样的模型不可识别。未注册 `'score'` 预测类型；可用类型为 `'xb'`、`'stdp'`、`'pr'` 与 `'residuals'`。"
+  },
+  "Poisson": {
+    "stata": "poisson ycnt x1 x2",
+    "en": "Poisson regression by maximum likelihood -- Stata's `poisson`. Coefficients are on the log-mean scale; the header prints an LR chi-square test, `e(ll_0)` and a pseudo R-squared. `predict(kind='n')` and `kind='ir'` both give the predicted mean (on this data they are numerically identical), while `kind='pr'` needs a count: `predict(kind='pr', n=2)` gives `Pr(y = 2)`, and calling `'pr'` without it raises rather than assuming a value.",
+    "zh": "极大似然 Poisson 回归，即 Stata 的 `poisson`。系数在对数均值尺度上；表头打印 LR 卡方检验、`e(ll_0)` 与伪 R²。`predict(kind='n')` 与 `kind='ir'` 都给出预测均值（在本数据上数值完全相同），而 `kind='pr'` 需要指定计数：`predict(kind='pr', n=2)` 给出 `Pr(y = 2)`；不指定就调用 `'pr'` 会报错，而不是擅自假定一个取值。",
+    "example": "ws.Poisson.from_formula('ycnt ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "`'pr'` is Stata's `pr(n)`/`pr(a, b)` family, not a single probability, so it takes `n=`. Frequency weights are supported and are applied by row expansion.",
+    "notes_zh": "`'pr'` 是 Stata 的 `pr(n)`/`pr(a, b)` 家族，而不是单一概率，因此需要传 `n=`。频数权重受支持，按行展开实现。"
+  },
+  "NegativeBinomial": {
+    "stata": "nbreg yod x1 x2",
+    "en": "Negative binomial regression, NB2 -- Stata's default `nbreg`. The dispersion is statsmodels' `alpha` with `Var = mu + alpha*mu^2`, the same parameterisation as Stata's default, estimated on the log scale and reported as `/lnalpha` with `e(alpha)` as the exponentiated value. The optimiser is BFGS rather than Newton because the Newton step diverges from the Poisson start once `alpha` is in the parameter vector. `e(aic)` is stored and agrees with `estat_ic`.",
+    "zh": "负二项回归，NB2——Stata 默认的 `nbreg`。离散参数是 statsmodels 的 `alpha`，`Var = mu + alpha*mu^2`，与 Stata 默认的参数化相同；它在对数尺度上估计，报告为 `/lnalpha`，`e(alpha)` 为其指数。优化器用 BFGS 而非 Newton，因为一旦 `alpha` 进入参数向量，从 Poisson 初值出发的 Newton 步会发散。`e(aic)` 会被存下，且与 `estat_ic` 一致。",
+    "example": "d = base.assign(yod=base.ycnt ** 2)\nws.NegativeBinomial.from_formula('yod ~ x1 + x2', d).fit().summary(style='stata')",
+    "notes_en": "`e(ll_c)` is the log-likelihood at the Poisson (i.e. `alpha = 0`) limit, and `e(chi2_c)` is twice the difference between it and `e(ll)`; on this data `e(chi2_c)` reproduces `2*(e(ll) - e(ll_c))` exactly, so the dispersion test is available from the macros. No `'score'` prediction type is registered, because the score would be one column per equation, and `'pr'` again requires `n=`.",
+    "notes_zh": "`e(ll_c)` 是在 Poisson（即 `alpha = 0`）极限处的对数似然，`e(chi2_c)` 是它与 `e(ll)` 之差的二倍；在本数据上 `e(chi2_c)` 精确复现 `2*(e(ll) - e(ll_c))`，因此离散检验可直接由这些宏得到。未注册 `'score'` 预测类型，因为得分会是每个方程一列；`'pr'` 同样需要 `n=`。"
+  },
+  "NegativeBinomialNB1": {
+    "stata": "nbreg yod x1 x2, dispersion(constant)",
+    "en": "Negative binomial regression with a constant dispersion, NB1 -- Stata's `nbreg, dispersion(constant)`, where `Var = mu*(1 + delta)` is linear in the mean rather than quadratic. This is a different model with a different likelihood from `NegativeBinomial`, which is why it is a separate class rather than an option on that one. The dispersion is reported as `/lndelta` with `e(delta)` as its exponential, and the likelihood follows `nbreg_al.ado`, whose gamma terms involve `mu/delta` rather than `mu`.",
+    "zh": "常数离散参数的负二项回归，NB1，即 Stata 的 `nbreg, dispersion(constant)`，其中 `Var = mu*(1 + delta)` 对均值是线性的，而非二次的。它与 `NegativeBinomial` 是不同的模型、不同的似然，因此单独成类，而不是后者上的一个选项。离散参数报告为 `/lndelta`，`e(delta)` 为其指数；似然依照 `nbreg_al.ado` 实现，其 gamma 项使用的是 `mu/delta` 而不是 `mu`。",
+    "example": "d = base.assign(yod=base.ycnt ** 2)\nws.NegativeBinomialNB1.from_formula('yod ~ x1 + x2', d).fit().summary(style='stata')",
+    "notes_en": "`e(aic)`, `e(bic)` and `e(r2_p)` are absent, and `e(cmd)` is the descriptive string `'Negative binomial (NB1)'` rather than a Stata command name, so `predict` registers no type for it: call `estat_ic` if a criterion is needed. Robust and cluster VCEs are refused by name -- only `cov_type='nonrobust'` is implemented.",
+    "notes_zh": "没有 `e(aic)`、`e(bic)` 与 `e(r2_p)`，且 `e(cmd)` 是描述性字符串 `'Negative binomial (NB1)'` 而非 Stata 命令名，因此 `predict` 不为其注册任何类型：需要信息准则时请调用 `estat_ic`。稳健与聚类 VCE 会按名称被拒绝——只实现了 `cov_type='nonrobust'`。"
+  },
+  "ZeroInflatedPoisson": {
+    "stata": "zip ycnt x1 x2, inflate(x3)",
+    "en": "Zero-inflated Poisson -- Stata's `zip`. The count equation is Poisson and the inflation equation is binary logit on the variables named by `inflate=`; the two blocks appear in one table, the inflation rows prefixed `inflate#`. `e(n_zero)` and `e(n_nonzero)` count the zeros and non-zeros in the estimation sample. With `inflate=None` there is no mixture and the model is the plain Poisson regression, fitted by the same likelihood.",
+    "zh": "零膨胀 Poisson，即 Stata 的 `zip`。计数方程是 Poisson，膨胀方程是 `inflate=` 所指定变量上的二值 logit；两个区块出现在同一张表中，膨胀部分的行以 `inflate#` 为前缀。`e(n_zero)` 与 `e(n_nonzero)` 统计估计样本中的零与非零个数。当 `inflate=None` 时没有混合成分，模型就是普通 Poisson 回归，用同一似然拟合。",
+    "example": "ws.ZeroInflatedPoisson.from_formula('ycnt ~ x1 + x2', base, inflate='x3').fit().summary(style='stata')",
+    "notes_en": "`predict` supports only `'xb'`, `'n'`, `'pr'` and `'stdp'`; `'stdf'` and every other kind are refused. `'pr'` is the inflation probability `logistic(w'g)`, not a count probability, and it raises when the model was fitted with `inflate=None`. `e(df_m)` counts only the main-equation regressors beyond the constant, so the printed `LR chi2` degrees of freedom are smaller than `e(rank)`.",
+    "notes_zh": "`predict` 只支持 `'xb'`、`'n'`、`'pr'` 与 `'stdp'`；`'stdf'` 及其他任何类型都会被拒绝。`'pr'` 是膨胀概率 `logistic(w'g)`，不是计数概率；若模型以 `inflate=None` 拟合，调用它会报错。`e(df_m)` 只计主方程中常数项以外的回归元，因此打印的 `LR chi2` 自由度小于 `e(rank)`。"
+  },
+  "ZeroInflatedNegativeBinomial": {
+    "stata": "zinb yz x1 x2, inflate(x3)",
+    "en": "Zero-inflated negative binomial, NB2 -- Stata's `zinb`. A negative-binomial count equation plus a logit inflation equation; the dispersion is estimated as `/lnalpha` on the log scale, exactly as `nbreg` stores it. It uses a quasi-Newton optimiser for the same reason `NegativeBinomial` does. With `inflate=None` it reduces to the plain NB2 fit.",
+    "zh": "零膨胀负二项回归，NB2，即 Stata 的 `zinb`。它由一条负二项计数方程加一条 logit 膨胀方程组成；离散参数在对数尺度上估计为 `/lnalpha`，与 `nbreg` 的存法一致。出于与 `NegativeBinomial` 相同的原因，它使用准牛顿优化器。当 `inflate=None` 时退化为普通的 NB2 拟合。",
+    "example": "rng = np.random.default_rng(0)\nmu = np.exp(0.4 + 0.6 * base.x1 + 0.2 * base.x2)\ncnt = rng.negative_binomial(1 / 0.8, 1 / (1 + 0.8 * mu))\nd = base.assign(yz=np.where(rng.uniform(size=200) < 1 / (1 + np.exp(-base.x3)), 0, cnt))\nws.ZeroInflatedNegativeBinomial.from_formula('yz ~ x1 + x2', d, inflate='x3').fit().summary(style='stata')",
+    "notes_en": "`predict` offers only `'xb'`, `'n'`, `'pr'` and `'stdp'`; `'pr'` is the inflation probability and raises when `inflate=None`. On data without genuine excess zeros the inflation equation is not identified: the estimate is then driven to a boundary and the information matrix can be singular, which is reported as a `ConvergenceError` rather than a table of huge standard errors.",
+    "notes_zh": "`predict` 只提供 `'xb'`、`'n'`、`'pr'` 与 `'stdp'`；`'pr'` 是膨胀概率，当 `inflate=None` 时会报错。若数据没有真正的超额零，膨胀方程不可识别：估计会被推向边界，信息矩阵可能奇异，此时报告为 `ConvergenceError`，而不是给出一张满是巨大标准误的表。"
+  },
+  "TruncatedPoisson": {
+    "stata": "ztp ycnt x1 x2",
+    "en": "Poisson regression truncated to `[lower, upper]` -- Stata's `ztp` when `lower=1` with no upper limit, and `tpoisson` for any other limit; `model_name` (`e(cmd)`) follows suit, so the same class reports `ztp` or `tpoisson` depending on the limits. Every observation must lie inside the limits: the constructor raises a `ConsistencyError` naming how many observations fall outside rather than silently dropping them.",
+    "zh": "截断到 `[lower, upper]` 的 Poisson 回归——`lower=1` 且无上界时即 Stata 的 `ztp`，其他限制则为 `tpoisson`；`model_name`（`e(cmd)`）随之变化，因此同一个类会按限制的不同报告 `ztp` 或 `tpoisson`。每个观测都必须落在限制之内：构造函数会抛出 `ConsistencyError` 并说明有多少观测越界，而不是静默剔除。",
+    "example": "d = base[base.ycnt > 0]\nws.TruncatedPoisson.from_formula('ycnt ~ x1 + x2', d).fit().summary(style='stata')",
+    "notes_en": "Truncation means the out-of-range rows are ABSENT from the sample, so the caller has to subset first -- this class refuses to subset for you, which is the opposite of `Truncreg`'s behaviour. `predict` offers `'xb'`, `'n'` and `'stdp'` only; there is no `'pr'`.",
+    "notes_zh": "截断意味着越界的行本就不在样本中，因此调用方必须先取子集——本类不会替你取子集，这与 `Truncreg` 的行为相反。`predict` 只提供 `'xb'`、`'n'` 与 `'stdp'`，没有 `'pr'`。"
+  },
+  "TruncatedNegativeBinomial": {
+    "stata": "tnbreg yod x1, ll(1)",
+    "en": "Negative binomial regression truncated to `[lower, upper]` -- Stata's `tnbreg`. The NB2 dispersion is estimated alongside the slopes and reported as `/lnalpha`; as with `TruncatedPoisson`, the data must already be subset to the interior of the limits or the constructor raises. `predict` offers `'xb'`, `'n'` and `'stdp'` only.",
+    "zh": "截断到 `[lower, upper]` 的负二项回归，即 Stata 的 `tnbreg`。NB2 离散参数与斜率一同估计，报告为 `/lnalpha`；与 `TruncatedPoisson` 一样，数据必须已经取到限制内部的子集，否则构造函数会报错。`predict` 只提供 `'xb'`、`'n'` 与 `'stdp'`。",
+    "example": "d = base[base.ycnt > 0].assign(yod=lambda f: f.ycnt ** 2)\nws.TruncatedNegativeBinomial.from_formula('yod ~ x1', d).fit().summary(style='stata')",
+    "notes_en": "On data where the negative binomial collapses to the Poisson limit the optimiser warns that it did not fully converge; the coefficient table is still produced, so check the warning before trusting the dispersion. No `'pr'` or `'score'` type is registered.",
+    "notes_zh": "当负二项退化到 Poisson 极限时，优化器会警告未完全收敛；系数表仍会输出，因此在采信离散参数之前请先看该警告。未注册 `'pr'` 或 `'score'` 类型。"
+  },
+  "Tobit": {
+    "stata": "tobit ycens x1 x2, ll(0)",
+    "en": "Tobit regression with left and/or right censoring -- Stata's `tobit`, defaulting to `lower=0` as Stata's `ll(0)` does. Censored observations contribute their censoring probability and uncensored ones the normal density, with `/sigma` estimated and `e(sigma) = var_e` derived. `e(N_lc)`, `e(N_rc)` and `e(N_unc)` count left-censored, right-censored and uncensored observations, and `e(df_r)` is the residual degrees of freedom.",
+    "zh": "带左和/或右删失的 Tobit 回归，即 Stata 的 `tobit`，默认 `lower=0`，与 Stata 的 `ll(0)` 一致。删失观测贡献其删失概率，未删失观测贡献正态密度；`/sigma` 被估计，`e(sigma) = var_e` 由之导出。`e(N_lc)`、`e(N_rc)` 与 `e(N_unc)` 分别统计左删失、右删失与未删失观测个数，`e(df_r)` 为残差自由度。",
+    "example": "ws.Tobit.from_formula('ycens ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "`tobit` stores NO `e(aic)`; `estat_ic` computes AIC and BIC on demand instead, so the criterion is still available. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'e'`, `'ystar'`, `'pr'` and `'residuals'`; `'e'` and `'ystar'` take `lower=`/`upper=` for the censoring limits, and `'pr'` without them returns 1 for every observation because the default interval covers the whole line. Only `cov_type='nonrobust'` is implemented.",
+    "notes_zh": "`tobit` 不存 `e(aic)`；`estat_ic` 会按需计算 AIC 与 BIC，因此准则仍然可用。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'e'`、`'ystar'`、`'pr'` 与 `'residuals'`；`'e'` 与 `'ystar'` 用 `lower=`/`upper=` 传入删失界限，而不传时 `'pr'` 对每个观测都返回 1，因为默认区间覆盖整条实轴。只实现了 `cov_type='nonrobust'`。"
+  },
+  "Truncreg": {
+    "stata": "truncreg y x1 x2, ll(0)",
+    "en": "Truncated regression -- Stata's `truncreg`. Each observation contributes the normal density divided by the probability of lying inside the limits, and at least one limit is required. Observations at or outside the limits are dropped from the estimation sample and the count is reported: `e(N_bf)` is the number of observations before truncation, so `e(N_bf) - e(N)` is how many were dropped, which is what Stata prints as `(N obs truncated)`.",
+    "zh": "截断回归，即 Stata 的 `truncreg`。每个观测贡献正态密度除以落在限制区间内的概率，且至少要给出一个限制。处于或超出限制的观测被从估计样本中剔除并报告个数：`e(N_bf)` 是截断前的观测数，因此 `e(N_bf) - e(N)` 即被剔除的个数，也就是 Stata 打印的 `(N obs truncated)`。",
+    "example": "ws.Truncreg.from_formula('y ~ x1 + x2', base, lower=0.0).fit().summary(style='stata')",
+    "notes_en": "Unlike `TruncatedPoisson`, this class drops the out-of-range rows itself and warns instead of raising, because `truncreg`'s sample really is defined by the limits. The dropped count is an attribute on the model (`_n_truncated`) and is NOT stored in `e()`: `e()` follows `truncreg.sthlp`, which has no such scalar -- use `e(N_bf) - e(N)`. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'residuals'` and `'fitted'`.",
+    "notes_zh": "与 `TruncatedPoisson` 相反，本类会自行剔除越界的行并给出警告，而不是报错，因为 `truncreg` 的样本本就由限制定义。被剔除的个数是模型上的属性（`_n_truncated`），并**不**存入 `e()`：`e()` 遵循 `truncreg.sthlp`，其中没有这个标量——请用 `e(N_bf) - e(N)`。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'residuals'` 与 `'fitted'`。"
+  },
+  "Intreg": {
+    "stata": "intreg lo hi x1",
+    "en": "Interval regression -- Stata's `intreg`, written with the two-sided formula `'lo hi ~ x'`. Only the interval is known for each observation: `lower < upper` is interval-censored, `lower == upper` an exactly observed value, and a missing bound means that side is censored. `e(N_int)`, `e(N_lc)`, `e(N_rc)` and `e(N_unc)` count the four kinds, `/lnsigma` is estimated and `e(sigma)` derived.",
+    "zh": "区间回归，即 Stata 的 `intreg`，用双边公式 `'lo hi ~ x'` 书写。每个观测只知区间：`lower < upper` 为区间删失，`lower == upper` 为精确观测值，某一端缺失表示该侧删失。`e(N_int)`、`e(N_lc)`、`e(N_rc)` 与 `e(N_unc)` 统计这四类，`/lnsigma` 被估计，`e(sigma)` 由之导出。",
+    "example": "d = base.assign(lo=np.floor(base.y1), hi=np.floor(base.y1) + 1)\nws.Intreg.from_formula('lo hi ~ x1', d).fit().summary(style='stata')",
+    "notes_en": "If every `hi - lo` is tiny relative to the model's residual scale, `sigma` is driven to zero and the standard errors of the other parameters become unusable above the reported values -- the fit is then essentially an exact interpolation, so pass intervals whose width is realistic for the outcome. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'e'`, `'ystar'`, `'pr'` and `'fitted'`; `'e'`, `'ystar'` and `'fitted'` all return the linear prediction here, and there is no `'residuals'` type.",
+    "notes_zh": "若所有 `hi - lo` 相对模型残差尺度都极小，`sigma` 会被推向零，其余参数的标准误将变得不可用（大于所报数值）——此时拟合本质上成了精确插值，请给出与结果尺度相称的区间宽度。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'e'`、`'ystar'`、`'pr'` 与 `'fitted'`；在此 `'e'`、`'ystar'`、`'fitted'` 都返回线性预测值，且没有 `'residuals'` 类型。"
+  },
+  "Heckman": {
+    "stata": "heckman yselect x1, select(sel = x3)",
+    "en": "Heckman sample-selection model -- Stata's `heckman`, written `'y ~ x + select(s ~ z)'`. The selection equation is a probit on the full sample; the outcome equation is fitted only where `s == 1`, and a MISSING `y` is what marks a non-selected observation, so the outcome column may be NaN off the selected rows. `fit(method='twostep')` (the default) is the two-step estimator with the inverse Mills ratio added as a regressor and `e(lambda) = rho*sigma`; `fit(method='ml')` fits the joint likelihood with `/athrho` and `/lnsigma`.",
+    "zh": "Heckman 样本选择模型，即 Stata 的 `heckman`，写作 `'y ~ x + select(s ~ z)'`。选择方程是在全样本上的 probit；结果方程只在 `s == 1` 处拟合，未选中的观测以 `y` 缺失为标志，因此结果列在未选中行上可以是 NaN。`fit(method='twostep')`（默认）是两步法，把逆米尔斯比作为回归元加入，并有 `e(lambda) = rho*sigma`；`fit(method='ml')` 拟合联合似然，参数为 `/athrho` 与 `/lnsigma`。",
+    "example": "ws.Heckman.from_formula('yselect ~ x1 + select(sel ~ x3)', base).fit().summary(style='stata')",
+    "notes_en": "The two-step result stores NO `e(aic)` (the two-step estimator is not an ML fit of the joint model) and `e(N_selected)`/`e(N_nonselected)` split the sample, while `e(N)` is the full sample size even though the printed `Number of obs` is the selected count. On the ML path `e(aic)` IS stored and equals `-2*e(ll) + 2*k`, agreeing with `estat_ic`. Standard errors are the two-step M-estimator sandwich, not naive OLS ones. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'fitted'`, `'psel'`, `'ycond'`, `'yexpected'`, `'mills'` and `'nshazard'`.",
+    "notes_zh": "两步法结果不存 `e(aic)`（两步估计量不是联合模型的 ML 拟合），`e(N_selected)`/`e(N_nonselected)` 划分样本，而 `e(N)` 是全样本量，尽管打印的 `Number of obs` 是选中样本数。在 ML 路径上 `e(aic)` 会被存下，且等于 `-2*e(ll) + 2*k`，与 `estat_ic` 一致。标准误是两步 M 估计的夹心形式，而非朴素 OLS 标准误。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'fitted'`、`'psel'`、`'ycond'`、`'yexpected'`、`'mills'` 与 `'nshazard'`。"
+  },
+  "Etregress": {
+    "stata": "etregress ytreat x1, treat(treat = x3)",
+    "en": "Endogenous treatment regression by the control-function method -- Stata's `etregress`, written `'y ~ x + treat(t ~ z)'`. A probit treatment equation is estimated on the full sample and its generalized residual is added to the outcome regression, which absorbs the correlation between the two errors; unlike `Heckman`, `y` is observed for treated and control units alike, so every row enters the outcome equation. The treatment indicator is added to the outcome equation automatically, and naming it there as well does not duplicate it.",
+    "zh": "用控制函数法实现的内生处理回归，即 Stata 的 `etregress`，写作 `'y ~ x + treat(t ~ z)'`。处理方程是在全样本上的 probit，其广义残差被加入结果回归，从而吸收两个误差项之间的相关；与 `Heckman` 不同，处理组与对照组的 `y` 都可观测，因此每一行都进入结果方程。处理指示变量会被自动加入结果方程，若在公式中再写一次也不会重复。",
+    "example": "ws.Etregress.from_formula('ytreat ~ x1 + treat(treat ~ x3)', base).fit().summary(style='stata')",
+    "notes_en": "`e(N)` is the full sample and `e(N_treated)` the treated count. Standard errors are the two-step M-estimator sandwich (`e(se_corrected) = 1`), not naive OLS ones and not Stata's ML ones. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'fitted'`, `'cte'`, `'yctrt'`, `'ycntrt'`, `'ptrt'` and `'xbtrt'`, i.e. the treated and untreated conditional means, the treatment probability and the treatment-equation index.",
+    "notes_zh": "`e(N)` 是全样本量，`e(N_treated)` 是处理组个数。标准误是两步 M 估计的夹心形式（`e(se_corrected) = 1`），既非朴素 OLS 标准误，也非 Stata 的 ML 标准误。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'fitted'`、`'cte'`、`'yctrt'`、`'ycntrt'`、`'ptrt'` 与 `'xbtrt'`，即处理组/对照组条件均值、处理概率与处理方程的线性指数。"
+  },
+  "Frontier": {
+    "stata": "frontier y x1 x2, distribution(halfnormal)",
+    "en": "Stochastic production frontier -- Stata's `frontier`. The model is `y = x'b + v - u` with a symmetric two-sided error `v` and a one-sided inefficiency `u`; `distribution='halfnormal'` (the default) or `'exponential'` is accepted, and the truncated-normal variants are not implemented and raise `UnsupportedError`. The table reports `/lnsig2v` and `/lnsig2u` on the log-variance scale, and `e()` carries the derived `sigma_v`, `sigma_u`, `sigma2_v`, `sigma2_u`, `lambda` and `gamma`.",
+    "zh": "随机生产前沿，即 Stata 的 `frontier`。模型为 `y = x'b + v - u`，其中 `v` 是对称的双边误差，`u` 是单边无效率项；接受 `distribution='halfnormal'`（默认）或 `'exponential'`，截断正态变体未实现，会抛出 `UnsupportedError`。表中按对数方差尺度报告 `/lnsig2v` 与 `/lnsig2u`，`e()` 中则带有导出的 `sigma_v`、`sigma_u`、`sigma2_v`、`sigma2_u`、`lambda` 与 `gamma`。",
+    "example": "ws.Frontier.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')",
+    "notes_en": "There is no `e(aic)` or `e(bic)`, and the model test is a Wald statistic (`e(chi2type)='Wald'`), with the likelihood-ratio statistic against the no-inefficiency model in `e(lr_chi2)` and its p-value in `e(p_lr)`. `predict` registers no types for `frontier`, so all prediction goes through the macros or by hand.",
+    "notes_zh": "没有 `e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量（`e(chi2type)='Wald'`），对「无无效率项」模型的似然比统计量存于 `e(lr_chi2)`，其 p 值存于 `e(p_lr)`。`predict` 未为 `frontier` 注册任何类型，因此预测只能经由宏或手工完成。"
+  },
+  "XtLogit": {
+    "stata": "xtlogit yb x1, fe",
+    "en": "Panel logit -- Stata's `xtlogit`, with `method='fe'`, `'re'` or `'pa'`, and `model_name` set to `'xtlogit, fe'`, `'xtlogit, re'` or `'xtlogit, pa'` accordingly. `fe` is Chamberlain's conditional likelihood: groups whose outcome never varies are dropped, `e(N_drop)` and `e(N_group_drop)` record the cost, there is no intercept and the model test is an LR. `re` is an integrated likelihood with a Gaussian random effect by adaptive Gauss-Hermite quadrature, storing `/lnsig2u` as a parameter plus `e(sigma_u)` and `e(rho)`.",
+    "zh": "面板 logit，即 Stata 的 `xtlogit`，`method` 可为 `'fe'`、`'re'` 或 `'pa'`，`model_name` 相应设为 `'xtlogit, fe'`、`'xtlogit, re'` 或 `'xtlogit, pa'`。`fe` 是 Chamberlain 条件似然：结果从不变化的组被剔除，`e(N_drop)` 与 `e(N_group_drop)` 记录其代价，模型无截距，检验为 LR。`re` 是带高斯随机效应的积分似然，用自适应 Gauss-Hermite 求积，把 `/lnsig2u` 作为参数存下，并给出 `e(sigma_u)` 与 `e(rho)`。",
+    "example": "ws.XtLogit.from_formula('yb ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')",
+    "notes_en": "`method='pa'` is a GEE with an exchangeable working correlation and is NOT a likelihood: it stores no `e(ll)`, `e(ll_0)`, `e(r2_p)`, `e(aic)` or `e(bic)`, its model test is a Wald statistic and `e(estimator)='gee'` marks it. `e(ll_0)` on the `fe` path is the intercept-only logit on the retained observations, which is what makes the LR statistic comparable. `predict` registers no types for any of the three.",
+    "notes_zh": "`method='pa'` 是带可交换工作相关的 GEE，**不是**似然：它不存 `e(ll)`、`e(ll_0)`、`e(r2_p)`、`e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量，并以 `e(estimator)='gee'` 标记。`fe` 路径上的 `e(ll_0)` 是在保留样本上仅含常数项的 logit，这正是 LR 统计量可比的原因。三者都没有注册任何 `predict` 类型。"
+  },
+  "XtProbit": {
+    "stata": "xtprobit ybp x1, re",
+    "en": "Panel probit -- Stata's `xtprobit`, random effects only. It is the same integral as `xtlogit, re` with the normal CDF in place of the logistic one, and it stores `/lnsig2u` as a parameter plus `e(sigma_u)` and `e(rho)`. Any other `method` raises `UnsupportedError`: Stata offers no fixed-effects or population-averaged `xtprobit` in this shape, because there is no sufficient statistic to condition on for the probit.",
+    "zh": "面板 probit，即 Stata 的 `xtprobit`，仅有随机效应。它与 `xtlogit, re` 是同一个积分，只把逻辑分布换成正态分布函数；把 `/lnsig2u` 作为参数存下，并给出 `e(sigma_u)` 与 `e(rho)`。其他任何 `method` 都会抛出 `UnsupportedError`：Stata 在此形态下没有固定效应或总体平均的 `xtprobit`，因为 probit 没有可供条件的充分统计量。",
+    "example": "d = base.assign(ybp=(base.ypanel > 1).astype(int))\nws.XtProbit.from_formula('ybp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')",
+    "notes_en": "`method='fe'` and `method='pa'` are refused by name with `method='fe' is not available; supported: 're'` (and the same for `'pa'`), not silently mapped to `re`. On a binary outcome with little within-group correlation the estimate of `/lnsig2u` can be driven far negative, so `sigma_u` is effectively zero -- that is the model hitting the boundary, not a failure to converge.",
+    "notes_zh": "`method='fe'` 与 `method='pa'` 会按名称被拒绝，报错为 `method='fe' is not available; supported: 're'`（`'pa'` 同），而不是静默映射为 `re`。在组内相关很弱的二值结果上，`/lnsig2u` 的估计可能被推得很负，于是 `sigma_u` 实际为零——这是模型撞到边界，而非未收敛。"
+  },
+  "XtPoisson": {
+    "stata": "xtpoisson ycnt x1, fe",
+    "en": "Panel Poisson -- Stata's `xtpoisson`, with `method='fe'` or `'re'`. `fe` conditions on the group total `S_i = sum_t y_it`, which removes the group effect exactly (the multinomial reduction), so it is a genuine likelihood and groups with `S_i = 0` are dropped. `re` uses a gamma random effect, which is conjugate to the Poisson, so the group likelihood is closed form and no quadrature is involved; the dispersion is reported as `/lnalpha` and `e(alpha)` as its exponential.",
+    "zh": "面板 Poisson，即 Stata 的 `xtpoisson`，`method` 可为 `'fe'` 或 `'re'`。`fe` 以组总量 `S_i = sum_t y_it` 为条件，精确消去组效应（即多项分布归约），因此是真正的似然，`S_i = 0` 的组被剔除。`re` 使用与 Poisson 共轭的 gamma 随机效应，组似然有闭式，不涉及求积；离散参数报告为 `/lnalpha`，`e(alpha)` 为其指数。",
+    "example": "ws.XtPoisson.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')",
+    "notes_en": "`method='pa'` is refused (`supported: 'fe', 're'`). The `fe` likelihood has no intercept -- the group effect absorbs it, and the likelihood is exactly flat in a constant -- so the patsy intercept is removed rather than estimated. `e(ivar)` and `e(tvar)` are not populated for this class, so the printed `Group variable:` line shows `.` even though `e(N_g)` does count the groups. `predict` registers no types.",
+    "notes_zh": "`method='pa'` 会被拒绝（`supported: 'fe', 're'`）。`fe` 似然没有截距——组效应吸收了它，似然在常数方向上完全平坦——因此 patsy 的截距被移除而不是估计。本类不填 `e(ivar)` 与 `e(tvar)`，因此打印的 `Group variable:` 行显示为 `.`，尽管 `e(N_g)` 确实统计了组数。`predict` 未注册任何类型。"
+  },
+  "XtNbreg": {
+    "stata": "xtnbreg ycnt x1, fe",
+    "en": "Conditional fixed-effects negative binomial -- Stata's `xtnbreg, fe`, and only `fe` is available. Stata maximises the Hausman-Hall-Griliches (1984) conditional kernel, which is not the conditional Poisson kernel: the dispersion enters through the `ln Gamma(lam + y) - ln Gamma(lam)` terms, which is why `xtnbreg, fe` and `xtpoisson, fe` report different standard errors on the same data. `e(estimator)='hhg_conditional_ml'` and `e(quasi_likelihood)=1` mark it, and `e(ll)` is the maximised conditional log-kernel -- the value Stata prints under `Log likelihood`.",
+    "zh": "条件固定效应负二项，即 Stata 的 `xtnbreg, fe`，且只有 `fe` 可用。Stata 最大化的是 Hausman-Hall-Griliches（1984）条件核，而非条件 Poisson 核：离散参数通过 `ln Gamma(lam + y) - ln Gamma(lam)` 项进入，这正是同一数据上 `xtnbreg, fe` 与 `xtpoisson, fe` 报告不同标准误的原因。`e(estimator)='hhg_conditional_ml'` 与 `e(quasi_likelihood)=1` 标记这一点，`e(ll)` 是最大化的条件对数核——也就是 Stata 在 `Log likelihood` 下打印的值。",
+    "example": "ws.XtNbreg.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')",
+    "notes_en": "The objective is a quasi-likelihood, so `e(ll)` is not a likelihood of the data and no AIC/BIC is stored. `_cons` is part of the parameter vector as in Stata, but the objective is nearly flat in it -- adding a constant to every `lam_it` barely moves the kernel -- so its estimate (and its enormous standard error) is optimiser-dependent while the slopes are not; dropping the constant would move the slopes, so it is kept.",
+    "notes_zh": "目标函数是准似然，因此 `e(ll)` 并非数据的似然，也不存 AIC/BIC。与 Stata 一样，`_cons` 属于参数向量，但目标函数在该方向上近乎平坦——给每个 `lam_it` 加常数几乎不改变核——所以它的估计值（及其巨大的标准误）依赖优化器，而斜率不然；去掉常数项会改变斜率，因此予以保留。"
+  },
+  "XtTobit": {
+    "stata": "xttobit ycensp x1, re",
+    "en": "Random-effects Tobit -- Stata's `xttobit`, random effects only. The latent outcome is `y*_it = x_it'b + u_i + e_it` with `u_i ~ N(0, sigma_u^2)` and `e_it ~ N(0, sigma_e^2)`, censored at `lower` and/or `upper`. Both variance components are reported as `sigma_u` and `sigma_e`, and `e(rho) = sigma_u^2/(sigma_u^2 + sigma_e^2)`; the integration is Stata's adaptive Gauss-Hermite (`e(intmethod)='mvaghermite'`) with `e(intpoints)` defaulting to 12.",
+    "zh": "随机效应 Tobit，即 Stata 的 `xttobit`，仅有随机效应。潜在结果为 `y*_it = x_it'b + u_i + e_it`，其中 `u_i ~ N(0, sigma_u^2)`、`e_it ~ N(0, sigma_e^2)`，并在 `lower` 和/或 `upper` 处删失。两个方差成分分别报告为 `sigma_u` 与 `sigma_e`，`e(rho) = sigma_u^2/(sigma_u^2 + sigma_e^2)`；积分使用 Stata 的自适应 Gauss-Hermite（`e(intmethod)='mvaghermite'`），`e(intpoints)` 默认为 12。",
+    "example": "d = base.assign(ycensp=np.clip(base.ypanel, 0.0, None))\nws.XtTobit.from_formula('ycensp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')",
+    "notes_en": "`method='fe'` is refused (`supported: 're'`). The number of quadrature points buys accuracy only up to a point -- 12 is Stata's default and this module's default, and more points do not change the estimates on well-behaved panels. `e(ivar)` is not populated for this class either, so the header's `Group variable:` shows `.` while `e(N_g)` still counts the groups. `predict` registers no types for `xttobit`.",
+    "notes_zh": "`method='fe'` 会被拒绝（`supported: 're'`）。求积点数的收益是有上限的——12 是 Stata 的默认值，也是本模块的默认值，在性态良好的面板上增加点数并不改变估计。本类同样不填 `e(ivar)`，因此表头的 `Group variable:` 显示 `.`，而 `e(N_g)` 仍统计组数。`xttobit` 未注册任何 `predict` 类型。"
+  }
+}

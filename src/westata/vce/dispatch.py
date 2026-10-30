@@ -54,6 +54,28 @@ def _normalize_cov_type(cov_type: str) -> str:
         ) from None
 
 
+def cluster_labels_from_kwds(kwds: Any) -> Any:
+    """Extract cluster labels from ``cov_kwds`` under ANY of the accepted key spellings.
+
+    ``groups``, ``clusters`` and ``cluster`` all work, everywhere. Stata's option is
+    ``vce(cluster clustvar)`` so ``clusters`` reads naturally; the OLS/ML family documented
+    ``groups`` while the IV family documented ``clusters``, and ``hdfe`` used ``cluster``.
+    Each rejected the others' spelling, so moving a call between families failed even
+    though the labels were correct.
+
+    One accessor, because the lookup had been repeated in four modules -- and fixing them
+    one at a time is how the mismatch survived in the first place.
+    """
+
+    if not kwds:
+        return None
+    for key in ("groups", "clusters", "cluster"):
+        labels = kwds.get(key)
+        if labels is not None:
+            return labels
+    return None
+
+
 def compute_cov(
     X: np.ndarray,
     resid: np.ndarray,
@@ -224,11 +246,21 @@ def compute_cov(
         return cov, float(n_eff - k)
 
     # canonical == "cluster"
+    #
+    # ``groups`` and ``clusters`` are BOTH accepted. Stata calls the option ``vce(cluster
+    # clustvar)``, so ``clusters`` reads naturally, and the IV family documents that
+    # spelling; the OLS/ML family took ``groups``. That split meant moving a call from one
+    # family to another failed with "requires cov_kwds['groups']" even though the labels
+    # were right -- the same user error, two vocabularies. Accepting both costs nothing and
+    # removes the trap.
     groups = kwds.get("groups")
     if groups is None:
+        groups = kwds.get("clusters")
+    if groups is None:
         raise ValueError(
-            "cov_type='cluster' requires cov_kwds['groups']; pass the "
-            "cluster labels as cov_kwds={'groups': groups}"
+            "cov_type='cluster' requires the cluster labels; pass them as "
+            "cov_kwds={'groups': groups} (or the equivalent cov_kwds={'clusters': "
+            "groups}, which the IV family uses)"
         )
     cov, n_groups = cov_cluster(
         Xw, rw, groups, bread=bread, ssc=settings, nobs=n_eff

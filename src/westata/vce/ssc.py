@@ -19,6 +19,7 @@ ones in Stata's ``[R] regress`` (Methods and formulas):
 
 from __future__ import annotations
 
+from westata.errors import ConsistencyError
 from westata.protocols import SSC
 
 DEFAULT_SSC = SSC()
@@ -67,7 +68,7 @@ def cluster_factor(nobs: float, k: int, n_groups: int, ssc: SSC | None) -> float
     factor = (nobs - 1.0) / (nobs - k)
     if settings.cluster_adj:
         if n_groups < 2:
-            raise ValueError(
+            raise ConsistencyError(
                 "cluster-robust covariance requires at least 2 groups; "
                 f"got {n_groups}"
             )

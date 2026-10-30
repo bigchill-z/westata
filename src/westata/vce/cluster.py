@@ -17,6 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from westata.errors import ConsistencyError
 from westata.protocols import SSC
 from westata.vce.ssc import cluster_factor
 
@@ -76,7 +77,12 @@ def cov_cluster(
 
     n_groups = int(codes.max()) + 1
     if n_groups < 2:
-        raise ValueError(
+        # ConsistencyError, not ValueError: the OTHER estimators already raise that for
+        # this exact situation (``discrete.py`` via its cluster check), so the same user
+        # error produced two different exception types and ``except WestataError`` caught
+        # only one of them. ConsistencyError is also a ValueError, so nothing that used to
+        # catch it stops working.
+        raise ConsistencyError(
             "cluster-robust covariance requires at least 2 groups; "
             f"got {n_groups}"
         )

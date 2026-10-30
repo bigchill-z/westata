@@ -1587,7 +1587,16 @@ def _density(kind: str, value: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         density = cdf * (1.0 - cdf)
         return density, density * (1.0 - 2.0 * cdf)
     density = stats.norm.pdf(value)
-    return density, -value * density
+    # ``-value * density`` warns "invalid value encountered in multiply" when ``value``
+    # holds +-inf: ``pdf(inf)`` is 0 and ``inf * 0`` is nan. The correct derivative at
+    # infinity is 0, and the identity ``phi'(z) = -z phi(z)`` holds in the limit, so the
+    # product is computed where it is finite and zeroed elsewhere. This reproduced for any
+    # ordered-PROBIT outcome (ologit's logistic branch does not hit it) and is what made a
+    # clean run emit a warning on correct numbers.
+    with np.errstate(invalid="ignore"):
+        derivative = -value * density
+    derivative = np.where(np.isfinite(derivative), derivative, 0.0)
+    return density, derivative
 
 
 def _cdf(kind: str, value: np.ndarray) -> np.ndarray:

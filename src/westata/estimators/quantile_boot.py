@@ -126,6 +126,17 @@ class Sqreg:
             ]
         )
 
+        # Resolve the seed HERE, not inside ``_bootstrap``, so the value actually used can be
+        # reported in ``e(seed)``. The comment in ``_bootstrap`` promises that an unseeded
+        # draw "picks a seed now and records it" -- it picked one but never recorded it, so
+        # an unseeded fit was unreproducible in practice: the numbers could not be obtained
+        # again. Recording it makes ``fit(reps=..., seed=r.e["seed"])`` reproduce a fit
+        # exactly, which is what Stata's ``c(seed)`` discipline gives a user who runs
+        # ``set seed``.
+        if seed is None:
+            seed = int(np.random.SeedSequence().entropy % (2**63))
+        seed = int(seed)
+
         replicates = self._bootstrap(reps=reps, seed=seed)
         covariance = np.cov(replicates, rowvar=False, ddof=1)
         covariance = np.atleast_2d(covariance)
@@ -146,6 +157,11 @@ class Sqreg:
             "df_r": float(n - k),
             "quantiles": list(self._quantiles),
             "reps": reps,
+            # The seed actually used, so an unseeded fit can be reproduced by passing it
+            # back to ``fit(seed=...)``. Stata does the same through ``c(seed)``. Without
+            # this the promise in ``_bootstrap``'s comment ("picks a seed now and records
+            # it") was not kept, and an unseeded draw could not be obtained twice.
+            "seed": seed,
             "rank": k * len(self._quantiles),
             "vce": "bootstrap",
         }
@@ -180,11 +196,9 @@ class Sqreg:
         # Stata's generator. `sqreg.ado` stores c(seed) and every draw comes from
         # MT19937-64, so numpy's default generator diverges from the first number.
         #
-        # With no seed given Stata uses its CURRENT seed (c(seed)), which is
-        # whatever the session happens to hold -- so a draw is reproducible only
-        # after `set seed`.  Mirroring that means picking a seed now and recording
-        # it, rather than silently fixing a constant (which would make every
-        # unseeded run identical, unlike Stata).
+        # The seed is resolved by the CALLER (``_fit``), not here, so that the value
+        # actually used can be reported in ``e(seed)`` and an unseeded draw can be
+        # reproduced. This function still tolerates ``None`` for direct callers.
         if seed is None:
             seed = int(np.random.SeedSequence().entropy % (2**63))
         generator = Mt19937_64(seed)

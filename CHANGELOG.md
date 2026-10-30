@@ -66,6 +66,54 @@ and the fix covers it fully.
 
 **Tests: 1995 → 2007 passing.**
 
+### Added — a complete bilingual API reference, generated from the code
+
+`docs/API.md` (English) and `docs/API.zh-CN.md` (中文), ~6,200 lines each, covering all 172
+public names: 126 exports, 34 result methods, 29 result properties, plus `StataResults` and
+`model_data`. Every entry gives the Stata command, a description in both languages, the
+signature, and a RUNNABLE example whose output is captured from an actual run.
+
+**Nothing mechanical is hand-written.** ``docs/collect_api_reference.py`` obtains signatures
+through ``inspect`` and executes every example through the same runner the tests use;
+``docs/render_api_reference.py`` merges that with the prose and emits both files. A name
+without prose renders with a visible warning rather than being dropped, so a half-written
+section looks half-written. ``--check`` reports missing prose, failing examples, unpaired
+caveats and duplicate keys before anything is rendered.
+
+That design is a direct response to this repository's own history: a README test count that
+lagged the suite, a Quick start that had never run, and ``e(aic)`` documented as a Stata macro
+when ``regress`` stores nothing of the sort. Generating the mechanical parts removes those
+failure modes; only the prose is reviewable, and it is checked for presence, pairing and
+non-stub-ness in both languages.
+
+**Writing it surfaced four library defects, all fixed.**
+
+A single-cluster clustered VCE raised ``ConsistencyError`` from ``logit`` but a plain
+``ValueError`` from OLS and IV — the same user error with two exception types, so
+``except WestataError`` caught only one. ``ConsistencyError`` now inherits
+``(WestataError, ValueError)``, following the precedent ``FormulaError`` already set:
+existing ``except ValueError`` callers are unaffected, and ``except WestataError`` finally
+catches the VCE refusals. The three sites now agree.
+
+``cov_kwds`` spelled the cluster labels differently per family — ``groups`` for OLS/ML,
+``clusters`` for IV, ``cluster`` for hdfe — and each rejected the others. Moving a call
+between families failed on the name. All three spellings are now accepted, through one
+accessor instead of four separate lookups.
+
+``OrderedProbit`` emitted ``invalid value encountered in multiply`` for any outcome: the
+normal-density derivative ``-z phi(z)`` becomes ``inf * 0`` at ``±inf``. The correct limit
+is 0, so the product is computed where finite and zeroed elsewhere.
+
+``e(seed)`` was never recorded for ``bsqreg``/``sqreg``, although the code's own comment
+promised the unseeded draw "picks a seed now and records it". An unseeded fit was therefore
+unreproducible — even by the person who had just run it. The seed is now resolved by the
+caller and stored, so ``fit(seed=result.e['seed'])`` replays a draw exactly, which is the
+guarantee Stata's ``c(seed)`` discipline gives.
+
+**Tests: 3715 → 3742 passing** (18 of them check that the manual stays in sync: every
+example executes, every name has a section, no unresolved warnings, caveats paired across
+languages, Chinese not a stub).
+
 ### Added — the display layer brought in line with captured Stata output, and a copied error removed
 
 **Three rendering defects, all found by comparing against committed captures rather than

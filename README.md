@@ -45,7 +45,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **3715 passing** |
+| Tests | **3742 passing** |
 | Commands covered | 93 registry entries |
 | Evidence | **52 × E3**, 26 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
@@ -301,6 +301,12 @@ docs/              design spec and implementation plans
 
 ## Documentation
 
+- **Complete API reference**: [`docs/API.md`](docs/API.md) (English) and
+  [`docs/API.zh-CN.md`](docs/API.zh-CN.md) (中文) — all 172 public names, each with the
+  Stata command it corresponds to, a description, and a runnable example whose output is
+  captured from a real run. Both files are generated from the code
+  ([`docs/render_api_reference.py`](docs/render_api_reference.py)), so signatures and
+  example outputs cannot drift from it.
 - **Comparing westata with Stata**: [`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md) —
   which quantities are interchangeable and which are not, for the four E2 commands.
 - Evidence registry: [`tests/conformance/registry.yml`](tests/conformance/registry.yml) —

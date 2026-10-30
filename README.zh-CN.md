@@ -36,7 +36,7 @@ Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 
 | | |
 |---|---|
-| 测试 | **3715 通过** |
+| 测试 | **3742 通过** |
 | 覆盖命令 | 93 条注册条目 |
 | 证据等级 | **52 × E3**，26 × E2，15 × E1 |
 | 独立复测 | 386 个对照点，对真实 Stata 运行（`retest/`） |
@@ -216,7 +216,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              3715 个测试，不需要 Stata 授权
+tests/              3742 个测试，不需要 Stata 授权
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```
@@ -225,6 +225,8 @@ docs/               GUIDE.md、对照数据、生成脚本
 
 | 文件 | 内容 |
 |---|---|
+| [docs/API.zh-CN.md](docs/API.zh-CN.md) | **完整 API 参考**：全部 172 个公开名称，逐项给出对应 Stata 指令、功能说明与真实运行的示例输出 |
+| [docs/API.md](docs/API.md) | 同上，英文版 |
 | [docs/GUIDE.md](docs/GUIDE.md) | 完整使用指南：命令映射、逐参数对照、已知偏差（英文） |
 | [docs/GAP_REGISTER.md](docs/GAP_REGISTER.md) | 每个未解决差异的排查记录与结论 |
 | [docs/USING_WITH_STATA.md](docs/USING_WITH_STATA.md) | 哪些量与 Stata 可互换，哪些不可 |

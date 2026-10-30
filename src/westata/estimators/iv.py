@@ -709,11 +709,19 @@ class IV2SLS:
                 )
             return None
 
+        # Accept BOTH spellings, for the same reason ``vce/dispatch.py`` does: Stata's
+        # option is ``vce(cluster clustvar)``, so ``clusters`` reads naturally, but the
+        # OLS/ML family takes ``groups``. Before this, moving a call between families
+        # failed with "requires cov_kwds['clusters']" while the caller had supplied
+        # perfectly good labels under the other name.
         clusters = kwds.pop("clusters", None)
         if clusters is None:
+            clusters = kwds.pop("groups", None)
+        if clusters is None:
             raise ValueError(
-                "cov_type='cluster' requires cov_kwds['clusters']; pass the "
-                "cluster labels as cov_kwds={'clusters': labels}"
+                "cov_type='cluster' requires the cluster labels; pass them as "
+                "cov_kwds={'clusters': labels} (or the equivalent "
+                "cov_kwds={'groups': labels})"
             )
         if kwds:
             raise ValueError(
@@ -841,7 +849,11 @@ class IV2SLS:
         if canonical == "cluster":
             n_groups = int(np.unique(np.asarray(clusters)).size)
             if n_groups < 2:
-                raise ValueError(
+                # ConsistencyError for the same reason as ``vce/cluster.py``: the other
+                # estimators already refused this with that class, so one user error had
+                # two exception types. It is also a ValueError, so ``except ValueError``
+                # callers are unaffected.
+                raise ConsistencyError(
                     "cluster-robust covariance requires at least 2 groups; "
                     f"got {n_groups}"
                 )

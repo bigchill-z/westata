@@ -1,0 +1,427 @@
+{
+  "_readme": [
+    "Hand-written prose for the API reference. Keys are export names from api_data.json.",
+    "Fields: stata = the Stata command this corresponds to; en/zh = one-paragraph description;",
+    "example = a runnable Python EXPRESSION evaluated against the collector's frames",
+    "(base frame is available as `base`; ws/np/pd are in scope).",
+    "notes_en/notes_zh = caveats worth stating; omit when there is nothing to warn about.",
+    "Every example here is EXECUTED by collect_api_reference.py -- if it raises, the manual",
+    "shows the error rather than hiding it, so a broken example is visible.",
+    "This file covers the CORE surface: the fitted result's properties, the error types,",
+    "the weight/expression support types, and the objects the postestimation commands return."
+  ],
+  "estat_ic": {
+    "stata": "estat ic",
+    "en": "Information criteria for one fitted model. Prints AIC and BIC computed from the log-likelihood and the parameter count, following `estimates.ado:985-1002`. Unlike the `e(aic)` macro -- which several commands do not store at all, and which `regress` stores on a different scale -- this is the surface that matches what Stata's `estat ic` prints.",
+    "zh": "单个已拟合模型的信息准则。依据 `estimates.ado:985-1002`，由对数似然与参数个数计算 AIC 与 BIC 并打印。与 `e(aic)` 宏不同——若干命令根本不存该宏，而 `regress` 存的还在另一个尺度上——本函数才是与 Stata `estat ic` 输出一致的入口。",
+    "example": "ws.estat_ic(ws.OLS.from_formula('y ~ x1 + x2', base).fit())",
+    "notes_en": "`regress` stores no `e(aic)`; this function computes the criterion on demand, so it works there anyway.",
+    "notes_zh": "`regress` 不存 `e(aic)`；本函数按需计算，因此在那里同样可用。"
+  },
+  "margins": {
+    "stata": "margins, dydx(x1) at(x2=0)",
+    "en": "Marginal effects and predictive margins. Supports the derivative forms Stata spells `dydx`, `eyex`, `dyex` and `eydx`, plus `at()` for fixing covariates and `over()` for group-wise margins. After a discrete-choice fit the derivative is taken on the response scale, which is what Stata's `margins` does -- the linear-index derivative would be a different quantity.",
+    "zh": "边际效应与预测边际。支持 Stata 的 `dydx`、`eyex`、`dyex`、`eydx` 四种导数形式，以及 `at()` 固定协变量、`over()` 分组。拟合离散选择模型后在响应尺度上求导，这与 Stata `margins` 一致——线性指数上的导数会是另一个量。",
+    "example": "ws.margins(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), dydx='x1', at={'x2': 0.0})",
+    "notes_en": "Which prediction types `margins` may use is declared by the command itself in `e(marginsok)`/`e(marginsnotok)`; a type the command forbids is refused rather than silently computed.",
+    "notes_zh": "`margins` 可用哪些预测类型由命令自身通过 `e(marginsok)`/`e(marginsnotok)` 声明；被命令禁止的类型会被拒绝，而不是静默计算。"
+  },
+  "params": {
+    "stata": "regress -- the `Coef.` column, i.e. `e(b)`",
+    "en": "Point estimates as a `pandas.Series` indexed by `param_names`, in the column order the design matrix was built with. That order is patsy's, which puts the constant FIRST (`Intercept`), whereas Stata's `e(b)` puts `_cons` LAST; the two vectors hold the same numbers in a different order. Use `stata_params` when the comparison is against Stata's `e(b)`.",
+    "zh": "点估计值，以 `param_names` 为索引的 `pandas.Series`，顺序与构建设计矩阵时的列序一致。该顺序是 patsy 的顺序，常数项排在最前（`Intercept`），而 Stata 的 `e(b)` 把 `_cons` 排在最后；两个向量数值相同但顺序不同。要与 Stata 的 `e(b)` 对比时请用 `stata_params`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.params"
+  },
+  "bse": {
+    "stata": "regress -- the `Std. err.` column",
+    "en": "Standard errors, the square roots of the diagonal of the covariance matrix that `cov_type` selected. They are computed once at construction from `cov`, so a caller who changes the covariance afterwards does not change `bse`.",
+    "zh": "标准误，即 `cov_type` 所选协方差矩阵对角线的平方根。它在构造时由 `cov` 一次算出，因此之后改动协方差不会改变 `bse`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.bse"
+  },
+  "pvalues": {
+    "stata": "regress -- the `P>|t|` column; logit -- the `P>|z|` column",
+    "en": "Two-sided p-values for the null that each coefficient is zero. The reference distribution follows `dist`: Student t with `df_resid` degrees of freedom when `dist` is `\"t\"`, the standard normal when it is `\"z\"`. A model whose `df_resid` is `G - 1` from a clustered VCE therefore uses that count, not `nobs - k`.",
+    "zh": "各系数为零这一原假设的双侧 p 值。参照分布由 `dist` 决定：`dist` 为 `\"t\"` 时用自由度为 `df_resid` 的 Student t 分布，为 `\"z\"` 时用标准正态分布。因此聚类 VCE 下 `df_resid` 为 `G - 1` 的模型用的是该计数，而不是 `nobs - k`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.pvalues"
+  },
+  "tvalues": {
+    "stata": "regress -- the `t` column",
+    "en": "The coefficient divided by its standard error, always named `tvalues` even for a z-based model. It is the test statistic, not a t statistic as such: for a logit fit the same numbers are the z statistics Stata prints. `zvalues` is the same object under the name the distribution calls for.",
+    "zh": "系数除以其标准误，即便对基于 z 的模型也始终命名为 `tvalues`。它是检验统计量，而非严格意义上的 t 统计量：对 logit 拟合，这些数字就是 Stata 打印的 z 值。`zvalues` 是同一对象，只是用了分布所对应的名字。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.tvalues"
+  },
+  "zvalues": {
+    "stata": "logit, probit, poisson -- the `z` column",
+    "en": "The normal statistic for the null that a coefficient is zero. It is numerically identical to `tvalues` -- both are `params / bse` -- and is exposed under this name so downstream code can branch on the inference distribution without recomputing it. It is an alias, not an independent calculation, so the Series it returns still carries the name `tvalues`.",
+    "zh": "系数为零这一原假设的正态统计量。它与 `tvalues` 在数值上完全相同（两者都是 `params / bse`），之所以以这个名字暴露，是为了让下游代码能按推断分布分支而无需重算。它是别名而非独立计算，因此返回的 Series 仍带有 `tvalues` 这个名字。",
+    "example": "r = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr.zvalues"
+  },
+  "fvalue": {
+    "stata": "regress -- the `F(k, n-k)` model test",
+    "en": "The model's joint F statistic, read from `e(F)`; NaN when the command does not store it. Likelihood-based commands report a chi-square model test instead, stored as `e(chi2)`, so `fvalue` is NaN after a logit or Poisson fit -- that is the correct absence, not a missing calculation.",
+    "zh": "模型的联合 F 统计量，取自 `e(F)`；命令不存该宏时为 NaN。基于似然的命令改报卡方模型检验，存为 `e(chi2)`，因此 logit 或 Poisson 拟合后 `fvalue` 是 NaN——这是正确的“不存在”，而非漏算。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.fvalue"
+  },
+  "llf": {
+    "stata": "e(ll) -- the log-likelihood",
+    "en": "The maximised log-likelihood, read from `e(ll)`; NaN when the command does not record it. It is the number `estat ic` and `lrtest` build their statistics from, so a fit that reports NaN here cannot support either of them.",
+    "zh": "最大化对数似然，取自 `e(ll)`；命令不记录该宏时为 NaN。`estat ic` 与 `lrtest` 的统计量都由这个数构成，因此此处报 NaN 的拟合无法支撑这两者。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.llf"
+  },
+  "aic": {
+    "stata": "e(aic) -- note that `estat ic` is the surface that matches Stata's printed table",
+    "en": "AIC read from `e(aic)`; NaN when the command does not record it. For `regress` this is NOT the number `estat ic` prints: `regress` stores no AIC at all, and the value exposed here is on the Gaussian-deviance scale, `N log(rss/N) + 2k`, which is a different quantity from the likelihood-scale `-2 logL + 2k`. For commands that do store `e(aic)` the two agree.",
+    "zh": "取自 `e(aic)` 的 AIC；命令不记录该宏时为 NaN。对 `regress` 而言这不是 `estat ic` 打印的那个数：`regress` 根本不存 AIC，此处暴露的值在正态偏差尺度上，即 `N log(rss/N) + 2k`，与似然尺度的 `-2 logL + 2k` 是不同的量。对确实存 `e(aic)` 的命令，两者一致。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\n(r.aic, ws.estat_ic(r).aic)",
+    "notes_en": "Do not compare `result.aic` against `estat ic` output for a `regress` fit; they are on different scales. `e(_aic_is_stata)` records which sense applies, and the summary table prints AIC only when that flag says the value is Stata's.",
+    "notes_zh": "不要把 `result.aic` 与 `regress` 拟合的 `estat ic` 输出相比；两者尺度不同。`e(_aic_is_stata)` 记录适用的是哪一种含义，摘要表仅在该标志表明该值即 Stata 的值时才打印 AIC。"
+  },
+  "bic": {
+    "stata": "e(bic) -- with the same caveat as `aic`",
+    "en": "BIC read from `e(bic)`; NaN when the command does not record it. The same scale caveat as `aic` applies: after `regress` the stored value is the Gaussian-deviance `N log(rss/N) + k log(N)`, not the likelihood-scale criterion `estat ic` prints.",
+    "zh": "取自 `e(bic)` 的 BIC；命令不记录该宏时为 NaN。`aic` 的尺度注意事项同样适用：`regress` 之后存的值是正态偏差形式 `N log(rss/N) + k log(N)`，而非 `estat ic` 打印的似然尺度准则。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\n(r.bic, ws.estat_ic(r).bic)"
+  },
+  "nobs": {
+    "stata": "e(N) / the `Number of obs` line",
+    "en": "The number of ROWS in the estimation sample, as an integer. It is deliberately not `e(N)` under frequency weights: with `fweight` the rows are replication counts, so `e(N)` becomes `sum(w)` while `nobs` stays the row count. Use `result.e['N']` for the effective sample size.",
+    "zh": "估计样本的行数，为整数。在频数权重下它刻意不等于 `e(N)`：使用 `fweight` 时行是重复计数，因此 `e(N)` 变为 `sum(w)`，而 `nobs` 仍是行数。有效样本量请用 `result.e['N']`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\n(r.nobs, r.e['N'])"
+  },
+  "df_model": {
+    "stata": "e(df_m) -- model degrees of freedom",
+    "en": "Model degrees of freedom, i.e. the number of restrictions the model test imposes: the regressors excluding the constant. It is read from `e(df_m)`, so for a one-regressor model it is 1, not 2, even though the coefficient vector has two entries.",
+    "zh": "模型自由度，即模型检验施加的约束个数：不含常数项的回归元个数。它取自 `e(df_m)`，因此单回归元模型的值为 1 而非 2，尽管系数向量有两个元素。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.df_model"
+  },
+  "df_resid": {
+    "stata": "e(df_r) -- residual degrees of freedom",
+    "en": "The denominator degrees of freedom the reference distribution uses. It is NOT always `nobs - k`: for a clustered VCE it is `G - 1`, the number of clusters minus one. This property returns the value the estimator computed at fit time; `e(df_r)` is a separate matter, because that macro is only present for non-z models (or when an estimator such as `tobit` or `xtivreg` supplied it explicitly), so a logit fit has a `df_resid` here and no `e(df_r)`.",
+    "zh": "参照分布使用的分母自由度。它并不总是 `nobs - k`：聚类 VCE 下为 `G - 1`，即聚类数减一。本属性返回估计器在拟合时算出的值；`e(df_r)` 是另一回事，因为该宏只对非 z 模型存在（或由 `tobit`、`xtivreg` 等估计器显式提供），因此 logit 拟合在这里有 `df_resid`，却没有 `e(df_r)`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': base['firm']})\n(r.df_resid, r.cov_type)"
+  },
+  "dist": {
+    "stata": "(no Stata equivalent -- Stata picks t or z per command and stores it in e() indirectly)",
+    "en": "Which reference distribution inference uses: `\"t\"` for t statistics and t confidence intervals, `\"z\"` for normal tests. It is decided by the estimator, not by the caller, and it is what `pvalues` and `conf_int` branch on. A linear fit reports `t`; logit, probit and the count models report `z`.",
+    "zh": "推断所使用的参照分布：`\"t\"` 表示 t 统计量与 t 置信区间，`\"z\"` 表示正态检验。它由估计器而非调用者决定，`pvalues` 与 `conf_int` 正是据此分支。线性拟合报 `t`；logit、probit 与计数模型报 `z`。",
+    "example": "r = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr.dist"
+  },
+  "model_name": {
+    "stata": "e(cmd) -- the command name, e.g. `regress`",
+    "en": "The Stata command name of the estimator that produced the result -- `regress`, `logit`, `reghdfe` and so on -- which is also the label the summary prints. When the estimator did not record `e(cmd)`, this value is used to synthesise it, so `result.e['cmd']` is always available even though Stata always stores it.",
+    "zh": "产生该结果的估计器对应的 Stata 命令名——`regress`、`logit`、`reghdfe` 等——它同时也是摘要打印的标签。估计器未记录 `e(cmd)` 时，用该值合成，因此 `result.e['cmd']` 总是可用，尽管 Stata 本身总是会存它。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.model_name"
+  },
+  "cov_type": {
+    "stata": "e(vce) / e(vcetype) -- the `Covariance Type` line of the summary",
+    "en": "Label of the covariance estimator that was used, kept for display and auditing: `nonrobust` by default, `HC1` for heteroskedasticity-robust, `cluster` for clustered. It is a recorded label, not a switch; changing it after the fact changes nothing, because the matrix itself was built at fit time.",
+    "zh": "所用协方差估计器的标签，用于展示与审计：默认 `nonrobust`，异方差稳健为 `HC1`，聚类为 `cluster`。它是记录下来的标签而非开关，事后修改不会改变任何东西，因为矩阵本身在拟合时已构建完成。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit(cov_type='HC1')\nr.cov_type"
+  },
+  "cov": {
+    "stata": "e(V) -- the coefficient covariance matrix",
+    "en": "The coefficient covariance matrix as a `k x k` numpy array, already carrying every small-sample correction that was requested. It is the same object `cov_params()` returns; `cov_params()` exists only so statsmodels-compatible code that calls a method finds one. Order follows `param_names`, so it is patsy's order, not Stata's `e(V)` order.",
+    "zh": "系数协方差矩阵，为 `k x k` 的 numpy 数组，已包含所请求的全部小样本修正。它与 `cov_params()` 返回的是同一对象；`cov_params()` 的存在只是为了满足按方法调用的 statsmodels 兼容代码。顺序遵循 `param_names`，即 patsy 顺序，而非 Stata 的 `e(V)` 顺序。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nnp.round(r.cov, 4)"
+  },
+  "e": {
+    "stata": "e() -- the stored estimation results",
+    "en": "The Stata `e()` macros as a dictionary-like object with BOTH item and attribute access. Item access keeps normal mapping semantics and raises `KeyError` for a macro the command did not store; attribute access is deliberately forgiving and returns `None` instead. The key set DIFFERS PER COMMAND -- assuming uniformity is exactly how invented keys get added to a manual: `regress` stores no `aic` on the `estat ic` scale and `tobit` stores no `aic` at all.",
+    "zh": "以字典式对象提供的 Stata `e()` 宏，同时支持下标与属性访问。下标访问保持普通映射语义，命令未存的宏会抛 `KeyError`；属性访问则刻意宽容，返回 `None`。键集逐命令不同——假定它统一，正是手册里凭空多出键的原因：`regress` 在 `estat ic` 尺度上不存 `aic`，`tobit` 则根本不存 `aic`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nsorted(r.e)",
+    "notes_en": "Two macros are synthesised because every command documents them: `e(depvar)` from the response name and `e(cmd)` from `model_name`. `e(cmdline)` is deliberately NOT synthesised -- it records the command as typed, options included, and this package has no such string, so inventing one would fabricate a value.",
+    "notes_zh": "有两个宏是合成出来的，因为每条命令都记录它们：`e(depvar)` 取自响应变量名，`e(cmd)` 取自 `model_name`。`e(cmdline)` 刻意不合成——它记录的是用户键入的原样命令（含选项），本包没有该字符串，编造一个即为伪造值。"
+  },
+  "fittedvalues": {
+    "stata": "predict, xb -- the linear prediction",
+    "en": "The fitted values on the estimation sample, a numpy array of length `nobs` in row order. For weighted fits these are the predictions of the weighted least-squares problem, not weighted fitted values. `predict(kind='xb')` recomputes the same quantity from the retained design matrix, which is what to use for out-of-sample data.",
+    "zh": "估计样本上的拟合值，长度为 `nobs`、按行序排列的 numpy 数组。加权拟合时它们是加权最小二乘问题的预测值，而非加权后的拟合值。`predict(kind='xb')` 会从保留下来的设计矩阵重算同一个量，样本外数据应改用该入口。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.fittedvalues[:5]"
+  },
+  "resid": {
+    "stata": "predict, residuals -- the residuals",
+    "en": "Residuals on the estimation sample, `y - fittedvalues`, a numpy array of length `nobs`. They are raw residuals, not standardised or studentised ones, and for weighted fits they are the raw deviations rather than the weighted residuals.",
+    "zh": "估计样本上的残差，即 `y - fittedvalues`，长度为 `nobs` 的 numpy 数组。它们是原始残差，而非标准化或学生化残差；加权拟合时它们是原始离差，而非加权残差。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.resid[:5]"
+  },
+  "param_names": {
+    "stata": "row names of e(b) -- but in patsy spelling and order",
+    "en": "The coefficient names, in coefficient order, as a list of strings. The spelling is patsy's: `Intercept` first, factor levels as `foreign[T.Foreign]`, interactions with `:`. Stata spells these `_cons` last, `foreign` for a bare dummy, and `#` for interactions; `stata_param_names` performs that translation.",
+    "zh": "系数名，按系数顺序排列的字符串列表。拼写是 patsy 的：`Intercept` 在前，因子水平写作 `foreign[T.Foreign]`，交互项用 `:`。Stata 则把 `_cons` 排在最后、裸哑变量写作 `foreign`、交互项用 `#`；`stata_param_names` 负责该转换。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.param_names"
+  },
+  "rsquared": {
+    "stata": "e(r2)",
+    "en": "R-squared read from `e(r2)`; NaN when the command does not record it. This exists for the OLS family; the maximum-likelihood families store a pseudo R-squared in `e(r2_p)` instead and leave this NaN, so a NaN here means \"this model has no R-squared\", not a failed computation. Read `e['r2_p']` for logit, probit and the count models.",
+    "zh": "取自 `e(r2)` 的 R²；命令不记录该宏时为 NaN。它属于 OLS 一族；极大似然族改在 `e(r2_p)` 中存伪 R²，此处留作 NaN，因此这里的 NaN 表示“该模型没有 R²”，而非计算失败。logit、probit 与计数模型请读 `e['r2_p']`。",
+    "example": "ols = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nlg = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\n((ols.rsquared, lg.rsquared), lg.e['r2_p'])"
+  },
+  "rsquared_adj": {
+    "stata": "e(r2_a)",
+    "en": "Adjusted R-squared read from `e(r2_a)`; NaN when the command does not record it. Like `rsquared` it belongs to the linear family, and the degrees-of-freedom adjustment uses the effective sample size, so a frequency-weighted fit corrects by `sum(w)` rather than by the row count.",
+    "zh": "取自 `e(r2_a)` 的调整 R²；命令不记录该宏时为 NaN。与 `rsquared` 一样它属于线性族，其自由度修正使用有效样本量，因此频数加权拟合按 `sum(w)` 而非行数修正。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.rsquared_adj"
+  },
+  "stata_param_names": {
+    "stata": "the row names of e(b) as Stata spells and orders them",
+    "en": "Coefficient names in Stata's `e(b)` order and spelling: regressors first, then `_cons` LAST, then auxiliary parameters such as `cut1` or `lnalpha`. `Intercept` becomes `_cons`, a bare factor column takes the variable name without the level, `:` becomes `#`, and a leading `/` is dropped. Raises `NotImplementedError` for an explicit `C(...)` factor, where Stata has one row per level plus a zero base row and no one-to-one mapping exists.",
+    "zh": "按 Stata 的 `e(b)` 顺序与拼写给出的系数名：先是回归元，然后 `_cons` 在最后，最后是 `cut1` 或 `lnalpha` 等辅助参数。`Intercept` 变为 `_cons`，裸因子列取变量名而省略水平，`:` 变 `#`，前导 `/` 被去掉。对显式 `C(...)` 因子会抛 `NotImplementedError`，因为 Stata 为每个水平给一行再加一行零基准，不存在一一映射。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\n(r.param_names, r.stata_param_names)"
+  },
+  "stata_params": {
+    "stata": "e(b)",
+    "en": "The coefficient vector permuted into Stata's `e(b)` order and spelling: `_cons` last instead of first, factor and interaction names rewritten. It is a property, not a method -- write `r.stata_params`, not `r.stata_params()`. The numbers are identical to `params`, only the order and the labels differ, and this is the view to compare against a Stata fixture.",
+    "zh": "重排为 Stata `e(b)` 顺序与拼写的系数向量：`_cons` 移到末尾而非开头，因子与交互项名称重写。它是属性而非方法——写 `r.stata_params`，不要写 `r.stata_params()`。数值与 `params` 完全相同，只是顺序与标签不同，与 Stata fixture 对比时应用此视图。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.stata_params"
+  },
+  "stata_cov_params": {
+    "stata": "e(V)",
+    "en": "The covariance matrix permuted by the same ordering as `stata_params`, as a numpy array. It surfaces the same refusal as the names for an ambiguous factor term, so a caller cannot receive a matrix whose rows silently disagree with Stata's. Use this rather than `cov` when the comparison target is Stata's `e(V)`.",
+    "zh": "按与 `stata_params` 相同的顺序重排后的协方差矩阵，为 numpy 数组。对含义不明确的因子项，它抛出与名称访问相同的拒绝，因此调用者不会拿到一个行序与 Stata 静默不一致的矩阵。比较对象是 Stata 的 `e(V)` 时请用它而非 `cov`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nnp.round(r.stata_cov_params, 4)"
+  },
+  "stata_factor_terms": {
+    "stata": "i.<var> -- the explicit factor expansion in a varlist",
+    "en": "The factor terms whose Stata `e(b)` spelling cannot be reconstructed, as a sorted list; empty when every coefficient has an unambiguous Stata spelling. Stata expands an explicit `i.foreign` into one row per level plus an explicit zero base row (`0b.foreign`), while this package has a single level column, so there is no one-to-one mapping. A bare binary column is NOT reported here, because Stata names its single row after the variable.",
+    "zh": "无法重建其 Stata `e(b)` 拼写的因子项，为排序后的列表；当每个系数都有明确的 Stata 拼写时为空。Stata 把显式 `i.foreign` 展开为每个水平一行再加一行显式零基准（`0b.foreign`），而本包只有一个水平列，故不存在一一映射。裸二元列不会出现在此，因为 Stata 用变量名为其单独一行命名。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()\nr.stata_factor_terms",
+    "notes_en": "Non-empty here means `stata_param_names`, `stata_params` and `stata_cov_params` all raise `NotImplementedError` on this result; compare with `params`/`bse`, or encode the factor as dummies and refit.",
+    "notes_zh": "此处非空意味着该结果上的 `stata_param_names`、`stata_params` 与 `stata_cov_params` 都会抛 `NotImplementedError`；请改用 `params`/`bse` 对比，或把因子编码为哑变量后重新拟合。"
+  },
+  "converged": {
+    "stata": "e(converged) -- 1 if the optimizer converged",
+    "en": "Whether the optimizer reported convergence, read from `e(converged)`. An ABSENT macro is reported as `True` rather than `False`, because it means the estimator runs no iterative optimizer at all -- a closed-form fit has nothing to fail to converge. So `True` has two senses here: \"converged\" for an ML fit and \"not applicable\" for OLS.",
+    "zh": "优化器是否报告收敛，取自 `e(converged)`。该宏缺失时报 `True` 而非 `False`：缺失意味着估计器根本不跑迭代优化，闭式解没有“收敛失败”可言。因此 `True` 在此有两种含义：对 ML 拟合是“已收敛”，对 OLS 是“不适用”。",
+    "example": "r = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\n(r.converged, r.iterations, r.grad_norm)"
+  },
+  "iterations": {
+    "stata": "e(ic) -- the number of iterations",
+    "en": "The number of optimizer iterations, read from `e(ic)`, which the help files document as the iteration count. NaN when the estimator is not iterative or the backend reported no count. It is a float, not an int, so a non-iterative fit can be distinguished from a fit that converged in zero iterations.",
+    "zh": "优化器迭代次数，取自 `e(ic)`；帮助文件将该宏说明为迭代次数。估计器非迭代或后端未报告计数时为 NaN。它是浮点数而非整数，因此非迭代拟合可以与“零次迭代即收敛”的拟合区分开。",
+    "example": "r = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr.iterations"
+  },
+  "grad_norm": {
+    "stata": "e(gradient_norm) -- the norm of the gradient at the reported estimate",
+    "en": "The norm of the gradient at the reported estimate, read from `e(gradient_norm)`. A small value is the numeric counterpart of `converged`: the optimizer stops when this is near zero. It is NaN whenever the backend does not report it, DELIBERATELY, because `0.0` would read as \"exactly converged\" and a caller cannot distinguish that from unavailable data.",
+    "zh": "所报告估计值处的梯度范数，取自 `e(gradient_norm)`。数值很小是 `converged` 的数值对应物：优化器在它接近零时停止。后端未报告时它一律为 NaN，这是刻意的，因为 `0.0` 会被读作“精确收敛”，调用者将无法把它与“数据不可得”区分开。",
+    "example": "r = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr.grad_norm"
+  },
+  "StataResults": {
+    "stata": "(the object every estimation command returns, analogous to Stata's e() results)",
+    "en": "The object returned by every `fit()`. It carries a statsmodels-compatible surface (`params`, `bse`, `pvalues`, `conf_int`, `cov_params`), the Stata `e()` macros as a dictionary, and the postestimation commands as methods -- `test`, `lincom`, `margins`, `predict`, and the twenty `estat_*` forwarders. This is where most day-to-day work happens after a fit.",
+    "zh": "每个 `fit()` 返回的对象。它带有 statsmodels 兼容接口（`params`、`bse`、`pvalues`、`conf_int`、`cov_params`）、以字典形式提供的 Stata `e()` 宏，以及作为方法提供的后估计命令——`test`、`lincom`、`margins`、`predict` 和二十个 `estat_*` 转发器。拟合之后的日常工作大多在这里完成。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.e['r2']",
+    "notes_en": "The `e()` key set differs per command; it is not uniform, and assuming otherwise is how invented keys get added. `e(ic)`, `e(aic)` and `e(title)` are each present for some commands and absent for others.",
+    "notes_zh": "`e()` 的键集逐命令不同，并不统一；假定它统一正是凭空添加键的来源。`e(ic)`、`e(aic)`、`e(title)` 都是某些命令有、某些命令没有。"
+  },
+  "WestataError": {
+    "stata": "(no Stata equivalent -- an exception base class)",
+    "en": "The base class of every westata-specific failure. Catching it handles the whole family at once: `ConsistencyError`, `ConvergenceError`, `WeightError`, `FormulaError` and `UnsupportedError` all subclass it, so a caller who only wants to separate westata's own refusals from numpy or pandas errors can catch this one name. It does not catch `ValueError` raised for plain bad arguments -- but two of its subclasses, `ConsistencyError` and `FormulaError`, are themselves `ValueError`s, so `except WestataError` does catch every VCE and formula refusal even though generic type errors still escape it.",
+    "zh": "本包所有专有失败的基类。捕获它即可一次性覆盖整个家族：`ConsistencyError`、`ConvergenceError`、`WeightError`、`FormulaError` 与 `UnsupportedError` 都是它的子类，因此只想把本包自身的拒绝与 numpy/pandas 的错误区分开的调用者，捕获这一个名字即可。它不会捕获对普通错误参数抛出的 `ValueError`——但它的两个子类 `ConsistencyError` 与 `FormulaError` 本身就是 `ValueError`，因此 `except WestataError` 会捕获所有 VCE 与公式拒绝，而一般类型错误仍会逃出。",
+    "example": "[c.__name__ for c in (ws.ConsistencyError, ws.ConvergenceError, ws.WeightError, ws.FormulaError, ws.UnsupportedError) if issubclass(c, ws.WestataError)]"
+  },
+  "ConsistencyError": {
+    "stata": "(no Stata equivalent -- Stata refuses with return codes such as r(498) or r(2000))",
+    "en": "Raised when a result could not be guaranteed Stata-conformant, so the package refuses instead of returning a number it knows may diverge. This is the deliberate-failure channel: a clustered VCE with fewer than two clusters, an unidentified IV model, an `lrtest` between two models with the same parameter count, a `pweight` fit with a nonrobust covariance. The message states what diverged, so the refusal is auditable rather than mysterious. It is ALSO a `ValueError`, deliberately, so `except ValueError` continues to catch it while `except WestataError` now catches the VCE refusals too -- those two bases are what let one user error carry one exception type across OLS, logit and the IV estimators instead of two.",
+    "zh": "当结果无法保证与 Stata 一致时抛出，本包选择拒绝，而不是返回一个它知道可能偏离的数字。这是刻意的失败通道：聚类数少于两个的聚类 VCE、不可识别的 IV 模型、参数个数相同的两个模型之间的 `lrtest`、`pweight` 拟合配非稳健协方差。消息会说明哪里不一致，因此该拒绝是可审计的而非莫名的。它同时刻意是 `ValueError`：`except ValueError` 仍能捕获它，而 `except WestataError` 现在也能捕获 VCE 的拒绝——正是这两个基类，使同一个用户错误在 OLS、logit 与各 IV 估计器上只对应一个异常类型，而不是两个。",
+    "example": "msg = None\ntry:\n    r = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': np.zeros(len(base), dtype=int)})\nexcept ws.WestataError as exc:\n    msg = (type(exc).__name__, isinstance(exc, ValueError))\nmsg",
+    "notes_en": "`cov_kwds` key names are NOT uniform: OLS and the ML estimators take `{'groups': labels}`, while the IV estimators take `{'clusters': labels}` and reject `groups` as an unexpected entry. Pass the key the estimator documents, or the error you get will be about the kwds name rather than about your clusters.",
+    "notes_zh": "`cov_kwds` 的键名并不统一：OLS 与各 ML 估计器用 `{'groups': 标签}`，而各 IV 估计器用 `{'clusters': 标签}`，会把 `groups` 当作多余条目拒绝。请按所使用估计器的文档传键，否则你拿到的错误将关于 kwds 名称而非你的聚类。"
+  },
+  "ConvergenceError": {
+    "stata": "(no Stata equivalent -- Stata reports `convergence not achieved` and returns estimates, r(430))",
+    "en": "Raised when an iterative estimator does not converge and the caller asked for a hard failure via `strict=True`. The default is `strict=False`, which returns the estimates anyway and records `converged=False`, matching Stata's behaviour of reporting non-convergence and keeping the estimates. Pass `strict=True` when an unconverged estimate is worse than no estimate.",
+    "zh": "当迭代估计器未收敛、且调用者通过 `strict=True` 要求硬失败时抛出。默认是 `strict=False`，此时仍返回估计值并记录 `converged=False`，与 Stata 报告未收敛却保留估计值的行为一致。当未收敛的估计比没有估计更糟时，请传 `strict=True`。",
+    "example": "msg = None\ntry:\n    ws.Logit.from_formula('yb ~ x1 + x2', base).fit(maxiter=1, strict=True)\nexcept ws.ConvergenceError as exc:\n    msg = str(exc)\nmsg"
+  },
+  "FormulaError": {
+    "stata": "(no Stata equivalent -- Stata raises r(111) for an unknown variable)",
+    "en": "Raised when a model formula cannot be evaluated on the given data: an unknown column, a malformed term, a factor that does not exist. It wraps patsy's own error as a plain exception rather than letting `PatsyError` escape, because patsy keeps a namespace object in the traceback frame and several formatters -- pytest's included -- fail while introspecting it, hiding the real message. Like `ConsistencyError` it subclasses `ValueError` as well as `WestataError`, so generic argument-error handling still catches it.",
+    "zh": "当模型公式无法在给定数据上求值时抛出：未知列、畸形项、不存在的因子。它把 patsy 自身的错误包装成普通异常，而不让 `PatsyError` 逃出，因为 patsy 会在回溯帧中保留命名空间对象，若干格式化器（包括 pytest 的）在自省它时会失败，从而掩盖真正的消息。与 `ConsistencyError` 一样，它既是 `WestataError` 的子类也是 `ValueError` 的子类，因此通用的参数错误处理仍能捕获它。",
+    "example": "msg = None\ntry:\n    ws.OLS.from_formula('y ~ nosuchcolumn', base)\nexcept ws.FormulaError as exc:\n    msg = str(exc).splitlines()[0]\nmsg"
+  },
+  "UnsupportedError": {
+    "stata": "(no Stata equivalent -- this means Stata CAN do it and westata cannot yet)",
+    "en": "Raised when a capability exists in Stata but is not implemented here -- the distinction from `ConsistencyError` matters. It also subclasses `NotImplementedError`, so an unknown predict type or an `estat` subcommand Stata supports but this package does not reaches the caller as an explicit gap rather than as a silently wrong number. The message names what was asked for and what IS available.",
+    "zh": "当某项能力在 Stata 中存在但本包尚未实现时抛出——与 `ConsistencyError` 的区别很重要。它同时是 `NotImplementedError` 的子类，因此未知的 predict 类型、或 Stata 支持而本包未实现的 `estat` 子命令，会作为明确的缺口而非静默错误的数字抵达调用者。消息会说明请求了什么、以及实际可用什么。",
+    "example": "msg = None\ntry:\n    ws.Logit.from_formula('yb ~ x1', base).fit().predict(kind='zzz')\nexcept ws.UnsupportedError as exc:\n    msg = str(exc)\nmsg"
+  },
+  "WeightError": {
+    "stata": "(no Stata equivalent -- Stata raises r(402) or r(401) for a bad weight)",
+    "en": "Raised for a missing, unsupported or ambiguous Stata weight specification: an unknown weight type, negative weights, missing weights, weights that sum to zero, or `weights` supplied without a `weight_type` (and vice versa). Weights are validated once, when the model is built, so the error names the offending condition rather than surfacing later as a NaN in the covariance.",
+    "zh": "当 Stata 权重设定缺失、不受支持或含义不明时抛出：未知权重类型、负权重、缺失权重、权重和为零，或提供了 `weights` 却未给 `weight_type`（反之亦然）。权重在构建模型时一次性校验，因此错误会点明有问题的条件，而不会之后以协方差中的 NaN 形式浮现。",
+    "example": "msg = None\ntry:\n    ws.normalize_weights(np.array([1.0, -1.0]), 'aweight')\nexcept ws.WeightError as exc:\n    msg = str(exc)\nmsg"
+  },
+  "ExpListError": {
+    "stata": "(no Stata equivalent -- Stata's exp_list parser reports r(198))",
+    "en": "Raised when text does not conform to Stata's `exp_list` grammar, or when a statistic names a stored result that does not exist. It subclasses `ValueError`. The two failure modes are kept apart in the message: a syntax error quotes the offending text and offset, while an unresolvable statistic lists the keys actually available, which is what makes `r(mean)` after a command that stores only `r(N)` diagnosable.",
+    "zh": "当文本不符合 Stata 的 `exp_list` 语法，或某个统计量引用了不存在的已存结果时抛出。它是 `ValueError` 的子类。两类失败在消息中被区分开：语法错误会引用有问题的文本与偏移量，而无法解析的统计量会列出实际可用的键——这正是让“只存 `r(N)` 的命令之后写 `r(mean)`”可诊断的原因。",
+    "example": "msg = None\ntry:\n    ws.parse_exp_list('(((')\nexcept ws.ExpListError as exc:\n    msg = str(exc)\nmsg"
+  },
+  "PackageNotFoundError": {
+    "stata": "(no Stata equivalent -- an importlib.metadata exception, re-exported)",
+    "en": "The `importlib.metadata` exception raised when a distribution's metadata cannot be found. It is re-exported so callers can catch it without importing `importlib.metadata` themselves, and it is what `westata.__version__` falls back from: running the source tree without installing leaves no distribution metadata, and the version then becomes the literal fallback rather than raising. It is NOT a `WestataError` -- it is an `ImportError` subclass from the standard library.",
+    "zh": "当找不到某发行版的元数据时由 `importlib.metadata` 抛出的异常。此处重新导出，使调用者无需自己导入 `importlib.metadata`；`westata.__version__` 也以它为回退：未安装而直接运行源码树时没有发行版元数据，版本号于是取字面回退值而非抛错。它本身不是 `WestataError`——它是标准库的 `ImportError` 子类。",
+    "example": "(ws.PackageNotFoundError.__module__, issubclass(ws.PackageNotFoundError, ImportError))",
+    "notes_en": "Because it is `importlib.metadata`'s class and not a westata error, `except ws.WestataError` does NOT catch it. Catch `ws.PackageNotFoundError` or `ImportError` directly.",
+    "notes_zh": "由于它是 `importlib.metadata` 的类而非本包的异常，`except ws.WestataError` 捕不到它。请直接捕获 `ws.PackageNotFoundError` 或 `ImportError`。"
+  },
+  "StoredResults": {
+    "stata": "r(), e(), _b[] and _se[] -- the four tables a replicate leaves behind",
+    "en": "The stored results of ONE replicate's command, as a frozen dataclass with four mapping fields: `r` and `e` hold scalars, `b` and `se` hold coefficients by name. These are exactly the four tables Stata's `exp_list` can reach, which is why a bootstrap or permutation statistic is written against this object. `lookup(table, key)` returns a float and raises `ExpListError` naming the available keys when the entry is absent.",
+    "zh": "单次重复所运行命令留下的已存结果，是一个冻结 dataclass，含四个映射字段：`r` 与 `e` 存放标量，`b` 与 `se` 按名称存放系数。它们正好是 Stata 的 `exp_list` 能触及的四张表，这也是 bootstrap 或置换统计量针对该对象编写的原因。`lookup(table, key)` 返回浮点数，条目缺失时抛 `ExpListError` 并列出可用的键。",
+    "example": "s = ws.StoredResults(r={'mean': 1.5}, e={'N': 200.0})\nws.parse_exp_list('(n=e(N)) (m=r(mean))').evaluate(s)"
+  },
+  "WeightSpec": {
+    "stata": "[fw=], [aw=], [pw=], [iw=] -- the parsed weight specification",
+    "en": "The normalized weights plus the metadata the estimators need, produced by `normalize_weights` from a weight array and a Stata weight type. Fields: `weights` (already normalized per that type's rule), `weight_type`, `effective_n` (the sample size used for degrees of freedom), `implies_robust` (true for `pweight`, because Stata's `[pw=w]` implies `vce(robust)`), and `n_obs` (the row count, not the effective size). A frozen dataclass, so an estimator cannot quietly rewrite the specification after validation.",
+    "zh": "由 `normalize_weights` 从权重数组与 Stata 权重类型生成的、已归一化的权重及估计器所需的元数据。字段：`weights`（已按该类型规则归一化）、`weight_type`、`effective_n`（用于自由度的样本量）、`implies_robust`（对 `pweight` 为真，因为 Stata 的 `[pw=w]` 蕴含 `vce(robust)`）、`n_obs`（行数而非有效样本量）。它是冻结 dataclass，估计器无法在校验后悄悄改写该设定。",
+    "example": "ws.normalize_weights(np.array([1.0, 2.0, 3.0, 4.0]), 'pweight')"
+  },
+  "normalize_weights": {
+    "stata": "[fw=], [aw=], [pw=], [iw=] -- the weight normalization rules of [U] 20.24",
+    "en": "Normalizes a weight array according to Stata's rule for the given type and returns a `WeightSpec`. The four types differ in a way that changes the numbers: `fweight` and `iweight` are left unnormalized and contribute `sum(w)` as the effective sample size, while `aweight` and `pweight` are rescaled to sum to the row count and contribute `N`; `pweight` additionally sets `implies_robust`, which is the only difference between it and `aweight`. Validation rejects an unknown type, negative, missing or non-finite weights, and a zero total.",
+    "zh": "按 Stata 对给定类型的规则归一化权重数组，返回 `WeightSpec`。四种类型的差异会改变数值：`fweight` 与 `iweight` 不做归一化，并以 `sum(w)` 作为有效样本量贡献；`aweight` 与 `pweight` 被重新缩放至和等于行数，并以 `N` 贡献；`pweight` 还会置 `implies_robust`，这是它与 `aweight` 唯一的区别。校验会拒绝未知类型、负/缺失/非有限权重，以及和为零的情况。",
+    "example": "s = ws.normalize_weights(np.array([1.0, 2.0, 3.0, 4.0]), 'fweight')\n(s.effective_n, s.implies_robust, s.n_obs)",
+    "notes_en": "`effective_n` is what the degrees of freedom use: 10 for this four-row `fweight` example, because each row counts as its weight. That is why `nobs` and `e(N)` diverge under frequency weights.",
+    "notes_zh": "`effective_n` 才是自由度所用的量：这个四行 `fweight` 例子里为 10，因为每行按其权重计数。这正是频数权重下 `nobs` 与 `e(N)` 会分岔的原因。"
+  },
+  "WEIGHT_TYPES": {
+    "stata": "[fw=], [aw=], [pw=], [iw=]",
+    "en": "The four Stata weight type names accepted everywhere a weight is accepted, as a tuple: `fweight`, `aweight`, `pweight`, `iweight`. The meanings are the ones in `[U] 20.24`: frequency (integer replication counts, the sample is effectively `sum(w)`), analytic or precision (rescaled to sum to `N`, used like a frequency weight for the estimate), sampling (point estimate as with `aweight`, but the variance MUST be a linearized sandwich -- `[pw=w]` implies `vce(robust)`), and importance (used like a frequency weight without normalization). The part readers get wrong is that `fweight` and `aweight` give the same point estimate and differ only in the degrees of freedom, while `pweight` is the one that changes the VARIANCE.",
+    "zh": "凡是接受权重之处都接受的四个 Stata 权重类型名，以元组给出：`fweight`、`aweight`、`pweight`、`iweight`。含义即 `[U] 20.24` 所述：频数权（整数重复计数，样本实际为 `sum(w)`）、解析/精度权（缩放至和等于 `N`，估计上按频数权使用）、抽样权（点估计同 `aweight`，但方差必须用线性化三明治——`[pw=w]` 蕴含 `vce(robust)`）、重要性权（按频数权使用且不归一化）。读者最常弄错的是：`fweight` 与 `aweight` 点估计相同、只差在自由度，而 `pweight` 才是改变方差的那一个。",
+    "example": "ws.WEIGHT_TYPES"
+  },
+  "SSC": {
+    "stata": "the `, ssc(...)` style choices behind vce()'s small-sample corrections",
+    "en": "The Stata-style small-sample correction settings, as a frozen dataclass: `adj` applies the `N/(N-K)` degrees-of-freedom correction, `cluster_adj` applies the `G/(G-1)` cluster correction on top of `adj`, and `df` selects which convention the t/z degrees of freedom follow (`\"stata\"` is the default and follows the corresponding Stata command's own default). Every field defaults to the Stata choice, so an estimator that accepts `ssc=` behaves like Stata until the caller says otherwise.",
+    "zh": "Stata 风格的小样本修正设定，为冻结 dataclass：`adj` 施加 `N/(N-K)` 自由度修正，`cluster_adj` 在 `adj` 之上再施加 `G/(G-1)` 聚类修正，`df` 选择 t/z 自由度遵循的约定（默认 `\"stata\"`，即遵循对应 Stata 命令自身的默认）。每个字段都默认为 Stata 的选择，因此接受 `ssc=` 的估计器在调用者另行指定前表现与 Stata 一致。",
+    "example": "ws.SSC(adj=False)"
+  },
+  "VceMatrix": {
+    "stata": "estat vce / estat vce, correlation",
+    "en": "A printed coefficient covariance (or correlation) matrix. Three fields: `names` (row and column labels in Stata's spelling), `values` (the full symmetric matrix as a DataFrame -- the machine-readable surface), and `kind` (`\"covariance\"` or `\"correlation\"`). `str(...)` renders the LOWER TRIANGLE the way Stata prints it, and `to_frame()` returns the whole symmetric matrix. Row order follows the coefficient table, with `_cons` last.",
+    "zh": "打印出来的系数协方差距阵（或相关阵）。三个字段：`names`（按 Stata 拼写的行列标签）、`values`（完整对称矩阵的 DataFrame——机器可读接口）、`kind`（`\"covariance\"` 或 `\"correlation\"`）。`str(...)` 按 Stata 的方式只渲染下三角，`to_frame()` 返回完整对称矩阵。行序与系数表一致，`_cons` 在最后。",
+    "example": "ws.estat_vce(ws.OLS.from_formula('y ~ x1 + x2', base).fit())",
+    "notes_en": "For `kind == \"correlation\"` the diagonal is blanked to 0 exactly as Stata prints it -- a variable is not \"correlated with itself\" in that table. Read `values` for the real diagonal, which is 1.",
+    "notes_zh": "当 `kind == \"correlation\"` 时，对角线按 Stata 的打印方式置为 0——在那张表里变量不“与自身相关”。要取真实的对角线（其值为 1）请读 `values`。"
+  },
+  "ParsedExpressionList": {
+    "stata": "(the parsed form of an exp_list -- what Stata's parser builds internally)",
+    "en": "A parsed Stata `exp_list`, ready to evaluate against one replicate's stored results. It holds `groups`, a tuple of statistic groups (a labelled group keeps its label), and exposes `names` (the flattened statistic names, prefixed with `label:` for a labelled group) and `evaluate(results)`, which maps each name to a float by resolving `r()`, `e()`, `_b[]` and `_se[]` lookups in a `StoredResults`. It is a frozen dataclass: parsing produces a value, not a mutable builder.",
+    "zh": "解析后的 Stata `exp_list`，可直接对单次重复的已存结果求值。它持有 `groups`（统计量组的元组，带标签的组保留其标签），并提供 `names`（展平后的统计量名，有标签的组加 `label:` 前缀）与 `evaluate(results)`——后者通过解析 `StoredResults` 中的 `r()`、`e()`、`_b[]`、`_se[]` 查表，把每个名字映射为浮点数。它是冻结 dataclass：解析产生一个值，而非可变构建器。",
+    "example": "ws.parse_exp_list('(mean=r(mean)) (sd=r(sd))').names"
+  },
+  "SummarizeResult": {
+    "stata": "estat summarize -- summarize of the estimation sample",
+    "en": "The `estat summarize` table: a per-variable summary of the ESTIMATION sample, not of the whole frame. Fields: `table` (a DataFrame indexed by variable with `Obs`, `Mean`, `Std. Dev.`, `Min`, `Max`), `n_obs` (the estimation sample size), `labels`, `clusters` and `noheader`. Because it summarises the rows the fit actually used, its `Obs` column can be smaller than `len(base)` after listwise deletion.",
+    "zh": "`estat summarize` 表格：对估计样本（而非整个数据框）的逐变量摘要。字段：`table`（以变量为索引、含 `Obs`、`Mean`、`Std. Dev.`、`Min`、`Max` 的 DataFrame）、`n_obs`（估计样本量）、`labels`、`clusters` 与 `noheader`。由于它摘要的是拟合实际使用的行，列出删除后其 `Obs` 列可能小于 `len(base)`。",
+    "example": "ws.estat_summarize(ws.OLS.from_formula('y ~ x1 + x2', base).fit()).to_frame()"
+  },
+  "WaldTest": {
+    "stata": "test x1 = 0",
+    "en": "One Wald test of the linear hypothesis `Rb = r`, rendered the way Stata prints it. Fields: `statistic` (`W` for chi-square inference, `W/q` for F), `df` (the numerator `q`), `df_denom` (the denominator for the F form, `None` for chi-square), `pvalue`, `distribution` (`\"F\"` or `\"chi2\"`), and `constraint` (a human-readable statement of what was tested, printed above the statistic). Whether the F or the chi-square form is used follows the model's `dist`, so a logit fit yields chi-square and an OLS fit yields F.",
+    "zh": "对线性假设 `Rb = r` 的单次 Wald 检验，按 Stata 的方式渲染。字段：`statistic`（卡方推断时为 `W`，F 推断时为 `W/q`）、`df`（分子的 `q`）、`df_denom`（F 形式的分母，卡方形式为 `None`）、`pvalue`、`distribution`（`\"F\"` 或 `\"chi2\"`）与 `constraint`（被检验内容的可读说明，打印在统计量上方）。采用 F 还是卡方形式取决于模型的 `dist`，因此 logit 拟合给卡方、OLS 拟合给 F。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.test('x1 = 0')",
+    "notes_en": "`to_dict()` gives Stata's `r()` names: the statistic travels under the name of its OWN distribution (`F` or `chi2`), so reading `r(F)` after a chi-square test finds nothing -- which is correct, because Stata stores `r(chi2)` there.",
+    "notes_zh": "`to_dict()` 给出 Stata 的 `r()` 名称：统计量以其自身分布的名字出现（`F` 或 `chi2`），因此在卡方检验之后读 `r(F)` 会找不到——这是对的，因为 Stata 在那里存的是 `r(chi2)`。"
+  },
+  "LincomResult": {
+    "stata": "lincom x1 - x2",
+    "en": "One linear combination of parameters, shaped like Stata's `lincom` output. Fields: `estimate`, `std_err`, `statistic`, `pvalue`, `ci_lower`, `ci_upper`, `distribution` (`\"t\"` or `\"z\"`), `df` (`None` for a z-based fit, which genuinely has no degrees of freedom), `expression` (the hypothesis as written), plus `eform` and `label`. The standard error comes from the delta method on `weights @ b`, using the same covariance the coefficient table used.",
+    "zh": "参数的一个线性组合，形态与 Stata 的 `lincom` 输出一致。字段：`estimate`、`std_err`、`statistic`、`pvalue`、`ci_lower`、`ci_upper`、`distribution`（`\"t\"` 或 `\"z\"`）、`df`（基于 z 的拟合为 `None`，它确实没有自由度）、`expression`（所写假设），以及 `eform` 与 `label`。标准误由 `weights @ b` 上的 delta 方法给出，使用与系数表相同的协方差。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.lincom('x1 - x2')",
+    "notes_en": "`to_dict()` omits `df` for a z-based fit rather than reporting 0 or None, because Stata does not store `r(df)` in that case; the statistic appears as `t` or `z` accordingly.",
+    "notes_zh": "对基于 z 的拟合，`to_dict()` 省略 `df`，而不是报 0 或 None，因为 Stata 在这种情况下不存 `r(df)`；统计量相应地以 `t` 或 `z` 出现。"
+  },
+  "IcResult": {
+    "stata": "estat ic",
+    "en": "The `estat ic` table for one fitted model. Fields: `n`, `ll_null`, `ll_model`, `df` (the first four columns, matching Stata's `r(S)` layout), the four criteria `aic`, `bic`, `aicc`, `caic`, and `model` (the command name in the `Model` column). A missing statistic prints as `.` rather than `nan`, following Stata's rendering. This is the right surface for `regress`, which stores no information criteria of its own.",
+    "zh": "单个已拟合模型的 `estat ic` 表。字段：`n`、`ll_null`、`ll_model`、`df`（前四列，对应 Stata 的 `r(S)` 布局）、四个准则 `aic`、`bic`、`aicc`、`caic`，以及 `model`（`Model` 列中的命令名）。缺失的统计量按 Stata 的方式打印为 `.` 而非 `nan`。对自身不存信息准则的 `regress` 来说，这才是正确的入口。",
+    "example": "ws.estat_ic(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
+  },
+  "VifResult": {
+    "stata": "estat vif",
+    "en": "The variance inflation factor table for a linear fit. Fields: `names` (regressors in the reported order, sorted by descending VIF unless `nosort=True`), `vif` and `tolerance` (its reciprocal) as arrays, and `mean_vif`. `to_frame()` returns the table as a DataFrame and `to_dict()` gives Stata's `r(vif_#)` scalars keyed by variable name. Only defined for the linear family: the auxiliary regressions are ordinary least squares by construction.",
+    "zh": "线性拟合的方差膨胀因子表。字段：`names`（按报告顺序排列的回归元，除非 `nosort=True`，否则按 VIF 降序排序）、数组形式的 `vif` 与其倒数 `tolerance`，以及 `mean_vif`。`to_frame()` 返回 DataFrame 形式的表，`to_dict()` 给出以变量名为键的 Stata `r(vif_#)` 标量。仅对线性族有定义：辅助回归按构造就是普通最小二乘。",
+    "example": "ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
+  },
+  "MarginsResult": {
+    "stata": "margins, dydx(x1)",
+    "en": "One row of a `margins` table plus its covariance. Fields: `label` (the row label), `estimate`, `std_err`, `statistic`, `pvalue`, `ci_lower`, `ci_upper` and `prediction` (the prediction type used). The standard error is a delta-method one, with an analytic gradient where the response family has a closed form and an adaptive numeric one otherwise. `to_dict()` flattens to the row labels of Stata's `r(table)`.",
+    "zh": "`margins` 表的一行及其协方差。字段：`label`（行标签）、`estimate`、`std_err`、`statistic`、`pvalue`、`ci_lower`、`ci_upper` 与 `prediction`（所用的预测类型）。标准误是 delta 方法值：响应族有闭式解处用解析梯度，其余用自适应数值梯度。`to_dict()` 展平为 Stata `r(table)` 的行标签。",
+    "example": "ws.margins(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), dydx='x1')",
+    "notes_en": "`to_dict()` labels the statistic row `t` unconditionally, because this object does not carry the distribution flag; Stata would label it `z` after a logit. Use `str(...)` when the label itself matters.",
+    "notes_zh": "`to_dict()` 一律把统计量行标为 `t`，因为该对象不携带分布标志；logit 之后 Stata 会标为 `z`。当标签本身重要时请用 `str(...)`。"
+  },
+  "GofResult": {
+    "stata": "estat gof (after poisson)",
+    "en": "The Poisson goodness-of-fit table: a deviance (likelihood-ratio) test and a Pearson test, each with its upper-tail chi-square p-value. Fields: `deviance`, `deviance_pvalue`, `pearson`, `pearson_pvalue`, `df` (`e(N) - e(df_m) - 1`, shared by both). Stata defines `estat gof` ONLY for `poisson`; `nbreg` sets no `e(estat_cmd)`, so requesting it there raises `NotImplementedError` rather than returning an invented statistic.",
+    "zh": "Poisson 拟合优度表：一个偏差（似然比）检验与一个 Pearson 检验，各带上尾卡方 p 值。字段：`deviance`、`deviance_pvalue`、`pearson`、`pearson_pvalue`、`df`（`e(N) - e(df_m) - 1`，两者共用）。Stata 仅对 `poisson` 定义 `estat gof`；`nbreg` 不设 `e(estat_cmd)`，因此在那里请求会抛 `NotImplementedError`，而不会返回编造的统计量。",
+    "example": "ws.estat_gof(ws.Poisson.from_formula('ycnt ~ x1', base).fit())"
+  },
+  "ClassificationResult": {
+    "stata": "estat classification",
+    "en": "The `estat classification` 2x2 table and its nine percentages. Fields: `table` (3x3 DataFrame with rows `+`/`-`/`Total` and columns `D`/`~D`/`Total`), `cutoff` (the probability threshold), and the rates Stata returns as `r(P_*)`: `percent_correct`, `sensitivity`, `specificity`, `false_positive_rate`, `false_negative_rate`, `positive_predictive_value`, `negative_predictive_value`, `false_positive_classified`, `false_negative_classified`. Note that the two \"false\" families are conditioned differently -- on the true class versus on the classified class.",
+    "zh": "`estat classification` 的 2x2 表及其九个百分比。字段：`table`（3x3 DataFrame，行为 `+`/`-`/`Total`，列为 `D`/`~D`/`Total`）、`cutoff`（概率阈值），以及 Stata 以 `r(P_*)` 返回的各项比率：`percent_correct`、`sensitivity`、`specificity`、`false_positive_rate`、`false_negative_rate`、`positive_predictive_value`、`negative_predictive_value`、`false_positive_classified`、`false_negative_classified`。注意两类“错误率”的条件不同——一类以真实类别为条件，另一类以判定的类别为条件。",
+    "example": "r = ws.estat_classification(ws.Logit.from_formula('yb ~ x1 + x2', base).fit())\n(r.cutoff, r.percent_correct)"
+  },
+  "HetTestResult": {
+    "stata": "estat hettest",
+    "en": "The Breusch-Pagan / Cook-Weisberg test for heteroskedasticity. Fields: `method` (`\"normal\"`, `\"iid\"` or `\"fstat\"`), `statistic`, `df`, `pvalue`, `df_denom` (only for `method=\"fstat\"`), and `variables` (the regressors the auxiliary regression used -- empty means the fitted values were used, which is Stata's default when no varlist is given). Like Stata, it refuses after a robust or clustered VCE and on pweighted data.",
+    "zh": "Breusch-Pagan / Cook-Weisberg 异方差检验。字段：`method`（`\"normal\"`、`\"iid\"` 或 `\"fstat\"`）、`statistic`、`df`、`pvalue`、`df_denom`（仅 `method=\"fstat\"` 时）与 `variables`（辅助回归所用的回归元——为空表示使用了拟合值，这是未给变量列表时 Stata 的默认）。与 Stata 一致，在稳健或聚类 VCE 之后以及 pweight 数据上它会拒绝。",
+    "example": "ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
+  },
+  "ImTestResult": {
+    "stata": "estat imtest",
+    "en": "Cameron & Trivedi's information-matrix test decomposition, optionally with White's original test. Fields: `heteroskedasticity`, `skewness`, `kurtosis` and their degrees of freedom `df_heteroskedasticity`, `df_skewness`, `df_kurtosis`; `total` and `df_total` (the sum of the three); and `white`, `white_df`, `white_pvalue`, which are `None` unless `white=True` was requested.",
+    "zh": "Cameron & Trivedi 的信息矩阵检验分解，可选附带 White 原始检验。字段：`heteroskedasticity`、`skewness`、`kurtosis` 及其自由度 `df_heteroskedasticity`、`df_skewness`、`df_kurtosis`；`total` 与 `df_total`（三者之和）；以及 `white`、`white_df`、`white_pvalue`——除非请求了 `white=True`，否则为 `None`。",
+    "example": "ws.estat_imtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
+  },
+  "OvTestResult": {
+    "stata": "estat ovtest",
+    "en": "Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given.",
+    "zh": "Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。",
+    "example": "ws.estat_ovtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
+  },
+  "EndogenousResult": {
+    "stata": "estat endogenous",
+    "en": "Durbin and Wu endogeneity tests for an IV fit. Fields: `durbin`, `durbin_pvalue` (Durbin's chi-square, with `df` equal to the number of tested endogenous regressors), `wu`, `wu_pvalue`, `wu_df`, `wu_df_denom` (Wu's F and its two degrees of freedom), and `tested` (the names of the endogenous regressors covered). A rejection means the regressor is endogenous, so OLS on the same equation would be inconsistent.",
+    "zh": "IV 拟合的 Durbin 与 Wu 内生性检验。字段：`durbin`、`durbin_pvalue`（Durbin 卡方，`df` 等于被检验的内生回归元个数）、`wu`、`wu_pvalue`、`wu_df`、`wu_df_denom`（Wu 的 F 及其两个自由度），以及 `tested`（所覆盖的内生回归元名称）。拒绝意味着该回归元内生，因此同方程上的 OLS 会不一致。",
+    "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit()\nws.estat_endogenous(iv)"
+  },
+  "FirstStageResult": {
+    "stata": "estat firststage",
+    "en": "First-stage diagnostics for an IV fit: one row per endogenous regressor plus the headline F. Fields: `endog` (names in reported order), `r2` and `adj_r2` (the endogenous regressor on ALL exogenous variables), `partial_r2` (the residualised endogenous regressor on the residualised excluded instruments), `f`, `df_num`, `df_denom`, `pvalue` (the joint test of the excluded instruments), and `shea`, `shea_adj` (only computed with more than one endogenous regressor, because with one they coincide with `partial_r2`).",
+    "zh": "IV 拟合的第一阶段诊断：每个内生回归元一行，外加一个总体 F。字段：`endog`（按报告顺序的名称）、`r2` 与 `adj_r2`（内生回归元对全部外生变量回归）、`partial_r2`（残差化后的内生回归元对残差化后的排除工具变量回归）、`f`、`df_num`、`df_denom`、`pvalue`（排除工具变量的联合检验），以及 `shea`、`shea_adj`（仅在内生回归元多于一个时计算，因为只有一个时它们与 `partial_r2` 相同）。",
+    "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit()\nws.estat_firststage(iv)"
+  },
+  "OverIdResult": {
+    "stata": "estat overid",
+    "en": "The overidentification restrictions test for an IV fit. Fields: `statistic`, `df` (the number of overidentifying restrictions) and `pvalue`; `basmann` and `basmann_pvalue`, the finite-sample variant `Sargan*(N-k)/(N-Sargan)`, which is `None` for GMM; and `test`, either `\"Sargan\"` (2SLS and LIML) or `\"Hansen J\"` (GMM). An exactly identified model has no restriction to test and is refused rather than reported as a statistic of zero.",
+    "zh": "IV 拟合的过度识别约束检验。字段：`statistic`、`df`（过度识别约束个数）与 `pvalue`；`basmann` 与 `basmann_pvalue`，即有限样本变体 `Sargan*(N-k)/(N-Sargan)`，对 GMM 为 `None`；以及 `test`，为 `\"Sargan\"`（2SLS 与 LIML）或 `\"Hansen J\"`（GMM）。恰好识别的模型没有可检验的约束，会被拒绝，而不是报成统计量为零。",
+    "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + y1]', base).fit()\nws.estat_overid(iv)"
+  },
+  "LRTestResult": {
+    "stata": "lrtest unrestricted restricted",
+    "en": "A likelihood-ratio test between a restricted and an unrestricted model. Fields: `statistic` (`2 (lnL_unrestricted - lnL_restricted)`), `df` (the difference in parameter counts, always positive because two models with equal counts are refused as Stata's `r(498)`), `pvalue` (`P > chi2(df)`, exactly 1.0 for a negative statistic as Stata prints), and `ll_unrestricted`, `ll_restricted`, kept so the number can be audited without re-fitting.",
+    "zh": "受限模型与非受限模型之间的似然比检验。字段：`statistic`（`2 (lnL_unrestricted - lnL_restricted)`）、`df`（参数个数之差，始终为正，因为参数个数相同的两个模型会按 Stata 的 `r(498)` 被拒绝）、`pvalue`（`P > chi2(df)`，统计量为负时按 Stata 的打印恰为 1.0），以及 `ll_unrestricted`、`ll_restricted`——保留它们以便无需重新拟合即可审计该数值。",
+    "example": "u = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr = ws.Logit.from_formula('yb ~ x1', base).fit()\nu.lrtest(r)"
+  },
+  "HausmanResult": {
+    "stata": "hausman fe re",
+    "en": "The Hausman specification test: `(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`. Fields: `statistic`, `df` (the number of coefficients actually compared, constants excluded), `pvalue` (`P > chi2(df)`), and `excluded` (parameters not present in both models, so not comparable -- a diagnostic this package adds, not an `r()` scalar). A rejection means the efficient estimator is inconsistent, so the consistent one is preferred.",
+    "zh": "Hausman 设定检验：`(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`。字段：`statistic`、`df`（实际参与比较的系数个数，不含常数项）、`pvalue`（`P > chi2(df)`），以及 `excluded`（两个模型中不同时存在、因而不可比较的参数——这是本包增加的诊断，不是 `r()` 标量）。拒绝意味着有效估计量不一致，应改用一致估计量。",
+    "example": "fe = ws.PanelOLS.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()\nre = ws.RandomEffects.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()\nfe.hausman(re)",
+    "notes_en": "The difference matrix `V_c - V_e` can be singular or have negative eigenvalues in finite samples; the test compares only the coefficients present in both models, which is what `df` counts.",
+    "notes_zh": "差矩阵 `V_c - V_e` 在有限样本中可能奇异或出现负特征值；该检验只比较两个模型共有的系数，`df` 数的就是这些。"
+  },
+  "model_data": {
+    "stata": "e(sample) / the estimation sample",
+    "en": "The estimation-sample data frame the fit was computed on. Stata exposes the same information through e(sample) and the saved dataset; here it is the frame itself, which is why postestimation commands that must re-read the estimation data -- linktest, estat_mundlak, predict with an explicit sample -- can work from a fitted result without the caller passing the data again.",
+    "zh": "该拟合所用的估计样本数据框。Stata 通过 `e(sample)` 与保存的数据集提供同一信息；这里直接就是数据框，因此需要重读估计数据的后估计命令（如 `linktest`、`estat_mundlak`、需显式样本的 `predict`）可以直接从结果对象工作，无需调用者再次传入数据。",
+    "example": "r = ws.OLS.from_formula(\"y ~ x1 + x2\", base).fit()\nlist(r.model_data.columns)",
+    "notes_en": "Only estimators that retained the sample carry it; assuming it is always present is what makes a postestimation call fail late rather than at the call site.",
+    "notes_zh": "只有保留了样本的估计器才带有它；假定它总是存在，会让后估计调用在深处失败而不是在调用处失败。"
+  }
+}

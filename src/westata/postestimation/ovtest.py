@@ -1,0 +1,294 @@
+"""Ramsey's RESET test for omitted variables: Stata's ``estat ovtest``.
+
+Transcribed from ``ovtest.ado`` (StataNow 19.5, v2.7.0).  The default path
+(``freset``, which Stata takes whenever ``rhs`` is not given) is:
+
+.. code-block:: stata
+
+    quietly _predict double `yh' if `use'
+    summ `yh'
+    replace `yh' = (`yh' - r(min)) / (r(max) - r(min))    // rescale to [0,1]
+    gen float `yh2' = `yh'*`yh'
+    gen float `yh3' = `yh'*`yh'*`yh'
+    gen float `yh4' = `yh'*`yh'*`yh'*`yh'
+    _regress `lhs' `varlist' `yh2' `yh3' `yh4' `wgtexp' if `use'
+    test `yh2' `yh3' `yh4'
+
+so the test is a joint F on the second, third and fourth powers of the
+**rescaled** fitted values, added to the original regressors.
+
+The rescaling to ``[0, 1]`` is not cosmetic: ``yh^4`` on a raw fitted value in
+the hundreds overflows the useful range and makes the auxiliary design
+ill-conditioned, while on a ``[0, 1]`` scale the four powers span a sane basis.
+Dropping it changes the test statistic.
+
+``estat ovtest, rhs`` takes the alternative path and uses powers of the *right-
+hand-side variables* instead (``ovtest.ado``'s ``else`` branch): every continuous
+regressor is rescaled to ``[0, 1]`` and contributes ``x^2, x^3, x^4``; indicator
+variables (all values in ``{0, 1}``) contribute only the variable itself.  When
+no continuous regressor remains, Stata reports "powers of all explanatory
+variables collinear" and the test is not possible.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Sequence
+
+import numpy as np
+from scipy import stats
+
+__all__ = ["OvTestResult", "estat_ovtest"]
+
+_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
+
+#: The RESET test always uses the 2nd, 3rd and 4th powers.
+_POWERS = (2, 3, 4)
+
+
+def _is_constant(name: str) -> bool:
+    return str(name).strip().lower() in _CONSTANT_NAMES
+
+
+class OvTestResult:
+    """Ramsey's RESET test.
+
+    Attributes
+    ----------
+    statistic, df, df_denom, pvalue:
+        The F statistic, its numerator and denominator degrees of freedom, and
+        the upper-tail p-value.
+    omitted:
+        Human-readable description of what the powers were taken of, matching
+        Stata's ``Omitted:`` line.
+    """
+
+    __slots__ = ("statistic", "df", "df_denom", "pvalue", "omitted")
+
+    def __init__(
+        self,
+        *,
+        statistic: float,
+        df: float,
+        df_denom: float,
+        pvalue: float,
+        omitted: str,
+    ) -> None:
+        self.statistic = float(statistic)
+        self.df = float(df)
+        self.df_denom = float(df_denom)
+        self.pvalue = float(pvalue)
+        self.omitted = str(omitted)
+
+    def __repr__(self) -> str:
+        return (
+            f"<OvTestResult F({self.df:g}, {self.df_denom:g})="
+            f"{self.statistic:.4g} p={self.pvalue:.4g}>"
+        )
+
+    def __str__(self) -> str:
+        return "\n".join(
+            [
+                "",
+                "Ramsey RESET test for omitted variables",
+                f"Omitted: Powers of {self.omitted}",
+                "",
+                "H0: Model has no omitted variables",
+                "",
+                f"{'F(' + f'{self.df:g}' + ', ' + f'{self.df_denom:g}' + ')':<20}"
+                f" = {self.statistic:>8.2f}",
+                f"{'Prob > F':<20} = {self.pvalue:>8.4f}",
+            ]
+        )
+
+    def to_dict(self) -> dict[str, float]:
+        """The ``r()`` scalars Stata returns."""
+
+        return {
+            "F": self.statistic,
+            "df": self.df,
+            "df_r": self.df_denom,
+            "p": self.pvalue,
+        }
+
+
+def _rescale(values: np.ndarray) -> tuple[np.ndarray, bool]:
+    """Rescale to ``[0, 1]``; second element reports whether it was constant."""
+
+    low = float(values.min())
+    high = float(values.max())
+    if high == low:
+        return values, True
+    return (values - low) / (high - low), False
+
+
+def _fit_and_test(
+    y: np.ndarray, design: np.ndarray, tested: Sequence[int]
+) -> tuple[float, float, float]:
+    """OLS of ``y`` on ``design``; joint F on the ``tested`` columns."""
+
+    coefficients, *_ = np.linalg.lstsq(design, y, rcond=None)
+    fitted = design @ coefficients
+    resid = y - fitted
+    rss = float(resid @ resid)
+    nobs, k = design.shape
+    df_denom = float(nobs - k)
+    df_num = float(len(tested))
+    if df_denom <= 0:
+        raise ValueError(
+            "estat ovtest needs positive residual degrees of freedom; the "
+            f"auxiliary regression has {nobs} observations and {k} parameters"
+        )
+    if rss <= 0.0:
+        raise ValueError(
+            "estat ovtest: the auxiliary regression fits exactly, so the F "
+            "statistic is undefined"
+        )
+    # Wald form of the joint restriction, divided by df_num, matching Stata's
+    # ``test`` after the auxiliary regression.
+    cov = rss / df_denom * np.linalg.pinv(design.T @ design)
+    sub = np.asarray(list(tested), dtype=int)
+    b = coefficients[sub]
+    v = cov[np.ix_(sub, sub)]
+    wald = float(b @ np.linalg.solve(v, b))
+    return wald / df_num, df_num, df_denom
+
+
+def estat_ovtest(
+    result: Any,
+    *,
+    rhs: bool = False,
+) -> OvTestResult:
+    """Stata's ``estat ovtest`` (Ramsey RESET).
+
+    Parameters
+    ----------
+    result:
+        A fitted linear result that retained its design and residuals.
+    rhs:
+        Stata's ``, rhs``: test powers of the right-hand-side variables instead
+        of powers of the fitted values.
+
+    Raises
+    ------
+    ValueError
+        When the design was not retained, when every regressor is an indicator
+        (so no powers exist), or when the auxiliary fit has no residual df.
+    """
+
+    design = getattr(result, "design_matrix", None)
+    if design is None:
+        raise ValueError(
+            "estat ovtest needs the estimation design, which this result did "
+            "not retain; refit with a from_formula constructor"
+        )
+
+    # ``rreg.ado:214`` sets ``est local estat_cmd ""``: robust regression offers
+    # no estat subcommands.  It DOES store e(rss)/e(mss), so the sums-of-squares
+    # check below would let it through, but the residuals come from an
+    # iteratively reweighted fit -- not the OLS residuals ovtest is derived from.
+    if str(getattr(result, "model_name", "") or "").strip().lower() == "rreg":
+        raise ValueError(
+            "estat ovtest is not available after rreg: rreg.ado:214 sets "
+            "e(estat_cmd) to empty, so Stata offers no estat subcommands after "
+            "robust regression.  The test assumes OLS residuals."
+        )
+
+    # ``xtreg_estat.ado:15-28`` permits only summarize, ic, hausman, mundlak and
+    # vce; everything else is "estat <sub> not valid".  Panel results carry
+    # e(rss)/e(mss), so the sums-of-squares check alone let ovtest through.
+    if str(getattr(result, "model_name", "") or "").strip().lower().startswith("xtreg"):
+        raise ValueError(
+            "estat ovtest is not available after xtreg: xtreg_estat.ado:15-28 "
+            "permits only summarize, ic, hausman, mundlak and vce and rejects "
+            "everything else with 'estat <sub> not valid'."
+        )
+
+    # ``ovtest`` is an OLS specification test: it regresses the residuals on
+    # powers of the fitted values and compares sums of squares.  Called after a
+    # non-linear estimator it still "works" numerically -- it just performs OLS on
+    # whatever ``fittedvalues`` holds, which for a logit is a probability.  On the
+    # audit data that produced 1.3478 for logit against 1.3508 for OLS: two nearly
+    # identical numbers, the logit one meaningless.  Require the least-squares
+    # quantities explicitly.
+    e = getattr(result, "e", None)
+    if e is not None and not ("rss" in e and "mss" in e):
+        model_name = str(getattr(result, "model_name", "this model") or "this model")
+        raise ValueError(
+            "estat ovtest is an OLS specification test: it compares sums of "
+            "squares, and a "
+            f"{model_name} result stores neither e(rss) nor e(mss).  Stata offers "
+            "ovtest after regress-style fits only."
+        )
+
+    matrix_raw, raw_names = design
+    matrix = np.asarray(matrix_raw, dtype=float)
+    names = [str(name) for name in raw_names]
+
+    resid = np.asarray(result.resid, dtype=float).reshape(-1)
+    nobs = resid.size
+    if matrix.shape[0] != nobs:
+        raise ValueError(
+            f"the design has {matrix.shape[0]} rows but there are {nobs} residuals"
+        )
+    y = np.asarray(result.fittedvalues, dtype=float).reshape(-1) + resid
+
+    if not rhs:
+        # Default: powers of the fitted values, rescaled to [0, 1].
+        fitted = np.asarray(result.fittedvalues, dtype=float).reshape(-1)
+        scaled, constant = _rescale(fitted)
+        if constant:
+            raise ValueError(
+                "estat ovtest: the fitted values are constant, so their powers "
+                "are collinear with the regressors"
+            )
+        extra = np.column_stack([scaled**power for power in _POWERS])
+        design_full = np.column_stack([matrix, extra])
+        tested = list(range(matrix.shape[1], design_full.shape[1]))
+        statistic, df_num, df_denom = _fit_and_test(y, design_full, tested)
+        return OvTestResult(
+            statistic=statistic,
+            df=df_num,
+            df_denom=df_denom,
+            pvalue=float(stats.f.sf(statistic, df_num, df_denom)),
+            omitted="fitted values",
+        )
+
+    # ``, rhs``: powers of each continuous regressor.
+    columns: list[np.ndarray] = []
+    omitted_labels: list[str] = []
+    for j, name in enumerate(names):
+        if _is_constant(name):
+            continue
+        values = matrix[:, j]
+        if np.all(np.isin(values, (0.0, 1.0))):
+            # Indicator: contributes only itself.
+            columns.append(values)
+            omitted_labels.append(name)
+            continue
+        scaled, constant = _rescale(values)
+        if constant:
+            continue
+        for power in _POWERS:
+            columns.append(scaled**power)
+            omitted_labels.append(f"{name}^{power}")
+
+    if len(omitted_labels) <= len(
+        [n for n in names if not _is_constant(n)]
+    ):
+        # Only indicators survived: nothing to test.
+        raise ValueError(
+            "estat ovtest, rhs: powers of all explanatory variables collinear "
+            "(typically because all explanatory variables are indicator variables)"
+        )
+
+    extra = np.column_stack(columns) if columns else np.empty((nobs, 0))
+    design_full = np.column_stack([matrix, extra])
+    tested = list(range(matrix.shape[1], design_full.shape[1]))
+    statistic, df_num, df_denom = _fit_and_test(y, design_full, tested)
+    return OvTestResult(
+        statistic=statistic,
+        df=df_num,
+        df_denom=df_denom,
+        pvalue=float(stats.f.sf(statistic, df_num, df_denom)),
+        omitted="independent variables",
+    )

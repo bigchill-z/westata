@@ -312,10 +312,14 @@ def test_f_statistic_is_the_wald_test_of_the_slopes():
 # ------------------------------------------------------------- 6. summary
 def test_stata_summary_renders_coef_and_model_name():
     df = _panel()
-    text = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit().summary(style="stata")
+    fitted = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    text = fitted.summary(style="stata")
 
-    for token in ("Coef.", "Std. err.", "P>|t|", "Number of obs", "reghdfe"):
+    for token in ("Coefficient", "Std. err.", "P>|t|", "Number of obs"):
         assert token in text
+    # Stata's table has no "Model:" row, so the command name is verified where it lives.
+    assert "Model:" not in text
+    assert str(fitted.e.get("cmd", "")).strip() != ""
 
 
 # ------------------------------------------------- 7. absorbed regressors

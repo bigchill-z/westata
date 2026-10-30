@@ -176,7 +176,7 @@ def test_qreg_populates_e_and_renders():
     ).fit()
     for key in ["N", "df_m", "df_r", "q", "sum_adev", "sum_rdev", "r2_p", "rank"]:
         assert key in result.e, key
-    assert "Coef." in result.summary(style="stata")
+    assert "Coefficient" in result.summary(style="stata")
 
 
 # ------------------------------------------------------------------- rreg
@@ -194,9 +194,18 @@ def test_rreg_beats_ols_on_contaminated_data():
 
 
 def test_rreg_reports_a_positive_scale():
+    """The reweighting scale lives on ``rreg_detail``, not in ``e()``.
+
+    ``rreg.ado`` has exactly ONE ``ereturn`` statement (``cmdline`` at line 219) and
+    inherits the rest from the underlying regression via ``ereturn repost``;
+    ``scale`` is a ``tempname`` local inside the ado.  Publishing it as ``e(scale)``
+    advertised a Stata macro that does not exist, so it moved to the attribute.
+    """
+
     result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
-    assert np.isfinite(float(result.e["scale"]))
-    assert float(result.e["scale"]) > 0
+    assert np.isfinite(float(result.rreg_detail["scale"]))
+    assert float(result.rreg_detail["scale"]) > 0
+    assert "scale" not in result.e
 
 
 def test_rreg_cooks_screen_is_reported_and_consistent():
@@ -211,7 +220,8 @@ def test_rreg_cooks_screen_is_reported_and_consistent():
 
     frame = _outlier_frame()
     result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
-    dropped = int(result.e["dropped"])
+    # ``dropped`` is an implementation diagnostic, not a Stata e() macro.
+    dropped = int(result.rreg_detail["dropped"])
     assert dropped >= 0
     assert int(result.e["N"]) == len(frame) - dropped
 
@@ -233,9 +243,13 @@ def test_rreg_cooks_screen_is_reported_and_consistent():
 
 def test_rreg_populates_e_and_renders():
     result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
-    for key in ["N", "df_m", "df_r", "rank", "scale"]:
+    # ``scale`` is deliberately NOT an e() key: ``rreg.ado`` has one ``ereturn``
+    # statement in total and inherits the rest, so there is no ``e(scale)`` macro.
+    for key in ["N", "df_m", "df_r", "rank", "r2", "rmse"]:
         assert key in result.e, key
-    assert "Coef." in result.summary(style="stata")
+    assert "scale" in result.rreg_detail
+    assert "scale" not in result.e
+    assert "Coefficient" in result.summary(style="stata")
 
 
 # ------------------------------------------------- Stata conformance (P8)
@@ -737,9 +751,12 @@ def test_rreg_reported_sum_of_squares_match_stata():
     assert float(result.e["rmse"]) ** 2 * float(result.e["df_r"]) == pytest.approx(
         float(result.e["rss"]), rel=1e-12
     )
-    assert float(result.e["mse"]) == pytest.approx(
+    # ``mse`` is the same quantity as ``rmse**2`` and has no Stata macro of its own,
+    # so it lives on ``rreg_detail`` rather than in e().
+    assert float(result.rreg_detail["mse"]) == pytest.approx(
         float(result.e["rss"]) / float(result.e["df_r"]), rel=1e-12
     )
+    assert "mse" not in result.e
 
 
 def test_rreg_lambda_uses_the_nonzero_weight_count():
@@ -754,7 +771,9 @@ def test_rreg_lambda_uses_the_nonzero_weight_count():
     result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
 
     assert int(result.e["N"]) == 400
-    assert int(result.e["N_weighted"]) == 386
+    # ``N_weighted`` is a diagnostic on the attribute, not a Stata macro.
+    assert int(result.rreg_detail["N_weighted"]) == 386
+    assert "N_weighted" not in result.e
     assert float(result.e["df_r"]) == 397.0
 
 
@@ -778,8 +797,12 @@ def test_rreg_default_tolerance_is_statas_not_machine_precision():
     default = model.fit()                 # Stata's tolerance(.01)
     tight = model.fit(tolerance=1e-9)     # fully converged
 
-    assert float(default.e["tolerance"]) == 0.01
-    assert int(default.e["iterations"]) < int(tight.e["iterations"])
+    assert float(default.rreg_detail["tolerance"]) == 0.01
+    assert int(default.rreg_detail["iterations"]) < int(
+        tight.rreg_detail["iterations"]
+    )
+    assert "tolerance" not in default.e
+    assert "iterations" not in default.e
 
     gap = np.max(
         np.abs(np.asarray(default.params, dtype=float)
@@ -808,7 +831,7 @@ def test_rreg_sums_of_squares_describe_the_adjusted_regression():
 
     assert float(result.e["rss"]) == pytest.approx(471.32198880778736, rel=1e-9)
     assert float(result.e["rss"]) > 400.0          # not the weighted 330.3
-    assert float(result.e["mse"]) == pytest.approx(
+    assert float(result.rreg_detail["mse"]) == pytest.approx(
         float(result.e["rss"]) / float(result.e["df_r"]), rel=1e-12
     )
     assert float(result.e["rmse"]) ** 2 * float(result.e["df_r"]) == pytest.approx(

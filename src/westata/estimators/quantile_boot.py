@@ -177,9 +177,17 @@ class Sqreg:
         """
 
         n, k = self._X.shape
-        # Stata's generator. `sqreg.ado` stores c(seed) and every draw comes from MT19937-64, so numpy's default
-        # generator diverges from the first number.
-        generator = Mt19937_64(DEFAULT_SEED if seed is None else seed)
+        # Stata's generator. `sqreg.ado` stores c(seed) and every draw comes from
+        # MT19937-64, so numpy's default generator diverges from the first number.
+        #
+        # With no seed given Stata uses its CURRENT seed (c(seed)), which is
+        # whatever the session happens to hold -- so a draw is reproducible only
+        # after `set seed`.  Mirroring that means picking a seed now and recording
+        # it, rather than silently fixing a constant (which would make every
+        # unseeded run identical, unlike Stata).
+        if seed is None:
+            seed = int(np.random.SeedSequence().entropy % (2**63))
+        generator = Mt19937_64(seed)
         replicates = np.empty((reps, k * len(self._quantiles)), dtype=float)
 
         # THE ROW ORDER CARRIES BETWEEN REPLICATES. `bsampl_w.ado` ends with `sort r w` and `qreg_c.ado` line 35

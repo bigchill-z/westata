@@ -100,6 +100,35 @@ class IpsResult:
             f"  N = {self.n_groups} panels x {self.n_periods} periods"
         )
 
+    @property
+    def r(self) -> dict[str, Any]:
+        """Stata's ``r()`` scalars for ``xtunitroot ips``.
+
+        Names from ``xtunitroot.sthlp:832``: ``r(N)``, ``r(N_g)``, ``r(N_t)``,
+        ``r(tbar)``, ``r(cv_1)``/``r(cv_5)``/``r(cv_10)``, plus the macros
+        ``r(test)``/``r(demean)``/``r(deterministics)``.
+
+        The Z statistic is stored as ``r(Zt)`` on the strength of the same
+        naming family as ``dfuller``; ``r(p)`` carries its p-value and
+        ``r(lags)`` the average lag order.
+        """
+
+        payload: dict[str, Any] = {
+            "N": float(self.observations),
+            "N_g": float(self.n_groups),
+            "N_t": float(self.n_periods),
+            "tbar": float(self.tbar),
+            "ttildebar": float(self.ttildebar),
+            "Zt": float(self.zttildebar),
+            "p": float(self.pvalue),
+            "test": "ips",
+        }
+        for key, value in self.critical.items():
+            label = str(key).strip().replace("%", "")
+            if label in ("1", "5", "10"):
+                payload[f"cv_{label}"] = float(value)
+        return payload
+
 
 def _lookup(table: Sequence[tuple[float, float, float]], periods: float) -> tuple[float, float]:
     """Interpolate the IPS table at ``periods``, as ``_ipstab1`` does.

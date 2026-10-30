@@ -270,6 +270,21 @@ def test_as_stata(
     if not specs:
         raise ValueError("test requires at least one hypothesis")
 
+    # Stata separates multiple constraints with a COMMA inside one string:
+    # ``test x1 = 0, x2 = 0`` is a joint test of two restrictions.  Treating the whole
+    # string as one hypothesis made the parser read ``0,x2`` as a coefficient name and
+    # fail with a KeyError.  Splitting here means both spellings work:
+    # ``test("x1 = 0, x2 = 0")`` and ``test("x1 = 0", "x2 = 0")``.
+    expanded: list[Any] = []
+    for spec in specs:
+        if isinstance(spec, str) and "," in spec:
+            expanded.extend(part for part in spec.split(",") if part.strip())
+        else:
+            expanded.append(spec)
+    specs = tuple(expanded)
+    if not specs:
+        raise ValueError("test requires at least one hypothesis")
+
     names = list(result.param_names)
     params = np.asarray(result.params, dtype=float)
     cov = result.cov_params()
@@ -327,6 +342,19 @@ def lincom_as_stata(
         raise ValueError(
             "lincom does not accept an equals sign; use results.test() for "
             "hypotheses"
+        )
+    if "," in expression:
+        # ``lincom.sthlp``'s syntax is ``lincom exp [, options]`` -- ONE expression.
+        # A comma there separates the expression from OPTIONS, never a second
+        # expression, so ``lincom "x1 + x2, x1 - x2"`` is not a Stata request at all.
+        # Without this check the parser read ``x2,x1`` as a coefficient name and raised
+        # a bare KeyError, which says nothing about the real problem.
+        raise ValueError(
+            "lincom evaluates ONE linear combination; a comma separates the "
+            "expression from its options (lincom.sthlp: syntax is "
+            "'lincom exp [, options]'), never a second expression.  To test several "
+            "combinations use results.test(), which takes them comma-separated: "
+            "test 'x1 + x2 = 0, x1 - x2 = 0'."
         )
     terms, constant = _split_linear_form(expression, names)
     weights = np.zeros(len(names), dtype=float)

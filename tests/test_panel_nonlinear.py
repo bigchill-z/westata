@@ -605,11 +605,15 @@ def test_xttobit_reports_both_variance_components(tobit_result):
 
 
 def test_xttobit_counts_the_censored_observations(tobit_result):
-    """p9_outputs.txt lines 196-198: 461 uncensored, 239 left-censored."""
+    """p9_outputs.txt lines 196-198: 461 uncensored, 239 left-censored.
 
-    assert int(tobit_result.e["n_uncensored"]) == 461
-    assert int(tobit_result.e["n_left"]) == 239
-    assert int(tobit_result.e["n_right"]) == 0
+    The counts carry Stata's names (``tobit.sthlp:254-256``): ``N_unc``/``N_lc``/
+    ``N_rc``.
+    """
+
+    assert int(tobit_result.e["N_unc"]) == 461
+    assert int(tobit_result.e["N_lc"]) == 239
+    assert int(tobit_result.e["N_rc"]) == 0
     assert int(tobit_result.e["N"]) == 700
 
 
@@ -635,7 +639,7 @@ def test_xttobit_with_a_very_low_limit_approximates_xtreg_re():
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
-    assert int(tobit.e["n_left"]) == 0
+    assert int(tobit.e["N_lc"]) == 0
     assert float(tobit.params["x1"]) == pytest.approx(
         float(linear.params["x1"]), abs=2e-2
     )
@@ -708,7 +712,7 @@ def test_every_model_reports_the_stata_contract(factory, label):
     rendered = result.summary(style="stata")
     assert isinstance(rendered, str)
     assert "Number of obs" in rendered
-    assert "Coef." in rendered
+    assert "Coefficient" in rendered
     assert "Std. err." in rendered
     assert "P>|z|" in rendered
     # Every reported coefficient must appear in the table body.

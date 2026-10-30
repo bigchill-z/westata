@@ -323,9 +323,17 @@ def test_stdp_and_stdf_are_registered_for_regress():
 
 
 def test_stdp_is_registered_wherever_xb_is_and_stdf_only_for_linear_models():
-    """stdp is universal; stdf belongs to the linear families only."""
+    """stdp is universal; stdf belongs to the linear families only.
 
-    linear = ["regress", "ivregress 2sls", "reghdfe", "xtreg, fe", "tobit"]
+    ``reghdfe`` is deliberately ABSENT from the linear list: its predict was
+    withdrawn in round 74 because the fitted value depends on whether the absorbed
+    effects are included, and ``ado/base`` (``reghdfe`` is a user command) has no
+    help file settling which one is the default.  Listing it here asserted a
+    surface the package no longer claims; ``xtreg, fe`` replaced it in the list
+    because Stata DOES document its default (``xtreg_postestimation.sthlp:128``).
+    """
+
+    linear = ["regress", "ivregress 2sls", "xtreg, fe", "tobit"]
     nonlinear = ["logit", "probit", "poisson", "nbreg", "ologit", "oprobit"]
 
     for model in linear:
@@ -337,6 +345,17 @@ def test_stdp_is_registered_wherever_xb_is_and_stdf_only_for_linear_models():
         kinds = supported_types(model)
         assert "stdp" in kinds, model
         assert "stdf" not in kinds, model
+
+
+def test_reghdfe_no_longer_registers_predict_types():
+    """It refuses at the result level with a message naming the ambiguity.
+
+    Registering types that cannot run would advertise a feature and then raise --
+    worse than not listing them.
+    """
+
+    with pytest.raises(ws.UnsupportedError):
+        supported_types("reghdfe")
 
 
 def test_xb_still_equals_fittedvalues_for_ols():

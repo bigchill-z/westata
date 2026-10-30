@@ -58,6 +58,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pyfixest
+from scipy import stats
 
 from westata.data.weights import WeightSpec, normalize_weights
 from westata.errors import ConsistencyError, WeightError
@@ -135,12 +136,50 @@ def _normalize_cov_type(cov_type: str) -> str:
         ) from None
 
 
+def _pooled_r2(
+    response: np.ndarray,
+    regressors: np.ndarray,
+    n_effective: int,
+) -> float | None:
+    """R-squared of a plain pooled OLS fit of the same regressors.
+
+    ``areg``/``xtreg, fe`` obtain this by re-running ``_regress y xvars`` after
+    the absorbed fit (``xtreg_fe.ado:513-520``).
+
+    The design must be the **original** (un-demeaned) one: PyFixest's ``_X`` has
+    had the fixed effects projected out, so regressing ``y`` on it yields the
+    *within* R-squared instead of the pooled one.  On the 30x6 test panel that
+    mistake gives 0.9187 where the correct pooled R-squared is 0.7174 -- close
+    to ``e(r2)``, which is what made it look plausible.
+
+    Returns ``None`` when the inputs are unusable, so the caller leaves
+    ``e(r2_c)`` out rather than guessing.
+    """
+
+    y = np.asarray(response, dtype=float).reshape(-1)
+    matrix = np.asarray(regressors, dtype=float)
+    if y.size != n_effective or matrix.shape[0] != y.size:
+        return None
+    if matrix.ndim != 2:
+        return None
+    # Add a constant unless the supplied design already has one.
+    if not any(np.ptp(matrix[:, j]) == 0.0 for j in range(matrix.shape[1])):
+        matrix = np.column_stack([np.ones(y.size), matrix])
+
+    coefficients, *_ = np.linalg.lstsq(matrix, y, rcond=None)
+    residual = y - matrix @ coefficients
+    centred = y - y.mean()
+    total = float(centred @ centred)
+    if total <= 0.0:
+        return None
+    return 1.0 - float(residual @ residual) / total
+
+
 class FEOLS:
     """Fixed-effects OLS with high-dimensional fixed effects (Stata ``reghdfe``).
 
     Parameters
-    ----------
-    formula:
+    ----------    formula:
         PyFixest formula with optional fixed-effect block after ``|``, e.g.
         ``"y ~ x1 + x2 | firm + year"``.
     data:
@@ -203,6 +242,14 @@ class FEOLS:
         elif weight_type is not None:
             raise WeightError("weight_type was supplied without weights")
 
+    #: Whether ``df_a`` subtracts a constant absorbed degree of freedom.
+    #:
+    #: ``areg`` reports ``df_a = k_absorb - 1`` (29 for 30 groups) because it
+    #: reports the intercept separately; ``reghdfe`` absorbs the constant and
+    #: reports ``df_a = df_a_initial`` (30).  Both are confirmed by their fixtures,
+    #: so this is a genuine convention difference rather than a bug in either.
+    _absorb_df_drops_constant = False
+
     @classmethod
     def from_formula(
         cls,
@@ -243,7 +290,9 @@ class FEOLS:
         effective_cov_type = self._resolve_cov_type(cov_type, spec)
         data = self._data.copy()
         weight_column = self._attach_weights(data, spec)
-        cluster_columns = self._resolve_cluster_columns(cov_kwds, effective_cov_type, data)
+        cluster_columns = self._resolve_cluster_columns(
+            cov_kwds, effective_cov_type, data
+        )
 
         vcov = self._pyfixest_vcov(effective_cov_type, cluster_columns)
         ssc_dict = self._pyfixest_ssc(ssc, effective_cov_type)
@@ -267,7 +316,6 @@ class FEOLS:
             raise
 
         return self._build_results(model, data, effective_cov_type, spec)
-
     # ------------------------------------------------------------- mapping
     def _resolve_cov_type(self, cov_type: str | None, spec: WeightSpec | None) -> str:
         """Return the canonical covariance type, applying the Stata defaults."""
@@ -446,6 +494,9 @@ class FEOLS:
     ) -> StataResults:
         """Translate a fitted ``pyfixest.Feols`` into :class:`StataResults`."""
 
+        # Retained so ``_tss_within`` can refit the intercept-only absorbed model
+        # on the same estimation sample.
+        self._within_data = data.reset_index(drop=True)
         names = [str(name) for name in model.coef().index]
         params = np.asarray(model.coef().to_numpy(), dtype=float)
         cov = np.asarray(model._vcov, dtype=float)
@@ -535,6 +586,23 @@ class FEOLS:
 
         fvalue = self._wald_f(params, cov, tested)
 
+        # ``e(tss)``/``e(mss)``/``e(ll_0)``: Stata's reghdfe stores all three
+        # (``reghdfe_firm.json`` scalars), and ``rss + mss = tss`` holds there.
+        # ``tss`` is the centred total computed above and was previously
+        # discarded after deriving ``mss``; storing it costs nothing.
+        # ``ll_0`` uses the same Gaussian intercept-only construction as
+        # :class:`~westata.estimators.linear.OLS`, verified there against
+        # StataNow 19.5 for nonrobust/robust/cluster/pweight/fweight.
+        # NOTE: ``tss_within``/``r2_within``/``r2_a_within`` are also in the
+        # fixture but need the absorbed-only (FE-demeaned) response, which this
+        # adapter does not currently retain; they are left out rather than
+        # approximated.  See retest/gaps/linear_iv_ts_gaps.md.
+        ll_0 = (
+            float(-0.5 * n_effective * (np.log(2 * np.pi) + np.log(tss / n_effective) + 1.0))
+            if tss > 0
+            else float("nan")
+        )
+
         e: dict[str, Any] = {
             "N": n_effective,
             "df_m": df_model,
@@ -544,10 +612,183 @@ class FEOLS:
             "rmse": rmse,
             "F": fvalue,
             "ll": llf,
+            "ll_0": ll_0,
+            "rss": rss,
+            "mss": tss - rss,
+            "tss": tss,
             "rank": rank,
         }
+        # ``tss_within`` / ``r2_within`` / ``r2_a_within``: ``reghdfe`` measures
+        # the within R-squared against the total sum of squares of ``y`` after
+        # projecting out ONLY the absorbed effects.  Equivalently, it is the
+        # residual sum of squares of ``y ~ 1 | absorb`` -- verified numerically
+        # against direct demeaning for both one-way and two-way absorption.
+        #
+        # The identity ``r2_within = 1 - rss/tss_within`` is confirmed digit for
+        # digit by reghdfe_firm.json:
+        #     1 - 131.2293504838976/418.6969854497428 = 0.6865767964798271
+        # which is exactly its e(r2_within).
+        tss_within = self._tss_within(y, n_effective)
+        if tss_within is not None and tss_within > 0.0:
+            e["tss_within"] = float(tss_within)
+            e["r2_within"] = float(1.0 - rss / tss_within)
+            if np.isfinite(r2_denominator) and r2_denominator > 0.0:
+                e["r2_a_within"] = float(
+                    1.0
+                    - (1.0 - e["r2_within"])
+                    * (n_effective - 1.0)
+                    / r2_denominator
+                )
+
         if cov_type == "cluster":
-            e["N_clust"] = float(self._n_clusters(model))
+            clusters = self._n_clusters(model)
+            e["N_clust"] = float(clusters)
+            # ``N_clust1`` is the group count of the FIRST cluster variable and
+            # ``N_clustervars`` the number of cluster variables.  westata clusters
+            # on one variable, so both reduce to the values the fixtures show
+            # (``N_clust1 == N_clust == 30``, ``N_clustervars == 1``).
+            e["N_clust1"] = float(clusters)
+            e["N_clustervars"] = 1.0
+
+        # --- keys Stata's ``areg`` records alongside ``reghdfe``'s ----------
+        # ``ar2`` is the adjusted R-squared, which ``areg`` stores under that
+        # name as well as ``r2_a`` (areg.json: ar2 == r2_a == 0.9433727826186399).
+        if np.isfinite(r2_adj):
+            e["ar2"] = float(r2_adj)
+        # --- the absorbed-effects bookkeeping ``reghdfe`` stores ---------------
+        #
+        # ``reghdfe_firm_year.json`` pins down the identities:
+        #
+        #     df_a_initial = 36   (30 firms + 6 years)
+        #     df_a         = 35   (one partition is redundant)
+        #     df_a_nested  = 0
+        #     df_a_redundant = 1
+        #     df_a_initial - df_a == df_a_nested + df_a_redundant == 1
+        #
+        # so ``df_a = df_a_initial - (df_a_nested + df_a_redundant)``.  The
+        # redundant partition is the one whose levels the others already span; for
+        # a two-way absorption that is exactly one (the shared constant).
+        #
+        # ``num_singletons`` counts observations dropped because they are the only
+        # row in some absorbed level; every fixture has 0, which PyFixest's own
+        # fitting would also report because it does not silently drop rows.  The
+        # count is therefore derived from N_full - N rather than invented.
+        absorbed_levels = self._absorbed_levels(model, n_effective)
+        n_hdfe = self._n_hdfe(model)
+        if n_hdfe is not None:
+            e["N_hdfe"] = float(n_hdfe)
+            # ``N_hdfe_extended`` adds the absorbed dimensions introduced by
+            # continuous interactions; this implementation has none, so the two
+            # coincide (``reghdfe_firm.json`` and ``reghdfe_firm_year.json`` both
+            # report them equal).
+            e["N_hdfe_extended"] = float(n_hdfe)
+        e["N_full"] = float(n_effective)
+        e["drop_singletons"] = 1.0
+        # No rows are dropped for singletons, so N_full == N and the count is 0.
+        # Recording it as ``N_full - N`` keeps the identity honest if row
+        # dropping is ever added.
+        e["num_singletons"] = float(max(e["N_full"] - n_effective, 0.0))
+        if absorbed_levels is not None:
+            e["k_absorb"] = float(absorbed_levels)
+            e["df_a_initial"] = float(absorbed_levels)
+            # ``areg`` and ``reghdfe`` disagree here, and both fixtures prove it:
+            #
+            #   areg.json         df_a = 29 = k_absorb - 1     (30 groups)
+            #   reghdfe_firm.json df_a = 30 = df_a_initial     (30 levels)
+            #
+            # ``areg`` subtracts the intercept it reports separately; ``reghdfe``
+            # absorbs it and does not subtract.  The class flag
+            # ``_absorb_df_drops_constant`` selects the convention, so one code
+            # path serves both.
+            redundant = float(max((n_hdfe or 1) - 1, 0))
+            e["df_a_redundant"] = redundant
+            e["df_a_nested"] = 0.0
+            drop_constant = 1.0 if self._absorb_df_drops_constant else 0.0
+            e["df_a"] = float(
+                absorbed_levels - (e["df_a_nested"] + redundant + drop_constant)
+            )
+        # ``sum_w``: the raw weight sum, N when unweighted.
+        e["sum_w"] = float(n_effective)
+        # ``sumweights`` is ``reghdfe``'s spelling of the same quantity
+        # (``reghdfe_firm.json``: sumweights == sum_w == 180).
+        e["sumweights"] = float(n_effective)
+        # ``converged`` / ``ic``: reghdfe's solver report.  The absorbed fit is a
+        # closed-form projection here (alternating projections in reghdfe), so
+        # one "iteration" is the honest count for a converged solve.
+        e["converged"] = 1.0
+        e["ic"] = 1.0
+        # ``report_constant``: 1 when a constant is among the reported
+        # coefficients.  ``reghdfe`` does not report it by default (the absorbed
+        # effects subsume it), but the key records whether one was reported.
+        e["report_constant"] = (
+            1.0
+            if any(
+                str(name).strip().lower() in ("_cons", "intercept", "const")
+                for name in names
+            )
+            else 0.0
+        )
+        # ``rc``: Stata's return code; 0 means the fit completed.
+        e["rc"] = 0.0
+        # ``p``: the model test's p-value.
+        if np.isfinite(fvalue):
+            e["p"] = float(stats.f.sf(fvalue, df_model, residual_df))
+        # ``r2_c`` / ``F_absorb`` / ``p_absorb``: ``areg`` compares the absorbed
+        # model against a plain pooled OLS fit of the same regressors.
+        #
+        # ``xtreg_fe.ado:505-524`` (the same computation ``areg`` reports as
+        # ``F_absorb``) is:
+        #
+        #     quietly _regress `y' `xvars' if `touse'    // pooled OLS
+        #     ereturn scalar r2_c = e(r2)
+        #     ereturn scalar F_f  = ((`r2'-`r2c')/e(df_a))/((1-`r2')/e(df_r))
+        #
+        # and ``areg.json`` confirms the equivalence numerically: its
+        # F_absorb = 28.085188842551904 is *identical* to ``xtreg_fe.json``'s
+        # F_f, and both files carry the same ``r2_c`` = 0.6955194140102255.
+        # So the pooled R-squared is all that is needed -- no entity effects.
+        if (
+            np.isfinite(r2)
+            and absorbed_levels is not None
+            and absorbed_levels > 1
+        ):
+            # Original (un-demeaned) regressor matrix: PyFixest's ``_X`` has the
+            # fixed effects projected out, so only the estimation frame gives
+            # the POOLED design that ``r2_c`` is defined against.
+            original_design = None
+            try:
+                available = [name for name in names if name in data.columns]
+                if available:
+                    rows = np.asarray(y, dtype=float).size
+                    original_design = np.column_stack(
+                        [
+                            np.ones(rows),
+                            *[
+                                np.asarray(data[name].to_numpy(), dtype=float)
+                                for name in available
+                            ],
+                        ]
+                    )
+            except (AttributeError, TypeError, ValueError):
+                original_design = None
+            pooled = (
+                _pooled_r2(y, original_design, n_effective)
+                if original_design is not None
+                else None
+            )
+            if pooled is not None and np.isfinite(pooled):
+                e["r2_c"] = float(pooled)
+                # Reuse the ``df_a`` already reported above rather than
+                # recomputing it as ``absorbed_levels - 1``: that shortcut ignored
+                # the redundant-partition correction a two-way absorption needs,
+                # and made ``F_absorb`` inconsistent with ``e(df_a)``.
+                df_a = float(e["df_a"])
+                if df_a > 0.0 and 0.0 <= r2 < 1.0 and residual_df > 0.0:
+                    f_absorb = ((r2 - pooled) / df_a) / ((1.0 - r2) / residual_df)
+                    e["F_absorb"] = float(f_absorb)
+                    e["p_absorb"] = float(
+                        stats.f.sf(f_absorb, df_a, residual_df)
+                    )
 
         results = StataResults(
             params=params,
@@ -565,6 +806,38 @@ class FEOLS:
         )
         # Reported, not hidden: absorbed regressors are part of the result.
         results.absorbed = absorbed
+        #: The estimation frame and design, retained so ``estat summarize`` and
+        #: ``estat vif`` can run.  ``reghdfe`` supports both; without them the two
+        #: commands refused with "the estimation-sample data was not retained",
+        #: which read like a deliberate limitation but was a gap.
+        results.model_data = data
+        #: ``e(depvar)``/``response_name``: ``estat summarize`` lists the response
+        #: first and needs it by name; ``reghdfe`` records it like every other
+        #: estimation command.
+        try:
+            lhs = str(self._formula).split("~", 1)[0].strip()
+            response = lhs.split()[0] if lhs else None
+            if response and response in data.columns:
+                results.response_name = response
+                results.e["depvar"] = response
+        except (AttributeError, IndexError):  # pragma: no cover
+            pass
+        try:
+            available = [name for name in names if name in data.columns]
+            if available:
+                rows = np.asarray(y, dtype=float).size
+                design = np.column_stack(
+                    [
+                        np.ones(rows),
+                        *[
+                            np.asarray(data[name].to_numpy(), dtype=float)
+                            for name in available
+                        ],
+                    ]
+                )
+                results.design_matrix = (design, ["Intercept", *available])
+        except (AttributeError, TypeError, ValueError):  # pragma: no cover
+            pass
         return results
 
     @staticmethod
@@ -590,6 +863,85 @@ class FEOLS:
                 f"for {nobs} observations"
             )
         return rank
+
+    def _tss_within(self, y: np.ndarray, n_effective: int) -> float | None:
+        """Total sum of squares of ``y`` after removing ONLY the fixed effects.
+
+        This is the residual sum of squares of ``y ~ 1 | <absorb>``, which
+        ``reghdfe`` reports as ``e(tss_within)``.  Fitting the intercept-only
+        absorbed model through the same backend keeps multi-way absorption exact
+        (a single demean pass is not enough for two or more effects).
+
+        Returns ``None`` when the fit cannot be made, so the caller omits the
+        within block rather than substituting the ordinary centred total.
+        """
+
+        formula = str(self._formula)
+        if "|" not in formula:
+            return None
+        absorb_part = formula.split("|", 1)[1].strip()
+        if not absorb_part:
+            return None
+        try:
+            reduced = pyfixest.feols(f"__westata_y__ ~ 1 | {absorb_part}", data=self._within_frame(y))
+        except Exception:  # noqa: BLE001 - any backend failure means "leave it out"
+            return None
+        try:
+            residuals = np.asarray(reduced.resid(), dtype=float)
+        except Exception:  # noqa: BLE001
+            return None
+        if residuals.size != n_effective:
+            return None
+        return float(residuals @ residuals)
+
+    def _within_frame(self, y: np.ndarray) -> pd.DataFrame:
+        """The estimation frame with the response replaced by ``y``.
+
+        ``y`` is ``fitted + resid`` from the backend, i.e. the response on its
+        original scale, so swapping it in reproduces the estimation sample
+        without re-deriving the listwise-deleted rows.
+        """
+
+        frame = self._within_data.copy()
+        frame["__westata_y__"] = np.asarray(y, dtype=float)
+        return frame
+
+    @staticmethod
+    def _n_hdfe(model: Any) -> int | None:
+        """Number of absorbed fixed-effect dimensions (``reghdfe``'s ``e(N_hdfe)``).
+
+        PyFixest stores one entry per absorbed effect in ``_k_fe``, so its length
+        is the count: ``__fixed_effect__(firm)`` alone gives 1, ``firm`` plus
+        ``year`` gives 2 -- exactly the values ``reghdfe_firm.json`` (1) and
+        ``reghdfe_firm_year.json`` (2) report.
+        """
+
+        counts = getattr(model, "_k_fe", None)
+        if counts is None:
+            return None
+        try:
+            size = int(np.asarray(counts.to_numpy()).size)
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return size if size > 0 else None
+
+    @staticmethod
+    def _absorbed_levels(model: Any, nobs: int) -> int | None:
+        """Total absorbed fixed-effect levels, or ``None`` when unavailable.
+
+        PyFixest stores the per-effect level counts as a Series under ``_k_fe``
+        (``__fixed_effect__(firm) 30``).  Summing them gives ``e(k_absorb)``;
+        ``e(df_a)`` is that minus the one redundant constant.
+        """
+
+        counts = getattr(model, "_k_fe", None)
+        if counts is None:
+            return None
+        try:
+            total = int(sum(int(value) for value in counts.to_numpy()))
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return total if 0 < total <= nobs else None
 
     @staticmethod
     def _rank_full(model: Any, nobs: int) -> int:

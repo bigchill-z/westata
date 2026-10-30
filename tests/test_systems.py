@@ -470,6 +470,217 @@ def test_mvreg_reports_per_equation_fit_statistics():
     assert float(result.e["df_r"]) == 396.0
 
 
+def test_mvreg_stores_sigma_under_statats_name():
+    """``mvreg.sthlp:194`` spells it ``e(Sigma)`` -- "Sigma hat matrix".
+
+    sigma_ij = u_i'u_j/(n-k), the cross-equation residual covariance that makes
+    the multivariate VCE differ from stacking separate OLS fits.
+    """
+
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    sigma = result.e["Sigma"]
+    assert len(sigma) == 2 and len(sigma[0]) == 2
+
+    # Recompute directly from the per-equation residuals.
+    design = np.column_stack(
+        [np.ones(len(frame))] + [frame[name].to_numpy() for name in ("x1", "x2", "x3")]
+    )
+    residuals = []
+    for outcome in ("y1", "y2"):
+        values = frame[outcome].to_numpy()
+        beta, *_ = np.linalg.lstsq(design, values, rcond=None)
+        residuals.append(values - design @ beta)
+    expected = np.array(
+        [
+            [residuals[i] @ residuals[j] / (len(frame) - 4) for j in range(2)]
+            for i in range(2)
+        ]
+    )
+
+    np.testing.assert_allclose(np.asarray(sigma), expected, rtol=1e-10)
+
+
+def test_mvreg_keeps_the_lowercase_sigma_alias():
+    """``e["sigma"]`` stays available for callers written against it, and must
+    hold the same matrix as Stata's ``e(Sigma)``."""
+
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+
+    np.testing.assert_allclose(
+        np.asarray(result.e["Sigma"]), np.asarray(result.e["sigma"])
+    )
+
+
+def test_mvreg_carries_the_documented_macros():
+    """``mvreg.sthlp:172-196`` lists the macros an eclass command carries."""
+
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    e = result.e
+
+    assert e["cmd"] == "mvreg"
+    assert e["eqnames"] == "y1 y2"
+    assert e["depvar"] == "y1 y2"
+    assert e["properties"] == "b V"
+    assert e["estat_cmd"] == "mvreg_estat"
+    assert e["asbalanced"] == ""
+    assert e["asobserved"] == ""
+
+
+def test_mvreg_predict_program_is_reg3_p():
+    """``mvreg.ado:124``: ``est local predict "reg3_p"``.
+
+    There is no ``mvreg_p.ado`` in ``ado/base/m``; the multiple-equation predict
+    is the shared ``reg3_p`` (``reg3_p.ado:12`` declares
+    ``local myopts "Difference Residuals"``).  An earlier round invented the name
+    ``mvreg_p`` from the command name, which is exactly the kind of plausible-but-
+    wrong identifier that never raises an error.
+    """
+
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+
+    assert result.e["predict"] == "reg3_p"
+    assert "difference" in result.predict_types
+
+
+def test_mvreg_predict_difference_is_xb1_minus_xb2():
+    """``reg3_p.ado:126-127``: ``gen varn = xb1 - xb2``."""
+
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    difference = np.asarray(
+        result.predict(kind="difference", equation=1, equation2=2), dtype=float
+    )
+    expected = np.asarray(result.predict(kind="xb", equation=1), dtype=float) - np.asarray(
+        result.predict(kind="xb", equation=2), dtype=float
+    )
+
+    np.testing.assert_allclose(difference, expected, rtol=1e-10)
+
+
+def test_sureg_predict_is_equation_aware():
+    """``sureg.ado:14,45`` routes through ``reg3``, so predict is ``reg3_p``."""
+
+    frame = _sur()
+    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+
+    assert result.e["predict"] == "reg3_p"
+    assert "difference" in result.predict_types
+
+
+def test_sureg_predict_xb_uses_the_sureg_coefficients():
+    """The fitted values must come from the FGLS coefficients, not per-equation OLS.
+
+    ``sureg`` and stacked OLS differ precisely because SUR reweights using the
+    cross-equation residual covariance, so asserting equality with OLS would be
+    asserting a bug.
+    """
+
+    frame = _sur()
+    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+
+    predicted = np.asarray(result.predict(kind="xb", equation=1), dtype=float)
+    design = np.asarray(result._equation_design[0], dtype=float)
+    coefficients = np.asarray(result._equation_coefficients[0], dtype=float)
+
+    np.testing.assert_allclose(predicted, design @ coefficients, rtol=1e-10)
+
+
+def test_sureg_predict_residuals_reconstruct_the_response():
+    frame = _sur()
+    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+
+    reconstructed = np.asarray(result.predict(kind="xb", equation=1), dtype=float) + np.asarray(
+        result.predict(kind="residuals", equation=1), dtype=float
+    )
+
+    np.testing.assert_allclose(reconstructed, frame["y1"].to_numpy(), rtol=1e-10)
+
+
+def test_sureg_predict_handles_equations_with_different_regressors():
+    """Each equation keeps its OWN design, so the column counts may differ."""
+
+    frame = _sur()
+    result = Sureg.from_formula(["y1 ~ x1", "y2 ~ x1 + x2 + x3"], frame).fit()
+
+    first = np.asarray(result.predict(kind="xb", equation=1), dtype=float)
+    second = np.asarray(result.predict(kind="xb", equation=2), dtype=float)
+
+    assert first.shape == (len(frame),)
+    assert second.shape == (len(frame),)
+    assert not np.allclose(first, second)
+
+
+def test_mvreg_predict_xb_matches_a_separate_ols_fit():
+    """The equation's fitted values must equal a standalone OLS of that outcome."""
+
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    for equation, outcome in ((1, "y1"), (2, "y2")):
+        predicted = np.asarray(result.predict(kind="xb", equation=equation), dtype=float)
+        separate = ws.OLS.from_formula(f"{outcome} ~ x1 + x2 + x3", frame).fit()
+        np.testing.assert_allclose(
+            predicted, np.asarray(separate.fittedvalues, dtype=float), rtol=1e-10
+        )
+
+
+def test_mvreg_predict_defaults_to_the_first_equation():
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    np.testing.assert_allclose(
+        np.asarray(result.predict(kind="xb"), dtype=float),
+        np.asarray(result.predict(kind="xb", equation=1), dtype=float),
+    )
+
+
+def test_mvreg_predict_residuals_reconstruct_the_response():
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    reconstructed = np.asarray(result.predict(kind="xb", equation=2), dtype=float) + np.asarray(
+        result.predict(kind="residuals", equation=2), dtype=float
+    )
+
+    np.testing.assert_allclose(reconstructed, frame["y2"].to_numpy(), rtol=1e-10)
+
+
+def test_mvreg_predict_stdp_is_positive_and_finite():
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    stdp = np.asarray(result.predict(kind="stdp"), dtype=float)
+
+    assert stdp.shape == (len(frame),)
+    assert np.all(np.isfinite(stdp))
+    assert np.all(stdp > 0)
+
+
+def test_mvreg_predict_refuses_single_equation_diagnostics():
+    """``hat``/``cooksd``/... are single-equation influence quantities.
+
+    A stacked multiple-equation fit has no design matrix of the right shape, so
+    these are refused rather than computed from the wrong matrix.
+    """
+
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    with pytest.raises(ValueError, match="multiple-equation"):
+        result.predict(kind="cooksd")
+
+
+def test_mvreg_predict_refuses_an_equation_out_of_range():
+    frame = _sur()
+    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+
+    with pytest.raises(ValueError, match="out of range"):
+        result.predict(kind="xb", equation=3)
+
+
 def test_mvreg_rejects_a_missing_equals_sign():
     with pytest.raises(ConsistencyError, match="="):
         Mvreg.from_formula("y1 y2 ~ x1 x2", _sur())

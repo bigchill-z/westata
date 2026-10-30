@@ -279,9 +279,12 @@ def test_truncreg_drops_observations_outside_the_limits():
     with pytest.warns(RuntimeWarning, match="truncated"):
         result = Truncreg.from_formula("y ~ x1", frame, lower=0.5).fit()
 
-    assert result.e["n_truncated"] == below
+    # ``n_truncated`` is OUR diagnostic, not a Stata macro (``truncreg.sthlp`` has
+    # no such key; ``e(N_bf)`` covers the pre-truncation count).  It is asserted via
+    # the sample arithmetic instead of through e().
     assert result.e["N"] == len(frame) - below
     assert result.nobs == len(frame) - below
+    assert "n_truncated" not in result.e
 
 
 def test_truncreg_refuses_a_sample_entirely_outside_the_limits():
@@ -298,7 +301,7 @@ def test_truncreg_populates_e_and_renders():
     assert result.model_name == "truncreg"
     assert result.dist == "z"
     text = result.summary(style="stata")
-    assert "Coef." in text
+    assert "Coefficient" in text
     assert "Wald chi2(2)" in text
 
 
@@ -333,24 +336,40 @@ def test_intreg_point_interval_uses_the_density_not_a_zero_probability():
 
 
 def test_intreg_reports_lnsigma_like_stata():
+    """``intreg`` names the auxiliary parameter ``/lnsigma``; there is no ``e(lnsigma)``.
+
+    ``intreg.sthlp:241-262`` lists ``e(sigma)`` and ``e(se_sigma)`` only.  The
+    logged parameter is visible through ``e(b)``/``params`` under the ``/lnsigma``
+    name, not as an e() scalar.
+    """
+
     result = Intreg.from_formula("lo hi ~ x1", _intervals()).fit()
     names = list(result.param_names)
     assert "/lnsigma" in names
     assert "/sigma" not in names
     assert float(result.e["sigma"]) > 0
-    assert float(result.e["lnsigma"]) == pytest.approx(
+    assert "lnsigma" not in result.e
+    # The stored parameter IS ln(sigma).
+    assert float(result.params[names.index("/lnsigma")]) == pytest.approx(
         np.log(float(result.e["sigma"])), rel=1e-12
     )
 
 
 def test_intreg_censoring_bookkeeping_matches_the_data():
+    """``intreg.sthlp:242-245`` uses ``N_lc``/``N_rc``/``N_int``/``N_unc``.
+
+    The lower-case spellings are not Stata macros and are no longer reported.
+    """
+
     frame = _intervals()
     result = Intreg.from_formula("lo hi ~ x1", frame).fit()
-    assert result.e["n_left"] == int(np.isneginf(frame["lo"]).sum())
-    assert result.e["n_right"] == int(np.isposinf(frame["hi"]).sum())
-    assert result.e["n_interval"] == int(
+    assert result.e["N_lc"] == int(np.isneginf(frame["lo"]).sum())
+    assert result.e["N_rc"] == int(np.isposinf(frame["hi"]).sum())
+    assert result.e["N_int"] == int(
         (np.isfinite(frame["lo"]) & np.isfinite(frame["hi"])).sum()
     )
+    for stale in ("n_left", "n_right", "n_interval", "n_uncensored"):
+        assert stale not in result.e, stale
     assert result.model_name == "intreg"
 
 
@@ -387,10 +406,26 @@ def test_intreg_handles_mixed_censoring_and_point_intervals():
 
     assert np.all(np.isfinite(result.params.to_numpy()))
     assert np.all(np.isfinite(result.bse.to_numpy()))
-    assert result.e["n_left"] == int(np.isneginf(lower).sum())
-    assert result.e["n_right"] == int(np.isposinf(upper).sum())
-    assert result.e["n_uncensored"] == int(
-        (np.isfinite(lower) & np.isfinite(upper) & (lower == upper)).sum()
+    # The four kinds are MUTUALLY EXCLUSIVE in ``_interval_counts``.  A row with
+    # BOTH bounds infinite carries no information at all, so it is neither
+    # left-censored nor right-censored: the naive ``isneginf(lower)`` count of 80
+    # overcounts by the 12 rows where the two patterns overlap.
+    left = ~np.isfinite(lower) & np.isfinite(upper)
+    right = np.isfinite(lower) & ~np.isfinite(upper)
+    exact = np.isfinite(lower) & np.isfinite(upper) & (lower == upper)
+    interval = np.isfinite(lower) & np.isfinite(upper) & (lower != upper)
+    assert result.e["N_lc"] == int(left.sum())
+    assert result.e["N_rc"] == int(right.sum())
+    assert result.e["N_unc"] == int(exact.sum())
+    assert result.e["N_int"] == int(interval.sum())
+    # The overlap rows are excluded from every kind, so the total is short of n.
+    assert left.sum() + right.sum() + exact.sum() + interval.sum() < n
+    assert (
+        result.e["N_lc"]
+        + result.e["N_rc"]
+        + result.e["N_unc"]
+        + result.e["N_int"]
+        == int(left.sum() + right.sum() + exact.sum() + interval.sum())
     )
     assert "LR chi2(1)" in result.summary(style="stata")
 
@@ -581,7 +616,7 @@ def test_heckman_populates_e_and_renders():
     assert result.model_name == "heckman"
     assert result.dist == "z"
     text = result.summary(style="stata")
-    assert "Coef." in text
+    assert "Coefficient" in text
     assert "Wald chi2(1)" in text
 
 
@@ -656,7 +691,7 @@ def test_etregress_populates_e_and_renders():
         assert key in result.e, key
     assert result.model_name == "etregress"
     text = result.summary(style="stata")
-    assert "Coef." in text
+    assert "Coefficient" in text
 
 
 def test_etregress_does_not_duplicate_the_treatment_regressor():

@@ -542,7 +542,7 @@ def test_stata_summary_renders_for_every_model():
         assert "LR chi2(" in text
         assert "Pseudo R2" in text
         assert "Log likelihood" in text
-        assert "Coef." in text
+        assert "Coefficient" in text
 
 
 def test_pseudo_r2_is_mcfadden_against_the_constant_only_model():

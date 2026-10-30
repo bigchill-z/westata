@@ -137,8 +137,23 @@ class StataResults:
         merged_e: dict[str, Any] = {
             "N": nobs_int,
             "df_m": df_model_value,
-            "df_r": df_resid_value,
         }
+        # ``e(df_r)`` is NOT universal.  ``logit``/``poisson``/``nbreg``/``ologit``
+        # do not document it (only ``e(df_m)``), because an ML model's tests are
+        # z-tests with no residual degrees of freedom; ``tobit`` DOES document it.
+        # Injecting it unconditionally put a fabricated 200.0 in e() for a logit
+        # fit, where Stata has no such key at all.
+        # ``e(df_r)`` is NOT universal.  ``logit``/``poisson``/``nbreg``/``ologit``
+        # do not document it (only ``e(df_m)``), because an ML model's tests are
+        # z-tests with no residual degrees of freedom; ``tobit`` DOES document it,
+        # and so does ``xtivreg`` -- even though both report z statistics.
+        #
+        # So the decision cannot be made from ``dist`` alone.  An estimator that
+        # passes ``df_r`` in its own e() dict is stating that Stata stores it;
+        # only the unconditional injection is suppressed for z-based models.
+        explicit_df_r = e is not None and "df_r" in dict(e)
+        if explicit_df_r or str(dist_value or "").strip().lower() != "z":
+            merged_e["df_r"] = df_resid_value
         if e is not None:
             merged_e.update(dict(e))
         self._e = EReturn(merged_e)
@@ -172,6 +187,239 @@ class StataResults:
 
         return list(self._param_names)
 
+    # ------------------------------------------------------------------
+    # Stata's coefficient ordering
+    # ------------------------------------------------------------------
+    #
+    # ``regress mpg weight foreign`` reports ``e(b)`` in the order
+    # ``weight foreign _cons`` -- the CONSTANT LAST.  patsy, which builds this
+    # package's design matrices, puts the intercept FIRST and spells the factor
+    # level ``foreign[T.Foreign]``.
+    #
+    # The numbers agree exactly once reordered: ``regress_auto.json``'s ``b``
+    # matches to 1.6e-12 and its ``V`` to 1.6e-15.  But a caller who compares
+    # ``result.params`` against Stata's ``e(b)`` directly sees a difference of
+    # ~41.7 in the first element and concludes the fit is wrong.  These accessors
+    # remove that trap.
+    #
+    # ``VARResults`` already had its own ``stata_params``/``stata_cov_params``
+    # for the same reason (Stata orders a VAR equation by equation); this is the
+    # equivalent for the single-equation results.
+
+    _STATA_CONSTANT_NAMES = frozenset(
+        {"intercept", "intercept_", "_cons", "const"}
+    )
+
+    def _stata_order(self) -> list[int]:
+        """Indices that reorder ``param_names`` into Stata's ``e(b)`` order.
+
+        Stata's layout, in order:
+
+        1. the regressors, in the order the formula wrote them;
+        2. ``_cons``, if the model has one;
+        3. the auxiliary parameters -- ``cut1``.. (ordinal models) and
+           ``lnalpha`` (negative binomial) -- LAST.
+
+        Step 3 is confirmed by ``nbreg.json``, whose names are
+        ``['x1', '_cons', 'lnalpha']``: the dispersion follows the constant, it
+        does not sit among the regressors.  The ``ologit.json`` names
+        ``['x1', 'x2', 'cut1', 'cut2']`` put the cuts after the slopes for the
+        same reason.
+
+        patsy alphabetises, so the written order is recovered from the
+        estimator's ``_formula_rhs_order`` when available; without it the slope
+        order is whatever patsy produced.
+        """
+
+        names = [str(name) for name in self._param_names]
+        constants = [
+            index
+            for index, name in enumerate(names)
+            if name.strip().lower() in self._STATA_CONSTANT_NAMES
+        ]
+        # Auxiliary parameters: Stata stores them without the display slash, so
+        # recognise the leading "/" of the internal spelling.
+        auxiliary = [
+            index
+            for index, name in enumerate(names)
+            if name.startswith("/") or name.startswith("cut")
+        ]
+        taken = set(constants) | set(auxiliary)
+        slopes = [index for index in range(len(names)) if index not in taken]
+
+        written = getattr(self, "_formula_rhs_order", None) or []
+        if written:
+            def _base(name: str) -> str:
+                return str(name).split("[T.", 1)[0]
+
+            ordered: list[int] = []
+            remaining = list(slopes)
+            for variable in written:
+                for index in list(remaining):
+                    if _base(names[index]) == variable:
+                        ordered.append(index)
+                        remaining.remove(index)
+                        break
+            # Anything the formula did not name plainly (interactions, I(...))
+            # keeps patsy's relative order after the named terms.
+            slopes = ordered + remaining
+
+        return slopes + constants + auxiliary
+
+    @property
+    def stata_factor_terms(self) -> list[str]:
+        """Factor terms whose Stata ``e(b)`` spelling cannot be reconstructed.
+
+        Stata expands an explicit factor into one coefficient per LEVEL plus an
+        explicit base row, so ``regress mpg weight i.foreign`` reports FOUR
+        entries -- ``weight``, ``0b.foreign``, ``1.foreign``, ``_cons`` -- with
+        the base recorded as 0 (``regress_auto_factor.json`` shows exactly that:
+        ``b = [-0.00659, 0.0, -1.65003, 41.6797]``).
+
+        A plain binary variable is different: ``regress mpg weight foreign``
+        reports a single ``foreign`` row naming the level, which maps one-to-one
+        onto this package's ``foreign[T.Foreign]`` column. That case is fine and
+        is NOT reported here.
+
+        The discriminating question is therefore "is this an explicit factor
+        expansion, or a 0/1 variable?"  patsy spells both as ``[T.<level>]``, so
+        the check uses the source the caller wrote: a ``C(...)`` term is explicit,
+        a bare column whose values are all 0/1 is a dummy.
+
+        Returns
+        -------
+        list[str]
+            Empty when every coefficient has an unambiguous Stata spelling.
+
+        Notes
+        -----
+        The discriminating question is what the CALLER wrote, not what patsy
+        produced: an explicit ``C(...)`` term is a factor expansion, while a bare
+        column is a variable Stata would render as one row -- even when the column
+        is a string that patsy had to code as a factor (the ``auto.dta``
+        ``foreign`` column is ``"Domestic"``/``"Foreign"``, yet
+        ``regress_auto.json`` reports a single ``foreign`` row).  So the check is
+        purely syntactic on the recorded parameter names.
+        """
+
+        offending: list[str] = []
+        # Group the factor columns by their base variable and note whether the
+        # caller wrote an explicit ``C(...)``.
+        levels: dict[str, int] = {}
+        explicit: set[str] = set()
+        for name in self._param_names:
+            text = str(name)
+            if "[T." not in text:
+                continue
+            base = text.split("[T.", 1)[0].replace("C(", "").rstrip(")")
+            levels[base] = levels.get(base, 0) + 1
+            if text.startswith("C("):
+                explicit.add(base)
+
+        for base, count in levels.items():
+            # Two independent reasons a term is ambiguous:
+            #
+            # * it expands into MORE THAN ONE level column.  `y ~ x1 + g` on a
+            #   string column with five levels yields `g[T.b]`..`g[T.e]` with no
+            #   `C(...)` in sight; treating those as bare dummies made all four
+            #   collapse to the name `g`, silently giving four coefficients one
+            #   label.
+            #
+            # * the caller wrote an explicit `C(...)`.  Even a BINARY factor has
+            #   this problem: `i.foreign` reports FOUR e(b) rows -- `0b.foreign`,
+            #   `1.foreign` and `_cons` plus the other regressor -- with the base
+            #   at 0, while this result has one level column.  The single level
+            #   count would otherwise pass the test above.
+            if count > 1 or base in explicit:
+                offending.append(base)
+        return sorted(offending)
+
+    @property
+    def stata_param_names(self) -> list[str]:
+        """Coefficient names as Stata reports them (``_cons`` last).
+
+        Raises
+        ------
+        NotImplementedError
+            When a factor term's Stata spelling is ambiguous -- Stata reports one
+            row per level plus a zero base row, while this package has a single
+            level column. See :attr:`stata_factor_terms`. Returning an invented
+            name would be worse than refusing: it would look like a valid
+            correspondence to Stata's ``e(b)`` row when none exists.
+        """
+
+        factors = self.stata_factor_terms
+        if factors:
+            raise NotImplementedError(
+                "stata_param_names cannot name these factor terms unambiguously: "
+                + ", ".join(factors)
+                + ".  Stata reports one e(b) row per factor LEVEL plus an "
+                "explicit zero base row (0b.<var>), while this result has a "
+                "single level column; there is no one-to-one mapping.  Compare "
+                "with `params`/`bse`, or encode the factor as dummies and refit."
+            )
+
+        order = self._stata_order()
+        names = [str(self._param_names[index]) for index in order]
+        renamed = []
+        for name in names:
+            if name.strip().lower() in self._STATA_CONSTANT_NAMES:
+                renamed.append("_cons")
+            elif "[T." in name:
+                # A bare factor column: Stata names the row after the VARIABLE,
+                # not the level -- ``regress_auto.json`` reports ``foreign`` for
+                # what patsy spells ``foreign[T.Foreign]``.
+                renamed.append(name.split("[T.", 1)[0])
+            elif ":" in name:
+                # Stata separates interaction terms with ``#``, patsy with ``:``:
+                # ``x1 * x2`` yields ``x1:x2`` here and ``x1#x2`` in Stata.  The
+                # ORDER is already right, only the separator differs, so swapping
+                # it is a rename rather than a guess.
+                renamed.append(name.replace(":", "#"))
+            elif name.startswith("/"):
+                # Auxiliary parameters are DISPLAYED with a leading slash by
+                # Stata (``/cut1``, ``/lnalpha``) but stored WITHOUT it in e(b).
+                # The fixtures are decisive: ``ologit.json``'s names are
+                # ``['x1', 'x2', 'cut1', 'cut2']`` and ``nbreg.json``'s are
+                # ``['x1', '_cons', 'lnalpha']`` -- no slashes anywhere.
+                renamed.append(name[1:])
+            else:
+                renamed.append(name)
+        return renamed
+
+    @property
+    def stata_params(self) -> pd.Series:
+        """``b`` in Stata's ``e(b)`` order and spelling.
+
+        Raises
+        ------
+        NotImplementedError
+            For factor terms whose Stata spelling is ambiguous; see
+            :attr:`stata_param_names`.
+        """
+
+        order = self._stata_order()
+        values = np.asarray(self._params.to_numpy(), dtype=float)[order]
+        return pd.Series(values, index=self.stata_param_names, name="params")
+
+    @property
+    def stata_cov_params(self) -> np.ndarray:
+        """``V`` in Stata's ``e(V)`` order (the same permutation as the names).
+
+        Raises
+        ------
+        NotImplementedError
+            For factor terms whose Stata layout has more rows than this result;
+            see :attr:`stata_param_names`.
+        """
+
+        # Surface the same refusal as the names, so a caller cannot get a matrix
+        # whose rows silently do not match Stata's.
+        _ = self.stata_param_names
+        order = self._stata_order()
+        covariance = np.asarray(self.cov_params(), dtype=float)
+        return covariance[np.ix_(order, order)]
+
     @property
     def params(self) -> pd.Series:
         return self._params
@@ -204,6 +452,221 @@ class StataResults:
         """Return the covariance matrix of the parameter estimates."""
 
         return self._cov
+
+    def estat_vce(self, *, correlation: bool = False) -> Any:
+        """Stata's ``estat vce`` -- print the coefficient covariance matrix.
+
+        ``correlation=True`` gives ``estat vce, correlation``.  Both are pure
+        renderings of :meth:`cov_params`; nothing is recomputed.
+
+        Returns
+        -------
+        VceMatrix
+            ``str(...)`` prints the table; ``.to_frame()`` returns the full
+            symmetric matrix.
+        """
+
+        from westata.postestimation.vce import estat_vce
+
+        return estat_vce(self, correlation=correlation)
+
+    def estat_gof(self, **kwargs: Any) -> Any:
+        """Stata's ``estat gof`` -- Poisson goodness-of-fit tests.
+
+        Only defined for ``poisson``: Stata has no ``estat gof`` after ``nbreg``
+        (``nbreg`` sets no ``e(estat_cmd)``), so requesting it there raises
+        ``NotImplementedError`` rather than returning an invented statistic.
+        """
+
+        from westata.postestimation.gof import estat_gof
+
+        return estat_gof(self, **kwargs)
+
+    def estat_vif(self, **kwargs: Any) -> Any:
+        """Stata's ``estat vif`` -- variance inflation factors.
+
+        Only defined for linear models: the auxiliary regressions are ordinary
+        least squares by construction, and Stata reaches the command through
+        ``regress_estat``.
+        """
+
+        from westata.postestimation.vif import estat_vif
+
+        return estat_vif(self, **kwargs)
+
+    def estat_hettest(self, **kwargs: Any) -> Any:
+        """Stata's ``estat hettest`` -- Breusch-Pagan / Cook-Weisberg.
+
+        Refuses, like Stata, after a robust or clustered VCE and on pweighted
+        data.
+        """
+
+        from westata.postestimation.hettest import estat_hettest
+
+        return estat_hettest(self, **kwargs)
+
+    def suest(self, *others: Any, **kwargs: Any) -> Any:
+        """Stata's ``suest`` -- stack this fit with others into one covariance.
+
+        Combines the parameter vectors and forms the simultaneous sandwich covariance
+        across models (``suest.sthlp:84-88``).  The models must share an estimation
+        sample.
+        """
+
+        from westata.postestimation.suest import suest
+
+        return suest((self,) + tuple(others), **kwargs)
+
+    def linktest(self) -> Any:
+        """Stata's ``linktest`` -- Pregibon's link test for a specification error.
+
+        Refits the same estimator with ``_hat`` and ``_hatsq`` added and reports the t
+        statistic of the squared term (``linktest.ado:131-132``).
+        """
+
+        from westata.postestimation.linktest import linktest
+
+        return linktest(self)
+
+    def estat_moran(self, *args: Any, **kwargs: Any) -> Any:
+        """Stata's ``estat moran`` -- Moran's test for spatial correlation in residuals.
+
+        Requires a spatial weighting matrix.  This package has no ``spmatrix`` toolchain,
+        so the matrix is passed explicitly; see
+        :mod:`westata.postestimation.moran` for the caveat about Stata's own statistic.
+        """
+
+        from westata.postestimation.moran import estat_moran
+
+        return estat_moran(self, *args, **kwargs)
+
+    def estat_esize(self, **kwargs: Any) -> Any:
+        """Stata's ``estat esize`` -- eta/epsilon/omega-squared effect sizes.
+
+        ``regress_postestimation.sthlp:599-614`` restricts it to linear models; eta-squared
+        is ``R^2`` and carries a noncentral-F interval.
+        """
+
+        from westata.postestimation.esize import estat_esize
+
+        return estat_esize(self, **kwargs)
+
+    def estat_szroeter(self, *args: Any, **kwargs: Any) -> Any:
+        """Stata's ``estat szroeter`` -- Szroeter's rank test for heteroskedasticity.
+
+        Refuses, like ``szroeter.ado:13-22``, after anything other than ``regress``, and
+        on weighted or clustered fits.
+        """
+
+        from westata.postestimation.szroeter import estat_szroeter
+
+        return estat_szroeter(self, *args, **kwargs)
+
+    def estat_ovtest(self, **kwargs: Any) -> Any:
+        """Stata's ``estat ovtest`` -- Ramsey RESET test for omitted variables."""
+
+        from westata.postestimation.ovtest import estat_ovtest
+
+        return estat_ovtest(self, **kwargs)
+
+    def estat_ic(self, **kwargs: Any) -> Any:
+        """Stata's ``estat ic`` -- AIC, BIC, AICc and CAIC.
+
+        ``df`` defaults to ``rank(V)``, matching ``estimates.ado:977-978``; ``N``
+        is ``e(N_ic)`` when recorded and ``e(N)`` otherwise.
+        """
+
+        from westata.postestimation.ic import estat_ic
+
+        return estat_ic(self, **kwargs)
+
+    def estat_firststage(self, **kwargs: Any) -> Any:
+        """Stata's ``estat firststage`` -- IV first-stage diagnostics.
+
+        Reports each endogenous regressor's first-stage R-squared, adjusted
+        R-squared, partial R-squared and the joint F of the excluded
+        instruments; with more than one endogenous regressor it adds Shea's
+        partial R-squared.
+        """
+
+        from westata.postestimation.firststage import estat_firststage
+
+        return estat_firststage(self, **kwargs)
+
+    def estat_overid(self, **kwargs: Any) -> Any:
+        """Stata's ``estat overid`` -- overidentification restrictions test.
+
+        Reports Sargan (with Basmann's finite-sample variant) for 2SLS/LIML and
+        Hansen's J for GMM.
+        """
+
+        from westata.postestimation.overid import estat_overid
+
+        return estat_overid(self, **kwargs)
+
+    def estat_mundlak(self, **kwargs: Any) -> Any:
+        """Stata's ``estat mundlak`` -- the Mundlak panel specification test.
+
+        Adds the within-group means of the regressors to the random-effects equation and
+        tests them jointly to zero: ``xtreg_postestimation.sthlp:366-370``.  A rejection
+        means the unobserved effect is correlated with ``x``, so the random-effects
+        estimator is inconsistent.
+        """
+
+        from westata.postestimation.mundlak import estat_mundlak
+
+        return estat_mundlak(self, **kwargs)
+
+    def estat_weakrobust(self, **kwargs: Any) -> Any:
+        """Stata's ``estat weakrobust`` -- inference robust to weak instruments.
+
+        Reports the Anderson-Rubin test, whose distribution does not depend on instrument
+        strength.  The conditional likelihood-ratio test (the overidentified default in
+        Stata) is refused with its reason; see
+        :func:`westata.postestimation.weakrobust.estat_weakrobust`.
+        """
+
+        from westata.postestimation.weakrobust import estat_weakrobust
+
+        return estat_weakrobust(self, **kwargs)
+
+    def estat_endogenous(self, **kwargs: Any) -> Any:
+        """Stata's ``estat endogenous`` -- Durbin-Wu endogeneity test."""
+
+        from westata.postestimation.endogenous import estat_endogenous
+
+        return estat_endogenous(self, **kwargs)
+
+    def estat_classification(self, **kwargs: Any) -> Any:
+        """Stata's ``estat classification`` -- the 2x2 classification table."""
+
+        from westata.postestimation.classification import estat_classification
+
+        return estat_classification(self, **kwargs)
+
+    def estat_auc(self) -> Any:
+        """Stata's ``estat auc`` -- the area under the ROC curve.
+
+        ``logit_estat.ado:19-21`` dispatches the subcommand to ``lroc, nograph``.
+        """
+
+        from westata.postestimation.auc import estat_auc
+
+        return estat_auc(self)
+
+    def estat_imtest(self, **kwargs: Any) -> Any:
+        """Stata's ``estat imtest`` -- Cameron & Trivedi's IM-test."""
+
+        from westata.postestimation.imtest import estat_imtest
+
+        return estat_imtest(self, **kwargs)
+
+    def estat_summarize(self, **kwargs: Any) -> Any:
+        """Stata's ``estat summarize`` -- describe the estimation sample."""
+
+        from westata.postestimation.summarize import estat_summarize
+
+        return estat_summarize(self, **kwargs)
 
     def conf_int(self, alpha: float = 0.05) -> pd.DataFrame:
         """Confidence intervals for the coefficients.
@@ -277,8 +740,37 @@ class StataResults:
     # ------------------------------------------------------------------
     @property
     def e(self) -> EReturn:
-        """Stata ``e()`` scalars (item and attribute access)."""
+        """Stata ``e()`` scalars (item and attribute access).
 
+        Two macros are synthesised when the estimator did not record them, because
+        every estimation command documents both and a consumer reading ``e()``
+        cannot tell "not recorded" from "not applicable":
+
+        * ``e(depvar)`` falls back to ``response_name`` (``logit.sthlp:264`` and
+          five other help files list "name of dependent variable");
+        * ``e(cmd)`` falls back to ``model_name``, which already holds Stata's
+          command name (``regress``, ``logit``, ``reghdfe``, ...).
+
+        ``e(cmdline)`` is deliberately NOT synthesised: it records the command as
+        the user TYPED it, including options, and this package has no such string.
+        Inventing one would be a fabricated value rather than a recovered one.
+        """
+
+        if "depvar" not in self._e:
+            response = getattr(self, "response_name", None)
+            if response:
+                self._e["depvar"] = str(response)
+        if "cmd" not in self._e:
+            model_name = str(getattr(self, "_model_name", "") or "")
+            if model_name:
+                self._e["cmd"] = model_name
+        if "properties" not in self._e:
+            # ``regress.sthlp:439`` and ``logit.sthlp:279`` (and the others) all
+            # document e(properties) as ``b V`` -- a CONSTANT, not a per-command
+            # value -- so it is safe to recover.  e(title) and e(vcetype) are
+            # per-command English strings with no derivable source, so they are
+            # left absent rather than guessed.
+            self._e["properties"] = "b V"
         return self._e
 
     def _e_scalar(self, key: str) -> float:
@@ -316,6 +808,46 @@ class StataResults:
         """AIC from ``e(aic)``; NaN when not recorded."""
 
         return self._e_scalar("aic")
+
+    @property
+    def converged(self) -> bool:
+        """Whether the optimizer reported convergence.
+
+        ``design.md:209`` lists ``converged``/``iterations``/``grad_norm`` as part of the
+        result surface, and Stata stores the first as ``e(converged)`` (``1`` if it
+        converged, ``0`` otherwise -- ``logit.sthlp:259``).  Absent means the estimator
+        does not run an iterative optimizer at all, which is reported as ``True`` rather
+        than ``False``: a closed-form fit has nothing to fail to converge.
+        """
+
+        value = self.e.get("converged")
+        if value is None:
+            return True
+        try:
+            return bool(float(value) != 0.0)
+        except (TypeError, ValueError):
+            return bool(value)
+
+    @property
+    def iterations(self) -> float:
+        """Number of optimizer iterations, from ``e(ic)`` (``logit.sthlp:257``).
+
+        NaN when the estimator is not iterative or the backend did not report a count.
+        """
+
+        return self._e_scalar("ic")
+
+    @property
+    def grad_norm(self) -> float:
+        """Norm of the gradient at the reported estimate; NaN when not recorded.
+
+        A small value is the numeric counterpart of ``converged``: the optimizer stops
+        when this is near zero.  It is exposed as NaN rather than ``0.0`` where the
+        backend does not report it, so a caller cannot mistake "unavailable" for "exactly
+        converged".
+        """
+
+        return self._e_scalar("gradient_norm")
 
     @property
     def bic(self) -> float:
@@ -422,11 +954,47 @@ class StataResults:
             stored = getattr(self, "design_matrix", None)
             if stored is None:
                 raise ConsistencyError(
-                    "predict: the design matrix was not retained on this result; "
-                    "pass exog=... explicitly"
+                    self._predict_unavailable_message()
                 )
             exog = stored[0]
         return predict(self, exog, kind, **kwargs)
+
+    def _predict_unavailable_message(self) -> str:
+        """Explain WHY this result cannot predict, per estimator.
+
+        A single generic message ("the design matrix was not retained") is
+        accurate but unhelpful, and it hid a real gap: an audit of the full
+        predict matrix showed EVERY type failing for IV2SLS while every per-type
+        test passed, because each one was "correctly" refusing.  Naming the
+        estimator and the reason makes the gap visible.
+
+        For the absorbed/panel estimators the reason is semantic, not missing
+        data: ``predict, xb`` after ``reghdfe``/``xtreg, fe`` must decide whether
+        the absorbed effects are added back, and guessing either way would be
+        silently wrong for half the callers.
+        """
+
+        name = str(getattr(self, "model_name", "") or "").strip().lower()
+        if "reghdfe" in name:
+            return (
+                "predict after reghdfe is not implemented: the fitted value "
+                "depends on whether the absorbed effects are included, which "
+                "Stata exposes as separate options.  Returning one of the two "
+                "without saying which would be silently wrong, so no type is "
+                "offered."
+            )
+        if name.startswith("xtreg"):
+            return (
+                "predict after xtreg: the design matrix was not retained on this "
+                "result, so the linear prediction cannot be formed.  Stata's "
+                "default is xb = a + xb (WITHOUT the panel effect, "
+                "xtreg_postestimation.sthlp:128); the variant that adds it is "
+                "xbu."
+            )
+        return (
+            "predict: the design matrix was not retained on this result; "
+            "pass exog=... explicitly"
+        )
 
     def wald_test(self, R: Any, q: Any = None, scalar: bool = True) -> Any:
         """statsmodels-compatible joint Wald test.

@@ -56,13 +56,56 @@ class WaldTest:
     constraint: str
 
     def __str__(self) -> str:
+        # Stata prints each restriction ABOVE the statistic::
+        #
+        #    ( 1)  x1 = 0
+        #    ( 2)  x2 = 0
+        #
+        #          F(  2,   297) =  156.36
+        #               Prob > F =    0.0000
+        #
+        # ``constraint`` ALREADY carries the numbering and one restriction per line --
+        # wrapping it in another ``( n)`` printed "( 1) ( 1) x1 = 0".  It was simply
+        # never rendered, so the table showed a statistic with no statement of what was
+        # being tested.
+        lines: list[str] = []
+        text = str(self.constraint or "").strip()
+        if text:
+            lines.extend(f"  {line.strip()}" for line in text.splitlines() if line.strip())
+            lines.append("")
         if self.distribution == "F":
             head = f"F({self.df:g}, {self.df_denom:g}) = {self.statistic:10.2f}"
             tail = f"Prob > F        = {self.pvalue:10.4f}"
         else:
             head = f"chi2({self.df:g}) = {self.statistic:10.2f}"
             tail = f"Prob > chi2     = {self.pvalue:10.4f}"
-        return f"{head}\n{tail}"
+        lines.append(head)
+        lines.append(tail)
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, float]:
+        """Flatten to the ``r()`` names Stata returns for a Wald test.
+
+        ``regress_postestimation.sthlp:770-785`` documents two shapes:
+
+        * F inference -- ``r(F)``, ``r(df)``, ``r(df_r)``, ``r(p)``;
+        * chi2 inference -- ``r(chi2)``, ``r(df)``, ``r(p)``.
+
+        The statistic travels under the name of its OWN distribution, so a caller
+        reading ``r(F)`` after a likelihood test finds nothing -- which is correct,
+        because Stata stores ``r(chi2)`` there.
+        """
+
+        table: dict[str, float] = {}
+        if self.distribution == "F":
+            table["F"] = float(self.statistic)
+            if self.df_denom is not None:
+                table["df_r"] = float(self.df_denom)
+        else:
+            table["chi2"] = float(self.statistic)
+        table["df"] = float(self.df)
+        table["p"] = float(self.pvalue)
+        return table
 
 
 def resolve_names(

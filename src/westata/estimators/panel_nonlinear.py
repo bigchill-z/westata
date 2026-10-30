@@ -719,10 +719,28 @@ class _PanelBase:
         e: dict[str, Any] = {
             "N": nobs,
             "N_g": groups_fitted,
+            # Stata prints "Group variable: <name>" in the xt design block
+            # (``p9_outputs.txt:15``: ``Group variable: firm``).  The name is not
+            # recoverable from ``model_data`` -- that frame carries the CODED group
+            # labels -- so it is recorded here from the frame the user passed in.
+            "ivar": str(getattr(self, "_entity_name", "") or ""),
+            "tvar": str(getattr(self, "_time_name", "") or ""),
             "df_m": int(df_m),
             "rank": int(params.size),
             "converged": int(converged),
+            # ``logit.sthlp:257``: "``e(ic)`` **number of iterations**".
+            #
+            # This slot used to hold ``params.size + 1`` on the belief that ``ic`` was the
+            # AIC/BIC penalty term, and the real iteration count was parked under a
+            # non-Stata name ``e(iterations)``.  The fixtures refute that reading:
+            # ``poisson_sim`` has ``ic = 1.0`` with TWO parameters, so ``k + 1`` (which
+            # would be 3) cannot explain it, while "iterations" describes both it and
+            # ``logit_sim``'s 4.0.  Round 238 fixed this in ``discrete.py``; the same
+            # wrong comment and formula lived here, in the panel non-linear estimator.
             "ic": int(iterations),
+            # Convenience alias kept for callers written against the older layout, where
+            # the iteration count lived only here.  It is the SAME number as ``ic``.
+            "iterations": int(iterations),
         }
         if np.isfinite(llf):
             e["ll"] = float(llf)
@@ -823,9 +841,14 @@ class XtLogit(_PanelBase):
 
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
-        return cls(
+        built = cls(
             y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
+        # Keep the variable NAMES: model_data stores coded group labels, so the xt
+        # design block could not otherwise print "Group variable: <name>".
+        built._entity_name = str(entity)
+        built._time_name = "" if time is None else str(time)
+        return built
 
     def fit(
         self,
@@ -1240,9 +1263,14 @@ class XtProbit(_PanelBase):
     ) -> "XtProbit":
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
-        return cls(
+        built = cls(
             y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
+        # Keep the variable NAMES: model_data stores coded group labels, so the xt
+        # design block could not otherwise print "Group variable: <name>".
+        built._entity_name = str(entity)
+        built._time_name = "" if time is None else str(time)
+        return built
 
     def fit(
         self,
@@ -1520,11 +1548,15 @@ class XtTobit(_PanelBase):
                 "sigma_u": sigma_u,
                 "sigma_e": sigma_e,
                 "rho": rho,
-                "lower": lower,
-                "upper": upper,
-                "n_uncensored": int(uncensored.sum()),
-                "n_left": int(left.sum()),
-                "n_right": int(right.sum()),
+                # ``xttobit.sthlp:241-243`` and ``:274-275``: the censoring counts
+                # are ``N_unc``/``N_lc``/``N_rc`` and the limits are ``llopt``/
+                # ``ulopt`` -- the same names ``tobit`` uses, not the descriptive
+                # lower-case spellings this used to emit.
+                "llopt": lower,
+                "ulopt": upper,
+                "N_unc": int(uncensored.sum()),
+                "N_lc": int(left.sum()),
+                "N_rc": int(right.sum()),
                 "intpoints": int(intpoints),
                 "intmethod": "mvaghermite",
                 "estimator": "random_effects_ml",

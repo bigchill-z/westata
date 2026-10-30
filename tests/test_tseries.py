@@ -233,7 +233,7 @@ def test_var_ml_false_reproduces_stata_dfk():
     np.testing.assert_allclose(dfk.bse.to_numpy(), stata_dfk_se, rtol=1e-13)
     # dfk changes only the residual-covariance divisor, never the coefficients.
     np.testing.assert_allclose(
-        dfk.stata_params().to_numpy(), default.stata_params().to_numpy(), rtol=0
+        dfk.stata_params.to_numpy(), default.stata_params.to_numpy(), rtol=0
     )
 
 

@@ -158,7 +158,9 @@ __all__ = ["IV2SLS", "IVLIML", "IVGMM"]
 #: ``cov_type`` values accepted by the IV estimators.  ``HC2``/``HC3`` are in
 #: :data:`westata.vce.dispatch.SUPPORTED_COV_TYPES` for OLS but have no IV
 #: analogue, so they are rejected here (see the module docstring).
-_IV_COV_TYPES = tuple(t for t in SUPPORTED_COV_TYPES if t not in ("HC2", "HC3"))
+_IV_COV_TYPES = tuple(
+    t for t in SUPPORTED_COV_TYPES if t not in ("HC2", "HC3")
+)
 
 #: linearmodels covariance names, verified against linearmodels 7.1
 #: (``COVARIANCE_ESTIMATORS`` in ``linearmodels/iv/model.py``).
@@ -167,6 +169,10 @@ _LM_COV_TYPES = {
     "HC0": "robust",
     "HC1": "robust",
     "cluster": "clustered",
+    # ``kernel`` is linearmodels' Newey-West covariance; it accepts ``kappa`` so
+    # it works for the k-class (LIML) and GMM paths, which ``compute_cov`` cannot
+    # express.  Used only for LIML/GMM; 2SLS routes HAC through ``compute_cov``.
+    "HAC": "kernel",
 }
 
 _WEAK_INSTRUMENT_F = 10.0
@@ -403,6 +409,21 @@ class IV2SLS:
         self._Z_instr = Z_instr
         self._param_names = names
         self._kept_index: list[Any] | None = None
+        #: Names of the three regressor blocks; populated by ``from_formula``.
+        #: The array constructor leaves them positional placeholders.
+        self._exog_names: list[str] = [
+            f"x{i}" for i in range(0 if X_exog is None else X_exog.shape[1])
+        ]
+        self._endog_names: list[str] = [
+            f"endog{i}" for i in range(0 if X_endog is None else X_endog.shape[1])
+        ]
+        self._instr_names: list[str] = [
+            f"instr{i}" for i in range(0 if Z_instr is None else Z_instr.shape[1])
+        ]
+        #: Stata's ``e(b)`` ordering (endogenous first).  ``from_formula`` fills
+        #: it; the array constructor leaves it empty, so ``stata_params`` falls
+        #: back to the design order.
+        self._formula_rhs_order: list[str] = []
 
     # -------------------------------------------------------------- builders
     @classmethod
@@ -453,7 +474,30 @@ class IV2SLS:
             instruments.to_numpy(dtype=float) if instruments.shape[1] else None,
             param_names=names,
         )
+        #: ``ivregress`` reports ``e(b)`` in the order **endogenous then included
+        #: exogenous**, with ``_cons`` last.  The fixtures prove it:
+        #: ``iv_liml.json``'s cmdline is ``ivregress liml y x2 (x = z1 z2)`` and
+        #: its names are ``['x', 'x2', '_cons']`` -- the endogenous ``x`` precedes
+        #: the exogenous ``x2``.  This package builds the design as
+        #: ``exog + endog``, so the two orders differ whenever both are present.
+        model._formula_rhs_order = [
+            str(name)
+            for name in list(endog.columns) + list(exog.columns)
+            if str(name).strip().lower() not in ("intercept", "intercept_", "_cons", "const")
+        ]
         model._kept_index = list(dependent.index)
+        #: ``e(depvar)`` (``ivregress.sthlp`` documents it like every estimation
+        #: command); ``StataResults.e`` falls back to ``response_name``.
+        try:
+            model._response_name = str(list(dependent.columns)[0])
+        except (IndexError, AttributeError):  # pragma: no cover - unnamed response
+            pass
+        # The three regressor blocks, named separately: ``estat firststage``
+        # needs to know which columns are included exogenous regressors, which
+        # are endogenous, and which are excluded instruments.
+        model._exog_names = [str(c) for c in exog.columns]
+        model._endog_names = [str(c) for c in endog.columns]
+        model._instr_names = [str(c) for c in instruments.columns]
         return model
 
     # ------------------------------------------------------------------- fit
@@ -505,11 +549,13 @@ class IV2SLS:
             ref = self._backend_fit("nonrobust", None, settings)
             params = np.asarray(ref.params, dtype=float)
             resid = y - X @ params
-            cov, df_t = self._shared_vce(resid, canonical, clusters, settings)
+            cov, df_t = self._shared_vce(
+                resid, canonical, clusters, settings, cov_kwds
+            )
         else:
             # k-class/GMM: one fit yields both the estimates and the covariance
             # that compute_cov cannot express.
-            ref = self._backend_fit(canonical, clusters, settings)
+            ref = self._backend_fit(canonical, clusters, settings, cov_kwds)
             params = np.asarray(ref.params, dtype=float)
             resid = y - X @ params
             cov, df_t = self._backend_vce(ref, canonical, clusters, settings)
@@ -525,7 +571,7 @@ class IV2SLS:
             canonical=canonical,
         )
 
-        return StataResults(
+        results = StataResults(
             params=params,
             param_names=self._param_names,
             cov=cov,
@@ -539,6 +585,42 @@ class IV2SLS:
             cov_type=canonical,
             e=scalars,
         )
+        #: The IV design pieces, retained so ``estat firststage`` can rebuild the
+        #: auxiliary regressions.  Stata's ``e(insts)``/``e(instd)`` divide the
+        #: regressor space into included exogenous regressors, endogenous
+        #: regressors and excluded instruments; the estimator already holds all
+        #: three, but only the combined ``X`` reached the result.
+        results.iv_structure = {
+            "exog": self._X_exog,
+            "endog": self._X_endog,
+            "instruments": self._Z_instr,
+            "exog_names": [str(n) for n in self._exog_names],
+            "endog_names": [str(n) for n in self._endog_names],
+            "instrument_names": [str(n) for n in self._instr_names],
+            "response": self._y,
+        }
+        #: ``e(b)`` order for ``stata_params``: endogenous regressors first, then
+        #: the included exogenous ones (``iv_liml.json``: ``x`` before ``x2``).
+        results._formula_rhs_order = list(self._formula_rhs_order or [])
+        #: The estimation design, retained so ``predict`` can run.  Without it
+        #: EVERY predict type raised ConsistencyError ("the design matrix was not
+        #: retained") -- an audit of the full predict matrix showed the whole
+        #: IV2SLS column failing, which no per-type test would have revealed
+        #: because each one was "correctly" refusing.
+        results.design_matrix = (X, list(self._param_names))
+        #: ``e(depvar)``: the IV result builds its own StataResults, so the
+        #: base-class fallback needs this attribute set here.
+        _response = getattr(self, "_response_name", None)
+        if _response:
+            results.response_name = str(_response)
+            results.e["depvar"] = str(_response)
+        #: Cluster labels, when the VCE was clustered.  Retained so
+        #: ``estat endogenous`` can rebuild the augmented ``regF`` regression with
+        #: the same VCE -- after a clustered fit Stata reports ONLY ``regF``.
+        results.cluster_labels = (
+            None if clusters is None else np.asarray(clusters)
+        )
+        return results
 
     # -------------------------------------------------------------- internals
     def _backend_kwargs(
@@ -602,6 +684,22 @@ class IV2SLS:
                 f"arguments; got {type(cov_kwds).__name__}"
             )
         kwds = {} if cov_kwds is None else dict(cov_kwds)
+        if canonical == "HAC":
+            # ``newey`` needs an explicit bandwidth (``newey.sthlp:55``); the
+            # validated value is stashed for ``_shared_vce`` to forward.
+            if not kwds:
+                raise ValueError(
+                    "cov_type='HAC' requires cov_kwds['maxlags']; Stata's "
+                    "newey takes lag() as a required option with no default"
+                )
+            unknown = set(kwds) - {"maxlags", "lags"}
+            if unknown:
+                raise ValueError(
+                    "unexpected cov_kwds entries for cov_type='HAC': "
+                    + ", ".join(sorted(unknown))
+                )
+            self._hac_kwds = kwds
+            return None
         if canonical != "cluster":
             if kwds:
                 raise ValueError(
@@ -630,6 +728,7 @@ class IV2SLS:
         canonical: str,
         clusters: np.ndarray | None,
         settings: SSC,
+        cov_kwds: Mapping[str, Any] | None = None,
     ) -> tuple[np.ndarray, float]:
         """Stata VCE through :func:`westata.vce.dispatch.compute_cov`.
 
@@ -648,7 +747,17 @@ class IV2SLS:
                 f"{self._stata_command}: the projected regressor matrix Xhat is "
                 "rank deficient, so the model is not identified"
             )
-        cov_kwds = None if clusters is None else {"groups": clusters}
+        # ``cluster`` needs the labels, ``HAC`` the bandwidth.  Forward both from
+        # the caller rather than rebuilding them here, so a HAC fit cannot
+        # silently lose ``maxlags`` and fall back to another estimator.
+        if canonical == "cluster":
+            dispatch_kwds: dict[str, Any] | None = (
+                None if clusters is None else {"groups": clusters}
+            )
+        elif canonical == "HAC":
+            dispatch_kwds = dict(getattr(self, "_hac_kwds", None) or cov_kwds or {})
+        else:
+            dispatch_kwds = None
         # Two different Stata conventions are in play, and ``ssc.adj`` controls
         # only the first:
         #
@@ -659,9 +768,20 @@ class IV2SLS:
         # compute_cov ties both to ``ssc.adj``, so pass a per-call SSC here with
         # adj=True for the robust variants and let ``df_resid`` carry only the
         # nonrobust denominator decision.
-        robust_variant = canonical in ("HC0", "HC1", "HC2", "HC3", "cluster")
+        robust_variant = canonical in ("HC0", "HC1", "HC2", "HC3", "cluster", "HAC")
         cov_ssc = settings
-        if robust_variant and not settings.adj:
+        if canonical == "HAC":
+            # ``newey`` always applies N/(N-K): ``newey.sthlp:113-114`` says
+            # lag(0) reproduces ``vce(robust)``, and that VCE carries the factor
+            # regardless of ``ssc.adj``.  Without this branch the covariance came
+            # out exactly (N-K)/N too small -- a clean 398/400 = 0.995 ratio that
+            # reads like a kernel error rather than a missing scale factor.
+            cov_ssc = SSC(
+                adj=True,
+                cluster_adj=settings.cluster_adj,
+                df=settings.df,
+            )
+        elif robust_variant and not settings.adj:
             # An explicit HC1 with adj=False must still apply N/(N-K); HC0 must
             # not. Only re-enable the factor for HC1.
             cov_ssc = SSC(
@@ -674,7 +794,7 @@ class IV2SLS:
             Xhat,
             resid,
             cov_type=canonical,
-            cov_kwds=cov_kwds,
+            cov_kwds=dispatch_kwds,
             ssc=cov_ssc,
             nobs=nobs,
             df_resid=denominator,
@@ -685,6 +805,7 @@ class IV2SLS:
         canonical: str,
         clusters: np.ndarray | None,
         settings: SSC,
+        cov_kwds: Mapping[str, Any] | None = None,
     ) -> Any:
         """Fit the backend with the covariance settings ``ssc`` asks for."""
 
@@ -701,6 +822,17 @@ class IV2SLS:
             debiased = False
         elif canonical == "HC1":
             debiased = True
+        elif canonical == "HAC":
+            # ``newey.ado:187`` multiplies by ``nobs/tdf`` UNCONDITIONALLY:
+            #     mat `v' = (`xtxi'*`xtx'*`xtxi')*(`nobs'/`tdf')
+            # There is no ``small`` option on ``newey``.  So HAC always applies
+            # the factor, regardless of the IV default ``SSC(adj=False)`` that
+            # ``ivregress`` uses for its other VCEs.
+            #
+            # Without this branch ``liml``/``gmm`` HAC agreed exactly with HC0 at
+            # lag 0, while 2SLS HAC (through ``compute_cov``) carried the factor
+            # -- an inconsistency between the two paths.
+            debiased = True
         else:
             # ``cluster``: CR0 by default.  ``ssc.adj=True`` is the caller asking
             # for the ``small`` variant, which is exactly ``debiased=True``.
@@ -714,6 +846,26 @@ class IV2SLS:
                     f"got {n_groups}"
                 )
             config["clusters"] = clusters
+        if canonical == "HAC":
+            # LIML/GMM cannot use ``compute_cov`` (their bread is the k-class
+            # ``(1-kappa)X'X + kappa X'P_Z X`` or GMM's weight matrix), but
+            # linearmodels ships ``KernelCovariance`` -- a Bartlett-kernel
+            # Newey-West sandwich that accepts ``kappa``, so it covers both.
+            # Passing the kernel and bandwidth through is therefore enough; no
+            # separate implementation is needed on this path.
+            lags = (cov_kwds or {}).get("maxlags", (cov_kwds or {}).get("lags"))
+            if lags is None:
+                raise ValueError(
+                    "cov_type='HAC' requires cov_kwds['maxlags']; Stata's "
+                    "newey takes lag() as a required option with no default"
+                )
+            bandwidth = int(lags)
+            if bandwidth < 0:
+                raise ValueError(
+                    f"lag() must be nonnegative (newey.ado:24-27); got {bandwidth}"
+                )
+            config["kernel"] = "bartlett"
+            config["bandwidth"] = bandwidth
         return self._backend_model(canonical, clusters).fit(
             cov_type=_LM_COV_TYPES[canonical], debiased=debiased, **config
         )

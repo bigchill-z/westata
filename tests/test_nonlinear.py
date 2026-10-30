@@ -181,7 +181,14 @@ def test_eform_exponentiates_estimate_and_interval(ols):
 def test_expression_is_attached_to_the_result(ols):
     outcome = nlcom(ols, "exp(_b[x1])")
     assert outcome.expression == "exp(_b[x1])"
+    # ``LincomResult`` has its OWN renderer (``postestimation/lincom.py:42``), separate
+    # from ``summary(style="stata")``.  Round 248 changed the SUMMARY header to
+    # ``Coefficient`` to match the captured Stata output; this table was not part of that
+    # change and still prints ``Coef.``.  A batch replacement briefly rewrote this
+    # assertion to "Coefficient" and broke it -- so the two renderers are pinned here as
+    # different on purpose.
     assert "Coef." in str(outcome)
+    assert "Coefficient" not in str(outcome)
 
 
 # ------------------------------------------------------------- testnl

@@ -35,7 +35,7 @@ STATA_LABELS = [
     "R-squared",
     "Adj R-squared",
     "Root MSE",
-    "Coef.",
+    "Coefficient",
     "Std. err.",
     "[95% conf. interval]",
 ]
@@ -140,7 +140,7 @@ def test_summary_stata_uses_z_labels_for_z_distribution() -> None:
         "Wald chi2(",
         "Prob > chi2",
         "R-squared",
-        "Coef.",
+        "Coefficient",
         "Std. err.",
     ]:
         assert token in text, f"missing Stata label {token!r}"

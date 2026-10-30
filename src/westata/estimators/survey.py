@@ -1049,11 +1049,23 @@ class SvyRegress(_SvyCommand):
         weighted_resid = self._weights * self._resid
         return self._xtwx_inv_xt.T * weighted_resid[:, None]
 
-    def _r_squared(self) -> float:
+    def _sums_of_squares(self) -> tuple[float, float, float]:
+        """Weighted ``(rss, tss, mss)`` for the outcome equation.
+
+        Stata's ``svy: regress`` stores all three (with ``rss + mss = tss``);
+        they were computed here and thrown away, so only ``r2`` reached
+        ``e()``.  Storing them lets ``etable`` and ``estat vce`` report them
+        without recomputing anything.
+        """
+
         weights = self._weights
         rss = float((weights * self._resid**2).sum())
         mean = float(weights @ self._y / weights.sum())
         tss = float((weights * (self._y - mean) ** 2).sum())
+        return rss, tss, tss - rss
+
+    def _r_squared(self) -> float:
+        rss, tss, _ = self._sums_of_squares()
         return 1.0 - rss / tss if tss > 0 else float("nan")
 
     def fit(self) -> StataResults:
@@ -1061,13 +1073,21 @@ class SvyRegress(_SvyCommand):
         df_r = float(self._layout.df_r)
         n_tested = self._params.size - (1 if self._has_constant else 0)
         statistic, p_value = _survey_f_stat(self._params, covariance, n_tested, df_r)
+        rss, tss, mss = self._sums_of_squares()
         return self._results(
             self._params,
             covariance,
             resid=self._resid,
             fitted=self._X @ self._params,
             df_model=float(n_tested),
-            extra={"r2": self._r_squared(), "F": statistic, "p": p_value},
+            extra={
+                "r2": self._r_squared(),
+                "F": statistic,
+                "p": p_value,
+                "rss": rss,
+                "tss": tss,
+                "mss": mss,
+            },
         )
 
 

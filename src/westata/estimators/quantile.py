@@ -356,6 +356,8 @@ class QuantileRegression:
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
         model = cls(y, X, quantile=quantile, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: ``e(depvar)`` (``qreg.sthlp``), surfaced through ``StataResults.e``.
+        model._response_name = lhs
         return model
 
     # ------------------------------------------------------------- fitting
@@ -412,8 +414,23 @@ class QuantileRegression:
             "df_r": float(n - k),
             "q": self._quantile,
             "q_v": raw_center,
+            # ``qreg.ado:279``: ``ereturn scalar sum_w = `sum_w'``, documented at
+            # ``qreg.sthlp:507`` as "sum of weights".  ``qreg`` is unweighted here,
+            # so every observation weighs 1 and the sum is the sample size.
+            "sum_w": float(n),
             "sum_adev": sum_adev,
             "sum_rdev": sum_rdev,
+            # ``qreg.ado:287``: ``ereturn local marginsnotok stdp stddp residuals``.
+            # A quantile regression has no conditional-mean standard error, and the
+            # residual it minimizes is a different object from ``predict, residuals``.
+            # ``qreg.ado:190`` also clears ``marginsok``, so no type is blessed.
+            "marginsnotok": "stdp stddp residuals",
+            "marginsok": "",
+            # ``qreg.ado:189``: ``ereturn local title`` with NO VALUE, which in Stata
+            # CLEARS the macro -- the key ends up ABSENT, not empty.  Adding it as "" was
+            # wrong and an existing test (``test_qreg_e_surface::test_cleared_macros_are_
+            # absent``) caught it.  Same for the other bare ``ereturn local`` lines in
+            # that block, so none of them are recorded here.
             "r2_p": pseudo_r2,
             "rank": k,
             "sparsity": sparsity,
@@ -425,7 +442,7 @@ class QuantileRegression:
             "convcode": 0,
         }
 
-        return StataResults(
+        results = StataResults(
             params=beta,
             param_names=list(self._param_names),
             cov=covariance,
@@ -441,6 +458,13 @@ class QuantileRegression:
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
         )
+        #: ``e(depvar)`` (``qreg.sthlp``): ``StataResults.e`` falls back to
+        #: ``response_name``, so recording it here surfaces the macro.
+        response = getattr(self, "_response_name", None)
+        if response:
+            results.response_name = str(response)
+            results.e["depvar"] = str(response)
+        return results
 
     # ---------------------------------------------------------- covariance
     def _covariance(
@@ -633,6 +657,8 @@ class RobustRegression:
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
         model = cls(y, X, tune=tune, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: ``e(depvar)`` (``rreg.sthlp``), surfaced through ``StataResults.e``.
+        model._response_name = lhs
         return model
 
     # ------------------------------------------------------------- fitting
@@ -721,29 +747,41 @@ class RobustRegression:
 
         e: dict[str, Any] = {
             "N": n_used,
-            "N_weighted": effective_n,
             "df_m": float(df_m),
             "df_r": df_r,
             "rank": k,
+            "mss": mss,
+            "rss": rss,
+            "r2": r2,
+            "r2_a": r2_adjusted,
+            "F": f_stat,
+            "rmse": rmse,
+        }
+
+        # ``rreg.ado`` contains exactly ONE ``ereturn`` statement (the ``cmdline``
+        # at line 219); everything else is inherited from the underlying regression
+        # via ``ereturn repost``.  So the iterative-reweighting quantities below are
+        # NOT e() macros in Stata -- ``scale``, ``aa``, ``lambda`` and ``tune`` are
+        # ``tempname`` locals used inside the ado.  Exposing them as e() keys
+        # advertised a surface Stata does not have.
+        #
+        # They are kept as an ATTRIBUTE instead: they describe the fit and are useful
+        # for diagnostics, but they must not masquerade as Stata scalars.
+        rreg_detail = {
+            "N_weighted": effective_n,
             "dropped": int(self._dropped.sum()),
             "scale": scale,
             "aa": aa,
             "lambda": lam,
             "tune": self._tune,
             "tolerance": tolerance,
-            "mss": mss,
-            "rss": rss,
             "mse": float(rss / df_r) if df_r > 0 else float("nan"),
-            "r2": r2,
-            "r2_a": r2_adjusted,
-            "F": f_stat,
-            "rmse": rmse,
             "huber_c": _HUBER_C,
             "biweight_c": _BIWEIGHT_C * self._tune / 7.0,
             "iterations": state["iterations"],
         }
 
-        return StataResults(
+        results = StataResults(
             params=beta_final,
             param_names=list(self._param_names),
             cov=covariance,
@@ -759,6 +797,15 @@ class RobustRegression:
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
         )
+        #: ``e(depvar)`` (``rreg.sthlp``).
+        response = getattr(self, "_response_name", None)
+        if response:
+            results.response_name = str(response)
+            results.e["depvar"] = str(response)
+        #: Diagnostics of the iterative reweighting.  NOT e() macros: see the note
+        #: where ``rreg_detail`` is built.
+        results.rreg_detail = rreg_detail
+        return results
 
     # --------------------------------------------------------------- steps
     def _iterate(

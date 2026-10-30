@@ -1031,3 +1031,71 @@
   date: 2026-10-23
   notes: "The recorded 1.6e-2 gap was NEVER an estimator problem. Stata prints 'Newey-West lags = 5' straight in its output and uses the standard rule floor(4*(n/100)^(2/9)); westata was letting arch choose the bandwidth, which picked a different value. Applying the rule gives -1.953113 against Stata's -1.953, i.e. agreement to its three-decimal display. That the rule was visible in Stata's own output and went unread for two batches is the lesson. kpss still cannot be compared: StataNow 19 removed the command (r(199)), the same pattern as xtreg, fd."
   retest_gap: "independent 386-point sweep graded this E3 -> E2; worst tier B, 8 rows; see retest/REPORT.md"
+- command: estat szroeter
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "szroeter.ado:158-178, the Szroeter subroutine -- fully readable: Q = (n^2/(2*(n-1))) * (h-mh)^2/vh, where ht=rank(var), mh/vh are the rank mean and SAMPLE variance, and h is the rank mean weighted by the squared residuals"
+    - type: invariant
+      ref: "test_estat_szroeter rebuilds Q from the ado formula independently and matches to 1e-12; the statistic is chi2 with df=1"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1 because it has NOT been contrasted with a Stata run -- no fixture was captured for it. The formula, however, was transcribed from readable ado source rather than inferred, and the four refusals match szroeter.ado:13-22 verbatim (only after regress; no weights; no cluster()). The four mtest() adjustments follow regress_postestimation.sthlp:537-540."
+- command: estat esize
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "regress_postestimation.sthlp:599-614 -- eta-squared is stated to be EQUIVALENT TO R-SQUARED; epsilon-squared and omega-squared are described as adjusted R-squared estimates"
+    - type: published_output
+      ref: "Kerlinger (1964) and Grisson & Kim (2012), the sources the help file itself cites: eta2 = SS_effect/SS_total; epsilon2 = (SS_effect - df_effect*MS_error)/SS_total; omega2 = (SS_effect - df_effect*MS_error)/(SS_total + MS_error)"
+    - type: invariant
+      ref: "eta2 equals e(r2) to 1e-12; the ordering eta2 > epsilon2 > omega2 follows from the formulas and is asserted"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1, and a caveat worth stating: esize.ado hands the arithmetic to compiled builtins, so the formulas come from the literature the help file cites, NOT from Stata source. The eta2 identity is independently checkable against e(r2) and is exact; the other two rest on the cited formulas. The noncentral-F interval (Smithson 2001) is asserted only for structural properties -- it brackets the estimate, lies in [0,1], widens with the level and narrows with N -- not for a Stata number."
+- command: estat moran
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "Moran (1950) and Cliff & Ord (1981): I = (n/S0)*(e'We)/(e'e), E[I] = -1/(n-1), with the randomisation variance from the weights' moments S0/S1/S2 and the residual kurtosis"
+    - type: invariant
+      ref: "test_estat_moran rebuilds I, E[I] and sd[I] from their definitions and matches to 1e-12; repeated errorlag() matrices are verified to combine by summation"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1, and this one is NOT verified against Stata at all. estat_moran.sthlp:56-59 points at a 'Methods and formulas' section that is not included in the help file, and there is no estat_moran.ado in ado/base -- the arithmetic is a compiled builtin. Stata's r(chi2) convention therefore cannot be reproduced from local evidence, and the implemented statistic is the standard randomisation-based Moran test instead. Its p-value is exact for 'no spatial correlation' but may DIFFER from Stata's number. The package also has no spmatrix/spset toolchain, so the weighting matrix must be supplied by the caller. Recorded as E1 rather than omitted precisely so the gap stays auditable."
+- command: estat auc
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "lroc.ado:47-49, whose area is the trapezoid over the ROC curve -- algebraically identical to the Mann-Whitney U/(n1*n0) used here"
+    - type: invariant
+      ref: "AUC is invariant to negating the predictor and to affine transforms of it; a noisier predictor gives a smaller area (both asserted)"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1: not contrasted with a Stata run. The equivalence to the Mann-Whitney statistic is exact and checked; what is NOT checked is Stata's own printed r(area) on a fixture. An earlier test assumed flipping the outcome gives 1-AUC and FAILED: the model REFITS, the coefficient changes sign, the ordering is preserved and the AUC is unchanged (measured coefficient -2.4234). That failure is why the tests use invariance rather than reflection."
+- command: estat weakrobust
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "ivregress_postestimation.sthlp:364-375 -- Anderson-Rubin for a just-identified model, CLR for an overidentified one"
+    - type: invariant
+      ref: "test_estat_weakrobust rebuilds the AR statistic as a restricted-versus-unrestricted F from two OLS fits and matches to 1e-10; the statistic collapses to exactly 0 when betanull is set to the estimated value"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1, and only PART of the command: Anderson-Rubin is implemented, CLR is refused. AR is chosen because it is a closed-form restricted F test whose distribution does not depend on instrument strength -- the point of the command -- and whose value at the point estimate is identically zero, which is a checkable identity. CLR needs Moreira's conditional likelihood ratio, obtained by simulating over a nuisance-parameter grid, and Stata's implementation is a compiled builtin with no ado/base source. An overidentified model therefore REFUSES by default rather than running AR under a CLR label -- Stata's default there is CLR, and reporting a different test under that name would be worse than refusing."
+- command: estat mundlak
+  level: E1
+  tolerance: 1.0e-12
+  sources:
+    - type: published_output
+      ref: "xtreg_postestimation.sthlp:366-370 -- a test that nu is uncorrelated with x, by adding the within-group means of the regressors and testing them jointly to zero"
+    - type: invariant
+      ref: "test_estat_mundlak rebuilds the joint Wald statistic from an augmented refit and matches to 1e-10; correlated data rejects below 0.001 while uncorrelated data does not reject at 0.05"
+  verified_by: lead
+  date: 2026-10-30
+  notes: "E1: no Stata fixture. The test is the standard Mundlak/Augmented-RE form, and the group means are what carry any correlation between the unobserved effect and x, so the joint test IS a test of that correlation. Two API facts surfaced while building it and are worth recording: model_name is Stata's spelling ('xtreg, re'), and panel_entity holds CODED GROUP LABELS rather than a column name -- so entity= and time= must be passed explicitly, because the result object cannot rebuild the augmented formula on its own."

@@ -22,10 +22,11 @@ import numpy as np
 
 from westata.protocols import SSC
 from westata.vce.cluster import cov_cluster
+from westata.vce.hac import cov_hac
 from westata.vce.robust import cov_hc
 from westata.vce.ssc import resolve_ssc
 
-SUPPORTED_COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster")
+SUPPORTED_COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster", "HAC")
 """Canonical ``cov_type`` values understood by :func:`compute_cov`."""
 
 _ALIASES = {
@@ -35,6 +36,10 @@ _ALIASES = {
     "HC2": "HC2",
     "HC3": "HC3",
     "CLUSTER": "cluster",
+    "HAC": "HAC",
+    # ``newey``/``vce(hac ...)`` spellings.
+    "NEWEY": "HAC",
+    "NEWEYWEST": "HAC",
 }
 
 
@@ -183,6 +188,38 @@ def compute_cov(
             nobs=n_eff,
             weights=weights,
             weight_type=weight_type,
+        )
+        return cov, float(n_eff - k)
+
+    if canonical == "HAC":
+        # ``newey`` requires lag() explicitly (``newey.sthlp:55``); there is no
+        # default bandwidth, so a missing ``maxlags`` is an error rather than an
+        # arbitrary choice.
+        lags = kwds.get("maxlags", kwds.get("lags"))
+        if lags is None:
+            raise ValueError(
+                "cov_type='HAC' requires cov_kwds['maxlags']; Stata's newey "
+                "takes lag() as a required option with no default "
+                "(newey.sthlp:55)"
+            )
+        try:
+            lag_value = int(lags)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"cov_kwds['maxlags'] must be an integer; got {lags!r}"
+            ) from None
+        if lag_value < 0:
+            raise ValueError(
+                f"lag() must be nonnegative (newey.ado:24-27); got {lag_value}"
+            )
+        cov = cov_hac(
+            Xw,
+            rw,
+            lags=lag_value,
+            bread=bread,
+            ssc=settings,
+            nobs=n_eff,
+            df_resid=float(n_eff - k),
         )
         return cov, float(n_eff - k)
 

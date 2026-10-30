@@ -93,7 +93,7 @@ def test_panel_fe_re_be_fd(panel):
 
     for res in (fe, re, be, fd):
         assert np.all(np.isfinite(res.params.to_numpy()))
-        assert "Coef." in res.summary(style="stata")
+        assert "Coefficient" in res.summary(style="stata")
 
     # FE is consistent here; the DGP slope should be recovered closely.
     assert fe.params["x1"] == pytest.approx(1.5, abs=0.1)

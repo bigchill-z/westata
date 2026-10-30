@@ -703,7 +703,9 @@ class _CountBase(_DiscreteBase):
                 f"Stata accepts {self._predict_types}"
             )
         if normalized == "stdp":
-            return None  # the generic sqrt(x'Vx) implementation is exactly right
+            # ``stdp`` is sqrt(x'Vx): the generic implementation is exactly right,
+            # so do not duplicate it here.
+            return None
         theta = (
             np.asarray(params, dtype=float)
             if params is not None
@@ -821,6 +823,13 @@ class _ZeroInflatedBase(_CountBase):
         }
         if self._inflate_exog is None:
             scalars["inflate"] = "none"
+        else:
+            # A zero-inflated model has two linear predictors, so Stata's
+            # ``e(k_eq)`` is 2 rather than the default 1 that ``_DiscreteBase``
+            # records for the single-equation models -- and both equations carry
+            # a model, so ``k_eq_model`` is 2 as well.
+            scalars["k_eq"] = 2
+            scalars["k_eq_model"] = 2
         return scalars
 
     # -- predict -----------------------------------------------------------

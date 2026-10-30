@@ -217,6 +217,125 @@ def _slope_positions(names: list[str]) -> list[int]:
     ]
 
 
+def _ml_vce_label(cov_type: Any) -> str:
+    """``e(vce)`` for the ML families -- the lowercase token.
+
+    Delegates to the shared helper in ``linear`` with ``ml=True`` so the ML default is
+    ``oim`` rather than ``ols``.  Imported locally because ``linear`` imports from this
+    module's siblings.
+    """
+
+    from westata.estimators.linear import _stata_vce_label
+
+    return _stata_vce_label(cov_type, ml=True)
+
+
+def _ml_vcetype_label(cov_type: Any) -> str:
+    """``e(vcetype)`` for the ML families -- the capitalised display title (``"OIM"``)."""
+
+    from westata.estimators.linear import _stata_vcetype_label
+
+    return _stata_vcetype_label(cov_type, ml=True)
+
+
+def _command_predict_program(command: str) -> str:
+    """``e(predict)`` -- the program that answers ``predict`` for this command.
+
+    Transcribed from each ado.  Note two names are TRUNCATED to Stata's 8-character
+    limit for program names, which is easy to get wrong by guessing:
+
+    ============  ===============  ===============================
+    command       ``e(predict)``   ado line
+    ============  ===============  ===============================
+    ``logit``     ``logit_p``      ``logit.ado:266``
+    ``probit``    ``probit_p``     ``probit.ado:258``
+    ``poisson``   ``poisso_p``     ``poisson.ado`` (NOT poisson_p)
+    ``nbreg``     ``nbreg_p``      ``nbreg.ado``
+    ``ologit``    ``ologit_p``     ``ologit.ado``
+    ``oprobit``   ``oprobi_p``     ``oprobit.ado`` (NOT oprobit_p)
+    ============  ===============  ===============================
+
+    An unknown command gets the empty string rather than a name built by appending ``_p``,
+    because that construction produces the wrong answer for exactly the two commands above.
+    """
+
+    programs = {
+        "logit": "logit_p",
+        "logistic": "logit_p",
+        "probit": "probit_p",
+        "dprobit": "probit_p",
+        "poisson": "poisso_p",
+        "nbreg": "nbreg_p",
+        "ologit": "ologit_p",
+        "oprobit": "oprobi_p",
+    }
+    return programs.get(command.strip().lower(), "")
+
+
+def _command_title(command: str) -> str:
+    """``e(title)`` per command, from whichever route its ado uses.
+
+    ``logit.ado:253`` / ``probit.ado:252`` set it with a literal ``ereturn local title``;
+    ``poisson.ado:241`` hands it to ``ml`` as ``title(Poisson regression)``.  Either way
+    Stata ends up with the same macro, and ``*.sthlp`` documents ``e(title)`` for all
+    three -- so the value is recorded here regardless of how the ado supplies it.
+
+    An unknown command gets the empty string, which is Stata's "set but blank" form rather
+    than a guess.
+    """
+
+    titles = {
+        "logit": "Logistic regression",
+        "logistic": "Logistic regression",
+        "probit": "Probit regression",
+        "dprobit": "Probit regression",
+        "poisson": "Poisson regression",
+        # ``nbreg.ado:71``: ``local title "Negative binomial regression"``, handed to
+        # ``ml`` as ``title(`title')`` at ``nbreg.ado:352`` -- the same indirect route
+        # poisson uses, so its ado has no ``ereturn local title`` either.
+        "nbreg": "Negative binomial regression",
+        # ``ologit.ado:270`` / ``oprobit.ado:267`` -- set DIRECTLY with
+        # ``ereturn local title``, unlike the two above.
+        "ologit": "Ordered logistic regression",
+        "oprobit": "Ordered probit regression",
+    }
+    return titles.get(command.strip().lower(), "")
+
+
+def _iteration_count(result: Any) -> float:
+    """``e(ic)`` -- the number of iterations the optimizer took (``logit.sthlp:257``).
+
+    Stata counts iterations, not parameters.  The backend records how many it ran in
+    ``mle_retvals["iterations"]``; where that is unavailable the value is missing rather
+    than invented, because a wrong iteration count is worse than an absent one.
+    """
+
+    retvals = getattr(result, "mle_retvals", None)
+    if isinstance(retvals, dict) and "iterations" in retvals:
+        try:
+            return float(retvals["iterations"])
+        except (TypeError, ValueError):
+            return float("nan")
+    return float("nan")
+
+
+def _gradient_vector_removed() -> None:  # pragma: no cover
+    """``e(gradient)`` was attempted and withdrawn -- see this module's notes.
+
+    ``logit.sthlp:291`` documents ``e(gradient)`` as "gradient vector".  The obvious
+    construction is the score summed over observations, i.e. ``sum_i (y_i - mu_i) x_i``,
+    which is zero at the reported estimate.
+
+    An implementation was written and produced values of order 100 instead of 0, which
+    means the arrays it reached (``fittedvalues``/``endog`` on the backend result) are not
+    the estimation-sample probability and response in the order assumed.  Rather than ship
+    a key whose values cannot be checked, it was withdrawn; ``e(offset)`` is the part of
+    that block that could be added safely.
+    """
+
+    return None
+
+
 def _chi2_pvalue(statistic: float, df: int) -> float:
     from scipy import stats
 
@@ -273,7 +392,18 @@ def _model_test(
     positions = _slope_positions(names)
     if robust:
         return "Wald", _wald_statistic(params, cov, positions), len(positions)
-    statistic = 2.0 * (llf - ll_null) if np.isfinite(ll_null) else float("nan")
+    if not np.isfinite(ll_null):
+        return "LR", float("nan"), len(positions)
+    statistic = 2.0 * (llf - ll_null)
+    # A likelihood-ratio statistic cannot be negative: it would mean the
+    # restricted model fits better than the unrestricted one, which only happens
+    # when the numerical optimum is not the true maximum.  Stata clamps this
+    # rather than printing a negative chi-square -- ``nbreg.ado:378-384``
+    # reports ``chi2_c = 0`` when ``e(ll) < e(ll_c)``.  The same guard belongs
+    # here, and it is what catches a non-converged backend instead of letting a
+    # negative statistic through to ``e(chi2)``.
+    if statistic < 0.0:
+        return "LR", 0.0, len(positions)
     return "LR", statistic, len(positions)
 
 
@@ -372,6 +502,11 @@ class _DiscreteBase:
         else:
             model = cls(y, X, param_names=names, freq_weights=weights)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: ``e(depvar)``: ``logit.sthlp:264`` and ``poisson.sthlp:244`` both list
+        #: "name of dependent variable".  Also recorded as ``response_name``,
+        #: which ``estat summarize`` and ``estat gof`` read (``lfit.ado:120``
+        #: prints "Variable: <depvar>").
+        model._response_name = lhs
         return model
 
     # ------------------------------------------------------------------ fit
@@ -554,8 +689,13 @@ class _DiscreteBase:
         e = self._stata_scalars(
             result, params, cov, names, llf, nobs, canonical, groups
         )
+        # ``logit.sthlp:264``/``poisson.sthlp:244``: e(depvar) is part of the
+        # documented surface, and ``lfit.ado:120`` prints it as "Variable: ...".
+        response = getattr(self, "_response_name", None)
+        if response:
+            e["depvar"] = str(response)
 
-        return StataResults(
+        results = StataResults(
             params=params,
             param_names=names,
             cov=cov,
@@ -571,6 +711,9 @@ class _DiscreteBase:
             design_matrix=(self._X, list(names)),
             model_data=self._model_data,
         )
+        if response:
+            results.response_name = str(response)
+        return results
 
     # ------------------------------------------------------------ housekeeping
     def _canonical_cov(self, requested: str) -> str:
@@ -613,14 +756,291 @@ class _DiscreteBase:
             "chi2type": chi2type,
             "p": _chi2_pvalue(statistic, df_m),
             "r2_p": pseudo_r2,
+            # ``logit.sthlp:262`` / ``probit.sthlp`` / ``poisson.sthlp:247`` all document
+            # ``e(title)`` -- "title in estimation output".  For logit/probit the value
+            # comes from a literal ``ereturn local title`` (``logit.ado:253``); for
+            # poisson the ado passes it to ``ml`` instead (``poisson.ado:241``:
+            # ``title(Poisson regression)``), which is why grepping that ado for
+            # ``ereturn local title`` finds nothing while the help file still lists the
+            # key.  Both routes end with the same macro, so both are recorded here.
+            "title": _command_title(str(getattr(self, "_stata_command", "") or "")),
+            # ``poisson.ado:255``: ``est local estat_cmd "poisson_estat"``, and that
+            # program exists (``poisson_estat.ado``).  ``poisson.sthlp`` documents the key.
+            # ``logit``/``probit`` record theirs further down via ``_RETURN_LOCALS``; the
+            # other families (nbreg/ologit/oprobit) document NO estat_cmd, so the key stays
+            # absent there rather than being copied over for symmetry.
+            **(
+                {"estat_cmd": "poisson_estat"}
+                if str(getattr(self, "_stata_command", "")).strip().lower() == "poisson"
+                else {}
+            ),
+            # ``e(predict)``: the program answering ``predict``.  ``logit``/``probit`` get
+            # theirs from ``_RETURN_LOCALS`` below; the rest are supplied here so every ML
+            # family that publishes the macro records it.  Two names are TRUNCATED to
+            # Stata's 8-character program-name limit -- ``poisso_p`` and ``oprobi_p`` --
+            # which a naive ``command + "_p"`` gets wrong.
+            **(
+                {
+                    "predict": _command_predict_program(
+                        str(getattr(self, "_stata_command", "") or "")
+                    )
+                }
+                if _command_predict_program(
+                    str(getattr(self, "_stata_command", "") or "")
+                )
+                else {}
+            ),
+            # ``logit.sthlp:271-272`` / ``poisson.sthlp`` / ``ologit`` / ``nbreg`` all
+            # document the pair:
+            #   e(vce)      vcetype specified in vce()
+            #   e(vcetype)  title used to label Std. err.
+            # The ML non-robust default is ``oim`` / ``"OIM"``, NOT ``ols``/``"Ols"`` --
+            # ``arch.ado:1474`` and ``arima.ado:741`` both write
+            # ``est local vcetype "OIM"``, and ``arch.ado:1470`` shows the two branches
+            # side by side.
+            "vce": _ml_vce_label(canonical),
+            "vcetype": _ml_vcetype_label(canonical),
             "aic": float(getattr(result, "aic", float("nan"))),
             "bic": float(getattr(result, "bic", float("nan"))),
+            # ``logit.sthlp:257``: "``e(ic)`` **number of iterations**".
+            #
+            # This used to be recorded as ``params.size + 1`` on the belief that it was
+            # the AIC/BIC penalty term.  The fixtures refute that outright: ``poisson_sim``
+            # has ``ic = 1.0`` with TWO parameters, while ``logit_sim`` has ``ic = 4.0``
+            # with three -- a ``k + 1`` formula cannot produce both, whereas "iterations"
+            # describes both (the Poisson fit converged in one step, the logit took four).
+            # The help file names the quantity directly, so the value now comes from the
+            # backend's own iteration count.
+            "ic": _iteration_count(result),
+            # ``logit.sthlp:269``: the linear offset variable.  This package does not
+            # implement ``offset()``, so Stata's empty-string-for-none convention applies.
+            "offset": getattr(result, "_westata_offset_name", ""),
         }
+        # The ``ereturn local`` block each command writes verbatim.  Values are
+        # transcribed from the ado rather than invented:
+        #   logit.ado:253-267    title / marginsnotok / marginsok / predict / estat_cmd
+        #   probit.ado:252-259   the same five, with its own spellings
+        # Popping them in makes ``e("predict")`` and ``e("estat_cmd")`` -- which a
+        # ported Stata script reads to discover what the estimator supports -- resolve
+        # instead of returning None.
+        _RETURN_LOCALS = {
+            "logit": {
+                "title": "Logistic regression",
+                "predict": "logit_p",
+                "estat_cmd": "logit_estat",
+                "marginsok": "default Pr",
+                "marginsnotok": "stdp DBeta DEviance DX2 DDeviance Hat Number "
+                "Residuals RStandard SCore",
+            },
+            "probit": {
+                "title": "Probit regression",
+                "predict": "probit_p",
+                "estat_cmd": "probit_estat",
+                "marginsok": "default Pr",
+                "marginsnotok": "stdp DBeta DEviance DX2 DDeviance Hat Number "
+                "Residuals RStandard SCore",
+            },
+        }
+        command = str(getattr(self, "_stata_command", "") or "").strip().lower()
+        for key, value in _RETURN_LOCALS.get(command, {}).items():
+            scalars[key] = value
+        # Stata's parameter-count block.  ``e(k)`` counts every estimated
+        # parameter including auxiliary ones, ``e(k_dv)`` the dependent
+        # variables (always one here), ``e(k_eq)`` the equations (one per
+        # linear predictor: two for the zero-inflated models, one otherwise).
+        scalars["k"] = int(params.size)
+        scalars["k_dv"] = 1
+        scalars["k_eq"] = 1
+        # ``k_eq_model`` counts the equations that actually carry a model
+        # (as opposed to an auxiliary equation).  For every single-equation ML
+        # model here that is 1; the zero-inflated models override it through
+        # ``_extra_scalars`` because their inflation equation is a model too.
+        scalars["k_eq_model"] = 1
+        # ``consonly``, ``k_autoCns`` and ``noconstant`` ARE real Stata macros on
+        # this family -- they simply are not listed in the command's own help file.
+        # They come from the shared estimation machinery: ``tests/conformance/
+        # stata_fixtures/logit_sim.json`` (captured from a real Stata run) records
+        # ``consonly=0``, ``k_autoCns=0`` and ``noconstant=0``, and ``nbreg.json`` /
+        # ``ologit.json`` carry the same five keys.
+        #
+        # Removing them on the strength of "not in logit.sthlp" would have been
+        # wrong: the FIXTURES are the authority, and they say Stata stores them.
+        intercept_present = any(
+            str(name).strip().lower() in ("_cons", "intercept", "const")
+            for name in self._param_names
+        )
+        scalars["noconstant"] = 0 if intercept_present else 1
+        n_slopes = len(
+            [
+                name
+                for name in self._param_names
+                if str(name).strip().lower() not in ("_cons", "intercept", "const")
+            ]
+        )
+        scalars["consonly"] = 1 if n_slopes == 0 else 0
+        # ``k_autoCns``: automatically generated constraints; 0 unless a parameter
+        # was dropped.  ``rc`` is Stata's return code, 0 for a completed fit.
+        scalars["k_autoCns"] = 0
+        scalars["rc"] = 0
+        # ``converged``: the optimiser's own verdict, read from the same place
+        # ``_check_convergence`` does rather than inferred from the estimates.
+        scalars["converged"] = (
+            1
+            if bool(getattr(result, "mle_retvals", {}).get("converged", True))
+            else 0
+        )
+
+        # ``e(alpha)``: the dispersion on its natural scale.  ``nbreg`` reports
+        # ``/lnalpha`` as the coefficient, and Stata additionally stores the
+        # exponentiated value as ``e(alpha)`` -- ``nbreg.json`` has
+        # ``alpha = 0.4202832...`` alongside ``/lnalpha``.  ``zinb``/``tnbreg``
+        # already do this via their own ``_extra_scalars``; ``nbreg`` did not.
+        if "/lnalpha" in self._param_names:
+            position = list(self._param_names).index("/lnalpha")
+            if position < len(params):
+                scalars["alpha"] = float(np.exp(float(params[position])))
+        elif "lnalpha" in self._param_names:
+            position = list(self._param_names).index("lnalpha")
+            if position < len(params):
+                scalars["alpha"] = float(np.exp(float(params[position])))
+        else:
+            # ``_param_names`` holds the regressors only for models whose
+            # dispersion is appended after the fit (``nbreg``), so fall back to
+            # the reported names and their trailing parameter.
+            reported = [str(name) for name in names]
+            for marker in ("/lnalpha", "lnalpha"):
+                if marker in reported:
+                    position = reported.index(marker)
+                    if position < len(params):
+                        scalars["alpha"] = float(np.exp(float(params[position])))
+                    break
+        # ``k_aux`` is the number of auxiliary parameters -- the ones that are
+        # not a regression slope.  ``nbreg`` has exactly one (``/lnalpha``);
+        # ``logit``/``probit``/``poisson`` have none and Stata stores no
+        # ``k_aux`` for them, so it is written only when the count is positive.
         if self._aux_count:
-            scalars["k_aux"] = self._aux_count
+            scalars["k_aux"] = int(self._aux_count)
+        else:
+            n_aux = sum(
+                1
+                for name in names
+                if str(name).startswith("/") or str(name).startswith("cut")
+            )
+            if n_aux:
+                scalars["k_aux"] = n_aux
+        # ``N_cds`` / ``N_cdf``: observations in covariate patterns whose outcomes
+        # are ALL successes (``N_cds``) or ALL failures (``N_cdf``).
+        # ``logit.sthlp:243-244`` names them "number of completely determined
+        # successes / failures"; ``frac_154.ado:679`` uses the identity
+        # ``e(N) == e(N_cds) + e(N_cdf)`` to detect perfect prediction.
+        #
+        # Both fixtures report 0.0, which is the correct answer for data whose
+        # covariate patterns all contain variation -- so a hardcoded zero would
+        # also "pass".  Computing it means the value is right on data where
+        # patterns *are* homogeneous, which the tests cover explicitly.
+        #
+        # ONLY the binary-outcome commands publish them: ``logit.sthlp:243-244`` and
+        # ``probit.sthlp:265-266`` do, while ``poisson.sthlp`` has no such entry.  The
+        # keys were previously added for every ML family, so ``poisson`` reported
+        # ``N_cds = 179`` for a count model -- a quantity with no meaning there ("all
+        # successes" of a count requires a target value).
+        if str(getattr(self, "_stata_command", "")).strip().lower() in (
+            "logit",
+            "logistic",
+            "probit",
+            "dprobit",
+        ):
+            cds, cdf = self._completely_determined(result)
+            if cds is not None:
+                scalars["N_cds"] = cds
+                scalars["N_cdf"] = cdf
+
+        # ``ll_c`` / ``chi2_c`` / ``rank0``: the LR test against a *comparison*
+        # model, which for ``nbreg`` is the Poisson fit of the same regressors
+        # (``nbreg.ado:215-228`` fits ``poisson y xvars`` and stores its e(ll) as
+        # ``llp``, then ``nbreg.ado:377`` sets ``e(ll_c) = llp``).
+        # ``e(rank0)`` is the rank of e(V) in the constant-only model.
+        comparison = self._comparison_loglik(llf)
+        if comparison is not None:
+            scalars["ll_c"] = float(comparison)
+            # ``nbreg.ado:378-384``: report 0 rather than a negative statistic
+            # when the comparison model fits at least as well.
+            if llf >= comparison:
+                scalars["chi2_c"] = float(2.0 * (llf - comparison))
+            else:
+                scalars["chi2_c"] = 0.0
+            # The constant-only Poisson model has one parameter, so its e(V) has
+            # rank 1 unless the model itself is constant-only.
+            scalars["rank0"] = float(1 if len(self._param_names) > 1 else len(self._param_names))
+
         if groups is not None:
             scalars["N_clust"] = int(np.unique(groups).size)
         return scalars
+
+    def _comparison_loglik(self, llf: float) -> float | None:
+        """Log-likelihood of the model ``e(ll_c)`` is measured against.
+
+        ``None`` means the estimator has no comparison model, so the caller omits
+        ``ll_c``/``chi2_c``/``rank0`` entirely.  ``NegativeBinomial`` overrides
+        this with the Poisson fit of the same regressors.
+        """
+
+        return None
+
+    def _completely_determined(self, result: Any) -> tuple[float, float] | tuple[None, None]:
+        """Count observations in all-success / all-failure covariate patterns.
+
+        A "covariate pattern" is a distinct combination of the estimation-sample
+        regressors.  Returns ``(None, None)`` when the design or response is not
+        available, so the caller omits the keys rather than reporting zeros.
+        """
+
+        # The statsmodels result does not carry westata's ``design_matrix``; the
+        # estimator holds the design and the response it actually fitted.
+        design = getattr(self, "_X", None)
+        if design is None:
+            return None, None
+        matrix = np.asarray(design, dtype=float)
+        if matrix.ndim != 2:
+            return None, None
+        # Drop the constant column: it is identical everywhere and would not
+        # distinguish patterns anyway.
+        keep = [j for j in range(matrix.shape[1]) if np.ptp(matrix[:, j]) > 0.0]
+        keys = matrix[:, keep] if keep else np.zeros((matrix.shape[0], 1))
+
+        observed = np.asarray(getattr(self, "_y", None), dtype=float).reshape(-1)
+        if observed.size != keys.shape[0]:
+            # Fall back to fitted + residual, which is the response on its own
+            # scale for the binary models.
+            try:
+                fitted = np.asarray(result.predict(), dtype=float).reshape(-1)
+                residual = np.asarray(result.resid_response, dtype=float).reshape(-1)
+            except (AttributeError, TypeError, ValueError):
+                return None, None
+            if fitted.size != keys.shape[0] or residual.size != keys.shape[0]:
+                return None, None
+            observed = fitted + residual
+
+        cds = 0.0
+        cdf = 0.0
+        # Group rows by their covariate pattern.
+        order = np.lexsort(keys.T[::-1]) if keys.shape[1] > 1 else np.argsort(keys[:, 0])
+        ordered_keys = keys[order]
+        ordered_observed = observed[order]
+        start = 0
+        total = ordered_keys.shape[0]
+        while start < total:
+            end = start + 1
+            while end < total and np.array_equal(ordered_keys[end], ordered_keys[start]):
+                end += 1
+            block = ordered_observed[start:end]
+            if block.size and np.all(block == block[0]):
+                if block[0] != 0:
+                    cds += float(block.size)
+                else:
+                    cdf += float(block.size)
+            start = end
+        return cds, cdf
 
 
 class Logit(_DiscreteBase):
@@ -1054,6 +1474,30 @@ class NegativeBinomial(_DiscreteBase):
         import statsmodels.api as sm
 
         return sm.NegativeBinomial(self._y, self._X)
+
+    def _comparison_loglik(self, llf: float) -> float | None:
+        """``e(ll_c)``: the Poisson fit of the same regressors.
+
+        ``nbreg.ado:215-228`` fits ``poisson y xvars`` before the negative
+        binomial and stores that log-likelihood as ``llp``; ``nbreg.ado:377``
+        then sets ``e(ll_c) = llp``.  The Poisson model is the ``alpha = 0``
+        special case, so it is the natural comparison for the LR test that
+        ``e(chi2_c)`` reports -- a test of whether the dispersion is needed at
+        all.
+
+        Verified against ``nbreg.json``: its ``chi2_c`` = 96.45036022672957
+        equals ``2*(ll - ll_c)`` = ``2*(-976.791299423244 + 1025.0164795366088)``
+        exactly.
+        """
+
+        try:
+            import statsmodels.api as sm
+
+            poisson = sm.Poisson(self._y, self._X).fit(disp=False, maxiter=200)
+            candidate = float(poisson.llf)
+        except Exception:  # noqa: BLE001 - omitting the keys is better than guessing
+            return None
+        return candidate if np.isfinite(candidate) else None
 
     def _backend_cov(
         self,
@@ -1571,6 +2015,64 @@ class _Ordered(_DiscreteBase):
                 if np.isfinite(ll_null) and ll_null
                 else float("nan")
             ),
+            # These were the only ML models in the package without an
+            # information criterion under *any* name: ``ll``, ``rank`` and
+            # ``N`` are all in hand here, so AIC/BIC (and Stata's ``e(ic)``
+            # penalty term) are a two-line addition rather than a computation.
+            "aic": float(-2.0 * llf + 2.0 * params.size)
+            if np.isfinite(llf)
+            else float("nan"),
+            "bic": float(-2.0 * llf + np.log(max(nobs, 1)) * params.size)
+            if np.isfinite(llf)
+            else float("nan"),
+            # ``e(ic)`` counts ITERATIONS (``logit.sthlp:257``), not parameters; see
+            # ``_iteration_count`` for the fixture evidence that refuted the old formula.
+            "ic": _iteration_count(result),
+            # ``ologit.ado:270``: ``ereturn local title "Ordered logistic regression"``;
+            # ``oprobit.ado:267``: ``"Ordered probit regression"``.  Both use the DIRECT
+            # route, unlike poisson/nbreg which pass a ``title()`` option to ``ml``.
+            "title": _command_title(str(getattr(self, "_stata_command", "") or "")),
+            # ``ologit.sthlp``/``oprobit.sthlp`` document the vce pair too; the ML
+            # non-robust default is ``oim`` / ``"OIM"``.  Use the REAL canonical VCE so a
+            # robust request is reflected rather than always reporting the default.
+            "vce": _ml_vce_label(canonical),
+            "vcetype": _ml_vcetype_label(canonical),
+            # ``ologit.ado``/``oprobit.ado``: ``ereturn local predict ologit_p`` and
+            # ``oprobi_p`` (truncated to 8 characters -- NOT ``oprobit_p``).
+            **(
+                {
+                    "predict": _command_predict_program(
+                        str(getattr(self, "_stata_command", "") or "")
+                    )
+                }
+                if _command_predict_program(
+                    str(getattr(self, "_stata_command", "") or "")
+                )
+                else {}
+            ),
+            # ``k_cat`` is the number of outcome categories Stata prints.
+            "k": int(params.size),
+            "k_dv": 1,
+            "k_eq": 1,
+            "k_cat": int(extra) + 1,
+            # ``N_cd`` counts observations where the outcome is a "current
+            # dependant" censoring pattern; for the ordered models Stata records
+            # 0 (``ologit.json``/``oprobit.json`` both have N_cd = 0.0).
+            "N_cd": 0,
+            # ``version`` is the estimator's internal version stamp; the ordered
+            # fixtures carry 3.0.
+            "version": 3,
+            # The shared parameter-count block, which the ordered models build
+            # their own ``e`` dict and so did not inherit from
+            # ``_stata_scalars``.
+            "k_eq_model": 1,
+            "k_autoCns": 0,
+            "rc": 0,
+            # The real optimiser verdict, not an inference from the estimates:
+            # ``_check_convergence`` above already reads it for its warning.
+            "converged": 1
+            if bool(getattr(result, "mle_retvals", {}).get("converged", True))
+            else 0,
         }
         chi2type, statistic, df_m = _model_test(
             params, cov, names, llf, ll_null, canonical != "nonrobust"
@@ -1579,10 +2081,28 @@ class _Ordered(_DiscreteBase):
         e["chi2type"] = chi2type
         e["p"] = _chi2_pvalue(statistic, df_m)
         e["df_m"] = df_m
+        # ``noconstant`` / ``consonly`` from the reported parameter names, the
+        # same derivation ``_stata_scalars`` uses.  Both are real Stata macros even
+        # though ``ologit.sthlp`` does not list them -- ``ologit.json`` (captured
+        # from Stata) carries them.
+        intercept_present = any(
+            str(name).strip().lower() in ("_cons", "intercept", "const")
+            for name in names
+        )
+        e["noconstant"] = 0 if intercept_present else 1
+        n_slopes = len(_slope_positions(names))
+        e["consonly"] = 1 if n_slopes == 0 else 0
         if groups is not None:
             e["N_clust"] = int(np.unique(groups).size)
 
-        return StataResults(
+        #: ``e(depvar)`` (``ologit.sthlp``): ``_Ordered.fit`` builds its own
+        #: ``StataResults`` rather than going through ``_DiscreteBase.fit``, so the
+        #: wiring there does not reach it.
+        response = getattr(self, "_response_name", None)
+        if response:
+            e["depvar"] = str(response)
+
+        results = StataResults(
             params=params,
             param_names=names,
             cov=cov,
@@ -1598,6 +2118,9 @@ class _Ordered(_DiscreteBase):
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
         )
+        if response:
+            results.response_name = str(response)
+        return results
 
 
 class OrderedLogit(_Ordered):

@@ -166,6 +166,12 @@ class _StataNameSeries(pd.Series):
 class _SystemResults(StataResults):
     """``StataResults`` whose coefficient Series resolves both constant spellings."""
 
+    #: Set by the multiple-equation estimators so an equation-aware ``predict``
+    #: can run.  ``None`` means the design was not retained.
+    _equation_design: Any = None
+    _equation_coefficients: Any = None
+    _equation_responses: Any = None
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         for attribute in ("_params", "_bse", "_tvalues", "_pvalues"):
@@ -175,6 +181,110 @@ class _SystemResults(StataResults):
                 attribute,
                 _StataNameSeries(source.to_numpy(), index=source.index, name=source.name),
             )
+
+    @property
+    def predict_types(self) -> tuple[str, ...]:
+        """Types available on this result.
+
+        A stacked multiple-equation fit cannot answer a single-equation ``xb``:
+        ``nobs`` covers every equation-observation and the design is not one
+        matrix.  Once ``_equation_design`` is set the equation-aware types work.
+        """
+
+        if self._equation_design is None:
+            return ()
+        # ``reg3_p.ado:12``: ``local myopts "Difference Residuals"`` plus the
+        # ``_pred_me`` standard set (XB/Index/STDP).
+        return ("xb", "index", "stdp", "residuals", "difference")
+
+    def predict(
+        self,
+        exog: Any = None,
+        kind: str = "xb",
+        *,
+        equation: int | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Equation-aware prediction for a multiple-equation fit.
+
+        ``mvreg_p`` is the standard multiple-equation predict: it takes
+        ``equation(#)`` and defaults to the FIRST equation.  The base
+        ``StataResults.predict`` cannot serve here because the stacked fit has
+        ``nobs = equations * n`` and a single coefficient vector spanning all
+        equations, so ``X @ b`` is not defined.
+        """
+
+        if self._equation_design is None:
+            return super().predict(exog, kind, **kwargs)
+
+        requested = str(kind).strip().lower()
+        if requested not in self.predict_types:
+            raise ValueError(
+                f"predict, {kind}: a multiple-equation result supports "
+                f"{', '.join(self.predict_types)}; the influence diagnostics are "
+                "single-equation quantities"
+            )
+
+        coefficients = self._equation_coefficients
+        responses = np.asarray(self._equation_responses, dtype=float)
+        # ``mvreg`` supplies one (equations, k) array; ``sureg`` supplies a list
+        # of per-equation vectors whose lengths may differ.
+        if isinstance(coefficients, (list, tuple)):
+            coefficient_vectors = [
+                np.asarray(vector, dtype=float).reshape(-1) for vector in coefficients
+            ]
+        else:
+            matrix = np.asarray(coefficients, dtype=float)
+            coefficient_vectors = [matrix[index] for index in range(matrix.shape[0])]
+        n_equations = len(coefficient_vectors)
+
+        position = 0 if equation is None else int(equation) - 1
+        if not 0 <= position < n_equations:
+            raise ValueError(
+                f"predict: equation {equation} is out of range; the model has "
+                f"{n_equations} equation(s)"
+            )
+
+        # A single design shared by every equation (``mvreg``) or one per
+        # equation (``sureg``, whose equations may carry different regressors and
+        # therefore different column counts -- so a list, not a 3-d array).
+        if isinstance(self._equation_design, (list, tuple)):
+            design = np.asarray(self._equation_design[position], dtype=float)
+        else:
+            design = np.asarray(self._equation_design, dtype=float)
+        if exog is not None:
+            design = np.asarray(exog, dtype=float)
+        fitted = design @ coefficient_vectors[position]
+
+        if requested in ("xb", "index"):
+            return fitted
+        if requested == "residuals":
+            return responses[:, position] - fitted
+        if requested == "difference":
+            # ``reg3_p.ado:126-127``: ``gen varn = xb1 - xb2``.
+            if kwargs.get("equation2") is None:
+                raise ValueError(
+                    "predict, difference requires equation(eq1, eq2); "
+                    "reg3_p.ado:120-130 differences two equations"
+                )
+            second = int(kwargs["equation2"]) - 1
+            if not 0 <= second < n_equations:
+                raise ValueError(
+                    f"predict: equation {kwargs['equation2']} is out of range; "
+                    f"the model has {n_equations} equation(s)"
+                )
+            if isinstance(self._equation_design, (list, tuple)):
+                second_design = np.asarray(self._equation_design[second], dtype=float)
+            else:
+                second_design = np.asarray(self._equation_design, dtype=float)
+            return fitted - second_design @ coefficient_vectors[second]
+        # stdp: sqrt(x' V_j x) with V_j the equation's own OLS covariance.
+        residual = responses[:, position] - fitted
+        n, k = design.shape
+        sigma2 = float(residual @ residual) / max(n - k, 1)
+        covariance = sigma2 * np.linalg.pinv(design.T @ design)
+        variance = np.einsum("ij,jk,ik->i", design, covariance, design)
+        return np.sqrt(np.maximum(variance, 0.0))
 
 
 def _resolve_cov_type(
@@ -547,6 +657,9 @@ class Sureg:
             "sigma": sigma_resid.tolist(),
             "corr": _correlation(sigma_resid).tolist(),
             "method": "sure",
+            # ``sureg.ado:14,45`` runs through ``reg3``, which is what supplies
+            # the equation-aware predict; ``reg3_p.ado:12`` is that program.
+            "predict": "reg3_p",
             "vce": "unadjusted",
         }
 
@@ -587,7 +700,7 @@ class Sureg:
                 e[f"chi2_{position + 1}"] = statistic
                 e[f"p_{position + 1}"] = float(stats.chi2.sf(statistic, len(slopes)))
 
-        return _SystemResults(
+        result = _SystemResults(
             params=beta,
             param_names=names,
             cov=covariance,
@@ -609,6 +722,17 @@ class Sureg:
             e=e,
             model_data=self._model_data,
         )
+        #: ``sureg`` runs through ``reg3`` (``sureg.ado:14,45``), so its predict is
+        #: the shared ``reg3_p``.  The equations may carry DIFFERENT regressors, so
+        #: the designs cannot be stacked into one 3-d array -- a list of matrices
+        #: keeps every equation's own column count.
+        result._equation_design = [np.asarray(X, dtype=float) for X in designs]
+        result._equation_coefficients = [
+            np.asarray(beta[offsets[i] : offsets[i + 1]], dtype=float)
+            for i in range(equations)
+        ]
+        result._equation_responses = np.column_stack(responses)
+        return result
 
 
 def _correlation(sigma: np.ndarray) -> np.ndarray:
@@ -746,8 +870,28 @@ class Mvreg:
             "df_r": float(n - k),
             "df_m": float(k - 1),
             "outcomes": list(self._outcome_names),
+            # ``mvreg.sthlp:194`` spells it ``e(Sigma)``: "Sigma hat matrix",
+            # i.e. sigma_ij = u_i'u_j/(n-k).  Both spellings are recorded so
+            # ``e["Sigma"]`` matches Stata while ``e["sigma"]`` keeps working for
+            # existing callers.
+            "Sigma": sigma.tolist(),
             "sigma": sigma.tolist(),
             "corr": _correlation(sigma).tolist(),
+            # ``mvreg.sthlp:172-196``: the macros an eclass command carries.
+            "cmd": "mvreg",
+            "depvar": " ".join(self._outcome_names),
+            "eqnames": " ".join(self._outcome_names),
+            "properties": "b V",
+            "estat_cmd": "mvreg_estat",
+            # ``mvreg.ado:124``: ``est local predict "reg3_p"`` -- the shared
+            # multiple-equation predict program, NOT a ``mvreg_p`` (no such file
+            # exists in ado/base/m).  ``reg3_p.ado:12`` declares
+            # ``local myopts "Difference Residuals"`` and delegates the rest to
+            # ``_pred_me``, which is exactly the equation-aware surface
+            # ``_SystemResults.predict`` provides.
+            "predict": "reg3_p",
+            "asbalanced": "",
+            "asobserved": "",
             "vce": "unadjusted",
         }
         # Stata prints per-equation fit rows above the coefficient table and
@@ -786,7 +930,7 @@ class Mvreg:
             e[f"p_{outcome}"] = pvalue
         e.update(fit_rows)
 
-        return _SystemResults(
+        results = _SystemResults(
             params=beta,
             param_names=names,
             cov=covariance,
@@ -805,6 +949,12 @@ class Mvreg:
             e=e,
             model_data=self._model_data,
         )
+        #: Retained so the equation-aware ``predict`` can run; without these a
+        #: stacked fit cannot answer ``xb`` for any single equation.
+        results._equation_design = X
+        results._equation_coefficients = np.vstack(coefficients)
+        results._equation_responses = np.column_stack(self._responses)
+        return results
 
 
 # ---------------------------------------------------------------------- eivreg
@@ -1030,6 +1180,26 @@ class ManovaResult:
     nobs: int = 0
     groups: int = 0
     statistics: Mapping[str, float] = field(default_factory=dict)
+    #: Number of dependent variables (``e(k_eq)`` in Stata).  Recorded explicitly
+    #: so ``e()`` does not have to guess it from ``statistics``.
+    n_equations: int = 0
+    #: Per-equation OLS fit measures.  ``manova.sthlp:238-241`` stores e(r2),
+    #: e(rmse), e(F) and e(p_F) as one entry PER EQUATION -- the ordinary
+    #: univariate numbers for each response, not the multivariate test.
+    r2_by_equation: "Sequence[float]" = field(default_factory=list)
+    rmse_by_equation: "Sequence[float]" = field(default_factory=list)
+    f_by_equation: "Sequence[float]" = field(default_factory=list)
+    p_f_by_equation: "Sequence[float]" = field(default_factory=list)
+    #: ``e(depvar)``: the response variable names.
+    depvar_names: "Sequence[str]" = field(default_factory=list)
+    #: The design matrix (intercept + g-1 group dummies) and the coefficient
+    #: matrix of shape ``(k, n_equations)``.  Retained so ``predict`` can run.
+    design_matrix: Any = None
+    coefficients: Any = None
+    #: The FITTED response matrix, used by ``residuals``.
+    fitted_values: Any = None
+    #: The observed response matrix, used by ``residuals``.
+    responses: Any = None
 
     # -- aliases kept for the previously exported attribute names ----------
     @property
@@ -1048,6 +1218,192 @@ class ManovaResult:
     def pvalue(self) -> float:
         return self.p
 
+    # -- the other three multivariate statistics ---------------------------
+    #
+    # ``manova`` prints only Wilks' lambda; ``manovatest`` prints all four
+    # (``manova_postestimation.sthlp:243-245``).  A ``KeyError`` rather than a
+    # silent ``nan`` keeps a caller from treating an unavailable statistic as a
+    # computed zero.
+    def _statistic(self, key: str) -> float:
+        try:
+            return float(self.statistics[key])
+        except KeyError:
+            raise KeyError(
+                f"multivariate statistic {key!r} is not recorded on this result; "
+                f"available: {sorted(self.statistics)}"
+            ) from None
+
+    @property
+    def pillai_trace(self) -> float:
+        """Pillai's trace ``V = sum lambda_i/(1+lambda_i)``."""
+
+        return self._statistic("pillai_trace")
+
+    @property
+    def lawley_hotelling_trace(self) -> float:
+        """Lawley-Hotelling trace ``U = sum lambda_i``."""
+
+        return self._statistic("lawley_hotelling_trace")
+
+    @property
+    def roy_largest_root(self) -> float:
+        """Roy's largest root ``theta = lambda_max/(1+lambda_max)``."""
+
+        return self._statistic("roy_largest_root")
+
+    def multivariate_tests(self) -> dict[str, float]:
+        """The four statistics together, as ``manovatest`` reports them."""
+
+        return {
+            "Wilks' lambda": float(self.wilks_lambda),
+            "Pillai's trace": self.pillai_trace,
+            "Lawley-Hotelling trace": self.lawley_hotelling_trace,
+            "Roy's largest root": self.roy_largest_root,
+        }
+
+    #: ``manova_p`` types.  ``manova_p.ado:16`` declares ``local myopts
+    #: "Difference"`` and delegates the rest to ``_pred_me``, whose standard set
+    #: is ``Equation()``/``Index``/``XB``/``STDP``/``Residuals``/``STDDP``.
+    SUPPORTED_PREDICT_TYPES = ("xb", "index", "stdp", "residuals", "stddp", "difference")
+
+    def _equation_covariance(self, position: int) -> Any:
+        """``V`` for one equation: ``sigma2_j (X'X)^-1``.
+
+        This is the classical OLS covariance of the j-th univariate regression on
+        the shared design, which is the block ``manova`` uses.  Computed on demand
+        rather than stored, because it is only needed by ``stdp``/``stddp``.
+        """
+
+        design = np.asarray(self.design_matrix, dtype=float)
+        response = np.asarray(self.responses, dtype=float)[:, position]
+        fitted = np.asarray(self.fitted_values, dtype=float)[:, position]
+        residual = response - fitted
+        n, k = design.shape
+        df_resid = max(n - k, 1)
+        sigma2 = float(residual @ residual) / df_resid
+        return sigma2 * np.linalg.pinv(design.T @ design)
+
+    def _cross_equation_covariance(self, first: int, second: int) -> Any:
+        """``V12 = sigma12 (X'X)^-1`` across two equations.
+
+        ``manova_postestimation.sthlp:164-165`` defines ``stddp`` as the standard
+        error of ``x1j b - x2j b``, which needs the CROSS-equation covariance.
+        Omitting it is only correct when the equations' residuals are
+        uncorrelated -- measured at 0.17 on the test data, so the term matters.
+        """
+
+        design = np.asarray(self.design_matrix, dtype=float)
+        responses = np.asarray(self.responses, dtype=float)
+        fitted = np.asarray(self.fitted_values, dtype=float)
+        residual_first = responses[:, first] - fitted[:, first]
+        residual_second = responses[:, second] - fitted[:, second]
+        n, k = design.shape
+        df_resid = max(n - k, 1)
+        sigma12 = float(residual_first @ residual_second) / df_resid
+        return sigma12 * np.linalg.pinv(design.T @ design)
+
+    def predict(
+        self,
+        kind: str = "xb",
+        *,
+        equation: int | None = None,
+        equation2: int | None = None,
+    ) -> Any:
+        """``manova_p`` -- equation-aware prediction.
+
+        ``manova_p.ado:38-44``: with no ``equation()`` Stata uses the **first**
+        dependent variable, so ``equation`` defaults to 1 (0-based here: 0).
+
+        Parameters
+        ----------
+        kind:
+            ``xb``/``index`` (fitted values, synonyms), ``stdp`` (prediction
+            standard error), ``residuals``, ``stddp`` (difference between two
+            equations' standard errors) or ``difference`` (``xb1 - xb2``,
+            ``manova_p.ado:100-106``).
+        equation, equation2:
+            1-based equation numbers.  ``stddp`` and ``difference`` need both.
+
+        Raises
+        ------
+        ValueError
+            For an unknown ``kind``, a missing second equation, or an equation
+            number outside the model.
+        """
+
+        requested = str(kind).strip().lower()
+        if requested not in self.SUPPORTED_PREDICT_TYPES:
+            raise ValueError(
+                f"predict, {kind}: manova_p supports only "
+                f"{', '.join(self.SUPPORTED_PREDICT_TYPES)} (manova_p.ado:16)."
+            )
+
+        if self.design_matrix is None or self.coefficients is None:
+            raise ValueError(
+                "predict: this manova result carries no design matrix, so nothing "
+                "can be predicted from it"
+            )
+
+        n_equations = int(self.coefficients.shape[1])
+
+        def _position(number: int | None) -> int:
+            # Stata's equation() is 1-based; the default is the first equation
+            # (``manova_p.ado:38-44``).
+            position = 0 if number is None else int(number) - 1
+            if not 0 <= position < n_equations:
+                raise ValueError(
+                    f"predict: equation {number} is out of range; the model has "
+                    f"{n_equations} equation(s)"
+                )
+            return position
+
+        first = _position(equation)
+        fitted_first = self.fitted_values[:, first]
+
+        if requested in ("xb", "index"):
+            return fitted_first
+        if requested == "residuals":
+            return self.responses[:, first] - fitted_first
+        if requested == "stdp":
+            # ``manova_postestimation.sthlp:151-154``: "the standard error of the
+            # estimated expected value or mean for the observation's covariate
+            # pattern" -- that is ``sqrt(x' V x)`` with V the equation's
+            # coefficient covariance, NOT an rmse/sqrt(n) shortcut.
+            #
+            # On a saturated one-way design the two happen to coincide, which is
+            # why the shortcut looked right; it is not general, so the sandwich
+            # form is used.
+            covariance = self._equation_covariance(first)
+            design = np.asarray(self.design_matrix, dtype=float)
+            variance = np.einsum("ij,jk,ik->i", design, covariance, design)
+            return np.sqrt(np.maximum(variance, 0.0))
+        if requested == "difference":
+            if equation2 is None:
+                raise ValueError(
+                    "predict, difference requires equation(eq1, eq2); "
+                    "manova_p.ado:96-106 differences two equations"
+                )
+            second = _position(equation2)
+            return fitted_first - self.fitted_values[:, second]
+        # stddp: the standard error of the DIFFERENCE between two equations'
+        # linear predictions.  ``manova_postestimation.sthlp:164-165``.  The
+        # cross-equation covariance must be included:
+        #
+        #     Var(x'b1 - x'b2) = x'V11x + x'V22x - 2 x'V12x
+        if equation2 is None:
+            raise ValueError("predict, stddp requires equation(eq1, eq2)")
+        second = _position(equation2)
+        design = np.asarray(self.design_matrix, dtype=float)
+        v_first = self._equation_covariance(first)
+        v_second = self._equation_covariance(second)
+        v_cross = self._cross_equation_covariance(first, second)
+        variance = (
+            np.einsum("ij,jk,ik->i", design, v_first, design)
+            + np.einsum("ij,jk,ik->i", design, v_second, design)
+            - 2.0 * np.einsum("ij,jk,ik->i", design, v_cross, design)
+        )
+        return np.sqrt(np.maximum(variance, 0.0))
+
     def __str__(self) -> str:
         return (
             f"MANOVA {self.term}\n"
@@ -1055,6 +1411,64 @@ class ManovaResult:
             f"  F({self.df1:g}, {self.df2:g}) = {self.F:.2f}"
             f"   p = {self.p:.4f}"
         )
+
+    @property
+    def e(self) -> dict[str, float]:
+        """Stata's ``e()`` scalars for ``manova``.
+
+        ``manova.sthlp:216-225`` lists ``e(N)``, ``e(k)``, ``e(k_eq)``,
+        ``e(df_m)``, ``e(df_r)``, ``e(df#)`` and ``e(rank)``.
+
+        ``e(df#)`` is the term's hypothesis degrees of freedom: ``manova`` numbers
+        terms from 1, and a one-factor model has a single term, so the key is
+        ``df1`` in Stata's spelling (``df`` + the term index, no underscore --
+        the same convention as ``var``'s ``df_m1``).
+
+        ``e(df_m)`` is that same hypothesis df (the model has one term here), and
+        ``e(df_r)`` is the residual df, ``N - g``.
+
+        ``e(k)`` counts estimated parameters and ``e(rank)`` the rank of ``e(V)``;
+        for this one-factor fit ``k`` is the number of equations times the
+        parameters per equation, which is the group count plus the intercept.
+        """
+
+        # ``manova`` numbers terms from 1 and this container holds one term.
+        df_term = float(self.df)
+        df_resid = float(self.nobs - self.groups)
+        n_equations = int(self.n_equations) if self.n_equations else 1
+        # ``k`` counts estimated parameters: the intercept plus g-1 dummies per
+        # equation, i.e. g per equation for a one-factor model.
+        n_parameters = int(round(self.groups * n_equations))
+        result = {
+            "N": float(self.nobs),
+            "k": float(n_parameters),
+            "k_eq": float(n_equations),
+            "df_m": df_term,
+            "df_r": df_resid,
+            "df1": df_term,
+            "rank": float(n_parameters),
+            # ``manova.sthlp:229-247`` -- the macros every eclass command carries.
+            "cmd": "manova",
+            "depvar": " ".join(self.depvar_names),
+            "indepvars": self.term,
+            "properties": "b V",
+            "estat_cmd": "manova_estat",
+            # ``e(predict)`` and the two margins macros were withdrawn in round 63
+            # because no predict existed; ``ManovaResult.predict`` now implements
+            # ``manova_p``, so they are restored.
+            "predict": "manova_p",
+            "marginsnotok": "predict(xb) stdp",
+            "marginsdefault": "xb",
+            "asbalanced": "",
+            "asobserved": "",
+        }
+        # Per-equation vectors (``manova.sthlp:238-241``).
+        if self.r2_by_equation:
+            result["r2"] = list(self.r2_by_equation)
+            result["rmse"] = list(self.rmse_by_equation)
+            result["F"] = list(self.f_by_equation)
+            result["p_F"] = list(self.p_f_by_equation)
+        return result
 
 
 class Manova:
@@ -1088,6 +1502,9 @@ class Manova:
         self._codes = np.asarray(codes, dtype=int)
         self._levels = list(levels)
         self._term = str(term)
+        #: ``e(depvar)`` -- filled by ``from_formula``; the array constructor has
+        #: no names to record.
+        self._response_names: list[str] = []
 
     @classmethod
     def from_formula(
@@ -1116,11 +1533,14 @@ class Manova:
                 "valued (Stata: 'factor variables may not contain noninteger "
                 "values'); covariates are not implemented"
             )
-        return cls(
+        model = cls(
             data[outcomes].to_numpy(dtype=float),
             predictor.to_numpy(),
             term=factor,
         )
+        #: ``e(depvar)``: the response names, space-separated as Stata stores them.
+        model._response_names = list(outcomes)
+        return model
 
     def fit(self) -> ManovaResult:
         """Compute the between/within matrices and Rao's F for Wilks' lambda."""
@@ -1158,7 +1578,59 @@ class Manova:
                 "manova: the total sum of squares is singular; a response is "
                 "collinear with the group indicator"
             )
-        wilks = float(np.linalg.det(within)) / denominator
+
+        # ---- all four multivariate statistics, from one eigen-decomposition --
+        #
+        # Every one of them is a function of the eigenvalues lambda_i of E^-1 H
+        # (``mv_glossary.sthlp``):
+        #
+        #   Wilks' lambda        L = |E| / |E + H|  = prod 1/(1 + lambda_i)
+        #   Pillai's trace       V = trace[(E+H)^-1 H] = sum lambda_i/(1+lambda_i)
+        #   Lawley-Hotelling     U = trace(E^-1 H)      = sum lambda_i
+        #   Roy's largest root   t = lambda_max/(1 + lambda_max)
+        #
+        # Stata's ``manova`` prints only Wilks' lambda; the other three appear in
+        # ``manovatest``.
+        #
+        # Wilks is taken from the eigenvalue product rather than from the two
+        # determinants.  The determinant form is numerically fragile: on a design
+        # with cond(E) ~ 3e12 it disagreed with the eigenvalue product by 2e-4
+        # while pillai/lawley/roy were all exact.  Deriving all four from the same
+        # eigenvalues also keeps them mutually consistent by construction.
+        try:
+            # ``E^-1 H`` is not symmetric, and ``eigvals`` on it can return a
+            # spurious complex pair -- on an ill-conditioned design it produced a
+            # wrong-signed real root next to a legitimate one.  ``E^-1/2 H E^-1/2``
+            # is symmetric with the same eigenvalues and is numerically better
+            # behaved, so the decomposition goes through that.
+            values, vectors = np.linalg.eigh(within)
+            inverse_root = vectors @ np.diag(values ** -0.5) @ vectors.T
+            symmetric = inverse_root @ between @ inverse_root
+            eigenvalues = np.sort(np.real(np.linalg.eigvalsh(symmetric)))[::-1]
+            positive = eigenvalues[eigenvalues > 0.0]
+        except np.linalg.LinAlgError:  # pragma: no cover - singular within
+            eigenvalues = np.empty(0, dtype=float)
+            positive = np.empty(0, dtype=float)
+
+        if positive.size:
+            pillai = float(np.sum(positive / (1.0 + positive)))
+            lawley_hotelling = float(np.sum(positive))
+            roy_root = float(positive[0] / (1.0 + positive[0]))
+            # ``|E|/|E+H| = prod 1/(1 + lambda_i)`` over ALL eigenvalues.
+            #
+            # Using every eigenvalue (not only the positive ones) is exactly the
+            # determinant ratio, but computed in a numerically stable way: the
+            # det(v)/det(v+w) route disagreed with this product by 2e-4 on a
+            # design with cond(E) ~ 3e12.  Discarding a small negative eigenvalue
+            # would silently drop its factor, so the full product is used.
+            denominators = 1.0 + eigenvalues
+            if np.all(denominators != 0.0):
+                wilks = float(np.prod(1.0 / denominators))
+            else:  # pragma: no cover - lambda = -1 cannot occur for real E, H
+                wilks = float(np.linalg.det(within)) / denominator
+        else:  # pragma: no cover - degenerate design
+            pillai = lawley_hotelling = roy_root = float("nan")
+            wilks = float(np.linalg.det(within)) / denominator
 
         # Rao's F approximation, in Stata's parameterisation:
         #   s    = sqrt((p^2 q^2 - 4) / (p^2 + q^2 - 5))
@@ -1190,6 +1662,61 @@ class Manova:
         # Stata prints "e"), while p=3 q=3 gives s=2.4337 ("a").
         exact = bool(s in (1.0, 2.0))
 
+        # ---- per-equation OLS statistics ------------------------------------
+        #
+        # ``manova.sthlp:238-241`` stores e(r2), e(rmse), e(F) and e(p_F) as
+        # VECTORS: "R-squared for each equation", "F statistic for each
+        # equation".  They are the ordinary fit measures of the j-th univariate
+        # regression on the same design, not the multivariate test.
+        #
+        # The design here is the intercept plus g - 1 group dummies, so each
+        # equation's F tests the group effect with q = g - 1 numerator and
+        # n - g denominator degrees of freedom.
+        design_columns = 1 + int(g - 1)
+
+        # ---- design and coefficient matrices --------------------------------
+        #
+        # ``manova_p`` predicts through the underlying multivariate regression
+        # (``manova_p.ado:56`` calls ``_predict ... eq()``), so the design and the
+        # coefficient matrix are needed.  The design is the intercept plus g - 1
+        # group dummies with the FIRST level as the base, which is how Stata
+        # parameterises ``manova ... = g``.
+        design = np.ones((n, design_columns))
+        for column, code in enumerate(groups[1:], start=1):
+            design[:, column] = (self._codes == code).astype(float)
+        coefficients, *_ = np.linalg.lstsq(design, Y, rcond=None)  # (k, p)
+
+        r2_by_equation: list[float] = []
+        rmse_by_equation: list[float] = []
+        f_by_equation: list[float] = []
+        p_f_by_equation: list[float] = []
+        for j in range(p):
+            response = Y[:, j]
+            total = float(np.sum((response - response.mean()) ** 2))
+            # Within-group residual sum of squares for this equation.
+            residuals = np.zeros_like(response)
+            for code in groups:
+                mask = self._codes == code
+                block = response[mask]
+                residuals[mask] = block - block.mean()
+            rss_j = float(residuals @ residuals)
+            r2_j = 1.0 - rss_j / total if total > 0.0 else float("nan")
+            df_resid_j = n - design_columns
+            rmse_j = (
+                float(np.sqrt(rss_j / df_resid_j)) if df_resid_j > 0 else float("nan")
+            )
+            df_num_j = int(g - 1)
+            if r2_j < 1.0 and df_resid_j > 0 and df_num_j > 0:
+                f_j = (r2_j / df_num_j) / ((1.0 - r2_j) / df_resid_j)
+                p_j = float(stats.f.sf(f_j, df_num_j, df_resid_j))
+            else:  # pragma: no cover - perfect fit or degenerate design
+                f_j = float("nan")
+                p_j = float("nan")
+            r2_by_equation.append(r2_j)
+            rmse_by_equation.append(rmse_j)
+            f_by_equation.append(f_j)
+            p_f_by_equation.append(p_j)
+
         return ManovaResult(
             wilks_lambda=wilks,
             df=q,
@@ -1200,9 +1727,22 @@ class Manova:
             term=self._term,
             nobs=int(n),
             groups=g,
+            n_equations=int(p),
             statistics={
                 "wilks_lambda": wilks,
+                "pillai_trace": pillai,
+                "lawley_hotelling_trace": lawley_hotelling,
+                "roy_largest_root": roy_root,
                 "s": s,
                 "exact": float(exact),
             },
+            r2_by_equation=r2_by_equation,
+            rmse_by_equation=rmse_by_equation,
+            f_by_equation=f_by_equation,
+            p_f_by_equation=p_f_by_equation,
+            depvar_names=getattr(self, "_response_names", []),
+            design_matrix=design,
+            coefficients=coefficients,
+            fitted_values=design @ coefficients,
+            responses=Y,
         )

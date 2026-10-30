@@ -68,7 +68,9 @@ def test_e_scalars_are_populated():
 def test_stata_summary_labels():
     df = _data()
     text = OLS.from_formula("y ~ x1 + x2", df).fit().summary(style="stata")
-    for token in ["Number of obs", "Coef.", "Std. err.", "P>|t|", "conf. interval"]:
+    # Spelled as the captured Stata output does (p8_outputs.txt:25):
+    #   y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+    for token in ["Number of obs", "Coefficient", "Std. err.", "P>|t|", "conf. interval"]:
         assert token in text
 
 

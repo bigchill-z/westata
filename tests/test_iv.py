@@ -510,7 +510,7 @@ def test_summary_stata_renders():
     text = IV2SLS.from_formula(OVER, df).fit().summary(style="stata")
     # Stata's ivregress table reports z / P>|z|, not t (see [R] ivregress,
     # Example 1: "Wald chi2(2) = 90.76" with a z column).
-    for token in ["Coef.", "Std. err.", "P>|z|", "Number of obs", "R-squared"]:
+    for token in ["Coefficient", "Std. err.", "P>|z|", "Number of obs", "R-squared"]:
         assert token in text
     assert "P>|t|" not in text
 
@@ -528,11 +528,27 @@ def test_iv_uses_normal_distribution_like_stata():
 # --------------------------------------------------------------------------
 # Guard rails
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("cov_type", ["HAC", "twoway", "Weiss", ""])
+@pytest.mark.parametrize("cov_type", ["twoway", "Weiss", ""])
 def test_unknown_cov_type_raises_value_error(cov_type):
     df = _just_identified()
     with pytest.raises(ValueError, match="Unknown cov_type"):
         IV2SLS.from_formula(JUST, df).fit(cov_type=cov_type)
+
+
+def test_hac_is_now_supported_by_iv2sls():
+    """Round 30 wired HAC into the IV path.
+
+    It used to raise ``UnsupportedError``; the covariance now goes through
+    ``compute_cov`` with the bandwidth forwarded.  See ``tests/test_iv_hac.py``.
+    """
+
+    df = _just_identified()
+
+    fitted = IV2SLS.from_formula(JUST, df).fit(
+        cov_type="HAC", cov_kwds={"maxlags": 1}
+    )
+
+    assert fitted.cov_type == "HAC"
 
 
 def test_nonrobust_alias_accepted():

@@ -427,10 +427,12 @@ def test_summary_renders_in_stata_style(pooled):
     assert "Number of obs" in text
     assert "1,600" not in text  # westata's renderer does not add separators
     assert "1600" in text
-    assert "Coef." in text
+    assert "Coefficient" in text
     assert "Std. err." in text
     assert "[95% conf. interval]" in text
-    assert "didregress" in text
+    # The command name is no longer printed as a "Model:" row (Stata has no such row),
+    # so it is checked where it actually lives.
+    assert "didregress" in str(pooled.model_name)
     # The coefficient row itself is present with Stata's digits.
     row = next(line for line in text.splitlines() if line.strip().startswith("treated"))
     assert "1.18613" in row
@@ -438,7 +440,8 @@ def test_summary_renders_in_stata_style(pooled):
 
 def test_summary_shows_the_panel_command(longitudinal):
     text = longitudinal.summary(style="stata")
-    assert "xtdidregress" in text
+    # Stata's table carries no "Model:" line, so the command is verified via e(cmd).
+    assert "xtdidregress" in str(longitudinal.model_name)
     assert ".05522799" in text
 
 

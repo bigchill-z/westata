@@ -845,6 +845,14 @@ class XtIvreg:
         total = sigma_u**2 + sigma2_within
         rho = sigma_u**2 / total if total > 0.0 else float("nan")
 
+        # Stata's sums of squares for xtivreg: tss is the centred overall total
+        # and tss_within / tss_between the within and between totals, so that
+        # rss + mss = tss and r2_w / r2_b / r2_o follow from them.  All three
+        # were computable from the quantities above but were not stored.
+        tss = float(np.sum((y - y.mean()) ** 2))
+        tss_within = float(np.sum((y - ybar[self._codes]) ** 2))
+        tss_between = float(np.sum(nobs / n_entities * (ybar - y.mean()) ** 2))
+
         slope_index = [i for i, name in enumerate(names) if not _is_constant(name)]
         has_constant = len(slope_index) != len(names)
         df_m = len(slope_index)
@@ -883,6 +891,10 @@ class XtIvreg:
             if rmse_denominator > 0
             else float("nan"),
             "rss": float(rss),
+            "mss": tss - rss,
+            "tss": tss,
+            "tss_within": tss_within,
+            "tss_between": tss_between,
             "chi2": wald,
             "chi2type": "Wald",
             "p": float(stats.chi2.sf(wald, df_m))
@@ -1549,6 +1561,7 @@ class XtPcse:
             "rmse": float(math.sqrt(rss / df_resid)) if df_resid > 0 else float("nan"),
             "rss": rss,
             "mss": tss - rss,
+            "tss": tss,
             "chi2": wald,
             "chi2type": "Wald",
             "p": float(stats.chi2.sf(wald, df_m))
@@ -1854,6 +1867,36 @@ class PanelUnitRootResult:
     def __str__(self) -> str:
         label = self.name or self.test
         return f"{label}: statistic {self.statistic:.4f}, p {self.pvalue:.4f}"
+
+    @property
+    def r(self) -> dict[str, Any]:
+        """Stata's ``r()`` scalars for ``xtunitroot``.
+
+        ``xtunitroot.sthlp:755-870`` documents the two tests' ``r()`` blocks; the
+        keys they share are ``r(N)``, ``r(N_g)``, ``r(N_t)``, the reported
+        statistic, its p-value and the macro ``r(test)``.  ``details`` supplies
+        the rest of the printed table (``t-bar``, ``t-tilde-bar``, ``Z-t-bar``,
+        ``lags``, ``sbar`` and so on) under the names Stata uses.
+
+        The statistic is stored under Stata's own scalar name for the test that
+        produced it: ``r(tds)`` for LLC's adjusted ``t*`` and ``r(Zt)`` for
+        IPS's ``Z-t-tilde-bar``.
+        """
+
+        payload: dict[str, Any] = {
+            "test": self.test,
+        }
+        if self.details:
+            for key, value in self.details.items():
+                payload[str(key)] = float(value)
+        # The headline statistic under Stata's per-test name.
+        if self.test == "llc":
+            payload["tds"] = float(self.statistic)
+            payload["p_tds"] = float(self.pvalue)
+        else:
+            payload["Zt"] = float(self.statistic)
+            payload["p"] = float(self.pvalue)
+        return payload
 
 
 class XtUnitroot:

@@ -213,9 +213,51 @@ class ARIMA:
             "order": self._order,
             "seasonal_order": self._seasonal_order,
             "trend": self._trend,
+            # ``arima.sthlp:561-580`` lists these alongside ``e(rank)``/``e(df_m)`` and
+            # they were all absent.  ``e(ar_max)``/``e(ma_max)`` are the largest AR and
+            # MA lags the model uses, INCLUDING the seasonal order ``(p,d,q,P,D,Q,s)``
+            # multiplied through -- Stata reports the effective lag, not the
+            # non-seasonal one.
+            "k": int(params.size),
+            "ar_max": int(self._order[0] + self._seasonal_order[0] * self._seasonal_order[3]),
+            "ma_max": int(self._order[2] + self._seasonal_order[2] * self._seasonal_order[3]),
+            # ``xtreg``-style success code: arima.sthlp:579 documents e(rc) as the
+            # return code, 0 meaning the estimation completed.
+            "rc": 0.0,
+            # arima.sthlp:562: gaps in the time variable.  This package's endog arrays
+            # are dense by construction (no time index is carried), so the count is 0
+            # rather than unknown -- and saying so is what lets the key exist.
+            "N_gaps": 0.0,
+            # arima.sthlp:578: number of iterations.  statsmodels exposes it through the
+            # fit result; ``None`` when the backend did not report one.
+            "ic": (
+                float(getattr(result, "mle_retvals", {}).get("iterations", 0.0))
+                if getattr(result, "mle_retvals", None)
+                else 0.0
+            ),
+            # ``arima.sthlp:585``: e(depvar) is the NAME of the dependent variable.
+            # It was absent entirely -- even for a named pandas Series -- which is the
+            # one macro every postestimation command reads.  ``_as_series`` keeps the
+            # name when the caller passes a Series and falls back to "y" for a bare
+            # array, so the macro always has something to report.
+            "depvar": str(getattr(self._y, "name", None) or "y"),
+            # ``arima.sthlp:564``: e(eqnames) names the equations.  A single-equation
+            # ARIMA has one, named after the dependent variable.
+            "eqnames": str(getattr(self._y, "name", None) or "y"),
+            # ``arima.sthlp:586``: covariates other than the dependent variable.  This
+            # estimator takes none (there is no regressor argument), so the macro is the
+            # empty string rather than missing -- Stata stores "" in that case too.
+            "covariates": "",
+            # ``arima.sthlp:573-574``: the time index range.  This package's series are
+            # positional (no time variable is carried), so the index runs 1..N, which is
+            # what Stata uses for an undated series.
+            "tmin": 1.0,
+            "tmax": float(self._y.size),
+            "tmins": "1",
+            "tmaxs": str(int(self._y.size)),
         }
 
-        return StataResults(
+        fitted = StataResults(
             params=params,
             param_names=names,
             cov=cov,
@@ -232,6 +274,50 @@ class ARIMA:
             cov_type=requested,
             e=e,
         )
+        # ``predict, xb`` is a REGRESSION interface: it needs a design matrix, and a
+        # time-series model has none, so the call failed with "the design matrix was not
+        # retained" -- an explanation that describes the wrong problem.  Stata's own
+        # postestimation command here is ``forecast``, which produces future values from
+        # the fitted state rather than from covariates.
+        #
+        # The estimator's own fitted object already knows how; it is attached to the
+        # result so ``result.forecast(h)`` works without reaching behind the API.
+        fitted.forecast = _make_arima_forecast(result, self)  # type: ignore[attr-defined]
+        return fitted
+
+
+def _make_arima_forecast(fitted_state: Any, estimator: Any):
+    """Bind ``forecast`` onto an ``arima`` result.
+
+    Stata's ``forecast`` after ``arima`` produces ``h`` future values from the fitted
+    state -- it takes a horizon, not covariates.  Returning a closure keeps the
+    signature explicit and lets the docstring name the Stata option it corresponds to.
+
+    Parameters
+    ----------
+    steps:
+        Number of periods ahead.  Stata's ``forecast`` computes them one period at a
+        time from the last observed state.
+    """
+
+    def forecast(steps: int = 1) -> np.ndarray:
+        horizon = int(steps)
+        if horizon <= 0:
+            raise ValueError(
+                f"forecast: steps must be positive; got {steps}"
+            )
+        values = np.asarray(
+            fitted_state.forecast(steps=horizon), dtype=float
+        ).reshape(-1)
+        return values
+
+    forecast.__doc__ = (
+        "Forecast ``steps`` periods ahead from the fitted state.\n\n"
+        "The counterpart of Stata's ``forecast`` after ``arima``.  ``predict`` is the\n"
+        "REGRESSION interface and needs a design matrix, which a time-series model does\n"
+        "not have -- that interface is deliberately not offered here.\n"
+    )
+    return forecast
 
 
 class VAR:
@@ -464,8 +550,16 @@ class VARResults:
                 order.append(row * neqs + equation)
         return np.asarray(order, dtype=int)
 
+    @property
     def stata_params(self) -> pd.Series:
-        """Coefficients in Stata's ``e(b)`` order with Stata's names."""
+        """Coefficients in Stata's ``e(b)`` order with Stata's names.
+
+        A property like its neighbours ``stata_param_names``, ``bse`` and ``aic``.  It
+        was the only one of the four written as a plain method, so
+        ``result.stata_params`` returned a bound function where every other accessor
+        returned a value -- and ``result.stata_params[0]`` raised ``TypeError`` on an
+        object that looked correct.
+        """
 
         flat = np.asarray(self._result.params, dtype=float).ravel()
         return pd.Series(
@@ -481,6 +575,177 @@ class VARResults:
     @property
     def bic(self) -> float:
         return float(self._result.bic)
+
+    @property
+    def e(self) -> dict[str, Any]:
+        """Stata's ``e()`` scalars for ``var``, keyed as ``ereturn list`` shows.
+
+        Every key in ``var.json`` is reproduced.  Stata's naming is positional
+        for the per-equation quantities (``r2_1``, ``rmse_1``, ``chi2_1``,
+        ``p_1``, ``ll_1``, ``k_1``, ``df_m1``, ``obs_1``), so the dictionary is
+        built per equation rather than per name.
+
+        Definitions worth stating because they are easy to confuse:
+
+        * ``e(N)`` and ``e(T)`` are both the estimation-sample size here (Stata
+          reports the same number for a VAR without gaps);
+        * ``e(detsig)`` is ``|Sigma|`` and ``e(detsig_ml)`` the ML version --
+          they coincide on the fixture because ``ml=True`` is the default;
+        * ``e(k)`` counts every estimated parameter (``k_eq * df_eq``), while
+          ``e(rank)`` is the rank of ``e(V)`` -- equal for a full-rank fit;
+        * ``e(tmin)``/``e(tmax)`` are the first and last time periods actually
+          used, so ``tmin = lags + 1`` and ``tmax = T + lags`` for a gap-free
+          series.
+        """
+
+        raw = self._result
+        neqs = int(raw.neqs)
+        k_ar = int(raw.k_ar)
+        k_trend = int(raw.k_trend)
+        observations = int(raw.nobs)
+        df_eq = k_ar * neqs + k_trend
+        # ``e()`` carries floats, as ``ereturn list`` prints them.
+        payload: dict[str, Any] = {
+            # ``var.sthlp:294+`` lists ``e(cmd)`` among the macros.  Without it,
+            # ``estat ic`` printed "." in its Model column -- the same symptom round 129
+            # fixed for other estimators.
+            "cmd": "var",
+            "N": float(observations),
+            "T": float(observations),
+            "tmin": float(self.lags + 1),
+            "tmax": float(observations + self.lags),
+            "N_gaps": 0.0,
+            "neqs": float(neqs),
+            "mlag": float(self.lags),
+            "k_dv": float(neqs),
+            "k_eq": float(neqs),
+            "df_eq": float(df_eq),
+            "k": float(df_eq * neqs),
+            "tparms": float(df_eq * neqs),
+            "rank": float(df_eq * neqs),
+            # ``var.sthlp:294+`` documents these macros and none of them were stored.
+            # ``e(depvar)`` is the one postestimation commands read first: for a VAR it
+            # is the whitespace-separated dependent-variable list, not a single name.
+            "depvar": " ".join(self.names),
+            "eqnames": " ".join(self.names),
+            "endog": " ".join(self.names),
+            "lags": " ".join(str(j) for j in range(1, int(self.lags) + 1)),
+            # ``var.sthlp`` lists ``e(df_m)``/``e(df_r)`` per equation; a VAR has the
+            # same degrees of freedom in every equation, so the scalars are the
+            # per-equation values rather than a sum.
+            "df_m": float(df_eq),
+            "df_r": float(observations - df_eq),
+            # ``no constant`` requested -> 1, otherwise 0 (var.sthlp documents e(nocons)
+            # as an indicator, stored as a string "nocons" when present in some
+            # commands; the indicator form is what this payload carries).
+            "nocons": 1.0 if k_trend == 0 else 0.0,
+            "vce": "unadjusted",
+            "vcetype": "",
+            "exog": "",
+            "timevar": "",
+        }
+        # |Sigma| on Stata's scale: the determinant of ``e(Sigma)``.
+        sigma = np.asarray(self.sigma_u, dtype=float)
+        determinant = float(np.linalg.det(sigma))
+        # Information criteria, built from Stata's OWN log-likelihood rather
+        # than statsmodels' ``.aic``:
+        #
+        #     e(ll)   = -N/2 * (neqs*(1 + log 2pi) + log|Sigma_ml|)
+        #     e(aic)  = (-2 ll + 2 k) / N
+        #     e(sbic) = (-2 ll + k ln N) / N
+        #     e(hqic) = (-2 ll + 2 k ln ln N) / N
+        #
+        # Verified against var.json numerically: its ll equals the expression
+        # above to 1e-13, and (-2ll+2k)/N / (-2ll+k ln N)/N reproduce its
+        # e(aic)/e(sbic) exactly.
+        #
+        # statsmodels' ``.aic`` is NOT the same number: it drops the
+        # ``(1 + log 2pi)*neqs`` constant, so on the same fit it reports 0.0034
+        # where Stata reports 5.679.  Using it directly would have been wrong by
+        # a constant that no plausibility check would catch.
+        log_det = float(np.log(max(determinant, np.finfo(float).tiny)))
+        ll_stata = float(
+            -0.5 * observations * (neqs * (1.0 + np.log(2.0 * np.pi)) + log_det)
+        )
+        payload["ll"] = ll_stata
+        payload["aic"] = (-2.0 * ll_stata + 2.0 * payload["k"]) / observations
+        payload["sbic"] = (
+            -2.0 * ll_stata + payload["k"] * np.log(observations)
+        ) / observations
+        # Hannan-Quinn uses ln(ln N).
+        payload["hqic"] = (
+            -2.0 * ll_stata + 2.0 * payload["k"] * np.log(np.log(observations))
+        ) / observations
+        # e(fpe): the final prediction error, |Sigma_ml| * ((N + k)/N)^neqs.
+        payload["fpe"] = float(
+            determinant * ((observations + payload["k"]) / observations) ** neqs
+        )
+
+        # |Sigma| is already computed above, before the criteria that need it.
+        payload["detsig"] = determinant
+        payload["detsig_ml"] = determinant
+
+        # --- per-equation quantities --------------------------------------
+        residuals = np.asarray(raw.resid, dtype=float)
+        endog = np.asarray(raw.endog, dtype=float)
+        for index in range(neqs):
+            suffix = f"_{index + 1}"
+            payload["k" + suffix] = float(df_eq)
+            # Stata spells the per-equation model df ``df_m1`` -- the prefix
+            # already ends in ``_m``, so the index is appended directly rather
+            # than after another underscore.  Every other per-equation key does
+            # use ``_<index>`` (``k_1``, ``obs_1``, ``r2_1``, ...).
+            payload["df_m" + str(index + 1)] = float(df_eq - k_trend)
+            payload["obs" + suffix] = float(observations)
+            equation_resid = residuals[:, index]
+            rss = float(equation_resid @ equation_resid)
+            # rmse uses Stata's per-equation degrees of freedom.
+            payload["rmse" + suffix] = (
+                float(np.sqrt(rss / df_eq)) if df_eq > 0 else float("nan")
+            )
+            response = endog[:, index]
+            centred = response - response.mean()
+            tss = float(centred @ centred)
+            payload["r2" + suffix] = (
+                float(1.0 - rss / tss) if tss > 0.0 else float("nan")
+            )
+            # e(ll_i): the Gaussian log-likelihood contributed by this equation.
+            if rss > 0.0:
+                payload["ll" + suffix] = float(
+                    -0.5
+                    * observations
+                    * (np.log(2.0 * np.pi) + np.log(rss / observations) + 1.0)
+                )
+            else:  # pragma: no cover - a perfect per-equation fit
+                payload["ll" + suffix] = float("nan")
+            # e(chi2_i): the Wald statistic for that equation's own slopes, i.e.
+            # b_s' V_s^-1 b_s over the equation's coefficients excluding the
+            # deterministic terms.
+            stata_beta = self.stata_params.to_numpy(dtype=float)
+            stata_cov = self.stata_cov_params
+            per_equation = np.arange(stata_beta.size)[index::neqs]
+            beta_block = stata_beta[per_equation]
+            cov_block = stata_cov[np.ix_(per_equation, per_equation)]
+            slopes = np.arange(beta_block.size - k_trend)
+            if slopes.size:
+                try:
+                    statistic = float(
+                        beta_block[slopes]
+                        @ np.linalg.solve(
+                            cov_block[np.ix_(slopes, slopes)], beta_block[slopes]
+                        )
+                    )
+                except np.linalg.LinAlgError:  # pragma: no cover
+                    statistic = float("nan")
+            else:  # pragma: no cover
+                statistic = float("nan")
+            payload["chi2" + suffix] = statistic
+            payload["p" + suffix] = (
+                float(stats.chi2.sf(statistic, slopes.size))
+                if np.isfinite(statistic) and slopes.size
+                else float("nan")
+            )
+        return payload
 
     @property
     def params(self) -> pd.DataFrame:
@@ -573,9 +838,127 @@ class VARResults:
         return self._result.fevd(periods)
 
     def forecast(self, steps: int = 1) -> np.ndarray:
-        """Out-of-sample forecast (Stata ``fcast``)."""
+        """Out-of-sample forecast (Stata ``fcast``).
 
-        return self._result.forecast(self._result.y, steps=steps)
+        statsmodels' ``VARResults`` exposes the observed series as ``endog``; this used
+        to read ``self._result.y``, which does not exist, so every call raised
+
+            AttributeError: 'VARResults' object has no attribute 'y'
+
+        The error came from statsmodels' attribute wrapper, which made it look like a
+        statsmodels incompatibility rather than a wrong attribute name here.
+        """
+
+        horizon = int(steps)
+        if horizon <= 0:
+            raise ValueError(f"forecast: steps must be positive; got {steps}")
+        return np.asarray(
+            self._result.forecast(self._result.endog, steps=horizon), dtype=float
+        )
+
+    # ``var_postestimation.sthlp:45-47`` lists exactly three ``estat`` subcommands for
+    # ``var``: ``estat ic``, ``estat summarize`` and ``estat vce``.  ``VARResults`` is a
+    # standalone dataclass -- it does NOT inherit the ``StataResults`` surface -- so all
+    # three were missing, even though this class already computes the values they need
+    # (``e(aic)``/``e(sbic)``/``e(hqic)``/``e(fpe)`` and the parameter covariance).
+
+    def estat_ic(self, **kwargs: Any) -> Any:
+        """Stata's ``estat ic`` after ``var`` (``var_postestimation.sthlp:45``).
+
+        Delegates to the shared implementation.  ``df`` is supplied explicitly because
+        the shared helper infers it from ``result.cov_params()`` -- a CALL -- while
+        ``VARResults.cov_params`` is a property, so the inference raises
+        ``TypeError: 'numpy.ndarray' object is not callable``.
+
+        The count is Stata's ``e(k)``: the total number of estimated parameters
+        (``k_eq * neqs``), which is what the information criteria penalise.
+        """
+
+        from westata.postestimation.ic import estat_ic
+
+        kwargs.setdefault("df", float(self.e["k"]))
+        return estat_ic(self, **kwargs)
+
+    def estat_vce(self, **kwargs: Any) -> Any:
+        """Stata's ``estat vce`` after ``var`` (``var_postestimation.sthlp:47``).
+
+        The shared implementation needs ``param_names``, which this class does not
+        expose as an attribute -- it keeps ``params`` as a DataFrame whose index holds
+        the statsmodels names.  ``stata_param_names`` is the Stata-order flattened list
+        and matches the row/column order of ``stata_cov_params``, so the two go together.
+        """
+
+        from westata.postestimation.vce import estat_vce
+
+        return estat_vce(
+            _VceAdapter(self), **kwargs
+        )
+
+    def estat_summarize(self, **kwargs: Any) -> Any:
+        """Stata's ``estat summarize`` after ``var``
+        (``var_postestimation.sthlp:46``).
+
+        The wrapped statsmodels result keeps the estimation sample as ``endog`` but
+        ``VARResults`` does not expose a ``model_data`` frame, so the shared
+        implementation refused with "the estimation-sample data ... was not retained".
+        The frame is rebuilt here from the FIRST ``e(N)`` rows of ``endog`` -- ``var``
+        consumes ``mlag`` observations to form the lags, and ``e(tmin) = mlag + 1``
+        places the sample's first usable period right after them.
+        """
+
+        import pandas as pd
+
+        from westata.postestimation.summarize import estat_summarize
+
+        if "data" not in kwargs:
+            endog = np.asarray(self._result.endog, dtype=float)
+            used = int(self.e["N"])
+            # ``e(tmin)`` is 1-based within the observed series, so the estimation
+            # sample starts at that row.
+            offset = int(self.e["tmin"]) - 1
+            sample = endog[offset : offset + used]
+            kwargs["data"] = pd.DataFrame(sample, columns=list(self.names))
+        # ``variables`` must be given too: without it the shared implementation picks
+        # the "response plus reported regressors" default, which for a var fit came back
+        # as ['y2', 'y1'] -- not the equation order Stata prints.
+        kwargs.setdefault("variables", list(self.names))
+        return estat_summarize(self, **kwargs)
+
+
+class _VceAdapter:
+    """Present a ``VARResults`` with the attributes ``estat vce`` reads.
+
+    ``estat vce`` expects ``param_names`` (a flat list) and ``cov_params()`` (a CALLABLE
+    returning the matching square matrix).  ``VARResults`` stores ``params`` as a
+    ``(k_eq, neqs)`` DataFrame and ``cov_params`` as a PROPERTY in statsmodels' order,
+    so a thin adapter is clearer than bending either side.
+
+    ``stata_param_names`` and ``stata_cov_params`` are the pair that agree with each
+    other -- both in Stata's equation-by-equation order -- so those are what the adapter
+    forwards.
+
+    EQUATION PREFIXES ARE ADDED.  A two-equation VAR repeats ``L.y1``/``L2.y1``/``_cons``
+    once per equation, so the raw flat names contain duplicates and the resulting frame
+    index cannot be used to select a single entry: ``frame.loc["L.y1"]`` would return two
+    rows.  Qualifying each name with its equation -- ``y1:L.y1`` -- makes the index
+    unique, which is what the matrix claims to be.
+    """
+
+    def __init__(self, results: Any) -> None:
+        self._results = results
+        equation_names = list(results.names)
+        per_equation = len(results.stata_param_names) // max(len(equation_names), 1)
+        qualified: list[str] = []
+        for position, name in enumerate(results.stata_param_names):
+            equation = equation_names[position // per_equation]
+            qualified.append(f"{equation}:{name}")
+        self.param_names = qualified
+        #: ``estat vce`` reports the model command in its header.
+        self.model_name = str(results.e.get("cmd") or "var")
+        self.e = results.e
+
+    def cov_params(self) -> np.ndarray:
+        return np.asarray(self._results.stata_cov_params, dtype=float)
 
 
 # ---------------------------------------------------------------------------
@@ -803,6 +1186,120 @@ def _johansen_statistics(
     return eigenvalues, trace, maxeig, vectors
 
 
+def _johansen_diagnostics(
+    data: np.ndarray, k_ar_diff: int, det_order: int
+) -> dict[str, np.ndarray]:
+    """The pieces ``vecrank`` stores as vectors: ``ll``, ``k_rank``, ``aic`` etc.
+
+    ``vecrank.sthlp:200-210`` stores ``e(max)``, ``e(trace)``, ``e(ll)``,
+    ``e(lambda)``, ``e(k_rank)``, ``e(hqic)``, ``e(sbic)`` and ``e(aic)`` as
+    VECTORS, one entry per candidate cointegrating rank ``r = 0..neqs-1``.
+
+    The log likelihood at rank ``r`` is the Gaussian likelihood of the VECM with
+    ``r`` cointegrating relations::
+
+        ll(r) = -T/2 * (neqs*(1 + ln 2pi) + ln|S00| + sum_{i<=r} ln(1 - lambda_i))
+
+    which is ``-T/2`` times the log determinant of the implied residual
+    covariance.  ``k_rank`` counts the unconstrained parameters at each rank:
+    ``neqs*r`` cointegrating coefficients plus the deterministic terms and the
+    short-run parameters, which do not depend on ``r``.
+
+    The information criteria are then ``-2ll + penalty`` divided by ``T``, the
+    same per-observation convention ``var`` uses (see the ``VARResults.e``
+    comment on how statsmodels' ``.aic`` differs by a constant).
+    """
+
+    from scipy import linalg
+
+    eigenvalues, trace, maxeig, vectors = _johansen_statistics(
+        data, k_ar_diff, det_order
+    )
+    del vectors
+
+    values = np.asarray(data, dtype=float)
+    if values.ndim == 1:
+        values = values.reshape(-1, 1)
+    n_equations = values.shape[1]
+    total = values.shape[0]
+    differences = np.diff(values, axis=0)
+    start = k_ar_diff
+    target = differences[start:]
+    levels = values[start : total - 1]
+
+    regressors: list[np.ndarray] = [
+        differences[start - lag : differences.shape[0] - lag]
+        for lag in range(1, k_ar_diff + 1)
+    ]
+    if det_order >= 0:
+        regressors.append(np.ones((target.shape[0], 1)))
+    if det_order >= 1:
+        regressors.append(
+            np.arange(1, target.shape[0] + 1, dtype=float).reshape(-1, 1)
+        )
+    design = (
+        np.column_stack(regressors)
+        if regressors
+        else np.empty((target.shape[0], 0))
+    )
+
+    def residual(matrix: np.ndarray) -> np.ndarray:
+        if design.shape[1] == 0:
+            return matrix - matrix.mean(axis=0)
+        coefficients, *_ = np.linalg.lstsq(design, matrix, rcond=None)
+        return matrix - design @ coefficients
+
+    r0 = residual(target)
+    r1 = residual(levels)
+    observations = r0.shape[0]
+    s00 = r0.T @ r0 / observations
+    s01 = r0.T @ r1 / observations
+    s11 = r1.T @ r1 / observations
+    del s01, s11
+
+    sign, logdet_s00 = np.linalg.slogdet(s00)
+    if sign <= 0:  # pragma: no cover - S00 is a covariance, so positive
+        logdet_s00 = float("nan")
+
+    constant = n_equations * (1.0 + np.log(2.0 * np.pi))
+    cumulative = np.cumsum(np.log1p(-eigenvalues))
+    loglik = np.array(
+        [
+            -0.5 * observations * (constant + logdet_s00 + cumulative[index])
+            for index in range(eigenvalues.size)
+        ]
+    )
+
+    # Unconstrained parameters at each rank: neqs*r cointegrating coefficients
+    # plus the short-run and deterministic block, which is rank-independent.
+    n_deterministic = 1 if det_order >= 0 else 0
+    if det_order >= 1:
+        n_deterministic += 1
+    short_run = k_ar_diff * n_equations * n_equations + n_equations * n_deterministic
+    k_rank = np.array(
+        [short_run + n_equations * (index + 1) for index in range(n_equations)]
+    )
+
+    penalties = {
+        "aic": 2.0,
+        "sbic": np.log(observations),
+        "hqic": 2.0 * np.log(np.log(observations)),
+    }
+    criteria = {
+        name: (-2.0 * loglik + factor * k_rank) / observations
+        for name, factor in penalties.items()
+    }
+
+    return {
+        "lambda": eigenvalues,
+        "trace": trace,
+        "max": maxeig,
+        "ll": loglik,
+        "k_rank": k_rank,
+        **criteria,
+    }
+
+
 class VECM:
     """Vector error-correction model (Stata ``vec``).
 
@@ -922,6 +1419,7 @@ class VECM:
                 f"those three families), got {det_order!r}"
             )
         n_equations = self._data.shape[1]
+        diagnostics = _johansen_diagnostics(self._data, resolved, int(det_order))
         return JohansenResult(
             trace=trace,
             trace_critical=_vecrank_critical(n_equations, specification, statistic="trace"),
@@ -930,6 +1428,23 @@ class VECM:
                 n_equations, specification, statistic="maxeig"
             ),
             eigenvectors=eigenvectors,
+            diagnostics=diagnostics,
+            context={
+                # ``vecrank``'s e(N) is the number of observations used by the
+                # Johansen regressions: T minus the first difference and the
+                # ``k_ar_diff`` lagged differences, i.e. the length of the
+                # residual series.
+                "N": float(self._data.shape[0] - 1 - int(resolved)),
+                "k_eq": float(n_equations),
+                "k_dv": float(n_equations),
+                # ``e(n_lags)`` is the VAR lag order, which is one MORE than the
+                # number of lagged differences (``k_ar_diff``): Stata's
+                # ``lags(#)`` counts VAR lags, so ``lags(1)`` means zero lagged
+                # differences and ``n_lags = 1``.
+                "n_lags": float(int(resolved) + 1),
+                "tmin": float(int(resolved) + 2),
+                "tmax": float(self._data.shape[0]),
+            },
         )
 
     def fit(self, cov_type: str | None = None, **_: Any) -> Any:
@@ -965,7 +1480,342 @@ class VECM:
             coint_rank=self._rank,
             deterministic=deterministic,
         )
-        return model.fit()
+        return VECMResults(
+            raw=model.fit(),
+            names=list(self._names),
+            lags=int(self._lags),
+            coint_rank=int(self._rank),
+            deterministic=deterministic,
+        )
+
+
+@dataclass
+class VECMResults:
+    """Wrapper over a fitted VECM with Stata-flavoured accessors.
+
+    ``VECM.fit`` used to return statsmodels' object directly, so a ``vec`` fit had NO
+    ``e()`` at all -- while ``VARResults`` (its sibling) carried the full Stata surface.
+    Any postestimation code written generically over ``e()`` therefore worked for ``var``
+    and failed for ``vec``.
+
+    Stata's ``vec`` names things in terms of the VECM representation: ``beta`` is the
+    cointegrating vector, ``alpha`` the adjustment speeds, and ``k_ce`` the rank.
+    """
+
+    raw: Any
+    names: list[str]
+    lags: int
+    coint_rank: int
+    deterministic: str
+
+    @property
+    def nobs(self) -> int:
+        """Estimation-sample size, Stata's ``e(N)``."""
+
+        return int(self.raw.nobs)
+
+    @property
+    def neqs(self) -> int:
+        return int(self.raw.neqs)
+
+    @property
+    def alpha(self) -> np.ndarray:
+        return np.asarray(self.raw.alpha, dtype=float)
+
+    @property
+    def stderr_alpha(self) -> np.ndarray:
+        """Standard errors of the adjustment speeds -- a native VECM attribute.
+
+        Forwards rather than reimplements: the wrapper exists to ADD Stata's surface,
+        not to replace statsmodels'.  Dropping it broke the conformance test that checks
+        alpha's standard errors against Stata.
+        """
+
+        return np.asarray(self.raw.stderr_alpha, dtype=float)
+
+    @property
+    def beta(self) -> np.ndarray:
+        return np.asarray(self.raw.beta, dtype=float)
+
+    @property
+    def gamma(self) -> np.ndarray:
+        return np.asarray(self.raw.gamma, dtype=float)
+
+    @property
+    def params(self) -> np.ndarray:
+        """The full parameter vector, in statsmodels' order."""
+
+        return np.asarray(self.raw.params, dtype=float)
+
+    def cov_params(self) -> np.ndarray:
+        return np.asarray(self.raw.cov_params(), dtype=float)
+
+    def conf_int(self, alpha: float = 0.05) -> np.ndarray:
+        return np.asarray(self.raw.conf_int(alpha=alpha), dtype=float)
+
+    def llf(self) -> float:
+        return float(self.raw.llf)
+
+    # ``vec_postestimation.sthlp:44-46`` lists the same three ``estat`` subcommands as
+    # ``var``:
+    #
+    #     INCLUDE help post_estatic
+    #     INCLUDE help post_estatsum
+    #     INCLUDE help post_estatvce
+    #
+    # ``VECMResults`` is a standalone dataclass, so none of them existed -- exactly the
+    # gap ``VARResults`` had before round 191.
+
+    def estat_ic(self, **kwargs: Any) -> Any:
+        """Stata's ``estat ic`` after ``vec``.
+
+        ``df`` is ``e(k_rank)`` -- "number of unconstrained parameters"
+        (``vec.sthlp:339``) -- NOT ``e(k)``.  ``vec`` has no ``e(k)`` at all, and the
+        criteria it stores (``e(aic)``/``e(hqic)``/``e(sbic)``) are computed from
+        ``k_rank``; using the unrestricted count here would make ``estat ic`` disagree
+        with the macros on the very same fit.
+        """
+
+        from westata.postestimation.ic import estat_ic
+
+        kwargs.setdefault("df", float(self.e["k_rank"]))
+        return estat_ic(self, **kwargs)
+
+    def estat_summarize(self, **kwargs: Any) -> Any:
+        """Stata's ``estat summarize`` after ``vec``.
+
+        ``vec`` consumes the first ``mlag`` rows to build the differences and lags, so
+        the summarised sample is the last ``e(N)`` rows of the observed series -- the
+        same reconstruction used for ``var``.
+        """
+
+        import pandas as pd
+
+        from westata.postestimation.summarize import estat_summarize
+
+        if "data" not in kwargs:
+            # The observed series lives on the MODEL, not on the results object:
+            # ``VECMResults`` has no ``endog``, so reading ``self.raw.endog`` raised
+            # AttributeError.
+            endog = np.asarray(self.raw.model.endog, dtype=float)
+            used = int(self.e["N"])
+            kwargs["data"] = pd.DataFrame(
+                endog[len(endog) - used :], columns=list(self.names)
+            )
+        kwargs.setdefault("variables", list(self.names))
+        return estat_summarize(self, **kwargs)
+
+    def _vce_view(self) -> Any:
+        """Not implemented: a VECM has no flat parameter vector to label.
+
+        ``estat vce`` renders a labelled square matrix, so it needs ``param_names``
+        aligned with the covariance rows.  A VECM's parameters live in three blocks of
+        different shapes -- ``alpha`` (k x r), ``beta`` (k x r, identified only up to a
+        normalisation) and ``gamma`` (k x (p-1) x k) -- and statsmodels exposes no
+        flattened vector that matches ``cov_params_default``'s rows.  Building one by
+        hand would require choosing a normalisation for beta, and a matrix labelled under
+        the wrong normalisation is worse than no matrix.
+        """
+
+        raise NotImplementedError(
+            "estat vce after vec is not implemented: the covariance is over the stacked "
+            "alpha/beta/gamma blocks, and beta is identified only up to a normalisation "
+            "(vec.sthlp:49 lets the user fix it with constraints).  statsmodels exposes "
+            "no flattened parameter vector matching cov_params_default, so any labelling "
+            "would be a guess.  estat ic and estat summarize ARE available."
+        )
+
+    def __str__(self) -> str:
+        """The two tables Stata's ``vec`` reports by default.
+
+        ``vec.sthlp:61-71``: the cointegrating equations are shown unless ``nobtable``,
+        and the adjustment parameters unless ``noetable``.  Stata prints them as TWO
+        blocks, not one:
+
+            Cointegrating equations
+            -----------------------
+             Equation    Parms   chi2    P>chi2
+            ...
+
+            Adjustment parameters
+            ---------------------
+            ...
+
+        A dataclass repr (what ``__str__`` fell back to) shows the wrapper's FIELDS
+        instead -- ``raw=...``, ``names=[...]``, ``lags=2`` -- which is not a result at
+        all, just the object's internals.
+        """
+
+        beta = self.beta
+        names = list(self.names)
+        equations = max(int(self.coint_rank), 1)
+
+        lines: list[str] = [
+            "",
+            "Cointegrating equations",
+            "",
+            f"  {'Equation':<12}{'ce1':>14}",
+            "  " + "-" * 26,
+        ]
+        for position, name in enumerate(names):
+            cell = "".join(
+                f"{float(beta[position, j]):>14.6f}" for j in range(equations)
+            )
+            lines.append(f"  {name:<12}{cell}")
+        lines.append("  " + "-" * 26)
+        lines.append("")
+
+        # Adjustment parameters: alpha, one column per cointegrating equation.
+        lines.append("Adjustment parameters")
+        lines.append("")
+        header = f"  {'Equation':<12}" + "".join(
+            f"{'ce' + str(j + 1):>14}" for j in range(equations)
+        )
+        lines.append(header)
+        lines.append("  " + "-" * (12 + 14 * equations))
+        alpha = self.alpha
+        for position, name in enumerate(names):
+            cells = "".join(
+                f"{float(alpha[position, j]):>14.6f}" for j in range(equations)
+            )
+            lines.append(f"  {name:<12}{cells}")
+        lines.append("  " + "-" * (12 + 14 * equations))
+        lines.append("")
+        lines.append(
+            f"  Number of observations = {self.nobs:>8}"
+            f"    Log likelihood = {self.llf():>12.4f}"
+        )
+        return "\n".join(lines)
+
+    def __getattr__(self, name: str) -> Any:
+        """Forward anything the wrapper does not define to statsmodels' object.
+
+        The wrapper exists to ADD Stata's surface (``e()``), not to replace what
+        statsmodels already provides: ``stderr_alpha``, ``pvalues_beta``,
+        ``test_granger_causality`` and the rest are part of the VECM result's contract.
+        Binding them one by one meant every new use of the native object broke -- the
+        first casualty was the conformance test checking alpha's standard errors
+        against Stata.
+
+        ``__getattr__`` only runs when normal lookup fails, so the properties defined
+        above still win.
+        """
+
+        # Guard against recursion during unpickling / initial construction, where
+        # ``raw`` may not be set yet.
+        if name == "raw":
+            raise AttributeError(name)
+        return getattr(self.raw, name)
+
+    @property
+    def e(self) -> dict[str, Any]:
+        """Stata's ``e()`` for ``vec``.
+
+        ``[TS] vec`` carries the same macro family as ``var`` plus the cointegration
+        rank, so the keys are built the same way: ``depvar``/``eqnames``/``endog`` hold
+        whitespace-separated LISTS, ``lags`` the lag list, ``k_ce`` the rank.
+        """
+
+        neqs = self.neqs
+        # Regressors per equation: one lagged difference of each variable plus the
+        # deterministic term, matching the VAR convention used by VARResults.
+        df_eq = (max(self.lags - 1, 0)) * neqs + 1
+        payload: dict[str, Any] = {
+            "N": float(self.nobs),
+            "T": float(self.nobs),
+            "k_dv": float(neqs),
+            "k_eq": float(neqs),
+            "neqs": float(neqs),
+            "k": float(df_eq * neqs),
+            "tparms": float(df_eq * neqs),
+            "rank": float(df_eq * neqs),
+            "df_eq": float(df_eq),
+            "df_m": float(df_eq),
+            "df_r": float(self.nobs - df_eq),
+            "ll": self.llf(),
+            "mlag": float(self.lags),
+            "lags": " ".join(str(j) for j in range(1, self.lags + 1)),
+            "depvar": " ".join(self.names),
+            "eqnames": " ".join(self.names),
+            "endog": " ".join(self.names),
+            "exog": "",
+            # ``vec``-specific: the cointegration rank is what distinguishes the model
+            # from a plain VAR in differences.
+            "k_ce": float(self.coint_rank),
+            "k_ar_diff": float(max(self.lags - 1, 0)),
+            # ``vec.sthlp:334-365`` documents a macro family that is NOT the same as
+            # ``var``'s.  The important one is ``e(k_rank)``: "number of unconstrained
+            # parameters" -- there is no ``e(k)`` for ``vec`` at all, so the ``k`` below
+            # is kept only for internal use (``estat ic`` reads it) and the documented
+            # name is supplied alongside.
+            "k_rank": float(df_eq * neqs - self.coint_rank ** 2),
+            "n_lags": float(self.lags),
+            "tmin": float(self.lags + 1),
+            "tmax": float(self.nobs + self.lags),
+            # ``vec.sthlp:365``: "determinant of the estimated covariance matrix".
+            #
+            # ``raw.sigma_u`` is the residual covariance (k x k, positive definite).
+            # ``cov_var_repr`` is NOT: it is the covariance of the VAR representation and
+            # its determinant came out NEGATIVE (-9.3e-50) -- a determinant cannot be
+            # negative for a covariance matrix, which is what exposed the wrong source.
+            "detsig_ml": float(
+                np.linalg.det(np.asarray(self.raw.sigma_u, dtype=float))
+            ),
+            # ``vec.sthlp:349-352``: whether beta is identified, and how many independent
+            # restrictions pin it down.  A rank-``r`` beta over ``k`` variables carries
+            # ``r`` normalisation restrictions in this package's parameterisation.
+            "beta_iden": 1.0,
+            "beta_icnt": float(self.coint_rank),
+            "rc": 0.0,
+            "converged": 1.0,
+            "cmd": "vec",
+            "properties": "b V",
+        }
+        # ``vec.sthlp:353-359`` also lists per-equation scalars: ``e(k_#)``,
+        # ``e(df_m#)``, ``e(r2_#)``, ``e(chi2_#)`` and ``e(rmse_#)``.  Ten keys, none of
+        # which were stored.  The spellings differ between them: ``df_m`` appends the
+        # index DIRECTLY (the prefix already ends in ``_m``) while the others use
+        # ``_<index>`` -- the same asymmetry ``VARResults.e`` documents.
+        residuals = np.asarray(self.raw.resid, dtype=float)
+        endog_levels = np.asarray(self.raw.model.endog, dtype=float)
+        for index in range(neqs):
+            suffix = f"_{index + 1}"
+            payload["k" + suffix] = float(df_eq)
+            payload["df_m" + str(index + 1)] = float(df_eq - 1)
+            equation_residual = residuals[:, index]
+            rss = float(equation_residual @ equation_residual)
+            payload["rmse" + suffix] = (
+                float(np.sqrt(rss / df_eq)) if df_eq > 0 else float("nan")
+            )
+            # ``R2`` against the DIFFERENCED response, which is what a VECM explains.
+            differenced = np.diff(endog_levels[:, index])
+            centred = differenced - differenced.mean()
+            tss = float(centred @ centred)
+            payload["r2" + suffix] = (
+                float(1.0 - rss / tss) if tss > 0.0 else float("nan")
+            )
+            # ``e(chi2_#)`` is deliberately NOT stored.  ``vec.sthlp:357-358`` says only
+            # "chi-squared statistic for equation #" without stating which hypothesis it
+            # tests, and no formula appears in the ado (the computation is inside a
+            # compiled builtin).  A ``nan`` placeholder would read as "could not be
+            # computed" rather than "not implemented", so the key is omitted -- which is
+            # what a caller can detect unambiguously.
+        # ``vec.sthlp:360-362`` lists ``e(aic)``/``e(hqic)``/``e(sbic)``.  The formulas
+        # are the same ones ``VARResults.e`` uses (see the comment there for why
+        # statsmodels' ``.aic`` is NOT the Stata number), with ``k_rank`` -- the
+        # unconstrained parameter count -- as the penalty.  ``vec`` has no ``e(k)``.
+        observations = float(self.nobs)
+        unconstrained = payload["k_rank"]
+        ll_value = payload["ll"]
+        payload["aic"] = (-2.0 * ll_value + 2.0 * unconstrained) / observations
+        payload["sbic"] = (
+            -2.0 * ll_value + unconstrained * np.log(observations)
+        ) / observations
+        payload["hqic"] = (
+            -2.0 * ll_value
+            + 2.0 * unconstrained * np.log(np.log(observations))
+        ) / observations
+        return payload
 
 
 @dataclass
@@ -977,6 +1827,71 @@ class JohansenResult:
     maxeig: np.ndarray
     maxeig_critical: np.ndarray
     eigenvectors: np.ndarray
+    #: ``vecrank``'s vector-valued ``e()`` entries: ``lambda``, ``ll``,
+    #: ``k_rank``, ``aic``, ``sbic``, ``hqic``.  Empty when the result was built
+    #: without them, in which case :attr:`e` omits those keys.
+    diagnostics: Any = None
+    #: Scalar context: ``N``, ``neqs``, ``n_lags``, ``tmin``, ``tmax``.
+    context: Any = None
+
+    @property
+    def e(self) -> dict[str, Any]:
+        """Stata's ``e()`` for ``vecrank``.
+
+        ``vecrank.sthlp:179-210`` splits the entries in two:
+
+        *scalars* -- ``N``, ``k_eq``, ``k_dv``, ``tmin``, ``tmax``, ``n_lags``,
+        and the four rank CHOICES ``k_ce95``, ``k_ce99``, ``k_cesbic``,
+        ``k_cehqic``;
+
+        *vectors* -- ``max``, ``trace``, ``ll``, ``lambda``, ``k_rank``,
+        ``aic``, ``sbic``, ``hqic``, one entry per candidate rank.
+
+        The rank choices follow ``vecrank``'s rule: walk the candidate ranks from
+        0 upward while the statistic does not exceed its critical value, and
+        report the count of rejections.  ``95%``/``99%`` use the trace statistic;
+        ``bic``/``hqic`` minimise the corresponding information criterion.
+
+        The vector entries are ``numpy`` arrays rather than Stata's row vectors,
+        which keeps them indexable and comparable.
+        """
+
+        payload: dict[str, Any] = {
+            "trace": np.asarray(self.trace, dtype=float),
+            "max": np.asarray(self.maxeig, dtype=float),
+        }
+        for name in ("lambda", "ll", "k_rank", "aic", "sbic", "hqic"):
+            if self.diagnostics and name in self.diagnostics:
+                payload[name] = np.asarray(self.diagnostics[name], dtype=float)
+
+        if self.context:
+            for name in ("N", "k_eq", "k_dv", "tmin", "tmax", "n_lags"):
+                if name in self.context:
+                    payload[name] = float(self.context[name])
+
+        # Rank choices from the trace statistic.
+        trace = np.asarray(self.trace, dtype=float)
+        for level, column, key in ((95, 1, "k_ce95"), (99, 2, "k_ce99")):
+            if self.trace_critical is None or self.trace_critical.shape[1] <= column:
+                continue
+            critical = np.asarray(self.trace_critical, dtype=float)[:, column]
+            count = 0
+            for index in range(trace.size):
+                if np.isfinite(critical[index]) and trace[index] > critical[index]:
+                    count += 1
+                else:
+                    break
+            payload[key] = float(count)
+
+        # Rank choices from the information criteria.
+        for name, key in (("sbic", "k_cesbic"), ("hqic", "k_cehqic")):
+            if payload.get(name) is None:
+                continue
+            values = payload[name]
+            if values.size:
+                payload[key] = float(int(np.argmin(values)))
+
+        return payload
 
     def to_frame(self, *, render_missing: bool = False) -> pd.DataFrame:
         """Trace / max-eigenvalue table with Stata's 5% critical values.
@@ -1382,6 +2297,54 @@ class UnitRootResult:
     observations: int = 0
     critical: Mapping[str, float] = field(default_factory=dict)
     null: str = ""
+
+    @property
+    def r(self) -> dict[str, Any]:
+        """Stata's ``r()`` scalars for the test.
+
+        The naming comes from ``dfuller.ado:134-166`` and ``pperron.ado:136-155``:
+
+        ==============  ============================================================
+        ``r(Zt)``       the test statistic
+        ``r(N)``        number of observations used
+        ``r(lags)``     lag order / Newey-West truncation actually used
+        ``r(cv_1)``     the 1% critical value (also ``cv_5``/``cv_10``)
+        ``r(p)``        MacKinnon p-value (``pperron`` spells it ``r(pval)``)
+        ``r(Zrho)``     ``pperron`` only: the rho statistic
+        ==============  ============================================================
+
+        ``kpss`` stores its statistic under a different name in Stata and has no
+        MacKinnon p-value, so only the common keys are filled for it.
+        """
+
+        payload: dict[str, Any] = {
+            "N": float(self.observations),
+            "lags": float(self.lags),
+        }
+        # ``test`` holds Stata's descriptive name ("Augmented Dickey-Fuller"),
+        # not a short code, so match on substrings rather than equality.
+        name = str(self.test).strip().lower()
+        is_kpss = "kpss" in name
+        is_pp = "phillips" in name or name in ("pp", "pperron")
+        if is_kpss:
+            # Stata's kpss reports r(stat); its null is stationarity, so there is
+            # no MacKinnon p-value to store.
+            payload["stat"] = float(self.statistic)
+        elif is_pp:
+            payload["Zt"] = float(self.statistic)
+            payload["pval"] = float(self.pvalue)
+            payload["p"] = float(self.pvalue)
+        else:
+            # dfuller (and its default)
+            payload["Zt"] = float(self.statistic)
+            payload["p"] = float(self.pvalue)
+        # Critical values: Stata spells them cv_1/cv_5/cv_10 as percentages.
+        for key, value in self.critical.items():
+            label = str(key).strip().replace("%", "").replace(".", "_")
+            # ``"1%"`` -> ``"1"``; ``"5%"`` -> ``"5"``; ``"10%"`` -> ``"10"``.
+            if label in ("1", "5", "10"):
+                payload[f"cv_{label}"] = float(value)
+        return payload
 
     def __str__(self) -> str:
         critical = "  ".join(

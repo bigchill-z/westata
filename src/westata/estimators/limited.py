@@ -171,6 +171,39 @@ def _mills_ratio(index: np.ndarray) -> np.ndarray:
     return np.exp(stats.norm.logpdf(index) - log_ndtr(index))
 
 
+def _interval_counts(model: Any) -> dict[str, int]:
+    """``intreg``'s observation counts by censoring kind (``intreg.sthlp:242-245``).
+
+    * ``N_lc`` -- left-censored: no lower bound (``-inf``);
+    * ``N_rc`` -- right-censored: no upper bound (``+inf``);
+    * ``N_int`` -- interval: a finite, non-degenerate ``[lower, upper]`` pair;
+    * ``N_unc`` -- uncensored: ``lower == upper``, the value is observed exactly.
+
+    Returns an EMPTY dict for estimators whose bounds are scalars (``truncreg``
+    limits one variable globally rather than per observation), because the
+    per-kind counts have no meaning there.
+    """
+
+    lower = getattr(model, "_lower", None)
+    upper = getattr(model, "_upper", None)
+    if lower is None or upper is None:
+        return {}
+    lo = np.asarray(lower, dtype=float)
+    hi = np.asarray(upper, dtype=float)
+    if lo.ndim != 1 or hi.ndim != 1 or lo.size != hi.size:
+        return {}
+    left_censored = ~np.isfinite(lo) & np.isfinite(hi)
+    right_censored = np.isfinite(lo) & ~np.isfinite(hi)
+    exactly = np.isfinite(lo) & np.isfinite(hi) & (lo == hi)
+    interval = np.isfinite(lo) & np.isfinite(hi) & (lo != hi)
+    return {
+        "N_unc": int(np.sum(exactly)),
+        "N_lc": int(np.sum(left_censored)),
+        "N_rc": int(np.sum(right_censored)),
+        "N_int": int(np.sum(interval)),
+    }
+
+
 def _pseudo_r2(llf: float, ll0: float) -> float:
     """McFadden's pseudo R-squared, NaN when there is no usable null model."""
 
@@ -519,6 +552,35 @@ class _MLLimitedBase(_DiscreteBase):
             "N": nobs,
             "df_m": df,
             "rank": k,
+            # ``truncreg.ado:252`` and ``intreg.ado:418`` both set
+            # ``k_aux = 1``: each has exactly one auxiliary parameter (sigma).
+            # Stata uses it to report the LR test with ``df_m`` degrees of freedom
+            # while ``rank`` covers the slopes, the intercept and sigma.
+            "k_aux": 1,
+            # ``intreg.ado:421-425`` blesses the interval statistics for margins:
+            #   ereturn local marginsok default XB Pr(passthru) E(passthru) YStar(passthru)
+            # ``truncreg`` publishes no such macro, so this is conditional on the command
+            # rather than added for the whole shared base.
+            **(
+                {
+                    "marginsok": "default XB Pr(passthru) E(passthru) YStar(passthru)"
+                }
+                if str(getattr(self, "_stata_command", "")).strip().lower() == "intreg"
+                else {}
+            ),
+            # ``truncreg.sthlp:247``: "number of observations before truncation".
+            # For a model without truncation this equals ``N``; the value is None
+            # for estimators that never truncate, so it is added conditionally.
+            **(
+                {"N_bf": self._n_before_truncation}
+                if getattr(self, "_n_before_truncation", None) is not None
+                else {}
+            ),
+            # ``intreg.sthlp:242-245`` counts each observation by kind.  ``intreg``
+            # carries VECTOR bounds (``self._lower``/``self._upper`` arrays), while
+            # ``truncreg`` carries scalars -- so the counts are only meaningful when
+            # the bounds are per-observation.
+            **_interval_counts(self),
             "ll": llf,
             "ll_0": ll0,
             "chi2": statistic,
@@ -533,6 +595,29 @@ class _MLLimitedBase(_DiscreteBase):
             "aic": float(-2.0 * llf + 2.0 * k),
             "bic": float(-2.0 * llf + k * np.log(nobs)),
         }
+        # ``intreg.ado:415-417`` (the non-heteroskedastic branch):
+        #
+        #     ereturn scalar sigma    = exp([lnsigma]_cons)
+        #     ereturn scalar se_sigma = exp([lnsigma]_cons) * [lnsigma]_se[_cons]
+        #
+        # i.e. ``se_sigma = sigma * se(lnsigma)`` -- the delta method on
+        # ``sigma = exp(lnsigma)``.  Computed only when the model carries an
+        # ``/lnsigma`` parameter, which ``truncreg`` does not.
+        sigma_position = next(
+            (
+                index
+                for index, name in enumerate(names)
+                if str(name).strip().lower() in ("/lnsigma", "lnsigma")
+            ),
+            None,
+        )
+        if sigma_position is not None:
+            variance = np.asarray(cov, dtype=float)
+            if sigma_position < variance.shape[0]:
+                se_lnsigma = float(np.sqrt(max(variance[sigma_position, sigma_position], 0.0)))
+                if np.isfinite(se_lnsigma):
+                    e["se_sigma"] = float(sigma * se_lnsigma)
+
         e.update(self._extra_scalars(params))
         return e
 
@@ -687,6 +772,13 @@ class Truncreg(_MLLimitedBase):
         model._model_data = frame.loc[_truncation_mask(y, lower, upper)].reset_index(
             drop=True
         )
+        #: ``e(depvar)`` (``truncreg.sthlp``), surfaced through ``StataResults.e``.
+        model._response_name = lhs
+        #: ``e(N_bf)`` -- "number of observations before truncation"
+        #: (``truncreg.sthlp:247``; ``truncreg.ado:232`` sets it from ``N_b``).
+        #: ``y`` here is still the PRE-truncation sample: ``__init__`` drops the
+        #: out-of-range rows, so the length has to be captured now.
+        model._n_before_truncation = int(y.size)
         return model
 
     # ------------------------------------------------------------ likelihood
@@ -750,11 +842,16 @@ class Truncreg(_MLLimitedBase):
         return adjusted_params, adjusted_cov
 
     def _extra_scalars(self, params: np.ndarray) -> dict[str, Any]:
+        # ``truncreg.sthlp:246-301`` is the authoritative list.  It has
+        # ``e(llopt)``/``e(ulopt)`` -- the ``ll()``/``ul()`` contents as typed -- and
+        # NOT ``lower``/``upper``.  It has no ``n_truncated`` and no
+        # ``n_uncensored`` either; ``e(N_bf)`` covers the pre-truncation count.
+        #
+        # The truncation count is still useful, so it stays an attribute on the
+        # result (``_n_truncated``) rather than pretending to be a Stata scalar.
         return {
-            "lower": self._lower,
-            "upper": self._upper,
-            "n_truncated": self._n_truncated,
-            "n_uncensored": int(self._y.size),
+            "llopt": self._lower,
+            "ulopt": self._upper,
         }
 
 
@@ -882,6 +979,9 @@ class Intreg(_MLLimitedBase):
         upper = data.loc[kept_index, upper_column].to_numpy(dtype=float)
         model = cls(lower, upper, X, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: ``e(depvar)`` (``intreg.sthlp``): the interval is given by TWO columns,
+        #: and Stata records both, space-separated.
+        model._response_name = f"{lower_column} {upper_column}"
         return model
 
     # ------------------------------------------------------------ likelihood
@@ -945,14 +1045,12 @@ class Intreg(_MLLimitedBase):
         return "LR", float(statistic), df
 
     def _extra_scalars(self, params: np.ndarray) -> dict[str, Any]:
-        lo, hi = self._lower, self._upper
-        return {
-            "lnsigma": float(params[-1]),
-            "n_left": int(np.isneginf(lo).sum()),
-            "n_right": int(np.isposinf(hi).sum()),
-            "n_interval": int((np.isfinite(lo) & np.isfinite(hi) & (lo != hi)).sum()),
-            "n_uncensored": int((np.isfinite(lo) & np.isfinite(hi) & (lo == hi)).sum()),
-        }
+        # ``intreg.sthlp:241-262`` is the authoritative list: the counts are
+        # ``N_unc``/``N_lc``/``N_rc``/``N_int`` (added by ``_interval_counts``) and
+        # sigma's spread is ``se_sigma``.  There is NO ``e(lnsigma)``, and the
+        # lower-case spelled-out counts do not exist.  Emitting them advertised a
+        # surface Stata does not have.
+        return {}
 
 
 # ------------------------------------------------------- two-step plumbing
@@ -1675,6 +1773,18 @@ class Heckman:
         e: dict[str, Any] = {
             "N": int(y.size),
             "N_selected": n_selected,
+            # The selection equation's regressor names, so ``predict, psel``/``mills``/
+            # ``ycond``/``yexpected`` can rebuild ``Z`` from ``model_data``.  ``e()``
+            # carries scalars and strings, not matrices, and the selection design is not
+            # the outcome design -- nothing else on the result records which columns
+            # belong to the probit part.  ``heckman.ado:491`` advertises all five
+            # statistics, so leaving them unbuildable would mean the macro named
+            # capabilities the model could not deliver.
+            "select_varlist": " ".join(str(name) for name in self._selection_names),
+            # heckman.ado:491: est local marginsok default XB PSel YCond
+            # YExpected Mills NShazard.  Recorded so the capability sweep can check
+            # that every advertised type is actually producible.
+            "marginsok": "default XB PSel YCond YExpected Mills NShazard",
             "ll": llf,
             "athrho": tau,
             "lnsigma": lnsigma,
@@ -1688,6 +1798,20 @@ class Heckman:
             "se_lambda": float(np.sqrt(max(float(grad_lambda @ covariance @ grad_lambda), 0.0))),
             "converged": int(converged),
             "method": "ml",
+            # Information criteria -- ``ll`` and the parameter count are both in
+            # hand, so these are a store, not a computation.  Before this the
+            # selection models were the only ML models with no criterion at all.
+            "aic": float(-2.0 * llf + 2.0 * theta.size),
+            "bic": float(-2.0 * llf + np.log(max(int(y.size), 1)) * theta.size),
+            # ``logit.sthlp:257`` (and every ML help file): ``e(ic)`` is the NUMBER OF
+            # ITERATIONS, not a parameter-count penalty.  This slot held
+            # ``theta.size + 1`` on the old belief; ``poisson_sim`` (``ic = 1.0`` with two
+            # parameters) refutes that formula.  The optimizer reports its count in
+            # ``result.nit``.
+            "ic": int(getattr(result, "nit", 0)) or int(theta.size) + 1,
+            "k": int(theta.size),
+            "k_dv": 1,
+            "k_eq": 2,  # outcome + selection equations
         }
 
         fitted = X @ b
@@ -1828,6 +1952,17 @@ class Heckman:
             "N": int(self._y.size),
             "N_selected": n_selected,
             "N_nonselected": int(self._y.size - n_selected),
+            # Selection-equation regressor names, so ``predict, psel``/``mills``/
+            # ``ycond``/``yexpected`` can rebuild ``Z`` from ``model_data``.  ``e()``
+            # holds scalars and strings, never matrices, and the selection design is not
+            # the outcome design -- nothing else on the result says which columns belong
+            # to the probit part.  ``heckman.ado:491`` advertises all five statistics,
+            # so they must be buildable after BOTH fit methods.
+            "select_varlist": " ".join(str(name) for name in self._selection_names),
+            # heckman.ado:491: est local marginsok default XB PSel YCond
+            # YExpected Mills NShazard.  Recorded so the capability sweep can check
+            # that every advertised type is actually producible.
+            "marginsok": "default XB PSel YCond YExpected Mills NShazard",
             "df_m": df_model,
             "rank": int(params.size),
             "ll": llf,
@@ -1846,6 +1981,14 @@ class Heckman:
             "estimator": "twostep",
             "vce": "twostep",
             "se_corrected": 1,
+            # No AIC/BIC here: the two-step estimator is not a maximum-likelihood
+            # fit of the joint model, so there is no single ``e(ll)`` to build
+            # one from.  Stata likewise reports criteria only for
+            # ``heckman, method(ml)``.  The parameter-count block is still
+            # meaningful and is recorded.
+            "k": int(params.size),
+            "k_dv": 1,
+            "k_eq": 2,  # outcome + selection equations
         }
 
         return StataResults(
@@ -2107,6 +2250,12 @@ class Etregress:
         e: dict[str, Any] = {
             "N": int(n),
             "N_treated": int(treated.sum()),
+            # Treatment-equation regressor names for the treatment predictions; see the
+            # control-function branch for why ``e()`` and not an attribute.
+            "treat_varlist": " ".join(str(name) for name in self._treatment_names),
+            # etregress.ado:423: est local marginsok "XB CTE YCTrt YCNTrt PTrt
+            # XBTrt default".
+            "marginsok": "XB CTE YCTrt YCNTrt PTrt XBTrt default",
             "ll": llf,
             "athrho": tau,
             "lnsigma": lnsigma,
@@ -2120,6 +2269,18 @@ class Etregress:
             "se_lambda": float(np.sqrt(max(float(grad_lambda @ covariance @ grad_lambda), 0.0))),
             "converged": int(converged),
             "method": "ml",
+            # Information criteria -- see the heckman ML assembly site.
+            "aic": float(-2.0 * llf + 2.0 * theta.size),
+            "bic": float(-2.0 * llf + np.log(max(int(n), 1)) * theta.size),
+            # ``logit.sthlp:257`` (and every ML help file): ``e(ic)`` is the NUMBER OF
+            # ITERATIONS, not a parameter-count penalty.  This slot held
+            # ``theta.size + 1`` on the old belief; ``poisson_sim`` (``ic = 1.0`` with two
+            # parameters) refutes that formula.  The optimizer reports its count in
+            # ``result.nit``.
+            "ic": int(getattr(result, "nit", 0)) or int(theta.size) + 1,
+            "k": int(theta.size),
+            "k_dv": 1,
+            "k_eq": 2,
         }
 
         return StataResults(
@@ -2235,6 +2396,14 @@ class Etregress:
         e: dict[str, Any] = {
             "N": n,
             "N_treated": int(self._treated.sum()),
+            # Treatment-equation regressor names, so ``predict`` can rebuild the probit
+            # design for ptrt/xbtrt/yctrt/ycntrt/cte.  ``e()`` holds scalars and strings
+            # only, and the treatment design is not the outcome design --
+            # ``etregress.ado:423`` advertises all five, so they must be buildable.
+            "treat_varlist": " ".join(str(name) for name in self._treatment_names),
+            # etregress.ado:423: est local marginsok "XB CTE YCTrt YCNTrt PTrt
+            # XBTrt default".
+            "marginsok": "XB CTE YCTrt YCNTrt PTrt XBTrt default",
             "df_m": df_model,
             "rank": int(params.size),
             "ll": llf,
@@ -2248,6 +2417,11 @@ class Etregress:
             "estimator": "control",
             "vce": "twostep",
             "se_corrected": 1,
+            # No AIC/BIC for the control-function estimator, for the same reason
+            # as ``heckman``'s two-step: no joint maximum-likelihood fit.
+            "k": int(params.size),
+            "k_dv": 1,
+            "k_eq": 2,
         }
 
         return StataResults(

@@ -21,6 +21,111 @@ from westata.vce.cluster import encode_groups
 from westata.vce.dispatch import compute_cov
 
 
+def _rhs_variable_order(formula: str) -> list[str]:
+    """Right-hand-side variable names, in the order the formula writes them.
+
+    ``"mpg ~ weight + foreign"`` returns ``["weight", "foreign"]``.  Only plain
+    names are extracted: ``C(g)``, ``I(x**2)``, ``np.log(x)`` and interaction
+    terms are skipped, because there is no Stata-side name to match them to and
+    guessing one would be worse than leaving them out.
+
+    Stata keeps the written order in ``e(b)`` and appends ``_cons``; patsy
+    alphabetises, which is why the order has to be captured here rather than read
+    off the design matrix.
+    """
+
+    if "~" not in formula:
+        return []
+    rhs = formula.split("~", 1)[1]
+    # Drop the "0"/"1" intercept markers and split on +.
+    order: list[str] = []
+    for raw in rhs.replace("-", "+").split("+"):
+        token = raw.strip()
+        if not token or token in ("0", "1"):
+            continue
+        # Only bare identifiers are usable; anything with parentheses, brackets
+        # or operators has a different (or no) Stata name.
+        if not token.replace("_", "").isalnum():
+            continue
+        order.append(token)
+    # De-duplicate while keeping order: ``x + x`` is one term.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for token in order:
+        if token not in seen:
+            seen.add(token)
+            unique.append(token)
+    return unique
+
+
+def _stata_vce_label(cov_type: Any, *, ml: bool = False) -> str:
+    """Map this package's ``cov_type`` onto Stata's ``e(vce)`` spelling (LOWERCASE).
+
+    ``regress.ado:48-78`` sets the macro from the ``vce()`` request, defaulting to ``ols``::
+
+        local vce = cond("`r(vce)'" != "", "`r(vce)'", "ols")
+        local vce cluster
+
+    The internal names differ -- this package uses statsmodels' ``HC1``/``nonrobust`` --
+    so the translation is explicit rather than a passthrough, which would put a token
+    like ``nonrobust`` where Stata prints ``ols``.
+
+    ``ml=True`` selects the MAXIMUM-LIKELIHOOD default instead: the ML estimators report
+    ``oim`` (observed information matrix), not ``ols``.  ``arch.ado:1470-1474`` shows the
+    pair together::
+
+        if "`e(vcetype)'" == "Robust" { ... }
+        else { ... est local vcetype "OIM" }
+    """
+
+    normalized = str(cov_type or "").strip().lower()
+    if normalized == "nonrobust":
+        return "oim" if ml else "ols"
+    mapping = {
+        "ols": "ols",
+        "oim": "oim",
+        "hc0": "hc0",
+        "hc1": "hc1",
+        "hc2": "hc2",
+        "hc3": "hc3",
+        "robust": "robust",
+        "cluster": "cluster",
+        "hac": "hac",
+        "newey": "hac",
+    }
+    return mapping.get(normalized, normalized)
+
+
+def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
+    """Stata's ``e(vcetype)`` -- the DISPLAY title, capitalised and sometimes two words.
+
+    This is a different string from ``e(vce)``, and the difference is load-bearing in
+    Stata's own code: ``arch.ado:1470`` and ``archlm.ado:16`` both branch on
+
+        if "`e(vcetype)'" == "Robust" { ... }
+
+    while ``e(vce)`` holds the lowercase option token.  The non-robust case differs by
+    family: ``ols`` for linear least squares, ``OIM`` for maximum likelihood
+    (``arch.ado:1474``/``arima.ado:741``: ``est local vcetype "OIM"``).
+
+    The HC forms are TWO WORDS, taken verbatim from ``didregress.ado:477`` and
+    ``nl.ado:1115-1119``::
+
+        ereturn local vcetype "Robust HC2"
+
+    so a naive ``token.capitalize()`` produces ``"Hc2"`` and would not match.
+    """
+
+    token = _stata_vce_label(cov_type, ml=ml)
+    if token == "ols":
+        return "Ols"
+    if token == "oim":
+        return "OIM"
+    if token in ("hc0", "hc1", "hc2", "hc3"):
+        return f"Robust {token.upper()}"
+    return token[:1].upper() + token[1:]
+
+
 def _wald_f(params: np.ndarray, cov: np.ndarray, tested: Sequence[int]) -> float:
     """Return ``b' V^-1 b / q`` over the ``tested`` coefficients.
 
@@ -96,6 +201,8 @@ class OLS:
         self._raw_weight_sum = float(self._X.shape[0])
         #: Estimation-sample covariates, retained for margins(over=...).
         self._model_data: pd.DataFrame | None = None
+        #: Response column name (``e(depvar)``), filled by ``from_formula``.
+        self._response_name: str | None = None
         if weights is not None:
             if weight_type is None:
                 raise WeightError(
@@ -145,9 +252,17 @@ class OLS:
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
         model = cls(y, X, weights=weights, weight_type=weight_type, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: The response column's name, which Stata reports as ``e(depvar)`` and
+        #: which ``estat summarize`` lists first.  Recorded here because the
+        #: result object otherwise has no way to recover it.
+        model._response_name = str(lhs)
+        #: The right-hand-side variable names in the order the FORMULA listed
+        #: them.  patsy alphabetises its design columns, so ``weight + foreign``
+        #: becomes ``[Intercept, foreign, weight]``; Stata keeps the written order
+        #: and puts ``_cons`` last.  Without this the original order is
+        #: unrecoverable, and ``stata_params`` would report the wrong sequence.
+        model._formula_rhs_order = _rhs_variable_order(formula)
         return model
-
-        return cls(y, X, weights=weights, weight_type=weight_type, param_names=names)
 
     # ------------------------------------------------------------------ fit
     def fit(
@@ -297,9 +412,18 @@ class OLS:
             fvalue = _wald_f(np.asarray(beta, dtype=float), cov, tested)
         else:
             fvalue = float("nan")
-        # Stata e(aic)/e(bic) for regress use the Gaussian likelihood with the
-        # MLE of sigma; statsmodels' OLS estimates sigma by sqrt(RSS/df_resid),
-        # so report the Stata-consistent values here.
+        # ``e(aic)``/``e(bic)`` are westata additions, not Stata values: Stata's
+        # ``regress`` stores neither (the three ``regress_auto*.json`` fixtures
+        # have no ``aic``/``bic`` key).  They are recorded because
+        # ``StataResults.aic``/``.bic`` read them, and they use the Gaussian
+        # deviance form ``N log(rss/N) + 2k``.
+        #
+        # NOTE this is NOT the same number as ``estat ic``'s AIC, which
+        # ``estimates.ado:953-1002`` builds as ``-2*e(ll) + 2*e(df)``.  ``e(ll)``
+        # here carries the ``N(1 + log 2pi)`` constant that the form above
+        # omits, so the two differ by exactly that constant (210.0 on the auto
+        # data).  Both are internally consistent; ``result.estat_ic()`` is the
+        # Stata-conformant one.
         aic = float(effective_n * np.log(rss / effective_n) + 2 * k)
         bic = float(effective_n * np.log(rss / effective_n) + k * np.log(effective_n))
 
@@ -311,6 +435,34 @@ class OLS:
         e: dict[str, Any] = {
             "N": effective_n,
             "sum_w": self._raw_weight_sum,
+            # ``regress.ado:174``: ``ereturn local marginsok "XB default"``.  This is the
+            # macro ``margins`` consults for which prediction types it may use -- an
+            # XB-scale derivative and the command's own default.  ``regress`` sets no
+            # ``marginsnotok`` at all, so nothing is forbidden beyond that list.
+            "marginsok": "XB default",
+            # ``regress.sthlp:437-438``:
+            #   e(vce)      vcetype specified in vce()
+            #   e(vcetype)  title used to label Std. err.
+            # ``regress.ado:48-78`` builds the first from ``vce()``, defaulting to ``ols``:
+            #   local vce = cond("`r(vce)'" != "", "`r(vce)'", "ols")
+            #   local vce cluster      (for vce(cluster clustvar))
+            # The second is the human-readable banner, which is what Stata prints beside
+            # the standard errors; ``e(vce)`` supplies it verbatim there.
+            "vce": _stata_vce_label(effective_cov_type),
+            "vcetype": _stata_vcetype_label(effective_cov_type),
+            # ``regress.sthlp:440-441`` lists both macros in the stored-results block:
+            #   e(estat_cmd)  program used to implement estat
+            #   e(predict)    program used to implement predict
+            # and the program ``regress_estat`` exists (``regress_estat.ado:2``), while
+            # ``estat.ado:10-11`` dispatches on the macro:
+            #   if `"`e(estat_cmd)'"' != "" { `ver' `e(estat_cmd)' `0' }
+            # so ``regress_estat`` is the value Stata stores.  ``e(predict)`` is left out
+            # on purpose: no ``regress_p.ado`` exists in ado/base and its value could not
+            # be confirmed from local evidence, so recording a guess here would be worse
+            # than the absent key.
+            "estat_cmd": "regress_estat",
+            # ``regress.ado:176``: ``ereturn local title "Linear regression"``.
+            "title": "Linear regression",
             "df_m": df_model,
             "df_r": df_t,
             "r2": r2,
@@ -322,8 +474,25 @@ class OLS:
             "rss": rss,
             "mss": mss,
             "rank": k,
+            # NOT Stata's ``e(aic)`` -- ``regress`` stores no such macro at all (its
+            # help file's stored-results block has no aic/bic, verified by grep over
+            # ``regress.sthlp``).  These two are this package's convenience values, on
+            # the Gaussian-deviance scale ``N log(rss/N) + 2k``; they deliberately omit
+            # the ``N (1 + log 2pi)`` constant that ``e(ll)`` carries, which is why they
+            # differ from ``estat ic``'s AIC by exactly that amount.
+            #
+            # They are kept (removing them would break callers and the tests that pin
+            # them) but must not be presented as Stata returns.  ``result.estat_ic()`` is
+            # the Stata-conformant surface; use ``e(ll)``/``e(rank)`` if a value tied to
+            # Stata's likelihood is needed.
             "aic": aic,
             "bic": bic,
+            # This command does NOT store information criteria in Stata, so the two values
+            # above are this package's convenience numbers.  The flag lets the summary
+            # renderer leave them out of the table -- Stata's own ``regress`` output has no
+            # AIC/BIC line, and printing a differently-scaled number there would invite a
+            # comparison that cannot succeed.  ``result.estat_ic()`` is the Stata route.
+            "_aic_is_stata": False,
         }
         if ll_0 is not None:
             e["ll_0"] = ll_0
@@ -331,7 +500,7 @@ class OLS:
             groups = (cov_kwds or {}).get("groups") if cov_kwds else None
             e["N_clust"] = float(np.unique(encode_groups(groups)).size)
 
-        return StataResults(
+        results = StataResults(
             params=beta,
             param_names=self._param_names,
             cov=cov,
@@ -347,3 +516,15 @@ class OLS:
             design_matrix=(X, self._param_names),
             model_data=self._model_data,
         )
+        #: ``e(depvar)``: ``estat summarize`` lists this variable first.
+        results.response_name = self._response_name
+        #: Kept on the RESULT so ``stata_params`` can restore Stata's coefficient
+        #: order; patsy's column order does not preserve it.
+        results._formula_rhs_order = getattr(self, "_formula_rhs_order", None)
+        #: The weight specification, retained because ``estat summarize`` applies
+        #: the ESTIMATION weights automatically when the caller passes none --
+        #: ``estat_summ.ado:208-231`` rebuilds the weight expression and summarises
+        #: with it.  Without this the descriptive table silently returns UNWEIGHTED
+        #: statistics for a weighted fit.
+        results.weight_spec = getattr(self, "_weight_spec", None)
+        return results

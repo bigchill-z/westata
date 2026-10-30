@@ -177,6 +177,7 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.estimators.panel_iv import _corr, _corr2 as _squared_correlation
 from westata.protocols import SSC
 from westata.results.base import StataResults
 from westata.vce.ssc import resolve_ssc
@@ -342,6 +343,44 @@ class PanelOLS:
 
     _stata_command = "xtreg, fe"
 
+    #: Whether the backend's ``rsquared`` is the *within* R-squared, so that it
+    #: can also be stored under Stata's ``e(r2_w)``.  True only for the within
+    #: estimator; see :meth:`_stata_scalars` for why this is not generalised.
+    _within_r2_is_backend_r2 = True
+
+    #: ``xtreg, fe`` is the only variant whose Stata fixture stores ``e(tss)``.
+    _stores_totals = True
+
+    # ``xtreg_fe.json`` has ll_0 and the absorbed-effects block.
+    _stores_ll_0 = True
+    _stores_absorbed = True
+
+    #: Whether the estimator regresses on one row per entity (``xtreg, be``),
+    #: so that ``e(N)`` counts entities and the response is already a group mean.
+    _estimates_on_entity_means = False
+
+    #: Whether Stata stores ``e(mss)`` WITHOUT ``e(tss)`` -- true only for
+    #: ``xtreg, be``, whose ``xtreg.sthlp:1014-1067`` block has ``mss``/``rss`` and no
+    #: ``tss``.  This is NOT "does the estimator store mss": ``xtreg, fe`` stores
+    #: ``mss`` too (``:1068-1144``), but together with ``tss``, so it is covered by
+    #: ``_stores_totals`` instead.  Line 1089 reads ``if self._stores_totals or
+    #: self._stores_mss``, which is why both routes exist.
+    _stores_mss = False
+
+    #: Whether the estimator quasi-demeans, i.e. whether ``e(theta)`` applies.
+    #: True only for ``xtreg, re`` (``xtreg_re.ado:265-266``).
+    _stores_theta = False
+
+    #: Whether Stata stores the ``sigma_u``/``sigma_e``/``sigma``/``rho``/``corr``
+    #: family.  True for ``xtreg, fe``/``re``; FALSE for ``xtreg, be`` (no
+    #: decomposition -- ``xtreg_be.ado`` only uses the ``corr`` COMMAND) and for
+    #: ``xtreg, fd`` (differencing removes the entity effect).
+    _stores_sigma = True
+
+    #: Whether Stata reports a Wald ``e(chi2)`` instead of ``e(F)`` -- true for
+    #: ``xtreg, re``, whose fixture has ``chi2``/``p`` and no ``F``.
+    _stores_wald_chi2 = False
+
     def __init__(
         self,
         formula: str,
@@ -442,6 +481,10 @@ class PanelOLS:
         nobs = int(resid.size)
         response = self._residual_response(y).reindex(_resid_index(ref, self._data.index))
         fitted = response.to_numpy(dtype=float) - resid
+        # The response on the estimator's own scale, for e(ll_0).
+        self._estimation_response = np.asarray(
+            response.to_numpy(dtype=float), dtype=float
+        )
 
         has_constant = any(str(name).lower() in _CONSTANT_NAMES for name in param_names)
         rank = len(param_names)
@@ -465,9 +508,13 @@ class PanelOLS:
             df_b=df_b,
             rank=rank,
             n_clust=n_clust,
+            response=response,
+            fitted=fitted,
+            design=(X, param_names),
+            params=params,
         )
 
-        return StataResults(
+        results = StataResults(
             params=params,
             param_names=param_names,
             cov=cov,
@@ -481,6 +528,51 @@ class PanelOLS:
             cov_type=_cov_label(cov_type),
             e=e,
         )
+        #: The estimation design, retained so ``predict`` can run.
+        #: ``xtreg_postestimation.sthlp:128`` defines ``xb`` as ``a + xb`` -- the
+        #: linear prediction WITHOUT the panel effect ``u_i`` -- and that is the
+        #: default; ``xbu`` is the variant that adds ``u_i``.  The default is
+        #: therefore not ambiguous, so predict should offer it rather than refuse.
+        #:
+        #: The column count must match ``param_names``: ``xtreg, fd`` drops the
+        #: intercept when differencing, so it has one coefficient but the built
+        #: ``X`` still carries two columns.  Retaining that mismatch made every
+        #: predict type fail with a matmul dimension error, which the registry
+        #: audit surfaced as a "registered but broken" entry.
+        design = np.asarray(X, dtype=float)
+        if design.ndim == 2 and design.shape[1] != len(param_names):
+            # Column-aligned truncation: the dropped column is the constant, which
+            # sits last in this package's designs (Stata's e(b) order).
+            if design.shape[1] > len(param_names):
+                design = design[:, : len(param_names)]
+        results.design_matrix = (design, list(param_names))
+        #: Entity labels aligned to the estimation sample, so ``predict`` can
+        #: separate ``u_i`` from ``e_it`` (``xtreg_postestimation.sthlp:127-134``).
+        try:
+            results.panel_entity = (
+                self._data.index.get_level_values(self._entity).to_numpy()
+            )
+        except (KeyError, ValueError):  # pragma: no cover - unnamed index
+            results.panel_entity = None
+        #: The estimation-sample frame, retained so ``estat summarize`` can run.
+        #: ``xtreg_estat.ado:18,36,48`` forwards unrecognised subcommands to
+        #: ``estat_default``, whose ``summarize`` is therefore available after
+        #: ``xtreg``; refusing it here was a gap, not a limitation.
+        try:
+            flat = self._data.reset_index()
+            results.model_data = flat
+        except (AttributeError, ValueError):  # pragma: no cover
+            flat = None
+        #: ``e(depvar)``: the response name, which ``estat summarize`` lists first.
+        try:
+            lhs = str(getattr(self, "_formula", "")).split("~", 1)[0].strip()
+            response = lhs.split()[0] if lhs else None
+            if response and flat is not None and response in flat.columns:
+                results.response_name = response
+                results.e["depvar"] = response
+        except (AttributeError, IndexError):  # pragma: no cover
+            pass
+        return results
 
     # -------------------------------------------------------------- internals
     def _design(self) -> tuple[pd.Series, pd.DataFrame]:
@@ -513,6 +605,16 @@ class PanelOLS:
             index=kept,
             name=str(y_frame.columns[0]),
         )
+        #: The untransformed response over the estimation sample.  Retained so
+        #: that ``xtreg, be`` can report ``e(r2_w)``, which Stata computes on the
+        #: long panel even though the between regression runs on group means.
+        self._long_response: np.ndarray | None = np.asarray(
+            y.to_numpy(dtype=float), dtype=float
+        )
+        #: The response the estimator actually regresses on -- entity means for
+        #: ``be``, differences for ``fd``, levels otherwise.  ``e(ll_0)`` is the
+        #: intercept-only likelihood on this scale, so it must match ``e(N)``.
+        self._estimation_response: np.ndarray | None = None
         X = pd.DataFrame(
             np.asarray(x_frame, dtype=float), index=kept, columns=list(x_frame.columns)
         )
@@ -721,6 +823,10 @@ class PanelOLS:
         scalar_df: float | None = None,
         rank: int,
         n_clust: int | None,
+        response: pd.Series | None = None,
+        fitted: np.ndarray | None = None,
+        design: tuple[pd.DataFrame, list[str]] | None = None,
+        params: np.ndarray | None = None,
     ) -> dict[str, Any]:
         """``e()`` scalars, including Stata's clustered-VCE convention.
 
@@ -731,6 +837,11 @@ class PanelOLS:
         ``df_r = 148``).  ``e(df_b)`` is the number of reported slopes, which
         ``xtreg, fe`` keeps separate from ``e(df_m)`` because the latter also
         counts the absorbed effects when the VCE is conventional.
+
+        ``response``/``fitted`` are the estimation-sample response and fitted
+        values; when supplied they enable the R-squared decomposition
+        (``r2_w``/``r2_b``/``r2_o``), the sums of squares and the variance
+        components that Stata's ``xtreg`` stores.
         """
 
         scalar_df = (df_resid if scalar_df is None else scalar_df)
@@ -738,6 +849,26 @@ class PanelOLS:
         r2 = float(getattr(ref, "rsquared", float("nan")))
         f_stat = self._stata_f(ref, df_model)
         r2_a = self._stata_r2_adjusted(r2, nobs, scalar_df)
+        # Stata's spellings for quantities westata already computed:
+        #   e(N_g)     == the entity count (was ``n_entities``)
+        # A Stata-porting script reading ``e(N_g)`` previously got ``None``
+        # with no error, which is the failure mode this removes.
+        #
+        # ``e(r2_w)`` is stored ONLY for the within estimator, and only because
+        # the backend's ``rsquared`` there *is* the within R-squared -- verified
+        # independently on the balanced test panel (0.838219091483202 against a
+        # hand-computed within R2 of 0.838219091483203) and against
+        # ``xtreg_fe.json`` where Stata's ``e(r2) == e(r2_w) ==
+        # 0.9299367179801631``.  It is deliberately NOT aliased for ``re``/``be``:
+        # ``xtreg_re.json`` stores no ``e(r2)`` at all and ``xtreg_be.json``
+        # stores ``r2 == r2_b = 0.28158005317996504`` while its ``r2_w`` is
+        # 0.7540434430300107.  A blanket alias would report the wrong number
+        # under Stata's name, which is worse than leaving the key absent.
+        # See retest/gaps/linear_iv_ts_gaps.md §1.6.
+        n_entities = int(
+            self._data.index.get_level_values(self._entity).nunique()
+        )
+        rmse = float(np.sqrt(rss / scalar_df)) if scalar_df > 0 else float("nan")
         e: dict[str, Any] = {
             "N": nobs,
             "df_m": df_model,
@@ -745,16 +876,450 @@ class PanelOLS:
             "df_b": float(df_b),
             "r2": r2,
             "r2_a": r2_a,
-            "rmse": float(np.sqrt(rss / scalar_df)) if scalar_df > 0 else float("nan"),
+            "rmse": rmse,
             "F": f_stat,
             "ll": _gaussian_loglik(rss, nobs),
             "rank": rank,
-            "n_entities": int(self._data.index.get_level_values(self._entity).nunique()),
+            "n_entities": n_entities,
+            "N_g": n_entities,
             "rss": rss,
         }
+        if self._within_r2_is_backend_r2:
+            e["r2_w"] = r2
+        if self._stores_wald_chi2:
+            # ``xtreg, re`` reports a Wald chi-square on the reported slopes
+            # rather than an F: ``xtreg_re.json`` has e(chi2) = 1965.988... with
+            # e(df_m) = 2 and no e(F).  ``_stata_f`` already computes the same
+            # Wald statistic divided by df_m, so chi2 is that times df_m.
+            if np.isfinite(f_stat) and df_model > 0:
+                chi2 = float(f_stat * df_model)
+                e["chi2"] = chi2
+                e["chi2type"] = "Wald"
+                e["p"] = float(stats.chi2.sf(chi2, df_model))
         if n_clust is not None:
             e["N_clust"] = n_clust
+
+        # e(ll_0): the Gaussian likelihood of the intercept-only model, using
+        # the centred total.  Same construction as westata.OLS, which was
+        # verified against StataNow 19.5 for all four weight types.  Stata's
+        # xtreg stores it for both fe and be (xtreg_fe.json: -313.83365173076487,
+        # xtreg_be.json has one too); ``re`` does not.
+        if self._stores_ll_0 and nobs > 1:
+            # ``e(ll_0)`` is the Gaussian likelihood of the intercept-only model,
+            # using the centred total of the ESTIMATION sample.  Same
+            # construction as westata.OLS (verified there against StataNow 19.5
+            # for every weight type).  Stata stores it for ``fe`` and ``be``
+            # but not ``re``.
+            #
+            # The estimation sample differs by estimator: ``be`` fits on entity
+            # means, so its response is shorter than the long panel.  Rather
+            # than guess, take whichever response matches ``nobs``.
+            candidates = [
+                getattr(self, "_estimation_response", None),
+                self._long_response,
+            ]
+            centred_total = float("nan")
+            for candidate in candidates:
+                if candidate is None:
+                    continue
+                values = np.asarray(candidate, dtype=float).reshape(-1)
+                if values.size != nobs:
+                    continue
+                total = float(np.sum((values - values.mean()) ** 2))
+                if total > 0:
+                    centred_total = total
+                    break
+            if np.isfinite(centred_total):
+                e["ll_0"] = float(
+                    -0.5
+                    * nobs
+                    * (
+                        np.log(2 * np.pi)
+                        + np.log(centred_total / nobs)
+                        + 1.0
+                    )
+                )
+        # e(sum_w): the raw weight sum.  With no weights it equals N.
+        e["sum_w"] = float(nobs)
+        # e(p): the model test's p-value.  For the F-based estimators it is the
+        # F upper tail; ``re`` already set it from its Wald chi-square above.
+        if "p" not in e and np.isfinite(f_stat) and df_model > 0:
+            e["p"] = float(stats.f.sf(f_stat, df_model, df_resid))
+        # e(rc): Stata's return code; 0 means the fit succeeded.
+        e["rc"] = 0.0
+
+        # --- R-squared decomposition, sums of squares, variance components ---
+        # Stata's xtreg stores all of these (xtreg_fe.json has r2_w/r2_b/r2_o/
+        # r2_c/sigma_u/sigma_e/rho/corr/Tbar/g_*/k_absorb/df_a/F_f; xtreg_re.json
+        # has theta as well).  They are derivable from the estimation sample, so
+        # nothing new is estimated -- only the decomposition is written out.
+        if response is not None and fitted is not None:
+            e.update(
+                self._panel_decomposition(
+                    response=response,
+                    fitted=np.asarray(fitted, dtype=float),
+                    resid=np.asarray(resid, dtype=float),
+                    nobs=nobs,
+                    n_entities=n_entities,
+                    scalar_df=scalar_df,
+                    design=design,
+                    params=params,
+                )
+            )
         return e
+
+    def _panel_decomposition(
+        self,
+        *,
+        response: pd.Series,
+        fitted: np.ndarray,
+        resid: np.ndarray,
+        nobs: int,
+        n_entities: int,
+        scalar_df: float,
+        design: tuple[pd.DataFrame, list[str]] | None = None,
+        params: np.ndarray | None = None,
+    ) -> dict[str, Any]:
+        """Stata's ``xtreg`` R-squared decomposition and variance components.
+
+        Read from ``xtreg_fe.ado`` (StataNow 19.5, version 2.0.2, lines
+        358-430), not inferred from output:
+
+        .. code-block:: stata
+
+            quietly _predict double `XB' if `touse', xb
+            quietly gen double `U' = `y' - `XB'        // LEVEL residual
+            `BY' replace `U' = cond(_n==_N,sum(`U')/`Ti',.)   // panel mean
+            quietly summ `U'
+            ereturn scalar sigma_u = r(sd)             // sd of the panel means
+            ereturn scalar ui      = r(sd)             // same value
+            `BY' replace `U' = `U'[_N]                 // expand back
+            quietly corr `XB' `U' if `touse'
+            ereturn scalar corr = r(rho)               // corr(Xb, u_i)
+            quietly corr `y' `XB' if `touse'
+            ereturn scalar r2_o = r(rho)^2
+            `BY' replace `XB' = cond(_n==_N,sum(`XB')/`Ti',.)  // panel mean
+            ... corr(y_mean, XB_mean)
+            ereturn scalar r2_b = r(rho)^2
+            ereturn scalar sigma_e = sqrt(e(rss)/e(df_r))
+            ereturn scalar sigma   = sqrt(e(sigma_u)^2 + e(sigma_e)^2)
+
+        Two consequences worth stating, because both are easy to get wrong:
+
+        * ``sigma_u`` is the **standard deviation of the panel means of the
+          level residual** ``y - Xb``, not a Swamy-Arora expression in the
+          within residual.  The within residual has entity means of exactly
+          zero by construction, so reusing it makes ``sigma_u`` collapse to 0
+          and ``rho`` to 0 -- a silent, plausible-looking wrong answer.
+        * ``r2_b`` uses the entity means of ``y`` and ``Xb``, while ``r2_o``
+          uses the raw series; ``r2_w`` uses the demeaned series.
+
+        Every key is omitted when its inputs are degenerate rather than filled
+        with a placeholder.
+        """
+
+        y = np.asarray(response.to_numpy(dtype=float), dtype=float).reshape(-1)
+        if y.size != nobs:
+            # The response could not be aligned with the residuals (e.g. a
+            # transformed estimator); leave the block out rather than guess.
+            return {}
+        fitted = np.asarray(fitted, dtype=float).reshape(-1)
+        if fitted.size != nobs:
+            return {}
+
+        entity_labels = self._data.index.get_level_values(self._entity)
+        if entity_labels.size == nobs:
+            codes = pd.factorize(entity_labels.to_numpy())[0]
+        elif self._estimates_on_entity_means:
+            # ``xtreg, be`` regresses on one row per entity, so the estimation
+            # sample is the entity index rather than the full long panel.
+            unique_labels = pd.unique(entity_labels.to_numpy())
+            if unique_labels.size != nobs:
+                return self._panel_structure_only(n_entities)
+            codes = pd.factorize(unique_labels)[0]
+        else:
+            # ``xtreg, fd`` differences within entity, so the estimation sample
+            # is shorter than the panel.  The R-squared decomposition is not
+            # defined on the differenced response, but the panel-structure
+            # block (Tbar / g_* / Tcon) still describes the data honestly.
+            structure = self._panel_structure_only(n_entities)
+            return structure
+
+        sizes = np.bincount(codes, minlength=n_entities).astype(float)
+        # ``e(Tbar)``/``e(g_*)`` describe the LONG panel's group sizes, not the
+        # entity-level estimation sample: Stata's xtreg_be.json reports N=180
+        # observations, N_g=30 entities, Tbar=6.  When the estimator regresses
+        # on entity means the ``codes`` above are one-per-entity, so the panel
+        # sizes must come from the full long data instead.
+        if self._estimates_on_entity_means:
+            long_labels = self._data.index.get_level_values(self._entity).to_numpy()
+            long_codes = pd.factorize(long_labels)[0]
+            long_sizes = np.bincount(long_codes).astype(float)
+            panel_sizes = long_sizes
+            long_nobs = float(long_labels.size)
+        else:
+            panel_sizes = sizes
+            long_nobs = float(nobs)
+        n_panels = int(panel_sizes.size)
+        t_bar = long_nobs / float(n_panels) if n_panels else float("nan")
+
+        def _entity_means(values: np.ndarray) -> np.ndarray:
+            totals = np.bincount(codes, weights=values, minlength=n_entities)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                return totals / sizes
+
+        y_bar = _entity_means(y)
+        f_bar = _entity_means(fitted)
+
+        out: dict[str, Any] = {
+            "Tbar": t_bar,
+            "g_min": int(panel_sizes.min()),
+            "g_avg": float(panel_sizes.mean()),
+            "g_max": int(panel_sizes.max()),
+            "Tcon": int(np.all(panel_sizes == panel_sizes[0])),
+        }
+        #: Whether every entity contributes the same number of periods.  Stata's
+        #: ``e(Tcon)``; it decides whether ``theta`` is a single number or a
+        #: distribution (``xtreg_re.ado:368-379``).
+        t_con = bool(out["Tcon"])
+
+        # Sums of squares, so that rss + mss = tss and the within/between
+        # totals are visible.  Stata records these per estimator, and the
+        # fixtures disagree: xtreg_fe.json has rss/mss/tss and
+        # tss_within-family keys, xtreg_be.json has rss/mss but NO tss, and
+        # xtreg_re.json has none of them.  So the totals are stored only where
+        # Stata stores them, rather than uniformly.
+        rss = float(resid @ resid)
+        if self._stores_totals or self._stores_mss:
+            tss = float(np.sum((y - y.mean()) ** 2))
+            out["mss"] = tss - rss
+            if self._stores_totals:
+                tss_within = float(np.sum((y - y_bar[codes]) ** 2))
+                tss_between = float(np.sum((y_bar - y.mean()) ** 2))
+                out["tss"] = tss
+                out["tss_within"] = tss_within
+                out["tss_between"] = tss_between
+                if tss_within > 0:
+                    out["r2_within"] = 1.0 - rss / tss_within
+
+        r2_w = _squared_correlation(fitted - f_bar[codes], y - y_bar[codes])
+        r2_b = _squared_correlation(f_bar, y_bar)
+        r2_o = _squared_correlation(fitted, y)
+        for key, value in (("r2_w", r2_w), ("r2_b", r2_b), ("r2_o", r2_o)):
+            if np.isfinite(value):
+                out[key] = float(value)
+
+        # ``xtreg, be`` estimates on entity means, so the r2_w above would be
+        # degenerate (no within variation).  Stata still reports e(r2_w) for
+        # ``be`` -- xtreg_be.json has 0.7540434430300107 alongside
+        # e(r2) == e(r2_b) == 0.28158005317996504 -- describing how the *level*
+        # fit explains the within variation.  That needs the long panel.
+        if (
+            self._estimates_on_entity_means
+            and design is not None
+            and params is not None
+            and self._long_response is not None
+        ):
+            design_frame, _ = design
+            matrix = np.asarray(design_frame.to_numpy(dtype=float), dtype=float)
+            y_long = self._long_response
+            if matrix.shape[0] == y_long.size:
+                level_pred = matrix @ np.asarray(params, dtype=float)
+                y_long_bar = _panel_means(y_long, long_codes, n_panels)
+                pred_bar = _panel_means(level_pred, long_codes, n_panels)
+                within_r2 = _squared_correlation(
+                    level_pred - pred_bar[long_codes],
+                    y_long - y_long_bar[long_codes],
+                )
+                if np.isfinite(within_r2):
+                    out["r2_w"] = float(within_r2)
+
+        # Variance components, following xtreg_fe.ado:358-430 exactly.
+        #
+        # Stata's ``XB`` is ``predict, xb`` -- the LEVEL linear predictor
+        # ``b0 + b1*x1 + ...``, which does NOT include the entity effect.  The
+        # ``fittedvalues`` westata carries for the within estimator is instead
+        # ``y - within_resid``, i.e. the *demeaned* fit, whose entity means are
+        # zero by construction; using it would make sigma_u and rho collapse to
+        # 0 (a silent, plausible-looking wrong answer).  So the level predictor
+        # is rebuilt from the design matrix and the reported coefficients.
+        level_fitted = fitted
+        if design is not None and params is not None:
+            design_frame, design_names = design
+            matrix = np.asarray(design_frame.to_numpy(dtype=float), dtype=float)
+            if matrix.shape[0] == nobs and matrix.shape[1] == len(params):
+                level_fitted = matrix @ np.asarray(params, dtype=float)
+            elif design_names != []:  # pragma: no cover - defensive
+                level_fitted = fitted
+
+        level_residual = y - level_fitted
+        u_panel = _entity_means(level_residual)
+
+        # e(sigma_u) = r(sd) of the panel means.  ``summ`` reports the
+        # df-adjusted standard deviation, so ddof=1 is deliberate.
+        #
+        # The whole sigma/rho/corr family is NOT universal.  ``xtreg_be.ado``
+        # never sets them: its only uses of ``corr``/``r(rho)`` are the CORR
+        # COMMAND, used to build ``r2_o`` and ``r2_w`` (``xtreg_be.ado:148-166``),
+        # not e() keys.  The between estimator runs OLS on the entity means, so
+        # there is no decomposed error structure to report.
+        finite = np.isfinite(u_panel)
+        if self._stores_sigma and finite.sum() > 1:
+            deviations = u_panel[finite] - u_panel[finite].mean()
+            sigma_u = float(np.sqrt(np.sum(deviations**2) / (finite.sum() - 1)))
+        else:
+            sigma_u = float("nan")
+
+        # e(corr) = corr(Xb, u_i), the correlation Stata prints beside rho.
+        if self._stores_sigma:
+            correlation = _corr(level_fitted, u_panel[codes])
+            if np.isfinite(correlation):
+                out["corr"] = float(correlation)
+
+        # e(sigma_e) = sqrt(e(rss)/e(df_r)) where e(df_r) is the reference df.
+        sigma_e = (
+            float(np.sqrt(rss / scalar_df))
+            if self._stores_sigma and scalar_df and scalar_df > 0
+            else float("nan")
+        )
+
+        if np.isfinite(sigma_u):
+            out["sigma_u"] = sigma_u
+            out["ui"] = sigma_u  # Stata stores both names with the same value
+        if np.isfinite(sigma_e):
+            out["sigma_e"] = sigma_e
+        if np.isfinite(sigma_u) and np.isfinite(sigma_e):
+            total = sigma_u**2 + sigma_e**2
+            out["sigma"] = float(np.sqrt(total))
+            if total > 0:
+                out["rho"] = float(sigma_u**2 / total)
+
+            # e(theta): the random-effects quasi-demeaning factor, from
+            # ``xtreg_re.ado:265-266``:
+            #     theta = 1 - s_e / sqrt(T * s_u^2 + s_e^2)
+            # Verified digit for digit against ``xtreg_re.json``:
+            # 1 - 0.4038449889037476/sqrt(6*0.8551376831355879^2
+            #     + 0.4038449889037476^2) = 0.8106881439929379, which is the
+            # fixture's e(theta).
+            #
+            # Only the random-effects estimator quasi-demeans, so the key is
+            # stored only there (`xtreg_fe.json` has no e(theta)).
+            if self._stores_theta and t_bar > 0:
+                # ``xtreg_re.ado:368-379`` branches on ``e(Tcon)``:
+                #
+                #   if e(Tcon) { est scalar theta = <thetav> }
+                #   else {
+                #       by ivar: replace thetav = . if _n != _N
+                #       summ thetav, d
+                #       est scalar thta_min/p5/p50/p95/max
+                #   }
+                #
+                # So the two forms are MUTUALLY EXCLUSIVE.  A balanced panel gets
+                # the single ``theta``; an UNBALANCED one gets the five
+                # percentiles of the per-entity theta -- because the group sizes
+                # differ, there is no single theta to report.
+                if t_con:
+                    theta = 1.0 - sigma_e / float(
+                        np.sqrt(t_bar * sigma_u**2 + sigma_e**2)
+                    )
+                    out["theta"] = theta
+                else:
+                    per_entity_theta = 1.0 - sigma_e / np.sqrt(
+                        panel_sizes * sigma_u**2 + sigma_e**2
+                    )
+                    out["thta_min"] = float(np.min(per_entity_theta))
+                    out["thta_5"] = float(
+                        np.percentile(per_entity_theta, 5)
+                    )
+                    out["thta_50"] = float(
+                        np.percentile(per_entity_theta, 50)
+                    )
+                    out["thta_95"] = float(
+                        np.percentile(per_entity_theta, 95)
+                    )
+                    out["thta_max"] = float(np.max(per_entity_theta))
+
+        # --- the absorbed-effects block (``xtreg, fe`` only) ----------------
+        if self._stores_absorbed:
+            # ``xtreg_fe.ado:505-524`` computes all three from ONE auxiliary
+            # regression, not from the entity effects:
+            #
+            #     scalar `r2'  = 1 - e(rss)/e(tss)          // the within R2
+            #     quietly _regress `y' `xvars' if `touse'   // plain OLS
+            #     local r2c = e(r2)
+            #     ereturn scalar r2_c = `r2c'
+            #     ereturn scalar F_f = ((`r2'-`r2c')/e(df_a))/((1-`r2')/e(df_r))
+            #     ereturn scalar p_f = fprob(e(df_a),e(df_r),e(F_f))
+            #
+            # so F_f is a comparison of the within R2 against the pooled OLS
+            # R2, scaled by the absorbed degrees of freedom -- no entity effects
+            # needed.  (An earlier version of this comment claimed the opposite,
+            # which would have left F_f permanently unimplemented.)
+            # ``xtreg_fe.ado:505-506`` is explicit that the r2 in this formula is
+            # NOT ``e(r2)``:
+            #
+            #     /* not the same as e(r2) returned from _regress */
+            #     scalar `r2' = 1 - e(rss)/e(tss)
+            #     ereturn scalar F_f = ((`r2'-`r2c')/e(df_a))/((1-`r2')/e(df_r))
+            #
+            # Measured on ``xtreg_fe.json``: ``1 - rss/tss`` is 0.9531797 while
+            # ``e(r2)`` is 0.9299367.  Substituting ``e(r2)`` gives 17.075 where the
+            # fixture records 28.085 -- the fixture's ``p_f`` then confirms it, since
+            # ``f.sf(28.085, 29, 148)`` reproduces the stored p-value exactly.
+            out["k_absorb"] = float(len(u_panel))
+            out["df_a"] = float(len(u_panel) - 1)
+            if design is not None and params is not None:
+                design_frame, _ = design
+                matrix = np.asarray(design_frame.to_numpy(dtype=float), dtype=float)
+                if matrix.shape[0] == nobs:
+                    pooled = _pooled_r2(matrix, y)
+                    if np.isfinite(pooled):
+                        out["r2_c"] = float(pooled)
+                        df_a = float(len(u_panel) - 1)
+                        # The formula's r2 is ``1 - e(rss)/e(tss)`` as Stata computes
+                        # it there -- both keys are already in ``out``.
+                        tss_within = float(out.get("tss", float("nan")))
+                        if np.isfinite(rss) and np.isfinite(tss_within) and tss_within > 0:
+                            within_r2 = 1.0 - float(rss) / tss_within
+                        else:  # pragma: no cover - defensive
+                            within_r2 = float("nan")
+                        if (
+                            df_a > 0
+                            and scalar_df > 0
+                            and np.isfinite(within_r2)
+                            and within_r2 < 1.0
+                        ):
+                            f_f = ((within_r2 - pooled) / df_a) / (
+                                (1.0 - within_r2) / scalar_df
+                            )
+                            out["F_f"] = float(f_f)
+                            out["p_f"] = float(
+                                stats.f.sf(f_f, df_a, scalar_df)
+                            )
+        return out
+
+
+    def _panel_structure_only(self, n_entities: int) -> dict[str, Any]:
+        """The panel-shape block, for estimators whose sample is transformed.
+
+        ``xtreg, fd`` estimates on first differences, so the response has no
+        within-entity variation left to decompose -- but ``e(Tbar)``,
+        ``e(g_min)``, ``e(g_avg)``, ``e(g_max)`` and ``e(Tcon)`` describe the
+        underlying panel and are still meaningful (and still stored by Stata).
+        """
+
+        labels = self._data.index.get_level_values(self._entity).to_numpy()
+        if labels.size == 0:
+            return {}
+        codes = pd.factorize(labels)[0]
+        sizes = np.bincount(codes).astype(float)
+        return {
+            "Tbar": float(labels.size) / float(sizes.size),
+            "g_min": int(sizes.min()),
+            "g_avg": float(sizes.mean()),
+            "g_max": int(sizes.max()),
+            "Tcon": int(np.all(sizes == sizes[0])),
+        }
 
     def _stata_r2_adjusted(self, r2: float, nobs: int, df_resid: float) -> float:
         if not np.isfinite(r2) or df_resid <= 0 or nobs <= 1:
@@ -791,6 +1356,21 @@ class RandomEffects(PanelOLS):
     """
 
     _stata_command = "xtreg, re"
+
+    # Stata stores no ``e(r2)`` for ``xtreg, re`` and its ``e(r2_w)`` is not the
+    # GLS ``rsquared`` the backend reports, so the alias is disabled.
+    _within_r2_is_backend_r2 = False
+
+    # The random-effects estimator quasi-demeans, so e(theta) is meaningful,
+    # and it reports a Wald chi-square rather than an F.
+    _stores_theta = True
+    _stores_wald_chi2 = True
+
+    # ``xtreg_re.json`` has no rss/mss/tss, no ll_0 and no absorbed block.
+    _stores_totals = False
+    _stores_mss = False
+    _stores_ll_0 = False
+    _stores_absorbed = False
 
     def fit(  # type: ignore[override]
         self,
@@ -873,6 +1453,32 @@ class BetweenOLS(RandomEffects):
 
     _stata_command = "xtreg, be"
 
+    #: ``xtreg.sthlp:1014-1067`` (the be block) lists ``e(F)`` and NOT ``e(chi2)``.
+    #: ``BetweenOLS`` inherits from ``RandomEffects``, which sets this flag True, so it
+    #: has to be turned back off explicitly -- inheritance made the between estimator
+    #: report a Wald chi-square that Stata does not store, and the value was just
+    #: ``F * df_m`` under a different name.
+    _stores_wald_chi2 = False
+
+    _estimates_on_entity_means = True
+    _stores_mss = True
+
+    #: ``xtreg_be.ado`` stores NO sigma/rho/corr: the between estimator runs OLS
+    #: on the entity means, so there is no panel/epsilon decomposition.  The
+    #: ``corr`` occurrences in that ado are the CORR COMMAND feeding ``r2_o`` and
+    #: ``r2_w``, not e() keys.
+    _stores_sigma = False
+
+    #: ``xtreg_be.ado`` contains no ``theta`` (or ``thta``) at all -- the between
+    #: estimator does not quasi-demean, it runs OLS on the entity means.  This
+    #: class inherits from ``RandomEffects``, which DOES store theta, so the flag
+    #: has to be switched off explicitly; leaving it inherited put a theta on a
+    #: be result where Stata stores none.
+    _stores_theta = False
+
+    # ``xtreg_be.json`` has ll_0 but not the fe-specific absorbed block.
+    _stores_ll_0 = True
+
     def _build_model(
         self,
         y: pd.Series,
@@ -913,6 +1519,24 @@ class FirstDifferenceOLS(RandomEffects):
     """
 
     _stata_command = "xtreg, fd"
+
+    #: ``xtreg.sthlp`` gives no chi-square for the first-difference estimator either
+    #: (the ``be``/``fe`` blocks list only ``e(F)``).  Inherited from
+    #: ``RandomEffects``, so it must be switched off here for the same reason as
+    #: ``BetweenOLS``: otherwise ``fd`` reports ``F * df_m`` under a ``chi2`` name.
+    _stores_wald_chi2 = False
+
+    #: Differencing removes the entity effect entirely, so there is no
+    #: ``sigma_u``/``rho``/``theta`` to report.  This class inherits from
+    #: ``RandomEffects``, which stores all of them, so each flag is switched off
+    #: explicitly.  Leaving them inherited "worked" only by accident: the theta
+    #: block is guarded by ``isfinite(sigma_u)``, and ``fd`` happens to have no
+    #: sigma_u -- so a future change that started computing one would silently
+    #: start reporting a theta for a model that has no quasi-demeaning.
+    _stores_theta = False
+    _stores_absorbed = False
+    #: No decomposed error structure: differencing removes the entity effect.
+    _stores_sigma = False
 
     def _build_model(
         self,
@@ -1101,6 +1725,38 @@ def _aligned_resid(ref: Any, *, command: str) -> np.ndarray:
             f"N={int(ref.nobs)} observations"
         )
     return values
+
+
+def _pooled_r2(design: np.ndarray, y: np.ndarray) -> float:
+    """R-squared of a plain OLS fit of ``y`` on ``design`` (Stata's ``r2_c``).
+
+    ``xtreg_fe.ado:513-520`` obtains this by running ``_regress y xvars`` after
+    the within fit; it is the pooled (between-and-within) explanatory power that
+    ``e(F_f)`` compares the within R-squared against.
+    """
+
+    matrix = np.asarray(design, dtype=float)
+    values = np.asarray(y, dtype=float).reshape(-1)
+    if matrix.ndim != 2 or matrix.shape[0] != values.size:
+        return float("nan")
+    coefficients, *_ = np.linalg.lstsq(matrix, values, rcond=None)
+    resid = values - matrix @ coefficients
+    centred = values - values.mean()
+    tss = float(centred @ centred)
+    if tss <= 0.0:
+        return float("nan")
+    return 1.0 - float(resid @ resid) / tss
+
+
+def _panel_means(values: np.ndarray, codes: np.ndarray, n_panels: int) -> np.ndarray:
+    """Entity means of ``values`` in the order of ``codes``."""
+
+    values = np.asarray(values, dtype=float).reshape(-1)
+    sizes = np.bincount(codes, minlength=n_panels).astype(float)
+    totals = np.bincount(codes, weights=values, minlength=n_panels)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        means = totals / sizes
+    return means
 
 
 def _gaussian_loglik(rss: float, nobs: int) -> float:

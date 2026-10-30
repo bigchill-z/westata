@@ -163,6 +163,8 @@ class Tobit:
             y, X, lower=lower, upper=upper, param_names=names
         )
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        #: ``e(depvar)`` (``tobit.sthlp``), surfaced through StataResults.e.
+        model._response_name = lhs
         return model
 
     # ------------------------------------------------------------ likelihood
@@ -382,12 +384,37 @@ class Tobit:
 
         e: dict[str, Any] = {
             "N": n,
-            "n_uncensored": int(uncensored.sum()),
-            "n_left": int(left.sum()),
-            "n_right": int(right.sum()),
+            # ``tobit.sthlp:254-256`` names the censoring counts ``e(N_unc)``,
+            # ``e(N_lc)`` and ``e(N_rc)`` -- capital N, abbreviations unc/lc/rc.
+            # These used to be spelled ``n_uncensored``/``n_left``/``n_right``,
+            # which no Stata consumer would look for.  The misspelled aliases are
+            # GONE rather than kept: leaving them in means ``e()`` reports keys
+            # Stata does not have, and the whole point of the rename is that the
+            # reported surface matches Stata's.
+            "N_unc": int(uncensored.sum()),
+            "N_lc": int(left.sum()),
+            "N_rc": int(right.sum()),
             "df_m": df_m,
             "df_r": df_r,
             "rank": k + 1,
+            # ``tobit.ado:153``: ``ereturn scalar k_aux = 1``.  The one auxiliary
+            # parameter is ``lnsigma``; Stata uses this to print the LR test with
+            # ``df_m`` degrees of freedom while ``rank`` covers the slopes, the
+            # intercept AND lnsigma.
+            "k_aux": 1,
+            # ``tobit.ado:145-149`` sets the pair explicitly:
+            #   ereturn local marginsok    default XB Pr(passthru) E(passthru) \
+            #                              YStar(passthru)
+            #   ereturn local marginsnotok
+            # The three ``(passthru)`` entries take an argument (a censoring point), so
+            # they are recorded with that suffix exactly as Stata writes them.  The
+            # ``marginsnotok`` macro is set EMPTY -- nothing is forbidden, which is why
+            # it is recorded as an empty string rather than omitted: ``margins`` uses the
+            # key's presence to know the command spoke about this at all.
+            "marginsok": "default XB Pr(passthru) E(passthru) YStar(passthru)",
+            "marginsnotok": "",
+            # ``tobit.ado:127``: ``ereturn local title "Tobit regression"``.
+            "title": "Tobit regression",
             "ll": llf,
             "ll_0": ll0,
             "chi2": chi2,
@@ -397,11 +424,15 @@ class Tobit:
             "sigma": sigma,
             "var_e": sigma**2,
             "converged": int(converged),
-            "lower": self._lower,
-            "upper": self._upper,
+            # ``tobit.ado:131-132`` stores the censoring limits as ``e(llopt)`` and
+            # ``e(ulopt)`` -- the LOWER and UPPER LIMIT options as typed.  They were
+            # previously called ``lower``/``upper`` here, which is descriptive but
+            # is not the name Stata uses, so ``e(llopt)`` read as missing.
+            "llopt": self._lower,
+            "ulopt": self._upper,
         }
 
-        return StataResults(
+        results = StataResults(
             params=params,
             param_names=names,
             cov=cov,
@@ -417,6 +448,13 @@ class Tobit:
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
         )
+        #: ``tobit.sthlp`` documents e(depvar); ``StataResults.e`` falls back to
+        #: ``response_name``, so recording it here is what makes that work.
+        response = getattr(self, "_response_name", None)
+        if response:
+            results.response_name = str(response)
+            results.e["depvar"] = str(response)
+        return results
 
     # -------------------------------------------------------------- internals
     def _observed_information(self, theta: np.ndarray, k: int) -> np.ndarray:

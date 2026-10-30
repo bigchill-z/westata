@@ -94,6 +94,20 @@ class LRTestResult:
             f"  Prob > chi2     = {self.pvalue:.4f}"
         )
 
+    def to_dict(self) -> dict[str, float]:
+        """Flatten to the ``r()`` names ``lrtest.sthlp:216-218`` returns.
+
+        ``r(chi2)``, ``r(df)`` and ``r(p)``.  The two log-likelihoods are kept as
+        attributes but are NOT ``r()`` scalars -- Stata stores them in ``e()`` of the
+        two fitted models, not in the test's own ``r()``.
+        """
+
+        return {
+            "chi2": float(self.statistic),
+            "df": float(self.df),
+            "p": float(self.pvalue),
+        }
+
 
 @dataclass(frozen=True)
 class HausmanResult:
@@ -125,6 +139,20 @@ class HausmanResult:
         if self.excluded:
             text += f"\n  excluded (not in both models): {self.excluded}"
         return text
+
+    def to_dict(self) -> dict[str, float]:
+        """Flatten to the ``r()`` names a Hausman test returns.
+
+        ``hausman.sthlp`` documents ``r(chi2)``, ``r(df)`` and ``r(p)`` -- the same
+        shape as ``lrtest``, because both are chi-square tests.  ``excluded`` is a
+        diagnostic this package adds, not an ``r()`` scalar, so it stays an attribute.
+        """
+
+        return {
+            "chi2": float(self.statistic),
+            "df": float(self.df),
+            "p": float(self.pvalue),
+        }
 
 
 def _loglike(result: Any, *, role: str) -> float:

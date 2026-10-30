@@ -70,10 +70,20 @@ def test_nonrobust_df_resid_does_not_affect_robust_types():
 
 
 def test_supported_cov_types_tuple():
-    assert SUPPORTED_COV_TYPES == ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster")
+    # HAC joined the list in round 29; ``newey`` supplies the bandwidth through
+    # cov_kwds["maxlags"].
+    assert SUPPORTED_COV_TYPES == (
+        "nonrobust",
+        "HC0",
+        "HC1",
+        "HC2",
+        "HC3",
+        "cluster",
+        "HAC",
+    )
 
 
-@pytest.mark.parametrize("bad", ["bogus", "HAC", "twoway", "robust", ""])
+@pytest.mark.parametrize("bad", ["bogus", "twoway", "robust", ""])
 def test_unknown_cov_type_raises_value_error(bad):
     X, resid, _ = _toy()
     with pytest.raises(ValueError) as excinfo:
@@ -83,6 +93,15 @@ def test_unknown_cov_type_raises_value_error(bad):
     assert "cov_type" in message
     for name in SUPPORTED_COV_TYPES:
         assert name in message
+
+
+def test_hac_without_a_bandwidth_is_an_error_not_an_unknown_type():
+    """HAC is now supported, so it fails for a different, specific reason."""
+
+    X, resid, _ = _toy()
+
+    with pytest.raises(ValueError, match="maxlags"):
+        compute_cov(X, resid, cov_type="HAC")
 
 
 @pytest.mark.parametrize(

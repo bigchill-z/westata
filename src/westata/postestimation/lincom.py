@@ -49,6 +49,31 @@ class LincomResult:
         )
         return "\n".join(lines)
 
+    def to_dict(self) -> dict[str, float]:
+        """Flatten to the ``r()`` names ``lincom.sthlp:182-189`` returns.
+
+        ``estimate``, ``se``, ``df``, ``t``/``z``, ``p``, ``lb`` and ``ub``.  The test
+        statistic travels under the name of its distribution -- ``r(t)`` for a t-based
+        fit, ``r(z)`` for a z-based one -- because that is how the ado stores it; asking
+        for the other name finds nothing, which matches Stata.
+        """
+
+        stat_label = "z" if self.distribution == "z" else "t"
+        table: dict[str, float] = {
+            "estimate": float(self.estimate),
+            "se": float(self.std_err),
+            stat_label: float(self.statistic),
+            "p": float(self.pvalue),
+            "lb": float(self.ci_lower),
+            "ub": float(self.ci_upper),
+        }
+        # A z-based fit has NO degrees of freedom, so ``r(df)`` is genuinely absent
+        # rather than zero or None.  Coercing it would invent a value the ado does not
+        # store.
+        if self.df is not None:
+            table["df"] = float(self.df)
+        return table
+
 
 def run_lincom(
     params: np.ndarray,

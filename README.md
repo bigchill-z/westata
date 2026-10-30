@@ -45,9 +45,9 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **1448 passing** |
-| Commands covered | 87 registry entries |
-| Evidence | **52 × E3**, 26 × E2, 9 × E1 |
+| Tests | **3715 passing** |
+| Commands covered | 93 registry entries |
+| Evidence | **52 × E3**, 26 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
@@ -149,6 +149,14 @@ A publication-style table:
 base = ws.OLS.from_formula("mpg ~ weight", df).fit()
 full = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
 print(ws.etable([base, full], model_names=["Base", "Full"]))
+```
+
+Stata's `estat vce`, for the coefficient covariance or correlation matrix:
+
+```python
+print(full.estat_vce())                      # covariance matrix
+print(full.estat_vce(correlation=True))      # estat vce, correlation
+full.estat_vce().to_frame()                  # full symmetric matrix as a DataFrame
 ```
 
 ## Command coverage

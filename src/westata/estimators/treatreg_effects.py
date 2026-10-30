@@ -65,7 +65,7 @@ estimator is the exception and is flagged as such: see
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -117,6 +117,17 @@ class TreatmentEffectResult:
         delta-method variance Stata uses.  ``"Abadie-Imbens approximation"``
         flags a number that is close to Stata's without matching it, so callers
         never have to guess whether a standard error is conformant.
+    nobs, estimator, outcome_model, treatment_model:
+        The header block Stata prints above the table
+        (``p11_outputs.txt:8-11``)::
+
+            Treatment-effects estimation    Number of obs     =      1,200
+            Estimator      : regression adjustment
+            Outcome model  : linear
+            Treatment model: none
+
+        Recorded separately because they describe the *method*, not the
+        estimate, and Stata shows them before the coefficient table.
     """
 
     estimand: str
@@ -128,14 +139,79 @@ class TreatmentEffectResult:
     ci_upper: float
     potential_outcomes: dict[str, tuple[float, float]] = field(default_factory=dict)
     se_method: str = _EXACT_SE
+    nobs: int = 0
+    estimator: str = ""
+    outcome_model: str = ""
+    treatment_model: str = ""
+
+    def with_header(
+        self,
+        *,
+        nobs: int,
+        estimator: str,
+        outcome_model: str,
+        treatment_model: str,
+    ) -> "TreatmentEffectResult":
+        """Return a copy carrying Stata's header block.
+
+        ``TreatmentEffectResult`` is frozen, so the header is attached by
+        replacement rather than mutation.  Keeping it out of the estimator
+        constructors avoids threading four strings through every call site.
+        """
+
+        return replace(
+            self,
+            nobs=int(nobs),
+            estimator=str(estimator),
+            outcome_model=str(outcome_model),
+            treatment_model=str(treatment_model),
+        )
+
+    @property
+    def e(self) -> dict[str, Any]:
+        """Stata's ``e()`` scalars for ``teffects``.
+
+        ``teffects`` stores the effect and its potential-outcome means as
+        matrices (``e(b)``/``e(V)`` over the ``ATE`` and ``POmean`` equations),
+        so the natural scalar mirror is the reported table itself.  Keys follow
+        the equation-and-row naming Stata uses in ``e(b)``'s column stripe.
+        """
+
+        payload: dict[str, Any] = {
+            "N": float(self.nobs),
+            # The headline effect, named after its estimand (ATE or ATET).
+            self.estimand.lower(): float(self.estimate),
+            "se_" + self.estimand.lower(): float(self.std_err),
+            "z_" + self.estimand.lower(): float(self.z),
+            "p_" + self.estimand.lower(): float(self.pvalue),
+            "ci_lower": float(self.ci_lower),
+            "ci_upper": float(self.ci_upper),
+            "estimator": self.estimator,
+            "outcome_model": self.outcome_model,
+            "treatment_model": self.treatment_model,
+            "se_method": self.se_method,
+        }
+        for level in sorted(self.potential_outcomes):
+            mean, error = self.potential_outcomes[level]
+            payload[f"po{level}"] = float(mean)
+            payload[f"se_po{level}"] = float(error)
+        return payload
 
     def __str__(self) -> str:
-        lines = [
-            "Treatment-effects estimation",
+        lines = ["Treatment-effects estimation"]
+        if self.nobs:
+            lines.append(f"  Number of obs = {self.nobs}")
+        if self.estimator:
+            lines.append(f"  Estimator      : {self.estimator}")
+        if self.outcome_model:
+            lines.append(f"  Outcome model  : {self.outcome_model}")
+        if self.treatment_model:
+            lines.append(f"  Treatment model: {self.treatment_model}")
+        lines.append(
             f"  {self.estimand:<5} {self.estimate:>13.7g}   se {self.std_err:.7g}"
             f"   z {self.z:>7.2f}   p {self.pvalue:.4f}"
-            f"   [{self.ci_lower:.7g}, {self.ci_upper:.7g}]",
-        ]
+            f"   [{self.ci_lower:.7g}, {self.ci_upper:.7g}]"
+        )
         for level in sorted(self.potential_outcomes):
             mean, error = self.potential_outcomes[level]
             lines.append(f"  POmean({level}) {mean:>9.7g}   se {error:.7g}")
@@ -312,6 +388,40 @@ def _influence_se(influence: np.ndarray, command: str) -> float:
     return float(np.sqrt(variance)) if variance > 0.0 else 0.0
 
 
+def _estimator_label(command: str) -> str:
+    """Stata's ``Estimator :`` line for each ``teffects`` variant.
+
+    Taken from the fixture headers (``p11_outputs.txt:9`` for ``ra``, and the
+    same block for the others).
+    """
+
+    return {
+        "teffects ra": "regression adjustment",
+        "teffects ipw": "inverse probability weighting",
+        "teffects aipw": "augmented inverse probability weighting",
+        "teffects nnmatch": "nearest-neighbor matching",
+    }.get(command, command)
+
+
+#: ``Outcome model :`` per estimator -- ``ra``/``aipw`` fit a linear outcome
+#: model; ``ipw`` only models treatment; ``nnmatch`` uses no outcome model.
+_OUTCOME_MODELS: dict[str, str] = {
+    "teffects ra": "linear",
+    "teffects ipw": "none",
+    "teffects aipw": "linear",
+    "teffects nnmatch": "none",
+}
+
+#: ``Treatment model :`` per estimator -- ``ra`` does not model treatment;
+#: the other three fit a logit propensity score.
+_TREATMENT_MODELS: dict[str, str] = {
+    "teffects ra": "none",
+    "teffects ipw": "logit",
+    "teffects aipw": "logit",
+    "teffects nnmatch": "logit",
+}
+
+
 def _summarise_from_standard_error(
     estimand: str,
     estimate: float,
@@ -320,6 +430,7 @@ def _summarise_from_standard_error(
     *,
     command: str,
     se_method: str,
+    nobs: int = 0,
 ) -> TreatmentEffectResult:
     """Build the result from an already-computed standard error."""
 
@@ -348,6 +459,10 @@ def _summarise_from_standard_error(
         ci_upper=upper,
         potential_outcomes=potential_outcomes,
         se_method=se_method,
+        nobs=int(nobs),
+        estimator=_estimator_label(command),
+        outcome_model=_OUTCOME_MODELS.get(command, ""),
+        treatment_model=_TREATMENT_MODELS.get(command, ""),
     )
 
 
@@ -362,12 +477,16 @@ def _summarise(
 ) -> TreatmentEffectResult:
     """Assemble a :class:`TreatmentEffectResult` from an influence function."""
 
+    # The influence function has one row per observation, so its length IS the
+    # sample size -- no need to thread ``nobs`` through every call site.
+    observations = int(np.asarray(influence).shape[0]) if np.ndim(influence) else 0
     return _summarise_from_standard_error(
         estimand,
         estimate,
         _influence_se(influence, command),
         potential_outcomes,
         command=command,
+        nobs=observations,
         se_method=se_method,
     )
 
@@ -1301,4 +1420,7 @@ class NearestNeighbourMatching:
             potential,
             command=self._command,
             se_method=_APPROX_SE,
+            # This estimator reports an already-computed standard error rather
+            # than an influence function, so the sample size has to be supplied.
+            nobs=int(self._y.size),
         )

@@ -115,17 +115,18 @@ def test_censoring_counts_match_the_data():
     res = Tobit.from_formula("y ~ x1 + x2", df, lower=2.0).fit()
 
     n_left = int((df["y"] <= 2.0).sum())
-    assert res.e["n_left"] == n_left
-    assert res.e["n_uncensored"] == len(df) - n_left
-    assert res.e["n_left"] + res.e["n_uncensored"] == len(df)
+    # ``tobit.sthlp:254-256``: the counts are N_lc (left-censored) / N_unc.
+    assert res.e["N_lc"] == n_left
+    assert res.e["N_unc"] == len(df) - n_left
+    assert res.e["N_lc"] + res.e["N_unc"] == len(df)
 
 
 def test_two_sided_censoring_runs():
     df = _two_sided()
     res = Tobit.from_formula("y ~ x1", df, lower=-0.4, upper=1.6).fit()
 
-    assert res.e["n_left"] > 0
-    assert res.e["n_right"] > 0
+    assert res.e["N_lc"] > 0
+    assert res.e["N_rc"] > 0
     assert res.params["x1"] == pytest.approx(0.8, abs=0.15)
 
 
@@ -171,7 +172,7 @@ def test_sigma_reported_like_stata():
 def test_e_keys_present():
     df = _left_censored()
     res = Tobit.from_formula("y ~ x1 + x2", df, lower=2.0).fit()
-    for key in ["N", "ll", "chi2", "r2_p", "sigma", "n_left", "n_uncensored"]:
+    for key in ["N", "ll", "chi2", "r2_p", "sigma", "N_lc", "N_unc"]:
         assert key in res.e, key
 
 

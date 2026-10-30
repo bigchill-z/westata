@@ -23,6 +23,7 @@ import pandas as pd
 import pytest
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.estimators.hdfe import FEOLS
 from westata.estimators.panel import (
     BetweenOLS,
     FirstDifferenceOLS,
@@ -459,7 +460,7 @@ def test_summary_stata_style_renders() -> None:
         FirstDifferenceOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
     ):
         text = model.fit().summary(style="stata")
-        for token in ("Coef.", "Std. err.", "P>|t|", "Number of obs", "R-squared"):
+        for token in ("Coefficient", "Std. err.", "P>|t|", "Number of obs", "R-squared"):
             assert token in text, token
 
 
@@ -820,3 +821,197 @@ def test_panel_indexed_cluster_series_is_aligned_by_index() -> None:
     ).fit(cov_type="cluster", cov_kwds={"clusters": labels})
 
     np.testing.assert_allclose(by_index.bse.to_numpy(), positional.bse.to_numpy(), rtol=0.0, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Stata e() spellings for quantities the panel estimators already computed
+# ---------------------------------------------------------------------------
+
+
+def test_xtreg_fe_stores_stata_e_spellings() -> None:
+    """``e(N_g)``/``e(r2_w)`` exist for ``xtreg, fe``.
+
+    Stata spells the entity count ``e(N_g)``; westata previously stored only
+    ``n_entities``, so a script ported from Stata read ``e(N_g)`` and got
+    ``None`` with no error.  ``e(r2_w)`` is stored because the backend's
+    ``rsquared`` for the within estimator *is* the within R-squared, which the
+    hand-computed check below proves independently of the implementation.
+    """
+
+    df = make_panel()
+    result = PanelOLS.from_formula(
+        "y ~ x1 + x2", df, entity="firm", time="year"
+    ).fit()
+
+    assert result.e["N_g"] == result.e["n_entities"]
+    assert result.e["N_g"] == df["firm"].nunique()
+
+    codes = pd.factorize(df["firm"])[0]
+    y = df["y"].to_numpy()
+    ybar = pd.Series(y).groupby(codes).transform("mean").to_numpy()
+    fitted = np.asarray(result.fittedvalues, dtype=float)
+    fbar = pd.Series(fitted).groupby(codes).transform("mean").to_numpy()
+    within_r2 = 1.0 - np.sum((y - ybar - (fitted - fbar)) ** 2) / np.sum((y - ybar) ** 2)
+
+    assert result.e["r2_w"] == pytest.approx(within_r2, rel=1e-12)
+    assert result.e["r2"] == pytest.approx(result.e["r2_w"], rel=1e-15)
+
+
+def test_xtreg_r2_w_is_not_a_blanket_alias_of_r2() -> None:
+    """``e(r2_w)`` is *computed*, never aliased from ``e(r2)``.
+
+    Stata's fixtures disagree on the relationship per estimator, so aliasing
+    would report a wrong number under Stata's name:
+
+    * ``xtreg_fe.json``  : ``e(r2) == e(r2_w) == 0.9299367179801631``
+    * ``xtreg_re.json``  : no ``e(r2)`` at all, ``e(r2_w) = 0.9299308456407561``
+    * ``xtreg_be.json``  : ``e(r2) == e(r2_b) == 0.28158005317996504`` while
+      ``e(r2_w) = 0.7540434430300107``
+
+    So for ``re`` and ``be`` the two keys must hold *different* numbers, and for
+    ``fe`` they may coincide -- but only because the within R-squared genuinely
+    is the model's R-squared there.
+    """
+
+    df = make_panel()
+
+    fe = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    assert fe.e["r2_w"] == pytest.approx(fe.e["r2"], rel=1e-15)
+
+    re = RandomEffects.from_formula(
+        "y ~ x1 + x2", df, entity="firm", time="year"
+    ).fit()
+    assert "r2_w" in re.e
+    assert re.e["r2_w"] != re.e["r2"], "re must not alias r2_w to r2"
+
+    be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    assert "r2_w" in be.e
+    # Stata's be stores r2 == r2_b, and r2_w is a different quantity.
+    assert be.e["r2"] == pytest.approx(be.e["r2_b"], rel=1e-12)
+    assert be.e["r2_w"] != be.e["r2_b"]
+
+    for result, label in ((fe, "fe"), (re, "re"), (be, "be")):
+        assert result.e["N_g"] == df["firm"].nunique(), label
+
+
+def test_reghdfe_stores_tss_mss_and_ll_0() -> None:
+    """``reghdfe`` stores the sums of squares Stata records.
+
+    ``reghdfe_firm.json`` has ``tss``, ``mss``, ``ll_0`` alongside ``rss``;
+    the centred total was computed and discarded, so these are now stored.
+    Only the ``rss + mss == tss`` identity is asserted numerically here -- the
+    fixture's own values cannot be reproduced without its dataset.
+    """
+
+    df = make_panel()
+    result = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit()
+
+    assert {"rss", "mss", "tss", "ll_0"} <= set(result.e)
+    assert result.e["rss"] + result.e["mss"] == pytest.approx(result.e["tss"], rel=1e-12)
+    assert result.e["r2"] == pytest.approx(
+        1.0 - result.e["rss"] / result.e["tss"], rel=1e-12
+    )
+    # ll_0 is the Gaussian intercept-only likelihood, so it must be worse (more
+    # negative) than the fitted log-likelihood.
+    assert result.e["ll_0"] < result.e["ll"]
+
+
+# ---------------------------------------------------------------------------
+# The xtreg variance-component block
+# ---------------------------------------------------------------------------
+
+
+def test_xtreg_sigma_u_is_the_sd_of_panel_means_of_the_level_residual() -> None:
+    """``e(sigma_u)`` must not be built from the *within* residual.
+
+    ``xtreg_fe.ado:358-390`` computes ``U = y - Xb`` (the LEVEL residual), takes
+    its panel means, and reports ``r(sd)`` of those.  The within residual's panel
+    means are identically zero by construction, so using it makes ``sigma_u``
+    collapse to 0 and ``rho`` to 0 -- a plausible-looking wrong answer that no
+    point-estimate check would catch.  This test reproduces the ado recipe
+    independently and compares.
+    """
+
+    df = make_panel()
+    result = PanelOLS.from_formula(
+        "y ~ x1 + x2", df, entity="firm", time="year"
+    ).fit()
+
+    # Independent reconstruction: Xb = level linear predictor, U = y - Xb,
+    # panel means of U, then the df-adjusted sd.
+    xb = (
+        result.params["Intercept"]
+        + result.params["x1"] * df["x1"].to_numpy()
+        + result.params["x2"] * df["x2"].to_numpy()
+    )
+    u = df["y"].to_numpy() - xb
+    panel_means = (
+        pd.Series(u).groupby(pd.factorize(df["firm"])[0]).mean().to_numpy()
+    )
+    expected_sigma_u = float(np.std(panel_means, ddof=1))
+
+    assert result.e["sigma_u"] == pytest.approx(expected_sigma_u, rel=1e-12)
+    assert result.e["sigma_u"] > 0.0, (
+        "sigma_u collapsed to zero: the within residual was used instead of "
+        "the level residual"
+    )
+
+
+def test_xtreg_variance_components_are_consistent() -> None:
+    """``sigma^2 = sigma_u^2 + sigma_e^2`` and ``rho`` is the implied share."""
+
+    df = make_panel()
+    for estimator in (PanelOLS, RandomEffects):
+        result = estimator.from_formula(
+            "y ~ x1 + x2", df, entity="firm", time="year"
+        ).fit()
+        e = result.e
+        assert e["sigma"] ** 2 == pytest.approx(
+            e["sigma_u"] ** 2 + e["sigma_e"] ** 2, rel=1e-12
+        )
+        assert e["rho"] == pytest.approx(
+            e["sigma_u"] ** 2 / (e["sigma_u"] ** 2 + e["sigma_e"] ** 2), rel=1e-12
+        )
+        assert 0.0 <= e["rho"] <= 1.0
+
+
+def test_xtreg_group_size_block_matches_the_panel() -> None:
+    """``e(Tbar)``/``e(g_min)``/``e(g_avg)``/``e(g_max)``/``e(Tcon)``."""
+
+    df = make_panel()
+    for estimator in (PanelOLS, RandomEffects, BetweenOLS, FirstDifferenceOLS):
+        result = estimator.from_formula(
+            "y ~ x1 + x2", df, entity="firm", time="year"
+        ).fit()
+        e = result.e
+        assert e["Tbar"] == pytest.approx(N_PERIODS)
+        assert e["g_min"] == N_PERIODS
+        assert e["g_max"] == N_PERIODS
+        assert e["g_avg"] == pytest.approx(N_PERIODS)
+        assert e["Tcon"] == 1
+
+
+def test_xtreg_sums_of_squares_match_what_stata_stores() -> None:
+    """The totals are stored per estimator, because Stata does it per estimator.
+
+    ``xtreg_fe.json`` has ``rss``/``mss``/``tss``; ``xtreg_be.json`` has
+    ``rss``/``mss`` but **no** ``tss``; ``xtreg_re.json`` has none of the three.
+    Reporting ``tss`` uniformly would put a number under a Stata name that Stata
+    does not use there.
+    """
+
+    df = make_panel()
+
+    fe = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    assert {"rss", "mss", "tss", "tss_within", "tss_between"} <= set(fe.e)
+    assert fe.e["rss"] + fe.e["mss"] == pytest.approx(fe.e["tss"], rel=1e-10)
+
+    be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    assert {"rss", "mss"} <= set(be.e)
+    assert "tss" not in be.e, "xtreg_be.json does not store e(tss)"
+
+    re = RandomEffects.from_formula(
+        "y ~ x1 + x2", df, entity="firm", time="year"
+    ).fit()
+    assert "tss" not in re.e
+    assert "mss" not in re.e

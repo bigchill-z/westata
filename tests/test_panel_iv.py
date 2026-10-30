@@ -835,10 +835,17 @@ def test_xtunitroot_result_renders() -> None:
 )
 def test_e_contains_the_standard_keys(build) -> None:
     result = build()
-    missing = [key for key in REQUIRED_E_KEYS if key not in result.e]
+    # ``e(df_r)`` is NOT universal: some z-based estimators document only
+    # ``e(df_m)``, because their tests need no residual degrees of freedom.  But
+    # ``xtivreg`` DOES document ``e(df_r)`` (three times in its help file) even
+    # though it reports z statistics -- so the estimator's own choice decides, not
+    # the distribution.
+    required = tuple(key for key in REQUIRED_E_KEYS if key != "df_r")
+    missing = [key for key in required if key not in result.e]
     assert not missing, f"missing e() keys: {missing}"
     assert result.e["N"] == result.nobs > 0
-    assert result.e["df_r"] > 0
+    if "df_r" in result.e:
+        assert result.e["df_r"] > 0
     assert result.e["rank"] >= 1
     assert result.e["df_m"] == result.e["rank"] - (
         1 if ("Intercept" in result.params.index or "_cons" in result.params.index) else 0
@@ -862,7 +869,7 @@ def test_e_contains_the_standard_keys(build) -> None:
 def test_summary_renders_in_stata_style(build) -> None:
     result = build()
     text = result.summary(style="stata")
-    for token in ("Coef.", "Std. err.", "P>|z|", "Number of obs"):
+    for token in ("Coefficient", "Std. err.", "P>|z|", "Number of obs"):
         assert token in text, token
 
 

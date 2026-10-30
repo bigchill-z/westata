@@ -61,6 +61,28 @@ class MarginsResult:
             f"{self.ci_lower:>14.7g}{self.ci_upper:>14.7g}"
         )
 
+    def to_dict(self) -> dict[str, float]:
+        """Flatten to the rows of Stata's ``r(table)``.
+
+        ``margins.sthlp:1101`` documents ``r(table)``: a matrix whose rows are ``b``,
+        ``se``, the test statistic, ``p``, and the two confidence bounds.  The keys here
+        are those row labels, which is how a caller reading the help file asks for them.
+
+        Stata labels the statistic row ``t`` or ``z`` according to the model's
+        distribution.  This object does not carry that flag, so the key is ``t`` --
+        naming it after a distribution we cannot verify would be a guess.  Use
+        ``str(...)`` when the label itself matters.
+        """
+
+        return {
+            "b": float(self.estimate),
+            "se": float(self.std_err),
+            "t": float(self.statistic),
+            "p": float(self.pvalue),
+            "ll": float(self.ci_lower),
+            "ul": float(self.ci_upper),
+        }
+
 
 def _statistic_and_gradient(
     result: Any,
@@ -458,6 +480,9 @@ def margins(
     result: Any,
     *,
     dydx: Sequence[str] | str | None = None,
+    eyex: Sequence[str] | str | None = None,
+    dyex: Sequence[str] | str | None = None,
+    eydx: Sequence[str] | str | None = None,
     at: Mapping[str, Any] | None = None,
     over: str | None = None,
     exog: np.ndarray | None = None,
@@ -506,13 +531,116 @@ def margins(
     names = list(param_names)
     factor_set = set(factor_vars or ())
 
-    # Stata differentiates the response, not the linear index: logit/probit
-    # marginals are on the probability scale and count models on the mean scale.
-    kind = predict_kind or default_predict_kind(str(getattr(result, "model_name", "")))
-
+    # ``at()`` replaces covariate values, so it must be applied BEFORE any form is
+    # computed -- including the ``dyex`` factor, which is mean(x) over the ADJUSTED
+    # design.  Applying it later made ``margins(dyex="x1", at={"x1": 2})`` return
+    # exactly the unadjusted number.
     if at:
         exog = _apply_at(exog, names, at)
 
+    # ``margins.sthlp:265-266`` documents four derivative forms:
+    #
+    #   dydx(varlist)   d response / d x
+    #   eyex(varlist)   d ln(response) / d ln(x)   -- elasticity
+    #   dyex(varlist)   d response / d ln(x)       -- semi-elasticity
+    #   eydx(varlist)   d ln(response) / d x       -- semi-elasticity
+    #
+    # Only ``dydx`` is implemented.  The three elasticity forms need a PER-OBSERVATION
+    # scaling factor (x/response, x, 1/response) applied to both the estimate and its
+    # gradient BEFORE averaging -- scaling the averaged number instead would give a
+    # different, wrong result, and the standard error has to carry the same factor.
+    # Refusing here beats the ``TypeError: unexpected keyword argument`` a caller got
+    # before, which does not say the form exists at all.
+    requested_forms = {
+        "eyex": eyex,
+        "dyex": dyex,
+        "eydx": eydx,
+    }
+    named = [form for form, value in requested_forms.items() if value is not None]
+    if named:
+        if dydx is not None:
+            raise ValueError(
+                "margins accepts one derivative form at a time; got dydx= together "
+                f"with {named[0]}="
+            )
+        if len(named) > 1:
+            raise ValueError(
+                "margins accepts one derivative form at a time; got "
+                + " and ".join(named)
+            )
+        form = named[0]
+        if dydx is not None:  # pragma: no cover - guarded above
+            raise ValueError("margins accepts one derivative form at a time")
+        # ``dyex`` = d E[y] / d ln(x) = x * d E[y] / d x, factor ``x_i``.
+        # ``eyex`` = d ln E[y] / d ln(x) = (x_i / E[y_i]) * d E[y] / d x.
+        # ``eydx`` = d ln E[y] / d x    = (1 / E[y_i]) * d E[y] / d x.
+        #
+        # The last two factors depend on ``E[y_i]``, which changes with the covariates,
+        # so they cannot be pulled out of the average as a constant coefficient can.
+        # They are computed per observation and then averaged -- which is what Stata
+        # does and what makes ``eyex``/``eydx`` different from a rescaled ``dydx``.
+        requested = None
+        for candidate in (dyex, eyex, eydx):
+            if candidate is not None:
+                requested = (
+                    [candidate] if isinstance(candidate, str) else list(candidate)
+                )
+                break
+        if requested is None:  # pragma: no cover - the caller always passes one
+            raise ValueError("margins needs a derivative form")
+        # ``kind`` is defined further down for the ``dydx`` path; the elastic branch
+        # returns early, so it has to compute the same value here.
+        elastic_kind = predict_kind or default_predict_kind(
+            str(getattr(result, "model_name", ""))
+        )
+        rows = _marginal_effects(
+            result,
+            exog,
+            names,
+            requested,
+            factor_set=factor_set,
+            over=over,
+            level=level,
+            predict_kind=elastic_kind,
+            outcome=outcome,
+            elasticity_form=form,
+        )
+        return rows[0] if len(rows) == 1 else rows
+
+    # Stata differentiates the response, not the linear index: logit/probit
+    # marginals are on the probability scale and count models on the mean scale.
+    #
+    # ``default`` is a KEYWORD in ``e(marginsok)``, not a prediction type -- passing it
+    # through as a literal made ``margins(dydx=..., predict_kind="default")`` fail even
+    # though Stata accepts it.  It resolves to the command's own default.
+    requested_kind = predict_kind
+    if requested_kind is not None and str(requested_kind).strip().lower() == "default":
+        requested_kind = None
+    kind = requested_kind or default_predict_kind(
+        str(getattr(result, "model_name", ""))
+    )
+
+    # ``e(marginsnotok)`` lists the prediction types ``margins`` must REFUSE after this
+    # command.  It is a real macro that ``logit.ado:254-263`` and ``probit.ado`` set, and
+    # Stata's own estimators rely on it -- ``areg.ado:255``, ``arch.ado:1531``,
+    # ``arima.ado:727`` and dozens more each forbid a different subset.  This module read
+    # it only in a comment, so ``margins`` accepted ``stdp``/``residuals`` after logit
+    # even though the command declares them disallowed.
+    forbidden = str(result.e.get("marginsnotok", "") or "").split()
+    if forbidden:
+        normalised_forbidden = {
+            entry.strip().lower() for entry in forbidden if entry.strip()
+        }
+        if str(kind).strip().lower() in normalised_forbidden:
+            raise ValueError(
+                f"margins: predict type {kind!r} is not allowed after "
+                f"{getattr(result, 'model_name', 'this command')!r} "
+                f"(e(marginsnotok) = {result.e.get('marginsnotok')!r}); "
+                "use one of e(marginsok) "
+                f"= {result.e.get('marginsok')!r}"
+            )
+
+    # ``at()`` was already applied above, before the derivative form was chosen.
     if dydx is None:
         rows = _predictive_margins(
             result, exog, names, over=over, level=level, predict_kind=kind,
@@ -583,6 +711,7 @@ def _marginal_effects(
     level: float,
     predict_kind: str,
     outcome: int | None = None,
+    elasticity_form: str | None = None,
 ) -> list[MarginsResult]:
     dist = "z" if getattr(result, "dist", "t") == "z" else "t"
     df_resid = float(result.df_resid)
@@ -590,6 +719,70 @@ def _marginal_effects(
 
     groups = _groups(over, exog.shape[0], getattr(result, "model_data", None))
     rows: list[MarginsResult] = []
+
+    def _scale(
+        name: str,
+        estimate: float,
+        gradient: np.ndarray,
+        subset: np.ndarray,
+    ) -> tuple[float, np.ndarray]:
+        """Apply the elasticity factor to the estimate AND its gradient.
+
+        ``margins.sthlp:265-266`` defines three elastic forms, and the factor is the
+        whole difference between them:
+
+        * ``dyex``  = ``d E[y] / d ln(x)``  factor ``x_i``;
+        * ``eyex``  = ``d ln E[y] / d ln(x)``  factor ``x_i / E[y_i]``;
+        * ``eydx``  = ``d ln E[y] / d x``  factor ``1 / E[y_i]``.
+
+        ``x_i`` alone is a constant for the linear predictor, but ``E[y_i]`` is not, so
+        the last two are averaged PER OBSERVATION.  The gradient has to carry the same
+        factor at every observation, because the delta-method variance is ``G' V G``
+        with ``G`` averaged over the same terms.
+        """
+
+        if elasticity_form is None:
+            return estimate, gradient
+
+        position = names.index(name)
+        covariate = np.asarray(subset[:, position], dtype=float)
+        if elasticity_form == "dyex":
+            factor = float(np.mean(covariate))
+            return estimate * factor, gradient * factor
+
+        # ``eyex``/``eydx`` divide by the predicted response at each observation.
+        prediction = np.asarray(
+            predict(result, subset, predict_kind), dtype=float
+        ).reshape(-1)
+        if prediction.size != covariate.size:  # pragma: no cover - defensive
+            raise ValueError(
+                "margins: the predicted response has "
+                f"{prediction.size} entries for {covariate.size} rows"
+            )
+        if np.any(prediction == 0.0):
+            raise ValueError(
+                f"margins, {elasticity_form}() divides by the predicted response, and "
+                "at least one fitted value is exactly zero; the elasticity is undefined "
+                "there."
+            )
+        # ``eyex``/``eydx`` are derivatives of ln E[y].  A NEGATIVE fitted value makes
+        # the logarithm undefined, and ``1/E[y]`` still evaluates there -- returning a
+        # finite number for an expression that does not exist.  Stata's own behaviour
+        # for this case cannot be read from the ado (the factors are computed inside a
+        # Mata routine with no source in ado/base), so the honest answer is a refusal
+        # naming the offending count rather than a plausible number.
+        if np.any(prediction < 0.0):
+            raise ValueError(
+                f"margins, {elasticity_form}() is a derivative of ln(E[y]), and "
+                f"{int(np.sum(prediction < 0.0))} fitted value(s) are negative, where "
+                "the log is undefined.  Use dydx() for the derivative of the level, or "
+                "model a strictly positive response."
+            )
+        per_observation = (
+            covariate / prediction if elasticity_form == "eyex" else 1.0 / prediction
+        )
+        factor = float(np.mean(per_observation))
+        return estimate * factor, gradient * factor
 
     for name in requested:
         if name not in names:
@@ -610,6 +803,7 @@ def _marginal_effects(
                     derivative_with_respect_to=position,
                     outcome=outcome,
                 )
+            estimate, gradient = _scale(name, estimate, gradient, exog)
             rows.append(
                 _row_from_statistic(
                     name,
@@ -637,6 +831,9 @@ def _marginal_effects(
                         derivative_with_respect_to=position,
                         outcome=outcome,
                     )
+                # The semi-elasticity factor is the mean of the covariate WITHIN the
+                # group, because each ``over`` row reports that group's own margin.
+                estimate, gradient = _scale(name, estimate, gradient, subset)
                 rows.append(
                     _row_from_statistic(
                         f"{group}",

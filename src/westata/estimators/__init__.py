@@ -41,6 +41,7 @@ from westata.estimators.limited import (
     Truncreg,
 )
 from westata.estimators.linear import OLS
+from westata.estimators.newey import NeweyWestResult, check_time_spacing, newey
 from westata.estimators.panel_dynamic import XtAbond
 from westata.estimators.panel_nonlinear import (
     XtLogit,
@@ -140,6 +141,9 @@ __all__ = [
     "Intreg",
     "Truncreg",
     "OLS",
+    "newey",
+    "NeweyWestResult",
+    "check_time_spacing",
     "IV2SLS",
     "IVLIML",
     "IVGMM",

@@ -25,6 +25,77 @@ QUANTILES = (0.25, 0.5, 0.75)
 # ------------------------------------------------------------------ sqreg
 
 
+def test_sqreg_fits_without_a_seed():
+    """An unseeded fit must work, not crash.
+
+    Every existing test passed ``seed=...``, so the default path was never
+    exercised -- and it raised ``NameError: DEFAULT_SEED is not defined`` because
+    that constant did not exist.  A NameError on the DEFAULT path is the worst
+    kind of gap: the feature is tested, documented and unusable in the ordinary
+    case.
+    """
+
+    frame = _frame(n=120)
+    result = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit()
+
+    assert np.all(np.isfinite(np.asarray(result.cov_params())))
+
+
+def test_unseeded_sqreg_runs_differ():
+    """No seed means Stata's current c(seed) -- a different draw each time.
+
+    Fixing a constant default would have made every unseeded call identical, which
+    is NOT how Stata behaves; the point of ``set seed`` is that the default is not
+    fixed.
+    """
+
+    frame = _frame(n=120)
+    first = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit()
+    second = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit()
+
+    assert not np.allclose(
+        np.asarray(first.cov_params()), np.asarray(second.cov_params())
+    )
+
+
+def test_seeded_sqreg_is_reproducible():
+    frame = _frame(n=120)
+    first = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit(seed=42)
+    second = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit(seed=42)
+
+    np.testing.assert_allclose(
+        np.asarray(first.cov_params()), np.asarray(second.cov_params())
+    )
+
+
+def test_bsqreg_fits_without_a_seed():
+    """``bsqreg`` shares the bootstrap machinery, so its default path matters too."""
+
+    frame = _frame(n=120)
+    result = Bsqreg.from_formula("y ~ x1 + x2", frame, quantile=0.5).fit()
+
+    assert np.all(np.isfinite(np.asarray(result.cov_params())))
+
+
+def test_sqreg_does_not_claim_iqregs_keys():
+    """``qreg.sthlp:547`` marks ``e(q0)``/``e(q1)``/``e(sumrdev0)`` as IQREG's.
+
+    ``iqreg`` is a quantile-DIFFERENCE regression and is not implemented, so those
+    keys must not appear on an ``sqreg`` result.  An audit that read them off
+    ``qreg.sthlp`` without checking which command owns that section reported them
+    as sqreg gaps -- a false positive worth pinning.
+    """
+
+    frame = _frame(n=120)
+    result = Sqreg.from_formula("y ~ x1 + x2", frame, quantiles=QUANTILES).fit(
+        seed=7
+    )
+
+    for key in ("q0", "q1", "sumrdev0", "sumrdev1", "sumadev0", "sumadev1", "n_q"):
+        assert key not in result.e, key
+
+
+
 def test_sqreg_coefficients_match_per_quantile_qreg():
     """The point estimates are the plain qreg fits, not a separate estimator."""
 
@@ -164,4 +235,4 @@ def test_bsqreg_populates_e_and_renders():
     for key in ["N", "df_m", "df_r", "reps", "q"]:
         assert key in result.e, key
     assert result.e["q"] == 0.5
-    assert "Coef." in result.summary(style="stata")
+    assert "Coefficient" in result.summary(style="stata")

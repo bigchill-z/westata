@@ -61,7 +61,7 @@ import pyfixest
 from scipy import stats
 
 from westata.data.weights import WeightSpec, normalize_weights
-from westata.errors import ConsistencyError, WeightError
+from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.protocols import SSC
 from westata.results.base import StataResults
 
@@ -846,6 +846,17 @@ class FEOLS:
                 results.design_matrix = (design, ["Intercept", *available])
         except (AttributeError, TypeError, ValueError):  # pragma: no cover
             pass
+
+        _register_hdfe_predict(
+            results,
+            design_matrix=getattr(results, "design_matrix", None),
+            formula=str(self._formula),
+            y=np.asarray(y, dtype=float),
+            params=np.asarray(params, dtype=float),
+            param_names=list(names),
+            data=data,
+            weights=getattr(self, "_weights", None),
+        )
         return results
 
     @staticmethod
@@ -1035,3 +1046,144 @@ class FEOLS:
                 "reghdfe: PyFixest did not record the number of clusters"
             )
         return int(min(groups))
+
+
+
+def _absorbed_columns(formula: str) -> list[str]:
+    """Names of the variables absorbed by ``|`` in ``"y ~ x | fe1 + fe2"``."""
+
+    if "|" not in formula:
+        return []
+    tail = formula.split("|", 1)[1]
+    # Drop any trailing option block (``| fe1, absorb(...)`` shapes) and split on ``+``.
+    tail = tail.split(",", 1)[0]
+    return [token.strip() for token in tail.split("+") if token.strip()]
+
+
+def _register_hdfe_predict(
+    results: Any,
+    *,
+    design_matrix: Any,
+    formula: str,
+    y: np.ndarray,
+    params: np.ndarray,
+    param_names: list[str],
+    data: pd.DataFrame,
+    weights: Any,
+) -> None:
+    """Give ``reghdfe`` the prediction types ``areg`` has, including the absorbed effect.
+
+    ``FEOLS`` was the only linear estimator with NO prediction types registered at all, so
+    ``fit().predict(kind="xb")`` raised ``UnsupportedError``. ``WESTATA_GAPS.md`` P0-2
+    records it: every other estimator -- ``OLS``, ``IV2SLS``, ``PanelOLS``, ``Logit``,
+    ``Poisson`` -- can predict, and fitted values from a fixed-effects model are routine
+    work.
+
+    The authority is ``areg_p.ado`` -- the same estimator with one absorbed dimension,
+    and available in the base installation where ``reghdfe`` is not::
+
+        areg_p.ado:147-158 -- ``xb`` (the default) is ``xb + u``, ``d`` is ``u`` alone,
+        and ``u`` is the within-group weighted mean of ``(e(depvar) - xb)``.
+
+    So ``xb`` INCLUDES the fixed effects. Returning only ``Xb`` would produce a plausible
+    number wrong by a group constant -- and because the output still looks like a
+    prediction, a reader would have no reason to check.
+    """
+
+    if design_matrix is None:
+        return
+    design, design_names = design_matrix
+
+    # The design carries an intercept column but the fitted parameters do NOT: with
+    # absorbed fixed effects the constant is absorbed along with them, so ``design`` has
+    # one more column than ``params``. Multiplying the full design by ``params`` therefore
+    # raises a dimension error -- and "fix" it by dropping a column positionally would pick
+    # the wrong one. Select BY NAME so the correspondence is explicit and checkable.
+    available = set(design_names)
+    if not set(param_names) <= available:
+        return
+    columns = [design_names.index(name) for name in param_names]
+    design = np.asarray(design, dtype=float)[:, columns]
+
+    absorbed_names = [name for name in _absorbed_columns(formula) if name in data.columns]
+    if not absorbed_names:
+        # Nothing absorbed: ``xb`` is the plain linear predictor, which the generic
+        # dispatcher already knows how to produce. Leave it unregistered rather than
+        # claiming a ``d`` that cannot exist.
+        return
+
+    # A MULTI-WAY absorption needs the SUM of the per-dimension effects, which is only
+    # identified up to a normalisation. Stata's ``areg`` takes one dimension and
+    # ``reghdfe`` maps multi-way effects through an iterative partition; reproducing that
+    # here would be guesswork. Rather than leaving the types unregistered (which makes the
+    # failure read as "reghdfe cannot predict at all"), register a dispatch that refuses
+    # with the actual reason.
+    if len(absorbed_names) > 1:
+        def _refuse(kind: str, exog: Any = None, **_kwargs: Any) -> np.ndarray:
+            raise UnsupportedError(
+                "reghdfe: predict with MORE THAN ONE absorbed dimension is not "
+                "implemented. The default 'xb' of an absorbed model is the linear "
+                "predictor plus the absorbed effect (areg_p.ado:147-158), and for a "
+                "multi-way absorption that effect is identified only up to a "
+                "normalisation. Predict from a single-dimension fit, or add the "
+                "absorbed effects back yourself."
+            )
+
+        results._predict_types = ("xb", "d", "residuals", "dresiduals")
+        results._predict_dispatch = _refuse
+        return
+
+    group_column = np.asarray(data[absorbed_names[0]])
+
+    def _fixed_effect() -> np.ndarray:
+        """The absorbed effect per observation -- ``u`` in ``areg_p.ado``."""
+
+        linear = design @ params
+        within = y - linear
+        if weights is not None:
+            return _group_weighted_mean(within, group_column, np.asarray(weights, dtype=float))
+        return _group_mean(within, group_column)
+
+    def dispatch(kind: str, exog: Any = None, **_kwargs: Any) -> np.ndarray:
+        normalized = str(kind).strip().lower()
+        linear = design @ params
+        if normalized in ("xb", "fitted", "index"):
+            # ``areg_p.ado``: xb is the linear predictor PLUS the absorbed effect.
+            return np.asarray(linear + _fixed_effect(), dtype=float)
+        if normalized == "d":
+            return np.asarray(_fixed_effect(), dtype=float)
+        if normalized in ("residuals", "dresiduals"):
+            # ``areg_p.ado``: residuals are on the full model, so this is y - (xb + u),
+            # which equals the within-residual the estimator minimised.
+            return np.asarray(y - (linear + _fixed_effect()), dtype=float)
+        raise UnsupportedError(
+            f"reghdfe: predict type {kind!r} is not implemented; the supported types "
+            "are 'xb', 'd', 'residuals' and 'dresiduals'"
+        )
+
+    results._predict_types = ("xb", "d", "residuals", "dresiduals")
+    results._predict_dispatch = dispatch
+
+
+def _group_mean(values: np.ndarray, groups: Any) -> np.ndarray:
+    """Mean of ``values`` within each level of ``groups``, broadcast back to every row."""
+
+    codes, _ = pd.factorize(np.asarray(groups), sort=False)
+    size = int(codes.max()) + 1
+    counts = np.bincount(codes, minlength=size).astype(float)
+    sums = np.bincount(codes, weights=np.asarray(values, dtype=float), minlength=size)
+    means = np.divide(sums, counts, out=np.zeros(size), where=counts > 0)
+    return means[codes]
+
+
+def _group_weighted_mean(values: np.ndarray, groups: Any, weights: np.ndarray) -> np.ndarray:
+    """Weighted mean of ``values`` within each level of ``groups``, broadcast back."""
+
+    codes, _ = pd.factorize(np.asarray(groups), sort=False)
+    size = int(codes.max()) + 1
+    weight_sums = np.bincount(codes, weights=weights, minlength=size)
+    weighted = np.bincount(
+        codes, weights=weights * np.asarray(values, dtype=float), minlength=size
+    )
+    means = np.divide(weighted, weight_sums, out=np.zeros(size), where=weight_sums > 0)
+    return means[codes]

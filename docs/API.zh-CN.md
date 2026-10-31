@@ -79,7 +79,7 @@ _cons    |     1.005003    .07442849    13.50    0.000     .8582236     1.151781
 
 **Stata 指令:** `reghdfe y x1 x2, absorb(firm year)`
 
-高维固定效应 OLS，即 Stata 的 `reghdfe`。固定效应区块写在公式中 `|` 之后（`'y ~ x1 + x2 | firm + year'`），吸收由 PyFixest 的交替投影完成。`cov_type` 只接受 `nonrobust`、`HC0`、`HC1` 与 `cluster`：`HC2`/`HC3` 需要完整虚拟变量设计的杠杆值，而后端对吸收模型不提供该量，因此直接拒绝，不做近似。
+高维固定效应 OLS，即 Stata 的 `reghdfe`。固定效应区块写在公式中 `|` 之后（`'y ~ x1 + x2 | firm + year'`），吸收由 PyFixest 的交替投影完成。`cov_type` 只接受 `nonrobust`、`HC0`、`HC1` 与 `cluster`：`HC2`/`HC3` 需要完整虚拟变量设计的杠杆值，而后端对吸收模型不提供该量，因此直接拒绝，不做近似。 它可以预测：`xb`（默认）是线性预测值**加上**吸收的固定效应，`d` 单独给出吸收效应，`residuals`/`dresiduals` 由二者推出——依据 `areg_p.ado:147-158`（同一估计器，只吸收一个维度）。
 
 **签名**
 
@@ -125,7 +125,7 @@ x2       |    -.4812685    .08571348    -5.61    0.000    -.6505945    -.3119426
 --------------------------------------------------------------------------------
 ```
 
-**注意:** `e(rank)` 计入每一个被吸收的固定效应参数，因此大于 `len(results.params)`；`e(df_m)` 只计报告的斜率。当给出 `weight_type='pweight'` 而未显式指定 `cov_type` 时，`fit` 选择 HC1——Stata 的 `pweight` 意味着 `vce(robust)`。`predict` 没有为 `reghdfe` 注册任何类型，因此无法经由它做预测。
+**注意:** `e(rank)` 计入每一个被吸收的固定效应参数，因此大于 `len(results.params)`；`e(df_m)` 只计报告的斜率。当给出 `weight_type='pweight'` 而未显式指定 `cov_type` 时，`fit` 选择 HC1——Stata 的 `pweight` 意味着 `vce(robust)`。`predict` 没有为 `reghdfe` 注册任何类型，因此无法经由它做预测。 吸收**多于一个维度**时预测会被拒绝：多路效应只在相差一个归一化常数的意义下可识别，因此拒绝信息会说明这一点，而不是让读者以为该估计器根本不能预测。
 
 ### `PanelOLS`
 
@@ -380,7 +380,7 @@ x2       |    -.1015749    .07546353    -1.35    0.180    -.2506223    .04747256
 **签名**
 
 ```python
-ws.IV2SLS(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IV2SLS(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IV2SLS.from_formula`**
@@ -433,7 +433,7 @@ _cons    |     .9463986     .1952162     4.85    0.000     .5637819     1.329015
 **签名**
 
 ```python
-ws.IVLIML(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IVLIML(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IVLIML.from_formula`**
@@ -486,7 +486,7 @@ _cons    |     1.045101     .1948412     5.36    0.000     .6632198     1.426983
 **签名**
 
 ```python
-ws.IVGMM(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IVGMM(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IVGMM.from_formula`**

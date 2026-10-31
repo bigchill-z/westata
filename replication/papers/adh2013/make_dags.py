@@ -408,6 +408,114 @@ def figure_comparison() -> Path:
     return _save(fig, "dag_04_comparison.png")
 
 
+def figure_final_model() -> Path:
+    """Figure 6: the estimation itself -- Table 3 column 6, every variable named.
+
+    The earlier figures explain the *idea*.  This one is the specification that was
+    actually estimated, so a reader can check it line by line against ``specs.py``:
+    1 endogenous regressor, 1 instrument, 15 exogenous controls in four named groups,
+    ``[aw=timepwt48]``, ``cluster(statefip)``, N = 1,444.
+
+    Layout decision, after two failed attempts: the control groups are stacked in a
+    LEFT-HAND column and the causal spine sits in a RIGHT-HAND column.  Trying to place
+    controls *above* the spine forced their arrows to cross the whole figure and pushed
+    the wide region block into its neighbours.  A column layout keeps every arrow short
+    and every box unobstructed.
+    """
+
+    fig, ax = _figure(width=10.6, height=7.6)
+    ax.set_xlim(0, X_MAX)
+    ax.set_ylim(0, Y_MAX)
+    _title(ax, "图 6：最终模型的因果图（Table 3 第 6 列，论文首选规格）",
+           "2SLS · N = 1,444（722 CZ × 2 期）· [aw=timepwt48] · cluster(statefip) · 17 个系数")
+
+    # ---- right column: the causal spine ------------------------------------
+    iv = Node(ax, 6.55, 4.55, "其他 8 富国进口", sub="d_tradeotch_pw_lag", width=2.5, height=0.92)
+    expo = Node(ax, 6.55, 2.95, "中国进口暴露", sub="d_tradeusch_pw", width=2.5, height=0.92)
+    out = Node(ax, 8.25, 1.42, "制造业就业变化", sub="d_sh_empl_mfg", width=2.3, height=0.92)
+
+    supply = Node(ax, 7.55, 5.50, "中国的供给冲击", sub="外生：生产率↑ · 入世 · 关税↓",
+                  width=2.6, height=0.86, face=GOOD, edge=PATH, bold=False)
+
+    _arrow(ax, supply, iv, color=PATH, lw=2.2)
+    _arrow(ax, iv, expo, color=PATH, lw=3.0)
+    _arrow(ax, expo, out, color=PATH, lw=3.2)
+
+    ax.text(5.05, 3.78, "第一阶段", ha="center", fontsize=9.4, color=PATH, fontweight="bold",
+            zorder=7, bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.97))
+    ax.text(5.05, 3.46, "0.631  (0.091)", ha="center", fontsize=8.8, color=PATH, zorder=7,
+            bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor="none", alpha=0.96))
+    # The label goes into the empty band between the instrument arrow and the outcome box.
+    # Every earlier attempt placed it over a box border or over a variable name; this band
+    # (y 2.55-2.95, x 7.6-9.6) is bounded by the exposure box above and the outcome box
+    # below, and nothing else is drawn there.
+    ax.text(8.05, 3.16, "结构方程", ha="center", fontsize=9.0, color=PATH, fontweight="bold",
+            zorder=7, bbox=dict(boxstyle="round,pad=0.16", facecolor="white",
+                                edgecolor="none", alpha=0.98))
+    ax.text(8.05, 2.86, "−0.596***  (0.099)", ha="center", fontsize=8.8, color=PATH, zorder=7,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.98))
+
+    # ---- left column: the 15 controls, in the four groups the paper names ---
+    ax.text(2.05, 5.92, "外生控制变量（15 个，分 4 组）", ha="center", fontsize=9.6,
+            color=INK, fontweight="bold")
+
+    g_period = Node(ax, 2.05, 5.42, "① 时期虚拟变量", sub="t2",
+                    width=3.3, height=0.78, face=GOOD, edge=PATH, bold=False)
+    g_share = Node(ax, 2.05, 4.52, "② 基期制造业就业份额", sub="l_shind_manuf_cbp",
+                   width=3.3, height=0.78, face=GOOD, edge=PATH, bold=False)
+    g_region = Node(ax, 2.05, 3.42, "③ 区域趋势：8 个 Census division 虚拟变量",
+                    sub="reg_midatl / encen / wncen / satl\nescen / wscen / mount / pacif",
+                    width=3.9, height=0.98, face=GOOD, edge=PATH, bold=False)
+    g_demo = Node(ax, 2.05, 2.28, "④ 人口结构", sub="l_sh_popedu_c　l_sh_popfborn　l_sh_empl_f",
+                  width=3.9, height=0.78, face=GOOD, edge=PATH, bold=False)
+    g_task = Node(ax, 2.05, 1.38, "⑤ 任务构成", sub="l_sh_routine33　l_task_outsource",
+                  width=3.9, height=0.78, face=GOOD, edge=PATH, bold=False)
+
+    # Each group reaches BOTH 暴露 and 就业: a control that only entered one side would
+    # not be a control in this design.  Arrows are drawn horizontally into a common
+    # vertical bus so they do not fan across the figure.
+    bus_x = 4.30
+    ax.plot([bus_x, bus_x], [1.38, 5.42], color=PATH, lw=1.4, linestyle=(0, (4, 3)), zorder=1)
+    for box, y in ((g_period, 5.42), (g_share, 4.52), (g_region, 3.42),
+                   (g_demo, 2.28), (g_task, 1.38)):
+        ax.plot([2.05 + (box.w / 2 if hasattr(box, "w") else 1.95), bus_x], [y, y],
+                color=PATH, lw=1.4, linestyle=(0, (4, 3)), zorder=1)
+    # Two labelled exits: the bus feeds exposure and outcome separately, so a reader can
+    # see that every control enters BOTH equations -- which is what "a control" means here.
+    _arrow_bus(ax, (bus_x, 3.42), expo, color=PATH)
+    _arrow_bus(ax, (bus_x, 1.62), out, color=PATH)
+    ax.text(bus_x + 0.10, 2.02, "同一组控制同时\u8fdb入两个方程", ha="left", fontsize=7.8,
+            color=PATH, zorder=7, bbox=dict(boxstyle="round,pad=0.16", facecolor="white",
+                                            edgecolor="none", alpha=0.95))
+
+    ax.text(bus_x + 0.08, 4.62, "吸收", ha="left", fontsize=8.2, color=PATH, zorder=7,
+            bbox=dict(boxstyle="round,pad=0.14", facecolor="white", edgecolor="none", alpha=0.95))
+
+    # ---- notes -------------------------------------------------------------
+    ax.text(0.45, 0.62, "未画入：" + "本地需求等不可观测因素 —— 由工具变量排除（见图 3）",
+            ha="left", fontsize=8.4, color=BIAS,
+            bbox=dict(boxstyle="round,pad=0.22", facecolor="#fff5f5",
+                      edgecolor=BIAS, linewidth=0.9))
+
+    _note(ax, 0.30,
+          "17 个系数 = 1 内生变量 + 1 工具变量（第一阶段）+ 15 外生控制　|　"
+          "R² = 0.343　N = 1,444　48 个州聚类",
+          edge=INK, size=8.6)
+    return _save(fig, "dag_06_final_model.png")
+
+
+def _arrow_bus(ax, start: tuple[float, float], dst: "Node", *, color=PATH) -> None:
+    """Arrow from a point on the control bus into a node's left edge."""
+
+    end = (dst.x - dst.w / 2 - 0.08, dst.y)
+    ax.plot([start[0], end[0]], [start[1], end[1]],
+            color=color, lw=1.4, linestyle=(0, (4, 3)), zorder=1)
+    ax.add_patch(
+        FancyArrowPatch(end, (end[0] + 0.01, end[1]), arrowstyle="-|>",
+                        mutation_scale=13, linewidth=1.4, color=color, zorder=2)
+    )
+
+
 def _save(fig, name: str) -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / name
@@ -422,6 +530,7 @@ FIGURES = (
     ("dag_02_iv", figure_iv),
     ("dag_05_full", figure_full),
     ("dag_04_comparison", figure_comparison),
+    ("dag_06_final_model", figure_final_model),
 )
 
 

@@ -225,21 +225,36 @@ def test_xtreg_component_types_are_not_offered_for_random_effects(frame) -> None
             result.predict(kind=kind)
 
 
-def test_reghdfe_predict_refusal_explains_the_ambiguity(frame) -> None:
-    """Absorbed effects: including them or not changes the answer, and Stata has
-    no single default to copy here (``reghdfe`` is a user command, absent from
-    ``ado/base``).
+def test_reghdfe_predict_uses_the_areg_semantics(frame) -> None:
+    """``reghdfe`` now predicts, and its ``xb`` includes the absorbed effect.
 
-    Round 81 gave the FEOLS result a design matrix (for ``estat summarize``/``vif``),
-    so the refusal no longer comes from a missing design -- it now comes from the
-    registry, which is the more accurate signal: the model has data, it simply
-    offers no predict types.  ``UnsupportedError`` says exactly that.
+    This test used to assert the OPPOSITE -- that the call raised -- on the grounds that
+    ``reghdfe`` is a user-written command absent from ``ado/base``, so Stata offered "no
+    single default to copy".
+
+    That reasoning was wrong in a way worth recording: ``areg`` IS in the base
+    installation and is the same estimator with one absorbed dimension, and
+    ``areg_p.ado:147-158`` states the convention outright --
+
+        xb (default) = xb + u, where u is the absorbed effect
+        d            = u
+
+    So the ambiguity was already resolved by the authority; "the command is user-written"
+    was a reason to look harder, not a reason to stop. Leaving it open made FEOLS the only
+    linear estimator that could not predict at all.
     """
 
     result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit()
 
-    with pytest.raises((ws.UnsupportedError, ws.ConsistencyError), match="reghdfe"):
-        result.predict(kind="xb")
+    predicted = np.asarray(result.predict(kind="xb"), dtype=float)
+
+    # xb includes the fixed effect, so it equals the published fitted values.
+    np.testing.assert_allclose(
+        predicted, np.asarray(result.fittedvalues, dtype=float), rtol=1e-12, atol=0.0
+    )
+    # And the absorbed effect is separately available.
+    effect = np.asarray(result.predict(kind="d"), dtype=float)
+    assert np.unique(np.round(effect, 10)).size == frame["firm"].nunique()
 
 
 def test_the_xtreg_refusal_names_the_estimator(frame) -> None:

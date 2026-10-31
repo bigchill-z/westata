@@ -79,7 +79,7 @@ _cons    |     1.005003    .07442849    13.50    0.000     .8582236     1.151781
 
 **Stata:** `reghdfe y x1 x2, absorb(firm year)`
 
-Fixed-effects OLS with high-dimensional fixed effects -- Stata's `reghdfe`. The fixed-effect block is written after a `|` in the formula (`'y ~ x1 + x2 | firm + year'`), and absorption is PyFixest's alternating projections. `cov_type` accepts `nonrobust`, `HC0`, `HC1` and `cluster` only: `HC2`/`HC3` need the leverage of the full dummy design, which the backend does not expose for absorbed models, so they are refused rather than approximated.
+Fixed-effects OLS with high-dimensional fixed effects -- Stata's `reghdfe`. The fixed-effect block is written after a `|` in the formula (`'y ~ x1 + x2 | firm + year'`), and absorption is PyFixest's alternating projections. `cov_type` accepts `nonrobust`, `HC0`, `HC1` and `cluster` only: `HC2`/`HC3` need the leverage of the full dummy design, which the backend does not expose for absorbed models, so they are refused rather than approximated. It predicts: `xb` (the default) is the linear predictor PLUS the absorbed effect, `d` is the absorbed effect alone, and `residuals`/`dresiduals` follow from those, per `areg_p.ado:147-158` (the same estimator with one absorbed dimension).
 
 **Signature**
 
@@ -125,7 +125,7 @@ x2       |    -.4812685    .08571348    -5.61    0.000    -.6505945    -.3119426
 --------------------------------------------------------------------------------
 ```
 
-**Notes:** `e(rank)` counts every absorbed fixed-effect parameter, so it is larger than `len(results.params)`, while `e(df_m)` counts only reported slopes. With `weight_type='pweight'` and no explicit `cov_type`, `fit` selects HC1 -- Stata's `pweight` implies `vce(robust)`. `predict` registers no types for `reghdfe`, so predictions are not available through it.
+**Notes:** `e(rank)` counts every absorbed fixed-effect parameter, so it is larger than `len(results.params)`, while `e(df_m)` counts only reported slopes. With `weight_type='pweight'` and no explicit `cov_type`, `fit` selects HC1 -- Stata's `pweight` implies `vce(robust)`. `predict` registers no types for `reghdfe`, so predictions are not available through it. Predicting is refused when MORE THAN ONE dimension is absorbed: the multi-way effect is identified only up to a normalisation, so the refusal names that reason rather than pretending the estimator cannot predict at all.
 
 ### `PanelOLS`
 
@@ -380,7 +380,7 @@ Two-stage least squares -- Stata's `ivregress 2sls`. The formula uses linearmode
 **Signature**
 
 ```python
-ws.IV2SLS(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IV2SLS(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IV2SLS.from_formula`**
@@ -433,7 +433,7 @@ Limited-information maximum likelihood -- Stata's `ivregress liml`. Solves the k
 **Signature**
 
 ```python
-ws.IVLIML(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IVLIML(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IVLIML.from_formula`**
@@ -486,7 +486,7 @@ Generalized method of moments -- Stata's `ivregress gmm`. `ivregress gmm` ties *
 **Signature**
 
 ```python
-ws.IVGMM(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, **kwargs: 'Any') -> 'None'
+ws.IVGMM(endog: 'Any', exog: 'Any', endog_instr: 'Any', instruments: 'Any', *, param_names: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
 **`IVGMM.from_formula`**

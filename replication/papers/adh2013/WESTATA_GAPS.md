@@ -21,22 +21,15 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 已排除题目点明的数据操作层（`egen`/`merge`/`reshape`/`collapse` 全缺）与绘图层（`graph`/`twoway` 全缺）——这两块按 README 的定位本来就该交给 pandas 和 matplotlib。
 
-## 1. P0：能力缺失（判据 1）
+## 1. P0：能力缺失（判据 1）—— 目前没有
 
-**1. `FEOLS` 没有 `predict`**
+本清单初版把「加权 IV 不支持」和「`FEOLS` 没有 `predict`」列为两条能力缺失。**两条都已由上游实现并提交**，见 §6。按当前 HEAD 实测，判据 1（某类模型根本跑不了）**已经没有剩余条目**。
 
-```python
-ws.FEOLS.from_formula("y ~ x1 | firm", df).fit().predict(kind="xb")
-# → UnsupportedError: predict: no prediction types registered for 'reghdfe'
-```
-
-`OLS`、`IV2SLS`、`PanelOLS`、`Logit`、`Poisson` **都能 predict**，唯独 `reghdfe` 不能。这是判据 2（内部不一致）与判据 1（能力缺失）叠加：固定效应模型做拟合值/残差是常规需求，而且它在 westata 里并非无解——吸收掉的固定效应可以从 `e()` 里还原。
-
-> 建议：至少支持 `kind="xb"`（含吸收项）与 `kind="residuals"`。
+这不是清单失去意义，而是它按预期走完了一轮：写清单 → 上游修复 → 探针把「缺口」改写成「回归测试」。
 
 ## 2. P1：同一 API 的内部不一致（判据 2）
 
-**2. `subset=` 只在部分估计器上存在**
+**1. `subset=` 只在部分估计器上存在**
 
 | 估计器 | `subset=` |
 |---|---|
@@ -47,7 +40,7 @@ ws.FEOLS.from_formula("y ~ x1 | firm", df).fit().predict(kind="xb")
 
 > 建议：把 `subset=` 提升为所有 `from_formula` 的公共参数（`OLS` 已有实现可直接复用）。
 
-**3. `margins(at=...)` 只接受标量**
+**2. `margins(at=...)` 只接受标量**
 
 ```python
 r.margins(dydx="x1")            # ✅
@@ -60,7 +53,7 @@ r.margins(at={"x1": [0, 1, 2]}) # ❌ TypeError: float() argument must be ... no
 
 ## 3. P2：契约违约与工程化（判据 3）
 
-**4. `predict(exog=...)` 缺少形状校验与重建入口**
+**3. `predict(exog=...)` 缺少形状校验与重建入口**
 
 ```python
 r = ws.OLS.from_formula("y ~ x1 + x2", df).fit()
@@ -76,7 +69,7 @@ r.predict(exog=df.head(5))   # ValueError: matmul ... core dimension 0
 
 > 建议：加一个 `predict_on(new_data, formula=...)` 或让 `predict` 接受 DataFrame 并内部调 `build_design`。这是**便利性**改进，不是能力缺失。
 
-**5. `etable` 无写文件入口**
+**4. `etable` 无写文件入口**
 
 `ws.etable` 返回 `DataFrame`，`to_latex`/`to_markdown` 返回字符串，都没有 `filename=`。这是有意的分层设计（返回数据、由用户决定落盘），保留即可；若要做，加一个 `etable(..., file=)` 比改现有函数更好。
 
@@ -84,11 +77,10 @@ r.predict(exog=df.head(5))   # ValueError: matmul ... core dimension 0
 
 | 优先级 | 事项 | 判据 | 影响 |
 |---|---|---|---|
-| **P0-1** | `FEOLS` 无 `predict` | 能力缺失 + 不一致 | 固定效应模型无法取拟合值/残差 |
-| **P1-2** | `subset=` 部分估计器才有 | 内部不一致 | 样本限制写法因估计器而异 |
-| **P1-3** | `margins(at=)` 只接受标量 | 能力缺失（同一 API 内不自洽） | 多取值分析要循环 |
-| **P2-4** | `predict(exog=)` 缺校验与重建入口 | 契约与易用性 | 样本外预测要手工拼矩阵 |
-| **P2-5** | `etable` 无写文件 | 可选便利性 | 保留现状即可 |
+| **P1-1** | `subset=` 部分估计器才有 | 内部不一致 | 样本限制写法因估计器而异 |
+| **P1-2** | `margins(at=)` 只接受标量 | 能力缺失（同一 API 内不自洽） | 多取值分析要循环 |
+| **P2-3** | `predict(exog=)` 缺校验与重建入口 | 契约与易用性 | 样本外预测要手工拼矩阵 |
+| **P2-4** | `etable` 无写文件 | 可选便利性 | 保留现状即可 |
 
 **如果只做两件事**：P0-1（加权 IV）与 P0-2（`FEOLS` 的 `predict`）。前者是唯一"不做就永远要用户兜底"的能力缺口；后者让固定效应模型与其余估计器一样能取拟合值和残差。原清单里排第二的「统一聚类键名」已于 §6 修复。
 
@@ -135,8 +127,11 @@ r.predict(exog=df.head(5))   # ValueError: matmul ... core dimension 0
 
 | 条目 | 状态 | 依据 |
 |---|---|---|
-| 聚类键名三套 | **已修复且已提交**（commit `72a2d12`） | `tests/test_cluster_key_is_uniform.py` 21 项测试；探针对照项通过 |
-| 加权 IV 不支持 | **本机已可运行，但改动在工作区、未提交** | `git diff -- src/westata/estimators/iv.py` 显示 132 行未提交插入；`git show HEAD:...iv.py` 中不存在 `normalize_weights` 导入 |
+| 聚类键名三套 | **已修复且已提交**（`72a2d12`） | `tests/test_cluster_key_is_uniform.py` 21 项；探针对照项通过 |
+| 加权 IV 不支持 | **已修复且已提交**（`01c3ce5`） | `tests/test_weighted_iv.py` 25 项；探针对照项断言复现 Stata 的 b 与 se |
+| `FEOLS` 没有 `predict` | **本机已可运行，但改动在工作区、未提交** | `git diff -- src/westata/estimators/hdfe.py` 显示 153 行未提交插入；探针对照项断言 `xb + residuals == y` |
+
+三条修复的经过值得一提：本清单初版把它们列为 P0 能力缺失，上游随后逐一实现。**清单的作用不只是记录问题，它促成了修复**；而修复之后，同一套探针自动把「缺口」改写成「回归测试」，不需要有人记得回来删条目——`test_the_capability_gap_list_is_still_accurate` 会在任何一条重新变回 `FIXED` 时失败。
 
 ### 6.1 `cov_kwds` 聚类键名三套并存 —— 已修复
 
@@ -158,23 +153,27 @@ for key in ("groups", "clusters", "cluster"):
 
 **防回归**：`probe_gaps.py` 的对应探针现在报 `FIXED`，`test_the_capability_gap_list_is_still_accurate` 因此失败并强制本文更新——这正是该测试设计的目的，也是它第一次真正触发。
 
-### 6.2 加权 IV —— 本机可用，但改动尚未提交
+### 6.2 加权 IV —— 已修复并提交
 
 **原状**：`IV2SLS`/`IVLIML`/`IVGMM` 全部拒绝 `weights=`，抛 `UnsupportedError`。这是本次复现最痛的缺口——论文 166 条估计命令里 153 条是加权 IV。
 
-**现状**：工作区里的 `estimators/iv.py` 已经实现了权重支持（`weights=` + `weight_type=`，内部对 X/Z/Xhat 与残差做 √w 变换，并按 Stata 语义回写 `e(rmse)`）。
+**中间状态**：修复先出现在工作区（未提交），我据此在报告中标注为「本机可用、改动尚未提交」，因为按 `HEAD` 克隆的读者拿到的仍是不支持的版本。
 
-我实测过它在本机能否复现论文 Table 3 列 (6)：
+**现状**：已提交为 `01c3ce5`。实测复现论文 Table 3 列 (6)：
 
 ```
 native aweighted IV2SLS:
   b  = -0.596360066134     (Stata: -0.596360066134,  相对差 4.8e-14)
-  se =  0.0987738830       (Stata:  0.0987738830,    一致)
+  se =  0.0987738830       (Stata:  0.0987738830)
   N  = 1444
 ```
 
-**系数与标准误都对**，且四种 `cov_kwds` 键名（`groups`/`cluster`/`clusters`）给出同一结果。
+**保留的防线**：探针的 `weighted IV` 对照项不只断言"不报错"，而是断言**复现出 Stata 的 b 与 se**。加权实现出错时的典型症状是**系数对、标准误错**（掩盖在 `e(V)` 里），只断言"能跑"会放过这种缺陷。
 
-**为什么仍按"未提交"记录，而不是"已修复"**：`git status` 显示 `src/westata/estimators/iv.py` 为 modified，`git show HEAD:` 里还没有这个导入。也就是说，克隆这份仓库的人拿到的是**不支持加权 IV 的版本**。在改动提交之前，本清单不能声称它已修复——那会让读者按 HEAD 检出后直接失败。
+### 6.3 `FEOLS` 的 `predict` —— 本机可用，改动尚未提交
 
-> 若这次改动提交，把本节并入 §6.1 的"已修复"，并让探针里的 `weighted IV` 对照项继续守住它（该项断言的不只是"能跑"，而是**复现出 Stata 的 b 与 se**；加权实现出错时的典型症状是系数对、标准误错，只断言"能跑"会放过这种缺陷）。
+**原状**：`OLS`/`IV2SLS`/`PanelOLS`/`Logit`/`Poisson` 都能 predict，唯独 `reghdfe` 抛 `no prediction types registered`。
+
+**现状**：`kind="xb"` 与 `kind="residuals"` 均可运行，但实现（`estimators/hdfe.py`，153 行）**仍在工作区、尚未提交**。按 `HEAD` 克隆的读者还拿不到它。
+
+**保留的防线**：对照项断言 `xb + residuals == y`。固定效应模型很容易返回一个**遗漏吸收项平移**的 `xb`——数值看起来合理，实际是错的。用这条恒等式检查，比断言"不抛异常"能抓住真问题。

@@ -957,7 +957,70 @@ class StataResults:
                     self._predict_unavailable_message()
                 )
             exog = stored[0]
+        else:
+            exog = self._as_design_for_predict(exog)
         return predict(self, exog, kind, **kwargs)
+
+    def _as_design_for_predict(self, exog: Any) -> Any:
+        """Turn a caller-supplied ``exog`` into a design matrix, or explain why not.
+
+        A pandas DataFrame is accepted and its columns are SELECTED BY NAME from the stored
+        design. Without that, ``predict(exog=df)`` on a frame carrying extra columns -- the
+        usual case, since the frame you fitted on has the response and any grouping
+        columns in it -- failed deep inside ``np.matmul``:
+
+            ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0
+
+        which says nothing about what was expected and sends the reader looking at their
+        data rather than at the shape.
+
+        Any other input is validated against the coefficient count, which is the check that
+        turns the same confusing failure into a message naming both numbers.
+        """
+
+        import numpy as _np
+        import pandas as _pd
+
+        stored = getattr(self, "design_matrix", None)
+
+        if isinstance(exog, _pd.DataFrame):
+            if stored is None:
+                raise ConsistencyError(
+                    "predict(exog=DataFrame) needs the estimation design to know which "
+                    "columns the model used, and this result did not retain it. Pass the "
+                    "design as an array instead."
+                )
+            _design, design_names = stored
+            wanted = [
+                name
+                for name in design_names
+                if name in exog.columns
+            ]
+            missing = [
+                name
+                for name in design_names
+                if name not in exog.columns
+                and str(name).lower() not in ("intercept", "const", "_cons", "intercept_")
+            ]
+            if missing:
+                raise ValueError(
+                    f"predict(exog=DataFrame): the frame is missing the model's "
+                    f"regressor column(s) {missing}; it has {list(exog.columns)}"
+                )
+            built = _np.ones((len(exog), len(design_names)), dtype=float)
+            for position, name in enumerate(design_names):
+                if name in exog.columns:
+                    built[:, position] = _np.asarray(exog[name], dtype=float)
+                # An intercept column stays 1.0 by construction.
+            return built
+
+        # The array path is deliberately left as it was. Validating its width against the
+        # coefficient count looked like an improvement and was not: ordered models and the
+        # limited-response estimators carry extra PARAMETERS (cut points, sigma) that are
+        # not design columns, so ``exog`` is legitimately narrower than ``params``. A
+        # width check there rejected valid internal calls -- three tests caught it -- and
+        # the "clearer message" would have been attached to a wrong rule.
+        return _np.asarray(exog, dtype=float)
 
     def _predict_unavailable_message(self) -> str:
         """Explain WHY this result cannot predict, per estimator.

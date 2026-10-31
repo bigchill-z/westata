@@ -18,6 +18,7 @@ Design choices that differ from ``esttab`` on purpose:
 
 from __future__ import annotations
 
+import pathlib
 from typing import Any, Sequence
 
 import numpy as np
@@ -61,6 +62,9 @@ def etable(
     keep: Sequence[str] | None = None,
     drop: Sequence[str] | None = None,
     show_param_names: bool = True,
+    file: Any = None,
+    caption: str = "",
+    label: str = "",
 ) -> pd.DataFrame:
     """Build a coefficient table from one or more fitted models.
 
@@ -161,6 +165,37 @@ def etable(
 
     table = pd.DataFrame(blocks, index=pd.Index(index), columns=pd.Index(names))
     table.index.name = None
+
+    if file is not None:
+        # ``etable`` still RETURNS the DataFrame; writing is an additional side effect, so
+        # a caller who passes ``file=`` can also keep inspecting the object. The format
+        # follows the extension, because the alternative -- a ``format=`` argument that has
+        # to agree with the filename -- is one more thing to get wrong:
+        #   .csv / .tsv   the table itself, index included
+        #   .tex          a LaTeX table via ``to_latex``
+        #   .md           a Markdown table via ``to_markdown``
+        #   .html         a DataFrame HTML table
+        # Stata users reach for this because esttab/outreg2 write a file directly; having to
+        # call a second function and remember its spelling was the gap WESTATA_GAPS.md
+        # recorded.
+        target = pathlib.Path(str(file))
+        suffix = target.suffix.lower()
+        if suffix in (".csv", ".tsv"):
+            table.to_csv(target, sep="," if suffix == ".csv" else "\t")
+        elif suffix == ".tex":
+            target.write_text(
+                to_latex(table, caption=caption or "", label=label or ""),
+                encoding="utf-8",
+            )
+        elif suffix in (".md", ".markdown"):
+            target.write_text(to_markdown(table, caption=caption or ""), encoding="utf-8")
+        elif suffix in (".html", ".htm"):
+            table.to_html(target)
+        else:
+            raise ValueError(
+                f"etable(file=...): cannot tell the format from {target.name!r}; use a "
+                ".csv, .tsv, .tex, .md or .html extension"
+            )
     return table
 
 

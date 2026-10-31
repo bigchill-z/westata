@@ -24,6 +24,8 @@ comparison adjustments.
 
 from __future__ import annotations
 
+import itertools
+
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -531,6 +533,40 @@ def margins(
     names = list(param_names)
     factor_set = set(factor_vars or ())
 
+    # ``at()`` with a SEQUENCE of values produces one result per value (and one per
+    # combination when several covariates carry sequences -- ``margins.sthlp:1000-1005``).
+    # Handling that by recursing keeps every downstream form correct: the derivative, the
+    # elasticity scaling and the standard error are all computed on the ADJUSTED design, so
+    # they cannot be reused across scenarios.
+    scenarios = _at_scenarios(at) if at else [{}]
+    if len(scenarios) > 1:
+        collected: list[MarginsResult] = []
+        for scenario in scenarios:
+            produced = margins(
+                result,
+                dydx=dydx,
+                eyex=eyex,
+                dyex=dyex,
+                eydx=eydx,
+                at=scenario,
+                over=over,
+                exog=exog,
+                param_names=param_names,
+                level=level,
+                predict_kind=predict_kind,
+                factor_vars=factor_vars,
+                outcome=outcome,
+            )
+            rows_for_scenario = produced if isinstance(produced, list) else [produced]
+            label = ", ".join(f"{name}={value}" for name, value in scenario.items())
+            for row in rows_for_scenario:
+                # Stata labels each block with the at() setting; carrying the label is what
+                # makes a multi-scenario table readable rather than a list of identical
+                # rows a reader cannot tell apart.
+                row.label = f"{row.label} ({label})" if row.label else label
+                collected.append(row)
+        return collected
+
     # ``at()`` replaces covariate values, so it must be applied BEFORE any form is
     # computed -- including the ``dyex`` factor, which is mean(x) over the ADJUSTED
     # design.  Applying it later made ``margins(dyex="x1", at={"x1": 2})`` return
@@ -663,6 +699,53 @@ def margins(
     return rows[0] if len(rows) == 1 else rows
 
 
+def _at_scenarios(at: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Expand ``at=`` into the scenarios Stata evaluates.
+
+    ``margins.sthlp:995-1005`` states the rule outright:
+
+        at(x1=5)                     one scenario
+        at(x1=(5 10))                two: x1=5, then x1=10
+        at(x1=(5 10) x2=(0 1))       FOUR: every combination, in turn
+
+    So a sequence means "evaluate at each value", and several sequences mean their
+    CARTESIAN PRODUCT -- not a zipped pass. Zipping would silently drop scenarios whenever
+    the lists differ in length, and dropping a scenario is invisible in the output: the
+    table just has fewer rows than the caller asked for.
+
+    A scalar (or a one-element sequence) stays one scenario, so existing calls are
+    unaffected.
+    """
+
+    if not at:
+        return [{}]
+
+    columns: list[str] = []
+    value_lists: list[list[Any]] = []
+    for name, value in at.items():
+        columns.append(name)
+        value_lists.append(list(value) if _is_sequence(value) else [value])
+
+    scenarios: list[dict[str, Any]] = []
+    for combination in itertools.product(*value_lists):
+        scenarios.append(dict(zip(columns, combination)))
+    return scenarios
+
+
+def _is_sequence(value: Any) -> bool:
+    """True for a list/tuple/array/Series, False for a string or a number.
+
+    ``str`` is deliberately excluded: ``at={"g": "treated"}`` is a scalar label, and
+    iterating it into characters would produce one scenario per letter.
+    """
+
+    if isinstance(value, (str, bytes)):
+        return False
+    if isinstance(value, np.ndarray):
+        return value.ndim > 0
+    return isinstance(value, (list, tuple, pd.Series))
+
+
 def _apply_at(
     exog: np.ndarray, names: Sequence[str], at: Mapping[str, Any]
 ) -> np.ndarray:
@@ -671,6 +754,11 @@ def _apply_at(
         if name not in names:
             raise KeyError(f"at(): column {name!r} not in {list(names)}")
         position = list(names).index(name)
+        if _is_sequence(value):
+            raise TypeError(
+                f"at(): {name!r} received a sequence inside a single scenario; "
+                "sequences are expanded by margins() before this point"
+            )
         adjusted[:, position] = float(value)
     return adjusted
 

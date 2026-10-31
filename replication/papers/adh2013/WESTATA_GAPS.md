@@ -46,17 +46,17 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 ### 小结
 
-**7 条全部已修复。** 其中 4 条在清单存续早期由上游提交，`margins(at=)`/`predict(exog=)`/`etable(file=)` 3 条为最后一轮补齐（清单归零）。
+**7 条全部已修复。** 前 4 条在清单存续早期由上游提交，后 3 条为最后一轮补齐（清单归零）。
 
-| 原优先级 | 事项 | 状态 |
-|---|---|---|
-| P0-1 | 加权 IV 不支持 | ✅ 已修复（§6.2）|
-| P0-2 | `FEOLS` 无 `predict` | ✅ 已修复（§6.3）|
-| P1-3 | `cov_kwds` 聚类键名三套 | ✅ 已修复（§6.1）|
-| P1-4 | `subset=` 部分估计器才有 | ✅ 已修复（§6.4）|
-| P1-5 | `margins(at=)` 只接受标量 | ✅ 已修复（§6.5）|
-| P2-6 | `predict(exog=)` 缺校验与重建入口 | ✅ 已修复（§6.6）|
-| P2-7 | `etable` 无写文件 | ✅ 已修复（§6.7）|
+| 原优先级 | 事项 | 状态 | 提交 |
+|---|---|---|---|
+| P0-1 | 加权 IV 不支持 | ✅ 已修复（§6.2）| `01c3ce5` |
+| P0-2 | `FEOLS` 无 `predict` | ✅ 已修复（§6.3）| `fa5787e` |
+| P1-3 | `cov_kwds` 聚类键名三套 | ✅ 已修复（§6.1）| `72a2d12` |
+| P1-4 | `subset=` 部分估计器才有 | ✅ 已修复（§6.4）| `7d11f1e` |
+| P1-5 | `margins(at=)` 只接受标量 | ✅ 已修复（§6.5）| `f84a404` |
+| P2-6 | `predict(exog=)` 缺校验与重建入口 | ✅ 已修复（§6.6）| `f84a404` |
+| P2-7 | `etable` 无写文件 | ✅ 已修复（§6.7）| `f84a404` |
 
 **这份清单现在的用途是回归测试套件**：`probe_gaps.py` 的 9 条对照探针必须全部保持 `FIXED`，任何一条退化都会让 `replication/tests` 失败。所以「曾经修好」是被持续验证的，不是一次性声明。
 
@@ -109,7 +109,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 三条修复的经过值得一提：本清单初版把它们列为 P0 能力缺失，上游随后逐一实现。**清单的作用不只是记录问题，它促成了修复**；而修复之后，同一套探针自动把「缺口」改写成「回归测试」，不需要有人记得回来删条目——`test_the_capability_gap_list_is_still_accurate` 会在任何一条重新变回 `FIXED` 时失败。
 
-### 6.1 `cov_kwds` 聚类键名三套并存 —— 已修复
+### 6.1 `cov_kwds` 聚类键名三套并存 —— 已修复并提交（`72a2d12`）
 
 **原状**（本清单初版 §2 第 3 条）：同样是 `fit(cov_type="cluster", cov_kwds=...)`，四个估计器接受的键名不同（`OLS` 只认 `groups`，`IV2SLS`/`PanelOLS` 认 `groups`+`clusters`，`FEOLS` 认 `groups`+`cluster`）。在 `OLS` 上传 `clusters` 得到的报错是 `cov_kwds['groups'] must be one-dimensional; got 0 dimensions`——读起来像数据有问题，实际是键名用错了。
 
@@ -129,7 +129,7 @@ for key in ("groups", "clusters", "cluster"):
 
 **防回归**：`probe_gaps.py` 的对应探针现在报 `FIXED`，`test_the_capability_gap_list_is_still_accurate` 因此失败并强制本文更新——这正是该测试设计的目的，也是它第一次真正触发。
 
-### 6.2 加权 IV —— 已修复并提交
+### 6.2 加权 IV —— 已修复并提交（`01c3ce5`）
 
 **原状**：`IV2SLS`/`IVLIML`/`IVGMM` 全部拒绝 `weights=`，抛 `UnsupportedError`。这是本次复现最痛的缺口——论文 166 条估计命令里 153 条是加权 IV。
 
@@ -146,7 +146,7 @@ native aweighted IV2SLS:
 
 **保留的防线**：探针的 `weighted IV` 对照项不只断言"不报错"，而是断言**复现出 Stata 的 b 与 se**。加权实现出错时的典型症状是**系数对、标准误错**（掩盖在 `e(V)` 里），只断言"能跑"会放过这种缺陷。
 
-### 6.3 `FEOLS` 的 `predict` —— 已修复并提交
+### 6.3 `FEOLS` 的 `predict` —— 已修复并提交（`fa5787e`）
 
 **原状**：`OLS`/`IV2SLS`/`PanelOLS`/`Logit`/`Poisson` 都能 predict，唯独 `reghdfe` 抛 `no prediction types registered`。
 
@@ -154,7 +154,7 @@ native aweighted IV2SLS:
 
 **保留的防线**：对照项断言 `xb + residuals == y`。固定效应模型很容易返回一个**遗漏吸收项平移**的 `xb`——数值看起来合理，实际是错的。用这条恒等式检查，比断言"不抛异常"能抓住真问题。
 
-### 6.4 `subset=` 覆盖不全 —— 已修复
+### 6.4 `subset=` 覆盖不全 —— 已修复并提交（`7d11f1e`）
 
 **原状**：`OLS`/`Logit`/`Poisson` 接受 `subset=`，而 `IV2SLS`/`IVLIML`/`IVGMM`/`FEOLS`/`PanelOLS` 不接受。"限制估计样本"是跨模型通用操作，却要按估计器换写法。
 
@@ -177,7 +177,7 @@ except TypeError as error:
 
 **保留的防线**：测试不只断言"能调用"，还断言 `subset=` 的结果与手工 `df[mask].reset_index(drop=True)` 后估计**逐位相同**（系数 `rtol=1e-10`、标准误 `rtol=1e-8`）。一个"接受参数但忽略它"的实现能通过前者、通不过后者——而那种实现的输出看起来完全正常，只是用了全样本。
 
-### 6.5 `margins(at=)` 只接受标量 —— 已修复
+### 6.5 `margins(at=)` 只接受标量 —— 已修复并提交（`f84a404`）
 
 **原状**：`margins(at={"x1": [0, 1, 2]})` 抛 `TypeError: float() argument must be a string or a real number, not 'list'`。多取值分析只能循环调用。
 
@@ -195,7 +195,7 @@ except TypeError as error:
 
 **验证**：非线性模型（logit）下三个取值必须给出**不同**的边际效应——线性模型下相同是正常的（边际效应是常数），所以测试用 logit 才能区分「真的按值计算」和「忽略了 at」。
 
-### 6.6 `predict(exog=)` 的形状问题 —— 已修复
+### 6.6 `predict(exog=)` 的形状问题 —— 已修复并提交（`f84a404`）
 
 **原状**：`r.predict(exog=df.head(5))` 在 `np.matmul` 里抛
 
@@ -211,7 +211,7 @@ ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0
 
 > **教训**：加校验时，"报错更清楚"是好事，但**先要确认校验的规则本身是对的**。
 
-### 6.7 `etable` 写文件 —— 已修复（且推翻了初稿结论）
+### 6.7 `etable` 写文件 —— 已修复并提交（`f84a404`，且推翻了初稿结论）
 
 **原状**：`etable` 返回 `DataFrame`，`to_latex`/`to_markdown` 返回字符串，都无法直接落盘。
 

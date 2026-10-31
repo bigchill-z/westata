@@ -16,7 +16,7 @@ from linearmodels.iv import IV2SLS as LMIV2SLS
 from linearmodels.iv import IVGMM as LMIVGMM
 from linearmodels.iv import IVLIML as LMIVLIML
 
-from westata.errors import ConsistencyError, UnsupportedError
+from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.estimators.iv import IV2SLS, IVGMM, IVLIML
 from westata.protocols import SSC
 
@@ -559,18 +559,72 @@ def test_nonrobust_alias_accepted():
     np.testing.assert_allclose(named.cov, default.cov, rtol=1e-15)
 
 
-def test_weights_are_out_of_scope():
+def test_weights_are_supported():
+    """Weighted IV works -- it was out of scope in P1 and is now implemented.
+
+    ``ivregress.sthlp`` allows aweight/fweight/iweight/pweight, so refusing them was a
+    capability gap rather than a design choice. The ADH replication needed it for 153 of
+    166 specifications and had to rescale by hand, including the constant.
+
+    Both entry points must accept it: ``from_formula`` and the array constructor.
+    """
+
+    df = _just_identified()
+    weight = np.linspace(0.5, 2.0, len(df))
+
+    from_formula = IV2SLS.from_formula(JUST, df, weights=weight, weight_type="aweight")
+    assert np.all(np.isfinite(np.asarray(from_formula.fit().params, dtype=float)))
+
+    array = IV2SLS(
+        df["y"].to_numpy(),
+        np.column_stack([np.ones(len(df)), df["x2"]]),
+        df["x"].to_numpy(),
+        df[["z1"]].to_numpy(),
+        weights=weight,
+        weight_type="aweight",
+    )
+    assert np.all(np.isfinite(np.asarray(array.fit().params, dtype=float)))
+
+
+def test_weights_require_a_type():
+    """Stata never guesses the weight type, so neither does this."""
+    df = _just_identified()
+    with pytest.raises(WeightError):
+        IV2SLS.from_formula(JUST, df, weights=df["x2"])
+
+
+def test_the_stata_weight_prefix_is_still_rejected():
+    """``[aweight=w]`` is a prefix, not a keyword; passing it must say so."""
     df = _just_identified()
     with pytest.raises(UnsupportedError):
-        IV2SLS.from_formula(JUST, df, weights=df["x2"])
-    with pytest.raises(UnsupportedError):
-        IV2SLS(
-            df["y"].to_numpy(),
-            np.column_stack([np.ones(len(df)), df["x2"]]),
-            df["x"].to_numpy(),
-            df[["z1"]].to_numpy(),
-            weights=df["x2"].to_numpy(),
-        )
+        IV2SLS.from_formula(JUST, df, aweights=df["x2"].to_numpy())
+
+
+def test_a_weight_changes_the_estimates():
+    """Guard against the weight being accepted and then ignored.
+
+    An implementation that validated ``weights`` and forgot to use it would pass every
+    "does it run" test while returning the unweighted answer -- so the point estimates
+    must differ once the weights are non-uniform.
+    """
+
+    rng = np.random.default_rng(11)
+    n = 200
+    z = rng.normal(size=n)
+    x = 0.8 * z + rng.normal(size=n) * 0.5
+    y = 1.0 + 0.6 * x + rng.normal(size=n)
+    weight = rng.uniform(0.2, 4.0, size=n)
+    frame = pd.DataFrame({"y": y, "x": x, "z": z})
+
+    plain = IV2SLS.from_formula("y ~ 1 + [x ~ z]", frame).fit()
+    weighted = IV2SLS.from_formula(
+        "y ~ 1 + [x ~ z]", frame, weights=weight, weight_type="aweight"
+    ).fit()
+
+    assert not np.allclose(
+        np.asarray(plain.params, dtype=float),
+        np.asarray(weighted.params, dtype=float),
+    )
 
 
 def test_weak_instrument_warns_but_fits():

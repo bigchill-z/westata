@@ -6,7 +6,7 @@
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
 - 已实现：**93 条命令条目**（见 `tests/conformance/registry.yml`），其中 **52 条 E3**、26 条 E2、**15 条 E1**
-- 测试：**3763 passing**
+- 测试：**3791 passing**
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -6943,7 +6943,7 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 | P12 | 复杂抽样（`svyset`/`svy:`） | ✅ |
 | P13 | 重抽样（`jackknife`/`bootstrap`/`permute`） | ✅ |
 
-**共 93 条命令条目、3763 个测试。** 这是 Stata 估计类命令的一个可审计子集，
+**共 93 条命令条目、3791 个测试。** 这是 Stata 估计类命令的一个可审计子集，
 不是 Stata 的替代品。§1–§7 中所有 ❌ 的边界依然成立。
 
 ## 11. 如何理解这份登记册

@@ -132,8 +132,12 @@ Known deviations from Stata
   10 emits a ``UserWarning`` rather than an error.  Stata itself stores only
   ``e(chi2)`` (or ``e(F)`` under ``small``), so ``e(F)`` is a westata
   convenience that is *derived* from ``e(chi2)`` and ``e(df_m)``.
-* Weighted IV is out of scope for P1: passing ``weights``/``weight_type``
-  raises :class:`westata.errors.UnsupportedError`.
+* Weights follow ``ivregress``: ``aweight``/``fweight``/``pweight``/``iweight`` are
+  accepted and normalized by :func:`westata.data.weights.normalize_weights`, the same
+  routine ``regress`` uses, so a weight means the same thing in both. A weighted IV is an
+  IV on the ``sqrt(w)``-transformed data throughout -- point estimates, the sandwich, and
+  the fit statistics -- because transforming only part of the pipeline yields numbers that
+  look right to three decimals and are not.
 """
 
 from __future__ import annotations
@@ -147,7 +151,8 @@ from linearmodels.iv import IV2SLS as _LMIV2SLS
 from linearmodels.iv import IVGMM as _LMIVGMM
 from linearmodels.iv import IVLIML as _LMIVLIML
 
-from westata.errors import ConsistencyError, UnsupportedError
+from westata.data.weights import normalize_weights
+from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.protocols import SSC
 from westata.results.base import StataResults
 from westata.vce.dispatch import SUPPORTED_COV_TYPES, compute_cov
@@ -177,9 +182,11 @@ _LM_COV_TYPES = {
 
 _WEAK_INSTRUMENT_F = 10.0
 
-_WEIGHT_KEYWORDS = frozenset(
-    {"weights", "weight_type", "fweights", "aweights", "pweights", "iweights"}
-)
+#: Stata spells the weight option as a PREFIX (``[aweight=w]``), and some callers copy that
+#: spelling as a keyword. ``weights``/``weight_type`` are now real parameters, so only these
+#: plural aliases are rejected -- loudly, because silently ignoring a weight would change
+#: every number in the table.
+_WEIGHT_KEYWORDS = frozenset({"fweights", "aweights", "pweights", "iweights"})
 
 
 def _ensure_intercept(formula: str) -> str:
@@ -217,9 +224,9 @@ def _reject_unsupported_kwargs(kwargs: Mapping[str, Any]) -> None:
     for key in kwargs:
         if key in _WEIGHT_KEYWORDS:
             raise UnsupportedError(
-                f"IV estimation does not support weights in P1: {key!r} was "
-                "passed, but 'ivregress' with weights is out of scope. Remove "
-                "the weight and refit; weights are never silently ignored."
+                f"{key!r} is Stata's weight PREFIX, not a keyword. Use "
+                "weights=<array> with weight_type='aweight'/'fweight'/'pweight'/"
+                "'iweight' instead; the weight is never silently ignored."
             )
     if kwargs:
         unexpected = ", ".join(sorted(kwargs))
@@ -331,9 +338,10 @@ class IV2SLS:
 
     Notes
     -----
-    Weights are out of scope for P1.  ``weights``/``weight_type`` are accepted
-    only so that they can be rejected with
-    :class:`westata.errors.UnsupportedError`; they are never silently ignored.
+    Weights are supported and follow ``ivregress``: ``weight_type`` is required whenever
+    ``weights`` is given, because Stata never guesses it. ``e(N)`` is the effective sample
+    size (the weight sum for ``fweight``, the row count otherwise) and ``e(rss)`` is on the
+    normalised weight scale, matching ``regress``.
     """
 
     _backend_cls = _LMIV2SLS
@@ -351,6 +359,8 @@ class IV2SLS:
         instruments: Any,
         *,
         param_names: Sequence[str] | None = None,
+        weights: Any = None,
+        weight_type: str | None = None,
         **kwargs: Any,
     ) -> None:
         _reject_unsupported_kwargs(kwargs)
@@ -404,6 +414,37 @@ class IV2SLS:
             raise ValueError("param_names must be unique")
 
         self._y = y
+        # ---- weights -------------------------------------------------------
+        #
+        # ``ivregress`` accepts all four Stata weight types (``ivregress.sthlp``
+        # "Weights ... aweights, fweights, iweights, and pweights are allowed"). This
+        # used to raise UnsupportedError; the ADH replication needed it for 153 of 166
+        # specifications, so the caller had to rescale by sqrt(w) by hand -- including
+        # the constant, and forgetting that gives a silent 4.4% bias.
+        #
+        # The normalization (and therefore the Stata semantics of each weight type) comes
+        # from the same ``normalize_weights`` OLS uses, so a weighted IV and a weighted
+        # OLS agree on what ``aweight`` MEANS rather than re-deriving it here.
+        self._weight_spec = None
+        self._weights = None
+        if weights is not None:
+            if weight_type is None:
+                raise WeightError(
+                    "weights were supplied without weight_type; specify one of "
+                    "'fweight', 'aweight', 'pweight', 'iweight' (Stata never "
+                    "guesses the weight type)"
+                )
+            spec = normalize_weights(weights, weight_type)
+            if spec.weights.shape[0] != nobs:
+                raise WeightError(
+                    f"weights have {spec.weights.shape[0]} entries but the data "
+                    f"have {nobs} rows"
+                )
+            self._weight_spec = spec
+            self._weights = np.asarray(spec.weights, dtype=float)
+        elif weight_type is not None:
+            raise WeightError("weight_type was supplied without weights")
+
         self._X_exog = X_exog
         self._X_endog = X_endog
         self._Z_instr = Z_instr
@@ -438,6 +479,10 @@ class IV2SLS:
         alignment.
         """
 
+        # ``weights``/``weight_type`` are legal here, so they come out BEFORE the
+        # unexpected-keyword check; leaving them in made them look like typos.
+        weights = kwargs.pop("weights", None)
+        weight_type = kwargs.pop("weight_type", None)
         _reject_unsupported_kwargs(kwargs)
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -467,12 +512,35 @@ class IV2SLS:
         instruments = parsed.instruments.pandas
 
         names = list(exog.columns) + list(endog.columns)
+
+        # Weights are aligned to the ESTIMATION SAMPLE, not to ``data``: linearmodels
+        # drops rows with missing values while parsing, so a weight vector indexed by the
+        # original frame would be misaligned -- and misaligned weights do not raise, they
+        # just weight the wrong observations. ``dependent.index`` is the kept sample.
+        # (``weights``/``weight_type`` were popped above, before the keyword check.)
+        if weights is not None and not isinstance(weights, str):
+            if hasattr(weights, "loc") and hasattr(weights, "index"):
+                weights = np.asarray(
+                    weights.loc[dependent.index], dtype=float
+                )
+            else:
+                values = np.asarray(weights, dtype=float).reshape(-1)
+                if values.shape[0] != len(data) and values.shape[0] != len(dependent):
+                    raise WeightError(
+                        f"weights have {values.shape[0]} entries but the data have "
+                        f"{len(data)} rows ({len(dependent)} after dropping missing "
+                        "values)"
+                    )
+                weights = values
+
         model = cls(
             dependent.to_numpy(dtype=float).reshape(-1),
             exog.to_numpy(dtype=float) if exog.shape[1] else None,
             endog.to_numpy(dtype=float) if endog.shape[1] else None,
             instruments.to_numpy(dtype=float) if instruments.shape[1] else None,
             param_names=names,
+            weights=weights,
+            weight_type=weight_type,
         )
         #: ``ivregress`` reports ``e(b)`` in the order **endogenous then included
         #: exogenous**, with ``_cons`` last.  The fixtures prove it:
@@ -645,9 +713,14 @@ class IV2SLS:
         endog = self._X_endog if self._X_endog.shape[1] else None
         instruments = self._Z_instr if self._Z_instr.shape[1] else None
         y = self._y.reshape(-1, 1)
-        return self._backend_cls(
-            y, exog, endog, instruments, **self._backend_kwargs(canonical, clusters)
-        )
+        kwargs = self._backend_kwargs(canonical, clusters)
+        if self._weights is not None:
+            # linearmodels applies ``weights`` internally to the moment conditions, which
+            # is the aweight/fweight semantics: minimise sum(w_i * e_i^2). The Stata
+            # normalization (including pweight rescaling) already happened in
+            # ``normalize_weights``, so pass the normalized vector rather than the raw one.
+            kwargs["weights"] = self._weights.reshape(-1, 1)
+        return self._backend_cls(y, exog, endog, instruments, **kwargs)
 
     def _check_rank(self, X: np.ndarray, Z_instr: np.ndarray) -> None:
         k_params = X.shape[1]
@@ -748,6 +821,15 @@ class IV2SLS:
 
         X = np.column_stack([self._X_exog, self._X_endog])
         Z = np.column_stack([self._X_exog, self._Z_instr])
+        # THE PROJECTION MUST HAPPEN ON THE WEIGHTED DATA. sqrt(w)*Xhat = P_{sqrt(w)Z}
+        # applied to sqrt(w)X, and that is not sqrt(w) times the unweighted Xhat unless
+        # the projection is scale-invariant -- which it is not. Building Xhat first and
+        # scaling afterwards left the slope standard errors 0.5% off while the intercept
+        # matched exactly, a pattern that pointed straight at this line.
+        if self._weights is not None:
+            root = np.sqrt(self._weights).reshape(-1, 1)
+            X = X * root
+            Z = Z * root
         pinvz = np.linalg.pinv(Z)
         Xhat = Z @ (pinvz @ X)
         nobs, k_params = X.shape
@@ -799,6 +881,23 @@ class IV2SLS:
                 df=settings.df,
             )
         denominator = float(nobs - k_params) if settings.adj else float(nobs)
+        if self._weights is not None:
+            # X/Z/Xhat are already sqrt(w)-transformed above (the projection needs the
+            # weighted data), so only the residual still has to follow. sqrt(w)*e, not
+            # w*e: e~'e~ must equal e'We for the nonrobust branch to give s^2 (X'WX)^-1.
+            #
+            # The weights do NOT rescale N: Stata keeps the sample size and the effective
+            # sample size separately, which is why ``nobs``/``denominator`` stay as they are.
+            resid = resid * np.sqrt(self._weights)
+            return compute_cov(
+                Xhat,
+                resid,
+                cov_type=canonical,
+                cov_kwds=dispatch_kwds,
+                ssc=cov_ssc,
+                nobs=nobs,
+                df_resid=denominator,
+            )
         return compute_cov(
             Xhat,
             resid,
@@ -932,6 +1031,15 @@ class IV2SLS:
         #   e(rmse) = sqrt(rss/N), e(r2_a) = 1 - (1-r2)(N-c)/N.
         df_r = float(nobs)
         rss = float(resid @ resid)
+        # A WEIGHTED fit reports weighted sums, the way ``regress [aw=w]`` does: e(rss) is
+        # sum(w*e^2), TSS is the weighted deviation sum, and e(N) is the EFFECTIVE sample
+        # size (the weight sum for fweight, the row count otherwise). Using the unweighted
+        # moments would leave the point estimates right and R^2/rmse wrong -- the same class
+        # of error as building the VCE from untransformed data.
+        effective_n = df_r
+        if self._weights is not None and self._weight_spec is not None:
+            effective_n = float(self._weight_spec.effective_n)
+            rss = float(np.sum(self._weights * np.asarray(resid, dtype=float) ** 2))
 
         # Whether the regressor space contains a constant vector, determined
         # from the data (column space of X containing the ones vector) rather
@@ -943,7 +1051,16 @@ class IV2SLS:
             np.linalg.matrix_rank(np.column_stack([X, ones])) == np.linalg.matrix_rank(X)
         )
 
-        if has_constant:
+        if self._weights is not None:
+            # Weighted TSS: the weight sum of squared deviations from the WEIGHTED mean
+            # (which is what Stata's `[aw=w]` summarise would report).
+            weights = np.asarray(self._weights, dtype=float)
+            if has_constant:
+                weighted_mean = float(np.sum(weights * Y) / np.sum(weights))
+                tss = float(np.sum(weights * (Y - weighted_mean) ** 2))
+            else:
+                tss = float(np.sum(weights * Y**2))
+        elif has_constant:
             centred = Y - Y.mean()
             tss = float(centred @ centred)
         else:
@@ -952,14 +1069,15 @@ class IV2SLS:
         # ``[R] ivregress``: R2_a = 1 - (1 - R2)(N - c)/(N - k).  The N-k
         # denominator applies to R2_a even though it does not to the VCE: these
         # are separate conventions in the same manual page.
-        r2_adj_denominator = float(nobs - k_params)
+        r2_adj_denominator = float(effective_n - k_params)
         r2_adj = (
-            1.0 - ((nobs - int(has_constant)) / r2_adj_denominator) * (1.0 - r2)
+            1.0
+            - ((effective_n - int(has_constant)) / r2_adj_denominator) * (1.0 - r2)
             if np.isfinite(r2) and r2_adj_denominator > 0.0
             else float("nan")
         )
 
-        rmse = float(np.sqrt(rss / df_r))
+        rmse = float(np.sqrt(rss / effective_n))
         # Gaussian likelihood at the reported estimates (Stata's e(ll) for
         # ivregress 2sls); sigma is the MLE sqrt(rss/n), as in westata.OLS.
         ll = float(-0.5 * nobs * (np.log(2.0 * np.pi) + np.log(rss / nobs) + 1.0))
@@ -972,7 +1090,11 @@ class IV2SLS:
         f_first = self._first_stage_f(ref, nobs)
 
         e: dict[str, Any] = {
-            "N": nobs,
+            "N": effective_n,
+            # The row count, kept alongside because e(N) and the number of observations
+            # differ once fweight expands the data -- ``regress [fw=w]`` reports
+            # e(N)=sum(w) while the frame still has n rows.
+            "N_obs": float(nobs),
             "df_m": df_m,
             "df_r": df_r,
             "r2": r2,

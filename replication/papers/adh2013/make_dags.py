@@ -295,68 +295,33 @@ def figure_iv() -> Path:
 
     _arrow(ax, supply, iv, color=PATH, lw=2.4)
     _arrow(ax, supply, expo, color=PATH, lw=2.4)
-    ax.text(1.20, 4.45, "① 主要驱动", ha="center", fontsize=8.8, color=PATH, zorder=6,
+    ax.text(1.15, 4.45, "① 主要驱动", ha="center", fontsize=8.8, color=PATH, zorder=6,
             bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
-    ax.text(4.05, 4.55, "② 也驱动", ha="center", fontsize=8.8, color=PATH, zorder=6,
+    ax.text(4.10, 4.55, "② 也驱动", ha="center", fontsize=8.8, color=PATH, zorder=6,
             bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
 
     _arrow(ax, iv, expo, color=PATH, lw=2.8)
     _arrow(ax, expo, out, color=PATH, lw=2.8)
-    ax.text(3.55, 3.10, "③ 第一阶段 0.63–0.79", ha="center", fontsize=8.8, color=PATH, zorder=6,
+    ax.text(3.52, 3.05, "③ 第一阶段 0.63–0.79", ha="center", fontsize=8.8, color=PATH, zorder=6,
             bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor="none", alpha=0.96))
-    ax.text(6.90, 3.10, "④ 结构方程 −0.596", ha="center", fontsize=8.8, color=PATH, zorder=6,
+    ax.text(6.90, 3.05, "④ 结构方程 −0.596", ha="center", fontsize=8.8, color=PATH, zorder=6,
             bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor="none", alpha=0.96))
 
-    # The path the instrument must exclude runs US demand -> exposure.  Drawn as a short
-    # arc over the top-right: routing it underneath would cross the structural-equation
-    # label, which an earlier version did.
+    # The path the instrument must exclude is US demand -> exposure (demand pushes imports
+    # up independently of Chinese supply).  Drawn as a short arc through the free space
+    # between the two upper boxes: routing it underneath would cross the structural
+    # equation label, which an earlier version did.
     _arrow(ax, usdemand, out, color=BIAS, dashed=True, lw=2.0)
-    _arrow(ax, usdemand, expo, color=BIAS, dashed=True, lw=2.0, via=(8.55, 4.70))
-    ax.text(7.10, 4.70, "被排除：需求不经过工具变量", ha="center", fontsize=8.6, color=BIAS, zorder=6,
+    _arrow(ax, usdemand, expo, color=BIAS, dashed=True, lw=2.0, via=(6.55, 5.40))
+    ax.text(6.55, 4.98, "被排除", ha="center", fontsize=8.6, color=BIAS, zorder=6,
             bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
-
-    _note(ax, 1.05,
-          "加控制变量让系数从 −0.746 衰减到 −0.596：其中一部分影响其实来自\n"
-          "「本来制造业就多的地方自然降得多」，那并不是中国冲击。\n"
-          "但反向因果控制变量关不掉 → 还必须有工具变量",
-          edge=MUTED)
-
-    _legend(ax, [(False, PATH, "主效应"), (True, PATH, "已切断的旁路"), (True, BIAS, "仍需靠 IV 处理")])
-    return _save(fig, "dag_01_controls.png")
-
-
-def figure_iv() -> Path:
-    """Figure 3: the instrument, and which path it excludes."""
-
-    fig, ax = _figure(height=6.6)
-    _title(ax, "图 3：工具变量怎么把「中国的供给冲击」单独拎出来",
-           "用「其他 8 个富国从中国进口」当工具：它们的需求与某个美国城市的就业无关")
-
-    supply = Node(ax, 2.35, 5.40, "中国的供给冲击",
-                  sub="生产率↑、入世、关税↓、基建改善",
-                  width=3.1, height=1.0, face=GOOD, edge=PATH, bold=False)
-    iv = Node(ax, 1.75, 3.30, "工具变量", sub="d_tradeotch_pw_lag", width=2.2)
-    expo = Node(ax, 5.10, 3.30, "中国进口暴露", sub="d_tradeusch_pw", width=2.2)
-    out = Node(ax, 8.45, 3.30, "制造业就业变化", sub="d_sh_empl_mfg", width=2.2)
-
-    usdemand = Node(ax, 8.45, 5.40, "美国本地需求", sub="会同时推高进口与就业",
-                    width=2.2, height=1.0, face=BAD, edge=BIAS, bold=False)
-
-    _arrow(ax, supply, iv, color=PATH, lw=2.3, label="① 主要驱动", label_at=(1.35, 4.55))
-    _arrow(ax, supply, expo, color=PATH, lw=2.3, label="② 也驱动", label_at=(3.75, 4.35))
-    _arrow(ax, iv, expo, color=PATH, lw=2.7, label="③ 第一阶段 0.63–0.79", label_at=(3.42, 2.95))
-    _arrow(ax, expo, out, color=PATH, lw=2.7, label="④ 结构方程 −0.596", label_at=(6.78, 2.95))
-    # The excluded path is routed below the exposure box so it never crosses it.
-    _arrow(ax, usdemand, out, color=BIAS, dashed=True, lw=1.9)
-    _arrow(ax, usdemand, expo, color=BIAS, dashed=True, lw=1.9,
-           via=(8.45, 1.95), label="被排除", label_at=(6.85, 1.95))
 
     _note(ax, 1.05,
           "关键假设（排他性）：工具变量只能通过「中国进口暴露」影响美国就业。\n"
           "中国对德国的出口涨了，不是因为底特律的汽车需求变了 —— 这条旁路因此被切断。",
           edge=MUTED)
 
-    _legend(ax, [(False, PATH, "工具变量利用的路径"), (True, BIAS, "被排除的路径")], y=0.32)
+    _legend(ax, [(False, PATH, "工具变量利用的路径"), (True, BIAS, "被排除的路径")])
     return _save(fig, "dag_02_iv.png")
 
 
@@ -364,40 +329,58 @@ def figure_full() -> Path:
     """Figure 4: the whole design in one picture."""
 
     fig, ax = _figure(height=6.6)
-    _title(ax, "图 4：整套识别策略合起来",
+    _title(ax, "图 5：整套识别策略合起来",
            "IV 负责切断反向因果，控制变量负责吸收区域趋势；两者一起才有 −0.596")
 
-    supply = Node(ax, 2.20, 5.40, "中国的供给冲击", sub="外生：不由美国本地决定",
-                  width=2.9, height=0.95, face=GOOD, edge=PATH, bold=False)
-    iv = Node(ax, 1.70, 3.35, "其他 8 富国进口", sub="d_tradeotch_pw_lag", width=2.3)
-    expo = Node(ax, 5.00, 3.35, "中国进口暴露", sub="d_tradeusch_pw", width=2.2)
-    out = Node(ax, 8.30, 3.35, "制造业就业变化", sub="d_sh_empl_mfg", width=2.3)
+    supply = Node(ax, 1.75, 5.40, "中国的供给冲击", sub="外生：不由美国本地决定",
+                  width=2.7, height=0.95, face=GOOD, edge=PATH, bold=False)
     controls = Node(ax, 5.00, 5.40, "控制变量组", sub="区域 / 人口 / 任务构成",
-                    width=2.6, height=0.95, face=GOOD, edge=PATH, bold=False)
-    resid = Node(ax, 8.30, 5.40, "本地需求等未观测因素", sub="被 IV 排除在外的旁路",
-                 width=3.0, height=0.95, face=BAD, edge=BIAS, bold=False)
+                    width=2.4, height=0.95, face=GOOD, edge=PATH, bold=False)
+    resid = Node(ax, 8.55, 5.40, "本地需求等未观测因素", sub="被 IV 排除在外的旁路",
+                 width=2.9, height=0.95, face=BAD, edge=BIAS, bold=False)
 
-    _arrow(ax, supply, iv, color=PATH, lw=2.2)
-    _arrow(ax, iv, expo, color=PATH, lw=2.6, label="第一阶段", label_at=(3.35, 3.02))
-    _arrow(ax, expo, out, color=PATH, lw=2.7, label="−0.596*** (0.099)", label_at=(6.65, 3.02))
-    _arrow(ax, controls, expo, color=PATH, lw=1.8, dashed=True, label="吸收", label_at=(4.05, 4.6))
-    _arrow(ax, controls, out, color=PATH, lw=1.8, dashed=True, label="吸收", label_at=(6.75, 4.6))
-    _arrow(ax, resid, out, color=BIAS, dashed=True, lw=1.9)
-    _arrow(ax, resid, expo, color=BIAS, dashed=True, lw=1.9, via=(8.30, 2.05),
-           label="切断", label_at=(6.70, 2.05))
+    iv = Node(ax, 1.75, 3.45, "其他 8 富国进口", sub="d_tradeotch_pw_lag", width=2.4)
+    expo = Node(ax, 5.00, 3.45, "中国进口暴露", sub="d_tradeusch_pw", width=2.3)
+    out = Node(ax, 8.55, 3.45, "制造业就业变化", sub="d_sh_empl_mfg", width=2.3)
+
+    _arrow(ax, supply, iv, color=PATH, lw=2.3)
+    _arrow(ax, iv, expo, color=PATH, lw=2.7)
+    ax.text(3.38, 3.10, "第一阶段", ha="center", fontsize=8.8, color=PATH, zorder=6,
+            bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor="none", alpha=0.96))
+
+    _arrow(ax, expo, out, color=PATH, lw=2.8)
+    # The coefficient label sits in the free band *below* the arrow (y = 2.95), clear of
+    # both boxes' borders and of the routed bias path.  Above the arrow there is no room:
+    # the "吸收" label and the controls' arrow are already there.
+    ax.text(6.78, 2.55, "−0.596*** (0.099)", ha="center", fontsize=9.2, color=PATH, zorder=7,
+            bbox=dict(boxstyle="round,pad=0.22", facecolor="white", edgecolor="none", alpha=0.98))
+
+    _arrow(ax, controls, expo, color=PATH, lw=1.9, dashed=True)
+    _arrow(ax, controls, out, color=PATH, lw=1.9, dashed=True)
+    ax.text(3.42, 4.60, "吸收", ha="center", fontsize=8.6, color=PATH, zorder=6,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
+    ax.text(6.70, 4.42, "吸收", ha="center", fontsize=8.6, color=PATH, zorder=6,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
+
+    _arrow(ax, resid, out, color=BIAS, dashed=True, lw=2.0)
+    # Round the right-hand margin, level with nothing else, so the line never crosses the
+    # coefficient label or the "吸收" label.
+    _arrow(ax, resid, expo, color=BIAS, dashed=True, lw=1.8, via=(9.55, 1.75))
+    ax.text(8.05, 1.75, "切断", ha="center", fontsize=8.6, color=BIAS, zorder=6,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none", alpha=0.96))
 
     _note(ax, 1.15,
           "结论：暴露度每上升 1,000 美元/工人，制造业就业占劳动年龄人口比例下降 0.596 个百分点。\n"
           "折算：解释了 1990s 33%、2000s 55%、全期 44% 的制造业就业下降。",
           edge=INK, size=9.4)
-    return _save(fig, "dag_03_full.png")
+    return _save(fig, "dag_05_full.png")
 
 
 def figure_comparison() -> Path:
     """Figure 5: the OLS/2SLS gap as replication evidence."""
 
     fig, ax = _figure(height=5.6)
-    _title(ax, "图 5：OLS 与 2SLS 差 3.5 倍——这正是识别策略在起作用的证据",
+    _title(ax, "图 4：OLS 与 2SLS 相差 3.5 倍——这正是识别策略在起作用的证据",
            "同一个模型、同一组控制变量、同一份数据，只因估计量不同")
 
     for cx, name, coef, se, note_text, color in (
@@ -437,7 +420,7 @@ FIGURES = (
     ("dag_00_naive", figure_naive),
     ("dag_01_controls", figure_controls),
     ("dag_02_iv", figure_iv),
-    ("dag_03_full", figure_full),
+    ("dag_05_full", figure_full),
     ("dag_04_comparison", figure_comparison),
 )
 

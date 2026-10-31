@@ -2,26 +2,9 @@
 
 Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 
-> **在看到具体数字之前，请先读这一节。** `westata` 是版本 0.0.1 的个人研究库。
-> 93 条注册命令中 **52 条与 Stata 达到机器精度**，**9 条有明显偏差**，
-> 另有 1 项能力缺失。每条偏差都给出实测数值和原因，不做隐藏。
->
-> | 命令 | 实测最大相对偏差 | 原因 |
-> |---|---|---|
-> | `xtgls` | 3.4e+00 | **仅在跨方程 Sigma 秩亏时**（方程数多于期数）。此时广义逆不唯一，Stata 自己也报警告。良态系统是机器精度。 |
-> | `teffects nnmatch` | 7.1e-02 | **仅标准误**；点估计精确（3.6e-15）。内部调用编译版 Mata。 |
-> | `frontier` | 4.3e-02 | 仅 `distribution(exponential)`，测试数据上 `sigma_u` 近乎不可识别。在 Stata 估计值处似然完全一致。 |
-> | `bsqreg` | 3.0e-02 | Bootstrap VCE。系数精确（3.4e-16）；重抽样估计量在任何有限重复数下都未收敛。 |
-> | `permute` | 1.2e-02 | Stata 的洗牌顺序无法从输出反推。 |
-> | `arima` | 5.5e-03 | 优化器停止点不同；我们的似然值**更高**。 |
-> | `rreg` | 1.0e-03 | 最终 biweight 权重。 |
-> | `xtlogit, pa` | 1.1e-03 | GEE 工作相关矩阵处理。 |
-> | `heckman` | 1.9e-05 | 两步法标准误。后加的 ML 路径是独立的精确估计。 |
->
-> 有一项能力**缺失而非近似**：`teffects nnmatch, biasadj()` 抛 `UnsupportedError`。
->
-> 以上数值取自独立复测（386 个对照点，对真实 Stata 运行）的最差情况。库的绝大部分远好于这些上界——
-> 250 个对照点达到机器精度——但会真正影响你的就是这些，所以放在最前面。
+> **适用范围。** `westata` 用 Python 重新实现 Stata 的一个估计命令子集。目标是数字与 Stata
+> 一致；做不到时会如实说明，而不是把差异四舍五入掉。每条命令都带证据等级，有偏差的命令
+> 列在 [已知偏差](#已知偏差) 一节，并给出实测差值。
 
 `westata` 回答一个问题：**同一份数据，在 Python 里跑出的数字，和 Stata 打印出来的是不是一样？**
 
@@ -196,7 +179,23 @@ Stata 的四种权重在本库里是**分开实现**的，不是都折成一种�
 数字由脚本生成，不是手写：`docs/build_doc_data.py` → `docs/collect_comparison.py` →
 `docs/comparison.json` → `docs/generate_guide.py`。不在 JSON 里的数字不会出现在表中。
 
-## 值得知道的设计取舍
+## 使用前值得知道的几个行为
+
+下面六条很容易想当然，每一条弄反都会改变数字：
+
+- **`df_resid` 与 `e(df_r)` 是两个不同的量。** 聚类下 t 检验用 `G − 1`，而 `e(df_r)`
+  保持 `N − K`（与 Stata 一致）。混用会静默给出错误的 p 值。
+- **频数权重等价于把数据展开后估计。** 这是 Stata 明确写下的一条不变量；把 `fweight`
+  当作解析权重处理会显著放大标准误。
+- **`margins` 对响应求导，而不是对线性指数求导。** logit 的边际效应是
+  `mean(p(1-p))·b`，不是系数本身。
+- **`PanelOLS.from_formula` 会忽略 `entity_effects`。** 传进 `fit()` 得到的是混合 OLS；
+  要固定效应须直接构造模型。
+- **`ivregress` 报告 z 与 Wald chi2**，而 OLS 与面板估计器用 t 与 F。
+- **`e()` 的键逐命令不同。** 并不存在统一集合：`regress` 不存 `e(aic)`，`tobit` 也不存，
+  而 ML 那一族存。假定它统一正是凭空造出一个键的来路。
+
+## 设计取舍
 
 - **不做静默近似。** 未实现的能力抛 `UnsupportedError`，而不是返回一个"差不多"的结果。
   例如 `vce(jackknife)` 尚未实现时会明确报错，绝不退化成稳健标准误。
@@ -232,9 +231,28 @@ docs/               GUIDE.md、对照数据、生成脚本
 | [docs/USING_WITH_STATA.md](docs/USING_WITH_STATA.md) | 哪些量与 Stata 可互换，哪些不可 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更与已知局限 |
 
+## 已知偏差
+
+有 9 条命令与 Stata 的吻合度低于其余。每个数值取自独立复测（386 个对照点，对真实 Stata
+运行）的最差情况；这 386 个点中有 250 个达到机器精度，因此下表是离群项，不是常态。
+
+| 命令 | 实测最大相对偏差 | 原因 |
+|---|---|---|
+| `xtgls` | 3.4e+00 | **仅在跨方程 Sigma 秩亏时**（方程数多于期数）。此时广义逆不唯一，Stata 自己也报警告。良态系统是机器精度。 |
+| `teffects nnmatch` | 7.1e-02 | **仅标准误**；点估计精确（3.6e-15）。内部调用编译版 Mata。 |
+| `frontier` | 4.3e-02 | 仅 `distribution(exponential)`，测试数据上 `sigma_u` 近乎不可识别。在 Stata 估计值处似然完全一致。 |
+| `bsqreg` | 3.0e-02 | bootstrap VCE。系数精确（3.4e-16）；重抽样估计量在任何有限重复次数下都不会完全收敛。 |
+| `permute` | 1.2e-02 | Stata 置换抽样的洗牌顺序无法从其输出复现。 |
+| `arima` | 5.5e-03 | 优化器停止点不同；本实现的似然**更高**。 |
+| `rreg` | 1.0e-03 | 最终 biweight 案例权重。 |
+| `xtlogit, pa` | 1.1e-03 | GEE 工作相关结构的处理。 |
+| `heckman` | 1.9e-05 | 两步法标准误。后来补的 ML 路径是另一条独立且精确的估计。 |
+
+有一项能力**缺失而非近似**：`teffects nnmatch, biasadj()` 抛 `UnsupportedError`。
+
 ## 已知缺口
 
-15 条 E1 命令见开头的表格，详细排查过程在 `docs/GAP_REGISTER.md`。此外：
+证据等级为 E1 的命令见 [证据分级](#证据分级)，详细排查过程在 `docs/GAP_REGISTER.md`。此外：
 
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。

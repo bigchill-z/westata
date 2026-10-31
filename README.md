@@ -2,32 +2,11 @@
 
 Stata-conformant econometrics with a statsmodels-style API.
 
-> **Read this before relying on a number.** `westata` is a personal research
-> library at version 0.0.1. 52 of its 87 commands match Stata to machine
-> precision, but **9 do not**, and one feature is missing. The measured
-> deviation for each is listed below. They are graded, not hidden, and the
-> grading is reproducible from this repository.
->
-> | Command | Worst measured relative difference | Why |
-> |---|---|---|
-> | `xtgls` | 3.4e+00 | **Only when the cross-equation Sigma is rank-deficient** (more equations than periods). No unique generalised inverse exists; Stata warns here too. On well-posed systems this is machine precision. |
-> | `teffects nnmatch` | 7.1e-02 | **Standard error only** — the point estimate is exact (3.6e-15). Uses compiled Mata internally. |
-> | `frontier` | 4.3e-02 | `distribution(exponential)` only, where `sigma_u` is nearly unidentified on the test data. The likelihood at Stata's estimates matches exactly. |
-> | `bsqreg` | 3.0e-02 | Bootstrap VCE. Coefficients are exact (3.4e-16); a resampling estimator has not converged at any finite replicate count. |
-> | `permute` | 1.2e-02 | Stata's shuffle order for the permutation draws is not reproducible from its output. |
-> | `arima` | 5.5e-03 | Optimiser stopping point; our likelihood is *higher* than Stata's. |
-> | `rreg` | 1.0e-03 | Final biweight case weights. |
-> | `xtlogit, pa` | 1.1e-03 | GEE working-correlation handling. |
-> | `heckman` | 1.9e-05 | Two-step standard errors. The ML path added later is a separate, exact estimate. |
->
-> One capability is **absent rather than approximate**: `teffects nnmatch,
-> biasadj()` raises `UnsupportedError`.
->
-> Each figure is the worst case across the invocations an independent
-> 386-point sweep exercised against live Stata. Most of the library is far
-> better than these bounds — 250 of 386 comparison points are at machine
-> precision — but these are the numbers that would bite you, so they come
-> first.
+> **Scope.** `westata` reimplements a subset of Stata's estimation commands in
+> Python. It aims to match Stata's numbers, and where it cannot it says so rather
+> than rounding the gap away. Every command carries an evidence grade, and the
+> commands that deviate are listed in [Known deviations](#known-deviations) with
+> the measured gap.
 
 `westata` is a personal research library that answers one question: *if I run
 this in Python, do I get the same numbers Stata would print?*
@@ -264,24 +243,26 @@ Two commands could not be compared at all because StataNow 19 removed them:
 `xtreg, fd` (r(198)) and `kpss` (r(199)). Their westata counterparts are
 validated by other means.
 
-## Design notes worth knowing
+## Behaviours worth knowing before you rely on a result
 
-Things that bit during development, documented so they do not bite again:
+Six properties that are easy to assume wrongly. Each is deliberate, and each
+would change a number if you got it backwards:
 
-- **`df_resid` vs `e(df_r)` are different quantities.** Under clustering, t
-  tests use `G − 1` while Stata's `e(df_r)` stays `N − K`. Conflating them
-  silently gives wrong p-values.
-- **Frequency weights must equal the expanded-data fit.** Stata's own stated
-  invariant. Getting the robust meat's weight form wrong inflates fweighted
-  standard errors by up to 51%.
-- **`margins` differentiates the response, not the linear index.** For a logit,
-  `mean(p(1-p))·b` — differentiating `xb` returns the coefficient, which was
-  4.38× too large in the first implementation.
-- **`PanelOLS.from_formula` ignores `entity_effects`.** Passing it through
-  `fit()` silently produces pooled OLS. The model must be constructed directly.
-- **linearmodels' clustered VCE needs `auto_df=False, group_debias=True`** to
-  reproduce Stata's `G/(G-1)·(N-1)/(N-K)`; the default is ~11% off.
-- **`ivregress` reports z / Wald chi2**, not t / F. OLS and panel use t.
+- **`df_resid` and `e(df_r)` are different quantities.** Under clustering, t
+  tests use `G − 1` while `e(df_r)` stays `N − K`, matching Stata. Conflating
+  them silently gives wrong p-values.
+- **Frequency weights reproduce the expanded-data fit.** That is Stata's stated
+  invariant; treating `fweight` as an analytic weight inflates the standard
+  errors substantially.
+- **`margins` differentiates the response, not the linear index.** For a logit
+  the marginal effect is `mean(p(1-p))·b`, not the coefficient itself.
+- **`PanelOLS.from_formula` ignores `entity_effects`.** Passing it to `fit()`
+  gives pooled OLS; construct the model directly to get fixed effects.
+- **`ivregress` reports z and Wald chi2**, while OLS and the panel estimators use
+  t and F.
+- **`e()` keys differ per command.** There is no uniform set: `regress` stores no
+  `e(aic)`, `tobit` stores none either, while the ML families do. Assuming
+  uniformity is how a key gets invented.
 
 ## Layout
 
@@ -317,6 +298,27 @@ docs/              design spec and implementation plans
   check against live Stata, and how to re-run it. This is where the evidence
   levels come from.
 - Design spec: [`docs/superpowers/specs/2026-10-22-westata-design.md`](docs/superpowers/specs/2026-10-22-westata-design.md)
+
+## Known deviations
+
+Nine commands match Stata less closely than the rest. Each figure is the worst
+case across an independent 386-point sweep against live Stata; 250 of those 386
+points are at machine precision, so these are the outliers rather than the norm.
+
+| Command | Worst measured relative difference | Why |
+|---|---|---|
+| `xtgls` | 3.4e+00 | **Only when the cross-equation Sigma is rank-deficient** (more equations than periods). No unique generalised inverse exists; Stata warns here too. On well-posed systems this is machine precision. |
+| `teffects nnmatch` | 7.1e-02 | **Standard error only** — the point estimate is exact (3.6e-15). Uses compiled Mata internally. |
+| `frontier` | 4.3e-02 | `distribution(exponential)` only, where `sigma_u` is nearly unidentified on the test data. The likelihood at Stata's estimates matches exactly. |
+| `bsqreg` | 3.0e-02 | Bootstrap VCE. Coefficients are exact (3.4e-16); a resampling estimator has not converged at any finite replicate count. |
+| `permute` | 1.2e-02 | Stata's shuffle order for the permutation draws is not reproducible from its output. |
+| `arima` | 5.5e-03 | Optimiser stopping point; our likelihood is *higher* than Stata's. |
+| `rreg` | 1.0e-03 | Final biweight case weights. |
+| `xtlogit, pa` | 1.1e-03 | GEE working-correlation handling. |
+| `heckman` | 1.9e-05 | Two-step standard errors. The ML path added later is a separate, exact estimate. |
+
+One capability is **absent rather than approximate**: `teffects nnmatch,
+biasadj()` raises `UnsupportedError`.
 
 ## Known gaps
 

@@ -139,6 +139,24 @@ best = sum(1 for e in comparisons if max(e["rel_b"], e["rel_se"]) < 1e-12)
 good = sum(1 for e in comparisons if max(e["rel_b"], e["rel_se"]) < 1e-9)
 total = len(comparisons)
 
+# ---- evidence counts, read from the registry rather than written into the template
+#
+# These used to be literals ("52 E3, 26 E2, 9 E1 across 87 registry entries") and went
+# stale the moment a command was added: by the time anyone noticed, the real numbers were
+# 15 E1 across 93 entries. A count in prose that nobody recomputes is a count that will be
+# wrong; deriving it here means the guide cannot disagree with the registry it cites.
+def _registry_counts() -> tuple[int, int, int, int]:
+    registry = (REPO / "tests" / "conformance" / "registry.yml").read_text(encoding="utf-8")
+    commands = registry.count("\n- command: ") + registry.startswith("- command: ")
+    e3 = registry.count("level: E3")
+    e2 = registry.count("level: E2")
+    e1 = registry.count("level: E1")
+    return commands, e3, e2, e1
+
+
+REGISTRY_COMMANDS, REGISTRY_E3, REGISTRY_E2, REGISTRY_E1 = _registry_counts()
+
+
 DOCUMENT = f"""# westata — a guide
 
 `westata` reimplements a set of Stata estimation commands in Python, with a statsmodels-style API, and
@@ -161,8 +179,9 @@ standard errors, at full double precision — not from comparing printed output.
 - **A reproducible check.** `retest/` re-runs the comparison against live Stata; `tests/` replays the
   committed captures without needing a licence.
 
-Current counts: **52 E3, 26 E2, 9 E1** across 87 registry entries. The nine E1 entries are listed with
-their measured numbers in [Known deviations](#known-deviations).
+Current counts: **{REGISTRY_E3} E3, {REGISTRY_E2} E2, {REGISTRY_E1} E1** across {REGISTRY_COMMANDS}
+registry entries. The E1 entries are listed with their measured numbers in
+[Known deviations](#known-deviations).
 
 ## Install
 
@@ -414,8 +433,8 @@ directly would show an 11% "difference" that is entirely a units question.
 
 ### Commands graded E1
 
-Nine of the 87 registry entries measurably deviate on at least one invocation. The full reasoning is in
-`docs/GAP_REGISTER.md`; the summary:
+{REGISTRY_E1} of the {REGISTRY_COMMANDS} registry entries measurably deviate on at least one
+invocation. The full reasoning is in `docs/GAP_REGISTER.md`; the summary:
 
 | Command | Worst measured | Why |
 |---|---|---|

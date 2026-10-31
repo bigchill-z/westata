@@ -250,17 +250,12 @@ TEXT = {
         "title": "westata — complete API reference",
         "intro": (
             "Every public name in `westata`, with the Stata command it corresponds to, a "
-            "description, and a runnable example whose output is captured from a real run.\n\n"
-            "**How this document is built.** The signatures come from `inspect` on the live "
-            "objects and the example outputs come from executing the examples, so neither can "
-            "drift from the code. Only the prose is hand-written. A name whose prose is "
-            "missing is shown with a warning rather than omitted, so an incomplete section "
-            "looks incomplete.\n\n"
-            "**Reading the examples.** Each block runs as written against a 200-row frame "
-            "reachable as `base`, whose columns are "
+            "description, and a runnable example with the output it actually returns.\n\n"
+            "Signatures and example outputs are read from the code itself, so they match "
+            "the version you are reading.\n\n"
+            "The examples run against a 200-row frame called `base`, whose columns are "
             "`y x1 x2 x3 yb ycnt ycens lo hi y1 y2 firm year ypanel treat ytreat sel yselect`; "
-            "`ws`, `np` and `pd` are in scope. The text below the code is the actual return "
-            "value, not a transcription."
+            "`ws`, `np` and `pd` are in scope."
         ),
         "toc": "Contents",
         "stata": "Stata",
@@ -281,16 +276,12 @@ TEXT = {
     "zh": {
         "title": "westata —— 完整 API 参考",
         "intro": (
-            "`westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段"
-            "**真实运行**、输出即所得的可运行示例。\n\n"
-            "**本文档如何生成。** 函数签名取自运行时对象的 `inspect`，示例输出由"
-            "**实际执行**示例得到，因此二者都不会与代码脱节。只有说明文字是手写的。"
-            "若某个名称尚未写说明，会**显式标注**而不是略去——让不完整的章节看起来就是"
-            "不完整的。\n\n"
-            "**如何阅读示例。** 每个代码块都可照抄运行，作用域内有一个 200 行的数据框 "
-            "`base`，列为 "
+            "`westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，"
+            "以及一段可照抄运行、并附**真实返回值**的示例。\n\n"
+            "签名与示例输出均直接取自代码，因此与你手上这一版一致。\n\n"
+            "示例作用于一个 200 行的数据框 `base`，其列为 "
             "`y x1 x2 x3 yb ycnt ycens lo hi y1 y2 firm year ypanel treat ytreat sel yselect`，"
-            "并有 `ws`、`np`、`pd`。代码块下方是**真实返回值**，不是转述。"
+            "作用域内另有 `ws`、`np`、`pd`。"
         ),
         "toc": "目录",
         "stata": "Stata 指令",

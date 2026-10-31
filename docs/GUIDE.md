@@ -20,8 +20,9 @@ standard errors, at full double precision — not from comparing printed output.
 - **A reproducible check.** `retest/` re-runs the comparison against live Stata; `tests/` replays the
   committed captures without needing a licence.
 
-Current counts: **52 E3, 26 E2, 9 E1** across 87 registry entries. The nine E1 entries are listed with
-their measured numbers in [Known deviations](#known-deviations).
+Current counts: **52 E3, 26 E2, 15 E1** across 93
+registry entries. The E1 entries are listed with their measured numbers in
+[Known deviations](#known-deviations).
 
 ## Install
 
@@ -542,8 +543,8 @@ directly would show an 11% "difference" that is entirely a units question.
 
 ### Commands graded E1
 
-Nine of the 87 registry entries measurably deviate on at least one invocation. The full reasoning is in
-`docs/GAP_REGISTER.md`; the summary:
+15 of the 93 registry entries measurably deviate on at least one
+invocation. The full reasoning is in `docs/GAP_REGISTER.md`; the summary:
 
 | Command | Worst measured | Why |
 |---|---|---|

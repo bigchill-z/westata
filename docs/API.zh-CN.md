@@ -1,12 +1,12 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.0.2 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.0.3 · 生成脚本 `docs/render_api_reference.py`_
 
-`westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段**真实运行**、输出即所得的可运行示例。
+`westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
-**本文档如何生成。** 函数签名取自运行时对象的 `inspect`，示例输出由**实际执行**示例得到，因此二者都不会与代码脱节。只有说明文字是手写的。若某个名称尚未写说明，会**显式标注**而不是略去——让不完整的章节看起来就是不完整的。
+签名与示例输出均直接取自代码，因此与你手上这一版一致。
 
-**如何阅读示例。** 每个代码块都可照抄运行，作用域内有一个 200 行的数据框 `base`，列为 `y x1 x2 x3 yb ycnt ycens lo hi y1 y2 firm year ypanel treat ytreat sel yselect`，并有 `ws`、`np`、`pd`。代码块下方是**真实返回值**，不是转述。
+示例作用于一个 200 行的数据框 `base`，其列为 `y x1 x2 x3 yb ycnt ycens lo hi y1 y2 firm year ypanel treat ytreat sel yselect`，作用域内另有 `ws`、`np`、`pd`。
 
 ## 目录
 

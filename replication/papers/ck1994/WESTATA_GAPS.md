@@ -1,45 +1,17 @@
-# westata 可优化点清单 · 第二篇（Card & Krueger 1994）
+# westata 可优化点清单 · Card & Krueger (1994)
 
 **来源**：Card & Krueger (1994) 复现过程中实测得到。
 **被测版本**：`westata 0.0.3`（本仓库 `src/westata`）。
-**复核方式**：`../../.venv/Scripts/python.exe replication/papers/ck1994/probe_gaps.py`
+**复核方式**：`.venv/Scripts/python.exe replication/papers/ck1994/probe_gaps.py`
 
 > 配套报告：[REPORT.md](REPORT.md) —— 讲这篇论文的复现结果。
-> 第一篇的清单见 [../adh2013/WESTATA_GAPS.md](../adh2013/WESTATA_GAPS.md)。
-
----
-
-## 0. 这份清单为什么和第一篇不一样
-
-第一篇（ADH 的 shift-share IV）的清单列了 **7 条缺口**，从"加权 IV 完全不支持"到"`margins` 不接受序列"。写完之后，上游把 **7 条全部修复并提交了**：
-
-| 原条目 | 修复提交 |
-|---|---|
-| 加权 IV 不支持 | `01c3ce5` |
-| `cov_kwds` 聚类键名三套 | `72a2d12` |
-| `FEOLS` 没有 `predict` | `fa5787e` |
-| `subset=` 覆盖不全 | `7d11f1e` |
-| `margins(at=)` 只接受标量 | `f84a404` |
-| `predict(exog=)` 形状问题 | `f84a404` |
-| `etable` 无写文件 | `f84a404` |
-
-所以现在跑第一篇的探针，结果是 **0 gap / 9 条对照全部通过**。那份清单已经完成了它的使命。
-
-**那么第二篇该写什么？** 简单复制旧格式没有意义——我实测过，Card & Krueger 需要的估计量（无权重 OLS，357 行、最多 10 个参数）在 westata 上**一次就过，没有任何摩擦**：
-
-```
-[OK] plain OLS      coefficient 2.3258, matching the paper's 2.33
-[OK] Stata labels   stata_param_names = ['nj', '_cons']
-[OK] weighted OLS   weighted OLS runs (N=357)
-```
-
-**这次复现暴露的问题不在估计，而在数据。** 因此本文的重点不是"westata 做不到 X"，而是**一篇真实复现中有多大比例的工作 westata 根本没参与**——以及这个空白里最容易出错的地方在哪里。
+> 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
 
 ---
 
 ## 1. 判定标准：区分"缺口"与"边界"
 
-第一篇的判据是三条（能力缺失 / 内部不一致 / 契约违约）。这次要加第四条，因为两者的**行动含义完全不同**：
+先说清楚一条区分，因为两者的**行动含义完全不同**：
 
 | 类别 | 含义 | 该怎么做 |
 |---|---|---|
@@ -173,19 +145,3 @@ result.stata_params        # Series, index 为 Stata 名称
 
 ---
 
-## 5. 两篇合起来的结论
-
-| | ADH (2013) | CK (1994) |
-|---|---|---|
-| 估计量 | 加权 2SLS + 聚类 | 无权重 OLS |
-| 参数数 | 178 | 26 |
-| westata 与 Stata 最大相对差 | 1.6e-11 | **2.1e-13** |
-| 主要难点 | 加权 IV 的实现 | **数据构造** |
-| 本次暴露的 westata 问题 | 7 条缺口（**已全部修复**） | 0 条缺口，1 条边界 |
-
-**结论**：
-
-> westata 的**估计层**已经足够好——两篇论文、187 个成对参数，最大差异都在浮点求和顺序量级。
-> **限制它的是估计之外的部分**：数据整理（pandas 的活，但缺乏可审计性支持）和绘图（完全空白）。
-
-第一篇的 7 条缺口被上游逐一修完，说明这份清单的机制是有效的：**写清楚 → 有人修 → 探针自动把"缺口"改写成"回归测试"**。第二篇没有产生新缺口，本身就是那个机制在起作用的证据。

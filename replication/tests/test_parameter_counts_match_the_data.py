@@ -125,3 +125,63 @@ def test_the_cross_paper_table_is_consistent_across_all_six_documents() -> None:
                     )
 
     assert problems == [], "\n".join(problems)
+
+# --------------------------------------------------- precision claims
+def _worst_relative_difference(paper: str) -> float:
+    """Largest relative coefficient difference the comparison data record."""
+
+    path = PAPERS / paper / "out" / "differences.json"
+    if not path.exists():  # pragma: no cover - committed artefact
+        pytest.skip(f"{path} not present")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return max(spec["max_rel_b"] for spec in data["specs"])
+
+
+def test_no_document_claims_precision_better_than_it_has() -> None:
+    """A report must not round its own error DOWN.
+
+    ``adh2013``'s worst difference is 1.56e-11 and ``ad2013``'s is 2.87e-11. Both
+    documents used to say "1e-11 以内" ("within 1e-11"), which is false for both -- the
+    numbers are ABOVE 1e-11. It is a small flattery, but this repository exists to not
+    do that, and a reader who checks the table against the sentence finds them
+    contradicting each other.
+
+    The rule enforced here: where a document states a bound, the measured worst case
+    must satisfy it. "量级" (order of magnitude) is allowed, since it makes no exact
+    claim; "以内" (within) is not, unless it is true.
+    """
+
+    measured = {paper: _worst_relative_difference(paper) for paper in ("adh2013", "ck1994", "ad2013")}
+    problems = []
+
+    for paper, filenames in DOC_FILES.items():
+        worst = measured[paper]
+        for filename in filenames:
+            path = PAPERS / paper / filename
+            if not path.exists():  # pragma: no cover
+                continue
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if "1e-11 以内" in line or "1e-11以内" in line:
+                    # A bound that the measured value violates.
+                    if worst > 1e-11:
+                        problems.append(
+                            f"{paper}/{filename}:{number} claims 'within 1e-11' but the "
+                            f"worst measured difference is {worst:.3e}"
+                        )
+
+    assert problems == [], "\n".join(problems)
+
+
+def test_the_headline_precision_numbers_are_the_measured_ones() -> None:
+    """Where the documents quote a specific worst case, it must match."""
+
+    measured = {paper: _worst_relative_difference(paper) for paper in ("adh2013", "ck1994", "ad2013")}
+
+    # Each paper's own headline figure, to two significant figures as quoted.
+    expected = {"adh2013": 1.6e-11, "ck1994": 2.1e-13, "ad2013": 2.9e-11}
+
+    for paper, quoted in expected.items():
+        actual = measured[paper]
+        assert actual == pytest.approx(quoted, rel=0.1), (
+            f"{paper}: documents quote {quoted:.1e} but the data give {actual:.3e}"
+        )

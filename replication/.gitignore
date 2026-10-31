@@ -1,0 +1,13 @@
+# Downloaded replication packages and generated artefacts.
+#
+# The archive is a 3 MB binary redistribution of the authors' data.  The repository's
+# stated policy (see the root .gitignore) is not to redistribute Stata datasets, so the
+# download, the unpacked copy and the run artefacts all stay local; `data.py` re-fetches
+# and re-verifies them by SHA-256 on demand, which is what makes them reproducible
+# without being stored.
+candidates/raw/
+data/
+papers/*/data/
+papers/*/out/
+__pycache__/
+*.pyc

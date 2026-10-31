@@ -373,11 +373,19 @@ class FEOLS:
                 f"{type(cov_kwds).__name__}"
             )
 
-        labels = cov_kwds.get("cluster", cov_kwds.get("groups"))
+        # One accessor for the cluster labels: ``groups``/``clusters``/``cluster`` are all
+        # accepted, the same way they are for every other estimator. This file used to
+        # accept only ``cluster`` and ``groups``, which made ``FEOLS`` the one estimator
+        # where ``clusters`` failed -- see
+        # ``replication/papers/adh2013/WESTATA_GAPS.md`` §3.
+        from westata.vce.dispatch import cluster_labels_from_kwds
+
+        labels = cluster_labels_from_kwds(cov_kwds)
         if labels is None:
             raise ValueError(
-                "cov_type='cluster' requires cov_kwds['cluster'] (or "
-                "cov_kwds['groups']); got keys " + ", ".join(map(str, cov_kwds))
+                "cov_type='cluster' requires the cluster labels; pass them as "
+                "cov_kwds={'groups': labels} (or the equivalent 'clusters' / "
+                "'cluster'); got keys " + ", ".join(map(str, cov_kwds))
             )
 
         if isinstance(labels, str):

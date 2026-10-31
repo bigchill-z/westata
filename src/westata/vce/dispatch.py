@@ -247,20 +247,18 @@ def compute_cov(
 
     # canonical == "cluster"
     #
-    # ``groups`` and ``clusters`` are BOTH accepted. Stata calls the option ``vce(cluster
-    # clustvar)``, so ``clusters`` reads naturally, and the IV family documents that
-    # spelling; the OLS/ML family took ``groups``. That split meant moving a call from one
-    # family to another failed with "requires cov_kwds['groups']" even though the labels
-    # were right -- the same user error, two vocabularies. Accepting both costs nothing and
-    # removes the trap.
-    groups = kwds.get("groups")
-    if groups is None:
-        groups = kwds.get("clusters")
+    # ``groups``, ``clusters`` and ``cluster`` are ALL accepted, everywhere. Stata calls the
+    # option ``vce(cluster clustvar)`` so ``clusters`` reads naturally; the OLS/ML family
+    # documented ``groups``, the IV family documented ``clusters``, and ``hdfe`` used
+    # ``cluster``. Each rejected the others' spelling, so the same call failed depending on
+    # which estimator received it. Going through ``cluster_labels_from_kwds`` means there is
+    # one answer instead of three.
+    groups = cluster_labels_from_kwds(kwds)
     if groups is None:
         raise ValueError(
             "cov_type='cluster' requires the cluster labels; pass them as "
-            "cov_kwds={'groups': groups} (or the equivalent cov_kwds={'clusters': "
-            "groups}, which the IV family uses)"
+            "cov_kwds={'groups': groups} (aliases 'clusters' and 'cluster' are also "
+            "accepted)"
         )
     cov, n_groups = cov_cluster(
         Xw, rw, groups, bread=bread, ssc=settings, nobs=n_eff

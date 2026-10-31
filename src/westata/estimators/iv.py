@@ -709,19 +709,20 @@ class IV2SLS:
                 )
             return None
 
-        # Accept BOTH spellings, for the same reason ``vce/dispatch.py`` does: Stata's
-        # option is ``vce(cluster clustvar)``, so ``clusters`` reads naturally, but the
-        # OLS/ML family takes ``groups``. Before this, moving a call between families
-        # failed with "requires cov_kwds['clusters']" while the caller had supplied
-        # perfectly good labels under the other name.
-        clusters = kwds.pop("clusters", None)
-        if clusters is None:
-            clusters = kwds.pop("groups", None)
+        # All THREE spellings are accepted, matching every other estimator: ``groups``
+        # (the OLS/ML documentation), ``clusters`` (natural for Stata's ``vce(cluster
+        # clustvar)``) and ``cluster`` (what ``hdfe`` used). Each name is POPPED so the
+        # "unexpected cov_kwds" check below still catches genuine typos.
+        clusters = None
+        for key in ("clusters", "groups", "cluster"):
+            candidate = kwds.pop(key, None)
+            if candidate is not None and clusters is None:
+                clusters = candidate
         if clusters is None:
             raise ValueError(
                 "cov_type='cluster' requires the cluster labels; pass them as "
-                "cov_kwds={'clusters': labels} (or the equivalent "
-                "cov_kwds={'groups': labels})"
+                "cov_kwds={'clusters': labels} (aliases 'groups' and 'cluster' are also "
+                "accepted)"
             )
         if kwds:
             raise ValueError(

@@ -686,7 +686,20 @@ class PanelOLS:
         wants_cluster = backend_cov == "clustered"
         key = "" if cov_type is None else str(cov_type).strip().lower()
 
-        clusters = kwds.pop("clusters", kwds.pop("groups", None))
+        # All three spellings, each POPPED so the "unexpected key(s)" check below still
+        # catches a real typo. ``groups`` is the OLS/ML documentation, ``clusters`` reads
+        # naturally from Stata's ``vce(cluster clustvar)``, ``cluster`` is what ``hdfe``
+        # used -- and every other estimator accepts all three now.
+        #
+        # The loop variable must NOT be called ``key``: the enclosing method already uses
+        # that name for the normalised cov_type, and reusing it silently replaced
+        # ``"robust"``/``"cluster"`` with ``"cluster"`` so every robust fit fell through to
+        # the wrong branch. Caught by test_robust_is_statas_clustered_vce_not_hc1.
+        clusters = None
+        for _label_key in ("clusters", "groups", "cluster"):
+            candidate = kwds.pop(_label_key, None)
+            if candidate is not None and clusters is None:
+                clusters = candidate
         if key in _ROBUST_COV_TYPES:
             # ``vce(robust)`` == ``vce(cluster panelvar)``: the panel variable is
             # the cluster variable, so callers must not pass their own labels --

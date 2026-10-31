@@ -497,8 +497,16 @@ class OLS:
         if ll_0 is not None:
             e["ll_0"] = ll_0
         if str(effective_cov_type).strip().lower() == "cluster":
-            groups = (cov_kwds or {}).get("groups") if cov_kwds else None
-            e["N_clust"] = float(np.unique(encode_groups(groups)).size)
+            # One accessor for the cluster labels, so ``groups``/``clusters``/``cluster``
+            # all work here as they do elsewhere. Reading ``groups`` directly meant this
+            # line KeyError'd (or silently mis-reported ``N_clust``) when a caller used one
+            # of the other two spellings -- the exact inconsistency
+            # ``replication/papers/adh2013/WESTATA_GAPS.md`` records.
+            from westata.vce.dispatch import cluster_labels_from_kwds
+
+            groups = cluster_labels_from_kwds(cov_kwds)
+            if groups is not None:
+                e["N_clust"] = float(np.unique(encode_groups(groups)).size)
 
         results = StataResults(
             params=beta,

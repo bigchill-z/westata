@@ -126,6 +126,54 @@ def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
     return token[:1].upper() + token[1:]
 
 
+def _resolve_weight_column(weights: Any, data: pd.DataFrame) -> Any:
+    """Turn ``weights="colname"`` into the column's values; pass anything else through.
+
+    ``statsmodels.formula.api`` accepts a column NAME here, and that is not a convenience
+    detail: it is what makes its missing-value handling transparent, because the weights
+    become one more column of the frame and are filtered with everything else. An array
+    forces the caller to replicate the row-dropping themselves.
+
+    A string that is NOT a column is an error rather than a silent array of one element --
+    guessing would produce a confusing length failure later.
+    """
+
+    if isinstance(weights, str):
+        if weights not in data.columns:
+            raise WeightError(
+                f"weights={weights!r} looks like a column name but the data have no such "
+                f"column; available: {list(data.columns)[:12]}"
+            )
+        return data[weights].to_numpy(dtype=float)
+    return weights
+
+
+def _slice_weights_to_sample(weights: Any, kept_index: Any, n_rows: int) -> Any:
+    """Restrict a weight vector to the rows the formula kept.
+
+    Accepts either a full-length vector aligned with ``data`` (the API's documented form)
+    or one already restricted to the estimation sample, so a caller who pre-sliced by hand
+    keeps working.
+
+    A length that is neither is refused with BOTH numbers and the reason, because the
+    original error ("weights have 722 entries but the data have 675 rows") described a
+    symptom while pointing at the caller's data.
+    """
+
+    values = np.asarray(weights, dtype=float).reshape(-1)
+    kept = np.asarray(kept_index, dtype=int)
+    if values.shape[0] == kept.shape[0]:
+        return values
+    if values.shape[0] == n_rows:
+        return values[kept]
+    raise WeightError(
+        f"weights have {values.shape[0]} entries; expected {n_rows} (one per row of the "
+        f"data) or {kept.shape[0]} (one per estimation-sample row). The formula drops rows "
+        "with missing values, which is why the estimation sample can be shorter than the "
+        "frame."
+    )
+
+
 def _wald_f(params: np.ndarray, cov: np.ndarray, tested: Sequence[int]) -> float:
     """Return ``b' V^-1 b / q`` over the ``tested`` coefficients.
 
@@ -231,7 +279,27 @@ class OLS:
         weight_type: str | None = None,
         subset: Any = None,
     ) -> "OLS":
-        """Build a model from a patsy-style formula, e.g. ``"y ~ x + C(g)"``."""
+        """Build a model from a patsy-style formula, e.g. ``"y ~ x + C(g)"``.
+
+        **Rows with missing values are dropped.** A formula can only be evaluated on
+        complete cases, so observations with a missing value in ANY variable the formula
+        touches are removed before estimation -- the same thing Stata's estimation commands
+        do, and the same thing ``statsmodels.formula.api`` does through its ``dropna``
+        handling.
+
+        ``weights`` follows that sample. Two forms are accepted:
+
+        * **a column name** -- ``weights="timepwt48"`` -- the natural statsmodels spelling.
+          The weights are read from the same frame, so they cannot disagree with it about
+          which rows are in the sample.
+        * **a vector aligned with ``data``** -- it is sliced by the rows the formula kept,
+          so a 722-element vector stays correct when the formula drops 47 rows.
+
+        Before this, a vector had to be pre-sliced by hand or the call failed with
+        "weights have 722 entries but the data have 675 rows" -- a message that reads like
+        malformed data when the data are fine. See
+        ``replication/papers/ad2013/WESTATA_GAPS.md`` §1.
+        """
 
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -240,6 +308,11 @@ class OLS:
         # Positional alignment: patsy's kept_index is only safe to use with
         # .loc when the index is unique, so normalise it to a RangeIndex.
         data = data.reset_index(drop=True)
+
+        # Resolve a weight COLUMN NAME before the design is built, so the name is read from
+        # the same frame the formula is evaluated on. Doing it afterwards would read from a
+        # frame whose index the caller no longer recognises.
+        weights = _resolve_weight_column(weights, data)
 
         X, names, kept_index = build_design(formula, data)
 
@@ -250,6 +323,16 @@ class OLS:
                 f"got {lhs!r}"
             )
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
+
+        # THE WEIGHTS FOLLOW THE ESTIMATION SAMPLE. ``kept_index`` are positions in
+        # ``data`` (a RangeIndex after the reset above), so the same slice selects the
+        # matching weights. Passing the vector through untouched made the constructor's
+        # length check fail for every caller whose formula dropped a row -- the single most
+        # common situation with real data, and the error pointed at the caller's data
+        # rather than at this line.
+        if weights is not None:
+            weights = _slice_weights_to_sample(weights, kept_index, len(data))
+
         model = cls(y, X, weights=weights, weight_type=weight_type, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
         #: The response column's name, which Stata reports as ``e(depvar)`` and

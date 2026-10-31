@@ -332,7 +332,17 @@ def test_the_capability_gap_list_is_still_accurate():
     suspect -- so a control failure is an error, never a pass.
     """
 
-    import probe_gaps
+    # Load by path: both replications now ship a module called ``probe_gaps``, and a
+    # plain ``import`` resolves to whichever directory is first on ``sys.path``.  That
+    # collision made this test ask CK's probe for an attribute only ADH's has.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "adh2013_probe_gaps", PAPER / "probe_gaps.py"
+    )
+    probe_gaps = importlib.util.module_from_spec(spec)
+    sys.modules["adh2013_probe_gaps"] = probe_gaps
+    spec.loader.exec_module(probe_gaps)
 
     statuses = {gap.name: gap.run()[0] for gap in probe_gaps.GAPS}
     stale = [name for name, status in statuses.items() if status == "FIXED"]
@@ -357,9 +367,27 @@ def test_the_capability_gap_list_is_still_accurate():
 
 
 def test_the_generated_do_file_lists_every_specification():
-    """The human-runnable artefact and the machine comparison must cover the same models."""
+    """The human-runnable artefact and the machine comparison must cover the same models.
 
-    from specs import SPECS
+    ``specs`` is imported from the ADH directory by explicit path rather than by module
+    name: both replication packages now have a module called ``specs``, and whichever
+    directory happens to be first on ``sys.path`` wins.  That collision made this test
+    fail with CK's specifications while checking ADH's do-file, which is exactly the kind
+    of silent cross-package mix-up the test exists to prevent elsewhere.
+    """
+
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "adh2013_specs", PAPER / "specs.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    # ``dataclasses`` looks the module up in ``sys.modules`` while decorating, so a
+    # module executed without being registered there fails with an AttributeError that
+    # says nothing about the real cause.
+    sys.modules["adh2013_specs"] = module
+    spec.loader.exec_module(module)
+    SPECS = module.SPECS
 
     do_file = OUT / "adh2013_replication.do"
     if not do_file.exists():

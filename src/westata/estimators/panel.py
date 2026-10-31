@@ -415,14 +415,23 @@ class PanelOLS:
         *,
         entity: str,
         time: str,
+        subset: Any = None,
     ) -> "PanelOLS":
         """Build a model from a formula and a panel frame.
 
         A long frame carrying the ``entity``/``time`` columns is converted with
         ``set_index([entity, time])``; a frame that already carries the
         two-level ``MultiIndex`` is used as is.
+
+        ``subset=`` restricts the estimation sample, matching ``OLS``/``Logit``/
+        ``Poisson`` and Stata's ``if``/``in``. The previous workaround -- pre-filtering the
+        frame and calling ``reset_index`` -- gives identical numbers (verified), so this is
+        a consistency fix rather than a correctness one: one spelling for the same
+        operation across estimators.
         """
 
+        if subset is not None:
+            data = data.loc[subset]
         return cls(formula, data, entity=entity, time=time)
 
     # ------------------------------------------------------------------ fit

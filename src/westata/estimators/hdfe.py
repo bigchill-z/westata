@@ -258,9 +258,18 @@ class FEOLS:
         *,
         weights: Any = None,
         weight_type: str | None = None,
+        subset: Any = None,
     ) -> "FEOLS":
-        """Build a model from a PyFixest formula (see :class:`FEOLS`)."""
+        """Build a model from a PyFixest formula (see :class:`FEOLS`).
 
+        ``subset=`` restricts the estimation sample, matching ``OLS``/``Logit``/
+        ``Poisson`` and Stata's ``if``/``in``. Filtering the frame by hand instead would
+        work numerically but loses the distinction between the frame and the sample, and
+        the absorbed-effect prediction added earlier reads the estimation frame.
+        """
+
+        if subset is not None:
+            data = data.loc[subset]
         return cls(formula, data, weights=weights, weight_type=weight_type)
 
     # ------------------------------------------------------------------ fit

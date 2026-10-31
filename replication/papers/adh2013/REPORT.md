@@ -375,7 +375,7 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 | **无数据操作层** | `egen` / `merge` / `reshape` / `collapse` / `bysort` / `append` **全部不存在**（142 个公开接口里 0 个） | 这是**有意的分工**：数据整理交给 pandas，westata 只负责估计（README 也是这么定位的）。但对"把 Stata 项目整体搬过来"这个目标而言，意味着另一半工作要另配工具——论文的暴露度变量正是预先构建好的，所以这次复现**恰好**没被这个缺口挡住 |
 | **无图形层** | `graph` / `twoway` / `scatter` / `histogram` 全无 | 论文的图必须另找工具（matplotlib 等） |
 
-> 更细的 westata 能力缺口清单（现存 6 条，按 westata 自身 API 契约判定并附可执行探针）见 [WESTATA_GAPS.md](WESTATA_GAPS.md)。本节只讨论"能否替代 Stata"这个问题本身。
+> 更细的 westata 能力缺口清单（现存 3 条，按 westata 自身 API 契约判定并附可执行探针）见 [WESTATA_GAPS.md](WESTATA_GAPS.md)。本节只讨论"能否替代 Stata"这个问题本身。
 
 另有 9 条命令存在**已记录的实质偏差**（`xtgls` 3.4e+00、`teffects nnmatch` 7.1e-02、`frontier` 4.3e-02 等），以及 15 条 E1 等级命令（`arima`、`heckman`、`xtlogit pa` 等）。这些不在本次复现范围内，但它们决定了"替代"的边界。
 
@@ -395,7 +395,16 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 
 摘要：按"是否损害 westata 自身 API 契约"（而非"是否像 Stata"）判定，初版列出 7 条——2 条能力缺失（加权 IV、`FEOLS` 无 `predict`）、3 条同一 API 内不一致（`cov_kwds` 聚类键名三套、`subset=` 覆盖不全、`margins(at=)` 只收标量）、2 条契约/工程化。
 
-**其中 `cov_kwds` 聚类键名不一致已修复**：`groups` / `clusters` / `cluster` 三种键名现在在 `OLS`、`IV2SLS`、`FEOLS`、`PanelOLS` 上全部可用，读取逻辑收敛到 `westata.vce.dispatch.cluster_labels_from_kwds()` 一处。**当前剩余 6 条**，其中加权 IV 与 `FEOLS` 的 `predict` 仍是最值得做的两项。
+**其中 4 条已修复并提交**：
+
+| 已修复 | 提交 |
+|---|---|
+| `cov_kwds` 聚类键名三套 → `groups`/`clusters`/`cluster` 全部可用，逻辑收敛到一处 | `72a2d12` |
+| 加权 IV 不支持 → 四种 Stata 权重类型全部实现 | `01c3ce5` |
+| `FEOLS` 无 `predict` → `xb`/`d`/`residuals`/`dresiduals`，`xb` 含吸收效应 | `fa5787e` |
+| `subset=` 覆盖不全 → 全部 `from_formula` 均接受 | 本次 |
+
+**当前剩余 3 条**：`margins(at=)` 只收标量、`predict(exog=)` 无形状校验、`etable` 无写文件。三项都不涉及数值正确性，属于 API 打磨；其中前两项是 statsmodels 风格的常规用法。
 
 每一条都由 `probe_gaps.py` 可执行验证；已修复的条目会报 `FIXED` 并由测试强制本文同步更新（`test_the_capability_gap_list_is_still_accurate`）。修复前后的完整记录见 WESTATA_GAPS.md §6。
 

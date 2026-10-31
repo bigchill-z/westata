@@ -483,9 +483,21 @@ class IV2SLS:
         # unexpected-keyword check; leaving them in made them look like typos.
         weights = kwargs.pop("weights", None)
         weight_type = kwargs.pop("weight_type", None)
+        subset = kwargs.pop("subset", None)
         _reject_unsupported_kwargs(kwargs)
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
+
+        # ``subset=`` restricts the estimation sample, the same way ``OLS`` does and the
+        # way Stata's ``if``/``in`` do. It was missing here while present on OLS/Logit/
+        # Poisson, so "estimate on a subset" needed a different spelling per estimator.
+        #
+        # Applied BEFORE parsing so that every downstream step -- the kept index, the
+        # weight alignment, the cluster labels -- sees the same rows. Pre-filtering the
+        # frame by hand gives identical numbers (verified), so this is a consistency fix,
+        # not a correctness one.
+        if subset is not None:
+            data = data.loc[subset]
 
         # Stata's ivregress always includes a constant unless noconstant is
         # given, while linearmodels only includes one if the formula says so.

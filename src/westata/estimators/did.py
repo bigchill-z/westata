@@ -504,12 +504,18 @@ class Didregress:
         group: str,
         time: str,
         covariates: Any = None,
+        subset: Any = None,
     ) -> "Didregress":
         """Build a model from Stata's ``didregress (y x1) (treated)`` spelling.
 
         Nothing is estimated until :meth:`fit` is called.
+
+        ``subset=`` restricts the estimation sample, matching every other
+        ``from_formula`` in the package and Stata's ``if``/``in``.
         """
 
+        if subset is not None:
+            data = data.loc[subset]
         return cls(
             outcome, treatment, data, group=group, time=time, covariates=covariates
         )

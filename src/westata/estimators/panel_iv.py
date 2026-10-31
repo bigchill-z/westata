@@ -571,6 +571,7 @@ class XtIvreg:
         entity: str,
         time: str | None = None,
         method: str = "fe",
+        subset: Any = None,
     ) -> "XtIvreg":
         """Build the model from ``"y ~ w + (endog = z)"``.
 
@@ -579,6 +580,8 @@ class XtIvreg:
         identifiers, matching Stata's default handling.
         """
 
+        if subset is not None:
+            data = data.loc[subset]
         command = "xtivreg"
         depvar, exog_terms, endog_terms, instrument_terms = _split_iv_formula(formula)
         frame = _as_frame(data, entity=entity, time=time, command=command)
@@ -978,9 +981,14 @@ class XtGls:
         panels: str = "heteroskedastic",
         corr: str = "independent",
         nmk: bool = False,
+        subset: Any = None,
     ) -> "XtGls":
         """Build the model from a formula and a panel frame."""
 
+        if subset is not None:
+            data = data.loc[subset]
+        if subset is not None:
+            data = data.loc[subset]
         command = "xtgls"
         frame = _as_frame(data, entity=entity, time=time, command=command)
         lhs = formula.split("~", 1)[0].strip()
@@ -1466,9 +1474,12 @@ class XtPcse:
         time: str | None = None,
         correlation: str = "independent",
         selection: str = "casewise",
+        subset: Any = None,
     ) -> "XtPcse":
         """Build the model from a formula and a panel frame."""
 
+        if subset is not None:
+            data = data.loc[subset]
         command = "xtpcse"
         frame = _as_frame(data, entity=entity, time=time, command=command)
         lhs = formula.split("~", 1)[0].strip()
@@ -1999,6 +2010,7 @@ class XtUnitroot:
         trend: bool = False,
         noconstant: bool = False,
         demean: bool = False,
+        subset: Any = None,
     ) -> "XtUnitroot":
         """Build the test from a formula and a panel frame.
 
@@ -2011,6 +2023,8 @@ class XtUnitroot:
         cannot be interpreted.
         """
 
+        if subset is not None:
+            data = data.loc[subset]
         command = "xtunitroot"
         if time is None:
             raise ConsistencyError(

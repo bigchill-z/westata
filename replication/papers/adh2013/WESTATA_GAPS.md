@@ -29,18 +29,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 ## 2. P1：同一 API 的内部不一致（判据 2）
 
-**1. `subset=` 只在部分估计器上存在**
-
-| 估计器 | `subset=` |
-|---|---|
-| `OLS` / `Logit` / `Poisson` | ✅ |
-| `IV2SLS` / `IVLIML` / `IVGMM` / `FEOLS` / `PanelOLS` | ❌ |
-
-这意味着"限制估计样本"这个**跨模型通用**的操作，在不同估计器上要用不同写法：有的传 `subset=`，有的必须先 `df[mask].reset_index(drop=True)`。后者还有个隐患——手工过滤后 `PanelOLS` 的个体/时间索引可能不再连续。
-
-> 建议：把 `subset=` 提升为所有 `from_formula` 的公共参数（`OLS` 已有实现可直接复用）。
-
-**2. `margins(at=...)` 只接受标量**
+**1. `margins(at=...)` 只接受标量**
 
 ```python
 r.margins(dydx="x1")            # ✅
@@ -177,3 +166,26 @@ native aweighted IV2SLS:
 **现状**：`kind="xb"` 与 `kind="residuals"` 均可运行，但实现（`estimators/hdfe.py`，153 行）**仍在工作区、尚未提交**。按 `HEAD` 克隆的读者还拿不到它。
 
 **保留的防线**：对照项断言 `xb + residuals == y`。固定效应模型很容易返回一个**遗漏吸收项平移**的 `xb`——数值看起来合理，实际是错的。用这条恒等式检查，比断言"不抛异常"能抓住真问题。
+
+### 6.4 `subset=` 覆盖不全 —— 已修复
+
+**原状**：`OLS`/`Logit`/`Poisson` 接受 `subset=`，而 `IV2SLS`/`IVLIML`/`IVGMM`/`FEOLS`/`PanelOLS` 不接受。"限制估计样本"是跨模型通用操作，却要按估计器换写法。
+
+**现状**：全部 `from_formula` 都接受 `subset=`，布尔掩码与索引标签两种形式均可。
+
+**改动范围**（比清单里写的更大）：除了清单点名的 5 个，实测发现另有 4 个面板估计器也缺 —— `XtGls`、`XtPcse`、`XtIvreg`、`XtUnitroot`，以及 `Didregress`/`Xtdidregress`。清单只列了当时复现用到的那些。
+
+**顺带修正了探针本身的一个缺陷**：它用 `inspect.signature` 判断 `subset=` 是否存在，而 `IV2SLS.from_formula` 走 `**kwargs` 再从里面 `pop("subset")`，签名里永远看不到该参数。于是探针把**已经可用**的 IV 族报成缺失——如果照它的报告去"修"，会去改一条本来正常的路径。
+
+改为**实际调用** `from_formula(..., subset=mask)` 后再判定：
+
+```python
+try:
+    _probe_subset_call(cls)
+except TypeError as error:
+    (lacks if "subset" in str(error) else has).append(name)
+```
+
+只有「签名拒绝」才算缺失；其他异常说明参数已被接受。这条区分正是探针该做的事——它测的是**能力**，不是**声明**。
+
+**保留的防线**：测试不只断言"能调用"，还断言 `subset=` 的结果与手工 `df[mask].reset_index(drop=True)` 后估计**逐位相同**（系数 `rtol=1e-10`、标准误 `rtol=1e-8`）。一个"接受参数但忽略它"的实现能通过前者、通不过后者——而那种实现的输出看起来完全正常，只是用了全样本。

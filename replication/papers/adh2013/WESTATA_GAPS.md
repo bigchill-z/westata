@@ -1,11 +1,13 @@
 # westata 可优化点清单
 
 **来源**：Autor–Dorn–Hanson (2013) 复现过程中实测得到。
-**被测版本**：`westata 0.0.3`（本仓库 `src/westata`，未作任何改动）。
+**被测版本**：`westata 0.0.3`（本仓库 `src/westata`）。
 **复核方式**：`.venv/Scripts/python.exe replication/papers/adh2013/probe_gaps.py`
 
 > 配套报告：[REPORT.md](REPORT.md) —— 讲这篇论文的复现结果。
 > 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
+>
+> **状态：7 条全部已修复，清单归零。** 初版是在 `westata` 未作任何改动时测得的；修复过程中本仓库的 `src/westata` 被修改，所以本文现在记录的是「曾经缺什么、怎么修的」，而 §4 的探针反过来充当**回归测试**——任何一条退化都会让 `replication/tests` 失败。按当前 HEAD 实测：`0 gap(s) present, 0 stale report entries`。
 
 ## 0. 先说清楚：本文不要求 westata 模仿 Stata
 
@@ -13,7 +15,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 所以本文**不以"像不像 Stata"为判据**。初稿曾按这个错误框架列过 5 条"缺口"（`i.` 语法糖、`lincom` 的 `_b[]`、`predict` 别名、全局 `set seed`、`log using`），它们全部被删除——详见 §5。
 
-本文的判据只有三条：
+本文的判据只有三条（下面括号里的例子都是**初版实测时**的）；
 
 1. **能力缺失**——某类模型根本跑不了（如加权 IV），与语法无关；
 2. **同一 API 内部不一致**——同为 statsmodels 风格，A 估计器有这个参数、B 没有；或同一语义在不同估计器上要用不同 kwds 键名；
@@ -103,7 +105,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 |---|---|---|
 | 聚类键名三套 | **已修复且已提交**（`72a2d12`） | `tests/test_cluster_key_is_uniform.py` 21 项；探针对照项通过 |
 | 加权 IV 不支持 | **已修复且已提交**（`01c3ce5`） | `tests/test_weighted_iv.py` 25 项；探针对照项断言复现 Stata 的 b 与 se |
-| `FEOLS` 没有 `predict` | **本机已可运行，但改动在工作区、未提交** | `git diff -- src/westata/estimators/hdfe.py` 显示 153 行未提交插入；探针对照项断言 `xb + residuals == y` |
+| `FEOLS` 没有 `predict` | **已修复且已提交**（`fa5787e`） | `tests/test_feols_predict.py` 17 项；探针对照项断言 `xb + residuals == y` |
 
 三条修复的经过值得一提：本清单初版把它们列为 P0 能力缺失，上游随后逐一实现。**清单的作用不只是记录问题，它促成了修复**；而修复之后，同一套探针自动把「缺口」改写成「回归测试」，不需要有人记得回来删条目——`test_the_capability_gap_list_is_still_accurate` 会在任何一条重新变回 `FIXED` 时失败。
 
@@ -131,7 +133,7 @@ for key in ("groups", "clusters", "cluster"):
 
 **原状**：`IV2SLS`/`IVLIML`/`IVGMM` 全部拒绝 `weights=`，抛 `UnsupportedError`。这是本次复现最痛的缺口——论文 166 条估计命令里 153 条是加权 IV。
 
-**中间状态**：修复先出现在工作区（未提交），我据此在报告中标注为「本机可用、改动尚未提交」，因为按 `HEAD` 克隆的读者拿到的仍是不支持的版本。
+**一个当时的中间状态值得记录**：修复先出现在工作区（尚未提交），我据此在报告中标注为「本机可用、改动尚未提交」，因为按 `HEAD` 克隆的读者拿到的仍是不支持的版本。这种标注是对的——**但在提交之后它也会过期**，本文后来确实需要回头修正（`fa5787e` 提交后，§6.3 的「未提交」字样已改为「已提交」）。文档里任何描述仓库状态的话，都会随提交而失效。
 
 **现状**：已提交为 `01c3ce5`。实测复现论文 Table 3 列 (6)：
 
@@ -144,11 +146,11 @@ native aweighted IV2SLS:
 
 **保留的防线**：探针的 `weighted IV` 对照项不只断言"不报错"，而是断言**复现出 Stata 的 b 与 se**。加权实现出错时的典型症状是**系数对、标准误错**（掩盖在 `e(V)` 里），只断言"能跑"会放过这种缺陷。
 
-### 6.3 `FEOLS` 的 `predict` —— 本机可用，改动尚未提交
+### 6.3 `FEOLS` 的 `predict` —— 已修复并提交
 
 **原状**：`OLS`/`IV2SLS`/`PanelOLS`/`Logit`/`Poisson` 都能 predict，唯独 `reghdfe` 抛 `no prediction types registered`。
 
-**现状**：`kind="xb"` 与 `kind="residuals"` 均可运行，但实现（`estimators/hdfe.py`，153 行）**仍在工作区、尚未提交**。按 `HEAD` 克隆的读者还拿不到它。
+**现状**：`kind="xb"`（含吸收效应）、`d`、`residuals`、`dresiduals` 均可用，实现在 `fa5787e` 提交（`estimators/hdfe.py`）。多路吸收（如 `| firm + year`）明确拒绝并说明原因——多路效应只在相差一个归一化常数下可识别。
 
 **保留的防线**：对照项断言 `xb + residuals == y`。固定效应模型很容易返回一个**遗漏吸收项平移**的 `xb`——数值看起来合理，实际是错的。用这条恒等式检查，比断言"不抛异常"能抓住真问题。
 

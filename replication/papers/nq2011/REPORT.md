@@ -11,9 +11,9 @@
 |---|---|
 | 论文的结论复现出来了吗？ | **是，系数到 7 位小数。** 表 2 六列的系数全部与作者日志逐位吻合 |
 | 标准误呢？ | **这里出现了一个真实发现**：系数一致，但标准误取决于对照哪个 Stata 命令——`areg` 与 `xtreg, fe` 差 4.5% |
-| `pystata` 与 `westata` 有差异吗？ | **与 `xtreg` 无差异**（1e-13）；**与 `areg` 差 4.5%**，但这是 **Stata 内部两个命令的约定分歧**，不是 westata 缺陷 |
+| `pystata` 与 `westata` 有差异吗？ | **系数全线一致**（最大 4.6e-08）。标准误：`Areg`/`FEOLS`/`PanelOLS` 均跟随 `reghdfe`/`xtreg`，与 `areg` 差 4.3–4.4%（Stata 内部约定，见 §3.2）。`_cons` 见上 |
 | 数据能获取吗？ | **能。** Harvard Dataverse，三个文件，含作者自己的完整 log |
-| 有新的 westata 问题吗？ | **有 1 条。** westata 的 `e(rmse)` 与标准误用了**两套不同的自由度约定**（前者随 `areg`、后者随 `xtreg`），输出内部不自洽。详见 [nq2011_gaps.md](../../gaps/nq2011_gaps.md) §3 |
+| 有新的 westata 问题吗？ | **有 1 条。** 新增的 `Areg` 命令能对上 `e(cmd)`/`e(title)`，斜率也正确，但 **`_cons` 与 Stata `areg` 不符**（点估计差 5.6e-04，标准误差 125%）。详见 [nq2011_gaps.md](../../gaps/nq2011_gaps.md) §4 |
 
 ---
 

@@ -91,7 +91,7 @@ def _serialise(result) -> dict:
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     frame, dummy_names = prepare()
-    payload: dict = {"feols": {}, "panelols": {}, "meta": {}}
+    payload: dict = {"areg": {}, "feols": {}, "panelols": {}, "meta": {}}
     payload["meta"]["westata_version"] = ws.__version__
     payload["meta"]["rows"] = int(len(frame))
     payload["meta"]["year_dummies"] = len(dummy_names)
@@ -99,7 +99,17 @@ def main() -> int:
     for spec in SPECS:
         formula = _formula(spec, dummy_names)
 
-        # reghdfe-equivalent: country effects absorbed, year effects as regressors.
+        # ``areg``-equivalent: the command the authors actually ran.  ``Areg`` takes the
+        # absorbed variable by name (``absorb=``) the way Stata's ``a(isocode)`` does, and
+        # reports ``e(cmd) = "areg"`` with a constant.
+        areg = ws.Areg.from_formula(formula, frame, absorb="isocode").fit(
+            cov_type="cluster", cov_kwds={"cluster": "isocode"}
+        )
+        payload["areg"][spec.id] = _serialise(areg)
+        print(f"[westata Areg]     {spec.id}: N={areg.nobs}", flush=True)
+
+        # ``reghdfe``-equivalent, kept as the comparison point: same estimation, different
+        # identity and no reported constant.
         fe = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit(
             cov_type="cluster", cov_kwds={"cluster": "isocode"}
         )

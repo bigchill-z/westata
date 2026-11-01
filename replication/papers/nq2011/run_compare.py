@@ -111,11 +111,26 @@ def main() -> int:
                 "xtreg_b": float(x["b"][ix]), "xtreg_se": float(x["se"][ix]),
             }
 
-        # ---- westata vs areg ------------------------------------------------
-        names, ab, ase, wb, wse = _pairs(stata["specs"][spec.id], westata["feols"][spec.id])
-        rec["agree_areg_coef"] = float(np.max(np.abs(wb - ab) / np.maximum(np.abs(ab), 1e-12)))
-        rec["agree_areg_se"] = float(np.max(np.abs(wse - ase) / np.maximum(np.abs(ase), 1e-12)))
-        rec["paired_feols"] = len(names)
+        # ---- westata Areg vs Stata areg --------------------------------------
+        # This is the direct comparison the command exists for: same command name, same
+        # absorbed variable, same constant.  The coefficient must match; the clustered
+        # standard error is expected to differ, because ``Areg`` subclasses ``FEOLS`` and
+        # therefore inherits reghdfe's variance path.
+        names, ab, ase, wb, wse = _pairs(stata["specs"][spec.id], westata["areg"][spec.id])
+        # Split slopes from the constant.  ``Areg`` reports ``_cons`` and its value does
+        # not match Stata's ``areg``; folding that into one maximum would hide that every
+        # slope agrees, which is the more useful statement for a replication.
+        is_cons = [name == "_cons" for name in names]
+        slope = [i for i, flag in enumerate(is_cons) if not flag]
+        cons = [i for i, flag in enumerate(is_cons) if flag]
+        rec["agree_areg_coef"] = float(np.max(np.abs(wb[slope] - ab[slope]) /
+                                              np.maximum(np.abs(ab[slope]), 1e-12)))
+        rec["agree_areg_se"] = float(np.max(np.abs(wse[slope] - ase[slope]) /
+                                            np.maximum(np.abs(ase[slope]), 1e-12)))
+        if cons:
+            rec["cons_b"] = {"stata": float(ab[cons[0]]), "westata": float(wb[cons[0]])}
+            rec["cons_se"] = {"stata": float(ase[cons[0]]), "westata": float(wse[cons[0]])}
+        rec["paired_areg"] = len(names)
 
         # ---- westata vs xtreg ----------------------------------------------
         names, xb, xse, wb2, wse2 = _pairs(stata["xtreg"][spec.id], westata["panelols"][spec.id])

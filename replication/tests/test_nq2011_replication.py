@@ -167,21 +167,21 @@ def test_data_provenance_is_pinned():
         assert len(item["sha256"]) == 64, name
 
 
-def test_the_gap_probe_reports_the_rmse_convention_and_keeps_the_note():
-    """Guard ``nq2011_gaps.md``: no gap, and both conventions attributed.
+def test_the_gap_probe_reports_the_areg_constant_and_keeps_the_note():
+    """Guard ``nq2011_gaps.md``: one open gap (``Areg``'s ``_cons``) plus the SE note.
 
-    An earlier version of this test asserted a ``GAP`` here -- "westata's ``e(rmse)`` uses
-    the ``areg`` denominator while the standard error uses the ``xtreg`` one, so the output
-    is not internally consistent".  **That assertion was wrong and has been inverted**,
-    because a live Stata capture of the same specification shows ``reghdfe`` reporting
-    exactly that pair (``e(rmse)`` on the full-rank denominator 1400, ``e(df_r)`` = 129).
-    The document records the correction in its section 3.
+    History this test has to respect: an earlier version asserted a *different* gap --
+    that ``e(rmse)`` and the standard error used different freedoms.  A live Stata capture
+    showed ``reghdfe`` reports exactly that pair, so that assertion was wrong and was
+    withdrawn (the gap list keeps the retraction in its section 3).
 
     What must hold now:
 
-    * the ``rmse`` probe is ``OK`` and attributes its behaviour to ``reghdfe``;
-    * it still pins the full-rank denominator 1400, so the evidence cannot drift;
-    * the ``areg``/``xtreg`` ``NOTE`` is unchanged.
+    * ``Areg``'s slope matches the authors' log;
+    * ``Areg``'s ``_cons`` does **not** match Stata's ``areg`` -- a real defect, asserted
+      in the failing direction so it cannot be silently dropped;
+    * ``Areg``'s clustered SE follows ``reghdfe``, recorded as a NOTE rather than a gap,
+      because ``reghdfe``'s source says the divergence is deliberate.
     """
 
     import importlib.util
@@ -197,28 +197,20 @@ def test_the_gap_probe_reports_the_rmse_convention_and_keeps_the_note():
     kinds = {name: status for name, (status, _) in statuses.items()}
 
     assert not [n for n, s in kinds.items() if s == "ERROR"], f"probes failed: {statuses}"
-    assert not [n for n, s in kinds.items() if s == "GAP"], (
-        "nq2011 reports a gap again: "
-        f"{[(n, statuses[n][1]) for n, s in kinds.items() if s == 'GAP']}"
-    )
 
-    rmse_probe = statuses["rmse vs se convention"]
-    assert rmse_probe[0] == "OK", (
-        "the rmse convention probe no longer passes; if westata stopped following "
-        "reghdfe, nq2011_gaps.md section 3 needs revisiting"
+    assert kinds.get("Areg coefficient") == "OK", (
+        f"the slope no longer matches the authors' log: {statuses.get('Areg coefficient')}"
     )
-    assert "1400" in rmse_probe[1], rmse_probe[1]
-    assert "reghdfe" in rmse_probe[1], (
-        "the probe no longer attributes the behaviour to reghdfe; the whole point of "
-        f"section 3 is that this is the reference implementation's convention: {rmse_probe[1]}"
+    assert kinds.get("Areg _cons") == "GAP", (
+        "Areg's _cons now matches Stata's areg; if that was a fix, nq2011_gaps.md section 4 "
+        f"must become a 'fixed' entry. Probe said: {statuses.get('Areg _cons')}"
     )
+    assert kinds.get("Areg clustered SE") == "NOTE", (
+        "the reghdfe/areg SE convention note no longer reproduces: "
+        f"{statuses.get('Areg clustered SE')}"
+    )
+    assert kinds.get("Areg identity") == "OK", statuses.get("Areg identity")
 
-    note = statuses["areg versus xtreg"]
-    assert note[0] == "NOTE", (
-        f"the areg/xtreg convention difference no longer reproduces ({note}); "
-        "nq2011_gaps.md section 1 needs rewriting"
-    )
-    assert "0.0164182" in note[1], f"the xtreg standard error moved: {note[1]}"
 
 
 def test_rmse_uses_the_full_rank_denominator_like_reghdfe():

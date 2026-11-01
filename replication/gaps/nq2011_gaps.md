@@ -8,21 +8,21 @@
 
 ---
 
-## 0. 结论：0 个缺口
+## 0. 结论：1 个缺口，1 条已知约定差异
 
-本论文复现过程中，westata 的**系数**全部正确。两条一度引起怀疑的现象，经对照后**都不是
-westata 的缺陷**：
+westata 新增了 `Areg`（提交 `56304d4`），本文件随之更新。
 
-| 条目 | 性质 | 探针结论 |
+| 条目 | 性质 | 状态 |
 |---|---|---|
-| 与 `areg` 的 4.5% 标准误差异 | Stata 内部约定分歧 | `NOTE`（§1）|
-| `rmse` 与 `df_r` 分母不同 | **reghdfe 自身的行为**，westata 忠实复现 | `OK`（§3）|
+| **`Areg` 的 `_cons` 与 Stata `areg` 不一致** | **缺口（P1）** | **未修复** |
+| `Areg` 的聚类标准误遵循 `reghdfe` 而非 `areg` | 已知约定差异 | 不是缺陷，见 §1 |
+| 系数（斜率） | 正确 | 6 列全部吻合 |
 
-第二条曾是本文档记录的"缺口"。**经与真实 Stata 的 `reghdfe` 逐位对照后，这个判定被推翻**——详见 §3。
+新增的 `Areg` 解决了**命令身份**（`e(cmd)="areg"`、`e(title)`、`e(predict)`）和
+**常数项的存在性**，但常数项的**数值**与本篇数据上的 Stata `areg` 不符；聚类标准误则
+仍然继承 `FEOLS`/`reghdfe` 的方差路径。
 
-> **判据教训**：把"我认为不一致"当成"确实有缺陷"，是本文档犯过的最大错误。
-> 唯一能判定的是**对照实现**：把 westata 与真实 `reghdfe` 的输出逐位比较，而不是与
-> "我预期的自洽关系"比较。§3 记录了这个纠正过程。
+细节见 §4（缺口）与 §1（约定差异）。
 
 ## 1. 最关键的一点：判定差异的归属需要对照
 
@@ -112,37 +112,27 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
 ## 2. 探针结果
 
 ```
--- estimator surface --
-  [OK  ] rmse vs se convention      e(rmse) keeps the full-rank denominator 1400, as
-                                    reghdfe does, while e(df_r)=129.0 follows the
-                                    clustered one; this is reghdfe's documented
-                                    behaviour, not an inconsistency
-  [OK  ] areg-equivalent (FEOLS)    coefficient 0.1213388
-  [OK  ] xtreg-equivalent (PanelOLS) coefficient 0.1213388
--- agreement --
-  [OK  ] Stata labels               22 parameters carry Stata-style labels
-  [NOTE] areg versus xtreg          SE 0.0164182 与 xtreg 一致；areg 的 0.0171579
-                                    差 4.5%，属 Stata 内部约定，不是 westata 缺陷
+-- Areg against Stata areg --
+  [OK  ] Areg coefficient       coefficient 0.1213388（与作者日志一致）
+  [GAP ] Areg _cons             _cons=12.63564782 (se 0.07604164)
+                                Stata areg: 12.64269254 (se 0.03383845)
+                                点估计差 5.57e-04，标准误差 125%
+  [NOTE] Areg clustered SE      SE 0.0164182 = reghdfe 值，非 areg 的 0.0171579
+  [OK  ] Areg identity          e(cmd)='areg', e(title)='Linear regression, absorbing indicators'
 -- controls --
-  [OK  ] public surface             142 public names
+  [OK  ] public surface         143 public names
 ```
 
-**5 ok、1 note、0 gap、0 error。**
+**3 ok、1 note、1 gap、0 error。**
 
-`OK` / `NOTE` / `GAP` 的区别是本文件的关键：
+| 类别 | 含义 |
+|---|---|
+| `OK` | 正确 |
+| `NOTE` | 已归因的预期差异，**不是缺陷** |
+| `GAP` | 该修的问题 |
 
-| 类别 | 含义 | 例 |
-|---|---|---|
-| `OK` | 与参照实现一致 | `rmse` 口径——与真实 `reghdfe` 逐位相同（§3）|
-| `NOTE` | 已归因的预期差异，**不是缺陷** | 与 `areg` 的 4.5% 差距——Stata 自己两个命令就不一致 |
-| `GAP` | 该修的问题 | —— 本文件目前没有 |
-
-**注意**：`rmse vs se convention` 这一条最初不存在。初版探针只对比系数和 `xtreg` 标准误，
-全部通过，于是文档写了"0 gap"。是追问"是否该实现 `areg`"才促成了这项检查——
-**"每个数字都能对上某个 Stata 命令"不等于"输出内部自洽"**，这两件事必须分开验证。
-
-但**这项检查本身后来又犯了一次方向相反的错**：它把"我自己预期的自洽关系"当成了契约，
-于是把 `reghdfe` 的正常行为报成了缺口。真正的判据只有对照实现——见 §3。
+`Areg` 新功能让 `e(cmd)`、`e(title)` 这些**身份**字段对上了，这部分是 `OK`。
+但 `_cons` 的**数值**和聚类标准误的**口径**是另外两件事，分别记在 §4 与 §1。
 
 ---
 
@@ -251,7 +241,61 @@ consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍�
 
 ---
 
-## 4. 复核方式
+## 4. 缺口：`Areg` 的 `_cons` 与 Stata `areg` 不符（P1，未修复）
+
+### 4.1 现象
+
+同一份数据、同一个设定（11 个马铃薯交互项 + 11 个年份虚拟变量 + 130 个国家固定效应，
+聚类于 `isocode`）：
+
+| | `_cons` 点估计 | `_cons` 标准误 |
+|---|---|---|
+| Stata `areg` | **12.64269254** | **0.03383845** |
+| westata `Areg` | 12.63564782 | 0.07604164 |
+| 差异 | 5.57e-04（相对） | **125%（相对）** |
+
+**6 列的全部斜率参数都正确**（与作者日志 1e-6 内吻合），只有常数项不符。
+
+### 4.2 为什么这算缺口
+
+`Areg` 存在的理由就是提供 Stata `areg` 的语义。提交 `56304d4` 已经做到：
+
+- `e(cmd) = "areg"`
+- `e(title) = "Linear regression, absorbing indicators"`
+- `e(predict) = "areg_p"`
+- 报告 `_cons`（`FEOLS` 不报告）
+
+但**报告一个与 Stata 数值不符的 `_cons`，比不报告更糟**——使用者会以为它可信。
+标准误相差 125% 尤其严重：这会让常数项的置信区间宽约 2.2 倍。
+
+### 4.3 可能的成因
+
+提交说明提到，常数项的正确算法是「拟合完整设计（斜率 + 每组一个虚拟变量），再取
+`c = (1/G)·[0,0,1,…,1]`」，这样才能同时得到 Stata 的方差与斜率协方差。
+
+本篇的设定比该 fixture 复杂：**除被吸收的 130 个国家效应外，还有 11 个显式的年份虚拟变量**。
+推测常数项的构造未正确处理"既有 absorbed 效应、又有显式虚拟变量"的情形。**这是推测，
+需要看 `hdfe.py` 的 `_cons` 代码确认。**
+
+### 4.4 建议
+
+1. 用本篇的设定（absorb + 显式年份虚拟变量）做一个 fixture，与 Stata 逐位对照；
+2. 若确认是上述成因，修 `_cons` 的构造路径；
+3. 修好前，若使用者只需斜率，`Areg` 可用；**若需要常数项，应暂用 Stata 结果**.
+
+### 4.5 分级：P1
+
+| 判据 | 情况 |
+|---|---|
+| 是否静默出错 | **是**——输出看起来正常，`_cons` 有值、有标准误，不报错 |
+| 影响面 | 中：常数项通常不是研究关注点，但它是 `predict` 与 `margins` 的输入 |
+| 是否有替代 | 有（`FEOLS` 不报常数项，反而不会误导） |
+
+主结果（斜率）不受影响，但会误导需要常数项的使用者。**P1。**
+
+---
+
+## 5. 复核方式
 
 ```bash
 .venv/Scripts/python.exe replication/papers/nq2011/nq2011_probe_gaps.py

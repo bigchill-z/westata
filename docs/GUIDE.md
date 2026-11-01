@@ -100,7 +100,7 @@ ws.OLS.from_formula(
 | `ivregress 2sls` / `liml` / `gmm` | `IV2SLS`, `IVLIML`, `IVGMM` |
 | `eivreg` | `Eivreg` |
 | `reghdfe` | `FEOLS` (backend: `pyfixest`) |
-| `areg` | `FEOLS` with one absorbed factor |
+| `areg` | `Areg` (its own command; `absorb=` required, reports `_cons`) |
 | `nl` | `Nl` |
 
 ```python

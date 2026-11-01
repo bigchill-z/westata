@@ -86,7 +86,16 @@ Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 
 ## 安装
 
-`westata` 尚未发布到 PyPI。请从仓库安装：
+`westata` 已发布到 PyPI：
+
+```bash
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install westata
+```
+
+Linux 或 macOS 上第二行是 `./.venv/bin/python -m pip install westata`。
+
+要从源码开发，用 editable 安装：
 
 ```bash
 git clone https://github.com/bigchill-z/westata.git
@@ -243,7 +252,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              1448 个测试，不需要 Stata 授权
+tests/              3963 个测试，不需要 Stata 授权
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```

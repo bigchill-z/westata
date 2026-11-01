@@ -230,7 +230,7 @@ ws.OLS.from_formula(
 | `ivregress 2sls` / `liml` / `gmm` | `IV2SLS`、`IVLIML`、`IVGMM` |
 | `eivreg` | `Eivreg` |
 | `reghdfe` | `FEOLS`（后端 `pyfixest`）|
-| `areg` | 单因子 absorbed 的 `FEOLS` |
+| `areg` | `Areg`（独立命令，必填 `absorb=`，报告 `_cons`）|
 | `nl` | `Nl` |
 
 ```python

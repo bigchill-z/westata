@@ -862,16 +862,6 @@
   date: 2026-10-22
   notes: "Parameters 7.5e-9, standard errors 8.8e-10. Verified in StataNow 19.5 that `xtreg, fd` is no longer a valid option, so a direct comparison is impossible; the first-difference identity is used instead."
 
-- command: areg
-  level: E3
-  tolerance: 1.0e-12
-  sources:
-    - type: r_crosscheck
-      ref: "Fixture areg.json: areg y x1 x2, absorb(firm)"
-  verified_by: lead
-  date: 2026-10-22
-  notes: "Slopes 4.6e-16, standard errors 1.8e-16, e(df_r) exact. This also validates FEOLS's ssc defaults for the single-FE case. reghdfe itself could not be installed (SSC timed out), so the multi-way HDFE path remains E1."
-
 - command: reghdfe
   level: E3
   tolerance: 1.0e-12
@@ -883,6 +873,18 @@
   verified_by: lead
   date: 2026-10-22
   notes: "Installed from the author's GitHub sources because SSC (fmwww.bc.edu) is unreachable from this network; scripts/install_reghdfe.py also fetches the ftools and require dependencies. All five specifications match at 4.4e-16 (params), 2.0e-16 (SE) and 0-2.2e-16 on every e() scalar. Reproducing e(df_r), e(rmse) and e(r2_a) required separating three different degrees of freedom: e(df_r)=G-1 under clustering (nested FE treated as redundant), e(rmse)=sqrt(rss/(N-rank)), e(r2_a)=1-(1-r2)(N-1)/(N-rank_full) where rank_full counts every absorbed level minus one redundancy per extra effect."
+
+- command: areg
+  level: E3
+  tolerance: 1.0e-12
+  sources:
+    - type: r_crosscheck
+      ref: "Fixture areg.json: areg y x1 x2, absorb(firm), vce(ols)"
+    - type: invariant
+      ref: "All three coefficients (including _cons), the whole 3x3 covariance matrix, and every scalar in areg.json"
+  verified_by: lead
+  date: 2026-11-01
+  notes: "Areg reproduces areg exactly: parameters 4.6e-16, covariance 4.2e-15 relative, names ['x1','x2','_cons'] identical. Three defects were fixed to get here. (1) _cons was the EQUAL-weighted mean of the absorbed effects; areg weights by group size, and the two coincide only on a balanced panel -- which is why this fixture could not distinguish them (the Nunn & Qian panel has 129 countries of very uneven size). (2) its variance needs the cluster-robust sandwich, not sigma^2 (X'X)^-1: 0.02306936 homoskedastic against Stata's 0.03383845. (3) clustered standard errors use K = k_reported + (k_absorb - 1) in the CR1 factor; k_absorb counts absorbed LEVELS and the constant is one of them, so it is not counted twice. Multiway needed a further step: that factor differs in STRUCTURE from reghdfe's (an implied K solves to 0.13, not an integer), so Areg rebuilds the CGM covariance on the full dummy design rather than scaling FEOLS'."
 
 - command: ivregress liml
   level: E3

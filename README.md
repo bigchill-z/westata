@@ -24,7 +24,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **3866 passing** |
+| Tests | **4167 passing** |
 | Commands covered | 93 registry entries |
 | Evidence | **52 × E3**, 26 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
@@ -144,7 +144,8 @@ full.estat_vce().to_frame()                  # full symmetric matrix as a DataFr
 |---|---|---|
 | Linear | `OLS` | `regress` (4 weight types, `i.` factors) |
 | IV | `IV2SLS` / `IVLIML` / `IVGMM` | `ivregress 2sls/liml/gmm` |
-| HDFE | `FEOLS` | `reghdfe` / `areg` |
+| HDFE | `FEOLS` | `reghdfe` |
+| HDFE | `Areg` | `areg` (requires `absorb=`, reports `_cons`) |
 | Panel | `PanelOLS` / `RandomEffects` / `BetweenOLS` / `FirstDifferenceOLS` | `xtreg fe/re/be/fd` |
 | Binary | `Logit` / `Probit` | `logit` / `probit` |
 | Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |

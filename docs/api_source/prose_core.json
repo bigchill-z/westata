@@ -423,5 +423,13 @@
     "example": "r = ws.OLS.from_formula(\"y ~ x1 + x2\", base).fit()\nlist(r.model_data.columns)",
     "notes_en": "Only estimators that retained the sample carry it; assuming it is always present is what makes a postestimation call fail late rather than at the call site.",
     "notes_zh": "只有保留了样本的估计器才带有它；假定它总是存在，会让后估计调用在深处失败而不是在调用处失败。"
+  },
+  "level": {
+    "stata": "regress ..., level(90)",
+    "en": "Confidence level used by `conf_int()` and the printed intervals, as a FRACTION (`0.90` for Stata's `level(90)`). Defaults to `0.95`. A model fitted with `level=` records it here, so a result estimated at 90% reports 90% intervals unless a caller passes an explicit `alpha`. Stata's `level(#)` takes a PERCENTAGE; the estimators accept either spelling and normalise, because reading `0.90` as a percentage would silently produce a 0.9% interval whose only symptom is \"intervals look too narrow\".",
+    "zh": "`conf_int()` 与打印区间使用的置信水平，以**分数**表示（Stata 的 `level(90)` 对应 `0.90`），默认 `0.95`。用 `level=` 拟合的模型会记录它，因此以 90% 估计的结果默认打印90% 区间，除非调用者显式传入 `alpha`。Stata 的 `level(#)` 收的是**百分数**；各估计器两种写法都接受并归一化——因为把 `0.90` 当百分数解读会悄悄产生 0.9% 的区间，而症状只是「区间看起来太窄」。",
+    "example": "ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()",
+    "notes_en": "The property returns the fraction; `conf_int()` still accepts an explicit `alpha`, which wins over the recorded level for that call. Only weighted and unweighted estimation are affected -- this is a reporting choice and never changes a coefficient or a standard error.",
+    "notes_zh": "该属性返回分数；`conf_int()` 仍接受显式 `alpha`，那一次调用里它会覆盖已记录的水平。它只影响区间的报告，**不改变任何系数或标准误**。"
   }
 }

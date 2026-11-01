@@ -18,7 +18,7 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 - **Postestimation functions** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
 - **Working with a fitted result** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **Errors and support types** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **Other names** — [`SummarizeResult`](#summarizeresult), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
+- **Other names** — [`Areg`](#areg), [`SummarizeResult`](#summarizeresult), [`level`](#level), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 
 ## Linear models and IV
 
@@ -43,7 +43,7 @@ OLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None,
 **`OLS.fit`**
 
 ```python
-OLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+OLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **Example**
@@ -90,13 +90,13 @@ ws.FEOLS(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_
 **`FEOLS.from_formula`**
 
 ```python
-FEOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'FEOLS'"
+FEOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'FEOLS'"
 ```
 
 **`FEOLS.fit`**
 
 ```python
-FEOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+FEOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **Example**
@@ -136,13 +136,13 @@ Fixed-effects panel regression -- Stata's `xtreg, fe`. `fit(entity_effects=True)
 **Signature**
 
 ```python
-ws.PanelOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> 'None'
+ws.PanelOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
 **`PanelOLS.from_formula`**
 
 ```python
-PanelOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> "'PanelOLS'"
+PanelOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
 **`PanelOLS.fit`**
@@ -203,13 +203,13 @@ Random-effects GLS -- Stata's `xtreg, re`. Variance components come from the bac
 **Signature**
 
 ```python
-ws.RandomEffects(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> 'None'
+ws.RandomEffects(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
 **`RandomEffects.from_formula`**
 
 ```python
-RandomEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> "'PanelOLS'"
+RandomEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
 **`RandomEffects.fit`**
@@ -265,13 +265,13 @@ Between estimator -- Stata's `xtreg, be`. Runs one OLS on entity means, so a 200
 **Signature**
 
 ```python
-ws.BetweenOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> 'None'
+ws.BetweenOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
 **`BetweenOLS.from_formula`**
 
 ```python
-BetweenOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> "'PanelOLS'"
+BetweenOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
 **`BetweenOLS.fit`**
@@ -322,13 +322,13 @@ First-difference estimator -- Stata's `xtreg, fd`. Every period is differenced a
 **Signature**
 
 ```python
-ws.FirstDifferenceOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> 'None'
+ws.FirstDifferenceOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
 **`FirstDifferenceOLS.from_formula`**
 
 ```python
-FirstDifferenceOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str') -> "'PanelOLS'"
+FirstDifferenceOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
 **`FirstDifferenceOLS.fit`**
@@ -392,7 +392,7 @@ IV2SLS.from_formula(formula: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> "'
 **`IV2SLS.fit`**
 
 ```python
-IV2SLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+IV2SLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **Example**
@@ -445,7 +445,7 @@ IVLIML.from_formula(formula: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> "'
 **`IVLIML.fit`**
 
 ```python
-IVLIML.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+IVLIML.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **Example**
@@ -545,7 +545,7 @@ ws.XtIvreg(endog: 'Any', exog: 'Any', endog_regressors: 'Any', instruments: 'Any
 **`XtIvreg.from_formula`**
 
 ```python
-XtIvreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe') -> "'XtIvreg'"
+XtIvreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtIvreg'"
 ```
 
 **`XtIvreg.fit`**
@@ -609,7 +609,7 @@ ws.XtGls(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *,
 **`XtGls.from_formula`**
 
 ```python
-XtGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False) -> "'XtGls'"
+XtGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, subset: 'Any' = None) -> "'XtGls'"
 ```
 
 **`XtGls.fit`**
@@ -673,7 +673,7 @@ ws.XtPcse(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *
 **`XtPcse.from_formula`**
 
 ```python
-XtPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise') -> "'XtPcse'"
+XtPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise', subset: 'Any' = None) -> "'XtPcse'"
 ```
 
 **`XtPcse.fit`**
@@ -2619,7 +2619,7 @@ ws.XtUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 
 **`XtUnitroot.from_formula`**
 
 ```python
-XtUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False) -> "'XtUnitroot'"
+XtUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> "'XtUnitroot'"
 ```
 
 **`XtUnitroot.fit`**
@@ -2815,7 +2815,7 @@ ws.Didregress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 
 **`Didregress.from_formula`**
 
 ```python
-Didregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> "'Didregress'"
+Didregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
 ```
 
 **`Didregress.fit`**
@@ -2866,7 +2866,7 @@ ws.Xtdidregress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group
 **`Xtdidregress.from_formula`**
 
 ```python
-Xtdidregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> "'Didregress'"
+Xtdidregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
 ```
 
 **`Xtdidregress.fit`**
@@ -3379,7 +3379,7 @@ ws.Bootstrap(frame: 'pd.DataFrame', response: 'np.ndarray', design: 'np.ndarray'
 **`Bootstrap.from_formula`**
 
 ```python
-Bootstrap.from_formula(formula: 'str', data: 'pd.DataFrame', *, estimator: 'str' = 'regress', reps: 'int' = 200, seed: 'int | None' = None, subset: 'Any' = None) -> "'Bootstrap'"
+Bootstrap.from_formula(formula: 'str', data: 'pd.DataFrame', *, estimator: 'str' = 'regress', reps: 'int' = 200, seed: 'int | None' = None, subset: 'Any' = None, absorb: 'Any' = None) -> "'Bootstrap'"
 ```
 
 **`Bootstrap.fit`**
@@ -3420,7 +3420,7 @@ ws.Jackknife(frame: 'pd.DataFrame', response: 'np.ndarray', design: 'np.ndarray'
 **`Jackknife.from_formula`**
 
 ```python
-Jackknife.from_formula(formula: 'str', data: 'pd.DataFrame', *, estimator: 'str' = 'regress', subset: 'Any' = None) -> "'Jackknife'"
+Jackknife.from_formula(formula: 'str', data: 'pd.DataFrame', *, estimator: 'str' = 'regress', subset: 'Any' = None, absorb: 'Any' = None) -> "'Jackknife'"
 ```
 
 **`Jackknife.fit`**
@@ -5267,7 +5267,7 @@ Confidence intervals for the coefficients as a DataFrame with `lower` and `upper
 **Signature**
 
 ```python
-ws.conf_int(self, alpha: 'float' = 0.05) -> 'pd.DataFrame'
+ws.conf_int(self, alpha: 'float | None' = None) -> 'pd.DataFrame'
 ```
 
 **Example**
@@ -6060,6 +6060,59 @@ Hausman test
 
 ## Other names
 
+### `Areg`
+
+**Stata:** `areg y x1 x2, absorb(firm)`
+
+Linear regression absorbing categorical indicators -- Stata's `areg`. This is a DIFFERENT command from `reghdfe`, not a synonym: `absorb=` is required, the banner reads "Linear regression, absorbing indicators" with a second line naming the absorbed variable, `e(predict)` is `areg_p`, and -- the substantive part -- it REPORTS an intercept. `reghdfe` reports slopes only, so `Areg` appends `_cons`, the group-size-weighted mean of the absorbed effects. Estimation is the same within transform, so coefficients match `FEOLS`; the identity, the constant and the small-sample convention are what differ. `fit` accepts `level=` for the printed confidence intervals and understands `vce(hc2)`/`vce(hc3)` because it builds the full dummy design and can form the leverages `FEOLS` cannot reach.
+
+**Signature**
+
+```python
+ws.Areg(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, noabsorb: 'bool' = False) -> 'None'
+```
+
+**`Areg.from_formula`**
+
+```python
+Areg.from_formula(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None, noabsorb: 'bool' = False) -> "'Areg'"
+```
+
+**`Areg.fit`**
+
+```python
+Areg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
+```
+
+**Example**
+
+```python
+ws.Areg.from_formula('y ~ x1', base, absorb='firm').fit().summary(style='stata')
+```
+
+**Output**
+
+```text
+Linear regression, absorbing indicators
+                                                 Absorbed variable: firm
+
+      Source |       SS           df       MS   Number of obs   =        200
+-------------+----------------------------------   F(1, 159)       =      86.12
+       Model |     205.4391          1     205.4391   Prob > F        =     0.0000
+    Residual |     211.4281        159     1.329736   R-squared       =     0.4928
+-------------+----------------------------------   Adj R-squared   =     0.3652
+       Total |     416.8671        160      2.60542   Root MSE        =     1.1531
+
+--------------------------------------------------------------------------------
+         |  Coefficient    Std. err.        t    P>|t|      [95% conf. interval]
+---------+----------------------------------------------------------------------
+x1       |     .8095565    .08723665     9.28    0.000     .6372645     .9818486
+_cons    |     .9742472    .08169274    11.93    0.000     .8129043      1.13559
+--------------------------------------------------------------------------------
+```
+
+**Notes:** `absorb=` is required -- without it this is just `regress`. `_cons` is the group-size-weighted average of the absorbed effects; an FE model does not identify a constant separately from them, so only a normalisation fixes it and this is areg's. The clustered covariance uses `K = k_reported + (k_absorb - 1)` in the CR1 factor, whereas `reghdfe` uses `k_reported`: the absorbed levels consume degrees of freedom in areg's convention. That difference is NOT uniform across cluster/absorb pairings, so the correction is applied only when `e(rank)` shows the dummies are not already counted. With multiway clustering the two commands' factors differ in structure rather than by a parameter count, so the covariance is rebuilt on the full design instead of scaled. `noabsorb=True` skips the absorbed-indicator F test (Stata's `noabsorbtest`), leaving `e(F_absorb)`/`e(p_absorb)` absent.
+
 ### `SummarizeResult`
 
 **Stata:** `estat summarize -- summarize of the estimation sample`
@@ -6087,6 +6140,28 @@ y         200.0  1.020667   1.447346 -2.752204  4.881985
 x1        200.0  0.057340   1.025868 -2.832134  3.278208
 x2        200.0  0.063540   0.993631 -2.226171  3.259538
 ```
+
+### `level`
+
+**Stata:** `regress ..., level(90)`
+
+Confidence level used by `conf_int()` and the printed intervals, as a FRACTION (`0.90` for Stata's `level(90)`). Defaults to `0.95`. A model fitted with `level=` records it here, so a result estimated at 90% reports 90% intervals unless a caller passes an explicit `alpha`. Stata's `level(#)` takes a PERCENTAGE; the estimators accept either spelling and normalise, because reading `0.90` as a percentage would silently produce a 0.9% interval whose only symptom is "intervals look too narrow".
+
+**Example**
+
+```python
+ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
+```
+
+**Output**
+
+```text
+              lower     upper
+Intercept  0.836140  1.108573
+x1         0.709618  0.975431
+```
+
+**Notes:** The property returns the fraction; `conf_int()` still accepts an explicit `alpha`, which wins over the recorded level for that call. Only weighted and unweighted estimation are affected -- this is a reporting choice and never changes a coefficient or a standard error.
 
 ### `stata_cov_params`
 

@@ -159,6 +159,35 @@ def test_areg_matches_stata():
     assert result.e["df_r"] == capture.scalars["df_r"]
 
 
+def test_areg_class_matches_stata_including_the_constant():
+    """The Areg command, not just FEOLS, must reproduce the captured areg.
+
+    The test above intentionally compares only SLOPES against an FEOLS fit, because
+    reghdfe reports no constant. Areg claims to be areg, which DOES report one
+    (areg.json names are ['x1', 'x2', '_cons']), so it has to match all three
+    coefficients, all three standard errors and the full covariance -- the off-diagonal
+    terms included, since a shortcut that only fixes the diagonal gets the standard errors
+    right and the covariance wrong.
+    """
+
+    capture = _load("areg")
+    result = ws.Areg.from_formula("y ~ x1 + x2", panel_frame(), absorb="firm").fit()
+
+    assert list(result.param_names) == capture.names
+    np.testing.assert_allclose(
+        np.asarray(result.params, dtype=float),
+        np.asarray(capture.b, dtype=float),
+        rtol=1e-10,
+        atol=0.0,
+    )
+    np.testing.assert_allclose(
+        np.asarray(result.cov_params(), dtype=float),
+        np.asarray(capture.V, dtype=float),
+        rtol=1e-8,
+        atol=1e-12,
+    )
+
+
 # --------------------------------------------------------------- IV
 
 

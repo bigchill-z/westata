@@ -9,6 +9,79 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+### Added — `Areg`: Stata's `areg` as its own command, and `PanelOLS` weights
+
+`areg` and `reghdfe` are different commands, and the package only had the second
+identity. A caller asking for `areg` got `e(cmd)="reghdfe"`, no `e(title)`, no
+`e(predict)`, and — the substantive part — no intercept, because `reghdfe` reports slopes
+only. `ws.Areg` is now a subclass of `FEOLS` that overrides the identity, the constant and
+the small-sample convention:
+
+    e(cmd)           areg
+    e(title)         Linear regression, absorbing indicators
+    e(title2)        Absorbed variable: firm      ("firm year" for two-way)
+    e(predict)       areg_p
+    e(marginsnotok)  Residuals SCore D XBD
+    absorb=          required, as in Stata
+
+**The intercept took four attempts**, and the wrong ones all produced plausible numbers:
+
+| rule | result | verdict |
+|---|---|---|
+| `mean(y - b'x)` | 1.2096712084 | right POINT, wrong variance |
+| `rmse^2 / G` | 0.0054 | against a true 0.0009 |
+| `rmse^2 / N` | 0.000906 | close enough to look right |
+| `[_cons]` from a full dummy design | 0.029182 | against Stata's 0.03015498 |
+
+What reproduces the fixture is `c = (1/G)·[0,…,0,1,…,1]` over the full dummy design —
+which gives the variance AND the covariances with the slopes. A shortcut that widens the
+matrix and leaves the off-diagonals at zero gets the standard errors right and the
+covariance wrong, so the whole matrix is compared.
+
+`vce(hc2)`/`vce(hc3)` were then reachable for the first time: `FEOLS` refuses them
+because PyFixest hides the leverage of the dummy design, while `Areg` builds that design
+itself. `noabsorb` (Stata's `noabsorbtest`) skips the absorbed-indicator F test, leaving
+`e(F_absorb)`/`e(p_absorb)` absent rather than present-and-empty.
+
+### Fixed — three degrees-of-freedom conventions that look alike and are not
+
+Each of these was found by measuring, not by reading, and each one looked correct until
+it was compared against the right reference:
+
+1. **`_cons` was equal-weighted; `areg` weights by group size.** The two coincide only
+   on a balanced panel, which is exactly what `areg.json` is (30 groups x 6 periods) — so
+   the fixture could not distinguish them. The Nunn & Qian panel has 129 countries of very
+   uneven size, where they differ in the fourth decimal.
+
+2. **Clustered standard errors depend on how the cluster variable relates to the absorbed
+   dimension.** Applying the correction unconditionally fixed the nested and multiway cases
+   and broke the crossed one by 9%, where westata was already exact. `e(rank)` has no
+   single meaning here: PyFixest reports 31 (dummies included) when the two are crossed and
+   2 (slopes only) when nested.
+
+3. **Multiway clustering is not a parameter-count difference.** Stata's `reghdfe` and
+   westata's `FEOLS` agree exactly (both 0.1023861); `areg` reports 0.11086346, and
+   solving for the implied K gives 0.13 — not an integer. The factors differ in structure,
+   so `Areg` rebuilds the CGM covariance on the full design instead of scaling FEOLS'.
+
+Also added: `level(#)` package-wide (`OLS`, `IV2SLS`/`IVLIML`/`IVGMM`, `FEOLS`, `Areg`),
+which was missing from `StataResults`, from `conf_int()` and from every `fit()`;
+`clustertable` for multiway fits, with the joint counts MEASURED rather than multiplied;
+and `Bootstrap`/`Jackknife` resampling of an `areg` fit.
+
+`PanelOLS` now accepts `weights=`/`weight_type=`, so the documented `xtreg` equivalent can
+estimate the AJR paper's weighted columns directly instead of forcing a detour through
+`FEOLS`. A missing weight drops the row (Stata's `[aweight=]` marks it "not to be used"),
+and weights align by position rather than by label.
+
+### Corrected — a "defect" that was a wrong reference
+
+The AJR write-up recorded `Areg`'s weighted clustered SE as 11% off. Measuring both Stata
+commands settles it: `areg` gives .45292274 and `xtreg` gives .40751063, and `Areg`
+reports .45292274 while `FEOLS` reports .40751063. Both are right, each against its own
+command. `Areg` claims to replace `areg`, so comparing it with `xtreg` was guaranteed to
+show 11% and says nothing about the implementation.
+
 ### Fixed — `estat summarize` weight semantics (rounds 17 and 31 closed)
 
 Round 17 recorded "no evidence that the aweight SD matches Stata" and round 31

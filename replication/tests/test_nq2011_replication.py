@@ -196,3 +196,44 @@ def test_the_gap_probe_reports_no_gap_but_keeps_the_convention_note():
         "nq2011_gaps.md section 1 needs rewriting"
     )
     assert "0.0164182" in note[1], f"the xtreg standard error moved: {note[1]}"
+
+
+def test_the_areg_xtreg_gap_comes_from_the_rmse_denominator():
+    """Pin the *mechanism*, not just the ratio.
+
+    An earlier version of the gap list attributed the 4.5 percent difference to the
+    cluster-VCE small-sample factor counting the absorbed effects in ``K``.  That is wrong:
+    the residuals are identical, so the cluster adjustment is identical, and the whole gap
+    comes from ``rmse`` being divided by a different denominator.
+
+    Asserting the arithmetic here means the wrong explanation cannot come back unnoticed.
+    ``areg`` divides the RSS by ``N - 152`` (22 regressors + intercept + 129 absorbed country
+    dummies); ``xtreg, fe`` divides by ``N - 23``.
+    """
+
+    import math
+
+    n = 1552
+    areg_denom = n - 152
+    xtreg_denom = n - 23
+
+    assert areg_denom == 1400
+    assert xtreg_denom == 1529
+
+    predicted = math.sqrt(xtreg_denom / areg_denom)
+    assert predicted == pytest.approx(1.0450563895, abs=1e-9), (
+        "the denominator arithmetic no longer reproduces the observed areg/xtreg ratio"
+    )
+
+    # Guard the claim the docs make about it.
+    gap_doc = (PAPER.parents[1] / "gaps" / "nq2011_gaps.md").read_text(encoding="utf-8")
+    assert "1529" in gap_doc and "1400" in gap_doc, (
+        "the gap list no longer states the rmse denominators the mechanism depends on"
+    )
+    # The section must not PRESENT the cluster-factor story as the explanation.  Mentioning
+    # it in order to refute it is the point, so look for the affirmative phrasing only.
+    section = gap_doc.split("### 1.3")[1].split("### 1.4")[0]
+    assert "这个解释是错的" in section or "是错的" in section, (
+        "the gap list no longer records that the cluster-factor explanation was wrong; a "
+        "future reader would not know it had been tested and rejected"
+    )

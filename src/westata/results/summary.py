@@ -689,6 +689,20 @@ def _stata_summary(result: Any) -> str:
     # back to the generic banner only where the command publishes none (``poisson``).
     banner = str((getattr(result, "e", None) or {}).get("title") or "").strip()
     lines.append(banner if banner else "Stata-style regression results")
+    # ``areg`` prints a SECOND title line naming what it absorbed:
+    #
+    #     Linear regression, absorbing indicators
+    #                                              Absorbed variable: firm
+    #
+    # The macro is ``e(title2)``, captured in ``areg.json``.  Only ``areg`` sets it, so
+    # every other command is unaffected; rendering it here is what makes an ``Areg`` table
+    # match Stata's instead of merely having the right numbers under a shorter banner.
+    subtitle = str((getattr(result, "e", None) or {}).get("title2") or "").strip()
+    if subtitle:
+        # Right-aligned under the banner, the way Stata prints its secondary title line.
+        # Do NOT rstrip a wholly-blank line: the padding IS the alignment, and stripping it
+        # turned this into an empty line.
+        lines.append(subtitle.rjust(72))
     # ``Model:`` and ``Covariance type:`` lines used to follow the banner.  Stata prints
     # NEITHER: the captured output in
     # ``tests/conformance/stata_fixtures/p10_outputs.txt:97-98`` opens the table directly
@@ -828,8 +842,14 @@ def _stata_summary(result: Any) -> str:
         # ``Covariance type:`` row before its table.
         lines = [
             banner if banner else "Stata-style regression results",
-            "",
         ]
+        # ``title2`` (areg's "Absorbed variable: ...") was appended to the earlier ``lines``
+        # list, which this branch REPLACES -- the same trap the design block below hit. It
+        # has to be re-attached here or the subtitle disappears exactly when the ANOVA
+        # table exists, i.e. always.
+        if subtitle:
+            lines.append(subtitle.rjust(72))
+        lines.append("")
         # The design block was appended to the earlier ``lines`` list, which this branch
         # REPLACES -- so it has to be re-attached here or xtpcse/xtgls lose it exactly
         # when the ANOVA table is available (i.e. always, for those commands).

@@ -224,6 +224,8 @@ class FEOLS:
     _command_title = None
     _predict_program = None
     _marginsnotok = None
+    #: e(estmethod): areg sets "areg"; reghdfe sets nothing.
+    _stata_estimethod = None
 
     def __init__(
         self,
@@ -681,6 +683,16 @@ class FEOLS:
             e["predict"] = self._predict_program
         if self._marginsnotok is not None:
             e["marginsnotok"] = self._marginsnotok
+        # ``e(vce)`` / ``e(vcetype)`` / ``e(estmethod)`` / ``e(marginsprop)``: all four are
+        # in areg.json and all four were missing. ``e(vce)`` in particular is the macro a
+        # Stata user reads to know which covariance was requested, and its absence made
+        # ``Areg`` look like it had no vce at all next to a genuine areg capture.
+        if self._stata_estimethod is not None:
+            e["estmethod"] = self._stata_estimethod
+            e["marginsprop"] = "nolinearize"
+            stata_vce, stata_vcetype = _stata_vce_names(cov_type)
+            e["vce"] = stata_vce
+            e["vcetype"] = stata_vcetype
         # ``areg`` prints a SECOND title line naming the absorbed variable
         # (areg.json: e(title2) = "Absorbed variable: firm") and stores e(absvar). Both
         # are areg-only; reghdfe has neither.
@@ -1174,6 +1186,19 @@ def _absorbed_columns(formula: str) -> list[str]:
     return [token.strip() for token in tail.split("+") if token.strip()]
 
 
+def _stata_vce_names(cov_type: Any) -> tuple[str, str]:
+    """``(e(vce), e(vcetype))`` for a ``reghdfe``/``areg`` fit.
+
+    ``e(vce)`` is LOWERCASE (``ols``, ``robust``, ``cluster``) and ``e(vcetype)`` is the
+    display spelling (``Ols``, ``Robust``, ``Cluster``). Delegated to the linear family's
+    helpers so the two spellings cannot drift apart between estimator families.
+    """
+
+    from westata.estimators.linear import _stata_vce_label, _stata_vcetype_label
+
+    return _stata_vce_label(cov_type), _stata_vcetype_label(cov_type)
+
+
 def _cluster_codes_for_intercept(
     model: Any, data: pd.DataFrame
 ) -> np.ndarray | None:
@@ -1387,6 +1412,7 @@ class Areg(FEOLS):
     _predict_program = "areg_p"
     # ``areg.json``'s e(marginsnotok): these prediction types are refused after areg.
     _marginsnotok = "Residuals SCore D XBD"
+    _stata_estimethod = "areg"
 
     def __init__(
         self,

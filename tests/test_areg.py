@@ -294,3 +294,76 @@ def _panel() -> pd.DataFrame:
     effect = rng.normal(size=30)[entity]
     y = 1.0 + 1.5 * x1 - 0.5 * x2 + effect + rng.normal(scale=0.4, size=n)
     return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "firm": entity})
+
+
+# ------------------------------------------- output parity beyond the numbers
+def test_the_summary_prints_the_absorbed_variable_line() -> None:
+    """Stata's areg prints a SECOND banner line; a table without it is not "the same output".
+
+    The macro ``e(title2)`` was recorded from the start but the renderer ignored it, so
+    ``Areg`` showed the right numbers under a one-line banner. This is the assertion that
+    the line actually reaches the table.
+    """
+
+    result = ws.Areg.from_formula("y ~ x1", _panel(), absorb="firm").fit()
+    rendered = result.summary(style="stata")
+
+    assert "Absorbed variable: firm" in rendered
+
+
+def test_the_absorbed_variable_line_is_the_second_line() -> None:
+    result = ws.Areg.from_formula("y ~ x1", _panel(), absorb="firm").fit()
+    lines = result.summary(style="stata").splitlines()
+
+    assert lines[0] == "Linear regression, absorbing indicators"
+    assert "Absorbed variable: firm" in lines[1]
+
+
+def test_reghdfe_prints_no_absorbed_variable_line() -> None:
+    """The subtitle is areg-only; leaking it into FEOLS would be a new inconsistency."""
+
+    result = ws.FEOLS.from_formula("y ~ x1 | firm", _panel()).fit()
+
+    assert "Absorbed variable" not in result.summary(style="stata")
+
+
+@pytest.mark.parametrize(
+    "key,expected",
+    [
+        ("estmethod", "areg"),
+        ("marginsprop", "nolinearize"),
+        ("vce", "ols"),
+    ],
+)
+def test_the_command_macros_match_stata(key: str, expected: str) -> None:
+    """These are in areg.json and were all missing before.
+
+    ``e(vce)`` matters most: it is the macro a Stata user reads to learn which covariance
+    was requested, and its absence made Areg look like it had no vce at all.
+    """
+
+    capture = _fixture()
+    result = ws.Areg.from_formula("y ~ x1 + x2", _panel(), absorb="firm").fit()
+
+    assert result.e[key] == capture["macros"][key] == expected
+
+
+def test_every_stata_scalar_is_present() -> None:
+    """The numeric side of the contract: no areg.json scalar may be missing."""
+
+    capture = _fixture()
+    result = ws.Areg.from_formula("y ~ x1 + x2", _panel(), absorb="firm").fit()
+
+    missing = [key for key in capture["scalars"] if key not in result.e]
+    assert missing == [], f"areg.json scalars absent from e(): {missing}"
+
+
+def test_vcetype_is_cluster_under_clustering() -> None:
+    """``e(vcetype)`` follows the requested vce, not a fixed string."""
+
+    frame = _panel()
+    result = ws.Areg.from_formula("y ~ x1", frame, absorb="firm").fit(
+        cov_type="cluster", cov_kwds={"cluster": "firm"}
+    )
+
+    assert result.e["vce"] == "cluster"

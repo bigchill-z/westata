@@ -391,7 +391,30 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 
 `FEOLS` 不获得该参数——`reghdfe` 没有这个选项，测试锁住了这一点。
 
-### 4.8 记录：`dfadjust` 尚未实现（附实测对照数据）
+### 4.8 补齐：`vce(bootstrap)` 与 `vce(jackknife)`
+
+`areg.sthlp:47-49` 把这两者都列为 areg 的 vcetype，且给了一个 bootstrap 的用法示例。
+原先 `Bootstrap`/`Jackknife` 只接受 `estimator='regress'`/`'mean'`。
+
+现在两者都支持 `estimator='areg'`（需配 `absorb=`）。实测对照（StataNow 19.5，
+210 行面板，30 组 × 7 期）：
+
+| 方法 | westata | Stata | 备注 |
+|---|---|---|---|
+| **`vce(jackknife)`** | 0.08945882 | **0.08945882** | 确定性，逐位相同 |
+| **`vce(bootstrap)`** | 0.08104865 | 0.08104864 | 随机性内（1e-8） |
+
+**实现要点**：`areg` 的估计就是组内去均值后的 OLS，而 `vce(bootstrap)` 用的是
+Stata 的 `wvar()` 频数权重形式，所以去均值必须用**加权组均值**，否则与 Stata 差一截。
+
+**踩到一个会静默出错的坑**：设计矩阵里若保留 `Intercept` 列，它与吸收组的哑变量完全
+共线，去均值后该列**恰好变成 0**，得到 `b=0`、`se=0` 的结果——不报错、不出 NaN，
+只是一列废数据。现在在 `areg` 路径上显式去掉截距列，并加了断言：
+**任何标准误为 0 即视为该列仍在**。
+
+> 这与本文件 §4.2 记录的是同一类教训：**看起来正常的数字比报错更危险**。
+
+### 4.9 记录：`dfadjust` 尚未实现（附实测对照数据）
 
 `areg` 的 `vce(hc2 [clustvar], dfadjust)` 会按 Imbens & Kolesár (2016) 计算**逐系数**的
 调整自由度。它不是显示开关——它直接改变 p 值与置信区间，属于会影响数值输出的选项。

@@ -119,6 +119,53 @@ def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
     return float(np.average(values, weights=weights))
 
 
+def _within_coefficients(
+    design: np.ndarray,
+    response: np.ndarray,
+    weights: np.ndarray,
+    codes: np.ndarray | None,
+) -> np.ndarray:
+    """Weighted within-group (fixed-effects) coefficients -- the ``areg`` estimate.
+
+    Fitting one dummy per absorbed group is the definition; the FWL theorem says the same
+    coefficients come out of demeaning both y and X by each group's WEIGHTED mean and then
+    running plain OLS. Demeaning is used here because a bootstrap replicate supplies
+    frequency weights, and refitting a 130-column dummy design 200 times would be far
+    slower for an identical answer.
+
+    A group whose total weight is zero contributes nothing and is left as-is (its
+    deviation is zero either way).
+    """
+
+    W = np.asarray(weights, dtype=float)
+    y = np.asarray(response, dtype=float)
+    X = np.asarray(design, dtype=float)
+    if codes is None:
+        raise UnsupportedError(
+            "a within-group estimator needs the absorbed group codes; pass absorb= to "
+            "from_formula"
+        )
+
+    codes = np.asarray(codes)
+    n_groups = int(codes.max()) + 1 if codes.size else 0
+    weight_sums = np.bincount(codes, weights=W, minlength=n_groups)
+    safe = np.where(weight_sums > 0, weight_sums, 1.0)
+
+    y_means = np.bincount(codes, weights=W * y, minlength=n_groups) / safe
+    y_within = y - y_means[codes]
+
+    X_within = np.empty_like(X)
+    for column in range(X.shape[1]):
+        means = np.bincount(codes, weights=W * X[:, column], minlength=n_groups) / safe
+        X_within[:, column] = X[:, column] - means[codes]
+
+    root = np.sqrt(W)
+    coefficients, *_ = np.linalg.lstsq(
+        X_within * root[:, None], y_within * root, rcond=None
+    )
+    return coefficients
+
+
 def _stata_shuffle(generator: Mt19937_64, values: np.ndarray) -> np.ndarray:
     """A permutation from the Stata stream (Fisher-Yates).
 
@@ -158,6 +205,9 @@ class _ResampleBase:
         # Set by from_formula when an exp_list is supplied; None means the older
         # hard-coded coefficient path.
         self._expressions: ParsedExpressionList | None = None
+        #: Cluster/absorb indicator for ``estimator='areg'``: areg's within transform is
+        #: exactly "demean by group", so the resampling estimator needs the group codes.
+        self._absorb_codes: np.ndarray | None = None
 
     def _estimate_weighted(self, weights: np.ndarray) -> np.ndarray:
         """Fit on the original data using ``bsampl_w`` frequency weights.
@@ -179,6 +229,13 @@ class _ResampleBase:
                 self._X * root[:, None], self._y * root, rcond=None
             )
             return coefficients
+
+        if self._estimator == "areg":
+            # areg's estimate is the within (demeaned) OLS, weighted by the bootstrap
+            # replicate weights. Demeaning both y and X by the absorbed group's weighted
+            # mean is the FWL transform, so one lstsq gives the same coefficients as
+            # fitting the full dummy design.
+            return _within_coefficients(self._X, self._y, weights, self._absorb_codes)
 
         if self._estimator == "mean":
             return np.array([float(np.average(self._y, weights=weights))])
@@ -313,6 +370,15 @@ class _ResampleBase:
 
         if self._estimator == "regress":
             return _ols(self._X[rows], self._y[rows])
+        if self._estimator == "areg":
+            # Leave-one-out keeps the group structure, so the same within transform
+            # applies to the reduced sample; every retained row has weight 1.
+            return _within_coefficients(
+                self._X[rows],
+                self._y[rows],
+                np.ones(len(rows), dtype=float),
+                np.asarray(self._absorb_codes)[rows],
+            )
         if self._estimator == "mean":
             return np.array([self._y[rows].mean()])
         raise UnsupportedError(
@@ -406,6 +472,7 @@ class Jackknife(_ResampleBase):
         *,
         estimator: str = "regress",
         subset: Any = None,
+        absorb: Any = None,
     ) -> "Jackknife":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -413,10 +480,16 @@ class Jackknife(_ResampleBase):
             data = data.loc[subset]
         data = data.reset_index(drop=True)
         normalized = str(estimator).strip().lower()
-        if normalized not in ("regress", "mean"):
+        if normalized not in ("regress", "mean", "areg"):
             raise UnsupportedError(
-                f"jackknife: estimator {estimator!r} is not supported; only "
-                "'regress' and 'mean' are"
+                f"jackknife: estimator {estimator!r} is not supported; 'regress', "
+                "'areg' and 'mean' are"
+            )
+        if normalized == "areg" and absorb is None:
+            raise ValueError(
+                "jackknife: estimator='areg' requires absorb=; Stata writes "
+                "'areg y x, absorb(varlist) vce(jackknife)' and the option is not "
+                "optional"
             )
         if normalized == "mean":
             lhs = formula.split("~", 1)[0].strip()
@@ -433,7 +506,34 @@ class Jackknife(_ResampleBase):
                     "jackknife: missing values are not supported; drop them first"
                 )
             response = data[lhs].to_numpy(dtype=float)
-        return cls(data, response, np.asarray(design, dtype=float), names, estimator=normalized)
+        if normalized == "areg":
+            # Same reason as the bootstrap branch: areg's constant is the absorbed effect,
+            # so an explicit intercept is collinear with the group dummies and the within
+            # transform drives it to exactly zero (with a zero standard error).
+            intercept_positions = [
+                index
+                for index, name in enumerate(names)
+                if str(name).strip().lower()
+                in ("intercept", "intercept_", "_cons", "const")
+            ]
+            if intercept_positions:
+                keep = [
+                    index
+                    for index in range(len(names))
+                    if index not in intercept_positions
+                ]
+                design = np.asarray(design, dtype=float)[:, keep]
+                names = [names[index] for index in keep]
+        model = cls(data, response, np.asarray(design, dtype=float), names, estimator=normalized)
+        if normalized == "areg":
+            absorb_names = [absorb] if isinstance(absorb, str) else list(absorb)
+            keys = (
+                data[absorb_names[0]]
+                if len(absorb_names) == 1
+                else list(zip(*(data[n] for n in absorb_names)))
+            )
+            model._absorb_codes = np.asarray(pd.factorize(keys, sort=True)[0])
+        return model
 
     def fit(self, *, mse: bool = False) -> StataResults:
         n = self._y.size
@@ -502,15 +602,22 @@ class Bootstrap(_ResampleBase):
         reps: int = 200,
         seed: int | None = None,
         subset: Any = None,
+        absorb: Any = None,
     ) -> "Bootstrap":
         if int(reps) <= 0:
             raise ValueError(f"bootstrap: reps must be positive, got {reps!r}")
         normalized = str(estimator).strip().lower()
-        if normalized not in ("regress", "mean"):
+        if normalized not in ("regress", "mean", "areg"):
             raise UnsupportedError(
-                f"bootstrap: estimator {estimator!r} is not supported; only "
-                "'regress' and 'mean' are. Stata's arbitrary r() statistics would "
+                f"bootstrap: estimator {estimator!r} is not supported; 'regress', "
+                "'areg' and 'mean' are. Stata's arbitrary r() statistics would "
                 "require a small expression interpreter."
+            )
+        if normalized == "areg" and absorb is None:
+            raise ValueError(
+                "bootstrap: estimator='areg' requires absorb=; Stata writes "
+                "'areg y x, absorb(varlist) vce(bootstrap)' and the option is not "
+                "optional"
             )
         if subset is not None:
             data = data.loc[subset]
@@ -524,9 +631,36 @@ class Bootstrap(_ResampleBase):
             design, names, kept = build_design(formula, data)
             lhs = formula.split("~", 1)[0].strip()
             response = data[lhs].to_numpy(dtype=float)
+        if normalized == "areg":
+            # Drop the intercept column: areg's constant IS the absorbed effect, so a
+            # separate intercept is perfectly collinear with the group dummies and the
+            # within transform annihilates it (the coefficient came out exactly 0.0 with a
+            # zero standard error before this). The reported ``_cons`` is added back at
+            # fit time, the same way Areg itself does it.
+            intercept_positions = [
+                index
+                for index, name in enumerate(names)
+                if str(name).strip().lower()
+                in ("intercept", "intercept_", "_cons", "const")
+            ]
+            if intercept_positions:
+                keep = [
+                    index
+                    for index in range(len(names))
+                    if index not in intercept_positions
+                ]
+                design = np.asarray(design, dtype=float)[:, keep]
+                names = [names[index] for index in keep]
         model = cls(
             data, response, np.asarray(design, dtype=float), names, estimator=normalized
         )
+        if normalized == "areg":
+            names = [absorb] if isinstance(absorb, str) else list(absorb)
+            codes, _ = pd.factorize(
+                data[names[0]] if len(names) == 1 else list(zip(*(data[n] for n in names))),
+                sort=True,
+            )
+            model._absorb_codes = np.asarray(codes)
         model._reps = int(reps)
         model._seed = seed
         return model

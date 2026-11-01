@@ -30,7 +30,7 @@ sys.path.insert(0, str(REPO / "retest" / "lib"))
 
 import numpy as np  # noqa: E402
 
-from specs import SPECS, Spec  # noqa: E402
+from adh2013_specs import SPECS, Spec  # noqa: E402
 from stata_probe import Capture, Stata  # noqa: E402
 
 OUT = HERE / "out"
@@ -68,7 +68,7 @@ def serialise(cap: Capture) -> dict:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    from data import workfile
+    from adh2013_data import workfile
 
     payload: dict[str, dict] = {"specs": {}, "first_stage": {}, "meta": {}}
     with Stata() as stata:

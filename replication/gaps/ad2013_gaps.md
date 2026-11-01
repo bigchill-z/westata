@@ -2,9 +2,9 @@
 
 **来源**：Autor & Dorn (2013) 复现过程中实测得到。
 **被测版本**：`westata 0.0.3`（本仓库 `src/westata`）。
-**复核方式**：`.venv/Scripts/python.exe replication/papers/ad2013/probe_gaps.py`
+**复核方式**：`.venv/Scripts/python.exe replication/papers/ad2013/ad2013_probe_gaps.py`
 
-> 配套报告：[REPORT.md](REPORT.md) —— 讲这篇论文的复现结果。
+> 配套报告：[REPORT.md](../papers/ad2013/REPORT.md) —— 讲这篇论文的复现结果。
 > 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
 
 ---

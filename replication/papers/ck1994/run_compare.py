@@ -23,7 +23,7 @@ sys.path.insert(0, str(HERE))
 
 import numpy as np  # noqa: E402
 
-from specs import PAPER, PAPER_SAMPLE, PAPER_TABLE3, SPECS, SOURCE  # noqa: E402
+from ck1994_specs import PAPER, PAPER_SAMPLE, PAPER_TABLE3, SPECS, SOURCE  # noqa: E402
 
 OUT = HERE / "out"
 
@@ -105,7 +105,7 @@ def main() -> int:
     # weak control.  This version instead perturbs the *treatment* variable: collapse GAP
     # to a New Jersey indicator, which discards the within-New-Jersey wage variation the
     # paper's identification relies on.  The coefficient should move.
-    from data import build, table4_sample  # noqa: E402
+    from ck1994_data import build, table4_sample  # noqa: E402
     import westata as ws  # noqa: E402
 
     frame = table4_sample(build()).copy()

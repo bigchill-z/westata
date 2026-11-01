@@ -22,15 +22,15 @@ def _hash(path: Path) -> str:
 
 
 def main() -> int:
-    import acquire
+    import ad2013_acquire
     import gen_do
     import run_compare
     import run_stata
-    import run_westata
+    import ad2013_run_westata
 
     started = time.time()
     print("== data ==", flush=True)
-    provenance = acquire.ensure()
+    provenance = ad2013_acquire.ensure()
 
     print("== do-file ==", flush=True)
     gen_do.main()
@@ -39,7 +39,7 @@ def main() -> int:
     run_stata.main()
 
     print("== westata ==", flush=True)
-    run_westata.main()
+    ad2013_run_westata.main()
 
     print("== compare ==", flush=True)
     run_compare.main()

@@ -2,9 +2,9 @@
 
 **来源**：Card & Krueger (1994) 复现过程中实测得到。
 **被测版本**：`westata 0.0.3`（本仓库 `src/westata`）。
-**复核方式**：`.venv/Scripts/python.exe replication/papers/ck1994/probe_gaps.py`
+**复核方式**：`.venv/Scripts/python.exe replication/papers/ck1994/ck1994_probe_gaps.py`
 
-> 配套报告：[REPORT.md](REPORT.md) —— 讲这篇论文的复现结果。
+> 配套报告：[REPORT.md](../papers/ck1994/REPORT.md) —— 讲这篇论文的复现结果。
 > 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
 
 ---
@@ -116,7 +116,7 @@ result.stata_params        # Series, index 为 Stata 名称
 
 ## 4. 复核方式与防回归
 
-探针 `probe_gaps.py` 有**四种**结论：
+探针 `ck1994_probe_gaps.py` 有**四种**结论：
 
 | 结论 | 含义 |
 |---|---|
@@ -126,7 +126,7 @@ result.stata_params        # Series, index 为 Stata 名称
 | `ERROR` | 探针本身异常 |
 
 ```bash
-.venv/Scripts/python.exe replication/papers/ck1994/probe_gaps.py
+.venv/Scripts/python.exe replication/papers/ck1994/ck1994_probe_gaps.py
 # 4 ok, 1 boundary, 0 gap, 0 error
 ```
 

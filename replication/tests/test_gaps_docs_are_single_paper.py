@@ -17,6 +17,13 @@ Two things are NOT violations and are excluded deliberately:
 
 Also checked: the section numbers the guard tests cite still exist, because deleting §0
 and §6 shifted the numbering and a dangling "see section 4" would be a new defect.
+
+Location
+--------
+Every gap list lives in ``replication/gaps/<paper>_gaps.md`` rather than beside its paper.
+Keeping them together is the point -- a reader asking "what does westata still need" should
+find one directory, not five.  ``test_every_gap_list_is_in_the_gaps_directory`` enforces the
+layout, so a future paper cannot quietly reintroduce a stray file.
 """
 
 from __future__ import annotations
@@ -26,17 +33,24 @@ import re
 
 import pytest
 
-PAPERS = pathlib.Path(__file__).resolve().parents[1] / "papers"
+REPLICATION = pathlib.Path(__file__).resolve().parents[1]
+PAPERS = REPLICATION / "papers"
+#: Every gap list now lives in one directory instead of beside its paper.
+GAPS = REPLICATION / "gaps"
 
+#: ``(paper, filename, directory)``.  Gap lists live in ``replication/gaps`` with a
+#: ``<paper>_gaps.md`` name; reports stay beside their code.
 DOCS = [
-    ("adh2013", "WESTATA_GAPS.md"),
-    ("adh2013", "REPORT.md"),
-    ("ck1994", "WESTATA_GAPS.md"),
-    ("ck1994", "REPORT.md"),
-    ("ad2013", "WESTATA_GAPS.md"),
-    ("ad2013", "REPORT.md"),
-    ("adhm2020", "WESTATA_GAPS.md"),
-    ("adhm2020", "REPORT.md"),
+    ("adh2013", "adh2013_gaps.md", GAPS),
+    ("adh2013", "REPORT.md", PAPERS / "adh2013"),
+    ("ck1994", "ck1994_gaps.md", GAPS),
+    ("ck1994", "REPORT.md", PAPERS / "ck1994"),
+    ("ad2013", "ad2013_gaps.md", GAPS),
+    ("ad2013", "REPORT.md", PAPERS / "ad2013"),
+    ("nq2011", "nq2011_gaps.md", GAPS),
+    ("nq2011", "REPORT.md", PAPERS / "nq2011"),
+    ("adhm2020", "adhm2020_gaps.md", GAPS),
+    ("adhm2020", "REPORT.md", PAPERS / "adhm2020"),
 ]
 
 #: Phrases that only make sense when talking about ANOTHER paper in this series.
@@ -68,14 +82,22 @@ COMPARISON_TABLE = (
 
 
 def _paper_text(paper: str, filename: str) -> str:
-    path = PAPERS / paper / filename
-    if not path.exists():  # pragma: no cover - committed files
-        pytest.skip(f"{path} not present")
-    return path.read_text(encoding="utf-8")
+    """Read one document, looking in the gaps directory first and then beside the paper.
+
+    Gap lists moved to ``replication/gaps/<paper>_gaps.md`` so that every finding sits in
+    one place; reports stayed next to their code.  Looking in both keeps the guard working
+    whichever convention a given file follows, and ``test_every_gap_list_is_in_the_gaps_dir``
+    below pins the convention itself.
+    """
+
+    for candidate in (GAPS / filename, PAPERS / paper / filename):
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+    pytest.skip(f"{paper}/{filename} not present")
 
 
-@pytest.mark.parametrize("paper,filename", DOCS)
-def test_a_document_does_not_discuss_other_papers(paper: str, filename: str) -> None:
+@pytest.mark.parametrize("paper,filename,directory", DOCS)
+def test_a_document_does_not_discuss_other_papers(paper: str, filename: str, directory) -> None:
     """The main rule, stated as plainly as possible."""
 
     text = _paper_text(paper, filename)
@@ -91,8 +113,8 @@ def test_a_document_does_not_discuss_other_papers(paper: str, filename: str) -> 
     )
 
 
-@pytest.mark.parametrize("paper,filename", DOCS)
-def test_a_document_does_not_carry_a_comparison_table(paper: str, filename: str) -> None:
+@pytest.mark.parametrize("paper,filename,directory", DOCS)
+def test_a_document_does_not_carry_a_comparison_table(paper: str, filename: str, directory) -> None:
     """A three-column table of the series is a series artefact, not a paper finding."""
 
     text = _paper_text(paper, filename)
@@ -105,12 +127,12 @@ def test_a_document_does_not_carry_a_comparison_table(paper: str, filename: str)
     assert offenders == [], "comparison table found:\n" + "\n".join(offenders)
 
 
-@pytest.mark.parametrize("paper,filename", DOCS)
-def test_a_document_does_not_link_to_another_paper(paper: str, filename: str) -> None:
+@pytest.mark.parametrize("paper,filename,directory", DOCS)
+def test_a_document_does_not_link_to_another_paper(paper: str, filename: str, directory) -> None:
     text = _paper_text(paper, filename)
     offenders = []
     for number, line in enumerate(text.splitlines(), 1):
-        if re.search(r"\.\./(?:adh2013|ck1994|ad2013)/", line):
+        if re.search(r"\.\./(?:adh2013|ck1994|ad2013|nq2011|adhm2020)/", line):
             offenders.append(f"{paper}/{filename}:{number}: {line.strip()[:90]}")
 
     assert offenders == [], "cross-document link found:\n" + "\n".join(offenders)
@@ -120,8 +142,8 @@ def test_a_document_does_not_link_to_another_paper(paper: str, filename: str) ->
 @pytest.mark.parametrize(
     "paper,filename,cited",
     [
-        ("ad2013", "WESTATA_GAPS.md", [1, 2, 4]),
-        ("ck1994", "WESTATA_GAPS.md", [2, 3]),
+        ("ad2013", "ad2013_gaps.md", [1, 2, 4]),
+        ("ck1994", "ck1994_gaps.md", [2, 3]),
     ],
 )
 def test_the_sections_the_guard_tests_cite_still_exist(
@@ -136,4 +158,30 @@ def test_the_sections_the_guard_tests_cite_still_exist(
     assert missing == [], (
         f"{paper}/{filename} no longer has section(s) {missing}; headings present: "
         f"{sorted(headings)}"
+    )
+
+
+def test_every_gap_list_is_in_the_gaps_directory():
+    """All gap lists live in one directory -- and none is left behind beside a paper.
+
+    The instruction was explicit: keep every findings document together.  A file left in
+    ``papers/<paper>/`` would still pass the content guards above while quietly defeating
+    the point, so the location itself is asserted.
+    """
+
+    expected = {
+        "adh2013_gaps.md", "ck1994_gaps.md", "ad2013_gaps.md",
+        "nq2011_gaps.md", "adhm2020_gaps.md",
+    }
+    present = {path.name for path in GAPS.glob("*_gaps.md")}
+    assert present == expected, (
+        f"gaps directory holds {sorted(present)}, expected {sorted(expected)}"
+    )
+
+    strays = sorted(
+        str(path.relative_to(REPLICATION))
+        for path in PAPERS.glob("*/WESTATA_GAPS.md")
+    )
+    assert strays == [], (
+        "these gap lists were not moved into replication/gaps: " + ", ".join(strays)
     )

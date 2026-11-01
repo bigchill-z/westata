@@ -5,7 +5,7 @@
 **复现环境**：StataNow 19.5 (MP) + `ivreg2`（`ssc install ivreg2 ranktest ftools`）。
 **复核方式**：`.venv/Scripts/python.exe replication/papers/adhm2020/adhm2020_probe_gaps.py`
 
-> 配套报告：[REPORT.md](REPORT.md)
+> 配套报告：[REPORT.md](../papers/adhm2020/REPORT.md)
 > 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
 
 ---

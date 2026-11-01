@@ -2,9 +2,9 @@
 
 **来源**：Autor–Dorn–Hanson (2013) 复现过程中实测得到。
 **被测版本**：`westata 0.0.3`（本仓库 `src/westata`）。
-**复核方式**：`.venv/Scripts/python.exe replication/papers/adh2013/probe_gaps.py`
+**复核方式**：`.venv/Scripts/python.exe replication/papers/adh2013/adh2013_probe_gaps.py`
 
-> 配套报告：[REPORT.md](REPORT.md) —— 讲这篇论文的复现结果。
+> 配套报告：[REPORT.md](../papers/adh2013/REPORT.md) —— 讲这篇论文的复现结果。
 > 本文只讲 westata 本身**在自身 API 契约下**还可以改进什么。
 >
 > **状态：7 条全部已修复，清单归零。** 初版是在 `westata` 未作任何改动时测得的；修复过程中本仓库的 `src/westata` 被修改，所以本文现在记录的是「曾经缺什么、怎么修的」，而 §4 的探针反过来充当**回归测试**——任何一条退化都会让 `replication/tests` 失败。按当前 HEAD 实测：`0 gap(s) present, 0 stale report entries`。
@@ -58,13 +58,13 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 | P2-6 | `predict(exog=)` 缺校验与重建入口 | ✅ 已修复（§6.6）| `f84a404` |
 | P2-7 | `etable` 无写文件 | ✅ 已修复（§6.7）| `f84a404` |
 
-**这份清单现在的用途是回归测试套件**：`probe_gaps.py` 的 9 条对照探针必须全部保持 `FIXED`，任何一条退化都会让 `replication/tests` 失败。所以「曾经修好」是被持续验证的，不是一次性声明。
+**这份清单现在的用途是回归测试套件**：`adh2013_probe_gaps.py` 的 9 条对照探针必须全部保持 `FIXED`，任何一条退化都会让 `replication/tests` 失败。所以「曾经修好」是被持续验证的，不是一次性声明。
 
 ---
 
 ## 4. 复核方式与防回归
 
-探针 `probe_gaps.py` 有**三种**结论，不是两种：
+探针 `adh2013_probe_gaps.py` 有**三种**结论，不是两种：
 
 | 结论 | 含义 |
 |---|---|
@@ -77,7 +77,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 测试 `test_the_capability_gap_list_is_still_accurate` 会在任何一条变 `FIXED` 时失败，强制本文更新——**一条过时的"westata 做不到 X"与谎称"能做到"同样有害**。§6 记录的正是这条机制第一次触发的实例。
 
 ```bash
-.venv/Scripts/python.exe replication/papers/adh2013/probe_gaps.py
+.venv/Scripts/python.exe replication/papers/adh2013/adh2013_probe_gaps.py
 .venv/Scripts/python.exe -m pytest replication/tests -q
 ```
 
@@ -127,7 +127,7 @@ for key in ("groups", "clusters", "cluster"):
 
 **修复过程中被自己的测试抓到一次**：`panel.py` 里我用 `for key in (...)` 循环，覆盖了外层同名变量 `key`（它保存归一化后的 `cov_type`），导致**所有 robust 拟合走进错误分支**。`test_robust_is_statas_clustered_vce_not_hc1` 立即失败。循环变量已改名为 `_label_key`。这条值得记下：修一个一致性问题时，最容易引入的是另一个一致性问题。
 
-**防回归**：`probe_gaps.py` 的对应探针现在报 `FIXED`，`test_the_capability_gap_list_is_still_accurate` 因此失败并强制本文更新——这正是该测试设计的目的，也是它第一次真正触发。
+**防回归**：`adh2013_probe_gaps.py` 的对应探针现在报 `FIXED`，`test_the_capability_gap_list_is_still_accurate` 因此失败并强制本文更新——这正是该测试设计的目的，也是它第一次真正触发。
 
 ### 6.2 加权 IV —— 已修复并提交（`01c3ce5`）
 

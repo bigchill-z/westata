@@ -25,7 +25,7 @@ sys.path.insert(0, str(HERE))
 
 import numpy as np  # noqa: E402
 
-from specs import PAPER, SPECS, SOURCE  # noqa: E402
+from ad2013_specs import PAPER, SPECS, SOURCE  # noqa: E402
 
 OUT = HERE / "out"
 
@@ -107,10 +107,10 @@ def main() -> int:
     # This is the same dependent variable and treatment, but without the state fixed
     # effects the paper partials out.  If the coefficient did not move, the state dummies
     # would be doing nothing and the agreement above would be a weak test.
-    from acquire import workfile  # noqa: E402
+    from ad2013_acquire import workfile  # noqa: E402
     import pandas as pd  # noqa: E402
     import westata as ws  # noqa: E402
-    from run_westata import _prepare  # noqa: E402
+    from ad2013_run_westata import _prepare  # noqa: E402
 
     raw = pd.read_stata(workfile(), convert_categoricals=False)
     control = {}

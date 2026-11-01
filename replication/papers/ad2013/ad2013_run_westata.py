@@ -14,7 +14,7 @@ to ``kept_index``.
 
 That is a real defect in the library's contract -- ``statsmodels``' own ``from_formula``
 accepts a weight *column name* and drops rows consistently, and Stata's ``[aw=w]`` drops
-them with the rest of the estimation sample.  It is reported in ``WESTATA_GAPS.md`` rather
+them with the rest of the estimation sample.  It is reported in ``ad2013_gaps.md`` rather
 than worked around silently.
 
 **This driver therefore pre-drops the rows the model would drop anyway**, so that the
@@ -50,7 +50,7 @@ import pandas as pd  # noqa: E402
 
 import westata as ws  # noqa: E402
 
-from specs import SPECS, Spec  # noqa: E402
+from ad2013_specs import SPECS, Spec  # noqa: E402
 
 OUT = HERE / "out"
 
@@ -111,7 +111,7 @@ def _serialise(spec: Spec, result, dummy_count: int) -> dict:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    from acquire import workfile
+    from ad2013_acquire import workfile
 
     raw = pd.read_stata(workfile(), convert_categoricals=False)
     payload: dict = {"specs": {}, "meta": {}}

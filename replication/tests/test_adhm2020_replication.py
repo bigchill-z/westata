@@ -153,7 +153,7 @@ def test_the_single_way_fallback_understates_the_two_way_standard_error(westata)
 
 
 def test_the_probe_reports_no_gaps_and_keeps_the_comparisons():
-    """Guard ``WESTATA_GAPS.md``: both gaps are fixed, the parity note stands.
+    """Guard ``adhm2020_gaps.md``: both gaps are fixed, the parity note stands.
 
     This test used to run the other way -- it asserted that two-way clustering was
     REFUSED for IV and for OLS, because the document recorded those as open gaps. They
@@ -180,17 +180,17 @@ def test_the_probe_reports_no_gaps_and_keeps_the_comparisons():
     assert not [n for n, (s, _) in statuses.items() if s == "ERROR"], statuses
 
     assert statuses["multiway cluster (IV)"][0] == "OK", (
-        "two-way IV clustering regressed; WESTATA_GAPS.md §2 says it produces the "
+        "two-way IV clustering regressed; adhm2020_gaps.md §2 says it produces the "
         f"paper's 9.236939. Probe said: {statuses['multiway cluster (IV)'][1]}"
     )
     assert statuses["vs stock Stata (IV)"][0] == "NOTE", (
         "the stock-Stata parity note no longer applies"
     )
     assert statuses["multiway cluster (OLS)"][0] == "OK", (
-        "two-way OLS clustering regressed; WESTATA_GAPS.md §3 says it works"
+        "two-way OLS clustering regressed; adhm2020_gaps.md §3 says it works"
     )
     assert statuses["FEOLS two-way cluster"][0] == "OK", (
-        "FEOLS stopped accepting two-way groups; WESTATA_GAPS.md §4's claim that all "
+        "FEOLS stopped accepting two-way groups; adhm2020_gaps.md §4's claim that all "
         "three estimators agree no longer holds"
     )
     assert statuses["CGM decomposition"][0] == "OK", (

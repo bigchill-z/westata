@@ -32,8 +32,8 @@ import numpy as np  # noqa: E402
 
 import westata as ws  # noqa: E402
 
-from data import build, table4_sample  # noqa: E402
-from specs import SPECS, Spec  # noqa: E402
+from ck1994_data import build, table4_sample  # noqa: E402
+from ck1994_specs import SPECS, Spec  # noqa: E402
 
 OUT = HERE / "out"
 

@@ -331,7 +331,7 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 | StataNow（基准） | −0.596360066134 | 0.0987738830 |
 | 相对差 | 4.8e-14 | 一致 |
 
-**所以本文所有复现数字仍然来自"驱动层自己做 √w 变换"这条路径**——那是复现当时代码的真实行为，也是这份报告的实验记录。原生加权 IV 的结果作为**独立交叉验证**：两条完全不同的实现路径（库内 vs 驱动层）给出同一组数字，反过来加强了对结论的信心。详情见 [`WESTATA_GAPS.md`](WESTATA_GAPS.md) §6.2。
+**所以本文所有复现数字仍然来自"驱动层自己做 √w 变换"这条路径**——那是复现当时代码的真实行为，也是这份报告的实验记录。原生加权 IV 的结果作为**独立交叉验证**：两条完全不同的实现路径（库内 vs 驱动层）给出同一组数字，反过来加强了对结论的信心。详情见 [`adh2013_gaps.md`](../../gaps/adh2013_gaps.md) §6.2。
 
 #### 为什么驱动层的 √w 变换必须连常数项一起缩放
 
@@ -375,7 +375,7 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 | **无数据操作层** | `egen` / `merge` / `reshape` / `collapse` / `bysort` / `append` **全部不存在**（142 个公开接口里 0 个） | 这是**有意的分工**：数据整理交给 pandas，westata 只负责估计（README 也是这么定位的）。但对"把 Stata 项目整体搬过来"这个目标而言，意味着另一半工作要另配工具——论文的暴露度变量正是预先构建好的，所以这次复现**恰好**没被这个缺口挡住 |
 | **无图形层** | `graph` / `twoway` / `scatter` / `histogram` 全无 | 论文的图必须另找工具（matplotlib 等） |
 
-> 更细的 westata 能力缺口清单（现存 0 条（7 条全部已修复），按 westata 自身 API 契约判定并附可执行探针）见 [WESTATA_GAPS.md](WESTATA_GAPS.md)。本节只讨论"能否替代 Stata"这个问题本身。
+> 更细的 westata 能力缺口清单（现存 0 条（7 条全部已修复），按 westata 自身 API 契约判定并附可执行探针）见 [adh2013_gaps.md](../../gaps/adh2013_gaps.md)。本节只讨论"能否替代 Stata"这个问题本身。
 
 另有 9 条命令存在**已记录的实质偏差**（`xtgls` 3.4e+00、`teffects nnmatch` 7.1e-02、`frontier` 4.3e-02 等），以及 15 条 E1 等级命令（`arima`、`heckman`、`xtlogit pa` 等）。这些不在本次复现范围内，但它们决定了"替代"的边界。
 
@@ -391,7 +391,7 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 
 ### 6.4 除数据操作层与图形层之外，westata 可优化的点
 
-这一节内容较长（含判定标准、缺口清单、探针与复核方式），已独立成文，见 **[WESTATA_GAPS.md](WESTATA_GAPS.md)**。
+这一节内容较长（含判定标准、缺口清单、探针与复核方式），已独立成文，见 **[adh2013_gaps.md](../../gaps/adh2013_gaps.md)**。
 
 摘要：按"是否损害 westata 自身 API 契约"（而非"是否像 Stata"）判定，初版列出 7 条——2 条能力缺失（加权 IV、`FEOLS` 无 `predict`）、3 条同一 API 内不一致（`cov_kwds` 聚类键名三套、`subset=` 覆盖不全、`margins(at=)` 只收标量）、2 条契约/工程化。
 
@@ -407,11 +407,11 @@ ws.IV2SLS(..., weights=w, weight_type="aweight")
 | `predict(exog=)` 无校验 → DataFrame 按列名选取，缺列明确报错 | 本次 |
 | `etable` 无写文件 → `file=` 支持 csv/tsv/tex/md/html，仍返回 DataFrame | 本次 |
 
-**清单归零：7 条全部已修复。** 剩下的工作是把它们变成回归测试——`probe_gaps.py` 的 9 条对照探针必须持续是 `FIXED`，任何一条退化都会让 `replication/tests` 失败。
+**清单归零：7 条全部已修复。** 剩下的工作是把它们变成回归测试——`adh2013_probe_gaps.py` 的 9 条对照探针必须持续是 `FIXED`，任何一条退化都会让 `replication/tests` 失败。
 
 **值得记录的一点**：`etable` 那一条初稿的结论是「保留即可」，理由是分层设计。理由没错，结论错了——Stata 用户习惯 `esttab` 直接写文件，"自己落盘"在 Python 里是常识、在跨语言迁移里是缺一环。**"没错"不等于"够用"。**
 
-每一条都由 `probe_gaps.py` 可执行验证；已修复的条目会报 `FIXED` 并由测试强制本文同步更新（`test_the_capability_gap_list_is_still_accurate`）。修复前后的完整记录见 WESTATA_GAPS.md §6。
+每一条都由 `adh2013_probe_gaps.py` 可执行验证；已修复的条目会报 `FIXED` 并由测试强制本文同步更新（`test_the_capability_gap_list_is_still_accurate`）。修复前后的完整记录见 adh2013_gaps.md §6。
 
 ---
 

@@ -43,7 +43,7 @@ import pandas as pd  # noqa: E402
 
 import westata as ws  # noqa: E402
 
-from specs import SPECS, Spec  # noqa: E402
+from adh2013_specs import SPECS, Spec  # noqa: E402
 
 OUT = HERE / "out"
 
@@ -228,7 +228,7 @@ RESTRICTED: dict[str, pd.DataFrame] = {}
 def load(path: Path | None = None) -> pd.DataFrame:
     """Read the estimation sample and pre-restrict it per spec."""
 
-    from data import workfile
+    from adh2013_data import workfile
 
     frame = pd.read_stata(path or workfile(), convert_categoricals=False)
     frame.columns = [str(c) for c in frame.columns]

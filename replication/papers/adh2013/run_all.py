@@ -40,17 +40,17 @@ def _file_hash(path: Path) -> str:
 
 
 def main() -> int:
-    import data
+    import adh2013_data
     import gen_do
     import run_compare
     import run_stata
-    import run_westata
+    import adh2013_run_westata
 
     started = time.time()
     steps: list[dict] = []
 
     print("== data ==", flush=True)
-    provenance = data.ensure()
+    provenance = adh2013_data.ensure()
     steps.append({"step": "data", "ok": True, "archive_sha256": provenance.sha256})
 
     print("== do-file ==", flush=True)
@@ -62,7 +62,7 @@ def main() -> int:
     steps.append({"step": "run_stata", "ok": True})
 
     print("== westata ==", flush=True)
-    run_westata.main()
+    adh2013_run_westata.main()
     steps.append({"step": "run_westata", "ok": True})
 
     print("== compare ==", flush=True)

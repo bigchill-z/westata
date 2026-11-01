@@ -282,7 +282,7 @@ Table 4 有五个规格，逐步加控制变量：
 
 ### 6.4 可优化点清单
 
-本次复现没有发现新的 westata 缺口，但量化了一条边界。完整清单见 **[WESTATA_GAPS.md](WESTATA_GAPS.md)**，摘要：
+本次复现没有发现新的 westata 缺口，但量化了一条边界。完整清单见 **[ck1994_gaps.md](../../gaps/ck1994_gaps.md)**，摘要：
 
 - **0 个 GAP**：估计层三个探针全过（纯 OLS、Stata 命名访问器、加权 OLS）。
 - **1 个 BOUNDARY**：14 个 Stata 数据动词全部不存在，本次 8 个数据变换全部在 pandas 完成。
@@ -317,7 +317,7 @@ cd D:/myCodeProject/statapy
 | `differences.json` | 全部数值 + 负对照 |
 | `run.json` | 数据哈希 + 各产物哈希 |
 
-另有 [WESTATA_GAPS.md](WESTATA_GAPS.md)（能力边界清单）与 `probe_gaps.py`（其可执行探针）。
+另有 [ck1994_gaps.md](../../gaps/ck1994_gaps.md)（能力边界清单）与 `ck1994_probe_gaps.py`（其可执行探针）。
 
 **数据溯源**：`acquire.py` 固定了 zip 的 SHA-256（`41a29aec…a587`）与字节数 23,017。
 
@@ -325,7 +325,7 @@ cd D:/myCodeProject/statapy
 1. `test_the_sample_matches_the_papers_357_stores`：断言 357 与均值/sd；
 2. `test_the_closed_store_rule_moves_the_estimate`：断言"简化样本规则"会改变估计，防止后人把规则删掉；
 3. `test_the_estimate_is_sensitive_to_the_treatment_variable`：负对照；
-4. `test_the_gap_probe_still_reports_what_the_gaps_doc_claims`：守护 WESTATA_GAPS.md 的结论。
+4. `test_the_gap_probe_still_reports_what_the_gaps_doc_claims`：守护 ck1994_gaps.md 的结论。
 
 ---
 

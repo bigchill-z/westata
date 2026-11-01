@@ -23,7 +23,7 @@ sys.path.insert(0, str(HERE))
 
 import numpy as np  # noqa: E402
 
-from specs import SPECS, Spec  # noqa: E402
+from ad2013_specs import SPECS, Spec  # noqa: E402
 from stata_probe import Capture, Stata  # noqa: E402
 
 OUT = HERE / "out"
@@ -53,7 +53,7 @@ def _serialise(cap: Capture) -> dict:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    from acquire import workfile
+    from ad2013_acquire import workfile
 
     payload: dict = {"specs": {}, "meta": {}}
     with Stata() as stata:

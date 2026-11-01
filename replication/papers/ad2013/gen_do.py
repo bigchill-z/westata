@@ -15,7 +15,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from specs import SPECS  # noqa: E402
+from ad2013_specs import SPECS  # noqa: E402
 
 HEADER = r"""* ===========================================================================
 * Autor & Dorn (2013), "The Growth of Low-Skill Service Jobs and the
@@ -63,7 +63,7 @@ def render(do_path: Path, log_path: Path, dta_path: Path) -> str:
 
 
 def main() -> int:
-    from acquire import workfile
+    from ad2013_acquire import workfile
 
     out = HERE / "out"
     out.mkdir(parents=True, exist_ok=True)

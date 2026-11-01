@@ -338,7 +338,7 @@ def test_the_capability_gap_list_is_still_accurate():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
-        "adh2013_probe_gaps", PAPER / "probe_gaps.py"
+        "adh2013_probe_gaps", PAPER / "adh2013_probe_gaps.py"
     )
     probe_gaps = importlib.util.module_from_spec(spec)
     sys.modules["adh2013_probe_gaps"] = probe_gaps
@@ -379,7 +379,7 @@ def test_the_generated_do_file_lists_every_specification():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
-        "adh2013_specs", PAPER / "specs.py"
+        "adh2013_specs", PAPER / "adh2013_specs.py"
     )
     module = importlib.util.module_from_spec(spec)
     # ``dataclasses`` looks the module up in ``sys.modules`` while decorating, so a

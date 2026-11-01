@@ -27,7 +27,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from specs import SPECS  # noqa: E402
+from adh2013_specs import SPECS  # noqa: E402
 
 
 HEADER = r"""* ===========================================================================
@@ -95,7 +95,7 @@ def render(do_path: Path, log_path: Path, dta_path: Path) -> str:
 
 
 def main() -> int:
-    from data import workfile
+    from adh2013_data import workfile
 
     out = HERE / "out"
     out.mkdir(parents=True, exist_ok=True)

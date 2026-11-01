@@ -35,7 +35,7 @@ sys.path.insert(0, str(HERE))
 
 import numpy as np  # noqa: E402
 
-from specs import PAPER, PAPER_SOURCE, SPECS, Spec  # noqa: E402
+from adh2013_specs import PAPER, PAPER_SOURCE, SPECS, Spec  # noqa: E402
 
 OUT = HERE / "out"
 

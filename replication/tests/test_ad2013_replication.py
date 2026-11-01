@@ -159,7 +159,7 @@ def test_the_generated_do_file_lists_every_specification():
 
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("ad2013_specs", PAPER / "specs.py")
+    spec = importlib.util.spec_from_file_location("ad2013_specs", PAPER / "ad2013_specs.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["ad2013_specs"] = module
     spec.loader.exec_module(module)
@@ -184,7 +184,7 @@ def test_data_provenance_is_pinned():
 
 
 def test_the_gap_probe_now_reports_every_defect_as_fixed():
-    """Guard ``WESTATA_GAPS.md``: the three contract gaps were fixed, so they must stay fixed.
+    """Guard ``ad2013_gaps.md``: the three contract gaps were fixed, so they must stay fixed.
 
     This test used to run the other way: the document recorded defects that were NOT fixed,
     so it failed if the probes started passing. They do pass now, and the guard inverts with
@@ -205,7 +205,7 @@ def test_the_gap_probe_now_reports_every_defect_as_fixed():
 
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("ad2013_probe_gaps", PAPER / "probe_gaps.py")
+    spec = importlib.util.spec_from_file_location("ad2013_probe_gaps", PAPER / "ad2013_probe_gaps.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["ad2013_probe_gaps"] = module
     spec.loader.exec_module(module)
@@ -213,7 +213,7 @@ def test_the_gap_probe_now_reports_every_defect_as_fixed():
     statuses = {probe.name: probe.run()[0] for probe in module.PROBES}
     assert "ERROR" not in statuses.values(), f"probes failed unexpectedly: {statuses}"
     assert statuses == {"aligned weights": "OK", "weights by name": "OK", "documentation": "OK"}, (
-        f"a contract defect came back: {statuses}. WESTATA_GAPS.md §1-2 say all three are "
+        f"a contract defect came back: {statuses}. ad2013_gaps.md §1-2 say all three are "
         "fixed, and section 4's workaround is no longer required by the library."
     )
 

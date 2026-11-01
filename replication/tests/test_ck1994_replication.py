@@ -58,18 +58,18 @@ def _coef(record: dict, name: str) -> tuple[float, float]:
 def test_the_reader_reproduces_the_codebook_counts():
     """The fixed-width parse is only trustworthy if it matches the codebook's own counts."""
 
-    import data
+    import ck1994_data
 
-    frame = data.build()  # raises if the counts disagree
+    frame = ck1994_data.build()  # raises if the counts disagree
     assert len(frame) == 410
     assert int((frame["state"] == 1).sum()) == 331
     assert int((frame["state"] == 0).sum()) == 79
 
 
 def test_the_sample_matches_the_papers_357_stores():
-    import data
+    import ck1994_data
 
-    sample = data.table4_sample(data.build())
+    sample = ck1994_data.table4_sample(ck1994_data.build())
     assert len(sample) == 357, "the Table 4 sample size is reported in the paper's notes"
     # The paper prints -0.237; the exact value is -0.2375..., so accept the print rounding
     assert round(sample["d_fte"].mean(), 2) == pytest.approx(-0.24, abs=5e-3)
@@ -87,11 +87,11 @@ def test_the_closed_store_rule_moves_the_estimate():
     import sys as _sys
 
     _sys.path.insert(0, str(PAPER.parent.parent / "papers" / "ck1994"))
-    import data
+    import ck1994_data
     import westata as ws
 
-    frame = data.build()
-    correct = data.table4_sample(frame)
+    frame = ck1994_data.build()
+    correct = ck1994_data.table4_sample(frame)
     assert len(correct) == 357
 
     # The wrong rule: demand a wave-2 wage from every store.
@@ -222,7 +222,7 @@ def test_the_estimate_is_sensitive_to_the_treatment_variable():
 
 
 def test_the_gap_probe_still_reports_what_the_gaps_doc_claims():
-    """Guard ``WESTATA_GAPS.md`` so its entries cannot go stale unnoticed.
+    """Guard ``ck1994_gaps.md`` so its entries cannot go stale unnoticed.
 
     The ADH replication has an equivalent test; this one exists because the CK document
     makes a *different* kind of claim -- not "these features are missing" but "this work
@@ -236,7 +236,7 @@ def test_the_gap_probe_still_reports_what_the_gaps_doc_claims():
 
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("ck_probe_gaps", PAPER / "probe_gaps.py")
+    spec = importlib.util.spec_from_file_location("ck_probe_gaps", PAPER / "ck1994_probe_gaps.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules["ck_probe_gaps"] = module
     spec.loader.exec_module(module)
@@ -250,7 +250,7 @@ def test_the_gap_probe_still_reports_what_the_gaps_doc_claims():
         f"probes failed unexpectedly: {statuses}"
     )
     assert not [n for n, (s, _) in statuses.items() if s == "GAP"], (
-        "westata now has a genuine gap; WESTATA_GAPS.md section 3 claims there are none"
+        "westata now has a genuine gap; ck1994_gaps.md section 3 claims there are none"
     )
     # The estimator probes are expected to pass; if one regresses that is a real defect.
     for probe in module.ESTIMATOR_PROBES:
@@ -261,6 +261,6 @@ def test_the_gap_probe_still_reports_what_the_gaps_doc_claims():
     # document's central claim ("all data work happened in pandas") is obsolete.
     data_status = statuses[module.DATA_PROBES[0].name][0]
     assert data_status == "BOUNDARY", (
-        "the data-surface probe no longer reports a boundary; WESTATA_GAPS.md section 2 "
+        "the data-surface probe no longer reports a boundary; ck1994_gaps.md section 2 "
         "needs rewriting"
     )

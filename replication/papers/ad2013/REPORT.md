@@ -13,7 +13,7 @@
 | `pystata` 与 `westata` 有差异吗？ | **有，但在浮点量级。** 546 个成对参数：最大系数相对差 **2.9e-11**、最大标准误相对差 **2.4e-11** |
 | 数据能获取吗？ | **能。** 作者站点直链，HTTP 200，2,741,391 字节，SHA-256 已固定 |
 | 这篇特殊在哪 | 归档里带着**作者自己的完整 log**（7 位小数）。这让基准比排版表格严格——不需要和三位小数打交道 |
-| 发现了什么新问题 | **3 条 API 契约缺陷**（已修复），见 [WESTATA_GAPS.md](WESTATA_GAPS.md) |
+| 发现了什么新问题 | **3 条 API 契约缺陷**（已修复），见 [ad2013_gaps.md](../../gaps/ad2013_gaps.md) |
 
 ---
 
@@ -164,7 +164,7 @@
 
 ## 5. 本次发现的问题
 
-这一篇在 **API 契约**上发现了真实缺陷，**现已全部修复**。完整记录见 [WESTATA_GAPS.md](WESTATA_GAPS.md)，这里摘要最关键的一条。
+这一篇在 **API 契约**上发现了真实缺陷，**现已全部修复**。完整记录见 [ad2013_gaps.md](../../gaps/ad2013_gaps.md)，这里摘要最关键的一条。
 
 ### 5.1 权重没有随样本一起收缩
 
@@ -241,7 +241,7 @@ WeightError: weights have 722 entries but the data have 675 rows
 cd D:/myCodeProject/statapy
 .venv/Scripts/python.exe replication/papers/ad2013/run_all.py                        # 全流程，约 28 秒
 .venv/Scripts/python.exe -m pytest replication/tests/test_ad2013_replication.py -q   # 27 项测试
-.venv/Scripts/python.exe replication/papers/ad2013/probe_gaps.py                     # 能力探针
+.venv/Scripts/python.exe replication/papers/ad2013/ad2013_probe_gaps.py                     # 能力探针
 ```
 
 产物（`replication/papers/ad2013/out/`）：

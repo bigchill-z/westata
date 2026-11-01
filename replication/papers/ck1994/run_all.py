@@ -26,20 +26,20 @@ def _hash(path: Path) -> str:
 
 
 def main() -> int:
-    import acquire
+    import ck1994_acquire
     import run_compare
     import run_stata
-    import run_westata
+    import ck1994_run_westata
 
     started = time.time()
     print("== data ==", flush=True)
-    provenance = acquire.ensure()
+    provenance = ck1994_acquire.ensure()
 
     print("== stata ==", flush=True)
     run_stata.main()
 
     print("== westata ==", flush=True)
-    run_westata.main()
+    ck1994_run_westata.main()
 
     print("== compare ==", flush=True)
     run_compare.main()

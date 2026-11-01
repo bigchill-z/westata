@@ -213,6 +213,18 @@ class FEOLS:
     when ``cov_type`` is left at its default.
     """
 
+    #: ``e(cmd)``. Subclasses override these to present themselves as a different Stata
+    #: command while reusing the same estimation machinery -- which is the honest way to
+    #: support ``areg``: it is a DIFFERENT command in Stata (``absorb()`` is required, the
+    #: banner reads "Linear regression, absorbing indicators", and ``e(title2)`` names the
+    #: absorbed variable), not another name for ``reghdfe``.
+    _command_name = "reghdfe"
+    #: areg reports an intercept, reghdfe does not. See fit().
+    _reports_intercept = False
+    _command_title = None
+    _predict_program = None
+    _marginsnotok = None
+
     def __init__(
         self,
         formula: str,
@@ -648,7 +660,25 @@ class FEOLS:
             "mss": tss - rss,
             "tss": tss,
             "rank": rank,
+            # Command identity. ``areg`` and ``reghdfe`` are DIFFERENT Stata commands with
+            # different banners, a different predict program and different
+            # ``e(marginsnotok)``; a subclass overrides the class attributes and these
+            # keys follow. ``areg.json`` is the authority for the areg values.
+            "cmd": self._command_name,
         }
+        if self._command_title is not None:
+            e["title"] = self._command_title
+        if self._predict_program is not None:
+            e["predict"] = self._predict_program
+        if self._marginsnotok is not None:
+            e["marginsnotok"] = self._marginsnotok
+        # ``areg`` prints a SECOND title line naming the absorbed variable
+        # (areg.json: e(title2) = "Absorbed variable: firm") and stores e(absvar). Both
+        # are areg-only; reghdfe has neither.
+        absorbed_names = getattr(self, "_absorbed_names", None)
+        if absorbed_names:
+            e["absvar"] = " ".join(absorbed_names)
+            e["title2"] = "Absorbed variable: " + " ".join(absorbed_names)
         # ``tss_within`` / ``r2_within`` / ``r2_a_within``: ``reghdfe`` measures
         # the within R-squared against the total sum of squares of ``y`` after
         # projecting out ONLY the absorbed effects.  Equivalently, it is the
@@ -821,6 +851,16 @@ class FEOLS:
                         stats.f.sf(f_absorb, df_a, residual_df)
                     )
 
+        # ``areg`` REPORTS AN INTERCEPT; ``reghdfe`` does not. areg.json's names are
+        # ['x1', 'x2', '_cons'] and its b carries three entries, so this is a real
+        # difference between the two commands rather than a cosmetic one.
+        #
+        # The value is the AVERAGE absorbed effect, ``mean(y - b'x)``, verified digit for
+        # digit against the fixture (1.209671208388627 both ways on its panel). An FE model
+        # does not identify a constant separately from the absorbed effects -- only a
+        # normalisation fixes it -- and this is the one areg uses.
+        params, names, cov = self._with_intercept(data, y, params, names, cov, e)
+
         results = StataResults(
             params=params,
             param_names=names,
@@ -831,7 +871,7 @@ class FEOLS:
             df_resid=df_resid,
             df_model=df_model,
             dist="t",
-            model_name="reghdfe",
+            model_name=self._command_name,
             cov_type=cov_type,
             e=e,
         )
@@ -875,12 +915,36 @@ class FEOLS:
             design_matrix=getattr(results, "design_matrix", None),
             formula=str(self._formula),
             y=np.asarray(y, dtype=float),
-            params=np.asarray(params, dtype=float),
-            param_names=list(names),
+            # The RESULT's parameters, not the local ones: ``areg`` appends ``_cons`` in
+            # ``_with_intercept``, and registering the pre-intercept list left the predict
+            # dispatcher looking for a coefficient the result no longer matched.
+            params=np.asarray(results.params, dtype=float),
+            param_names=list(results.param_names),
             data=data,
             weights=getattr(self, "_weights", None),
         )
         return results
+
+    def _with_intercept(
+        self,
+        data: pd.DataFrame,
+        y: np.ndarray,
+        params: np.ndarray,
+        names: list[str],
+        cov: np.ndarray,
+        e: dict[str, Any],
+    ) -> tuple[np.ndarray, list[str], np.ndarray]:
+        """Append ``e(_cons)``-style intercept reporting, per command.
+
+        ``reghdfe`` reports only the slopes; ``areg`` reports a constant as well, because
+        an absorbed-indicator model DOES have one once the absorbed effects are normalised
+        (``areg.json``: names ``['x1', 'x2', '_cons']``, three ``b`` entries).
+
+        Kept as a hook rather than an inline branch so the difference between the two
+        commands lives in one place per command, next to the other identity attributes.
+        """
+
+        return params, names, cov
 
     @staticmethod
     def _rank(model: Any, nobs: int) -> int:
@@ -1125,11 +1189,18 @@ def _register_hdfe_predict(
     # one more column than ``params``. Multiplying the full design by ``params`` therefore
     # raises a dimension error -- and "fix" it by dropping a column positionally would pick
     # the wrong one. Select BY NAME so the correspondence is explicit and checkable.
+    #
+    # ``areg`` additionally REPORTS a ``_cons`` that has no design column of its own (it is
+    # the average of the absorbed effects, see ``Areg._with_intercept``). It must be
+    # dropped here rather than treated as a missing column, or the membership test below
+    # fails and predict is never registered at all.
+    slope_names = [name for name in param_names if name != "_cons"]
     available = set(design_names)
-    if not set(param_names) <= available:
+    if not set(slope_names) <= available:
         return
-    columns = [design_names.index(name) for name in param_names]
+    columns = [design_names.index(name) for name in slope_names]
     design = np.asarray(design, dtype=float)[:, columns]
+    param_names = slope_names
 
     absorbed_names = [name for name in _absorbed_columns(formula) if name in data.columns]
     if not absorbed_names:
@@ -1164,7 +1235,8 @@ def _register_hdfe_predict(
     def _fixed_effect() -> np.ndarray:
         """The absorbed effect per observation -- ``u`` in ``areg_p.ado``."""
 
-        linear = design @ params
+        # Drop a reported ``_cons`` (areg) so the product matches the design's width.
+        linear = design @ np.asarray(params, dtype=float)[: design.shape[1]]
         within = y - linear
         if weights is not None:
             return _group_weighted_mean(within, group_column, np.asarray(weights, dtype=float))
@@ -1172,7 +1244,14 @@ def _register_hdfe_predict(
 
     def dispatch(kind: str, exog: Any = None, **_kwargs: Any) -> np.ndarray:
         normalized = str(kind).strip().lower()
-        linear = design @ params
+        # ``params`` comes from the RESULT, which for ``areg`` ends with a reported
+        # ``_cons`` that has no design column; ``design`` was already restricted to the
+        # slope columns above, so the constant must be dropped here too or the product is
+        # a shape error.
+        slope_params = np.asarray(params, dtype=float)[
+            : design.shape[1]
+        ]
+        linear = design @ slope_params
         if normalized in ("xb", "fitted", "index"):
             # ``areg_p.ado``: xb is the linear predictor PLUS the absorbed effect.
             return np.asarray(linear + _fixed_effect(), dtype=float)
@@ -1213,3 +1292,158 @@ def _group_weighted_mean(values: np.ndarray, groups: Any, weights: np.ndarray) -
     )
     means = np.divide(weighted, weight_sums, out=np.zeros(size), where=weight_sums > 0)
     return means[codes]
+
+
+class Areg(FEOLS):
+    """Linear regression absorbing categorical indicators -- Stata ``areg``.
+
+    This is a DIFFERENT command from ``reghdfe``, not a synonym, and the differences are
+    the reason it needs its own class:
+
+    ==========================  ====================================================
+    ``areg``                    ``reghdfe``
+    ==========================  ====================================================
+    ``absorb(varlist)`` REQUIRED, ``|`` block in the formula
+    banner "Linear regression, absorbing indicators"
+    ``e(title2)`` = "Absorbed variable: firm"
+    ``e(predict)`` = ``areg_p``  no predict program registered
+    ``e(marginsnotok)`` = ``Residuals SCore D XBD``
+    ==========================  ====================================================
+
+    All of those values come from ``tests/conformance/stata_fixtures/areg.json``, which is
+    a capture of the real command, not from reading prose.
+
+    The ESTIMATION is identical -- ``areg`` and ``reghdfe`` fit the same within model -- so
+    this subclass reuses :class:`FEOLS`'s machinery and overrides only the identity.
+
+    Parameters
+    ----------
+    formula:
+        ``"y ~ x1 + x2"`` alongside the ``absorb=`` keyword, matching Stata's
+        ``areg y x1 x2, absorb(firm)``.  The ``|`` form is also accepted for symmetry with
+        :class:`FEOLS`, but ``absorb=`` is the documented Stata spelling.
+    data:
+        Estimation sample.
+    absorb:
+        One or more categorical variables to absorb, e.g. ``"firm"`` or
+        ``("firm", "year")``.  Required, as in Stata.
+    """
+
+    _command_name = "areg"
+    #: areg reports _cons (areg.json names: x1, x2, _cons).
+    _reports_intercept = True
+    _command_title = "Linear regression, absorbing indicators"
+    _predict_program = "areg_p"
+    # ``areg.json``'s e(marginsnotok): these prediction types are refused after areg.
+    _marginsnotok = "Residuals SCore D XBD"
+
+    def __init__(
+        self,
+        formula: str,
+        data: pd.DataFrame,
+        *,
+        absorb: Any = None,
+        weights: Any = None,
+        weight_type: str | None = None,
+    ) -> None:
+        if absorb is None:
+            raise ValueError(
+                "areg requires absorb=; Stata's syntax is 'areg y x, absorb(varlist)' "
+                "and the option is not optional (areg.sthlp: 'absorb() is required')"
+            )
+        names = [absorb] if isinstance(absorb, str) else list(absorb)
+        if not names:
+            raise ValueError("absorb= was given but names no variables")
+        absorbed = " + ".join(str(name) for name in names)
+        combined = f"{formula.strip()} | {absorbed}" if "|" not in formula else formula
+        super().__init__(combined, data, weights=weights, weight_type=weight_type)
+        #: ``e(absvar)``: ``areg`` records the absorbed variable's NAME, which is what
+        #: ``e(title2)`` is built from.
+        self._absorbed_names = [str(name) for name in names]
+
+    @classmethod
+    def from_formula(
+        cls,
+        formula: str,
+        data: pd.DataFrame,
+        *,
+        absorb: Any = None,
+        weights: Any = None,
+        weight_type: str | None = None,
+        subset: Any = None,
+    ) -> "Areg":
+        """Build from Stata's spelling: ``"y ~ x1 + x2"`` with ``absorb="firm"``."""
+
+        if subset is not None:
+            data = data.loc[subset]
+        return cls(
+            formula, data, absorb=absorb, weights=weights, weight_type=weight_type
+        )
+
+    def _with_intercept(
+        self,
+        data: pd.DataFrame,
+        y: np.ndarray,
+        params: np.ndarray,
+        names: list[str],
+        cov: np.ndarray,
+        e: dict[str, Any],
+    ) -> tuple[np.ndarray, list[str], np.ndarray]:
+        """``areg`` reports ``_cons``, the EQUAL-WEIGHTED MEAN of the absorbed effects.
+
+        Verified against ``areg.json`` to machine precision. Fitting the full design
+        (slopes plus one dummy per group) and taking ``c = (1/G)·[0, 0, 1, ..., 1]``
+        reproduces BOTH the reported variance 9.093229e-04 and the covariances with the
+        slopes (5.80638e-05 against x1, 2.80071e-05 against x2). Two simpler guesses were
+        wrong and are recorded so they are not retried::
+
+            mean(y - b'x)          -> right POINT (1.2096712084), wrong variance
+            rmse^2 / G             -> 0.0054 against the true 0.0009
+            rmse^2 / N             -> 0.000906, close but not the reported value
+            full design, [_cons]   -> 0.029182 vs Stata's 0.03015498
+
+        The point estimate coincides with ``mean(y - b'x)`` -- the equal-weighted dummy
+        mean is the same number under this normalisation -- so the DESIGN-based route is
+        used for both, which keeps the covariance internally consistent with it.
+        """
+
+        if not names:
+            return params, names, cov
+
+        groups = np.asarray(data[self._absorbed_names[0]])
+        codes, levels = pd.factorize(groups, sort=True)
+        n_groups = len(levels)
+
+        # Full design: slopes, then one dummy per absorbed group.
+        design = np.column_stack(
+            [
+                *[np.asarray(data[name].to_numpy(), dtype=float) for name in names],
+                np.eye(n_groups)[codes],
+            ]
+        )
+        bread = np.linalg.pinv(design.T @ design)
+        dof = float(e.get("df_r", 0.0) or 0.0)
+        sigma2 = float(e.get("rss", 0.0)) / dof if dof > 0 else 0.0
+
+        # The constant is the average of the group effects, which is what areg prints.
+        weights = np.zeros(design.shape[1], dtype=float)
+        weights[len(names):] = 1.0 / n_groups
+        coef = np.linalg.pinv(design) @ np.asarray(y, dtype=float)
+        intercept = float(weights @ coef)
+
+        params = np.append(np.asarray(params, dtype=float), intercept)
+        names = [*names, "_cons"]
+
+        widened = np.zeros((params.size, params.size), dtype=float)
+        widened[:-1, :-1] = np.asarray(cov, dtype=float)
+        variance = sigma2 * float(weights @ bread @ weights)
+        widened[-1, -1] = variance
+        # Off-diagonal terms are NOT zero here: areg reports cov(_cons, x1) = 5.80638e-05
+        # on this fixture, which only the full-design route reproduces.
+        for index in range(len(names) - 1):
+            selector = np.zeros(design.shape[1], dtype=float)
+            selector[index] = 1.0
+            value = sigma2 * float(weights @ bread @ selector)
+            widened[index, -1] = value
+            widened[-1, index] = value
+        return params, names, widened

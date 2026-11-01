@@ -9,7 +9,8 @@ westata                    Stata
 ``IV2SLS``                 ``ivregress 2sls``
 ``IVLIML``                 ``ivregress liml``
 ``IVGMM``                  ``ivregress gmm``
-``FEOLS``                  ``reghdfe`` / ``areg``
+``FEOLS``                  ``reghdfe``
+``Areg``                   ``areg``  (absorb= required)
 ``PanelOLS``               ``xtreg, fe``
 ``RandomEffects``          ``xtreg, re``
 ``BetweenOLS``             ``xtreg, be``
@@ -26,7 +27,7 @@ from westata.estimators.discrete import (
     Poisson,
     Probit,
 )
-from westata.estimators.hdfe import FEOLS
+from westata.estimators.hdfe import Areg, FEOLS
 from westata.estimators.iv import IV2SLS, IVGMM, IVLIML
 from westata.estimators.counts import (
     TruncatedNegativeBinomial,
@@ -147,6 +148,7 @@ __all__ = [
     "IV2SLS",
     "IVLIML",
     "IVGMM",
+    "Areg",
     "FEOLS",
     "PanelOLS",
     "RandomEffects",

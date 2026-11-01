@@ -391,6 +391,44 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 
 `FEOLS` 不获得该参数——`reghdfe` 没有这个选项，测试锁住了这一点。
 
+### 4.8 记录：`dfadjust` 尚未实现（附实测对照数据）
+
+`areg` 的 `vce(hc2 [clustvar], dfadjust)` 会按 Imbens & Kolesár (2016) 计算**逐系数**的
+调整自由度。它不是显示开关——它直接改变 p 值与置信区间，属于会影响数值输出的选项。
+
+**当前状态：未实现。** 调研过程与结论一并记下，因为下面的实测数据比"没做"更有价值。
+
+**公式来源**：`areg.sthlp` 只给出论文名，公式在 `[R] regress` 的 Methods 章节
+（本地 `docs/reference/stata_r_manual.pdf` p.26-27，eq. 15 及聚类变体）。已完整提取：
+
+```
+G(l) 的第 g 列 = (I_N − H)_g' (I_Ng − H_gg)^{+1/2} X_g (X'X)^{-1} e_l
+K_l = (Σλ_i)² / Σλ_i²        λ_i 是 G'G 的特征值
+```
+
+**实测对照数据（可用于将来的验证）**：StataNow 19.5，210 行面板（30 组 × 7 期）：
+
+```stata
+areg y x1, absorb(firm) vce(hc2, dfadjust)
+* Note: p-values computed using adjusted degrees of freedom.
+* r(table) 的 df 行：x1 = 61.711292,  _cons = 170.54664
+* se(x1) = .08213816
+```
+
+顺带确认：`se(x1) = .08213816` 与 westata 的 HC2 **完全相同**——说明方差本身已经对了，
+缺的只是自由度的调整。
+
+**为什么没有实现**：尝试按公式实现后，在同一份数据上算出 19.79 / 1.0，而 Stata 是
+61.71，**始终没有收敛**。诊断发现问题在于 `I − H_gg` **奇异**——每组只有 7 个观测，
+而该组贡献的哑变量使其 `H_gg` 满秩（实测特征值含 0）。Stata 对这种奇异情形有专门处理，
+而 PDF 的 Methods 章节没有展开那一步。
+
+**结论：这需要比现有证据更多的信息，不能靠猜。** 已把未验证的实现从代码中移除，
+不留半成品；上表的实测数值与公式一起留档，将来有 Stata 侧细节时可以接上。
+
+> 判据：**能跑但数值可能与 Stata 不符**，比**明确不实现**更糟——这正是本文件 §4.2
+> 对 `_cons` 的判断标准，同样的标准也应适用于这里。
+
 ---
 
 ## 5. 复核方式

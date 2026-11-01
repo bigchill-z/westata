@@ -54,6 +54,25 @@ def _normalize_cov_type(cov_type: str) -> str:
         ) from None
 
 
+def _stata_multiway_reference(estimate_model: str | None) -> str:
+    """Which Stata command is the reference for multiway clustering HERE?
+
+    The answer changes the message a caller sees, and getting it backwards is misleading
+    in either direction:
+
+    * ``regress`` accepts ``vce(cluster a b)`` (``regress.sthlp:196``), so an OLS fit is
+      reproducing stock behaviour and the note should say so briefly.
+    * stock ``ivregress`` refuses it ("multiway cluster VCE not allowed"), so an IV fit is
+      reproducing ``ivreg2`` -- user-written -- and must say so, or the caller will try to
+      match the number in vanilla Stata and fail.
+    """
+
+    name = str(estimate_model or "").strip().lower()
+    if name.startswith("iv") or name in ("2sls", "liml", "gmm", "ivregress"):
+        return "ivregress"
+    return "regress"
+
+
 def cluster_labels_from_kwds(kwds: Any) -> Any:
     """Extract cluster labels from ``cov_kwds`` under ANY of the accepted key spellings.
 
@@ -88,6 +107,7 @@ def compute_cov(
     nobs_adj: float | None = None,
     weights: np.ndarray | None = None,
     weight_type: str | None = None,
+    estimate_model: str | None = None,
 ) -> tuple[np.ndarray, float]:
     """Return ``(cov, df_t)`` for the requested variance estimator.
 
@@ -268,7 +288,8 @@ def compute_cov(
     dimensions = _cluster_dimensions(groups)
     if dimensions is not None:
         cov, df_t = cov_multiway_cluster(
-            Xw, rw, dimensions, bread=bread, ssc=settings, nobs=n_eff
+            Xw, rw, dimensions, bread=bread, ssc=settings, nobs=n_eff,
+            stata_reference=_stata_multiway_reference(estimate_model),
         )
         return cov, df_t
     cov, n_groups = cov_cluster(

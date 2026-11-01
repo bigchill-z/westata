@@ -925,6 +925,7 @@ class IV2SLS:
                 ssc=cov_ssc,
                 nobs=nobs,
                 df_resid=denominator,
+                estimate_model="ivregress",
             )
         return compute_cov(
             Xhat,
@@ -934,6 +935,7 @@ class IV2SLS:
             ssc=cov_ssc,
             nobs=nobs,
             df_resid=denominator,
+            estimate_model="ivregress",
         )
 
     def _backend_fit(

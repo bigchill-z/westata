@@ -15,6 +15,8 @@ rejects two-dimensional group arrays instead of guessing.
 from __future__ import annotations
 
 import itertools
+import warnings
+
 from typing import Any, Sequence
 
 import numpy as np
@@ -23,6 +25,30 @@ import pandas as pd
 from westata.errors import ConsistencyError
 from westata.protocols import SSC
 from westata.vce.ssc import cluster_factor
+
+
+#: Emitted when multiway clustering is requested, tailored by whether stock Stata can do it.
+#:
+#: * For ``regress``-style OLS the answer is YES -- ``regress.sthlp:196`` documents
+#:   ``vce(cluster clustvarlist)`` with several variables -- so the short note confirms the
+#:   reference and changes nothing about how the number should be read.
+#: * For IV stock ``ivregress`` REFUSES it: "multiway cluster VCE not allowed", measured on
+#:   StataNow 19.5 and recorded in ``replication/papers/adhm2020/WESTATA_GAPS.md``. The
+#:   capability exists only in ``ivreg2``, which is USER-WRITTEN. A caller who assumes
+#:   "Stata can do this" would try to reproduce the number in Stata, fail, and have no clue
+#:   why -- so this one has to be explicit about provenance.
+MULTIWAY_PROVENANCE_STATA = (
+    "multiway clustering: matches stock Stata's `regress, vce(cluster a b)` "
+    "(regress.sthlp:196)."
+)
+
+MULTIWAY_PROVENANCE_IV = (
+    "multiway clustering on IV is NOT a stock Stata feature. Stock `ivregress` refuses it "
+    "('multiway cluster VCE not allowed'); the capability comes from `ivreg2`, a "
+    "USER-WRITTEN command (ssc install ivreg2 ranktest ftools), which is what the ADHM "
+    "(2020) authors actually ran. This result reproduces in Stata only through `ivreg2`, "
+    "not through `ivregress`."
+)
 
 
 def encode_groups(groups) -> np.ndarray:
@@ -117,6 +143,7 @@ def cov_multiway_cluster(
     bread: np.ndarray | None = None,
     ssc: SSC | None = None,
     nobs: float | None = None,
+    stata_reference: str = "regress",
 ) -> tuple[np.ndarray, float]:
     """Multiway cluster-robust covariance by the Cameron-Gelbach-Miller identity.
 
@@ -149,6 +176,16 @@ def cov_multiway_cluster(
             "cov_multiway_cluster needs at least two dimensions; a single dimension is "
             "the ordinary cluster covariance (cov_cluster)"
         )
+
+    # SAY WHERE THIS COMES FROM. Which note applies depends on the command, because the
+    # answer genuinely differs: stock ``regress`` supports multiway clusters, stock
+    # ``ivregress`` does not. Reporting the wrong one either way would mislead -- one
+    # direction makes a stock feature sound exotic, the other lets a caller assume a
+    # non-stock capability will reproduce in vanilla Stata.
+    if str(stata_reference).strip().lower().startswith("iv"):
+        warnings.warn(MULTIWAY_PROVENANCE_IV, stacklevel=3)
+    else:
+        warnings.warn(MULTIWAY_PROVENANCE_STATA, stacklevel=3)
 
     labels = [np.asarray(np.asarray(d, dtype=object).reshape(-1)) for d in dimensions]
     for index, column in enumerate(labels):

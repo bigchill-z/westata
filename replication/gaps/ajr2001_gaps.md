@@ -9,43 +9,56 @@
 
 ---
 
-## 0. 结论：1 个缺口
-
-本论文复现过程中发现 **1 个能力缺口**：
+## 0. 结论：0 个缺口（1 条已修复）
 
 | 条目 | 性质 | 状态 |
 |---|---|---|
-| **`PanelOLS` 不接受权重** | 能力缺失（P2） | **未修复** |
+| `PanelOLS` 不接受权重 | 能力缺失（P2） | **已修复** |
 | 系数、聚类标准误、联合检验 | 全部正确 | — |
 
-`xtreg` 是本篇的核心命令，而它在 westata 的对应物 `PanelOLS` **没有 `weights` 参数**，
-因此论文 5 列中有 4 列（加权列）无法用它估计。
+`PanelOLS` 现在接受 `weights=`/`weight_type=`，加权拟合与 Stata `xtreg, fe` 逐位相同：
+
+| 量 | westata `PanelOLS`（加权） | Stata `xtreg` |
+|---|---|---|
+| `fpresence1900` 系数 | 0.633869 | 0.633869 |
+| 聚类标准误 | 0.40751063 | 0.40751063 |
+
+`xtreg` 是本篇的核心命令。修复前 westata 的对应物 `PanelOLS` **没有 `weights` 参数**，
+论文 5 列中有 4 列（加权列）只能绕道 `FEOLS`；现在 `PanelOLS` 可直接做。
 
 ---
 
-## 1. 缺口：`PanelOLS` 不支持权重（P2，未修复）
+## 1. `PanelOLS` 不支持权重（P2）—— 已修复
 
-### 1.1 现象
+### 1.1 现象（修复前）
 
 论文的命令是 `xtreg urbrate ... [aweight=totalpop1750], fe cluster(id)`。
-按文档映射，`xtreg` 对应 `PanelOLS`：
+按文档映射，`xtreg` 对应 `PanelOLS`，但它原先接受不了权重：
+
+```
+PanelOLS.from_formula(formula, data, *, entity, time, subset=None)   # 修复前
+PanelOLS.from_formula(formula, data, *, entity, time, subset=None,
+                      weights=None, weight_type=None)                 # 现在
+```
+
+现在可用：
 
 ```python
-ws.PanelOLS.from_formula("urbrate ~ x1 + x2", df, entity="id", time="year")
+ws.PanelOLS.from_formula(
+    "urbrate ~ " + " + ".join(spec.regressors), frame,
+    entity="id", time="year",
+    weights=frame["totalpop1750"], weight_type="aweight",
+).fit(cov_type="cluster", cov_kwds={"cluster": frame["id"]})
 ```
 
-但 `PanelOLS.from_formula` 的签名里**没有 `weights`**：
+**两个实现要点**（都属于"不写出来就会静默出错"的那类）：
 
-```
-PanelOLS.from_formula(formula, data, *, entity, time, subset=None)
-```
-
-传进去直接报错：
-
-```python
-ws.PanelOLS.from_formula(..., weights=df.totalpop1750)
-# TypeError: PanelOLS.from_formula() got an unexpected keyword argument 'weights'
-```
+1. **权重缺失要删行**。Stata 的 `[aweight=]` 把权重缺失的观测标记为不使用，
+   所以样本是**交集**。本篇原始数据 209 行里有 **95 个权重缺失**，忽略这一点会让 N
+   算错，然后报「weights contain missing values」——症状看起来像另一个 bug。
+2. **权重按位置对齐，不按标签**。调用者传入的 Series 带的是长表 `RangeIndex`，
+   而面板索引是 `(entity, time)` MultiIndex，按标签 join 会得到全 NaN。
+   "每行一个权重" 说的就是行序。
 
 ### 1.2 影响
 
@@ -76,18 +89,25 @@ ws.PanelOLS.from_formula(..., weights=df.totalpop1750)
 
 不会算错，且有替代路径，但对应物缺参数会让使用者绕路。**P2。**
 
-### 1.5 顺带记录：`Areg` 的加权聚类标准误
+### 1.5 更正：`Areg` 的加权聚类标准误**并非缺陷**（原诊断用错了对照）
 
-同为加权固定效应，`FEOLS` 与 `Areg` 的**系数相同、标准误不同**：
+初版这里写着「`Areg` 的标准误偏离 11%，成因未定位」。**那个诊断是错的**，错在对照基准。
 
-| 路径 | 1900 年系数 | 聚类标准误 |
+实测两个 Stata 命令，它们本来就给不同的标准误：
+
+| 命令 | 1900 年系数 | 聚类标准误 |
 |---|---|---|
-| Stata `xtreg, fe [aweight]` | 0.633869 | **0.407511** |
-| westata `FEOLS` | 0.633869 | **0.407511** |
-| westata `Areg` | 0.633869 | 0.452923 |
+| Stata `areg ... [aweight], absorb(id) vce(cluster id)` | 0.633869 | **0.45292274** |
+| Stata `xtreg ... [aweight], fe vce(cluster id)` | 0.633869 | **0.40751063** |
+| westata `Areg` | 0.633869 | **0.45292274** ✅ = `areg` |
+| westata `FEOLS` | 0.633869 | **0.40751063** ✅ = `xtreg` |
 
-`Areg` 的标准误偏离 11%。它与 NQ 那篇记录的 `_cons` 问题可能同源（都在 `Areg` 的
-方差构造路径上），但**本篇只观察到现象，未定位成因**，因此单列记录，不并入 §1。
+**两个 westata 估计器都对**，各自对齐各自的 Stata 命令。`Areg` 声称替代的是 `areg`，
+拿它与 `xtreg` 比就必然差 11%——**差的不是实现，是参照系**。
+
+> 教训：**「数值对不上」时，先确认对的是不是同一个东西**。这条和 §1.4 里「`Areg` 只报
+> 斜率」是同一类错误的两个方向——一个是功能缺失被当成能跑，一个是正确结果被当成缺陷。
+> 探针原先把它记为 `NOTE`（未定位成因），现在改成 `OK` 并锁死 0.45292274。
 
 ---
 

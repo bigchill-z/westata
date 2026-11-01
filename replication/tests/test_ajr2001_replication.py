@@ -109,12 +109,33 @@ def test_the_replication_records_that_there_is_no_published_baseline():
     assert "no author log" in meta["baseline_type"].lower() or "paywalled" in meta["baseline_type"].lower()
 
 
-def test_panelols_still_rejects_weights():
-    """The gap: the documented ``xtreg`` equivalent cannot take the paper's weight.
+def _paper_sample():
+    """The exact estimation sample the paper's Stata run used."""
 
-    Four of the five replicated columns are weighted.  If ``PanelOLS`` ever gains a
-    ``weights`` parameter, this test fails and ``ajr2001_gaps.md`` section 1 must become a
-    "fixed" entry.
+    import sys
+
+    import pandas as pd
+
+    if str(PAPER) not in sys.path:
+        sys.path.insert(0, str(PAPER))
+    from ajr2001_run_westata import sample
+    from ajr2001_specs import SPECS
+
+    frame = pd.read_stata(
+        PAPER / "data" / "20100816_replication_dataset.dta", convert_categoricals=False
+    )
+    spec = next(item for item in SPECS if item.id == "T3_c1")
+    return sample(frame, spec)
+
+
+def test_panelols_accepts_the_paper_weight():
+    """``PanelOLS`` now takes ``weights=``; this used to assert the opposite.
+
+    The gap was: four of the five replicated columns are weighted, and the documented
+    ``xtreg`` equivalent could not take the paper's weight, so callers had to fall back to
+    ``FEOLS``. That is fixed, so the assertion inverts with the fact rather than being
+    deleted -- a regression here would mean the documented mapping silently stopped
+    covering the paper's own specification again.
     """
 
     import inspect
@@ -122,16 +143,62 @@ def test_panelols_still_rejects_weights():
     import westata as ws
 
     signature = inspect.signature(ws.PanelOLS.from_formula)
-    assert "weights" not in signature.parameters, (
-        "PanelOLS now accepts weights; ajr2001_gaps.md section 1 needs updating"
+    assert "weights" in signature.parameters, (
+        "PanelOLS lost its weights= parameter; ajr2001_gaps.md section 1 must say so"
+    )
+    assert "weight_type" in signature.parameters, (
+        "weights= without weight_type= cannot be interpreted; Stata never guesses the "
+        "weight type"
     )
 
-    frame = __import__("pandas").read_stata(
-        PAPER / "data" / "20100816_replication_dataset.dta", convert_categoricals=False
-    )
-    with pytest.raises(TypeError):
+
+def test_panelols_weighted_matches_xtreg():
+    """The weighted PanelOLS must reproduce the paper's own numbers, not just run.
+
+    Reference values come from ``xtreg urbrate ... [aweight=totalpop1750], fe
+    vce(cluster id)`` on the original data: coefficient 0.633869, clustered SE 0.407511.
+    """
+
+    import numpy as np
+    import pandas as pd
+
+    import westata as ws
+
+    # The paper's sample restriction has to be applied FIRST: Stata's 0.633869 was
+    # estimated on the 74 rows that survive it, not on the raw 209-row file.
+    frame = _paper_sample()
+    result = ws.PanelOLS.from_formula(
+        "urbrate ~ fpresence1750 + fpresence1800 + fpresence1850 + fpresence1875 + "
+        "fpresence1900 + yr1750 + yr1800 + yr1850 + yr1875 + yr1900",
+        frame,
+        entity="id",
+        time="year",
+        weights=frame["totalpop1750"],
+        weight_type="aweight",
+    ).fit(cov_type="cluster", cov_kwds={"cluster": frame["id"]})
+
+    index = [str(name) for name in result.param_names].index("fpresence1900")
+    coefficient = float(np.asarray(result.params, dtype=float)[index])
+    standard_error = float(np.asarray(result.bse, dtype=float)[index])
+
+    assert coefficient == pytest.approx(0.633869, abs=1e-5)
+    assert standard_error == pytest.approx(0.407511, rel=1e-6)
+
+
+def test_weights_require_a_weight_type():
+    """Stata never guesses the weight type (``[U] 20.24``), so neither may we."""
+
+    import pandas as pd
+
+    import westata as ws
+
+    frame = _paper_sample()
+    with pytest.raises(ValueError, match="weight_type"):
         ws.PanelOLS.from_formula(
-            "urbrate ~ fpresence1750", frame, entity="id", time="year",
+            "urbrate ~ fpresence1750",
+            frame,
+            entity="id",
+            time="year",
             weights=frame["totalpop1750"],
         )
 

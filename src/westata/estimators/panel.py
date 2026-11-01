@@ -388,6 +388,8 @@ class PanelOLS:
         *,
         entity: str,
         time: str,
+        weights: Any = None,
+        weight_type: str | None = None,
     ) -> None:
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
@@ -400,11 +402,27 @@ class PanelOLS:
         self._formula = formula
         self._entity = entity
         self._time = time
+        # ``xtreg, fe [aweight=...]`` is the combination this paper uses. Stored on the
+        # instance and applied at estimation time, matching ``FEOLS``/``Areg``; the
+        # weights are aligned to the estimation sample AFTER listwise deletion, which is
+        # why the raw argument is kept rather than an already-filtered array.
+        self._weights_argument = weights
+        self._weight_type = weight_type
+        if weights is not None and weight_type is None:
+            raise ValueError(
+                "weights were supplied without weight_type; Stata never guesses the "
+                "weight type ([U] 20.24). Pass weight_type='aweight' (or 'fweight', "
+                "'pweight', 'iweight')."
+            )
         self._data = _panel_frame(data, entity=entity, time=time, command=self._stata_command)
         # Remember the full sample so that user-supplied, observation-aligned
         # arguments (cluster labels) can be mapped onto the estimation sample
         # *after* listwise deletion.
         self._full_index = self._data.index
+        #: The index BEFORE _design drops rows. _weights_argument describes this
+        #: one, and _full_index is overwritten as the sample shrinks, so the original
+        #: has to be kept or positional re-labelling breaks on the second pass.
+        self._weight_source_index = self._data.index
         self._kept_index = self._data.index
 
     @classmethod
@@ -416,6 +434,8 @@ class PanelOLS:
         entity: str,
         time: str,
         subset: Any = None,
+        weights: Any = None,
+        weight_type: str | None = None,
     ) -> "PanelOLS":
         """Build a model from a formula and a panel frame.
 
@@ -428,11 +448,23 @@ class PanelOLS:
         frame and calling ``reset_index`` -- gives identical numbers (verified), so this is
         a consistency fix rather than a correctness one: one spelling for the same
         operation across estimators.
+
+        ``weights=``/``weight_type=`` reproduce ``xtreg, fe [aweight=...]``. They are
+        accepted here because ``xtreg`` is the command ``PanelOLS`` documents itself as
+        replacing: leaving them out forced callers onto ``FEOLS`` to get the same
+        estimator.
         """
 
         if subset is not None:
             data = data.loc[subset]
-        return cls(formula, data, entity=entity, time=time)
+        return cls(
+            formula,
+            data,
+            entity=entity,
+            time=time,
+            weights=weights,
+            weight_type=weight_type,
+        )
 
     # ------------------------------------------------------------------ fit
     def fit(
@@ -600,6 +632,25 @@ class PanelOLS:
             ) from exc
 
         kept = x_frame.index
+        # A MISSING WEIGHT drops the row, exactly like a missing regressor: Stata's
+        # ``[aweight=]`` marks an observation "not to be used" when the weight is missing,
+        # so the estimation sample is the intersection. The AJR data has 95 missing weights
+        # out of 209, so ignoring this both shrank N wrongly and then tripped the
+        # "weights contain missing values" check.
+        if self._weights_argument is not None:
+            aligned = self._raw_weight_values().reindex(kept)
+            mask = aligned.notna().to_numpy()
+            kept = kept[mask]
+            # ``y_frame``/``x_frame`` were built on the pre-weight sample, so they have to
+            # be cut by the SAME mask -- shrinking only ``kept`` left a 169-row response
+            # against a 109-row index.
+            y_frame = y_frame.loc[kept]
+            x_frame = x_frame.loc[kept]
+            if len(kept) == 0:
+                raise ConsistencyError(
+                    f"{self._stata_command}: no observations remain after dropping "
+                    "missing weights"
+                )
         if len(kept) == 0:
             raise ConsistencyError(
                 f"{self._stata_command}: no observations remain after listwise "
@@ -638,12 +689,71 @@ class PanelOLS:
     ) -> Any:
         from linearmodels.panel import PanelOLS as _BackendPanelOLS
 
+        weights = self._aligned_weights(y.index)
         return _BackendPanelOLS(
             y.to_frame(),
             X,
+            weights=None if weights is None else pd.Series(weights, index=y.index),
             entity_effects=bool(entity_effects),
             time_effects=bool(time_effects),
         )
+
+    def _raw_weight_values(self) -> pd.Series:
+        """The weights as a Series indexed like ``self._full_index``, NaNs included.
+
+        The caller hands over a Series carrying the LONG frame's index; the panel index is
+        a ``(entity, time)`` MultiIndex, so the two cannot be joined by label. Row order is
+        the contract -- "one weight per row of data" -- so the values are re-labelled
+        positionally.
+        """
+
+        raw = self._weights_argument
+        source = self._weight_source_index
+        if isinstance(raw, str):
+            raise ConsistencyError(
+                f"{self._stata_command}: pass the weight VALUES, not the column name "
+                f"{raw!r}; column names cannot be aligned to the original rows once the "
+                "panel index has been built"
+            )
+        if isinstance(raw, pd.Series):
+            if raw.index.equals(source):
+                return raw.astype(float)
+            return pd.Series(np.asarray(raw.to_numpy(), dtype=float), index=source)
+        array = np.asarray(raw, dtype=float).reshape(-1)
+        if array.size != len(source):
+            raise ConsistencyError(
+                f"{self._stata_command}: weights have {array.size} entries but the data "
+                f"have {len(source)} rows"
+            )
+        return pd.Series(array, index=source)
+
+    def _aligned_weights(self, index: pd.Index) -> np.ndarray | None:
+        """Weights for the ESTIMATION sample, or ``None`` when unweighted.
+
+        The argument the caller passed describes ``self._full_index``; ``_design`` has
+        already dropped rows with missing values, so it is reindexed onto the surviving
+        rows here. Skipping this step would either misalign silently (a longer array would
+        raise, but a same-length one from a different order would not) or, worse, hand the
+        backend weights in frame order while it expects sample order.
+        """
+
+        if self._weights_argument is None:
+            return None
+
+        values = np.asarray(self._raw_weight_values().reindex(index), dtype=float)
+        if np.any(np.isnan(values)):
+            raise ConsistencyError(
+                f"{self._stata_command}: weights are missing on rows of the estimation "
+                "sample; a missing weight should have dropped the row"
+            )
+
+        if not np.all(np.isfinite(values)):
+            raise ConsistencyError(
+                f"{self._stata_command}: weights contain missing or infinite values"
+            )
+        if np.any(values < 0):
+            raise ConsistencyError(f"{self._stata_command}: weights must be non-negative")
+        return values
 
     def _fit_backend(
         self,

@@ -81,35 +81,39 @@ def _sample() -> pd.DataFrame:
 
 
 def _panelols_weights() -> str:
-    """The gap: ``PanelOLS`` -- the documented ``xtreg`` equivalent -- takes no weights.
+    """PanelOLS -- the documented xtreg equivalent -- must take the paper's weight.
 
-    Four of this paper's five replicated columns are weighted, so the documented mapping
-    cannot express them.
+    This used to be the gap. It is fixed, so the probe now asserts the opposite: the
+    parameter exists AND the weighted fit reproduces Stata. Asserting only the signature
+    would let a wired-but-wrong implementation pass, which is exactly the failure mode
+    this file exists to catch.
     """
 
     import inspect
 
+    import numpy as np
+
     signature = inspect.signature(ws.PanelOLS.from_formula)
-    if "weights" in signature.parameters:
+    if "weights" not in signature.parameters:
         raise _Gap(
-            "PanelOLS now accepts weights; this probe and ajr2001_gaps.md section 1 are stale"
+            "PanelOLS.from_formula stopped accepting weights; the paper's xtreg ... "
+            "[aweight=totalpop1750] cannot be estimated through the documented mapping"
         )
 
     frame = _sample()
-    try:
-        ws.PanelOLS.from_formula(
-            "urbrate ~ " + " + ".join(_spec().regressors),
-            frame, entity="id", time="year",
-            weights=frame["totalpop1750"],
-        )
-    except TypeError as exc:
-        raise _Gap(
-            f"PanelOLS.from_formula does not accept weights ({exc}). The paper's command is "
-            "xtreg ... [aweight=totalpop1750], and 4 of the 5 replicated columns are weighted, "
-            "so the documented xtreg equivalent cannot estimate them. FEOLS can, and matches "
-            "Stata, so this is a mapping gap rather than a capability gap."
-        ) from None
-    raise _Gap("PanelOLS accepted weights via **kwargs; the gap may already be closed")
+    result = ws.PanelOLS.from_formula(
+        "urbrate ~ " + " + ".join(_spec().regressors),
+        frame, entity="id", time="year",
+        weights=frame["totalpop1750"], weight_type="aweight",
+    ).fit(cov_type="cluster", cov_kwds={"cluster": frame["id"]})
+    index = [str(n) for n in result.param_names].index("fpresence1900")
+    coefficient = float(np.asarray(result.params, dtype=float)[index])
+    se = float(np.asarray(result.bse, dtype=float)[index])
+    if abs(coefficient - 0.633869) > 1e-5:
+        raise _Gap(f"PanelOLS weighted coefficient {coefficient!r} is not Stata's 0.633869")
+    if abs(se - 0.407511) / 0.407511 > 1e-4:
+        raise _Gap(f"PanelOLS weighted clustered SE {se:.6f} is not Stata's 0.407511")
+    return f"weighted x1 coefficient {coefficient:.6f}, clustered SE {se:.6f}"
 
 
 def _feols_weighted() -> str:
@@ -133,11 +137,17 @@ def _feols_weighted() -> str:
 
 
 def _areg_weighted_se() -> str:
-    """``Areg`` takes weights but its clustered SE does not match ``xtreg`` on this data.
+    """Areg must match Stata's areg, NOT its xtreg.
 
-    Recorded as a NOTE rather than a GAP because the paper's own diagnostics (the joint test)
-    do not depend on it, and because the underlying cause was not isolated here -- only the
-    symptom is measured.  ``FEOLS`` is used precisely because of this.
+    The earlier note compared it with xtreg and reported an 11% gap. That comparison
+    was wrong, and measuring both Stata commands settles it:
+
+        Stata areg  [aweight], absorb(id) vce(cluster id)    se = .45292274
+        Stata xtreg [aweight], fe         vce(cluster id)    se = .40751063
+
+    They are different estimators with different small-sample conventions, so Areg
+    matching the first is correct. Its old NOTE was measuring it against the wrong
+    reference -- the symptom was real, the diagnosis was not.
     """
 
     frame = _sample()
@@ -153,13 +163,12 @@ def _areg_weighted_se() -> str:
 
     if abs(coefficient - 0.633869) > 1e-5:
         raise _Gap(f"Areg's coefficient {coefficient!r} no longer matches; revisit this probe")
-    if abs(se - 0.407511) / 0.407511 < 1e-4:
-        raise _Gap("Areg now matches xtreg's clustered SE; the NOTE is stale")
-    raise _Note(
-        f"Areg coefficient matches (0.633869) but its clustered SE is {se:.6f} against "
-        "xtreg's 0.407511 (11% apart). The replication uses FEOLS for this reason; the "
-        "cause was not isolated."
-    )
+    if abs(se - 0.45292274) / 0.45292274 > 1e-5:
+        raise _Gap(
+            f"Areg's clustered SE {se:.8f} is not Stata areg's 0.45292274; it is "
+            "drifting toward reghdfe/xtreg's 0.40751063"
+        )
+    return f"coefficient {coefficient:.6f}, clustered SE {se:.8f} (= Stata areg)"
 
 
 def _public_surface() -> str:
@@ -173,7 +182,7 @@ PROBES: tuple[Probe, ...] = (
     Probe("PanelOLS weights", "the documented xtreg equivalent can take weights",
           _panelols_weights),
     Probe("FEOLS weighted FE", "the workaround reproduces Stata", _feols_weighted),
-    Probe("Areg weighted SE", "Areg's clustered SE matches xtreg", _areg_weighted_se),
+    Probe("Areg weighted SE", "Areg's clustered SE matches Stata areg", _areg_weighted_se),
 )
 
 CONTROLS: tuple[Probe, ...] = (

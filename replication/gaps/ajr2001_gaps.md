@@ -60,24 +60,27 @@ ws.PanelOLS.from_formula(
    而面板索引是 `(entity, time)` MultiIndex，按标签 join 会得到全 NaN。
    "每行一个权重" 说的就是行序。
 
-### 1.2 影响
+### 1.2 影响（修复前的处境）
 
 本篇 5 个复现规格中，**4 个是加权的**（Table 3 列 1、3，Table 4 列 1，以及不含年份
-虚拟变量的变体）。用 `PanelOLS` 只能做那 1 个无权重列。
+虚拟变量的变体）。修复前用 `PanelOLS` 只能做那 1 个无权重列，其余 4 列必须绕道 `FEOLS`。
 
-这不是"少一个选项"——`xtreg, fe [aweight=]` 是实证论文里非常常见的组合。
+这不是"少一个选项"——`xtreg, fe [aweight=]` 是实证论文里非常常见的组合。这也是它被
+评为 P2（而非可以长期搁置）的原因：影响的是**文档指定的那个对应物能不能直接完成任务**。
 
 ### 1.3 现有的替代路径
 
-`FEOLS` 与 `Areg` 都接受 `weights`/`weight_type`，且都通过吸收实体效应实现同一 within 估计量：
+`FEOLS` 与 `Areg` 都接受 `weights`/`weight_type`，且都通过吸收实体效应实现同一 within
+估计量——但**三者的正确对照命令不同**，这一点曾经把本文件引向一个错误结论（§1.5）：
 
-| 估计器 | 接受权重 | 能否复现 `xtreg, fe` |
+| 估计器 | 接受权重 | 与哪个 Stata 命令对齐 |
 |---|---|---|
-| `PanelOLS` | ✗ | 否（无法加权） |
-| `FEOLS` | ✓ | **能**（本篇用它，系数与 SE 均精确吻合） |
-| `Areg` | ✓ | 系数能，**聚类 SE 不能**（见 §1.5） |
+| `PanelOLS` | ✓（现已支持） | `xtreg, fe` — 系数与聚类 SE 均精确吻合 |
+| `FEOLS` | ✓ | `xtreg` / `reghdfe` — 精确吻合（修复前本篇走这条） |
+| `Areg` | ✓ | **`areg`** — 系数与 SE 均精确吻合（见 §1.5） |
 
-所以**缺口不影响能否完成任务**，只影响"用文档指定的那个对应物能否完成任务"。
+修复前后"能否完成任务"都不受影响——差别在于是否必须绕道。**这也是当初把它评为 P2、
+而不是 P0 的理由：不误导、有替代，只是映射路径不完整。**
 
 ### 1.4 分级：P2
 
@@ -87,7 +90,8 @@ ws.PanelOLS.from_formula(
 | 是否有替代 | **有**，`FEOLS` 精确可用 |
 | 影响面 | 中：`PanelOLS` 是文档里 `xtreg` 的对应物，用户会先试它 |
 
-不会算错，且有替代路径，但对应物缺参数会让使用者绕路。**P2。**
+不会算错，且有替代路径，但对应物缺参数会让使用者绕路。**P2。**（已修复，分级保留作为
+当时的判断依据——它解释了为什么这条该修却不紧急。）
 
 ### 1.5 更正：`Areg` 的加权聚类标准误**并非缺陷**（原诊断用错了对照）
 
@@ -115,17 +119,18 @@ ws.PanelOLS.from_formula(
 
 ```
 -- estimator surface --
-  [GAP ] PanelOLS weights        PanelOLS.from_formula 不接受 weights=（论文 4/5 列需要它）
-  [OK  ] FEOLS weighted FE        coefficient 0.633869, SE 0.407511（与 Stata 一致）
--- agreement --
-  [OK  ] coefficients             最大相对差 5.17e-13
-  [OK  ] clustered standard errors 最大相对差 3.99e-14
-  [OK  ] joint Wald test          F 统计量逐位相同
+  [OK   ] PanelOLS weights       weighted x1 coefficient 0.633869, clustered SE 0.407511
+  [OK   ] FEOLS weighted FE      coefficient 0.633869, clustered SE 0.407511
+  [OK   ] Areg weighted SE       coefficient 0.633869, clustered SE 0.45292274 (= Stata areg)
+
 -- controls --
-  [OK  ] public surface           143 public names
+  [OK   ] public surface         143 public names
 ```
 
-**1 gap、0 error。**
+**4 ok, 0 note, 0 gap, 0 error。**
+
+（修复前是 `2 ok, 1 note, 1 gap`：`PanelOLS weights` 为 `GAP`，`Areg weighted SE` 为
+`NOTE`——后者是因为当时拿它与 `xtreg` 对照，见 §1.5。）
 
 ---
 
@@ -135,14 +140,19 @@ ws.PanelOLS.from_formula(
 .venv/Scripts/python.exe replication/papers/ajr2001/ajr2001_probe_gaps.py
 ```
 
-探针有四种结论：`OK`、`GAP`、`NOTE`、`ERROR`。**本篇当前预期是 `1 gap`。**
+探针有四种结论：`OK`、`GAP`、`NOTE`、`ERROR`。**本篇当前预期是 `0 gap`。**
 
 **测试守护**（`replication/tests/test_ajr2001_replication.py`）：
 
 | 测试 | 守住什么 |
 |---|---|
 | `test_westata_matches_stata_on_every_parameter` | 系数与 SE 对齐到 1e-9 |
-| `test_the_joint_test_matches` | 联合 Wald F 统计量一致 |
-| `test_panelols_still_rejects_weights` | §1 的缺口仍在（若哪天支持了，本文件需改成"已修复"） |
+| `test_the_joint_wald_test_matches` | 联合 Wald F 统计量一致 |
+| `test_panelols_accepts_the_paper_weight` | `PanelOLS` 有 `weights=`/`weight_type=` 两个参数（方向已随修复反转） |
+| `test_panelols_weighted_matches_xtreg` | 加权拟合复现 Stata 的 0.633869 / 0.407511，而不只是"能跑" |
+| `test_weights_require_a_weight_type` | 给了权重必须给类型（Stata 从不猜权重类型） |
 
-三条都是双向的：断言失败既可能意味着 westata 退化，也可能意味着它已修复、文档过期。
+这些断言都是双向的：失败既可能意味着 westata 退化，也可能意味着行为再次改变、文档过期。
+
+**只断言签名存在是不够的**：一个接了参数但算错的实现会直接通过签名检查——那正是本文件
+存在的意义所要防的失效形态，所以数值断言与签名断言并列。

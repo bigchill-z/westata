@@ -19,7 +19,7 @@
 | 用作者自己的命令跑，Stata 与 westata 一致吗？ | **是，精确一致。** 5 列 × 10 个参数，系数最大相对差 **5.2e-13**，聚类标准误 **4.0e-14** |
 | 联合检验（论文每列都报）一致吗？ | **是**，Wald F 统计量逐位相同 |
 | 数据能获取吗？ | **能**，作者完整归档（dta + do + readme），无网络依赖 |
-| 有新的 westata 问题吗？ | **有 1 条**：`PanelOLS`（文档指定的 `xtreg` 对应物）**不接受权重**，而本篇 5 列中 4 列是加权的 |
+| 有新的 westata 问题吗？ | **发现 1 条，已修复**：`PanelOLS`（文档指定的 `xtreg` 对应物）原先不接受权重，而本篇 5 列中 4 列是加权的。现已支持 `weights=`/`weight_type=`，加权拟合与 Stata 逐位相同 |
 
 ---
 
@@ -175,11 +175,12 @@ F 相同意味着 `e(V)` 在数值上也一致，不只是对角线。
 
 ---
 
-## 4. 本章的核心发现：`PanelOLS` 不接受权重
+## 4. 本章的核心发现：`PanelOLS` 原先不接受权重（已修复）
 
-### 4.1 现象
+### 4.1 现象（修复前）
 
-论文的命令是 `xtreg, fe [aweight=...]`。文档把 `xtreg` 映射到 `PanelOLS`：
+论文的命令是 `xtreg, fe [aweight=...]`。文档把 `xtreg` 映射到 `PanelOLS`，但它原先
+接受不了权重：
 
 ```python
 ws.PanelOLS.from_formula("urbrate ~ x", df, entity="id", time="year",
@@ -187,31 +188,50 @@ ws.PanelOLS.from_formula("urbrate ~ x", df, entity="id", time="year",
 # TypeError: PanelOLS.from_formula() got an unexpected keyword argument 'weights'
 ```
 
-`PanelOLS.from_formula` 的签名是 `(formula, data, *, entity, time, subset=None)`——
+`PanelOLS.from_formula` 的签名曾是 `(formula, data, *, entity, time, subset=None)`——
 **没有 `weights`**。
 
-### 4.2 影响
+**现在**签名是 `(formula, data, *, entity, time, subset=None, weights=None,
+weight_type=None)`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 
-本篇 5 个复现规格中 **4 个是加权的**。用文档指定的对应物，只能做 1 列。
-
-### 4.3 但这不阻碍完成任务
-
-`FEOLS` 与 `Areg` 都接受权重，且都实现同一 within 估计量。实测：
-
-| 估计器 | 接受权重 | 加权聚类 SE 与 Stata 一致 |
+| 量 | westata `PanelOLS`（加权） | Stata `xtreg` |
 |---|---|---|
-| `PanelOLS` | ✗ | — |
-| `FEOLS` | ✓ | **✓ 精确一致**（0.407511） |
-| `Areg` | ✓ | ✗（0.452923，偏 11%） |
+| `fpresence1900` 系数 | 0.633869 | 0.633869 |
+| 聚类标准误 | 0.40751063 | 0.40751063 |
 
-**本次复现用 `FEOLS`**，系数与标准误均精确吻合。
+### 4.2 影响（修复前）
 
-所以这是**映射层面的缺口**，不是能力缺口——但用户会先试文档指定的那个。
+本篇 5 个复现规格中 **4 个是加权的**。用文档指定的对应物，只能做 1 列，其余必须绕道
+`FEOLS`。
+
+### 4.3 三个估计器与三个不同的 Stata 命令
+
+这一节曾经写错，值得保留更正后的版本，因为它是一个**极易重犯**的错误：
+
+| 估计器 | 接受权重 | 正确的对照命令 | 加权聚类 SE |
+|---|---|---|---|
+| `PanelOLS` | ✓ | `xtreg, fe` | **0.40751063** ✅ |
+| `FEOLS` | ✓ | `xtreg` / `reghdfe` | **0.40751063** ✅ |
+| `Areg` | ✓ | **`areg`** | **0.45292274** ✅ |
+
+初版把 `Areg` 与 `xtreg` 对照，写出"偏 11%"，并据此把它当成缺陷。实测 Stata 的两个命令：
+
+| Stata 命令 | 聚类 SE |
+|---|---|
+| `areg ... [aweight], absorb(id) vce(cluster id)` | **.45292274** |
+| `xtreg ... [aweight], fe vce(cluster id)` | **.40751063** |
+
+**它们本来就不同**。`Areg` 报 .45292274 是对的，它对齐的是 `areg`。错的不是实现，
+是参照系——`Areg` 声称替代 `areg`，拿它比 `xtreg` 必然差 11%。
+
+> 本次复现**仍然用 `FEOLS`**，理由是它与 `xtreg, fe` 同源、口径一致；这不是"不得不"，
+> 而是"本来就是同一个命令的对应物"。
 
 ### 4.4 分级：P2
 
-会立刻抛 `TypeError`（不误导），且有精确的替代路径。但"文档指定的对应物缺参数"
-会让人绕路。详见 [ajr2001_gaps.md](../gaps/ajr2001_gaps.md) §1。
+修复前会立刻抛 `TypeError`（不误导），且有精确的替代路径。但"文档指定的对应物缺参数"
+会让人绕路——所以是 P2（该修但不紧急），不是 P0。详见
+[ajr2001_gaps.md](../gaps/ajr2001_gaps.md) §1。
 
 ---
 
@@ -284,5 +304,5 @@ cd D:/myCodeProject/statapy
 > 归档里没有作者 log，AER 原文在付费墙后，因此基准只能是 Stata 自己的输出。
 > 这条边界比任何数字都更需要放在前面——它决定了这次复现能声称什么。
 >
-> 附带发现：文档把 `xtreg` 映射到 `PanelOLS`，而 `PanelOLS` **不接受权重**，导致本篇
-> 4/5 的加权列用不了它；`FEOLS` 可以且精确，但用户会先试那个对应物。
+> 附带发现：文档把 `xtreg` 映射到 `PanelOLS`，而 `PanelOLS` 原先**不接受权重**，导致本篇
+> 4/5 的加权列用不了它。**现已修复**，加权拟合与 Stata 逐位相同（§4）。

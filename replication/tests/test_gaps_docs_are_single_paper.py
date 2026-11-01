@@ -51,6 +51,8 @@ DOCS = [
     ("nq2011", "REPORT.md", PAPERS / "nq2011"),
     ("adhm2020", "adhm2020_gaps.md", GAPS),
     ("adhm2020", "REPORT.md", PAPERS / "adhm2020"),
+    ("ajr2001", "ajr2001_gaps.md", GAPS),
+    ("ajr2001", "REPORT.md", PAPERS / "ajr2001"),
 ]
 
 #: Phrases that only make sense when talking about ANOTHER paper in this series.
@@ -171,7 +173,7 @@ def test_every_gap_list_is_in_the_gaps_directory():
 
     expected = {
         "adh2013_gaps.md", "ck1994_gaps.md", "ad2013_gaps.md",
-        "nq2011_gaps.md", "adhm2020_gaps.md",
+        "nq2011_gaps.md", "adhm2020_gaps.md", "ajr2001_gaps.md",
     }
     present = {path.name for path in GAPS.glob("*_gaps.md")}
     assert present == expected, (

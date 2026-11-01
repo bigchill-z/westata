@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.0.3 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.0.4 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 

@@ -9,6 +9,10 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.0.4] — 2026-11-02
+
 ### Added — `Areg`: Stata's `areg` as its own command, and `PanelOLS` weights
 
 `areg` and `reghdfe` are different commands, and the package only had the second

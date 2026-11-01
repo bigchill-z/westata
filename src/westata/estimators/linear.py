@@ -144,6 +144,21 @@ def _cluster_dimension_columns(groups: Any) -> list[Any]:
     return [array]
 
 
+def _cluster_dimension_labels(groups: Any, n_dimensions: int) -> list[str]:
+    """Names for the clustering dimensions, as ``clustertable`` prints them.
+
+    A DataFrame carries its column names and those are what Stata shows (``a``, ``b``).
+    A bare array carries none, so positional placeholders are used rather than inventing
+    names that would look authoritative but be wrong.
+    """
+
+    if isinstance(groups, pd.DataFrame) and groups.shape[1] >= n_dimensions:
+        return [str(name) for name in groups.columns[:n_dimensions]]
+    if n_dimensions == 1:
+        return ["group"]
+    return [f"dim{index + 1}" for index in range(n_dimensions)]
+
+
 def _resolve_weight_column(weights: Any, data: pd.DataFrame) -> Any:
     """Turn ``weights="colname"`` into the column's values; pass anything else through.
 
@@ -371,6 +386,7 @@ class OLS:
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        level: float | None = None,
     ) -> StataResults:
         """Estimate the model and return a Stata-conformant result object.
 
@@ -618,6 +634,30 @@ class OLS:
                     np.unique(encode_groups(column)).size for column in dimensions
                 ]
                 e["N_clust"] = float(min(counts))
+                # ``clustertable`` prints the count for EVERY combination of dimensions,
+                # so the per-dimension numbers are kept separately: e(N_clust) holds only
+                # the minimum, which is what that particular macro means.
+                e["_cluster_counts"] = [int(count) for count in counts]
+                e["_cluster_names"] = _cluster_dimension_labels(groups, len(counts))
+                # Joint counts for every multi-dimension combination, computed from the
+                # actual label tuples -- NOT from the per-dimension numbers. The product
+                # would be 30*7=210 here by coincidence, but two crossed dimensions with
+                # gaps give far fewer real combinations, and a table of products would be
+                # wrong in exactly the cases the table exists to reveal.
+                from itertools import combinations as _combinations
+
+                joint: dict[str, int] = {}
+                labels = _cluster_dimension_labels(groups, len(counts))
+                for size in range(2, len(counts) + 1):
+                    for indices in _combinations(range(len(counts)), size):
+                        tuples = list(
+                            zip(*(dimensions[index] for index in indices))
+                        )
+                        flat = np.empty(len(tuples), dtype=object)
+                        flat[:] = tuples
+                        key = "#".join(labels[index] for index in indices)
+                        joint[key] = int(np.unique(encode_groups(flat)).size)
+                e["_cluster_combination_counts"] = joint
 
         results = StataResults(
             params=beta,
@@ -634,6 +674,7 @@ class OLS:
             e=e,
             design_matrix=(X, self._param_names),
             model_data=self._model_data,
+            level=level,
         )
         #: ``e(depvar)``: ``estat summarize`` lists this variable first.
         results.response_name = self._response_name

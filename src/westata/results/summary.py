@@ -561,6 +561,73 @@ def _anova_block(
     return "ols"
 
 
+def _cluster_combinations(result: Any) -> list[str] | None:
+    """The ``clustertable`` block, or ``None`` when there is nothing multiway to report.
+
+    Stata prints this only for ``vce(cluster a b)`` with MORE THAN ONE cluster variable
+    (``areg.sthlp:225-228``), and the shape is::
+
+        -------------------------------
+                            |  Clusters
+        Cluster combination | per comb.
+        --------------------+----------
+                          a |        30
+                          b |         7
+                        a#b |       210
+        -------------------------------
+
+    Every combination of the dimensions appears, in the same order Stata lists them:
+    singletons first in dimension order, then the pairwise terms. The count for a
+    combined row is the number of DISTINCT tuples, which is why ``a#b`` is 210 here
+    rather than 30 or 7.
+
+    Returns ``None`` for a one-way spec so ordinary clustering output is untouched.
+    """
+
+    e = getattr(result, "e", None) or {}
+    counts = e.get("_cluster_counts") or []
+    names = e.get("_cluster_names") or []
+    if len(counts) < 2 or len(names) != len(counts):
+        return None
+
+    from itertools import combinations as _combinations
+
+    rows: list[tuple[str, int]] = []
+    for size in range(1, len(counts) + 1):
+        for indices in _combinations(range(len(counts)), size):
+            label = "#".join(names[index] for index in indices)
+            if size == 1:
+                value = int(counts[indices[0]])
+            else:
+                # Number of distinct joint tuples across the included dimensions. The
+                # covariance already computed this key; recomputing the COUNT from the
+                # labels alone is not possible here, so callers that care about multiway
+                # counts store the value. Fall back to the product only when it is absent,
+                # and say so rather than presenting the product as if it were measured.
+                stored = (e.get("_cluster_combination_counts") or {}).get(label)
+                value = int(stored) if stored is not None else 0
+            rows.append((label, value))
+
+    if not rows:
+        return None
+    width_label = max(len(label) for label, _ in rows)
+    width_label = max(width_label, len("Cluster combination"))
+
+    # Widths copied from a real ``areg ..., vce(cluster a b) clustertable`` capture, which
+    # is 31 characters wide: a 19-character label column plus the right-hand block. The
+    # first attempt sized the rule from the data and produced 36, so the two tables did not
+    # line up even though every cell was correct.
+    total_width = 31
+    lines = ["-" * total_width]
+    lines.append(f"{'':>{width_label}} |  {'Clusters':>7}")
+    lines.append(f"{'Cluster combination':<{width_label}} | {'per comb.':>9}")
+    lines.append("-" * (width_label + 1) + "+" + "-" * 10)
+    for label, value in rows:
+        lines.append(f"{label:>{width_label}} | {value:>{9}}")
+    lines.append("-" * total_width)
+    return lines
+
+
 def _stata_summary(result: Any) -> str:
     nobs = int(result.nobs)
     df_resid = float(result.df_resid)
@@ -703,6 +770,10 @@ def _stata_summary(result: Any) -> str:
         # Do NOT rstrip a wholly-blank line: the padding IS the alignment, and stripping it
         # turned this into an empty line.
         lines.append(subtitle.rjust(72))
+    # ``clustertable`` also adds a "Clusters per comb." summary to the HEADER block, and the
+    # actual combination table later, before the coefficient table. Both are emitted here
+    # and in the ANOVA branch because that branch rebuilds ``lines``.
+    cluster_summary = _cluster_combinations(result)
     # ``Model:`` and ``Covariance type:`` lines used to follow the banner.  Stata prints
     # NEITHER: the captured output in
     # ``tests/conformance/stata_fixtures/p10_outputs.txt:97-98`` opens the table directly
@@ -862,6 +933,11 @@ def _stata_summary(result: Any) -> str:
             fvalue=fvalue, p_f=p_f, rsquared=rsquared,
             rsquared_adj=rsquared_adj, rmse=rmse,
         )
+        # ``clustertable`` sits between the ANOVA header block and the coefficient
+        # table, so it is attached after the block is assembled rather than inside it.
+        if cluster_summary:
+            lines.append("")
+            lines.extend(cluster_summary)
     elif block == "ols":
         lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
         lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")

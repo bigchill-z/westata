@@ -84,6 +84,7 @@ class StataResults:
         e: Mapping[str, Any] | None = None,
         design_matrix: tuple[np.ndarray, list[str]] | None = None,
         model_data: pd.DataFrame | None = None,
+        level: float | None = None,
     ) -> None:
         names = list(param_names)
         params_arr = np.asarray(params, dtype=float).reshape(-1)
@@ -123,11 +124,32 @@ class StataResults:
         df_resid_value = float(df_resid)
         df_model_value = float(df_model)
 
+        if level is None:
+            level_value = 0.95
+        else:
+            level_value = float(level)
+            # Stata's level() takes a PERCENTAGE (level(90)); accept either spelling so a
+            # caller cannot accidentally ask for level(0.95) and silently get a 0.95%
+            # interval, whose critical value would be absurd and whose symptom (narrower
+            # intervals than expected) is easy to miss.
+            if 1.0 < level_value <= 100.0:
+                level_value = level_value / 100.0
+            if not 0.0 < level_value < 1.0:
+                raise ValueError(
+                    f"level must lie in (0, 1) as a fraction or (1, 100] as a "
+                    f"percentage, got {level!r}"
+                )
+
         self._param_names = names
         self._nobs = nobs_int
         self._df_resid = df_resid_value
         self._df_model = df_model_value
         self._dist = dist_value
+        # Confidence level for the printed intervals, as a FRACTION (0.95 for Stata's
+        # level(95)). Stata's ``level(#)`` takes a percentage; the models accept the
+        # percentage and store the fraction here, so ``conf_int`` and the summary agree on
+        # one representation.
+        self._level = level_value
         self._model_name = str(model_name)
         self._cov_type = str(cov_type)
         self._cov = cov_arr
@@ -668,14 +690,28 @@ class StataResults:
 
         return estat_summarize(self, **kwargs)
 
-    def conf_int(self, alpha: float = 0.05) -> pd.DataFrame:
+    @property
+    def level(self) -> float:
+        """The confidence level as a FRACTION (0.95 unless ``level(#)`` was given)."""
+
+        return 0.95 if self._level is None else float(self._level)
+
+    def conf_int(self, alpha: float | None = None) -> pd.DataFrame:
         """Confidence intervals for the coefficients.
 
         Uses the Student-t reference distribution for ``dist="t"`` and the
         standard normal for ``dist="z"``.
+
+        ``alpha`` defaults to ``1 - level``: a result estimated with Stata's
+        ``level(90)`` reports 90% intervals unless a caller asks for something else
+        explicitly. Hard-coding 0.05 here was what made ``level(#)`` unrepresentable --
+        the model could not influence the interval even if it recorded a level.
         """
 
-        alpha_value = float(alpha)
+        if alpha is None:
+            alpha_value = 1.0 - self.level
+        else:
+            alpha_value = float(alpha)
         if not 0.0 < alpha_value < 1.0:
             raise ValueError(f"alpha must lie in (0, 1), got {alpha!r}")
 

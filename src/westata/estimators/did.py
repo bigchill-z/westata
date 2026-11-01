@@ -293,8 +293,9 @@ class _DidFEOLS(FEOLS):
         data: pd.DataFrame,
         cov_type: str,
         spec: Any,
+        level: float | None = None,
     ) -> StataResults:
-        results = super()._build_results(model, data, cov_type, spec)
+        results = super()._build_results(model, data, cov_type, spec, level)
 
         names = [str(name) for name in model.coef().index]
         design = np.asarray(model._X, dtype=float)

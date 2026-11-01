@@ -309,6 +309,7 @@ class FEOLS:
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        level: float | None = None,
     ) -> StataResults:
         """Estimate the model and return a Stata-conformant result object.
 
@@ -359,7 +360,7 @@ class FEOLS:
                 ) from exc
             raise
 
-        return self._build_results(model, data, effective_cov_type, spec)
+        return self._build_results(model, data, effective_cov_type, spec, level)
     # ------------------------------------------------------------- mapping
     def _resolve_cov_type(self, cov_type: str | None, spec: WeightSpec | None) -> str:
         """Return the canonical covariance type, applying the Stata defaults."""
@@ -453,6 +454,12 @@ class FEOLS:
             return names
 
         # Array/Series of labels: add scratch columns so PyFixest can cluster.
+        # A DataFrame carries COLUMN NAMES, and ``clustertable`` must print those rather
+        # than the scratch names made up below -- capture them before the labels are
+        # flattened into an array, where the names are unrecoverable.
+        self._cluster_display_names: list[str] | None = None
+        if isinstance(labels, pd.DataFrame):
+            self._cluster_display_names = [str(name) for name in labels.columns]
         if isinstance(labels, pd.Series):
             values = labels.to_numpy()
         else:
@@ -469,6 +476,12 @@ class FEOLS:
             name = f"{_CLUSTER_COLUMN_PREFIX}{position}__"
             data[name] = values[:, position]
             names.append(name)
+        if self._cluster_display_names is None:
+            # A bare array supplies no names, so positional placeholders are used rather
+            # than inventing labels that would look authoritative but be wrong.
+            self._cluster_display_names = [
+                f"cluster{position + 1}" for position in range(values.shape[1])
+            ]
         return names
 
     @staticmethod
@@ -543,6 +556,7 @@ class FEOLS:
         data: pd.DataFrame,
         cov_type: str,
         spec: WeightSpec | None,
+        level: float | None = None,
     ) -> StataResults:
         """Translate a fitted ``pyfixest.Feols`` into :class:`StataResults`."""
 
@@ -734,6 +748,36 @@ class FEOLS:
             # (``N_clust1 == N_clust == 30``, ``N_clustervars == 1``).
             e["N_clust1"] = float(clusters)
             e["N_clustervars"] = 1.0
+            # ``clustertable`` needs the per-dimension counts and the joint counts for
+            # every combination; e(N_clust) alone holds the minimum. Computed from the
+            # actual labels so the joint rows are measured rather than multiplied.
+            columns = getattr(self, "_fit_cluster_columns", None) or []
+            if len(columns) >= 2:
+                from itertools import combinations as _combinations
+
+                display = getattr(self, "_cluster_display_names", None) or [
+                    str(name) for name in columns
+                ]
+                per_dimension = [
+                    int(pd.factorize(np.asarray(data[name]), sort=True)[0].max()) + 1
+                    for name in columns
+                ]
+                e["_cluster_names"] = [str(name) for name in display]
+                e["_cluster_counts"] = per_dimension
+                joint: dict[str, int] = {}
+                for size in range(2, len(columns) + 1):
+                    for indices in _combinations(range(len(columns)), size):
+                        pairs = list(
+                            zip(*(np.asarray(data[columns[index]]) for index in indices))
+                        )
+                        flat = np.empty(len(pairs), dtype=object)
+                        flat[:] = pairs
+                        # Keyed by the DISPLAY names, which is what the renderer builds
+                        # its row labels from too -- keying by the scratch column names
+                        # made every joint row fall back to zero.
+                        key = "#".join(display[index] for index in indices)
+                        joint[key] = int(pd.factorize(flat, sort=True)[0].max()) + 1
+                e["_cluster_combination_counts"] = joint
 
         # --- keys Stata's ``areg`` records alongside ``reghdfe``'s ----------
         # ``ar2`` is the adjusted R-squared, which ``areg`` stores under that
@@ -905,6 +949,7 @@ class FEOLS:
             model_name=self._command_name,
             cov_type=cov_type,
             e=e,
+            level=level,
         )
         # Reported, not hidden: absorbed regressors are part of the result.
         results.absorbed = absorbed
@@ -1486,6 +1531,7 @@ class Areg(FEOLS):
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        level: float | None = None,
     ) -> StataResults:
         """Fit, honouring ``vce(hc2 [clustvar])`` and ``vce(hc3)``.
 
@@ -1504,13 +1550,13 @@ class Areg(FEOLS):
             # Fit with HC1 (a valid, harmless placeholder) and remember what was asked for
             # so the covariance can be replaced once the full design is in hand.
             self._leverage_cov_type = requested
-            results = super().fit(cov_type="HC1", cov_kwds=cov_kwds, ssc=ssc)
+            results = super().fit(cov_type="HC1", cov_kwds=cov_kwds, ssc=ssc, level=level)
             results.e["vce"] = requested.lower()
             results.e["vcetype"] = requested
             return results
 
         self._leverage_cov_type = None
-        return super().fit(cov_type=cov_type, cov_kwds=cov_kwds, ssc=ssc)
+        return super().fit(cov_type=cov_type, cov_kwds=cov_kwds, ssc=ssc, level=level)
 
     def _rescale_cov_to_areg(
         self,

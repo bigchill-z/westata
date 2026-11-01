@@ -602,6 +602,7 @@ class IV2SLS:
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        level: float | None = None,
     ) -> StataResults:
         """Estimate the model and return a Stata-conformant result object.
 
@@ -680,6 +681,7 @@ class IV2SLS:
             model_name=self._stata_command,
             cov_type=canonical,
             e=scalars,
+            level=level,
         )
         #: The IV design pieces, retained so ``estat firststage`` can rebuild the
         #: auxiliary regressions.  Stata's ``e(insts)``/``e(instd)`` divide the

@@ -452,6 +452,83 @@ areg y x1, absorb(firm) vce(hc2, dfadjust)
 > 判据：**能跑但数值可能与 Stata 不符**，比**明确不实现**更糟——这正是本文件 §4.2
 > 对 `_cons` 的判断标准，同样的标准也应适用于这里。
 
+### 4.10 明确不做的选项（评估后决定）
+
+`areg.sthlp` 还剩三个选项没有实现。**这是决定，不是遗漏**，理由逐项记录如下，以免后来者
+（包括未来的我）反复重新评估同一件事。
+
+| 选项 | 出处 | 作用 | 为什么不做 |
+|---|---|---|---|
+| `tolerance(#)` | `areg.sthlp:244-246` | APM 迭代的收敛阈值，默认 `1e-8` | 见下方「更正」——**技术上可以接到 `pyfixest` 的 `fixef_tol`**，但对本篇无实际收益 |
+| `iterate(#)` | `areg.sthlp:59` | APM 最大迭代次数，默认 50 | 同理，可接到 `fixef_maxiter` |
+| `nolog` | `areg.sthlp:61` | 抑制 APM 迭代日志的打印 | westata 的 `pyfixest` 后端本来不打印该日志，接受这个参数等于**假装关掉了一个从未打开的东西** |
+
+三个都属 `Optimization` 组，且被 `areg.sthlp` 标注为 **†**：
+
+> † Ignored if only one absorbed variable is specified.
+
+也就是说，在本篇这种单吸收变量（`absorb(isocode)`）的场景下，Stata 自己都注明这三个选项
+**被忽略**。为它们做接口，收益为零。
+
+**⚠️ 更正（写这一节时先记错了）**：初稿写的是「`pyfixest` 的内部阈值不可从外部设定」。
+实测检查 `pyfixest.estimation.feols` 的签名，它**确实有** `fixef_tol` 与 `fixef_maxiter`
+（还有 `collin_tol`）。所以前两条**不是做不到，是做得到但不值得**——两者的理由强度不同，
+不该混为一谈。
+
+**注意区分**：不做 ≠ 无影响。真要改变收敛行为，正确的位置是 `FEOLS`/`pyfixest` 那一层，
+而不是在 `Areg` 上开三个转手就丢的空参数。若将来确实需要，应作为 **FEOLS 的能力**统一实现，
+`Areg` 再继承。
+
+#### 同时记录的缺口：`clustertable` 与 `level(`
+
+评估过程中还确认了两项，同样未实现，但性质不同——**它们有实际输出效果**：
+
+| 选项 | 出处 | 作用 | 状态 |
+|---|---|---|---|
+| `clustertable` | `areg.sthlp:225-228` | 多路聚类下打印「聚类组合 × 组数」表 | **未实现**；仅在 `vce(cluster a b)` 多变量时有意义，本包多路聚类已在 `cov_multiway_cluster` 支持，缺的只是这张表 |
+| `level(#)` | `areg.sthlp:53` | 置信水平，默认 95 | **未实现**，且 `OLS.fit`/`Areg.fit` 均无此参数——这是**全包范围的缺口**，不是 `Areg` 独有 |
+
+这两项与上面三项的区别：**它们改变实际的输出内容**（一张表、一组区间），不是纯日志控制。
+之所以仍未做，是因为：
+
+- `clustertable` 需要在 `vce(cluster a b)` 的多路聚类路径上额外渲染一张表，而 westata 的
+  系数表渲染器目前没有这个分支；
+- `level(#)` 需要同时改 `StataResults` 的区间计算路径，属于跨估计器的公共改动，
+  应单独一轮统一处理，而不是只在 `Areg` 上开个口子。
+
+**⚠️ 更正二（同样先记错了）**：初稿写的是「`clustertable` 的表头措辞与列宽没有任何 Stata
+捕获可对照，实现只能靠猜排版」。**这不成立**——Stata 就在本机，现场跑一次就有了：
+
+```stata
+areg y x1, absorb(a) vce(cluster a b) clustertable
+
+Linear regression, absorbing indicators            Number of obs     =     210
+Absorbed variable: a                               No. of categories =      30
+Clusters per comb.:                                Cluster comb.     =       3
+  min =   7                                        F(1, 6)           =    0.02
+  avg =  82                                        Prob > F          =    0.8993
+  max = 210                                        R-squared         =    0.0945
+                                                   Adj R-squared     =    -0.0573
+                                                   Root MSE          =    0.9713
+-------------------------------
+                    |  Clusters
+Cluster combination | per comb.
+-------------------------------
+                  a |        30
+                  b |         7
+                a#b |       210
+-------------------------------
+
+                                  (Std. err. adjusted for multiway clustering)
+...
+Cluster combinations formed by a and b.
+```
+
+所以「没有捕获」是**我没有去取**，不是取不到。保留这段是因为它标出了我自己的一个错误
+推理步骤：把「尚未调查」说成「无法调查」，会让一个可做的功能看起来不可做。
+
+> 这两项记为**待办**而非**不做**。上表输出已可直接作为实现与验证的对照基准。
+
 ---
 
 ## 5. 复核方式

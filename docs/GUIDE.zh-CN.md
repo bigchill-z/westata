@@ -94,13 +94,51 @@ ws.OLS.from_formula(
 | `ivregress 2sls` / `liml` / `gmm` | `IV2SLS`、`IVLIML`、`IVGMM` |
 | `eivreg` | `Eivreg` |
 | `reghdfe` | `FEOLS`（后端 `pyfixest`）|
-| `areg` | 单因子 absorbed 的 `FEOLS` |
+| `areg` | 单因子 absorbed 的 `FEOLS`（**系数**；标准误见下）|
 | `nl` | `Nl` |
 
 ```python
 sim = pd.read_csv("docs/data/sim.csv")
 ws.IV2SLS.from_formula("y_iv ~ w + [x_endog ~ z1 + z2]", sim).fit()
 ```
+
+**关于 `areg` 的标准误口径**
+
+`areg` 没有独立函数，用单因子 absorbed 的 `FEOLS`：
+
+```text
+westata:  ws.FEOLS.from_formula("y ~ x1 + x2 | country", df).fit()
+Stata:    areg y x1 x2, a(country)
+```
+
+（竖线 `|` 之后是被吸收的固定效应，对应 `areg` 的 `a(country)`。）
+
+**系数与 `areg` 完全一致，但标准误按 `reghdfe` 的口径计算。** 两者在含聚类标准误
+（`vce(cluster ...)`）时约有 4.5% 的差异。机制是：`e(rmse)` 的算法与 `areg` 相同，
+但标准误不按 `rmse` 缩放。
+
+以 Nunn & Qian (2011) 的数据为例（N=1552，130 个国家，22 个回归元 + 常数，聚类于 `isocode`）：
+
+| 路径 | 系数 | `e(rmse)` | 标准误 |
+|---|---|---|---|
+| Stata `areg` | 0.1213388 | 0.2608791 | **0.0171579** |
+| Stata `reghdfe` | 0.1213388 | 0.2608791 | 0.0164182 |
+| westata `FEOLS` | 0.1213388 | 0.2608791 | **0.0164182** |
+
+- **`e(rmse)` 三者相同**（0.2608791）：它是样本统计量，用 `N − rank_full` 作分母
+  （1552 − 152 = 1400，被吸收的固定效应计入），且**不随协方差估计量变化**。
+- **标准误不同**：差异在聚类小样本因子对 `K` 的计数——
+
+`sqrt(1529/1400) = 1.045056`
+
+`areg` 把被吸收的 129 个组计入 `K`，`reghdfe` 只计显式回归元。
+
+`reghdfe` 的源码注释明确说明它有意"breaks consistency with areg"——这是两个命令之间
+已知的记账分歧，不是实现错误。westata 跟随 `reghdfe`，因此与该命令逐位相同。
+
+**实践建议**：如果你的目标论文用 `areg` 报告标准误，`FEOLS` 的系数可直接对照，
+标准误需注意这 4.5% 的约定差异，而**不是算错**。若论文用 `reghdfe` 或 `xtreg, fe`，
+则两者精确吻合。
 
 ### 面板
 

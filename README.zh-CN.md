@@ -257,6 +257,8 @@ docs/               GUIDE.md、对照数据、生成脚本
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
 - 本库不做数据管理：没有 `use`、`merge`、`reshape`、`egen` 的对应物，输入是 pandas DataFrame。
+- `areg` 没有独立函数，用单因子 absorbed 的 `FEOLS`；**系数与 `areg` 一致，但聚类标准误遵循
+  `reghdfe` 口径**，两者相差约 4.5%。详见 [GUIDE](docs/GUIDE.zh-CN.md#线性回归与工具变量)。
 
 ---
 

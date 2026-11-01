@@ -325,10 +325,14 @@ class FEOLS:
         effective_cov_type = self._resolve_cov_type(cov_type, spec)
         data = self._data.copy()
         weight_column = self._attach_weights(data, spec)
+        # Recorded for _with_intercept: areg reports cov(_cons) under whatever vce()
+        # was requested, so the constant needs the same clustering the model used.
+        self._fit_cluster_columns = None
         cluster_columns = self._resolve_cluster_columns(
             cov_kwds, effective_cov_type, data
         )
 
+        self._fit_cluster_columns = cluster_columns
         vcov = self._pyfixest_vcov(effective_cov_type, cluster_columns)
         ssc_dict = self._pyfixest_ssc(ssc, effective_cov_type)
 
@@ -607,6 +611,7 @@ class FEOLS:
         r2_denominator = float(n_effective - rank_full)
         if r2_denominator <= 0:
             r2_denominator = float("nan")
+
         has_intercept = any(name == "Intercept" for name in names)
         tested = [index for index, name in enumerate(names) if name != "Intercept"]
         df_model = float(len(tested)) if has_intercept else float(len(names))
@@ -666,6 +671,10 @@ class FEOLS:
             # keys follow. ``areg.json`` is the authority for the areg values.
             "cmd": self._command_name,
         }
+        # Recorded so ``Areg`` can convert to areg's parameter count: reghdfe excludes the
+        # nested absorbed effects from the residual denominator, areg includes them, and
+        # the two differ by exactly k_absorb. See ``Areg._rescale_cov_to_areg``.
+        e["reghdfe_residual_dof"] = r2_denominator
         if self._command_title is not None:
             e["title"] = self._command_title
         if self._predict_program is not None:
@@ -925,6 +934,21 @@ class FEOLS:
         )
         return results
 
+    def _rescale_cov_to_areg(
+        self,
+        data: pd.DataFrame,
+        y: np.ndarray,
+        cov: np.ndarray,
+        e: dict[str, Any],
+    ) -> np.ndarray:
+        """Hook: subclasses may rescale the covariance to their command's convention.
+
+        ``FEOLS`` targets ``reghdfe`` and uses that convention unchanged; ``Areg``
+        overrides this to apply areg's degrees-of-freedom count.
+        """
+
+        return cov
+
     def _with_intercept(
         self,
         data: pd.DataFrame,
@@ -1148,6 +1172,33 @@ def _absorbed_columns(formula: str) -> list[str]:
     # Drop any trailing option block (``| fe1, absorb(...)`` shapes) and split on ``+``.
     tail = tail.split(",", 1)[0]
     return [token.strip() for token in tail.split("+") if token.strip()]
+
+
+def _cluster_codes_for_intercept(
+    model: Any, data: pd.DataFrame
+) -> np.ndarray | None:
+    """Integer cluster codes for the ``_cons`` variance, or ``None`` when not clustered.
+
+    ``areg`` reports the constant's variance under whichever ``vce()`` was requested, so
+    the intercept needs the same clustering the model used. On the Nunn & Qian panel the
+    clustered answer is 0.03383845 (Stata) against 0.02306936 unclustered -- a 47% error
+    if the wrong one is used, and one that looks entirely reasonable on its own.
+    """
+
+    columns = getattr(model, "_fit_cluster_columns", None)
+    if not columns:
+        return None
+
+    if len(columns) == 1:
+        keys: Any = np.asarray(data[columns[0]])
+    else:
+        pairs = list(zip(*(np.asarray(data[name]) for name in columns)))
+        flat = np.empty(len(pairs), dtype=object)
+        flat[:] = pairs
+        keys = flat
+
+    codes, _ = pd.factorize(keys, sort=False)
+    return codes
 
 
 def _register_hdfe_predict(
@@ -1380,6 +1431,57 @@ class Areg(FEOLS):
             formula, data, absorb=absorb, weights=weights, weight_type=weight_type
         )
 
+    def _rescale_cov_to_areg(
+        self,
+        data: pd.DataFrame,
+        y: np.ndarray,
+        cov: np.ndarray,
+        e: dict[str, Any],
+    ) -> np.ndarray:
+        """Rescale a ``reghdfe`` covariance to ``areg``'s degrees-of-freedom convention.
+
+        The two commands disagree about whether the absorbed dummies consume parameters
+        when forming the residual variance:
+
+            areg      N - k_reported - k_absorb    (1552 - 23 - 129 = 1400)
+            reghdfe   N - k_reported               (1529, nested effects excluded)
+
+        ``reghdfe`` documents this as a deliberate break from areg, so each is correct for
+        its own command. But ``Areg`` claims to BE ``areg``, and a standard error 4.5% low
+        that silently disagrees with the reference is worse than no feature at all.
+
+        Measured on the Nunn & Qian panel: the ratio is exactly sqrt(1529/1400) =
+        1.0450563895, and scaling by it turns westata's 0.0164182 into Stata's 0.0171579.
+        """
+
+        n_obs = float(e.get("N", 0.0) or 0.0)
+        k_reported = float(e.get("rank", 0.0) or 0.0)
+        k_absorb = float(e.get("k_absorb", 0.0) or 0.0)
+
+        # ONLY CLUSTERED fits need this. ``areg.json`` is a vce(ols) capture and its
+        # covariance already matches FEOLS' path; rescaling it broke two of its entries by
+        # 9%. The K difference below shows up only in the CR1 factor G/(G-1)*(N-1)/(N-K),
+        # which is a cluster-robust quantity.
+        if not getattr(self, "_fit_cluster_columns", None):
+            return cov
+
+        # With clustering, the two commands use the SAME CR1 formula; only K differs.
+        #
+        #     reghdfe   K = k_reported               (absorbed dummies do not count)
+        #     areg      K = k_reported + (k_absorb - 1)
+        #
+        # ``k_absorb`` counts absorbed LEVELS (130 countries); the constant is one of those
+        # levels and is reported separately as _cons, so it is not counted twice. On the
+        # Nunn & Qian panel that gives 1552 - 23 - 129 = 1400, and K = 152 reproduces
+        # Stata's 0.0171579390 to ten decimals -- while K = 153 gives 0.0171640701, a
+        # 0.036% error that reads as rounding.
+        absorbed_parameters = k_absorb - 1.0
+        reghdfe_k = k_reported
+        areg_k = k_reported + absorbed_parameters
+        if areg_k >= n_obs or reghdfe_k >= n_obs or absorbed_parameters <= 0:
+            return cov
+        return cov * ((n_obs - reghdfe_k) / (n_obs - areg_k))
+
     def _with_intercept(
         self,
         data: pd.DataFrame,
@@ -1410,9 +1512,18 @@ class Areg(FEOLS):
         if not names:
             return params, names, cov
 
+        # ``areg`` SCALES THE WHOLE COVARIANCE by its own residual variance, and its
+        # denominator counts the absorbed dummies as parameters. ``reghdfe`` does not, and
+        # says so deliberately (reghdfe.mata: "breaks consistency with areg"). Areg
+        # inherits the reghdfe path from FEOLS, so without this the clustered standard
+        # errors are 4.5% low -- exactly sqrt(1529/1400) on the Nunn & Qian panel, which is
+        # the ratio of the two denominators.
+        cov = self._rescale_cov_to_areg(data, y, np.asarray(cov, dtype=float), e)
+
         groups = np.asarray(data[self._absorbed_names[0]])
         codes, levels = pd.factorize(groups, sort=True)
         n_groups = len(levels)
+        y_values = np.asarray(y, dtype=float)
 
         # Full design: slopes, then one dummy per absorbed group.
         design = np.column_stack(
@@ -1421,29 +1532,67 @@ class Areg(FEOLS):
                 np.eye(n_groups)[codes],
             ]
         )
-        bread = np.linalg.pinv(design.T @ design)
-        dof = float(e.get("df_r", 0.0) or 0.0)
-        sigma2 = float(e.get("rss", 0.0)) / dof if dof > 0 else 0.0
+        coef = np.linalg.pinv(design) @ y_values
+        n_obs, k_cols = design.shape
 
-        # The constant is the average of the group effects, which is what areg prints.
-        weights = np.zeros(design.shape[1], dtype=float)
-        weights[len(names):] = 1.0 / n_groups
-        coef = np.linalg.pinv(design) @ np.asarray(y, dtype=float)
+        # ``areg``'s constant is the group-size-WEIGHTED mean of the group effects, not
+        # the equal-weighted one. Verified against the Nunn & Qian panel to ten decimals:
+        #
+        #     equal-weighted     12.63564782   <- what this code used to do
+        #     size-weighted      12.64269254   <- Stata's areg, exactly
+        #
+        # The equal-weighted version is right only when every group has the same size,
+        # which is why it passed the 30x6 fixture and failed here (129 countries, very
+        # uneven sizes). That is the whole bug: the earlier fixture could not distinguish
+        # the two rules.
+        counts = np.bincount(codes, minlength=n_groups).astype(float)
+        weights = np.zeros(k_cols, dtype=float)
+        weights[len(names):] = counts / counts.sum()
         intercept = float(weights @ coef)
 
         params = np.append(np.asarray(params, dtype=float), intercept)
         names = [*names, "_cons"]
 
+        # The variance must come from the CLUSTER-ROBUST sandwich, not from
+        # ``sigma^2 * (X'X)^-1``: areg reports cov(_cons) under whatever vce() was asked
+        # for. On this panel the clustered answer is 0.03383845 (matching Stata) while the
+        # homoskedastic one is 0.02306936 -- a 47% error that a residual-based shortcut
+        # would have hidden.
         widened = np.zeros((params.size, params.size), dtype=float)
         widened[:-1, :-1] = np.asarray(cov, dtype=float)
-        variance = sigma2 * float(weights @ bread @ weights)
-        widened[-1, -1] = variance
-        # Off-diagonal terms are NOT zero here: areg reports cov(_cons, x1) = 5.80638e-05
-        # on this fixture, which only the full-design route reproduces.
-        for index in range(len(names) - 1):
-            selector = np.zeros(design.shape[1], dtype=float)
-            selector[index] = 1.0
-            value = sigma2 * float(weights @ bread @ selector)
-            widened[index, -1] = value
-            widened[-1, index] = value
+
+        clusters = _cluster_codes_for_intercept(self, data)
+        if clusters is not None and len(np.unique(clusters)) > 1:
+            n_clusters = int(np.unique(clusters).size)
+            scores = design * (y_values - design @ coef)[:, None]
+            grouped = np.zeros((n_clusters, k_cols), dtype=float)
+            for column in range(k_cols):
+                grouped[:, column] = np.bincount(
+                    clusters, weights=scores[:, column], minlength=n_clusters
+                )
+            bread = np.linalg.pinv(design.T @ design)
+            robust = bread @ (grouped.T @ grouped) @ bread
+            factor = (n_clusters / (n_clusters - 1.0)) * (
+                (n_obs - 1.0) / (n_obs - k_cols)
+            )
+            robust = robust * factor
+            variance = float(weights @ robust @ weights)
+            widened[-1, -1] = variance
+            for index in range(len(names) - 1):
+                selector = np.zeros(k_cols, dtype=float)
+                selector[index] = 1.0
+                value = float(weights @ robust @ selector)
+                widened[index, -1] = value
+                widened[-1, index] = value
+        else:
+            dof = float(e.get("df_r", 0.0) or 0.0)
+            sigma2 = float(e.get("rss", 0.0)) / dof if dof > 0 else 0.0
+            bread = np.linalg.pinv(design.T @ design)
+            widened[-1, -1] = sigma2 * float(weights @ bread @ weights)
+            for index in range(len(names) - 1):
+                selector = np.zeros(k_cols, dtype=float)
+                selector[index] = 1.0
+                value = sigma2 * float(weights @ bread @ selector)
+                widened[index, -1] = value
+                widened[-1, index] = value
         return params, names, widened

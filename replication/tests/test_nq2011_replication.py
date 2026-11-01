@@ -201,13 +201,13 @@ def test_the_gap_probe_reports_the_areg_constant_and_keeps_the_note():
     assert kinds.get("Areg coefficient") == "OK", (
         f"the slope no longer matches the authors' log: {statuses.get('Areg coefficient')}"
     )
-    assert kinds.get("Areg _cons") == "GAP", (
-        "Areg's _cons now matches Stata's areg; if that was a fix, nq2011_gaps.md section 4 "
-        f"must become a 'fixed' entry. Probe said: {statuses.get('Areg _cons')}"
+    assert kinds.get("Areg _cons") == "OK", (
+        "_cons regressed: nq2011_gaps.md section 4 says it now matches Stata's areg. "
+        f"Probe said: {statuses.get('Areg _cons')}"
     )
-    assert kinds.get("Areg clustered SE") == "NOTE", (
-        "the reghdfe/areg SE convention note no longer reproduces: "
-        f"{statuses.get('Areg clustered SE')}"
+    assert kinds.get("Areg clustered SE") == "OK", (
+        "the clustered SE regressed to the reghdfe convention; nq2011_gaps.md section 1 "
+        f"says Areg now matches areg. Probe said: {statuses.get('Areg clustered SE')}"
     )
     assert kinds.get("Areg identity") == "OK", statuses.get("Areg identity")
 

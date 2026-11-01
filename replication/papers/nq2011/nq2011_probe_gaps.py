@@ -141,10 +141,21 @@ def _constant() -> str:
 
 
 def _standard_error_convention() -> str:
-    """The clustered SE follows ``reghdfe``, not ``areg`` -- by construction, not by bug.
+    """``Areg``'s clustered SE must match Stata's ``areg``, not ``reghdfe``.
 
-    ``Areg`` subclasses ``FEOLS`` and overrides the identity and the constant, so its
-    variance path is ``reghdfe``'s.  ``reghdfe``'s source notes this is deliberate.
+    This used to be a NOTE: ``Areg`` inherited ``FEOLS``'s ``reghdfe`` variance path, which
+    excludes the absorbed dummies from the CR1 parameter count and therefore reports a
+    standard error 4.5% low. That was defensible while the class was a thin identity
+    wrapper, but ``Areg`` CLAIMS to be ``areg`` -- a standard error that silently disagrees
+    with the reference is the kind of defect this document exists to catch.
+
+    The fix: with clustering, ``areg`` uses ``K = k_reported + (k_absorb - 1)`` in
+    ``G/(G-1)*(N-1)/(N-K)`` while ``reghdfe`` uses ``K = k_reported``. On this panel that
+    is K = 152 against K = 23, and the ratio of the two (N-K) terms turns westata's
+    0.0164182 into Stata's 0.0171579 exactly.
+
+    The check is now a plain equality against the areg target, so a regression that
+    restores the reghdfe path fails here rather than showing up as a quiet 4.5%.
     """
 
     result = _fit_areg()
@@ -152,15 +163,13 @@ def _standard_error_convention() -> str:
     se = float(np.asarray(result.bse, dtype=float)[index])
     areg_target, reghdfe_target = 0.0171579, 0.0164182
 
-    if abs(se - reghdfe_target) / reghdfe_target < 1e-4:
-        raise _Note(
-            f"SE {se:.7f} matches Stata's reghdfe ({reghdfe_target}), not its areg "
-            f"({areg_target}); the 4.5% gap is reghdfe's documented break from areg, and "
-            "Areg inherits the reghdfe variance path because it subclasses FEOLS"
-        )
     if abs(se - areg_target) / areg_target < 1e-4:
+        return f"SE {se:.7f} matches Stata's areg"
+    if abs(se - reghdfe_target) / reghdfe_target < 1e-4:
         raise _Gap(
-            f"SE {se:.7f} now matches areg; this probe and nq2011_gaps.md need updating"
+            f"SE {se:.7f} is reghdfe's value ({reghdfe_target}) again, not areg's "
+            f"({areg_target}); the CR1 parameter count regressed to excluding the "
+            "absorbed dummies"
         )
     raise _Gap(f"SE {se:.7f} matches neither areg {areg_target} nor reghdfe {reghdfe_target}")
 

@@ -368,6 +368,29 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 
 `FEOLS` 仍然拒绝 HC2/HC3——它的理由没有被削弱，测试里也锁住了这一点。
 
+### 4.7 顺带补齐：`noabsorb`（Stata 写作 `noabsorbtest`）
+
+`areg.sthlp:157-161`：
+
+> `noabsorbtest` prevents computation of the F test that all coefficients on indicators
+> for absorbed variables are jointly zero. Computation of this test requires an iterative
+> search. If the F test is of no interest, you may specify `noabsorbtest` and save
+> computational time.
+
+注意它是**省计算**的选项，不是显示开关——所以可观察的后果是
+`e(F_absorb)` / `e(p_absorb)` **不存在**（而不是存在但为空）。
+
+`Areg.from_formula(..., noabsorb=True)` 现已实现该行为。实测：
+
+| | 默认 | `noabsorb=True` |
+|---|---|---|
+| `e(F_absorb)` | 有 | **无** |
+| `e(p_absorb)` | 有 | **无** |
+| `e(r2_c)` | 有 | 无（它只用于算这个 F） |
+| `e(r2)` / `e(rmse)` / `e(df_a)` / 系数 | — | **完全相同** |
+
+`FEOLS` 不获得该参数——`reghdfe` 没有这个选项，测试锁住了这一点。
+
 ---
 
 ## 5. 复核方式

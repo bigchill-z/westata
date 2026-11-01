@@ -832,8 +832,15 @@ class FEOLS:
         # F_absorb = 28.085188842551904 is *identical* to ``xtreg_fe.json``'s
         # F_f, and both files carry the same ``r2_c`` = 0.6955194140102255.
         # So the pooled R-squared is all that is needed -- no entity effects.
+        # ``noabsorb`` (Stata: ``noabsorbtest``) suppresses this whole computation, per
+        # areg.sthlp:157-161 -- "prevents computation of the F test that all coefficients
+        # on indicators for absorbed variables are jointly zero", added because the test
+        # "requires an iterative search". So the option is about SKIPPING WORK, and the
+        # observable consequence is that e(F_absorb)/e(p_absorb) are absent from the
+        # result rather than present-and-empty.
         if (
-            np.isfinite(r2)
+            not getattr(self, "_suppress_absorb_test", False)
+            and np.isfinite(r2)
             and absorbed_levels is not None
             and absorbed_levels > 1
         ):
@@ -1429,6 +1436,7 @@ class Areg(FEOLS):
         absorb: Any = None,
         weights: Any = None,
         weight_type: str | None = None,
+        noabsorb: bool = False,
     ) -> None:
         if absorb is None:
             raise ValueError(
@@ -1440,6 +1448,9 @@ class Areg(FEOLS):
             raise ValueError("absorb= was given but names no variables")
         absorbed = " + ".join(str(name) for name in names)
         combined = f"{formula.strip()} | {absorbed}" if "|" not in formula else formula
+        # Set BEFORE the super() call: the fit that follows reads it to decide whether to
+        # compute the absorbed-indicator F test at all.
+        self._suppress_absorb_test = bool(noabsorb)
         super().__init__(combined, data, weights=weights, weight_type=weight_type)
         #: ``e(absvar)``: ``areg`` records the absorbed variable's NAME, which is what
         #: ``e(title2)`` is built from.
@@ -1455,13 +1466,19 @@ class Areg(FEOLS):
         weights: Any = None,
         weight_type: str | None = None,
         subset: Any = None,
+        noabsorb: bool = False,
     ) -> "Areg":
         """Build from Stata's spelling: ``"y ~ x1 + x2"`` with ``absorb="firm"``."""
 
         if subset is not None:
             data = data.loc[subset]
         return cls(
-            formula, data, absorb=absorb, weights=weights, weight_type=weight_type
+            formula,
+            data,
+            absorb=absorb,
+            weights=weights,
+            weight_type=weight_type,
+            noabsorb=noabsorb,
         )
 
     def fit(

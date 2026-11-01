@@ -431,3 +431,53 @@ def test_reghdfe_still_refuses_hc2() -> None:
 
     with pytest.raises(ValueError, match="HC2"):
         ws.FEOLS.from_formula("y ~ x1 | firm", _frame()).fit(cov_type="HC2")
+
+
+# --------------------------------------------------- noabsorb (noabsorbtest)
+def test_absorb_test_is_computed_by_default() -> None:
+    """``e(F_absorb)``/``e(p_absorb)`` are part of areg's stored results."""
+
+    result = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit()
+
+    assert result.e.get("F_absorb") is not None
+    assert result.e.get("p_absorb") is not None
+
+
+def test_noabsorb_omits_the_absorb_test() -> None:
+    """Stata's ``noabsorbtest`` "prevents computation of the F test".
+
+    The observable consequence is that the scalars are ABSENT, not present-and-empty --
+    so the assertion is on key presence, not on a value.
+    """
+
+    result = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm", noabsorb=True).fit()
+
+    assert "F_absorb" not in result.e
+    assert "p_absorb" not in result.e
+
+
+def test_noabsorb_does_not_change_the_estimate() -> None:
+    """It skips a test, not the fit -- every other number must be identical."""
+
+    with_test = ws.Areg.from_formula("y ~ x1 + x2", _frame(), absorb="firm").fit()
+    without = ws.Areg.from_formula(
+        "y ~ x1 + x2", _frame(), absorb="firm", noabsorb=True
+    ).fit()
+
+    for key in ("r2", "rmse", "df_a", "k_absorb", "N"):
+        assert without.e[key] == pytest.approx(with_test.e[key]), key
+
+    np.testing.assert_allclose(
+        np.asarray(without.params, dtype=float),
+        np.asarray(with_test.params, dtype=float),
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+
+def test_noabsorb_is_areg_only() -> None:
+    """``reghdfe`` has no such option, so FEOLS must not silently grow one."""
+
+    import inspect
+
+    assert "noabsorb" not in inspect.signature(ws.FEOLS.from_formula).parameters

@@ -226,6 +226,9 @@ class FEOLS:
     _marginsnotok = None
     #: e(estmethod): areg sets "areg"; reghdfe sets nothing.
     _stata_estimethod = None
+    #: Whether this command can serve HC2/HC3. FEOLS cannot (PyFixest hides the leverage
+    #: of the full dummy design); Areg can, because it builds that design itself.
+    _allows_leverage_cov_types = False
 
     def __init__(
         self,
@@ -1413,6 +1416,10 @@ class Areg(FEOLS):
     # ``areg.json``'s e(marginsnotok): these prediction types are refused after areg.
     _marginsnotok = "Residuals SCore D XBD"
     _stata_estimethod = "areg"
+    #: areg supports vce(hc2 [clustvar]); FEOLS does not, because PyFixest will not
+    #: expose the leverage of the full dummy design. Areg builds that design itself (for
+    #: _cons), so it CAN honour HC2/HC3 -- see Areg.fit.
+    _allows_leverage_cov_types = True
 
     def __init__(
         self,
@@ -1456,6 +1463,37 @@ class Areg(FEOLS):
         return cls(
             formula, data, absorb=absorb, weights=weights, weight_type=weight_type
         )
+
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Mapping[str, Any] | None = None,
+        ssc: SSC | None = None,
+    ) -> StataResults:
+        """Fit, honouring ``vce(hc2 [clustvar])`` and ``vce(hc3)``.
+
+        ``areg.sthlp`` lists ``vce(hc2 [clustvar])`` among its SE/Robust options, and
+        HC2 needs the leverage ``h_jj`` of the FULL dummy design. FEOLS cannot offer it
+        because PyFixest does not expose those leverages -- but ``Areg`` builds that design
+        itself for ``_cons``, so the restriction does not apply here.
+
+        The estimate is computed by FEOLS's machinery (the point estimates do not depend on
+        the VCE); the LEVERAGE-based covariance is then rebuilt on the full design in
+        ``_with_intercept``, which is where the design already exists.
+        """
+
+        requested = None if cov_type is None else str(cov_type).strip().upper()
+        if requested in ("HC2", "HC3"):
+            # Fit with HC1 (a valid, harmless placeholder) and remember what was asked for
+            # so the covariance can be replaced once the full design is in hand.
+            self._leverage_cov_type = requested
+            results = super().fit(cov_type="HC1", cov_kwds=cov_kwds, ssc=ssc)
+            results.e["vce"] = requested.lower()
+            results.e["vcetype"] = requested
+            return results
+
+        self._leverage_cov_type = None
+        return super().fit(cov_type=cov_type, cov_kwds=cov_kwds, ssc=ssc)
 
     def _rescale_cov_to_areg(
         self,
@@ -1588,6 +1626,40 @@ class Areg(FEOLS):
         widened[:-1, :-1] = np.asarray(cov, dtype=float)
 
         clusters = _cluster_codes_for_intercept(self, data)
+        leverage_type = getattr(self, "_leverage_cov_type", None)
+        if leverage_type:
+            # vce(hc2/hc3): rebuild from the FULL design. ``h_jj`` is the leverage of the
+            # dummy design, which is the quantity areg.sthlp:202 says HC2 uses
+            # (``u_j^2/(1-h_jj)``). Neither ``cov`` nor the cluster branch above is valid
+            # here -- both were computed without those leverages.
+            fitted_resid = y_values - design @ coef
+            leverage = np.einsum("ij,jk,ik->i", design, np.linalg.pinv(design.T @ design), design)
+            if leverage_type == "HC3":
+                omega = fitted_resid**2 / np.maximum(1.0 - leverage, 1e-12) ** 2
+            else:
+                omega = fitted_resid**2 / np.maximum(1.0 - leverage, 1e-12)
+            bread = np.linalg.pinv(design.T @ design)
+            robust = bread @ (design.T @ (design * omega[:, None])) @ bread
+            widened[-1, -1] = float(weights @ robust @ weights)
+            for index in range(len(names) - 1):
+                selector = np.zeros(k_cols, dtype=float)
+                selector[index] = 1.0
+                value = float(weights @ robust @ selector)
+                widened[index, -1] = value
+                widened[-1, index] = value
+            # The reported slopes carry the same statistic, taken from the design columns.
+            slope_block = np.zeros((len(names) - 1, len(names) - 1), dtype=float)
+            for row in range(len(names) - 1):
+                selector_row = np.zeros(k_cols, dtype=float)
+                selector_row[row] = 1.0
+                for column in range(len(names) - 1):
+                    selector_column = np.zeros(k_cols, dtype=float)
+                    selector_column[column] = 1.0
+                    slope_block[row, column] = float(
+                        selector_row @ robust @ selector_column
+                    )
+            widened[:-1, :-1] = slope_block
+            return params, names, widened
         if clusters is not None and len(np.unique(clusters)) > 1:
             n_clusters = int(np.unique(clusters).size)
             scores = design * (y_values - design @ coef)[:, None]

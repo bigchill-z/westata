@@ -346,6 +346,27 @@ consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍�
 | 是否有替代 | 有（`FEOLS` 不报常数项，反而不会误导） |
 
 主结果（斜率）不受影响，但会误导需要常数项的使用者。**P1。**
+（**已修复**，见 §4.1/§4.4。）
+
+### 4.6 顺带修复：`vce(hc2)` / `vce(hc3)`
+
+`areg.sthlp:47-49` 把 `vce(hc2 [clustvar])` 列为它的 SE/Robust 选项之一。
+`Areg` 原先继承 `FEOLS` 的限制而**拒绝** HC2/HC3：
+
+```
+ValueError: cov_type 'HC2' is not supported by FEOLS: HC2 needs the leverage of
+the full dummy design, which PyFixest does not expose for fixed-effect models
+```
+
+**这个理由对 `FEOLS` 成立，对 `Areg` 不成立**——`Areg` 为算 `_cons` 本来就构造了完整
+设计矩阵，杠杆值 `h_jj` 就在手里。`areg.sthlp:202` 写得很清楚：
+
+> `vce(hc2)` instead uses `u_j^2/(1-h_jj)` as the observation's variance estimate
+
+现在按此实现：HC2 用 `u²/(1−h)`，HC3 用 `u²/(1−h)²`，两者都在完整设计上重算协方差
+（含 `_cons` 那一行/列）。实测四者严格递增（HC0 < HC1 < HC2 < HC3），符合文档预期。
+
+`FEOLS` 仍然拒绝 HC2/HC3——它的理由没有被削弱，测试里也锁住了这一点。
 
 ---
 

@@ -367,3 +367,67 @@ def test_vcetype_is_cluster_under_clustering() -> None:
     )
 
     assert result.e["vce"] == "cluster"
+
+
+# --------------------------------------------------- vce(hc2) and vce(hc3)
+def test_areg_accepts_hc2() -> None:
+    """areg.sthlp lists ``vce(hc2 [clustvar])``; FEOLS refuses it, Areg must not.
+
+    The refusal in FEOLS is honest -- PyFixest does not expose the leverage of the full
+    dummy design -- but Areg builds that design itself for ``_cons``, so the restriction
+    does not apply.
+    """
+
+    result = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit(cov_type="HC2")
+
+    assert np.all(np.isfinite(np.asarray(result.bse, dtype=float)))
+
+
+@pytest.mark.parametrize("cov_type", ["HC0", "HC1", "HC2", "HC3"])
+def test_the_leverage_vces_get_increasingly_conservative(cov_type: str) -> None:
+    """The HC family must actually differ, and in the documented order.
+
+    HC2 divides by ``1-h`` and HC3 by ``(1-h)^2``, so for the same residuals their
+    standard errors come out progressively larger. A stub that returned HC1 for all four
+    would pass "the call works" and fail this.
+    """
+
+    fitted = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit(cov_type=cov_type)
+    standard = float(np.asarray(fitted.bse, dtype=float)[0])
+
+    baseline = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit(cov_type="HC0")
+    hc0 = float(np.asarray(baseline.bse, dtype=float)[0])
+
+    expected_rank = {"HC0": 0, "HC1": 1, "HC2": 2, "HC3": 3}[cov_type]
+    others = {"HC0": hc0}
+    for other in ("HC1", "HC2", "HC3"):
+        result = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit(cov_type=other)
+        others[other] = float(np.asarray(result.bse, dtype=float)[0])
+
+    ordered = sorted(others, key=lambda key: others[key])
+    assert ordered.index(cov_type) == expected_rank, (
+        f"the HC family is not ordered as documented: {others}"
+    )
+
+
+def test_fit_does_not_change_the_point_estimates() -> None:
+    """The VCE never moves the coefficients -- a guard against the rebuild leaking in."""
+
+    baseline = ws.Areg.from_formula("y ~ x1 + x2", _frame(), absorb="firm").fit(
+        cov_type="nonrobust"
+    )
+    robust = ws.Areg.from_formula("y ~ x1 + x2", _frame(), absorb="firm").fit(cov_type="HC2")
+
+    np.testing.assert_allclose(
+        np.asarray(baseline.params, dtype=float),
+        np.asarray(robust.params, dtype=float),
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+
+def test_reghdfe_still_refuses_hc2() -> None:
+    """The refusal belongs to FEOLS and must not have been removed by this change."""
+
+    with pytest.raises(ValueError, match="HC2"):
+        ws.FEOLS.from_formula("y ~ x1 | firm", _frame()).fit(cov_type="HC2")

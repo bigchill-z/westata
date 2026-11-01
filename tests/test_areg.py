@@ -481,3 +481,88 @@ def test_noabsorb_is_areg_only() -> None:
     import inspect
 
     assert "noabsorb" not in inspect.signature(ws.FEOLS.from_formula).parameters
+
+
+# ------------------------------------- clustered SE across ABSORB/CLUSTER pairings
+#
+# Reference values are from StataNow 19.5 on the 210-row panel (30 groups x 7 periods,
+# seed 1, one regressor, absorb(a)). The pairing matters: when the cluster variable IS the
+# absorbed dimension, when it is crossed with it, and when it is the other dimension each
+# take a different path, and an implementation can get one right while breaking another.
+def _pair_panel() -> pd.DataFrame:
+    rng = np.random.default_rng(1)
+    n = 210
+    return pd.DataFrame(
+        {
+            "y": rng.normal(size=n),
+            "x1": rng.normal(size=n),
+            "a": np.repeat(np.arange(30), 7),
+            "b": np.tile(np.arange(7), 30),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "cluster,expected",
+    [
+        ("a", (0.08671082, 0.00901583)),
+        ("b", (0.10683824, 0.10021268)),
+        (["a", "b"], (0.11086346, 0.07460234)),
+    ],
+    ids=["nested-in-absorb", "crossed-with-absorb", "multiway"],
+)
+def test_clustered_se_matches_stata_for_every_pairing(cluster, expected) -> None:
+    """One reference per pairing, because they exercise different code paths.
+
+    The regression this guards: applying areg's degrees-of-freedom correction
+    unconditionally fixed the nested case and broke the crossed one, where westata's
+    covariance was already exactly Stata's.
+    """
+
+    frame = _pair_panel()
+    labels = frame[cluster]
+    fitted = ws.Areg.from_formula("y ~ x1", frame, absorb="a").fit(
+        cov_type="cluster", cov_kwds={"cluster": labels}
+    )
+
+    np.testing.assert_allclose(
+        # 1e-6 rather than 1e-7: the reference values are transcribed to 8 decimals,
+        # and _cons = 0.00901583 has only 3 significant figures, so its relative
+        # tolerance is dominated by the rounding of the reference itself.
+        np.asarray(fitted.bse, dtype=float), np.array(expected), rtol=1e-6, atol=0.0
+    )
+
+
+def test_multiway_rebuild_reproduces_stata_not_reghdfe() -> None:
+    """The distinction this fix had to preserve.
+
+    On this panel Stata's reghdfe reports 0.1023861 for the multiway slope while areg
+    reports 0.11086346. Areg must produce the LATTER. Producing the former is what scaling
+    FEOLS' covariance left behind -- and it looked plausible, since 0.1024 is a perfectly
+    reasonable standard error.
+    """
+
+    frame = _pair_panel()
+    fitted = ws.Areg.from_formula("y ~ x1", frame, absorb="a").fit(
+        cov_type="cluster", cov_kwds={"cluster": frame[["a", "b"]]}
+    )
+    slope_se = float(np.asarray(fitted.bse, dtype=float)[0])
+
+    assert slope_se == pytest.approx(0.11086346, rel=1e-7)
+    assert abs(slope_se - 0.1023861) > 1e-3, "Areg reported reghdfe's value, not areg's"
+
+
+def test_reghdfe_keeps_its_own_multiway_value() -> None:
+    """Stata's reghdfe says 0.1023861 here; FEOLS must keep saying that.
+
+    The Areg fix rebuilt its covariance locally and must not have touched FEOLS.
+    """
+
+    frame = _pair_panel()
+    fitted = ws.FEOLS.from_formula("y ~ x1 | a", frame).fit(
+        cov_type="cluster", cov_kwds={"cluster": frame[["a", "b"]]}
+    )
+
+    assert float(np.asarray(fitted.bse, dtype=float)[0]) == pytest.approx(
+        0.1023861, rel=1e-6
+    )

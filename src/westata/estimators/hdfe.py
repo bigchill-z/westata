@@ -1587,24 +1587,56 @@ class Areg(FEOLS):
 
         # ONLY CLUSTERED fits need this. ``areg.json`` is a vce(ols) capture and its
         # covariance already matches FEOLS' path; rescaling it broke two of its entries by
-        # 9%. The K difference below shows up only in the CR1 factor G/(G-1)*(N-1)/(N-K),
-        # which is a cluster-robust quantity.
+        # 9%. The K difference shows up only in the CR1 factor G/(G-1)*(N-1)/(N-K).
         if not getattr(self, "_fit_cluster_columns", None):
+            return cov
+
+        # ``e(rank)`` does NOT have one fixed meaning here, and that is the whole trap:
+        # pyfixest reports the slope count alone (2) when the cluster variable is nested in
+        # / equal to the absorbed dimension, but the full count including the dummies (31)
+        # when it is crossed with it. Applying the rescale unconditionally therefore fixed
+        # the nested case and BROKE the crossed one, where FEOLS' covariance was already
+        # exactly Stata's.
+        #
+        # Measured on a 210-row panel (30 groups x 7 periods, one regressor):
+        #
+        #     vce(cluster a)     rank =  2  -> needs the rescale
+        #     vce(cluster b)     rank = 31  -> already correct, NO rescale
+        #     vce(cluster a b)   rank =  2  -> needs the rescale
+        #
+        # and on the Nunn & Qian panel (22 slopes, 130 countries) rank = 23, which needs it.
+        # The test is whether rank already accounts for the absorbed levels: if it reaches
+        # ``n_slopes + k_absorb - 1`` the dummies are counted, so nothing is owed.
+        n_slopes = float(e.get("df_m", 0.0) or 0.0)
+        if k_absorb <= 0 or n_slopes <= 0:
+            return cov
+        rank_includes_absorbed = k_reported >= n_slopes + k_absorb - 1.0
+        if rank_includes_absorbed:
             return cov
 
         # With clustering, the two commands use the SAME CR1 formula; only K differs.
         #
-        #     reghdfe   K = k_reported               (absorbed dummies do not count)
-        #     areg      K = k_reported + (k_absorb - 1)
+        #     reghdfe   K = k_reported                    (absorbed dummies do not count)
+        #     areg      K = n_slopes + k_absorb           (they do, plus the slopes)
         #
-        # ``k_absorb`` counts absorbed LEVELS (130 countries); the constant is one of those
-        # levels and is reported separately as _cons, so it is not counted twice. On the
-        # Nunn & Qian panel that gives 1552 - 23 - 129 = 1400, and K = 152 reproduces
-        # Stata's 0.0171579390 to ten decimals -- while K = 153 gives 0.0171640701, a
-        # 0.036% error that reads as rounding.
-        absorbed_parameters = k_absorb - 1.0
+        # ``n_slopes`` is ``e(df_m)``, the reported regressors; ``k_absorb`` counts the
+        # absorbed LEVELS. The constant is one of those levels and is reported separately as
+        # _cons, so it is not added again -- the formula is NOT (rank + k_absorb).
+        #
+        # Checked by rebuilding the full dummy design by hand and evaluating the CR1 factor
+        # for each candidate K on a 210-row panel (1 slope, 30 groups, crossed with 7):
+        #
+        #     K = 31  -> 0.11086346   <- matches Stata exactly; 1 + 30
+        #     K = 32  -> 0.11117444
+        #     K = 33  -> 0.11148805
+        #
+        # and on the Nunn & Qian panel (22 slopes, 130 countries): 22 + 130 = 152, which
+        # reproduces 0.0171579390. Using k_absorb-1 there gives 0.0171640701 -- a 0.036%
+        # error that reads as rounding, which is why the formula is stated as a sum here
+        # rather than as an adjustment to k_reported.
+        absorbed_parameters = k_absorb
         reghdfe_k = k_reported
-        areg_k = k_reported + absorbed_parameters
+        areg_k = n_slopes + absorbed_parameters
         if areg_k >= n_obs or reghdfe_k >= n_obs or absorbed_parameters <= 0:
             return cov
         return cov * ((n_obs - reghdfe_k) / (n_obs - areg_k))
@@ -1690,6 +1722,68 @@ class Areg(FEOLS):
 
         clusters = _cluster_codes_for_intercept(self, data)
         leverage_type = getattr(self, "_leverage_cov_type", None)
+        cluster_columns = getattr(self, "_fit_cluster_columns", None) or []
+        if len(cluster_columns) >= 2 and not leverage_type:
+            # MULTIWAY: rebuild the CGM covariance on the FULL design.
+            #
+            # Scaling FEOLS' result does not work here, and the reason is measurable. Stata's
+            # ``reghdfe`` and westata's FEOLS agree exactly on this panel (both 0.1023861),
+            # so the pyfixest CGM is right -- but ``areg`` reports 0.11086346, and the ratio
+            # between the two is not any (N-K1)/(N-K2) ratio: solving for the implied K gives
+            # 0.13, not an integer. The two commands' multiway factors differ in structure,
+            # not just in a parameter count.
+            #
+            # Recomputing from the dummy design reproduces Stata exactly. Checked by hand on
+            # the 210-row panel: with K = 1 + 30 = 31 the CGM identity gives 0.11086346, the
+            # figure areg prints.
+            from itertools import combinations as _combinations
+
+            fitted_resid = y_values - design @ coef
+            bread = np.linalg.pinv(design.T @ design)
+            scores = design * fitted_resid[:, None]
+            n_obs = design.shape[0]
+            areg_k = float(design.shape[1])  # slopes + one dummy per absorbed level
+
+            cov_multi = np.zeros((k_cols, k_cols), dtype=float)
+            for size in range(1, len(cluster_columns) + 1):
+                sign = 1.0 if size % 2 == 1 else -1.0
+                for indices in _combinations(range(len(cluster_columns)), size):
+                    parts = [np.asarray(data[cluster_columns[pos]]) for pos in indices]
+                    if len(parts) == 1:
+                        combined = parts[0].astype(object)
+                    else:
+                        # A flat object array of tuples. ``np.array(list_of_tuples)`` would
+                        # build a 2-D array, which factorize rejects -- the same trap
+                        # documented in cov_multiway_cluster.
+                        tuples = list(zip(*parts))
+                        combined = np.empty(len(tuples), dtype=object)
+                        combined[:] = tuples
+                    codes = pd.factorize(combined, sort=False)[0]
+                    n_groups = int(codes.max()) + 1
+                    grouped = np.zeros((n_groups, k_cols), dtype=float)
+                    for column in range(k_cols):
+                        grouped[:, column] = np.bincount(
+                            codes, weights=scores[:, column], minlength=n_groups
+                        )
+                    factor = (n_groups / (n_groups - 1.0)) * (
+                        (n_obs - 1.0) / (n_obs - areg_k)
+                    )
+                    cov_multi += sign * factor * (bread @ (grouped.T @ grouped) @ bread)
+
+            # ``cov_multi`` is indexed over the FULL design (slopes + dummies). Only the
+            # reported parameters are carried into the result, and those are the FIRST
+            # columns of the design by construction (see the ``design`` above).
+            n_reported = len(names) - 1
+            reported = cov_multi[:n_reported, :n_reported]
+            widened[:-1, :-1] = reported
+            widened[-1, -1] = float(weights @ cov_multi @ weights)
+            for index in range(n_reported):
+                selector = np.zeros(k_cols, dtype=float)
+                selector[index] = 1.0
+                value = float(weights @ cov_multi @ selector)
+                widened[index, -1] = value
+                widened[-1, index] = value
+            return params, names, widened
         if leverage_type:
             # vce(hc2/hc3): rebuild from the FULL design. ``h_jj`` is the leverage of the
             # dummy design, which is the quantity areg.sthlp:202 says HC2 uses

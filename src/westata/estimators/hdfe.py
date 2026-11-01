@@ -26,27 +26,41 @@ Conformance notes
 ``e(rank)``
     The number of estimated parameters *counted by the degrees-of-freedom
     correction*: reported regressors plus the absorbed fixed-effect parameters
-    (PyFixest's ``_df_k``).  Consequently ``e(df_r) == e(N) - e(rank)``, which
-    is the relation ``reghdfe``'s ``e(df_r)`` satisfies.  It is deliberately
-    larger than ``len(results.params)``.
+    (PyFixest's ``_df_k``).  It is deliberately larger than
+    ``len(results.params)``, and it is **not** reghdfe's own ``e(rank)``, which
+    is documented as the rank of ``e(V)`` -- the reported regressors only
+    (``reghdfe_firm.json``: ``e(rank)=2`` for two slopes plus an absorbed
+    intercept).  Use ``e(df_m)`` for that count.
 ``e(df_m)``
     Reported slope parameters only (absorbed fixed effects excluded), matching
-    the number of coefficients shown in the Stata output.
+    the number of coefficients shown in the Stata output.  This *is* reghdfe's
+    ``e(df_m)``.
 ``e(rmse)``
-    ``sqrt(rss / e(df_r))`` -- a residual standard deviation, not PyFixest's
-    ``sqrt(rss / N)``.
+    ``sqrt(rss / (N - rank_full))``, a residual standard deviation, not
+    PyFixest's ``sqrt(rss / N)``.  ``rank_full`` counts every absorbed
+    fixed-effect level, so ``rmse`` is a sample statistic: it is **invariant to
+    the covariance estimator** and does *not* follow ``e(df_r)``.  This is
+    reghdfe's behaviour too -- ``reghdfe_firm.json`` and
+    ``reghdfe_firm_cluster.json`` report the same ``e(rmse)`` while ``e(df_r)``
+    moves from 148 to 29.
 ``results.df_resid`` vs ``e(df_r)``
-    The two differ under clustering, exactly as for westata's ``OLS``:
-    inference uses ``G - 1`` (``results.df_resid``) while the residual df used
-    by ``rmse`` and the adjusted R-squared stays ``N - K`` (``e(df_r)``).
+    They coincide: both are ``G - 1`` under clustering and ``N - K`` otherwise.
+    ``results.df_resid`` is the reference distribution used for t/p/CI, and
+    ``e(df_r)`` is the same number stored as the Stata scalar (verified:
+    148/148 nonrobust, 29/29 clustered).  Note that under clustering this is
+    *not* the denominator behind ``e(rmse)`` -- see above.
 
 Nested fixed effects
 --------------------
 Following ``reghdfe``'s default ``dofadjustments(nested)`` (and fixest's
 ``k_fixef="nonnested"``), a fixed effect that is *fully nested* in the cluster
 variable contributes no parameters to ``K``: the cluster absorbs it.  So
-``e(rank)`` and therefore ``e(df_r)``/``e(rmse)`` legitimately shrink when the
-cluster variable nests a fixed effect, while the slopes are unchanged.
+``e(rank)`` and ``e(df_r)`` shrink when the cluster variable nests a fixed
+effect, while the slopes and ``e(rmse)`` are unchanged (``rmse`` keeps the
+full-rank denominator).  That mixed accounting is reghdfe's own: verified
+against a live capture, and reghdfe's source comments on it deliberately
+(``reghdfe.mata``: "breaks consistency with areg but ensures internal
+consistency between vce(robust) and vce(cluster _n)").
 """
 
 from __future__ import annotations
@@ -976,10 +990,13 @@ class FEOLS:
         """Parameter count including fixed effects nested in the cluster variable.
 
         ``_df_k`` drops nested effects under clustering (matching reghdfe's
-        ``dofadjustments(nested)``), but reghdfe still uses the full count for the
-        adjusted R-squared.  When PyFixest exposes ``_k_fe`` we can rebuild it as
-        ``_df_k + nested_effects``; otherwise fall back to ``_df_k``, which keeps
-        the previous behaviour rather than inventing a number.
+        ``dofadjustments(nested)`` for the VCE factor and ``e(df_r)``), but
+        reghdfe keeps the full count for ``e(rmse)``, ``e(ll)`` and ``e(r2_a)``
+        -- verified against a live capture: ``reghdfe_firm.json`` and
+        ``reghdfe_firm_cluster.json`` share one ``e(rmse)`` while ``e(df_r)``
+        moves from 148 to 29.  When PyFixest exposes ``_k_fe`` we can rebuild it
+        as ``_df_k + nested_effects``; otherwise fall back to ``_df_k``, which
+        keeps the previous behaviour rather than inventing a number.
         """
 
         base = getattr(model, "_df_k", None)

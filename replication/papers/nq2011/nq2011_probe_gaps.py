@@ -8,12 +8,16 @@ checks are about conventions:
 
 * the ``areg`` versus ``xtreg`` standard-error difference is a Stata-internal
   degrees-of-freedom disagreement, not a westata defect (a ``NOTE``);
-* but westata's own ``rmse`` and standard error use **two different** freedoms, so the
-  output is not internally consistent (a ``GAP``).
+* westata's ``e(rmse)`` and its standard errors use **different** denominators -- and that
+  is ``reghdfe``'s own behaviour, which westata reproduces (an ``OK``).
 
-The second one is why this file does not simply report "no gaps": a first pass that only
-compared the coefficient and the ``xtreg`` standard error missed it, because each number on
-its own matches some Stata command.
+The second one used to be recorded as a ``GAP``: "rmse and the standard errors must share one
+freedom, so the output is internally inconsistent".  That was wrong, and the correction is
+the most useful thing in this file: the contract is *reproduce the reference implementation*,
+not *obey the identity I expected*.  A live Stata capture of the same specification
+(``reghdfe ..., absorb(isocode) vce(cluster isocode)``) reports the same pair, and moving
+``rmse`` onto the nested-excluded denominator would put it 8.6 percent away from Stata.
+See ``../../gaps/nq2011_gaps.md`` section 3 for the full record.
 
 Five outcomes, because "not a gap" is not one thing
 ---------------------------------------------------
@@ -163,17 +167,28 @@ def _convention_note() -> str:
 
 
 def _rmse_se_convention_consistent() -> str:
-    """Does ``e(rmse)`` use the same degrees of freedom as the standard errors?
+    """Does ``e(rmse)`` sit on the same convention as Stata ``reghdfe``?
 
-    On this data ``areg`` and ``xtreg, fe`` disagree because they divide the residual
-    variance by different denominators (``N-152`` versus ``N-23``).  westata should pick
-    one convention and use it consistently.  It currently does not:
+    This probe used to report a GAP here, on the reasoning that ``rmse`` and the standard
+    errors must share one denominator.  **That reasoning was wrong**, and the fix is
+    recorded rather than quietly applied: a live Stata capture of the very same
+    specification shows ``reghdfe`` itself reporting ``e(rmse)`` on the full-rank
+    denominator while ``e(df_r)``/``bse`` follow the nested-excluded one::
 
-    * ``e(rmse)`` follows ``areg`` (0.2608791, the N-152 denominator);
-    * ``bse`` follows ``xtreg`` (0.0164182, the N-23 denominator).
+        reghdfe …, absorb(isocode) vce(cluster isocode)
+            e(rmse) = 0.2608790670546   -> denominator rss/rmse^2 = 1400
+            e(df_r) = 129
+            e(rank) = 22
 
-    Both numbers match a real Stata command, so neither looks wrong in isolation, and the
-    inconsistency is only visible when you check that they must come from the same model.
+    The offline fixtures show the same split with ``rmse`` held fixed while clustering
+    moves ``e(df_r)`` from 148 to 29.  ``reghdfe.mata`` (:3742, :3751) computes
+    ``rmse = sqrt(rss / used_df_r)`` with ``used_df_r`` on the full rank, and its source
+    comments that this "breaks consistency with areg but ensures internal consistency
+    between vce(robust) and vce(cluster _n)".
+
+    So the contract is "reproduce reghdfe", not "obey the identity I expected".  Rewriting
+    ``rmse`` onto the nested-excluded denominator would move it 8.6 percent away from
+    Stata.  This probe therefore pins reghdfe's actual convention.
     """
 
     result = _fit("feols")
@@ -182,28 +197,33 @@ def _rmse_se_convention_consistent() -> str:
     if rmse is None:
         raise _Gap("FEOLS no longer reports e(rmse), so this check cannot run")
 
-    # areg divides by N-152 = 1400; xtreg by N-23 = 1529.  Which one does rmse use?
+    # 1400 = N - rank_full (all absorbed levels); 1529 = N - rank with the nested effect
+    # excluded.  reghdfe (and therefore westata) uses the former for rmse.
     frame, dummies = _frame()
     n = len(frame)
     rss = float(np.sum(_residuals(result) ** 2))
     denom = rss / float(rmse) ** 2
-    areg_denom = n - 152
-    xtreg_denom = n - 23
-    uses_areg = abs(denom - areg_denom) < 1
-    uses_xtreg = abs(denom - xtreg_denom) < 1
+    full_rank_denom = n - 152
+    nested_excluded_denom = n - float(e.get("rank", n - 23))
 
-    if uses_areg:
-        raise _Gap(
-            f"e(rmse)={rmse:.7f} implies a denominator of {denom:.0f} = N-152, the areg "
-            f"convention, while the standard error follows xtreg (denominator N-23={xtreg_denom}). "
-            "The two are computed under different freedoms, so rmse, ll and r2_a are not "
-            "consistent with bse. Pick one convention and thread it through both."
+    if abs(denom - full_rank_denom) < 1:
+        return (
+            f"e(rmse) keeps the full-rank denominator {full_rank_denom:g}, as reghdfe does, "
+            f"while e(df_r)={e.get('df_r')} follows the clustered one; "
+            "this is reghdfe's documented behaviour, not an inconsistency"
         )
-    if uses_xtreg:
-        return f"rmse and bse both use the xtreg denominator {xtreg_denom}"
+    if abs(denom - nested_excluded_denom) < 1:
+        raise _Gap(
+            f"e(rmse)={rmse:.7f} now uses the nested-excluded denominator "
+            f"{nested_excluded_denom:g} instead of reghdfe's {full_rank_denom}. That is the "
+            "'fix' this probe used to ask for, and it would put rmse 8.6 percent away from "
+            "Stata's reghdfe on the fixtures (reghdfe_firm_cluster.json). Reconcile with "
+            "tests/conformance/test_stata_reghdfe.py before changing anything"
+        )
     raise _Gap(
         f"e(rmse)={rmse:.7f} implies a denominator of {denom:.0f}, which is neither "
-        f"areg's {areg_denom} nor xtreg's {xtreg_denom}"
+        f"reghdfe's full-rank {full_rank_denom} nor the nested-excluded "
+        f"{nested_excluded_denom}"
     )
 
 
@@ -217,7 +237,7 @@ def _residuals(result):
 
 
 PROBES: tuple[Probe, ...] = (
-    Probe("rmse vs se convention", "rmse and the standard errors share one df convention",
+    Probe("rmse vs se convention", "rmse follows reghdfe's full-rank denominator",
           _rmse_se_convention_consistent),
     Probe("areg-equivalent (FEOLS)", "FEOLS reproduces the authors' coefficient",
           lambda: _coefficient("feols")),

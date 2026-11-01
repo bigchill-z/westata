@@ -25,6 +25,8 @@ import pytest
 HERE = Path(__file__).resolve().parent
 PAPER = HERE.parent / "papers" / "nq2011"
 OUT = PAPER / "out"
+#: Real Stata captures (replayable without Stata) used by the reghdfe comparison below.
+FIXTURES = HERE.parents[1] / "tests" / "conformance" / "stata_fixtures"
 
 sys.path.insert(0, str(PAPER))
 
@@ -165,17 +167,21 @@ def test_data_provenance_is_pinned():
         assert len(item["sha256"]) == 64, name
 
 
-def test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note():
-    """Guard ``nq2011_gaps.md``: one open gap (rmse vs se freedoms) plus the areg note.
+def test_the_gap_probe_reports_the_rmse_convention_and_keeps_the_note():
+    """Guard ``nq2011_gaps.md``: no gap, and both conventions attributed.
 
-    The document says two things.  First, westata's ``e(rmse)`` uses the ``areg``
-    denominator while the standard error uses the ``xtreg`` one, so the output is not
-    internally consistent -- an open P2 gap.  Second, the 4.5 percent gap against ``areg``
-    is a Stata-internal convention difference, not a westata defect.
+    An earlier version of this test asserted a ``GAP`` here -- "westata's ``e(rmse)`` uses
+    the ``areg`` denominator while the standard error uses the ``xtreg`` one, so the output
+    is not internally consistent".  **That assertion was wrong and has been inverted**,
+    because a live Stata capture of the same specification shows ``reghdfe`` reporting
+    exactly that pair (``e(rmse)`` on the full-rank denominator 1400, ``e(df_r)`` = 129).
+    The document records the correction in its section 3.
 
-    Both must keep reproducing.  If the first starts passing, the gap is closed and the
-    document must be updated; if the second stops reproducing, the convention story is
-    stale.
+    What must hold now:
+
+    * the ``rmse`` probe is ``OK`` and attributes its behaviour to ``reghdfe``;
+    * it still pins the full-rank denominator 1400, so the evidence cannot drift;
+    * the ``areg``/``xtreg`` ``NOTE`` is unchanged.
     """
 
     import importlib.util
@@ -191,13 +197,20 @@ def test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note():
     kinds = {name: status for name, (status, _) in statuses.items()}
 
     assert not [n for n, s in kinds.items() if s == "ERROR"], f"probes failed: {statuses}"
-
-    assert kinds.get("rmse vs se convention") == "GAP", (
-        "the rmse/standard-error inconsistency no longer reproduces; if it was fixed, "
-        "nq2011_gaps.md section 3 must move to a 'fixed' entry"
+    assert not [n for n, s in kinds.items() if s == "GAP"], (
+        "nq2011 reports a gap again: "
+        f"{[(n, statuses[n][1]) for n, s in kinds.items() if s == 'GAP']}"
     )
-    assert "1400" in statuses["rmse vs se convention"][1], (
-        statuses["rmse vs se convention"][1]
+
+    rmse_probe = statuses["rmse vs se convention"]
+    assert rmse_probe[0] == "OK", (
+        "the rmse convention probe no longer passes; if westata stopped following "
+        "reghdfe, nq2011_gaps.md section 3 needs revisiting"
+    )
+    assert "1400" in rmse_probe[1], rmse_probe[1]
+    assert "reghdfe" in rmse_probe[1], (
+        "the probe no longer attributes the behaviour to reghdfe; the whole point of "
+        f"section 3 is that this is the reference implementation's convention: {rmse_probe[1]}"
     )
 
     note = statuses["areg versus xtreg"]
@@ -206,6 +219,120 @@ def test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note():
         "nq2011_gaps.md section 1 needs rewriting"
     )
     assert "0.0164182" in note[1], f"the xtreg standard error moved: {note[1]}"
+
+
+def test_rmse_uses_the_full_rank_denominator_like_reghdfe():
+    """``e(rmse)`` is a sample statistic: clustering must not move it.
+
+    This is the invariant that settles the question.  ``e(df_r)`` collapses under clustering
+    (1400 -> 129 here) and westata's standard errors follow that switch.  If ``rmse`` shared
+    the denominator, it would have to move too; instead it stays put, exactly as in
+    ``reghdfe_firm.json`` (``df_r`` = 148) and ``reghdfe_firm_cluster.json`` (``df_r`` = 29),
+    which report the *same* ``e(rmse)``.
+    """
+
+    import numpy as np
+
+    import westata as ws
+
+    frame = _nq2011_frame()
+    formula = _nq2011_formula()
+    plain = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit()
+    clustered = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit(
+        cov_type="cluster", cov_kwds={"cluster": "isocode"}
+    )
+
+    # rmse does not move with the covariance estimator.
+    assert clustered.e["rmse"] == pytest.approx(plain.e["rmse"], rel=1e-12)
+    # ... and it keeps the full-rank denominator (N - 152 = 1400), not the clustered df_r.
+    implied = float(clustered.e["rss"]) / float(clustered.e["rmse"]) ** 2
+    assert implied == pytest.approx(1400.0, abs=1.0), (
+        f"e(rmse) now implies a denominator of {implied:.1f}; reghdfe uses the full-rank "
+        "1400 here. If this changed it was probably 'fixed' to the nested-excluded "
+        "denominator, which moves rmse 8.6 percent away from Stata"
+    )
+    # ... while e(df_r) is the clustered reference distribution, a different number.
+    assert clustered.e["df_r"] == 129
+    assert plain.e["df_r"] == 1400
+
+
+def test_feols_matches_the_reghdfe_fixture_bit_for_bit():
+    """Section 3's claim rests on reproducing ``reghdfe`` exactly, not approximately.
+
+    ``reghdfe_firm_cluster.json`` is a real Stata capture, replayable without Stata.  It
+    records the "mixed" pair -- ``e(rmse)`` on the full-rank denominator, ``e(df_r)`` =
+    G - 1 -- and westata must match every scalar.  If this fails while the probe still
+    passes, the probe is measuring the wrong thing.
+    """
+
+    import numpy as np
+
+    import westata as ws
+
+    path = FIXTURES / "reghdfe_firm_cluster.json"
+    if not path.exists():
+        pytest.skip("reghdfe_firm_cluster.json missing; run scripts/capture_reghdfe_fixtures.py")
+    capture = json.loads(path.read_text(encoding="utf-8"))
+    scalars = capture["scalars"]
+
+    frame = _reghdfe_panel_frame()
+    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit(
+        cov_type="cluster", cov_kwds={"cluster": frame["firm"]}
+    )
+
+    assert result.e["rmse"] == pytest.approx(scalars["rmse"], rel=1e-12)
+    assert result.e["ll"] == pytest.approx(scalars["ll"], rel=1e-12)
+    assert result.e["r2_a"] == pytest.approx(scalars["r2_a"], rel=1e-12)
+    assert result.e["df_r"] == scalars["df_r"]
+    assert result.e["N"] == scalars["N"]
+
+    stata_bse = np.sqrt(np.diag(np.asarray(capture["V"], dtype=float)))[:2]
+    np.testing.assert_allclose(
+        np.asarray(result.bse, dtype=float), stata_bse, rtol=1e-12, atol=0
+    )
+
+
+_NQ_FRAME = None
+_NQ_DUMMIES: list[str] | None = None
+
+
+def _nq2011_frame():
+    """The prepared panel, computed once (it builds ~180 interaction columns)."""
+
+    global _NQ_FRAME, _NQ_DUMMIES
+    if _NQ_FRAME is None:
+        from nq2011_run_westata import prepare
+
+        _NQ_FRAME, _NQ_DUMMIES = prepare()
+    return _NQ_FRAME
+
+
+def _nq2011_formula() -> str:
+    from nq2011_specs import SPECS
+    from nq2011_run_westata import _formula
+
+    _nq2011_frame()  # populates _NQ_DUMMIES
+    spec = next(s for s in SPECS if s.id == "T2_c1")
+    return _formula(spec, _NQ_DUMMIES)
+
+
+def _reghdfe_panel_frame():
+    """The exact frame behind the reghdfe fixtures (mirrors test_stata_reghdfe.panel_frame)."""
+
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(21)
+    n_entities, n_periods = 30, 6
+    entity = np.repeat(np.arange(n_entities), n_periods)
+    time = np.tile(np.arange(1, n_periods + 1), n_entities)
+    n = n_entities * n_periods
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    effect = rng.normal(size=n_entities)[entity]
+    period = rng.normal(size=n_periods)[time - 1]
+    y = 1.0 + 1.5 * x1 - 0.5 * x2 + effect + period + rng.normal(scale=0.4, size=n)
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "firm": entity, "year": time})
 
 
 def test_the_areg_xtreg_gap_comes_from_the_rmse_denominator():

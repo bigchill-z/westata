@@ -8,19 +8,21 @@
 
 ---
 
-## 0. 结论：1 个缺口，1 条已知约定差异
+## 0. 结论：0 个缺口
 
-本论文复现过程中，westata 的**系数**全部正确，但发现了两件事：
+本论文复现过程中，westata 的**系数**全部正确。两条一度引起怀疑的现象，经对照后**都不是
+westata 的缺陷**：
 
-| 条目 | 性质 | 状态 |
+| 条目 | 性质 | 探针结论 |
 |---|---|---|
-| **`rmse` 与 `df_r` / 标准误使用两套自由度约定** | **内部不一致（P2）** | **未修复** |
-| 与 `areg` 的 4.5% 标准误差异 | Stata 内部约定分歧 | 不是缺陷，但暴露了上一条 |
+| 与 `areg` 的 4.5% 标准误差异 | Stata 内部约定分歧 | `NOTE`（§1）|
+| `rmse` 与 `df_r` 分母不同 | **reghdfe 自身的行为**，westata 忠实复现 | `OK`（§3）|
 
-**第一条是本文件唯一记录的缺口**，而且它是我在追问"是否需要实现 `areg` 效果"时才挖出来的——
-初版本文档只写了"没有缺口"，因为当时只对照了系数和 `xtreg`。
+第二条曾是本文档记录的"缺口"。**经与真实 Stata 的 `reghdfe` 逐位对照后，这个判定被推翻**——详见 §3。
 
-细节见 §3。
+> **判据教训**：把"我认为不一致"当成"确实有缺陷"，是本文档犯过的最大错误。
+> 唯一能判定的是**对照实现**：把 westata 与真实 `reghdfe` 的输出逐位比较，而不是与
+> "我预期的自洽关系"比较。§3 记录了这个纠正过程。
 
 ## 1. 最关键的一点：判定差异的归属需要对照
 
@@ -110,9 +112,11 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
 ## 2. 探针结果
 
 ```
--- probes --
-  [GAP ] rmse vs se convention      e(rmse)=0.2608791 隐含分母 1400 = N−152（areg 口径），
-                                    而标准误跟随 xtreg（分母 N−23 = 1529）
+-- estimator surface --
+  [OK  ] rmse vs se convention      e(rmse) keeps the full-rank denominator 1400, as
+                                    reghdfe does, while e(df_r)=129.0 follows the
+                                    clustered one; this is reghdfe's documented
+                                    behaviour, not an inconsistency
   [OK  ] areg-equivalent (FEOLS)    coefficient 0.1213388
   [OK  ] xtreg-equivalent (PanelOLS) coefficient 0.1213388
 -- agreement --
@@ -123,98 +127,127 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
   [OK  ] public surface             142 public names
 ```
 
-**1 gap、1 note、0 error。**
+**5 ok、1 note、0 gap、0 error。**
 
-`NOTE` 与 `GAP` 的区别是本文件的关键：
+`OK` / `NOTE` / `GAP` 的区别是本文件的关键：
 
 | 类别 | 含义 | 例 |
 |---|---|---|
+| `OK` | 与参照实现一致 | `rmse` 口径——与真实 `reghdfe` 逐位相同（§3）|
 | `NOTE` | 已归因的预期差异，**不是缺陷** | 与 `areg` 的 4.5% 差距——Stata 自己两个命令就不一致 |
-| `GAP` | 该修的问题 | `rmse` 与标准误用了两套自由度，输出内部矛盾 |
+| `GAP` | 该修的问题 | —— 本文件目前没有 |
 
 **注意**：`rmse vs se convention` 这一条最初不存在。初版探针只对比系数和 `xtreg` 标准误，
 全部通过，于是文档写了"0 gap"。是追问"是否该实现 `areg`"才促成了这项检查——
 **"每个数字都能对上某个 Stata 命令"不等于"输出内部自洽"**，这两件事必须分开验证。
 
+但**这项检查本身后来又犯了一次方向相反的错**：它把"我自己预期的自洽关系"当成了契约，
+于是把 `reghdfe` 的正常行为报成了缺口。真正的判据只有对照实现——见 §3。
+
 ---
 
-## 3. 缺口：`rmse` 与标准误使用两套自由度约定（P2，未修复）
+## 3. 曾记为缺口的一条：`rmse` 与 `df_r` 分母不同（已撤销）
 
-这一条是在追问"westata 是否需要实现 `areg` 的效果"时发现的。初版本文件只写了"没有缺口"，
-因为当时只核对了系数和 `xtreg` 标准误，没有检查输出内部是否自洽。
+这一条曾以"P2 内部不一致"记入本文档，后在**与真实 Stata `reghdfe` 逐位对照**后被撤销。
+保留全过程，因为撤销的理由比原来的判断更有价值。
 
-### 3.1 现象
+### 3.1 现象：确实存在两个不同的分母
 
-同一次 `FEOLS` 拟合，`e(rmse)` 与 `e(df_r)` 来自两套不同的约定：
+同一次 `FEOLS` 拟合（cluster 于 `isocode`），三个量的分母不一致：
 
 ```
 westata FEOLS (cluster):
-    e(rmse) = 0.2608791     ← 与 Stata areg 相同（分母 N−152 = 1400）
-    e(df_r) = 129           ← 与 reghdfe / xtreg 相同
+    e(rmse) = 0.2608791     ← 隐含分母 rss/rmse² = 1400
+    e(df_r) = 129           ← G−1 = 130−1
     bse     = 0.0164182     ← 与 xtreg, fe 相同
-
-Stata areg    : rmse = 0.2608791   (分母 1400)
-Stata xtreg fe: rmse = 0.2496316   (分母 1529)
 ```
 
-**`rmse` 跟随 `areg`，而 `df_r` 与标准误跟随 `reghdfe`。** 三者不是同一套约定。
+**现象本身是真的**：`e(rmse)` 的分母是 1400，`e(df_r)` 是 129，标准误的缩放因子又不同。
+下面的问题不是"有没有这个现象"，而是**这个现象该归给谁**。
 
-### 3.2 为什么这是缺陷而不是"跟随某个约定"
+### 3.2 关键对照：真实 `reghdfe` 也是这么算的
 
-Stata 的两个命令各自内部自洽：
+判定"是否缺陷"的唯一依据是**对照实现**。用真实 Stata（StataNow 19.5 MP）跑同一份数据、
+同一个设定：
 
-| 命令 | rmse 分母 | 标准误缩放 | 自洽？ |
+```stata
+. reghdfe ln_wpot … , absorb(isocode) vce(cluster isocode)
+```
+
+| 量 | 真实 `reghdfe` | westata `FEOLS` |
+|---|---|---|
+| `e(rmse)` | 0.2608790670546 | 0.2608790559441 |
+| 隐含 `rmse` 分母 | **1400** | **1400** |
+| `e(df_r)` | 129 | 129 |
+| `b` | 0.1213387966 | 0.1213387957 |
+| `se` | 0.0164181947 | 0.0164181944 |
+
+**`reghdfe` 自己就同时报出 `rmse` 分母 1400 与 `df_r` 129。** 这不是 westata 的混用，
+而是 `reghdfe` 的行为，westata 逐位复现了它。
+
+在仓库自带的、可离线回放的 Stata 抓取上，这一点更清楚——
+两个 fixture 的 `rmse` **完全相同**，而 `df_r` 从 148 变到 29：
+
+| fixture | vce | `e(df_r)` | `e(rmse)` | `rss/rmse²` |
+|---|---|---|---|---|
+| `reghdfe_firm.json` | ols | 148 | 0.9416394217357702 | 148 |
+| `reghdfe_firm_cluster.json` | cluster | **29** | **0.9416394217357702** | **148** |
+
+`rmse` 不随聚类变化，`df_r` 随聚类变化——两者按设计就是不同口径。
+
+`reghdfe` 源码对此有明确说明（`reghdfe.mata`，版本 6.14.1）：
+
+```mata
+// :3742
+used_df_r = sol.N - S.df_a - sol.df_m - S.df_a_nested
+// :3751
+sol.rmse = used_df_r ? sqrt(sol.rss / used_df_r) : sqrt(sol.rss)
+```
+
+并在 `:4061-4066` 自陈：这样会 "breaks consistency with areg but ensures internal
+consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍，不是疏漏。**
+
+### 3.3 所以原来错在哪
+
+原判断的推理是：
+
+> 因为 `rmse` 只对上 `areg`、标准误只对上 `xtreg`，所以两者不属于同一个模型，故为缺陷。
+
+错在**把"我预期的自洽关系"当成了判据，而没有对照实现**。
+真实参照系（`reghdfe`）给出的正是同一对数字。westata 的目标是复现 Stata，不是构造一个
+比 Stata 更"自洽"的新约定。
+
+**若按原建议去"修"**——让 `rmse` 改用嵌套排除口径——会直接破坏逐位一致性：
+
+| fixture | 改为 `sqrt(rss/(N−rank))` | Stata `reghdfe` | 误差 |
 |---|---|---|---|
-| `areg` | N−152 = 1400 | 同一个分母 | ✅ |
-| `xtreg, fe` | N−23 = 1529 | 同一个分母 | ✅ |
-| **westata `FEOLS`** | **1400（areg）** | **1529（xtreg）** | ❌ **混用** |
+| `reghdfe_firm_cluster` | 0.8610509917 | 0.9416394217357702 | **8.6%** |
+| `reghdfe_firm_year_cluster` | 0.3751496271 | 0.41143452536210567 | **8.8%** |
 
-westata 取了 `areg` 的 `rmse` 和 `xtreg` 的方差，两者不是同一个模型的对数似然。
-后果：`e(ll)`、`e(r2_a)` 这类从 `rmse` 推导的量，与 `e(bse)` 不在同一个概率模型下。
-单看任何一项都"能对上某个 Stata 命令"，合起来却不自洽。
+现在的误差是 **0.0**。也就是说，原建议的"修复"会制造真正的缺陷。
 
-### 3.3 源码位置
+### 3.4 源码位置与结论
 
-- `src/westata/estimators/hdfe.py:599` —— `rmse = sqrt(rss / (n_effective - rank_full))`，走 `areg` 口径
-- `src/westata/estimators/hdfe.py:306` —— `vcov` 直接复用 PyFixest 的协方差矩阵，走 `reghdfe` 口径
-- 两条路径各自演化，没有共享同一个自由度定义
+- `src/westata/estimators/hdfe.py` —— `rmse = sqrt(rss / r2_denominator)`，
+  其中 `r2_denominator = n_effective - rank_full`；`rank_full` 计入全部被吸收的
+  固定效应水平。这正是 `reghdfe` 的 `used_df_r`。
+- 同一文件的 `vcov` 复用 PyFixest 的协方差矩阵，其小样本因子按 `reghdfe` 的
+  `dofadjustments(nested)` 排除嵌套固定效应——同样与 `reghdfe` 一致。
 
-### 3.4 已有的部分机制
+**结论：不是缺口，是忠实复现。** 已改为 `NOTE`，并由探针锁定这个口径。
 
-`hdfe.py:251` 有一个 `_absorb_df_drops_constant` 开关，注释明确写着它是用来在
-`areg` 与 `reghdfe` 的 `df_a` 约定之间切换的。**但它只影响 `e(df_a)`，没有传导到 `rmse` 与方差缩放。**
+### 3.5 顺带修正的文档错误
 
-这就是修复的抓手：把已有的开关扩展成"完整约定选择"，一处控制三项 ——
-`df_a`、`rmse` 分母、方差缩放。
+`hdfe.py` 的模块文档原先有两处与实测不符，已随本次修正更新：
 
-### 3.5 建议的修复
-
-**第一步（该做，与 `areg` 无关）**：消除内部不一致。
-让 `rmse` 与方差缩放使用同一个自由度定义。默认跟随 `reghdfe`/`xtreg`（更主流，
-且当前标准误已是这个口径），此时 `rmse` 会从 0.2608791 变成 0.2496316。
-
-**第二步（可选）**：把上面的开关提升为公开参数，例如
-
-```python
-ws.FEOLS.from_formula(..., convention="areg")      # rmse 与方差都用 1400
-ws.FEOLS.from_formula(..., convention="reghdfe")   # 都用 1529（默认）
-```
-
-这样才能真正做到"复现用 `areg` 报告的论文"。
-
-**为什么第二步不是必须**：`areg` 与 `xtreg` 都是合法约定，`xtreg`/`reghdfe` 是更主流的一个。
-westata 现在跟随它，不算错。但如果**第一步不做**，用户拿到的是一个内部矛盾的输出——
-这才是必须修的部分。
-
-### 3.6 分级：P2
-
-| 判据 | 情况 |
+| 原说法 | 实测 |
 |---|---|
-| 是否静默出错 | **是**——系数和标准误都对得上某个 Stata 命令，`rmse` 也对得上另一个，单看都正常 |
-| 影响面 | 窄：只在"高维固定效应 + 需要 `e(rmse)`/`e(ll)`/`e(r2_a)`"时暴露 |
-| 是否有替代 | 有（`PanelOLS` 走 `xtreg` 口径，内部自洽） |
+| `e(rmse) = sqrt(rss / e(df_r))` | 仅非聚类时成立；聚类时 `e(df_r)=29` 而 `rmse` 分母是 1400 |
+| 嵌套固定效应会让 `e(rmse)` 一起缩小 | `rmse` 不随聚类变化（0.9416394217358 两种口径相同） |
 
-不误导主结果，但输出内部不自洽。**P2。**
+`e(rank)` 也补了一条澄清：它是**自由度修正口径**的参数数，与 `reghdfe` 的 `e(rank)`
+（文档定义为 `e(V)` 的秩，即只计报告出来的回归元）**不是同一个量**。要看后者的口径，
+用 `e(df_m)`。
 
 ---
 
@@ -224,20 +257,26 @@ westata 现在跟随它，不算错。但如果**第一步不做**，用户拿�
 .venv/Scripts/python.exe replication/papers/nq2011/nq2011_probe_gaps.py
 ```
 
-探针有四种结论：`OK`、`NOTE`（已知约定差异，不计为缺口）、`GAP`、`ERROR`。**本篇当前预期是 `1 gap`（§3）+ `1 note`。**
+探针有四种结论：`OK`、`NOTE`（已知约定差异，不计为缺口）、`GAP`、`ERROR`。
+**本篇当前预期是 `0 gap` + `1 note`。**
 
 **测试守护**（`replication/tests/test_nq2011_replication.py`）：
 
 | 测试 | 守住什么 |
 |---|---|
 | `test_westata_differs_from_areg_by_the_convention_ratio` | 每列 `areg/xtreg` 标准误比值落在 **[1.03, 1.06]** |
-| `test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note` | §3 的缺口仍在、§1 的 NOTE 仍在 |
+| `test_the_gap_probe_reports_the_rmse_convention_and_keeps_the_notes` | `rmse` 口径探针为 `OK` 且点明 `reghdfe` 来源；`areg` 的 `NOTE` 仍在 |
 | `test_the_areg_xtreg_gap_comes_from_the_rmse_denominator` | `sqrt(1529/1400) = 1.0450563895` 这套算术成立 |
+| `test_rmse_uses_the_full_rank_denominator_like_reghdfe` | `rmse` 不随聚类变化、分母为 N−rank_full |
+| `test_feols_matches_the_reghdfe_fixture_bit_for_bit` | 与离线 Stata 抓取逐位一致（含 `rmse`/`ll`/`r2_a`/`df_r`）|
 
-三条断言都是**双向**的：
+这些断言都是**双向**的：
 
 - 比值跑出区间 → 可能是 westata 的真实缺陷，或 Stata 改了约定；
-- 缺口探针转为 `OK` → 说明 §3 已修复，本文件需改成"已修复"条目；
-- 算术不再成立 → §1.3 的机制解释失效，需重新定位。
+- `rmse` 口径探针转为 `GAP` → 说明 `rmse` 不再跟随 `reghdfe`，本文件的"忠实复现"结论失效；
+- 与 fixture 的逐位一致被破坏 → `reghdfe` 抓取或 westata 实现有一方变了。
+
+**没有使用"rmse 必须等于 sqrt(rss/e(df_r))"这种断言**——那正是本文档曾经犯的错：
+把一条自己臆想的恒等式当成契约。
 
 ---

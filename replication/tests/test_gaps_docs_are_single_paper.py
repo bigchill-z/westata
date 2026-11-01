@@ -35,6 +35,8 @@ DOCS = [
     ("ck1994", "REPORT.md"),
     ("ad2013", "WESTATA_GAPS.md"),
     ("ad2013", "REPORT.md"),
+    ("adhm2020", "WESTATA_GAPS.md"),
+    ("adhm2020", "REPORT.md"),
 ]
 
 #: Phrases that only make sense when talking about ANOTHER paper in this series.

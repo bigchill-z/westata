@@ -8,21 +8,19 @@
 
 ---
 
-## 0. 这一篇的结论：没有新缺口
+## 0. 结论：1 个缺口，1 条已知约定差异
 
-本论文复现过程中，westata 的估计层没有出现问题。
+本论文复现过程中，westata 的**系数**全部正确，但发现了两件事：
 
-**这一篇（NQ）没有发现新的 westata 问题。**
+| 条目 | 性质 | 状态 |
+|---|---|---|
+| **`rmse` 与 `df_r` / 标准误使用两套自由度约定** | **内部不一致（P2）** | **未修复** |
+| 与 `areg` 的 4.5% 标准误差异 | Stata 内部约定分歧 | 不是缺陷，但暴露了上一条 |
 
-这不是因为没测——恰恰相反，这次测的是 westata 声称达标的**面板估计器**（`areg` / `xtreg` 路径），是前三次都没碰过的表面。结果是：
+**第一条是本文件唯一记录的缺口**，而且它是我在追问"是否需要实现 `areg` 效果"时才挖出来的——
+初版本文档只写了"没有缺口"，因为当时只对照了系数和 `xtreg`。
 
-- 系数：**全部正确**；
-- 标准误：与 Stata 的 `xtreg, fe` **精确一致**（1e-13）；
-- 与 `areg` 的 4.5% 差异：**是 Stata 内部两个命令的约定分歧，不是 westata 的缺陷**。
-
-**所以本文件记录的是"为什么这次没有缺口"，而不是硬凑几条。** 这本身有价值：它说明 westata 在加权 OLS + 高维固定效应这条路径上是干净的。
-
----
+细节见 §3。
 
 ## 1. 最关键的一点：判定差异的归属需要对照
 
@@ -112,34 +110,111 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
 ## 2. 探针结果
 
 ```
--- estimator surface --
-  [OK] areg-equivalent (FEOLS)      coefficient 0.1213388
-  [OK] xtreg-equivalent (PanelOLS)  coefficient 0.1213388
-  [OK] Stata labels                 stata_param_names exposes _cons
+-- probes --
+  [GAP ] rmse vs se convention      e(rmse)=0.2608791 隐含分母 1400 = N−152（areg 口径），
+                                    而标准误跟随 xtreg（分母 N−23 = 1529）
+  [OK  ] areg-equivalent (FEOLS)    coefficient 0.1213388
+  [OK  ] xtreg-equivalent (PanelOLS) coefficient 0.1213388
 -- agreement --
-  [OK] vs xtreg, fe                 SE rel diff 2.1e-13
-  [NOTE] vs areg                    SE rel diff 4.3e-02 (convention, not a defect)
+  [OK  ] Stata labels               22 parameters carry Stata-style labels
+  [NOTE] areg versus xtreg          SE 0.0164182 与 xtreg 一致；areg 的 0.0171579
+                                    差 4.5%，属 Stata 内部约定，不是 westata 缺陷
 -- controls --
-  [OK] public surface intact        142 public names
+  [OK  ] public surface             142 public names
 ```
 
-**0 gap、0 error。** `NOTE` 是这一篇特设的类别：**已知且已归因的预期差异**，不计为缺口，但必须显式记录——否则下一次复现的人会把它当成新缺陷重新调查一遍。
+**1 gap、1 note、0 error。**
+
+`NOTE` 与 `GAP` 的区别是本文件的关键：
+
+| 类别 | 含义 | 例 |
+|---|---|---|
+| `NOTE` | 已归因的预期差异，**不是缺陷** | 与 `areg` 的 4.5% 差距——Stata 自己两个命令就不一致 |
+| `GAP` | 该修的问题 | `rmse` 与标准误用了两套自由度，输出内部矛盾 |
+
+**注意**：`rmse vs se convention` 这一条最初不存在。初版探针只对比系数和 `xtreg` 标准误，
+全部通过，于是文档写了"0 gap"。是追问"是否该实现 `areg`"才促成了这项检查——
+**"每个数字都能对上某个 Stata 命令"不等于"输出内部自洽"**，这两件事必须分开验证。
 
 ---
 
-## 3. 一个建议：把约定写进文档
+## 3. 缺口：`rmse` 与标准误使用两套自由度约定（P2，未修复）
 
-虽然这不是缺口，但值得做一件小事：
+这一条是在追问"westata 是否需要实现 `areg` 的效果"时发现的。初版本文件只写了"没有缺口"，
+因为当时只核对了系数和 `xtreg` 标准误，没有检查输出内部是否自洽。
 
-> **在 `docs/USING_WITH_STATA.md` 里加一节，说明 westata 的面板标准误跟随 `xtreg`/`reghdfe` 而非 `areg`。**
+### 3.1 现象
 
-理由：
+同一次 `FEOLS` 拟合，`e(rmse)` 与 `e(df_r)` 来自两套不同的约定：
 
-- 这是一个**会被误判为缺陷**的差异，而且误判方向是低估 westata；
-- 已有文档列了"已知偏差"清单（`xtgls`、`teffects nnmatch` 等），但那些是 westata 的数值偏差；这一条相反——是 westata 正确、而与某个 Stata 命令的约定不同；
-- 成本极低（几行文字），收益是省掉未来每次复现的一轮排查。
+```
+westata FEOLS (cluster):
+    e(rmse) = 0.2608791     ← 与 Stata areg 相同（分母 N−152 = 1400）
+    e(df_r) = 129           ← 与 reghdfe / xtreg 相同
+    bse     = 0.0164182     ← 与 xtreg, fe 相同
 
-这条建议不是"缺口"，所以不影响探针的 `0 gap` 计数。
+Stata areg    : rmse = 0.2608791   (分母 1400)
+Stata xtreg fe: rmse = 0.2496316   (分母 1529)
+```
+
+**`rmse` 跟随 `areg`，而 `df_r` 与标准误跟随 `reghdfe`。** 三者不是同一套约定。
+
+### 3.2 为什么这是缺陷而不是"跟随某个约定"
+
+Stata 的两个命令各自内部自洽：
+
+| 命令 | rmse 分母 | 标准误缩放 | 自洽？ |
+|---|---|---|---|
+| `areg` | N−152 = 1400 | 同一个分母 | ✅ |
+| `xtreg, fe` | N−23 = 1529 | 同一个分母 | ✅ |
+| **westata `FEOLS`** | **1400（areg）** | **1529（xtreg）** | ❌ **混用** |
+
+westata 取了 `areg` 的 `rmse` 和 `xtreg` 的方差，两者不是同一个模型的对数似然。
+后果：`e(ll)`、`e(r2_a)` 这类从 `rmse` 推导的量，与 `e(bse)` 不在同一个概率模型下。
+单看任何一项都"能对上某个 Stata 命令"，合起来却不自洽。
+
+### 3.3 源码位置
+
+- `src/westata/estimators/hdfe.py:599` —— `rmse = sqrt(rss / (n_effective - rank_full))`，走 `areg` 口径
+- `src/westata/estimators/hdfe.py:306` —— `vcov` 直接复用 PyFixest 的协方差矩阵，走 `reghdfe` 口径
+- 两条路径各自演化，没有共享同一个自由度定义
+
+### 3.4 已有的部分机制
+
+`hdfe.py:251` 有一个 `_absorb_df_drops_constant` 开关，注释明确写着它是用来在
+`areg` 与 `reghdfe` 的 `df_a` 约定之间切换的。**但它只影响 `e(df_a)`，没有传导到 `rmse` 与方差缩放。**
+
+这就是修复的抓手：把已有的开关扩展成"完整约定选择"，一处控制三项 ——
+`df_a`、`rmse` 分母、方差缩放。
+
+### 3.5 建议的修复
+
+**第一步（该做，与 `areg` 无关）**：消除内部不一致。
+让 `rmse` 与方差缩放使用同一个自由度定义。默认跟随 `reghdfe`/`xtreg`（更主流，
+且当前标准误已是这个口径），此时 `rmse` 会从 0.2608791 变成 0.2496316。
+
+**第二步（可选）**：把上面的开关提升为公开参数，例如
+
+```python
+ws.FEOLS.from_formula(..., convention="areg")      # rmse 与方差都用 1400
+ws.FEOLS.from_formula(..., convention="reghdfe")   # 都用 1529（默认）
+```
+
+这样才能真正做到"复现用 `areg` 报告的论文"。
+
+**为什么第二步不是必须**：`areg` 与 `xtreg` 都是合法约定，`xtreg`/`reghdfe` 是更主流的一个。
+westata 现在跟随它，不算错。但如果**第一步不做**，用户拿到的是一个内部矛盾的输出——
+这才是必须修的部分。
+
+### 3.6 分级：P2
+
+| 判据 | 情况 |
+|---|---|
+| 是否静默出错 | **是**——系数和标准误都对得上某个 Stata 命令，`rmse` 也对得上另一个，单看都正常 |
+| 影响面 | 窄：只在"高维固定效应 + 需要 `e(rmse)`/`e(ll)`/`e(r2_a)`"时暴露 |
+| 是否有替代 | 有（`PanelOLS` 走 `xtreg` 口径，内部自洽） |
+
+不误导主结果，但输出内部不自洽。**P2。**
 
 ---
 
@@ -149,14 +224,20 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
 .venv/Scripts/python.exe replication/papers/nq2011/nq2011_probe_gaps.py
 ```
 
-探针有五种结论：`OK`、`NOTE`（已知约定差异）、`GAP`、`BOUNDARY`、`ERROR`。本篇预期是 `0 gap`。
+探针有四种结论：`OK`、`NOTE`（已知约定差异，不计为缺口）、`GAP`、`ERROR`。**本篇当前预期是 `1 gap`（§3）+ `1 note`。**
 
-**测试守护**：`replication/tests/test_nq2011_replication.py` 中的
-`test_westata_differs_from_areg_by_the_convention_ratio` 会检查每列的 `areg/xtreg` 标准误比值落在 **[1.03, 1.06]** 区间内。
+**测试守护**（`replication/tests/test_nq2011_replication.py`）：
 
-这个断言的作用是双向的：
+| 测试 | 守住什么 |
+|---|---|
+| `test_westata_differs_from_areg_by_the_convention_ratio` | 每列 `areg/xtreg` 标准误比值落在 **[1.03, 1.06]** |
+| `test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note` | §3 的缺口仍在、§1 的 NOTE 仍在 |
+| `test_the_areg_xtreg_gap_comes_from_the_rmse_denominator` | `sqrt(1529/1400) = 1.0450563895` 这套算术成立 |
 
-- 若某列跑出区间外 → 可能是 westata 的真实缺陷，或 Stata 改了约定；
-- 若某列**接近 1.0**（westata 同时匹配 `areg`）→ 说明约定故事已过时，本文件需重写。
+三条断言都是**双向**的：
+
+- 比值跑出区间 → 可能是 westata 的真实缺陷，或 Stata 改了约定；
+- 缺口探针转为 `OK` → 说明 §3 已修复，本文件需改成"已修复"条目；
+- 算术不再成立 → §1.3 的机制解释失效，需重新定位。
 
 ---

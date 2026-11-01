@@ -1,16 +1,19 @@
 """Probe westata's panel surface for what the Nunn & Qian replication needed.
 
-Why this probe reports "no gaps" on purpose
-------------------------------------------
-The three earlier replications each found a different kind of problem: missing features
-(ADH), a documented boundary (CK), and an API contract defect (AD).  This replication ran
-the first exercise of westata's **panel** surface -- ``FEOLS`` and ``PanelOLS`` against
-Stata's ``areg`` and ``xtreg, fe`` -- and found nothing wrong.
+What this probe covers
+----------------------
+This replication exercises westata's **panel** surface: ``FEOLS`` and ``PanelOLS`` against
+Stata's ``areg`` and ``xtreg, fe``.  The coefficients match everywhere, so the interesting
+checks are about conventions:
 
-That is a result, not an absence of testing, so the probe's job here is different: it must
-show *which* claims were checked, and it must keep the one expected difference (the
-``areg`` versus ``xtreg`` standard-error convention) from being re-investigated as a
-defect by the next reader.
+* the ``areg`` versus ``xtreg`` standard-error difference is a Stata-internal
+  degrees-of-freedom disagreement, not a westata defect (a ``NOTE``);
+* but westata's own ``rmse`` and standard error use **two different** freedoms, so the
+  output is not internally consistent (a ``GAP``).
+
+The second one is why this file does not simply report "no gaps": a first pass that only
+compared the coefficient and the ``xtreg`` standard error missed it, because each number on
+its own matches some Stata command.
 
 Five outcomes, because "not a gap" is not one thing
 ---------------------------------------------------
@@ -159,7 +162,63 @@ def _convention_note() -> str:
     )
 
 
+def _rmse_se_convention_consistent() -> str:
+    """Does ``e(rmse)`` use the same degrees of freedom as the standard errors?
+
+    On this data ``areg`` and ``xtreg, fe`` disagree because they divide the residual
+    variance by different denominators (``N-152`` versus ``N-23``).  westata should pick
+    one convention and use it consistently.  It currently does not:
+
+    * ``e(rmse)`` follows ``areg`` (0.2608791, the N-152 denominator);
+    * ``bse`` follows ``xtreg`` (0.0164182, the N-23 denominator).
+
+    Both numbers match a real Stata command, so neither looks wrong in isolation, and the
+    inconsistency is only visible when you check that they must come from the same model.
+    """
+
+    result = _fit("feols")
+    e = getattr(result, "e", {}) or {}
+    rmse = e.get("rmse")
+    if rmse is None:
+        raise _Gap("FEOLS no longer reports e(rmse), so this check cannot run")
+
+    # areg divides by N-152 = 1400; xtreg by N-23 = 1529.  Which one does rmse use?
+    frame, dummies = _frame()
+    n = len(frame)
+    rss = float(np.sum(_residuals(result) ** 2))
+    denom = rss / float(rmse) ** 2
+    areg_denom = n - 152
+    xtreg_denom = n - 23
+    uses_areg = abs(denom - areg_denom) < 1
+    uses_xtreg = abs(denom - xtreg_denom) < 1
+
+    if uses_areg:
+        raise _Gap(
+            f"e(rmse)={rmse:.7f} implies a denominator of {denom:.0f} = N-152, the areg "
+            f"convention, while the standard error follows xtreg (denominator N-23={xtreg_denom}). "
+            "The two are computed under different freedoms, so rmse, ll and r2_a are not "
+            "consistent with bse. Pick one convention and thread it through both."
+        )
+    if uses_xtreg:
+        return f"rmse and bse both use the xtreg denominator {xtreg_denom}"
+    raise _Gap(
+        f"e(rmse)={rmse:.7f} implies a denominator of {denom:.0f}, which is neither "
+        f"areg's {areg_denom} nor xtreg's {xtreg_denom}"
+    )
+
+
+def _residuals(result):
+    """Residuals of a FEOLS fit, falling back to y - xb when no residual accessor exists."""
+
+    for attribute in ("resids", "resid", "residuals"):
+        if hasattr(result, attribute):
+            return np.asarray(getattr(result, attribute), dtype=float).reshape(-1)
+    raise _Gap("the FEOLS result exposes no residual accessor; the probe cannot check rmse")
+
+
 PROBES: tuple[Probe, ...] = (
+    Probe("rmse vs se convention", "rmse and the standard errors share one df convention",
+          _rmse_se_convention_consistent),
     Probe("areg-equivalent (FEOLS)", "FEOLS reproduces the authors' coefficient",
           lambda: _coefficient("feols")),
     Probe("xtreg-equivalent (PanelOLS)", "PanelOLS reproduces the same coefficient",

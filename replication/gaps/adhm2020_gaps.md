@@ -191,6 +191,34 @@ ivreg2 的双维值          = 9.236939     ← 逐位相同
 
 两者混为一谈会得到错误的方差，所以这里明确：**只有多列才走 CGM 分解**，单列行为完全不变。
 
+### 5.3 运行时会提示来源（重要）
+
+功能能跑只是一半。**IV 上的双维聚类不是 Stata 原版能力**——stock `ivregress` 直接拒绝
+（`multiway cluster VCE not allowed`），能做的是用户自写的 `ivreg2`。如果 westata 悄悄
+算出这个数字而不说明来源，使用者会合理地以为"Stata 也能这么干"，然后去原版 Stata 里复现，
+失败且不知道为什么。
+
+所以多维聚类在**执行时发出 `UserWarning`**，并且按估计器给出**不同**的提示：
+
+| 估计器 | 提示内容 | 为什么不一样 |
+|---|---|---|
+| `IV2SLS` / `IVLIML` / `IVGMM` | 「**不是** stock Stata 功能；`ivregress` 拒绝，来源是用户自写的 `ivreg2`」 | 不说就是误导方向 |
+| `OLS` | 「与 stock Stata 的 `regress, vce(cluster a b)` 一致」 | 这里**确实是**原版行为，说成"非原版"同样是错的 |
+
+```
+UserWarning: multiway clustering on IV is NOT a stock Stata feature. Stock
+`ivregress` refuses it ('multiway cluster VCE not allowed'); the capability
+comes from `ivreg2`, a USER-WRITTEN command (ssc install ivreg2 ranktest
+ftools), which is what the ADHM (2020) authors actually ran. This result
+reproduces in Stata only through `ivreg2`, not through `ivregress`.
+```
+
+**单维聚类不提示**——那是文档化的原版行为，加噪音只会让人学会忽略警告。
+
+测试 `tests/test_multiway_provenance_warning.py`（9 项）锁定：两条提示必须不同、
+IV 提示必须同时点名 `ivregress`（拒绝方）与 `ivreg2`（来源方，且标明 user-written）、
+OLS 提示不得声称"非原版"、单维与无聚类不得提示、以及**提示不影响数值**。
+
 ---
 
 ## 6. 探针结果

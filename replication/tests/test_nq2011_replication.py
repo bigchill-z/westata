@@ -165,31 +165,41 @@ def test_data_provenance_is_pinned():
         assert len(item["sha256"]) == 64, name
 
 
-def test_the_gap_probe_reports_no_gap_but_keeps_the_convention_note():
-    """Guard ``nq2011_gaps.md``: this replication found no gaps, and that must stay true.
+def test_the_gap_probe_reports_the_rmse_inconsistency_and_keeps_the_note():
+    """Guard ``nq2011_gaps.md``: one open gap (rmse vs se freedoms) plus the areg note.
 
-    The document makes two claims: westata's panel surface matches Stata's, and the
-    ``areg`` difference is a convention rather than a defect.  The probe encodes both.  A
-    ``GAP`` here means a real problem appeared; a missing ``NOTE`` means the convention
-    story no longer reproduces and the document needs rewriting.
+    The document says two things.  First, westata's ``e(rmse)`` uses the ``areg``
+    denominator while the standard error uses the ``xtreg`` one, so the output is not
+    internally consistent -- an open P2 gap.  Second, the 4.5 percent gap against ``areg``
+    is a Stata-internal convention difference, not a westata defect.
+
+    Both must keep reproducing.  If the first starts passing, the gap is closed and the
+    document must be updated; if the second stops reproducing, the convention story is
+    stale.
     """
 
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("nq2011_probe_gaps", PAPER / "nq2011_probe_gaps.py")
+    spec = importlib.util.spec_from_file_location(
+        "nq2011_probe_gaps", PAPER / "nq2011_probe_gaps.py"
+    )
     module = importlib.util.module_from_spec(spec)
     sys.modules["nq2011_probe_gaps"] = module
     spec.loader.exec_module(module)
 
-    statuses = {probe.name: probe.run() for probe in (*module.PROBES, *module.CONTROLS)}
+    statuses = {p.name: p.run() for p in (*module.PROBES, *module.CONTROLS)}
     kinds = {name: status for name, (status, _) in statuses.items()}
 
     assert not [n for n, s in kinds.items() if s == "ERROR"], f"probes failed: {statuses}"
-    assert not [n for n, s in kinds.items() if s == "GAP"], (
-        f"a genuine gap appeared: { {n: d for n, (s, d) in statuses.items() if s == 'GAP'} }"
+
+    assert kinds.get("rmse vs se convention") == "GAP", (
+        "the rmse/standard-error inconsistency no longer reproduces; if it was fixed, "
+        "nq2011_gaps.md section 3 must move to a 'fixed' entry"
+    )
+    assert "1400" in statuses["rmse vs se convention"][1], (
+        statuses["rmse vs se convention"][1]
     )
 
-    # The convention note is the document's central claim about areg versus xtreg.
     note = statuses["areg versus xtreg"]
     assert note[0] == "NOTE", (
         f"the areg/xtreg convention difference no longer reproduces ({note}); "

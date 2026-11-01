@@ -210,11 +210,35 @@ def test_groups_length_mismatch_raises():
         )
 
 
-def test_two_dimensional_groups_raise():
+def test_two_dimensional_groups_mean_multiway_clustering():
+    """A 2-D ``groups`` is multiway clustering, not an error.
+
+    Stock Stata's ``regress`` accepts ``vce(cluster a b)`` (``regress.sthlp:196``), and
+    westata used to reject the equivalent call with "must be one-dimensional" -- the one
+    cell where it was behind a vanilla Stata on ADHM (2020)'s data.
+
+    The value must equal the Cameron-Gelbach-Miller combination of three one-way fits,
+    which is what makes this a decomposition rather than a new estimator.
+    """
+
     X, _, groups, res = _toy()
     two_way = np.column_stack([groups, groups[::-1]])
-    with pytest.raises(ValueError, match="one-dimensional"):
-        compute_cov(X, res.resid, cov_type="cluster", cov_kwds={"groups": two_way})
+
+    cov, df_t = compute_cov(
+        X, res.resid, cov_type="cluster", cov_kwds={"groups": two_way}
+    )
+    composite = np.array([f"{a}_{b}" for a, b in two_way])
+
+    def one_way(labels):
+        matrix, _ = compute_cov(
+            X, res.resid, cov_type="cluster", cov_kwds={"groups": labels}
+        )
+        return matrix
+
+    expected = one_way(two_way[:, 0]) + one_way(two_way[:, 1]) - one_way(composite)
+
+    np.testing.assert_allclose(cov, expected, rtol=1e-10, atol=0.0)
+    assert np.isfinite(df_t)
 
 
 def test_single_group_raises():

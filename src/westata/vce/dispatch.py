@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 
 from westata.protocols import SSC
-from westata.vce.cluster import cov_cluster
+from westata.vce.cluster import cov_cluster, cov_multiway_cluster
 from westata.vce.hac import cov_hac
 from westata.vce.robust import cov_hc
 from westata.vce.ssc import resolve_ssc
@@ -260,7 +260,60 @@ def compute_cov(
             "cov_kwds={'groups': groups} (aliases 'clusters' and 'cluster' are also "
             "accepted)"
         )
+    # MORE THAN ONE clustering dimension means multiway clustering, which Stata documents
+    # as ``vce(cluster clustvarlist)`` with several variables (``regress.sthlp:196``) and
+    # computes by Cameron-Gelbach-Miller inclusion-exclusion. A two-column DataFrame or an
+    # (n, 2) array is how a caller expresses that; a one-dimensional vector is the ordinary
+    # single-cluster case.
+    dimensions = _cluster_dimensions(groups)
+    if dimensions is not None:
+        cov, df_t = cov_multiway_cluster(
+            Xw, rw, dimensions, bread=bread, ssc=settings, nobs=n_eff
+        )
+        return cov, df_t
     cov, n_groups = cov_cluster(
-        Xw, rw, groups, bread=bread, ssc=settings, nobs=n_eff
+        Xw, rw, _flatten_single_dimension(groups), bread=bread, ssc=settings, nobs=n_eff
     )
     return cov, float(n_groups - 1)
+
+
+def _cluster_dimensions(groups: Any) -> list[Any] | None:
+    """Split ``groups`` into per-dimension label vectors, or ``None`` if it is one-way.
+
+    A DataFrame with two or more columns, or a 2-D array whose second axis is the
+    dimension count, is multiway. Everything else -- a Series, a list of labels, a 1-D
+    array -- stays one-way, so existing calls are unaffected.
+    """
+
+    import numpy as _np
+    import pandas as _pd
+
+    if isinstance(groups, _pd.DataFrame):
+        if groups.shape[1] >= 2:
+            return [groups.iloc[:, index].to_numpy() for index in range(groups.shape[1])]
+        # A ONE-COLUMN frame is still one-way, but it must be FLATTENED here: passing a
+        # single-column frame on to ``cov_cluster`` leaves it 2-D and raises "must be
+        # one-dimensional", even though the caller expressed an ordinary one-way spec.
+        return None
+
+    array = _np.asarray(groups)
+    if array.ndim == 2 and array.shape[1] >= 2:
+        return [array[:, index] for index in range(array.shape[1])]
+    if array.ndim == 2 and array.shape[1] == 1:
+        # Same story for an (n, 1) array.
+        return None
+    return None
+
+
+def _flatten_single_dimension(groups: Any) -> Any:
+    """Turn a one-column frame or ``(n, 1)`` array into a 1-D label vector."""
+
+    import numpy as _np
+    import pandas as _pd
+
+    if isinstance(groups, _pd.DataFrame):
+        return groups.iloc[:, 0].to_numpy()
+    array = _np.asarray(groups)
+    if array.ndim == 2 and array.shape[1] == 1:
+        return array[:, 0]
+    return groups

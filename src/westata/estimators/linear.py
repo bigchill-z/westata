@@ -126,6 +126,24 @@ def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
     return token[:1].upper() + token[1:]
 
 
+def _cluster_dimension_columns(groups: Any) -> list[Any]:
+    """Split cluster labels into per-dimension vectors (one entry for a one-way spec).
+
+    Mirrors ``westata.vce.dispatch._cluster_dimensions`` for the reporting side: a
+    two-column DataFrame or an ``(n, 2)`` array is multiway, anything else is a single
+    dimension.
+    """
+
+    if isinstance(groups, pd.DataFrame):
+        if groups.shape[1] >= 2:
+            return [groups.iloc[:, index].to_numpy() for index in range(groups.shape[1])]
+        return [groups.iloc[:, 0].to_numpy()]
+    array = np.asarray(groups)
+    if array.ndim == 2 and array.shape[1] >= 2:
+        return [array[:, index] for index in range(array.shape[1])]
+    return [array]
+
+
 def _resolve_weight_column(weights: Any, data: pd.DataFrame) -> Any:
     """Turn ``weights="colname"`` into the column's values; pass anything else through.
 
@@ -589,7 +607,17 @@ class OLS:
 
             groups = cluster_labels_from_kwds(cov_kwds)
             if groups is not None:
-                e["N_clust"] = float(np.unique(encode_groups(groups)).size)
+                # A multiway spec supplies one label column per dimension; e(N_clust) then
+                # follows Stata and reports the SMALLEST group count, which is the one that
+                # limits inference (and matches the df_t the covariance returns). Encoding
+                # the two-column object directly raised "must be one-dimensional", so the
+                # covariance worked but the fit failed afterwards -- an ordering surprise
+                # worth avoiding by handling both shapes here.
+                dimensions = _cluster_dimension_columns(groups)
+                counts = [
+                    np.unique(encode_groups(column)).size for column in dimensions
+                ]
+                e["N_clust"] = float(min(counts))
 
         results = StataResults(
             params=beta,

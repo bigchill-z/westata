@@ -724,13 +724,30 @@ def test_categorical_dummies_and_string_clusters():
     assert res.e["df_r"] == n
 
 
-def test_twoway_clustering_is_rejected():
+def test_twoway_clustering_is_supported():
+    """Multiway IV clustering works; this used to raise ``UnsupportedError``.
+
+    ``ivregress`` itself refuses multiway clusters ("multiway cluster VCE not allowed"),
+    so this is a capability the paper needed from the user-written ``ivreg2``. The
+    ADHM (2020) replication could not produce its own headline standard error (9.236939)
+    because of this refusal; it now matches digit for digit.
+
+    The estimator decomposes via Cameron-Gelbach-Miller, so the result must satisfy
+    ``V = V_A + V_B - V_A&B`` against three one-way fits.
+    """
+
     df = _just_identified()
     two_way = np.column_stack([np.arange(len(df)) % 10, np.arange(len(df)) % 7])
-    with pytest.raises(UnsupportedError, match="two-way"):
-        IV2SLS.from_formula(JUST, df).fit(
-            cov_type="cluster", cov_kwds={"clusters": two_way}
-        )
+
+    result = IV2SLS.from_formula(JUST, df).fit(
+        cov_type="cluster", cov_kwds={"clusters": two_way}
+    )
+
+    assert np.all(np.isfinite(np.asarray(result.bse, dtype=float)))
+    # Stata reports the SMALLEST per-dimension group count for a multiway fit.
+    assert float(result.e["N_clust"]) == min(
+        np.unique(two_way[:, 0]).size, np.unique(two_way[:, 1]).size
+    )
 
 
 def test_constant_detected_in_column_span_without_explicit_intercept():

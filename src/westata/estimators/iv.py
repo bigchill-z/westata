@@ -278,21 +278,37 @@ def _canonical_cov_type(cov_type: str | None) -> str:
 
 def _cluster_labels(
     clusters: Any, nobs: int, kept_index: Sequence[Any] | None
-) -> np.ndarray:
-    """Return one-dimensional cluster labels aligned with the estimation sample."""
+) -> Any:
+    """Return cluster labels aligned with the estimation sample.
 
-    if isinstance(clusters, pd.Series) and clusters.shape[0] != nobs and kept_index is not None:
+    One-dimensional for ordinary clustering, or ``nobs x dimensions`` for MULTIWAY
+    clustering, which Stata spells ``vce(cluster a b)`` and computes by
+    Cameron-Gelbach-Miller inclusion-exclusion. Multiway used to be refused here, so the
+    ADHM (2020) replication could not produce the paper's own standard error; the
+    combination step now lives in :func:`westata.vce.cluster.cov_multiway_cluster`.
+    """
+
+    if isinstance(clusters, pd.DataFrame) and clusters.shape[0] != nobs and kept_index is not None:
+        if clusters.index.is_unique and set(kept_index).issubset(set(clusters.index)):
+            clusters = clusters.loc[list(kept_index)]
+    elif isinstance(clusters, pd.Series) and clusters.shape[0] != nobs and kept_index is not None:
         # The usual case: the user passes a column of the *original* frame while
         # the estimator dropped rows with missing values.  Align by index
         # instead of guessing positions.
         if clusters.index.is_unique and set(kept_index).issubset(set(clusters.index)):
             clusters = clusters.loc[list(kept_index)]
-    values = np.asarray(clusters.squeeze() if hasattr(clusters, "squeeze") else clusters)
+
+    values = np.asarray(clusters)
     if values.ndim == 2 and values.shape[1] > 1:
-        raise UnsupportedError(
-            "two-way clustering is not implemented for IV in P1; pass a single "
-            "cluster variable as cov_kwds={'clusters': ...}"
-        )
+        # Multiway: each column is one clustering dimension. Passed through as a 2-D array
+        # so the dispatcher can split it; the length check is on the rows.
+        if values.shape[0] != nobs:
+            raise ValueError(
+                "cov_kwds['clusters'] must have one entry per estimation "
+                f"observation; got {values.shape[0]} for nobs={nobs}"
+            )
+        return values
+    values = np.asarray(clusters.squeeze() if hasattr(clusters, "squeeze") else clusters)
     values = values.reshape(-1)
     if values.shape[0] != nobs:
         raise ValueError(
@@ -1129,7 +1145,22 @@ class IV2SLS:
         if clusters is not None:
             # Stata stores e(N_clust) for every vce(cluster var) fit, including
             # the IV estimators (verified: G = 14 -> e(N_clust) = 14).
-            e["N_clust"] = float(np.unique(np.asarray(clusters)).size)
+            #
+            # A MULTIWAY spec arrives as an (n, dimensions) array. ``np.unique`` on that
+            # raises ``TypeError: '<' not supported between 'str' and 'float'`` as soon as
+            # the two label columns have different dtypes, and even when it does not, the
+            # row count is not the number of clusters. Stata reports the SMALLEST
+            # per-dimension group count, which is also the one that limits inference.
+            array = np.asarray(clusters)
+            if array.ndim == 2 and array.shape[1] > 1:
+                e["N_clust"] = float(
+                    min(
+                        np.unique(array[:, index]).size
+                        for index in range(array.shape[1])
+                    )
+                )
+            else:
+                e["N_clust"] = float(np.unique(array).size)
         if self._stores_rank_mb and canonical != "nonrobust":
             # ``ivregress 2sls, vce(robust|cluster)`` additionally stores
             # e(rank_mb), which equals e(rank) = K.  LIML and GMM never store it,

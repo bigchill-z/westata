@@ -408,6 +408,10 @@ class QuantileRegression:
         sparsity = self._sparsity["sparsity"]
         bandwidth = self._sparsity["bandwidth"]
 
+        # NOTE: no e(title) here on purpose. ``qreg.ado:189`` is a bare
+        # ``ereturn local title``, which REMOVES the macro rather than emptying it, so a
+        # ported do-file sees the key absent. Stata prints "Median regression" from a
+        # separate ``display``, so the banner is derived in the renderer from ``e(q)``.
         e: dict[str, Any] = {
             "N": n,
             "df_m": float(k - 1),

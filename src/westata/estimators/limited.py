@@ -850,6 +850,9 @@ class Truncreg(_MLLimitedBase):
         # The truncation count is still useful, so it stays an attribute on the
         # result (``_n_truncated``) rather than pretending to be a Stata scalar.
         return {
+            # ``e(title)``: measured, "Truncated regression". Stata prints it as the
+            # banner above the Limit: block.
+            "title": "Truncated regression",
             "llopt": self._lower,
             "ulopt": self._upper,
         }

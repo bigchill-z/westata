@@ -1389,7 +1389,9 @@ def _stata_summary(result: Any) -> str:
         and bool(_vcetype_for_banner)
         and not _pcse_family_for_header(result)
     ) or _block_for_banner == "newey"
-    if not _robust_banner:
+    # ``quantile`` prints its banner on the SAME line as Number of obs (see its branch),
+    # so the standalone line is skipped for it just as it is for a robust ols fit.
+    if not _robust_banner and block != "quantile":
         lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
     #
@@ -1462,8 +1464,10 @@ def _stata_summary(result: Any) -> str:
     # ``xtpcse``/``xtgls`` print the design block above, which already carries
     # "Number of obs" in its right column.
     _pcse_family = str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
+    # ``quantile`` prints "Number of obs" beside its banner inside its own branch, so the
+    # generic line is skipped here for it too.
     if (
-        block not in ("svy", "ml", "newey", "arch")
+        block not in ("svy", "ml", "newey", "arch", "quantile")
         and not _is_robust_ols
         and not _pcse_family
     ):
@@ -1735,6 +1739,17 @@ def _stata_summary(result: Any) -> str:
         #                                               Zero obs      =    540
         #                                               LR chi2(1)    = 248.04
         #   Log likelihood = -1700.705                  Prob > chi2   = 0.0000
+        # ``nbreg`` labels its parameterisation in the left column, opposite the chi2
+        # test, so the row count has to line up with "Prob > chi2" and not with
+        # "Number of obs". Captured:
+        #
+        #   Negative binomial regression                  Number of obs =   100
+        #                                                 LR chi2(2)    =  0.08
+        #   Dispersion: mean                              Prob > chi2   = 0.9599
+        #   Log likelihood = -120.61551                   Pseudo R2     = 0.0003
+        #
+        # ``nbreg`` is the mean-dispersion (NB2) form; ``nbreg, dispersion(constant)`` is
+        # the other parameterisation and would print "Dispersion: constant".
         n_zero = _e_float(result, "n_zero")
         n_nonzero = _e_float(result, "n_nonzero")
         if np.isfinite(n_nonzero):
@@ -1764,16 +1779,70 @@ def _stata_summary(result: Any) -> str:
         _pairs_with_pseudo = np.isfinite(pseudo_r2) and not _is_zero_inflated
         if _pairs_with_pseudo:
             ml_right.append(("Pseudo R2", _fixed(pseudo_r2, 4)))
+        # ``nbreg`` labels its parameterisation opposite "Prob > chi2", which is the third
+        # row of the right column when a chi2 test is present:
+        #
+        #   Negative binomial regression                  Number of obs =   100
+        #                                                 LR chi2(2)    =  0.08
+        #   Dispersion: mean                              Prob > chi2   = 0.9599
+        #   Log likelihood = -120.61551                   Pseudo R2     = 0.0003
+        #
+        # Placed by INDEX because the left column is padded to the right column's length
+        # below; appending it earlier shifted it up by one row.
+        # ``truncreg`` names its truncation points in the left column, opposite the row
+        # that carries Number of obs / chi2. Measured:
+        #
+        #   Limit: Lower =   -1                Number of obs     =        85
+        #          Upper = +inf                Wald chi2(2)      =       4.16
+        #
+        # ``e(llopt)``/``e(ulopt)`` hold them, or are absent when that side is unbounded.
+        if str(getattr(result, "model_name", "") or "") == "truncreg":
+            # The banner row is REPLACED by "Limit: Lower = ...", not followed by it:
+            # Stata prints the banner once, as the title above the table, and the Limit
+            # rows occupy the left column of the two-column block.
+            _lower = _e_float(result, "llopt")
+            _upper = _e_float(result, "ulopt")
+            _limit_row = "Limit: Lower = " + (
+                f"{_lower:>4g}" if np.isfinite(_lower) else "   ."
+            )
+            if ml_left:
+                ml_left[0] = _limit_row
+            else:
+                ml_left.append(_limit_row)
+            ml_left.append(
+                "       Upper = " + (f"{_upper:>4g}" if np.isfinite(_upper) else "+inf")
+            )
+
+        if (
+            str(getattr(result, "model_name", "") or "") == "nbreg"
+            and len(ml_left) < 3
+        ):
+            while len(ml_left) < 2:
+                ml_left.append("")
+            ml_left.append("Dispersion: mean")
+
         while len(ml_left) < (len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)):
             ml_left.append("")
         if np.isfinite(ll):
             ml_left.append("Log likelihood = " + ("%.8g" % ll))
+        # ``truncreg``'s left column is 48 wide, not the 56 the other ML commands use:
+        # its "Limit: Lower = ..." row is longer than a banner, so Stata shifts the right
+        # column left to keep the block 78 wide -- and the value field shrinks with it
+        # ("Number of obs     =  85": value in 4 columns, not 6).
+        _is_truncreg = str(getattr(result, "model_name", "") or "") == "truncreg"
+        _left_width = 48 if _is_truncreg else 56
         for index, line in enumerate(ml_left):
             right = ""
             if index < len(ml_right):
                 label, value = ml_right[index]
-                right = f"{label:<14}= {value:>6}"
-            lines.append(f"{line:<56}{right}".rstrip())
+                # Measured: truncreg's right column is label 18 + "= " + value 4
+                # ("Number of obs     =  85"), where the other ML commands use label 14
+                # + value 6. The block is the same 78 wide either way.
+                if _is_truncreg:
+                    right = f"{label:<18}= {value:>4}"
+                else:
+                    right = f"{label:<14}= {value:>6}"
+            lines.append(f"{line:<{_left_width}}{right}".rstrip())
     elif block == "quantile":
         # Stata's qreg header (p8_outputs.txt:20-22): the title carries the
         # quantile, then two deviation lines with Pseudo R2 on the right.  There
@@ -1786,6 +1855,31 @@ def _stata_summary(result: Any) -> str:
         sum_adev = _e_float(result, "sum_adev")
         q_v = _e_float(result, "q_v")
         pseudo_r2 = _e_float(result, "r2_p")
+        # Stata puts the banner and "Number of obs" on the SAME line, left-aligned pair:
+        #
+        #   Median regression              Number of obs =        100
+        #     Raw sum of deviations 39.90204 (about .12350311)
+        #     Min sum of deviations 39.21938    Pseudo R2     =     0.0171
+        #
+        # The generic header printed the banner alone and "Number of obs" on the next
+        # line, which is a different shape (the OLS one), not a shifted version of this.
+        # ``qreg`` CLEARS e(title) and prints its banner with ``display`` instead, so the
+        # text is derived from the quantile rather than read from the macro. Measured:
+        # .5 prints "Median regression"; other quantiles print "<q> Quantile regression"
+        # (p8_outputs.txt:20 shows ".25 Quantile regression").
+        _banner_text = str((getattr(result, "e", None) or {}).get("title") or "")
+        if not _banner_text:
+            _q = _e_float(result, "q")
+            if np.isfinite(_q):
+                _banner_text = (
+                    "Median regression"
+                    if abs(_q - 0.5) < 1e-12
+                    else f"{_q:g} Quantile regression"
+                )
+        # "Number of obs =        100": the label is 14 wide then "= " and an 11-wide
+        # value, so the "=" lands at column 66. The OLS header's 18-wide label field put
+        # it four columns further right.
+        lines.append(f"{_banner_text:<52}{'Number of obs':<14}= {nobs:>11d}")
         if np.isfinite(sum_rdev):
             about = f" (about {_num(q_v, 8)})" if np.isfinite(q_v) else ""
             lines.append(f"  Raw sum of deviations {_num(sum_rdev, 7)}{about}")
@@ -2044,23 +2138,23 @@ def _stata_summary(result: Any) -> str:
         _banner_end = _BANNER_END.get(_vcetype, name_width + 2 + len(_vcetype))
         lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_end - name_width - 2}}")
     lines.append(header)
-    # The survey family borders its table with FULL-WIDTH rules top and bottom, and keeps
-    # the SPLIT form between the header and the rows. Measured from ``svy: regress``:
-    # lines 11 and 18 carry no ``+``, line 14 does.
+    # Stata's table geometry, uniformly across families: a FULL-WIDTH rule opens the
+    # table, a SPLIT rule separates the column header from the rows, and a FULL-WIDTH
+    # rule closes it. Verified against a live ``regress y x1`` --
+    #
+    #   --------------------------------------------------------------   full
+    #                y | Coefficient  Std. err.  ...                      header
+    #   -------------+-----------------------------------------------     split
+    #             x1 |  .0312779   ...
+    #          _cons |  .0205762   ...
+    #   --------------------------------------------------------------   full
+    #
+    # -- and against the committed captures (p10_outputs.txt:13/16 for sureg,
+    # p9_outputs.txt:483/488, p12_outputs.txt:11/16). The closing rule used to reuse the
+    # split form for every family that was not svy/did/xtgls, which put a rule there that
+    # Stata never prints.
     _split_rule = "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
-    # The survey AND DID families border their tables with full-width rules; every other
-    # family uses the split form.
-    # The survey, DID and FGLS families border their tables with full-width rules; every
-    # other family uses the split form.
-    _border_rule = (
-        "-" * row_width
-        if (
-            block == "svy"
-            or _is_didregress(result)
-            or str(getattr(result, "model_name", "") or "") == "xtgls"
-        )
-        else _split_rule
-    )
+    _border_rule = "-" * row_width
     # The rule AFTER the header is always the split form, even for the survey family.
     lines.append(_split_rule)
     # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second

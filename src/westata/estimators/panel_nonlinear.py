@@ -1256,6 +1256,10 @@ class XtLogit(_PanelBase):
                 "scale": 1.0,
                 "vce": variance_label,
                 "estimator": "gee",
+                # Obs per group counts: the GEE header prints min/avg/max beside the
+                # family/link lines. Every group contributes here -- unlike the
+                # conditional estimators, which drop groups with a zero total.
+                **self._group_size_summary(self._slices),
                 # Spelled out so no reader mistakes this for a likelihood.
                 "quasi_likelihood": 1,
             },

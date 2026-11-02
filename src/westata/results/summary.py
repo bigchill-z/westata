@@ -612,6 +612,60 @@ def _panel_design_block(result: Any) -> list[str]:
                 f"{est_label:<27}" + "=" + f"{est_value:>10}" + " " * 10
                 + _right(fit_label, fit_value)
             )
+    elif (
+        str(e_macros.get("corr") or "").strip()
+        and str(e_macros.get("family") or "").strip()
+        and str(e_macros.get("link") or "").strip()
+    ):
+        # The GEE population-averaged shape (``xtlogit ..., pa``), measured:
+        #
+        #   Group variable: unit                       Number of groups =     20
+        #   Family: Binomial                           Obs per group:
+        #   Link:   Logit                                             min =      5
+        #   Correlation: exchangeable                                 avg =    5.0
+        #                                                             max =      5
+        #                                              Wald chi2(1)     =   0.62
+        #   Scale parameter = 1                        Prob > chi2      = 0.4300
+        #
+        # Right column starts at 53: min/avg/max right-align their label to 66 then "= "
+        # and a 6-wide value; the test labels are 17 wide. The model test is a WALD chi2,
+        # not the LR chi2 the conditional family prints.
+        _per_group = e_macros.get("_obs_per_group") or {}
+        _gmin = _per_group.get("min", _e_float(result, "g_min"))
+        _gavg = _per_group.get("avg", _e_float(result, "g_avg"))
+        _gmax = _per_group.get("max", _e_float(result, "g_max"))
+
+        def _count(value: Any, label: str) -> str:
+            if value is None or not np.isfinite(value):
+                text = "."
+            elif label == "avg":
+                text = f"{float(value):.1f}"
+            else:
+                text = f"{int(round(float(value)))}"
+            return f"{label:>19} = {text:>6}"
+
+        lines = [
+            f"{'Group variable:':<18}{entity or '.':<35}"
+            f"{'Number of groups':<17}= {_number('N_g'):>7}",
+            f"{'Family:':<18}{str(e_macros.get('family') or '.')}"
+            f"{'Obs per group:':>34}",
+            f"{'Link:':<18}{str(e_macros.get('link') or '.')}"
+            + _count(_gmin, "min"),
+            f"{'Correlation:':<18}{str(e_macros.get('corr') or '.')}"
+            + _count(_gavg, "avg"),
+            f"{'':<53}" + _count(_gmax, "max"),
+            f"{'':<53}{'Wald chi2(' + _df_label(_e_float(result, 'df_m')) + ')':<17}"
+            f" = {_e_float(result, 'chi2'):>6.2f}",
+        ]
+        _scale = _e_float(result, "scale")
+        _scale_text = (
+            "Scale parameter = " + f"{_scale:g}" if np.isfinite(_scale) else ""
+        )
+        _p_gee = _e_float(result, "p")
+        if np.isfinite(_p_gee):
+            lines.append(f"{_scale_text:<53}{'Prob > chi2':<17} = {_p_gee:>6.4f}")
+        elif _scale_text:
+            lines.append(_scale_text)
     else:
         # The xt NON-LINEAR shape: group variable + group count, then the per-group
         # extremes.  No time-variable line, no ``Panels:``, no "Estimated ..." rows.

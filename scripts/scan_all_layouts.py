@@ -357,7 +357,15 @@ def _stata_block(command: str) -> list[str]:
         # and made correct output look broken.
         "note:",
         "Fitting ",
+        # xttobit announces its two-stage start: "Obtaining starting values for full model:".
+        "Obtaining starting",
         "Grid node ",
+        # Standardisation-parameter iteration lines from the random-effects ML commands:
+        # "tau =  0.0    Log likelihood = -69.197758". Without this the header comparison
+        # starts several rows too high and makes a correct banner look wrong.
+        "tau =",
+        "rho =",
+        "delta =",
         "convergence not achieved",
         "Huber iteration",
         "Biweight iteration",

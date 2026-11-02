@@ -396,6 +396,88 @@ def _panel_design_block(result: Any) -> list[str]:
     # -- no ``Time variable:``, no ``Panels:``, no "Estimated ..." rows.  Emitting the
     # xtpcse rows for a plain xtlogit produced three lines of ``.``, so the two shapes
     # are kept separate rather than unified.
+    if model_name == "xtgls":
+        # ``xtgls`` has its OWN design block, and it is not xtpcse's. Captured
+        # (p9_outputs.txt:471-481):
+        #
+        #   Cross-sectional time-series FGLS regression
+        #
+        #   Coefficients:  generalized least squares
+        #   Panels:        heteroskedastic
+        #   Correlation:   no autocorrelation
+        #
+        #   Estimated covariances      =       100   Number of obs     =        700
+        #   Estimated autocorrelations =         0   Number of groups  =        100
+        #   Estimated coefficients     =         2   Time periods      =          7
+        #                                             Wald chi2(1)      =     246.99
+        #                                             Prob > chi2       =     0.0000
+        #
+        # Three plain lines instead of Group/Time/Panels/Autocorrelation, and the right
+        # column carries Time periods / Wald / Prob rather than Obs per group.
+        lines_gls: list[str] = []
+        panels_key = str(e_macros.get("panels") or "").strip().lower()
+        coefficients_label = {
+            "iid": "generalized least squares",
+            "heteroskedastic": "generalized least squares",
+            "correlated": "generalized least squares",
+        }.get(panels_key, "generalized least squares")
+        corr_key = str(e_macros.get("corr") or "").strip().lower()
+        correction_label = {
+            "independent": "no autocorrelation",
+            "independent_ar1": "common AR(1)",
+            "ar1": "common AR(1)",
+            "psar1": "panel-specific AR(1)",
+        }.get(corr_key, "no autocorrelation")
+        lines_gls.append(f"Coefficients:  {coefficients_label}")
+        lines_gls.append(f"Panels:        {panels_key or '.'}")
+        lines_gls.append(f"Correlation:   {correction_label}")
+        lines_gls.append("")
+
+        def _num(key: str, fmt: str = "{:.0f}") -> str:
+            value = _e_float(result, key)
+            return fmt.format(value) if np.isfinite(value) else "."
+
+        def _right_gls(label: str, value: str) -> str:
+            return f"{label:<18}= {value:>10}"
+
+        def _est_gls(label: str, value: str) -> str:
+            # "Estimated covariances      =       100" -- the "=" sits at column 27 and
+            # the number ends at 38, same as the xtpcse block.
+            return f"{label:<27}" + "=" + f"{value:>10}" + " " * 10
+
+        _df_m = _e_float(result, "df_m")
+        right_rows = [
+            _right_gls("Number of obs", f"{int(round(_e_float(result, 'N'))):,}"
+                        if np.isfinite(_e_float(result, "N")) else "."),
+            _right_gls("Number of groups", _num("N_g")),
+            _right_gls("Time periods", _num("N_t")),
+            "",
+            _right_gls(
+                f"Wald chi2({_df_label(_df_m)})",
+                f"{_e_float(result, 'chi2'):.2f}"
+                if np.isfinite(_e_float(result, "chi2")) else ".",
+            ),
+            _right_gls(
+                "Prob > chi2",
+                f"{_e_float(result, 'p'):.4f}"
+                if np.isfinite(_e_float(result, "p")) else ".",
+            ),
+        ]
+        est_pairs = [
+            _est_gls("Estimated covariances", _num("n_cv")),
+            _est_gls("Estimated autocorrelations", _num("n_cr")),
+            _est_gls("Estimated coefficients", _num("n_cf")),
+        ]
+        for index, est in enumerate(est_pairs):
+            lines_gls.append(est + right_rows[index][:48].lstrip())
+        # Row 3 of right_rows is a blank spacer that made an empty 48-wide line; Stata
+        # goes straight from "Time periods" to "Wald chi2".
+        for right in right_rows[4:]:
+            lines_gls.append(f"{'':<48}{right}")
+        # The captured banner row is "Cross-sectional ..." on its own line ABOVE this
+        # block, and the block itself has no rule before the table.
+        return lines_gls
+
     if model_name in ("xtpcse", "xtgls"):
         # A TWO-COLUMN block 78 wide. Measured from ``xtpcse y x1``: the left half holds
         # the panel structure and the "Estimated ..." counts, the right half the fit
@@ -1744,8 +1826,16 @@ def _stata_summary(result: Any) -> str:
     _split_rule = "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
     # The survey AND DID families border their tables with full-width rules; every other
     # family uses the split form.
+    # The survey, DID and FGLS families border their tables with full-width rules; every
+    # other family uses the split form.
     _border_rule = (
-        "-" * row_width if (block == "svy" or _is_didregress(result)) else _split_rule
+        "-" * row_width
+        if (
+            block == "svy"
+            or _is_didregress(result)
+            or str(getattr(result, "model_name", "") or "") == "xtgls"
+        )
+        else _split_rule
     )
     # The rule AFTER the header is always the split form, even for the survey family.
     lines.append(_split_rule)

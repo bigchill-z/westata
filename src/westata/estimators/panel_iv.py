@@ -1088,6 +1088,13 @@ class XtGls:
             "n_cf": int(k),
             "n_cv": self._n_covariances(),
             "n_cr": 0,
+            # The design block names these; without them the block printed "." and used a
+            # generic banner. Measured from the captured ``xtgls`` run:
+            # "Cross-sectional time-series FGLS regression".
+            "ivar": str(getattr(self, "_entity_name", "") or ""),
+            "tvar": str(getattr(self, "_time_name", "") or ""),
+            "depvar": str(getattr(self, "_depvar_name", "") or ""),
+            "title": "Cross-sectional time-series FGLS regression",
             "df": float(df_m),
             "df_pear": float(nobs - k),
             "rank": int(k),
@@ -1156,9 +1163,17 @@ class XtGls:
         return sigma
 
     def _n_covariances(self) -> int:
+        """``e(n_cv)``: how many covariance elements are estimated.
+
+        ``xtgls.ado:471-476`` is explicit, and each case was measured:
+        ``panels(iid)`` = 1, ``panels(heteroskedastic)`` = G, ``panels(correlated)`` =
+        G(G+1)/2. The iid case used to return 0, which printed
+        "Estimated covariances = 0" against Stata's 1.
+        """
+
         m = int(self._sizes.size)
         if self._panels == "iid":
-            return 0
+            return 1
         if self._panels == "heteroskedastic":
             return m
         return m * (m + 1) // 2

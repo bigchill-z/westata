@@ -486,6 +486,13 @@ def _design_from_terms(
     return np.asarray(X, dtype=float), list(names)
 
 
+#: ``e(title)`` per ``xtivreg`` method -- the banner each prints. Measured from live runs.
+_XTIVREG_TITLES = {
+    "fe": "Fixed-effects (within) IV regression",
+    "re": "G2SLS random-effects IV regression",
+}
+
+
 # ------------------------------------------------------------------- xtivreg
 class XtIvreg:
     """Panel instrumental variables (Stata ``xtivreg``), ``fe`` and ``re``.
@@ -608,7 +615,7 @@ class XtIvreg:
         _rank_check(Z_full, all_instrument_names, command)
 
         codes, sizes = _panel_labels(frame, entity, command)
-        return cls(
+        model = cls(
             frame[depvar].to_numpy(dtype=float),
             X,
             W,
@@ -621,6 +628,10 @@ class XtIvreg:
             method=method,
             model_data=frame.reset_index(drop=True),
         )
+        # The panel header names the grouping variable ("Group variable: unit"); without
+        # this the row printed blank.
+        model._entity_name = str(entity)
+        return model
 
     # ------------------------------------------------------ variance components
     def _means(self, array: np.ndarray) -> np.ndarray:
@@ -875,6 +886,14 @@ class XtIvreg:
         e: dict[str, Any] = {
             "N": int(nobs),
             "N_g": int(n_entities),
+            # ``e(title)``: measured per method --
+            #   xtivreg ..., fe -> "Fixed-effects (within) IV regression"
+            #   xtivreg ..., re -> "G2SLS random-effects IV regression"
+            "title": _XTIVREG_TITLES.get(
+                str(getattr(self, "_method", "") or "").strip().lower(), ""
+            ),
+            # The panel header's "Group variable:" row reads this macro.
+            "group": str(getattr(self, "_entity_name", "") or ""),
             # e(df_m) is the number of *reported* parameters other than the
             # constant.  For xtivreg, re this is exactly Stata's value (2 for the
             # fixture).  Stata's xtivreg, fe additionally counts the absorbed

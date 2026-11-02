@@ -969,7 +969,10 @@ def _is_xtreg_panel(result: Any) -> bool:
     """
 
     name = str(getattr(result, "model_name", "") or "")
-    if not name.startswith("xtreg"):
+    # ``xtivreg, fe`` shares xtreg's panel block (measured: the same R-squared
+    # decomposition, corr(u_i, Xb) and Obs per group), only the model test differs -- it
+    # prints Wald chi2 where xtreg prints F.
+    if not (name.startswith("xtreg") or name.startswith("xtivreg")):
         return False
     e = getattr(result, "e", None) or {}
     has_groups = np.isfinite(_e_float(result, "N_g"))
@@ -989,6 +992,11 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     df_model = _e_float(result, "df_m")
     df_resid = _e_float(result, "df_r")
     fvalue = _e_float(result, "F")
+    # ``xtivreg`` stores its model test as e(chi2), not e(F) -- the header still shows it
+    # in the same slot, labelled "Wald chi2" (see below). Without this fallback the row
+    # vanished entirely.
+    if not np.isfinite(fvalue):
+        fvalue = _e_float(result, "chi2")
     p_f = _e_float(result, "p")
     r2_w = _e_float(result, "r2_w")
     r2_b = _e_float(result, "r2_b")
@@ -1018,11 +1026,30 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         # right label starts at column 48 and the line stops there (62 wide, not 78).
         row("R-squared:", f"{'Obs per group:':>14}"),
     ]
+    # ``xtivreg`` prints a LITERAL MISSING VALUE for the within R-squared. Measured from
+    # ``xtivreg y x1 (x2 = z), fe``: "Within  =      .", while Between/Overall carry
+    # numbers. The 2SLS residuals do not admit Stata's within-R2 definition, so the value
+    # is genuinely not reported -- printing the estimator's own number would show a figure
+    # Stata deliberately blanks.
+    _is_xtivreg = str(getattr(result, "model_name", "") or "").startswith("xtivreg")
     decomposition = [
-        ("Within", r2_w),
+        ("Within", float("nan") if _is_xtivreg else r2_w),
         ("Between", r2_b),
         ("Overall", r2_o),
     ]
+    # ``_obs_per_group`` is set by the panel estimators; the IV ones store the same
+    # quantities as g_min/g_avg/g_max instead. Reading both keeps the right column intact
+    # ("min = 5") rather than dropping it.
+    if not per_group:
+        _g_min = _e_float(result, "g_min")
+        _g_avg = _e_float(result, "g_avg")
+        _g_max = _e_float(result, "g_max")
+        if any(np.isfinite(v) for v in (_g_min, _g_avg, _g_max)):
+            per_group = {
+                "min": _g_min,
+                "avg": _g_avg,
+                "max": _g_max,
+            }
     right_rows = [
         ("min", per_group.get("min")),
         ("avg", per_group.get("avg")),
@@ -1034,8 +1061,10 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         right_rows = [(label, None) for label, _ in right_rows]
     for (label, value), (rlabel, rvalue) in zip(decomposition, right_rows):
         # ``Within`` occupies 8 columns before " =": Stata prints
-        # "     Within  = 0.0006", not "     Within   = ...".
-        left = f"{'':>5}{label:<8}= {_four(value)}"
+        # "     Within  = 0.0006", not "     Within   = ...". The value field is 6 wide,
+        # and a MISSING value right-aligns in it too ("     Within  =      .").
+        _value_text = _four(value)
+        left = f"{'':>5}{label:<8}= {_value_text:>6}"
         right = ""
         if rvalue is not None:
             # The group-size labels are right-aligned to column 62 and carry the value in
@@ -1047,15 +1076,21 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
             right = f"{rlabel:>17} = {rendered:>10}"
         lines.append(row(left, right))
     lines.append("")
+    # ``xtivreg`` reports a WALD chi2 where the other panel estimators report an F:
+    # measured, "Wald chi2(2)" / "Prob > chi2" against xtreg's "F(1, 149)" / "Prob > F".
+    _uses_wald = _is_xtivreg
     if np.isfinite(fvalue):
-        lines.append(
-            row("", stat(f"F({_df_label(df_model)}, {_df_label(df_resid)})", f"{fvalue:.2f}"))
-        )
+        if _uses_wald:
+            _test_label = f"Wald chi2({_df_label(df_model)})"
+        else:
+            _test_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
+        lines.append(row("", stat(_test_label, f"{fvalue:.2f}")))
     left_corr = ""
     if np.isfinite(corr):
         left_corr = f"corr(u_i, Xb) = {_four(corr)}"
     if np.isfinite(p_f):
-        lines.append(row(left_corr, stat("Prob > F", _four(p_f))))
+        _p_label = "Prob > chi2" if _uses_wald else "Prob > F"
+        lines.append(row(left_corr, stat(_p_label, _four(p_f))))
     elif left_corr:
         lines.append(row(left_corr))
     return lines

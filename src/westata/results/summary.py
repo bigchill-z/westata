@@ -614,16 +614,45 @@ def _panel_design_block(result: Any) -> list[str]:
             )
     else:
         # The xt NON-LINEAR shape: group variable + group count, then the per-group
-        # extremes.  No time-variable line, no ``Panels:``, no "Estimated ..." rows --
-        # see the captured ``xtlogit, fe`` output quoted above.
+        # extremes.  No time-variable line, no ``Panels:``, no "Estimated ..." rows.
+        # Measured from ``xtlogit ybin x1, fe``:
+        #
+        #   Group variable: unit                       Number of groups =     20
+        #                                              Obs per group:
+        #                                                           min =      5
+        #                                                           avg =    5.0
+        #                                                           max =      5
+        #                                              LR chi2(1)       =   0.01
+        #   Log likelihood = -41.887242                 Prob > chi2      = 0.9159
+        #
+        # Left column 53, right column 25 (label 18, " =", value 7). The old version used
+        # 18/14 splits, which is why the earlier output was 64/69 wide instead of 78.
         lines = [
-            f"{'Group variable:':<18}{entity or '.':<14}"
-            f"{'Number of groups':<20}= {_number('N_g'):>10}",
-            f"{'':<18}{'Obs per group:':>32}",
-            f"{'':<50}{'min':>5} = {_number('g_min'):>11}",
-            f"{'':<50}{'avg':>5} = {_number('g_avg'):>11}",
-            f"{'':<50}{'max':>5} = {_number('g_max'):>11}",
+            f"{'Group variable:':<18}{entity or '.':<35}"
+            f"{'Number of groups':<17}= {_number('N_g'):>7}",
+            f"{'':<53}{'Obs per group:':>25}",
+            f"{'':<53}{'min':>18} = {_number('g_min'):>7}",
+            f"{'':<53}{'avg':>18} = {_number('g_avg'):>7}",
+            f"{'':<53}{'max':>18} = {_number('g_max'):>7}",
         ]
+        _chi2 = _e_float(result, "chi2")
+        _ll = _e_float(result, "ll")
+        _p = _e_float(result, "p")
+        _df = _e_float(result, "df_m")
+        if np.isfinite(_chi2):
+            lines.append(
+                f"{'':<53}{'LR chi2(' + _df_label(_df) + ')':<17}"
+                f"= {_chi2:>7.2f}"
+            )
+        _ll_text = (
+            "Log likelihood = " + _stata_number(_ll, 12).strip()
+            if np.isfinite(_ll)
+            else ""
+        )
+        if np.isfinite(_p):
+            lines.append(f"{_ll_text:<53}{'Prob > chi2':<17}= {_p:>7.4f}")
+        elif _ll_text:
+            lines.append(_ll_text)
     return lines
 
 
@@ -1528,7 +1557,13 @@ def _stata_summary(result: Any) -> str:
     # correlation structure was estimated over -- the single most important thing to know
     # about a PCSE fit.
     panel_lines = _panel_design_block(result)
-    if panel_lines:
+    # For the NON-LINEAR xt family the panel block comes AFTER the ML banner block: Stata
+    # prints "Conditional fixed-effects logistic regression   Number of obs = ..." first,
+    # then Group variable / Obs per group / LR chi2 / Log likelihood. Appending the panel
+    # block here (as every other family does) put it above the banner, so the banner never
+    # appeared at all.
+    _defer_panel_block = block == "ml" and bool(panel_lines)
+    if panel_lines and not _defer_panel_block:
         lines.extend(panel_lines)
         lines.append("")
 
@@ -2075,6 +2110,10 @@ def _stata_summary(result: Any) -> str:
         if _is_tobit or _is_truncreg or block == "ml":
             while lines and not lines[0].strip():
                 lines.pop(0)
+        # The deferred panel block goes AFTER the ML banner block (see where it is computed).
+        if _defer_panel_block:
+            lines.append("")
+            lines.extend(panel_lines)
     elif block == "quantile":
         # Stata's qreg header (p8_outputs.txt:20-22): the title carries the
         # quantile, then two deviation lines with Pseudo R2 on the right.  There

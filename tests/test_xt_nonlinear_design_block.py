@@ -104,8 +104,13 @@ def test_xtlogit_omits_the_xtpcse_only_rows(xtlogit_fit, label: str) -> None:
 def test_the_block_function_returns_the_short_shape(xtlogit_fit) -> None:
     block = _panel_design_block(xtlogit_fit)
 
-    assert 3 <= len(block) <= 6
+    # SEVEN rows, measured from ``xtlogit ybin x1, fe``: Group variable / Obs per group /
+    # min / avg / max / LR chi2 / (Log likelihood + Prob > chi2). The model test and the
+    # log likelihood belong to this block -- Stata prints them between "max" and the table
+    # rule. The upper bound was 6 when those two rows were missing.
+    assert 7 <= len(block) <= 8
     assert any("Group variable:" in entry for entry in block)
+    assert any("LR chi2" in entry for entry in block)
     assert not any("Estimated covariances" in entry for entry in block)
 
 

@@ -474,6 +474,28 @@ def _pooled_tobit_loglike(
     return -float(result.fun)
 
 
+#: ``e(title)`` per command+method -- every banner here was measured from a live Stata run,
+#: never derived. The same class prints a different banner per method: "xtlogit, fe" is
+#: "Conditional fixed-effects logistic regression", "xtlogit, re" is "Random-effects
+#: logistic regression", and "xtlogit, pa" is "GEE population-averaged model".
+_XT_NONLINEAR_TITLES = {
+    "xtlogit, fe": "Conditional fixed-effects logistic regression",
+    "xtlogit, re": "Random-effects logistic regression",
+    "xtlogit, pa": "GEE population-averaged model",
+    "xtprobit, re": "Random-effects probit regression",
+    "xtpoisson, fe": "Conditional fixed-effects Poisson regression",
+    "xtpoisson, re": "Random-effects Poisson regression",
+    "xtnbreg, fe": "Conditional FE negative binomial regression",
+    # ``xttobit`` has no method suffix, so its model_name is just the command.
+    "xttobit": "Random-effects tobit regression",
+}
+
+#: Extra lookup keyed on plain model_name, for commands whose name carries no method.
+_XT_PLAIN_TITLES = {
+    "xttobit": "Random-effects tobit regression",
+}
+
+
 # ------------------------------------------------------------------ the base
 class _PanelBase:
     """Shared plumbing: sample construction, optimiser, assembly, ``e()``."""
@@ -719,6 +741,14 @@ class _PanelBase:
         e: dict[str, Any] = {
             "N": nobs,
             "N_g": groups_fitted,
+            # ``e(title)``: the banner Stata prints, measured per command+method. These are
+            # NOT derivable from the class name -- "xtlogit, fe" prints "Conditional
+            # fixed-effects logistic regression" while "xtlogit, re" prints
+            # "Random-effects logistic regression", and the pa variant a third thing.
+            "title": _XT_NONLINEAR_TITLES.get(
+                f"{self._stata_command}, {self._method}", ""
+            )
+            or _XT_PLAIN_TITLES.get(str(self._stata_command), ""),
             # Stata prints "Group variable: <name>" in the xt design block
             # (``p9_outputs.txt:15``: ``Group variable: firm``).  The name is not
             # recoverable from ``model_data`` -- that frame carries the CODED group

@@ -241,7 +241,7 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("svy_total", "svy: total y",
          lambda: ws.SvyTotal.from_frame(["y"], CROSS, DESIGN).fit()),
         ("svy_logit", "svy: logit ybin x1",
-         lambda: ws.SvyLogit.from_frame("ybin ~ x1", CROSS, DESIGN).fit()),
+         lambda: ws.SvyLogit.from_frame(CROSS, "ybin ~ x1", DESIGN).fit()),
         ("xtpcse", "xtpcse y x1",
          lambda: ws.XtPcse.from_formula("y ~ x1", PANEL, entity="unit",
                                         time="period").fit()),

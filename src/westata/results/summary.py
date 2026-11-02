@@ -191,6 +191,35 @@ def _df_label(value: float) -> str:
 #:              is neither an RMSE nor a standard deviation.
 #: ``svy``   -- the survey design block (strata / PSUs / population / design df)
 #: ``quantile`` -- qreg's deviation lines
+#: Commands whose fit statistics print as a TWO-COLUMN block with NO sums-of-squares
+#: table, even though their ``e(vcetype)`` is empty.
+#:
+#: This set exists because the vcetype test was FALSIFIED by ``rreg``: both ``regress`` and
+#: ``rreg`` store ``e(vcetype)=""``, yet regress prints the ANOVA table and rreg prints the
+#: three-row robust header. So "is the vcetype non-empty" cannot decide the shape -- the
+#: command's identity has to. Each entry was measured against Stata, not inferred.
+_NO_ANOVA_TWO_COLUMN: frozenset[str] = frozenset(
+    {
+        "rreg",  # Number of obs / F / Prob > F, no ANOVA
+    }
+)
+
+
+def _wants_two_column_header(result: Any) -> bool:
+    """Whether this fit prints the two-column header instead of the ANOVA table.
+
+    True when the variance estimator is a robust one (non-empty ``e(vcetype)``), OR the
+    command is listed in :data:`_NO_ANOVA_TWO_COLUMN`. The second clause is what makes
+    ``rreg`` work -- its vcetype is empty like an ordinary regression.
+    """
+
+    vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    if vcetype:
+        return True
+    model_name = str(getattr(result, "model_name", "") or "")
+    return model_name in _NO_ANOVA_TWO_COLUMN
+
+
 _HEADER_BLOCK: dict[str, str] = {
     # ``newey.ado:245-258`` prints its own header and it is NOT regress's:
     #
@@ -689,6 +718,12 @@ def _pcse_family_for_header(result: Any) -> bool:
     return str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
 
 
+def _iv_family_for_header(result: Any) -> bool:
+    """Whether this is an ``ivregress`` fit, which has its own two-column block."""
+
+    return str(getattr(result, "model_name", "") or "").startswith("ivregress")
+
+
 def _is_didregress(result: Any) -> bool:
     """Whether this is a ``didregress``/``xtdidregress`` fit."""
 
@@ -1058,18 +1093,16 @@ def _anova_available(result: Any) -> bool:
     # -- a two-column block and nothing else. The ANOVA rows, Adj R-squared and Total
     # disappear; only R-squared and Root MSE survive. So availability depends on the
     # variance estimator, not only on which scalars exist.
-    _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-    if _vcetype:
+    # A robust variance estimator, or a command in _NO_ANOVA_TWO_COLUMN (rreg), means the
+    # two-column header and no ANOVA. Consolidated here so the decision lives in ONE place
+    # -- it used to be repeated as separate literals at several call sites.
+    if _wants_two_column_header(result):
         return False
     # The PCSE/GLS panel commands print their own design block and NO sums-of-squares
     # table: measured, ``xtpcse`` goes straight from the design rows to the coefficient
     # header. The ``ivregress`` estimators are the same: they store mss/rss but Stata
     # prints a two-column header with Wald chi2 and no ANOVA rows.
     if str(getattr(result, "model_name", "") or "").startswith("ivregress"):
-        return False
-    # ``rreg`` prints no ANOVA either: measured, its header is Number of obs / F / Prob > F
-    # and nothing else, exactly like a vce(robust) regress.
-    if str(getattr(result, "model_name", "") or "") == "rreg":
         return False
     if str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls"):
         return False
@@ -1473,8 +1506,14 @@ def _stata_summary(result: Any) -> str:
     # A robust ols fit prints its own two-column block below (see the ``block == "ols"``
     # branch), so the generic single-column lines are skipped for it.
     _robust_vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    # ``_wants_two_column_header`` folds in the commands whose vcetype is empty but that
+    # still print the two-column block (rreg), so this condition no longer has to know
+    # about them individually.
     _is_robust_ols = (
-        block == "ols" and bool(_robust_vcetype) and not _pcse_family_for_header(result)
+        block == "ols"
+        and _wants_two_column_header(result)
+        and not _pcse_family_for_header(result)
+        and not _iv_family_for_header(result)
     )
     # ``newey`` also prints its own two-column block (see the ``block == "newey"``
     # branch), so it is excluded from the generic single-column lines as well.
@@ -1741,20 +1780,30 @@ def _stata_summary(result: Any) -> str:
         #
         # Left column 48, right column 30 (label 18, " =", value 10).
         _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-        if _vcetype:
+        if _wants_two_column_header(result):
             _banner = str((getattr(result, "e", None) or {}).get("title") or "Linear regression")
             _rows: list[tuple[str, str]] = [
                 ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
             ]
             if np.isfinite(fvalue):
-                _rows.append(
-                    (f"F({_df_label(df_model)}, {_df_label(df_resid)})", _fixed(fvalue, 2))
-                )
+                # ``rreg`` pads the degrees of freedom ("F(  1,        98)") the same way
+                # ``newey`` does; a plain regress prints "F(5, 752)".
+                if str(getattr(result, "model_name", "") or "") == "rreg":
+                    _f_label = "F(%3d, %9d)" % (
+                        int(round(df_model)),
+                        int(round(df_resid)),
+                    )
+                else:
+                    _f_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
+                _rows.append((_f_label, _fixed(fvalue, 2)))
             if np.isfinite(p_f):
                 _rows.append(("Prob > F", _fixed(p_f, 4)))
-            if np.isfinite(rsquared):
+            # ``rreg`` prints ONLY Number of obs / F / Prob > F. Measured: no R-squared
+            # and no Root MSE, unlike a vce(robust) regress which shows both.
+            _is_rreg = str(getattr(result, "model_name", "") or "") == "rreg"
+            if np.isfinite(rsquared) and not _is_rreg:
                 _rows.append(("R-squared", _fixed(rsquared, 4)))
-            if np.isfinite(rmse):
+            if np.isfinite(rmse) and not _is_rreg:
                 _rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
             for index, (label, value) in enumerate(_rows):
                 left = _banner if index == 0 else ""

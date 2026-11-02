@@ -1906,7 +1906,10 @@ def _stata_summary(result: Any) -> str:
         #
         # ``e(llopt)``/``e(ulopt)`` hold them, or are absent when that side is unbounded.
         _is_tobit = str(getattr(result, "model_name", "") or "") == "tobit"
-        if _is_tobit:
+        # ``intreg`` prints the SAME censoring block as tobit (Uncensored / Left-censored /
+        # Right-censored), measured from its header -- its N_unc/N_lc/N_rc are stored.
+        _is_intreg = str(getattr(result, "model_name", "") or "") == "intreg"
+        if _is_tobit or _is_intreg:
             _lower = _e_float(result, "llopt")
             _upper = _e_float(result, "ulopt")
             # The banner keeps row 0; the Limit rows start at row 1, beside "Uncensored"
@@ -1914,13 +1917,18 @@ def _stata_summary(result: Any) -> str:
             # too high.
             while len(ml_left) < 3:
                 ml_left.append("")
-            # Row 2, beside "Left-censored" -- row 1 stays blank beside "Uncensored".
-            ml_left[2] = "Limits: Lower = " + (
-                f"{_lower:>4g}" if np.isfinite(_lower) else "   ."
-            )
-            ml_left.append(
-                "        Upper = " + (f"{_upper:>4g}" if np.isfinite(_upper) else "+inf")
-            )
+            # Only tobit has truncation points. intreg observes an INTERVAL per row rather
+            # than a censoring threshold, so it prints the censoring counts with no
+            # "Limits:" row at all -- measured.
+            if _is_tobit:
+                ml_left[2] = "Limits: Lower = " + (
+                    f"{_lower:>4g}" if np.isfinite(_lower) else "   ."
+                )
+            if _is_tobit:
+                ml_left.append(
+                    "        Upper = "
+                    + (f"{_upper:>4g}" if np.isfinite(_upper) else "+inf")
+                )
             # Blank separator between the Limit group and the fit statistics.
             ml_left.append("")
             _unc = _e_float(result, "N_unc")
@@ -1933,6 +1941,11 @@ def _stata_summary(result: Any) -> str:
                 _counts.append(("Left-censored", f"{int(_lc):,}"))
             if np.isfinite(_rc):
                 _counts.append(("Right-censored", f"{int(_rc):,}"))
+            # ``intreg`` observes intervals, so it reports an "Interval-cens." count that
+            # tobit does not have; its label is the longest in the block.
+            _n_int = _e_float(result, "N_int")
+            if _is_intreg and np.isfinite(_n_int):
+                _counts.append(("Interval-cens.", f"{int(_n_int):,}"))
             # ``Number of obs`` stays first; the counts follow it. Inserting at 1 keeps
             # row 0 as Number of obs -- inserting at 0 pushed it to the top of the block,
             # which is what put "Uncensored" on the banner row.
@@ -1975,9 +1988,11 @@ def _stata_summary(result: Any) -> str:
         # column left to keep the block 78 wide -- and the value field shrinks with it
         # ("Number of obs     =  85": value in 4 columns, not 6).
         _is_truncreg = str(getattr(result, "model_name", "") or "") == "truncreg"
+        # ``_is_intreg`` was computed above, beside ``_is_tobit``: intreg shares tobit's
+        # 52/18/6 geometry ("Interval regression            Number of obs     =    100").
         # tobit's right column starts at 52 with a 17-wide label and a 5-wide value
         # ("Right-censored =      0"); truncreg uses 48 / 18 / 4; the rest 56 / 14 / 6.
-        if _is_tobit:
+        if _is_tobit or _is_intreg:
             _left_width = 52
         elif _is_truncreg:
             _left_width = 48
@@ -1990,7 +2005,7 @@ def _stata_summary(result: Any) -> str:
                 # Measured: truncreg's right column is label 18 + "= " + value 4
                 # ("Number of obs     =  85"), where the other ML commands use label 14
                 # + value 6. The block is the same 78 wide either way.
-                if _is_tobit:
+                if _is_tobit or _is_intreg:
                     # Right part is 26 wide: label in 18, "= ", value in 6. The censoring
                     # counts right-align their label; every other row left-aligns it.
                     # An empty pair is the blank separator and renders as nothing.
@@ -2307,6 +2322,9 @@ def _stata_summary(result: Any) -> str:
             "Panel-corrected": 40,
             # arch's variance-estimator banner ends one column short of "Robust".
             "OPG": 34,
+            # A survey ML fit (svy: logit/probit) labels its table "Linearized", ending at
+            # 37 -- measured from ``svy: logit ybin x1``.
+            "Linearized": 37,
         }
         _banner_end = _BANNER_END.get(_vcetype, name_width + 2 + len(_vcetype))
         lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_end - name_width - 2}}")

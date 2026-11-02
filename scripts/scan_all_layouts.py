@@ -83,7 +83,11 @@ def _drop_banners(lines: list[str]) -> list[str]:
     kept: list[str] = []
     skip_blank = False
     for line in lines:
-        if line.strip() and line.strip().startswith(_BANNER_PREFIXES):
+        # EXACT match, not startswith: "Linear regression" is a prefix of
+        # "Linear regression, correlated panels corrected standard errors (PCSEs)",
+        # which is xtpcse's real banner and must survive the filter. Using startswith
+        # deleted it and shifted every following row, making xtpcse look broken.
+        if line.strip() and line.strip() in _BANNER_PREFIXES:
             skip_blank = True
             continue
         if skip_blank:
@@ -278,16 +282,12 @@ def _stata_block(command: str) -> list[str]:
         "(switching ",
         "(setting optimization",
         "(running ",
-        "Time variable:",
-        "Delta:",
-        "Panel variable:",
-        "VCE:",
-        "Single unit:",
-        "Strata ",
-        "Sampling unit",
-        "FPC 1:",
-        "Weight:",
-        "Balanced",
+        # NOTE: "Time variable:", "Panel variable:", "Strata", "Sampling unit", "VCE:",
+        # "Single unit:", "FPC 1:", "Weight:" and "Balanced" are NOT filtered here. They
+        # look like xtset/svyset echo, but the echo comes out of the SETUP calls (which
+        # write to a separate buffer) -- while xtreg, xtpcse and didregress print the same
+        # labels as real header content. Filtering them deleted rows from those headers
+        # and made correct output look broken.
         "note:",
         "Fitting ",
         "Grid node ",

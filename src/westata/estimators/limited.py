@@ -404,6 +404,16 @@ class _SelfLikelihoodModel(GenericLikelihoodModel):
 # ---------------------------------------------------------- ML limited base
 
 
+#: ``e(title)`` per command sharing this base -- the banner each prints. Measured from live
+#: runs; the base class's e() dict is shared, so one literal would give every command the
+#: same banner and they differ.
+_LIMITED_TITLES = {
+    "truncreg": "Truncated regression",
+    "intreg": "Interval regression",
+    "etregress": "Linear regression with endogenous treatment",
+}
+
+
 class _MLLimitedBase(_DiscreteBase):
     """Shared Stata layer for the self-implemented truncated/interval models.
 
@@ -550,6 +560,13 @@ class _MLLimitedBase(_DiscreteBase):
 
         e: dict[str, Any] = {
             "N": nobs,
+            # ``e(title)``: the banner each command prints, measured from a live run.
+            # This dict is shared by intreg and truncreg, so the title is looked up by
+            # command rather than written as one literal -- a single literal would give
+            # both commands the same banner, and they differ.
+            "title": _LIMITED_TITLES.get(
+                str(getattr(self, "_stata_command", "") or ""), ""
+            ),
             "df_m": df,
             "rank": k,
             # ``truncreg.ado:252`` and ``intreg.ado:418`` both set
@@ -1774,10 +1791,8 @@ class Heckman:
         grad_lambda[k + m + 1] = rho * sigma
 
         e: dict[str, Any] = {
-        # ``e(title)``: measured from a live run -- "Heckman selection model".
-        "title": "Heckman selection model",
-        # ``e(title)``: measured from a live run -- "Interval regression".
-        "title": "Interval regression",
+            # ``e(title)``: measured from a live run -- "Heckman selection model".
+            "title": "Heckman selection model",
             "N": int(y.size),
             "N_selected": n_selected,
             # The selection equation's regressor names, so ``predict, psel``/``mills``/

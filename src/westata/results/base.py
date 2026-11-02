@@ -314,11 +314,15 @@ class StataResults:
             if name.strip().lower() in self._STATA_CONSTANT_NAMES
         ]
         # Auxiliary parameters: Stata stores them without the display slash, so
-        # recognise the leading "/" of the internal spelling.
+        # recognise the leading "/" of the internal spelling. ``var(e.<depvar>)`` is
+        # tobit's scale and carries no slash at all -- leaving it out of this list put it
+        # BEFORE ``_cons`` in the table, where Stata prints it after.
         auxiliary = [
             index
             for index, name in enumerate(names)
-            if name.startswith("/") or name.startswith("cut")
+            if name.startswith("/")
+            or name.startswith("cut")
+            or name.startswith("var(e.")
         ]
         taken = set(constants) | set(auxiliary)
         slopes = [index for index in range(len(names)) if index not in taken]

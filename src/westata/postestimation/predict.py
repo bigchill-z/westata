@@ -1102,6 +1102,27 @@ def _predict_tobit_ystar(
     return value
 
 
+def _is_auxiliary_name(name: str) -> bool:
+    """Whether a reported parameter is an auxiliary statistic rather than a regressor.
+
+    Stata's spellings, all of which appear in this package's results:
+
+    ``/sigma``       truncreg's scale
+    ``/lnsigma``     intreg's log-scale
+    ``/lnalpha``     nbreg's dispersion
+    ``cut1``...      ordinal thresholds (with or without the leading slash)
+    ``var(e.<dep>)`` tobit's scale -- the one that is easy to miss, because it carries no
+                     leading slash and reads like a variable name
+    """
+
+    text = str(name).strip()
+    if text.startswith("/"):
+        return True
+    if text.startswith("cut") and text[len("cut") :].isdigit():
+        return True
+    return text.startswith("var(e.")
+
+
 def _coefficient_block(result: Any, n_columns: int) -> np.ndarray:
     """Return the parameter indices that multiply the columns of ``exog``.
 
@@ -1131,10 +1152,14 @@ def _coefficient_block(result: Any, n_columns: int) -> np.ndarray:
     names = [str(name) for name in getattr(result, "param_names", []) or []]
 
     if len(names) == n_params:
+        # Auxiliary parameters are the ones Stata reports after the design block: they are
+        # spelled "/sigma" (truncreg), "/lnalpha" (nbreg), "cut1"/"/cut1" (ordinal) or
+        # "var(e.<depvar>)" (tobit). Only the leading slash test was here, which counted
+        # tobit's "var(e.y)" as a design column and made every predict call raise.
         design_block = [
             position
             for position, name in enumerate(names)
-            if not name.startswith("/")
+            if not _is_auxiliary_name(name)
         ]
     else:
         design_block = list(range(n_params))
@@ -1236,11 +1261,14 @@ def _residual_variance(result: Any) -> float:
     if recorded is not None:
         return recorded**2
 
-    # A scale parameter reported as ``/sigma`` (tobit, truncreg after the delta
-    # transformation) is the innovation scale itself, so sigma^2 is its square.
-    # Reading the *name* keeps this independent of any estimator family list.
+    # A scale parameter reported as ``/sigma`` (truncreg after the delta transformation)
+    # or ``var(e.<depvar>)`` (tobit, which is Stata's spelling there) is the innovation
+    # scale itself, so sigma^2 is its square. Reading the *name* keeps this independent of
+    # any estimator family list. ``var(e.y)`` was added when tobit's parameter was renamed
+    # to Stata's actual row name -- without it every tobit predict broke with KeyError.
     names = [str(name) for name in getattr(result, "param_names", []) or []]
-    if names and names[-1] in ("/sigma", "sigma"):
+    _last = names[-1] if names else ""
+    if _last in ("/sigma", "sigma") or _last.startswith("var(e."):
         params = np.asarray(result.params, dtype=float).reshape(-1)
         if params.size == len(names):
             scale = float(params[-1])

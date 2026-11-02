@@ -116,8 +116,9 @@ def test_an_auxiliary_parameter_stays_last(frame) -> None:
     """``tobit`` reports its auxiliary ``sigma`` after ``_cons``.
 
     ``stata_param_names`` puts auxiliary parameters last (``_stata_order``).
-    ``tobit``'s is stored and displayed as ``sigma`` (no slash); ``intreg`` uses
-    ``/lnsigma``.  Both are covered here via the label set.
+    ``tobit``'s is displayed as ``var(e.<depvar>)`` -- Stata's own row name, confirmed by
+    ``matrix list e(b)`` -- while ``intreg`` uses ``/lnsigma`` and ``truncreg``
+    ``/sigma``. All three spellings are accepted here.
     """
 
     censored = frame.assign(y=np.maximum(frame["y"], 0.5))
@@ -125,7 +126,9 @@ def test_an_auxiliary_parameter_stays_last(frame) -> None:
     rows = _coefficient_rows(rendered)
 
     assert rows.index("_cons") < len(rows) - 1, rows
-    assert rows[-1] in ("sigma", "/lnsigma", "/sigma"), rows
+    assert rows[-1] in ("sigma", "/lnsigma", "/sigma") or rows[-1].startswith(
+        "var(e."
+    ), rows
 
 
 def test_the_statsmodels_style_keeps_patsy_names(frame) -> None:

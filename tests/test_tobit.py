@@ -165,7 +165,16 @@ def test_summary_uses_lr_chi2_and_pseudo_r2():
 def test_sigma_reported_like_stata():
     df = _left_censored()
     res = Tobit.from_formula("y ~ x1 + x2", df, lower=2.0).fit()
-    assert "/sigma" in res.param_names
+    # Stata names tobit's scale after the dependent variable, not "/sigma". Measured from
+    # ``matrix list e(b)`` on ``tobit y x1, ll(-1)``:
+    #
+    #   e(b)[1,3]
+    #               y:         y:         /:
+    #              x1      _cons    var(e.y)
+    #   y1  .03726948  .02512828  .93524697
+    #
+    # -- the row name is "var(e.y)". ``/sigma`` is truncreg's spelling, not tobit's.
+    assert "var(e.y)" in res.param_names
     assert res.e["var_e"] == pytest.approx(res.e["sigma"] ** 2, rel=1e-12)
 
 
@@ -288,7 +297,10 @@ def test_sigma_standard_error_uses_the_sigma_jacobian(variant):
         f"{lhs} ~ x1 + x2", _tobit_conformance_frame(), lower=lower, upper=upper
     ).fit()
 
-    assert float(res.bse["/sigma"]) == pytest.approx(
+    # The scale parameter is the LAST entry; its name is "var(e.<depvar>)" as Stata
+    # reports it, not "/sigma". Indexing by position keeps the assertion about the NUMBER
+    # rather than the spelling.
+    assert float(res.bse.iloc[-1]) == pytest.approx(
         reference["se"]["/sigma"], rel=1e-6
     )
 

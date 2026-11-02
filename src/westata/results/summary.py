@@ -1391,7 +1391,14 @@ def _stata_summary(result: Any) -> str:
     ) or _block_for_banner == "newey"
     # ``quantile`` prints its banner on the SAME line as Number of obs (see its branch),
     # so the standalone line is skipped for it just as it is for a robust ols fit.
-    if not _robust_banner and block != "quantile":
+    # "ml" is deliberately NOT in this gate: the ML branch renders its banner itself, and
+    # including it left a blank first row on every ML command. Only tobit/truncreg embed
+    # the banner in their own block (tobit keeps it on row 0, truncreg replaces it with the
+    # Limit row), and ``quantile`` merges it with Number of obs.
+    _banner_in_block = block == "quantile" or str(
+        getattr(result, "model_name", "") or ""
+    ) in ("tobit", "truncreg")
+    if not _robust_banner and not _banner_in_block:
         lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
     #
@@ -1812,6 +1819,8 @@ def _stata_summary(result: Any) -> str:
             ml_left.append(
                 "        Upper = " + (f"{_upper:>4g}" if np.isfinite(_upper) else "+inf")
             )
+            # Blank separator between the Limit group and the fit statistics.
+            ml_left.append("")
             _unc = _e_float(result, "N_unc")
             _lc = _e_float(result, "N_lc")
             _rc = _e_float(result, "N_rc")
@@ -1826,6 +1835,9 @@ def _stata_summary(result: Any) -> str:
             # row 0 as Number of obs -- inserting at 0 pushed it to the top of the block,
             # which is what put "Uncensored" on the banner row.
             ml_right[1:1] = _counts
+            # A blank separator follows the counts; Stata prints an empty line between
+            # "Right-censored" and "LR chi2".
+            ml_right.insert(1 + len(_counts), ("", ""))
 
         if str(getattr(result, "model_name", "") or "") == "truncreg":
             # The banner row is REPLACED by "Limit: Lower = ...", not followed by it:
@@ -1877,13 +1889,17 @@ def _stata_summary(result: Any) -> str:
                 # ("Number of obs     =  85"), where the other ML commands use label 14
                 # + value 6. The block is the same 78 wide either way.
                 if _is_tobit:
-                    _censoring = label.endswith("censored") or label == "Uncensored"
-                    if _censoring:
-                        # Seven extra columns of indent put the label at 59; the value is
-                        # right-aligned to the block's end at 78.
-                        right = f"{'':>7}{label} = {value:>6}"
+                    # Right part is 26 wide: label in 18, "= ", value in 6. The censoring
+                    # counts right-align their label; every other row left-aligns it.
+                    # An empty pair is the blank separator and renders as nothing.
+                    if label == "" and value == "":
+                        right = ""
                     else:
-                        right = f"{label:<18}= {value:>4}"
+                        _censoring = label.endswith("censored") or label == "Uncensored"
+                        if _censoring:
+                            right = f"{label:>17} = {value:>6}"
+                        else:
+                            right = f"{label:<18}= {value:>6}"
                 elif _is_truncreg:
                     right = f"{label:<18}= {value:>4}"
                 else:
@@ -1892,6 +1908,12 @@ def _stata_summary(result: Any) -> str:
                 lines.append(line.rstrip())
             else:
                 lines.append(f"{line:<{_left_width}}{right}".rstrip())
+        # tobit/truncreg replace the banner row, which leaves the standalone blank
+        # separator that preceded it stranded at the top of the block. Stata's header
+        # starts with the banner line and has no leading blank.
+        if _is_tobit or _is_truncreg:
+            while lines and not lines[0].strip():
+                lines.pop(0)
     elif block == "quantile":
         # Stata's qreg header (p8_outputs.txt:20-22): the title carries the
         # quantile, then two deviation lines with Pseudo R2 on the right.  There
@@ -2281,15 +2303,42 @@ def _stata_summary(result: Any) -> str:
         #   /cut2 |   .7037455   .2148227                      .2827008     1.12479
         #
         # Printing z and P there invented two numbers Stata does not show.
-        _is_cut_row = bare.strip().startswith("cut") or bare.strip().startswith("/cut")
-        if _is_cut_row and not _cut_rule_emitted:
-            # One rule separates the slopes from the thresholds, before the first cut row.
+        # Nuisance parameters print no test statistic: ordinal thresholds (/cut1...) and
+        # tobit's scale (/sigma). Both leave the z and P columns blank.
+        _bare_name = bare.strip()
+        _is_cut_row = (
+            _bare_name.startswith("cut")
+            or _bare_name.startswith("/cut")
+            or _bare_name in ("/sigma", "sigma", "/lnsigma")
+            or _bare_name.startswith("var(e.")
+        )
+        # Ordinal thresholds AND tobit's scale both get a split rule before them -- the
+        # scan showed the rule between _cons and var(e.y) as well. Only the suppression of
+        # the z/P columns is shared; the rule applies to the whole nuisance block.
+        _needs_rule = (
+            _bare_name.startswith("cut")
+            or _bare_name.startswith("/cut")
+            or _bare_name.startswith("var(e.")
+            or _bare_name in ("/sigma", "sigma", "/lnsigma")
+        )
+        if _is_cut_row and _needs_rule and not _cut_rule_emitted:
             lines.append(_split_rule)
             _cut_rule_emitted = True
         if _is_cut_row:
+            # Ordinal thresholds are padded to name_width then a space; tobit's scale is
+            # padded to name_width + 1 with NO space, so its pipe sits one column right:
+            #
+            #   '       /cut1 |'   ordinal
+            #   '     var(e.y)|'   tobit scale
+            _scale_label = _bare_name.startswith("var(e.")
+            _name_cell = (
+                f"{bare:>{name_width + 1}}|"
+                if _scale_label
+                else f"{bare:>{name_width}} |"
+            )
             lines.append(
-                f"{bare:>{name_width}} |"
-                f"{_stata_coef(params[index], coef_w)}"
+                _name_cell
+                + f"{_stata_coef(params[index], coef_w)}"
                 f"{_stata_coef(bse[index], se_w)}"
                 f"{'':>{stat_w}}"
                 f"{'':>{p_w}}"

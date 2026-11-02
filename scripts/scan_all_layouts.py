@@ -90,7 +90,14 @@ def _drop_banners(lines: list[str]) -> list[str]:
         kept.pop(0)
     while kept and not kept[-1].strip():
         kept.pop()
-    return kept
+    # Collapse interior runs of blanks to a single one: the chatter left empty lines
+    # behind, and every following row then compared against the wrong line.
+    collapsed: list[str] = []
+    for line in kept:
+        if not line.strip() and collapsed and not collapsed[-1].strip():
+            continue
+        collapsed.append(line)
+    return collapsed
 
 
 def _compare(stata_lines: list[str], ours: list[str]) -> tuple[str, str]:

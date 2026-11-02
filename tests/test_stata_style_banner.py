@@ -19,6 +19,8 @@ than the neutral fallback.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -51,7 +53,16 @@ def frame():
 
 
 def _banner(rendered: str) -> str:
-    return rendered.splitlines()[0].strip()
+    """The banner text, whether it stands alone or shares its line with a statistic.
+
+    ``tobit`` and ``quantile`` print the banner on the SAME line as "Number of obs"
+    (measured from live runs), so taking the whole first line returns
+    "Tobit regression            Number of obs = ..." instead of the title. Splitting on
+    the run of spaces that separates the two columns yields the banner either way.
+    """
+
+    first = rendered.splitlines()[0]
+    return re.split(r"\s{2,}", first.strip())[0].strip()
 
 
 # --------------------------------------------------------------- per command

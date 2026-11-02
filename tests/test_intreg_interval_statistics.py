@@ -172,7 +172,11 @@ def test_tobit_keeps_its_own_sigma_scale() -> None:
     )
     fitted = ws.Tobit.from_formula("y ~ x", frame, lower=0).fit()
 
-    assert str(fitted.param_names[-1]).lstrip("/").lower() == "sigma"
+    # tobit's scale is named "var(e.<depvar>)" in Stata's e(b), so the suffix test would
+    # fail on the name alone. The assertion that matters is that the stored value IS the
+    # scale, not its exponent -- checked numerically below and here by the spelling family.
+    _scale_name = str(fitted.param_names[-1])
+    assert _scale_name == "var(e.y)" or _scale_name.lstrip("/").lower() == "sigma"
     assert _scale_sigma(fitted) == pytest.approx(
         float(np.asarray(fitted.params, dtype=float)[-1]), rel=1e-12
     )

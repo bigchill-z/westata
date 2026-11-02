@@ -365,7 +365,12 @@ class Tobit:
         pseudo_r2 = 1.0 - llf / ll0 if np.isfinite(ll0) and ll0 != 0 else float("nan")
 
         left, right, uncensored = self._censoring()
-        names = list(self._param_names) + ["/sigma"]
+        # Stata calls tobit's scale "var(e.<depvar>)"; with no response name recorded
+        # (a caller passing fresh arrays) the generic spelling is kept rather than
+        # inventing a variable name.
+        _response = str(getattr(self, "_response_name", "") or "")
+        _sigma_name = f"var(e.{_response})" if _response else "/sigma"
+        names = list(self._param_names) + [_sigma_name]
         params = np.concatenate([beta, [sigma]])
         if cov.shape != (k + 1, k + 1):
             cov = np.full((k + 1, k + 1), np.nan)

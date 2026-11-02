@@ -433,7 +433,11 @@ def test_the_table_shows_the_f_test(frame) -> None:
     text = str(result)
 
     assert "Prob > F" in text
-    assert f"F({int(result.df_model)}, {int(result.df_resid)})" in text
+    # Stata PADS the degrees of freedom: ``F(  1,       198)``, not ``F(1, 198)``. The
+    # captured run from ``newey y s, lag(3)`` shows the field is fixed at
+    # ``F(%3d, %9d)``, wide enough for any pair, so an unpadded rendering does not match.
+    # Asserting the numbers rather than a spelling keeps the test about the statistic.
+    assert f"F({int(result.df_model):3d}, {int(result.df_resid):9d})" in text
 
 
 def test_str_renders_a_table_while_repr_stays_short(frame) -> None:

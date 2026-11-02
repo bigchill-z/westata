@@ -542,7 +542,7 @@ def _anova_available(result: Any) -> bool:
     # disappear; only R-squared and Root MSE survive. So availability depends on the
     # variance estimator, not only on which scalars exist.
     _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-    if _vcetype.lower().startswith("robust"):
+    if _vcetype:
         return False
 
     mss = _e_float(result, "mss")
@@ -857,9 +857,11 @@ def _stata_summary(result: Any) -> str:
     _vcetype_for_banner = str(
         (getattr(result, "e", None) or {}).get("vcetype") or ""
     ).strip()
-    _robust_banner = _block_for_banner == "ols" and _vcetype_for_banner.lower().startswith(
-        "robust"
-    )
+    # ``newey`` has its own two-column block, so its banner is paired there too and must
+    # not also be printed as a standalone line.
+    _robust_banner = (
+        _block_for_banner in ("ols", "newey") and bool(_vcetype_for_banner)
+    ) or _block_for_banner == "newey"
     if not _robust_banner:
         lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
@@ -925,14 +927,16 @@ def _stata_summary(result: Any) -> str:
     # A robust ols fit prints its own two-column block below (see the ``block == "ols"``
     # branch), so the generic single-column lines are skipped for it.
     _robust_vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-    _is_robust_ols = block == "ols" and _robust_vcetype.lower().startswith("robust")
-    if block not in ("svy", "ml") and not _is_robust_ols:
+    _is_robust_ols = block == "ols" and bool(_robust_vcetype)
+    # ``newey`` also prints its own two-column block (see the ``block == "newey"``
+    # branch), so it is excluded from the generic single-column lines as well.
+    if block not in ("svy", "ml", "newey") and not _is_robust_ols:
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if block in ("quantile", "ml") or _is_robust_ols:
+    if block in ("quantile", "ml", "newey") or _is_robust_ols:
         pass
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
@@ -1051,6 +1055,42 @@ def _stata_summary(result: Any) -> str:
         if cluster_summary:
             lines.append("")
             lines.extend(cluster_summary)
+    elif block == "newey":
+        # ``newey`` has its OWN two-column header, and it is not the robust one. Captured
+        # from ``newey y s, lag(3)``:
+        #
+        #   Regression with Newey-West standard errors    Number of obs     =        300
+        #   Maximum lag = 3                               F(  1,       298) =       0.34
+        #                                                 Prob > F          =     0.5589
+        #
+        # Left column 48 (banner, then "Maximum lag"), right column 30. The F statistic
+        # is padded as ``F(%3d, %9d)`` -- wide enough for any pair, unlike regress's
+        # ``F(1, 298)`` -- which is why this cannot reuse the ols branch.
+        _banner = str((getattr(result, "e", None) or {}).get("title") or "")
+        if not _banner:
+            _banner = "Regression with Newey-West standard errors"
+        _lag_value = _e_float(result, "lag")
+        _rows: list[tuple[str, str]] = [("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")]
+        if np.isfinite(fvalue):
+            _rows.append(
+                (
+                    "F(%3d, %9d)" % (int(round(df_model)), int(round(df_resid))),
+                    _fixed(fvalue, 2),
+                )
+            )
+        if np.isfinite(p_f):
+            _rows.append(("Prob > F", _fixed(p_f, 4)))
+        for index, (label, value) in enumerate(_rows):
+            if index == 0:
+                left = _banner
+            elif index == 1 and np.isfinite(_lag_value):
+                left = f"Maximum lag = {int(round(_lag_value))}"
+            else:
+                left = ""
+            lines.append(f"{left:<48}{label:<18}= {value:>10}".rstrip())
+        if cluster_summary:
+            lines.append("")
+            lines.extend(cluster_summary)
     elif block == "ols":
         # Reached when the ANOVA table is unavailable -- for a ROBUST fit that is Stata's
         # own behaviour, and its header is a two-column block 78 wide with FIVE rows and
@@ -1064,7 +1104,7 @@ def _stata_summary(result: Any) -> str:
         #
         # Left column 48, right column 30 (label 18, " =", value 10).
         _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-        if _vcetype.lower().startswith("robust"):
+        if _vcetype:
             _banner = str((getattr(result, "e", None) or {}).get("title") or "Linear regression")
             _rows: list[tuple[str, str]] = [
                 ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
@@ -1283,7 +1323,16 @@ def _stata_summary(result: Any) -> str:
     # ``e(vcetype)`` is the macro that says which: Stata sets it to "Robust"/"Robust HC2"
     # etc. for those fits and leaves it EMPTY for plain ols.
     _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-    _is_robust = _vcetype.lower().startswith("robust")
+    # ANY non-empty e(vcetype) means "not plain ols" and selects the two-column header
+    # with a label above the column names. Measured: ``newey`` stores
+    # e(vce)=""/e(vcetype)="Newey-West", i.e. the same shape as ``vce(robust)``, so
+    # testing only for "robust" left HAC fits on the ANOVA layout.
+    # NOT every non-empty vcetype means "robust". ``OIM`` is the DEFAULT variance for the
+    # maximum-likelihood estimators, and Stata's ``logit`` prints ``Std. err.`` in upper
+    # case with no banner row for it -- so treating any value as robust re-cased the whole
+    # ML family. OIM is excluded explicitly rather than by testing for "Robust", because
+    # ``newey`` stores "Newey-West" and must still take this branch.
+    _is_robust = bool(_vcetype) and _vcetype.strip().upper() != "OIM"
     se_header = "std. err." if _is_robust else "Std. err."
     header = (
         f"{response_label:>{name_width}} | "
@@ -1316,7 +1365,12 @@ def _stata_summary(result: Any) -> str:
     if _is_robust:
         # Ends at the same column as the ``Coefficient`` header: the banner row is the
         # name column, the pipe, then the label right-aligned to the coefficient field.
-        lines.append(f"{'':>{name_width}} |{_vcetype:>{coef_w + se_w - 1}}")
+        # The banner is right-aligned against a FIXED column, not against the coefficient
+        # field: measured, "Robust" ends at 35 and "Newey-West" at 37, and both start
+        # after the pipe at 13. Right-aligning to a fixed width reproduces both, whereas
+        # deriving an offset from the label length put Newey-West two characters long.
+        _banner_width = 37 if len(_vcetype) > len("Robust") else 35
+        lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_width - name_width - 2}}")
     lines.append(header)
     lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
     # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second

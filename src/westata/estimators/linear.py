@@ -129,7 +129,12 @@ def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
         # ("Robust") when choosing a display path.
         return ""
     if token == "oim":
-        return "OIM"
+        # EMPTY, not "OIM". ``logit y x1`` stores e(vce)="oim" and e(vcetype)="" -- the
+        # default information-matrix variance gets no display name, exactly like plain
+        # ``regress`` leaves it blank. Returning "OIM" made the ML family look like it
+        # carried a robust correction it does not have, and (before OIM was excluded from
+        # the robust test) re-cased every ML table header.
+        return ""
     if token in ("hc0", "hc1", "hc2", "hc3"):
         return f"Robust {token.upper()}"
     if token == "cluster":

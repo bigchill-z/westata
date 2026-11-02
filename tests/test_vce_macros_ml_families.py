@@ -80,10 +80,20 @@ def test_the_ml_default_token_is_oim(frame, command: str) -> None:
 
 
 @pytest.mark.parametrize("command", ML_COMMANDS)
-def test_the_ml_default_title_is_OIM(frame, command: str) -> None:
-    """Capitalised, exactly as ``arch.ado:1474`` writes it."""
+def test_the_ml_default_title_is_blank(frame, command: str) -> None:
+    """EMPTY, not "OIM".
 
-    assert BUILDERS[command](frame).e["vcetype"] == "OIM"
+    ``arch.ado:1473-1474`` does set ``vcetype "OIM"``, but only when ``e(vce)=="oim"`` --
+    and no ML command defaults to that: measured on StataNow 19.5, ``logit``, ``probit``,
+    ``poisson`` and ``nbreg`` all store ``e(vce)="oim"`` with ``e(vcetype)=""``, while
+    ``arch`` itself defaults to ``e(vce)="opg"``/``e(vcetype)="OPG"``.
+
+    The blank is load-bearing: e(vcetype) is what the table renderer uses to decide
+    between the plain and the robust layout, so a fabricated "OIM" re-cased every ML
+    header into the robust form.
+    """
+
+    assert BUILDERS[command](frame).e["vcetype"] == ""
 
 
 def test_the_ml_default_is_not_ols(frame) -> None:
@@ -109,8 +119,11 @@ def test_the_two_families_disagree(frame) -> None:
     linear = BUILDERS["regress"](frame).e
     ml = BUILDERS["logit"](frame).e
 
-    assert linear["vce"] != ml["vce"]
-    assert linear["vcetype"] != ml["vcetype"]
+    assert linear["vce"] != ml["vce"]        # "ols" vs "oim"
+    # Both leave e(vcetype) EMPTY, and that is not a collision: the two families are told
+    # apart by e(vce) (and by the command's own header branch), not by this macro. The
+    # old assertion required them to differ, which forced a value Stata never stores.
+    assert linear["vcetype"] == ml["vcetype"] == ""
 
 
 # -------------------------------------------------- the pair still differs

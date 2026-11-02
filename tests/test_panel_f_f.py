@@ -215,7 +215,10 @@ def test_the_rendered_statistic_is_the_stored_value() -> None:
     e = result.e
     rendered = result.summary(style="stata")
 
-    assert _stata_coef(float(e["F_f"]), 8).strip() in rendered
+    # The statistic is printed with TWO decimals, not the coefficient formatter's seven.
+    # Measured: Stata renders ``F test that all u_i=0: F(29, 149) = 0.93``, so asserting
+    # the 7-digit spelling pins a format the captures do not support.
+    assert f"= {float(e['F_f']):.2f}" in rendered
     assert f"{e['p_f']:.4f}" in rendered
 
 

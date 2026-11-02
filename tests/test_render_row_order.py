@@ -404,9 +404,13 @@ def test_the_panel_block_values_are_the_stored_scalars(panel_result) -> None:
     rendered = panel_result.summary(style="stata")
 
     for key in ("sigma_u", "sigma_e", "rho"):
-        # Render through the SAME formatter the table uses, so the assertion tests
-        # the value rather than re-deriving Stata's digit conventions.
-        assert _stata_coef(float(e[key]), 12).strip() in rendered, key
+        # The block uses EIGHT significant digits, not the coefficient table's formatter:
+        # Stata prints ".8853381", where ``_stata_coef`` would give ".8853381" only by
+        # coincidence for some values. Compare the VALUE parsed back out of the row, which
+        # tests what the row says rather than which formatter produced it.
+        line = next(row for row in rendered.splitlines() if row.strip().startswith(key))
+        shown = line.split("|")[1].strip().split()[0]
+        assert float(shown) == pytest.approx(float(e[key]), rel=1e-6), key
 
 
 def test_the_rho_identity_holds_in_the_rendered_block(panel_result) -> None:

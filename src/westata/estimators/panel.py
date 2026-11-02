@@ -254,6 +254,50 @@ def _cov_label(cov_type: str | None) -> str:
     return key.upper() if key.startswith("hc") else key
 
 
+#: ``e(title)`` per ``xtreg`` variant -- the banner each one prints. Measured from
+#: StataNow 19.5 by running each estimator and reading the first line of its output;
+#: ``e(title)`` is not retrievable through the macro interface for ``fe``/``re``, so the
+#: printed banner is the authority.
+#:
+#: ``xtreg, fd`` is deliberately ABSENT: it could not be run on this installation (the
+#: command errors out before producing a table), so its banner is unknown. An unknown
+#: variant falls back to the generic header rather than to a guessed string.
+def _obs_per_group(data: Any, entity: str) -> dict[str, float]:
+    """``min``/``avg``/``max`` observations per entity, for the ``xtreg`` header.
+
+    Returns an empty dict when the entity column is unknown, so the header omits the
+    column instead of printing made-up sizes.
+    """
+
+    if not entity:
+        return {}
+    # The entity lives in the INDEX after ``_panel_frame`` converts the frame to a
+    # MultiIndex, so grouping on a COLUMN finds nothing and silently returns no counts.
+    try:
+        if entity in getattr(data.index, "names", []):
+            sizes = data.groupby(level=entity, observed=True).size()
+        elif entity in getattr(data, "columns", []):
+            sizes = data.groupby(entity, observed=True).size()
+        else:
+            return {}
+    except Exception:  # pragma: no cover - defensive
+        return {}
+    if sizes.empty:
+        return {}
+    return {
+        "min": float(sizes.min()),
+        "avg": float(sizes.mean()),
+        "max": float(sizes.max()),
+    }
+
+
+_XTREG_TITLES = {
+    "xtreg, fe": "Fixed-effects (within) regression",
+    "xtreg, re": "Random-effects GLS regression",
+    "xtreg, be": "Between regression (regression on group means)",
+}
+
+
 class PanelOLS:
     """Fixed-effects panel regression (Stata ``xtreg, fe``).
 
@@ -1014,6 +1058,22 @@ class PanelOLS:
             "rank": rank,
             "n_entities": n_entities,
             "N_g": n_entities,
+            # ``e(title)`` and ``e(group)``: what Stata prints as the banner and as the
+            # variable it grouped on. Measured from ``xtreg y x1, fe``:
+            #
+            #   Fixed-effects (within) regression      Number of obs     =        180
+            #   Group variable: id                     Number of groups  =         30
+            #
+            # Neither was stored, so the header fell back to a generic string and the
+            # group column showed "." instead of the variable the caller passed.
+            "title": _XTREG_TITLES.get(self._stata_command, ""),
+            "group": str(getattr(self, "_entity", "") or ""),
+            # ``Obs per group``: Stata prints min / avg / max. Computed from the estimation
+            # frame because they describe the SAMPLE, not the estimator; ``avg`` keeps one
+            # decimal even when it is whole ("6.0" next to "min = 6").
+            "_obs_per_group": _obs_per_group(
+                self._data, str(getattr(self, "_entity", "") or "")
+            ),
             "rss": rss,
         }
         if self._within_r2_is_backend_r2:

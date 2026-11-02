@@ -520,6 +520,137 @@ def _cluster_variable(result: Any) -> str:
     return ""
 
 
+def _four(value: Any) -> str:
+    """Four decimals, or ``.`` when the value is missing -- Stata's fit-statistic form."""
+
+    return f"{float(value):.4f}" if np.isfinite(value) else "."
+
+
+def _is_xtreg_panel(result: Any) -> bool:
+    """Whether this is an ``xtreg`` fit whose header is the panel block, not ANOVA.
+
+    ``xtreg`` prints NO sums-of-squares table. Its header is a two-column block carrying
+    the R-squared DECOMPOSITION on the left and ``Obs per group`` on the right:
+
+      Fixed-effects (within) regression               Number of obs     =        180
+      Group variable: id                              Number of groups  =         30
+
+      R-squared:                                      Obs per group:
+           Within  = 0.0006                                         min =          6
+           Between = 0.0018                                         avg =        6.0
+           Overall = 0.0007                                         max =          6
+
+                                                      F(1, 149)         =       0.08
+      corr(u_i, Xb) = 0.0066                          Prob > F          =     0.7718
+
+    Recognised by the presence of ``e(N_g)`` AND one of the R-squared decomposition
+    scalars, which no other estimator stores together.
+    """
+
+    name = str(getattr(result, "model_name", "") or "")
+    if not name.startswith("xtreg"):
+        return False
+    e = getattr(result, "e", None) or {}
+    has_groups = np.isfinite(_e_float(result, "N_g"))
+    has_decomposition = any(
+        np.isfinite(_e_float(result, key)) for key in ("r2_w", "r2_b", "r2_o")
+    )
+    return bool(has_groups and has_decomposition)
+
+
+def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
+    """The two-column panel header Stata's ``xtreg`` prints instead of ANOVA."""
+
+    e = getattr(result, "e", None) or {}
+    banner = str(e.get("title") or "")
+    group = str(e.get("group") or "")
+    n_groups = _e_float(result, "N_g")
+    df_model = _e_float(result, "df_m")
+    df_resid = _e_float(result, "df_r")
+    fvalue = _e_float(result, "F")
+    p_f = _e_float(result, "p")
+    r2_w = _e_float(result, "r2_w")
+    r2_b = _e_float(result, "r2_b")
+    r2_o = _e_float(result, "r2_o")
+    corr = _e_float(result, "corr")
+
+    def row(left: str, right: str = "") -> str:
+        return f"{left:<48}{right}".rstrip()
+
+    def stat(label: str, value: str) -> str:
+        return f"{label:<18}= {value:>10}"
+
+    # ``Obs per group`` -- min/avg/max. The counts come from e() when stored; avg is the
+    # mean group size, printed with one decimal as Stata does ("6.0" beside "6").
+    per_group = e.get("_obs_per_group") or {}
+    lines = [
+        row(
+            banner,
+            stat("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else "."),
+        ),
+        row(
+            f"Group variable: {group}",
+            stat("Number of groups", f"{n_groups:,.0f}" if np.isfinite(n_groups) else "."),
+        ),
+        "",
+        # ``R-squared:`` heads the left column and ``Obs per group:`` the right one; the
+        # right label starts at column 48 and the line stops there (62 wide, not 78).
+        row("R-squared:", f"{'Obs per group:':>14}"),
+    ]
+    decomposition = [
+        ("Within", r2_w),
+        ("Between", r2_b),
+        ("Overall", r2_o),
+    ]
+    right_rows = [
+        ("min", per_group.get("min")),
+        ("avg", per_group.get("avg")),
+        ("max", per_group.get("max")),
+    ]
+    if not per_group:
+        # Without stored counts, print the R-squared block and omit the right column
+        # rather than inventing group sizes.
+        right_rows = [(label, None) for label, _ in right_rows]
+    for (label, value), (rlabel, rvalue) in zip(decomposition, right_rows):
+        # ``Within`` occupies 8 columns before " =": Stata prints
+        # "     Within  = 0.0006", not "     Within   = ...".
+        left = f"{'':>5}{label:<8}= {_four(value)}"
+        right = ""
+        if rvalue is not None:
+            # The group-size labels are right-aligned to column 62 and carry the value in
+            # a 10-wide field; ``avg`` keeps a decimal even when whole ("6.0").
+            if rlabel == "avg":
+                rendered = f"{float(rvalue):.1f}"
+            else:
+                rendered = f"{int(round(float(rvalue)))}"
+            right = f"{rlabel:>17} = {rendered:>10}"
+        lines.append(row(left, right))
+    lines.append("")
+    if np.isfinite(fvalue):
+        lines.append(
+            row("", stat(f"F({_df_label(df_model)}, {_df_label(df_resid)})", f"{fvalue:.2f}"))
+        )
+    left_corr = ""
+    if np.isfinite(corr):
+        left_corr = f"corr(u_i, Xb) = {_four(corr)}"
+    if np.isfinite(p_f):
+        lines.append(row(left_corr, stat("Prob > F", _four(p_f))))
+    elif left_corr:
+        lines.append(row(left_corr))
+    return lines
+
+
+def _fmt_group_size(value: Any) -> str:
+    """Group sizes print as integers, but the AVERAGE carries one decimal (``6.0``)."""
+
+    number = float(value)
+    if abs(number - round(number)) < 1e-9 and number == int(number):
+        # Stata prints avg with a decimal even when it is whole; min/max do not. The
+        # caller decides which, so the distinction is made there.
+        return f"{int(round(number))}"
+    return f"{number:.1f}"
+
+
 def _anova_available(result: Any) -> bool:
     """Whether the model+residual sums of squares are all present.
 
@@ -1011,7 +1142,19 @@ def _stata_summary(result: Any) -> str:
     # ``svy`` results store a pseudo-R2 / an R-squared that must NOT be
     # accompanied by Stata's OLS "Adj R-squared / Root MSE" pair, and ``qreg``
     # has no log-likelihood at all.
-    if block == "ols" and _anova_available(result):
+    if _is_xtreg_panel(result):
+        # ``xtreg`` prints the panel header INSTEAD of the sums-of-squares table, so this
+        # branch comes first: the ANOVA test would otherwise claim the fit, since xtreg
+        # stores mss/rss like any other linear model.
+        # The header block ends with the fit rows; Stata then prints ONE blank line and
+        # the table rule. Adding a blank after the rule as well pushed the coefficient
+        # header down by a row.
+        # Neither a rule NOR a trailing blank: the code path below appends one blank line
+        # and then the rule before the coefficient header.
+        lines = list(_xtreg_header_block(result, nobs))
+        # Everything appended before this point described a header that is not being
+        # printed; the panel block replaces it wholesale.
+    elif block == "ols" and _anova_available(result):
         # Stata prints the sums of squares as a TABLE with the fit statistics beside
         # it (``p10_outputs.txt:97-102`` shows the layout for ``nl``, which uses the
         # same block):
@@ -1413,7 +1556,10 @@ def _stata_summary(result: Any) -> str:
             f"{_stata_coef(lower[index], ci_lo_w)}"
             f"{_stata_coef(upper[index], ci_hi_w)}"
         )
-    lines.append("-" * row_width)
+    # The rule that CLOSES the coefficient table is the split form ("-------------+----"),
+    # matching the one that opened it; a full-width rule made the table end in a way Stata
+    # never prints.
+    lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
 
     # Stata's panel estimators print a decomposition block UNDER the coefficient
     # table.  The keys are confirmed by ``xtreg_fe.json``:
@@ -1430,22 +1576,34 @@ def _stata_summary(result: Any) -> str:
     sigma_e = _e_float(result, "sigma_e")
     rho = _e_float(result, "rho")
     corr = _e_float(result, "corr")
+    # These three use EIGHT significant digits, not the coefficient table's ``%9.0g``.
+    # Measured from ``xtreg y x1, fe``: ".34868505" / ".8853381" / ".13428387" -- four
+    # decimals short of what %.8g gives, so the coefficient formatter is the wrong one
+    # here. No leading zero, as everywhere else in Stata's output.
+    def _panel_stat(value: float) -> str:
+        text = "%.8g" % value
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        return text
+
     panel_rows: list[str] = []
     if np.isfinite(sigma_u):
-        panel_rows.append(f"{'sigma_u':>12} |  {_stata_coef(sigma_u, coef_w)}")
+        panel_rows.append(f"{'sigma_u':>12} | {_panel_stat(sigma_u):>10}")
     if np.isfinite(sigma_e):
-        panel_rows.append(f"{'sigma_e':>12} |  {_stata_coef(sigma_e, coef_w)}")
+        panel_rows.append(f"{'sigma_e':>12} | {_panel_stat(sigma_e):>10}")
     if np.isfinite(rho):
         panel_rows.append(
-            f"{'rho':>12} |  {_stata_coef(rho, coef_w)}"
+            f"{'rho':>12} | {_panel_stat(rho):>10}"
             f"   (fraction of variance due to u_i)"
         )
     if panel_rows:
         lines.extend(panel_rows)
-        if np.isfinite(corr):
-            lines.append("")
-            lines.append(f"{'corr(u_i, Xb)':>20} = {_stata_coef(corr, coef_w)}")
-
+        # ``corr(u_i, Xb)`` is NOT repeated here: the xtreg header block already printed
+        # it, on the same row as Prob > F. Emitting it again below the table put it where
+        # Stata's "F test that all u_i=0" belongs.
+        #
         # The printed wording is settled by ``whatsnew13.sthlp:1165-1168``, which
         # describes the statistic "reported below the results table as
         # 'F test that all u_i=0'" -- Stata's own words, not a paraphrase.
@@ -1455,13 +1613,24 @@ def _stata_summary(result: Any) -> str:
         p_f_test = _e_float(result, "p_f")
         if np.isfinite(f_f):
             df_a = _e_float(result, "df_a")
-            lines.append("")
-            lines.append(
+            # The rule above the F test is FULL width -- measured, Stata closes the
+            # sigma/rho block with a plain "-----..." line, not a split one.
+            lines.append("-" * row_width)
+            # ONE line, 78 wide: the statistic on the left, its p-value right-aligned.
+            # The F value carries TWO decimals here (``0.93``), not the four the fit
+            # statistics use -- so ``_four`` would print "0.9306" against Stata's "0.93".
+            text = (
                 f"F test that all u_i=0: F({_df_label(df_a)}, "
-                f"{_df_label(df_resid)}) = {_stata_coef(f_f, 8)}"
+                f"{_df_label(df_resid)}) = {f_f:.2f}"
             )
             if np.isfinite(p_f_test):
-                lines.append(f"{'Prob > F':<22} = {p_f_test:>10.4f}")
+                # ``Prob > F`` starts at column 61 and the line ends at 78, so the left
+                # part is padded to 61 rather than computed from the tail's length --
+                # which put it one column short.
+                tail = f"Prob > F = {_four(p_f_test)}"
+                lines.append(f"{text:<61}{tail}")
+            else:
+                lines.append(text)
 
     return "\n".join(lines)
 

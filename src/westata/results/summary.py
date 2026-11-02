@@ -526,6 +526,83 @@ def _four(value: Any) -> str:
     return f"{float(value):.4f}" if np.isfinite(value) else "."
 
 
+def _is_didregress(result: Any) -> bool:
+    """Whether this is a ``didregress``/``xtdidregress`` fit."""
+
+    name = str(getattr(result, "model_name", "") or "")
+    return name in ("didregress", "xtdidregress")
+
+
+def _did_header_block(result: Any, nobs: int) -> list[str]:
+    """The block ``didregress`` prints above its coefficient table.
+
+    Captured from ``didregress (y x1) (treated), group(unit) time(period)``:
+
+      Treatment and time information
+
+      Time variable: period
+      Control:       treated = 0
+      Treatment:     treated = 1
+      -----------------------------------
+                   |   Control  Treatment
+      -------------+---------------------
+      Group        |
+              unit |       100        100
+      -------------+---------------------
+      Time         |
+           Minimum |         0          1
+           Maximum |         0          1
+      -----------------------------------
+
+      Difference-in-differences regression               Number of obs = 1,600
+      Data type: Repeated cross-sectional
+
+    Returns an empty list when the arm counts are unavailable, so the estimate is never
+    preceded by a table of invented numbers.
+    """
+
+    e = getattr(result, "e", None) or {}
+    info = e.get("_did_info") or {}
+    if not info:
+        return []
+    width = 35
+    lines = [
+        "Treatment and time information",
+        "",
+        f"Time variable: {info.get('time_name', '')}",
+        f"Control:       {info.get('treatment_name', '')} = 0",
+        f"Treatment:     {info.get('treatment_name', '')} = 1",
+        "-" * width,
+        f"{'':>12} |   Control  Treatment",
+        "-" * 13 + "+" + "-" * 21,
+        "Group        |",
+        f"{str(e.get('group', '') or 'unit'):>12} | {info.get('control_units', 0):>9}"
+        f" {info.get('treated_units', 0):>10}",
+        "-" * 13 + "+" + "-" * 21,
+        "Time         |",
+        f"{'Minimum':>12} | {_did_time(info.get('control_min')):>9}"
+        f" {_did_time(info.get('treated_min')):>10}",
+        f"{'Maximum':>12} | {_did_time(info.get('control_max')):>9}"
+        f" {_did_time(info.get('treated_max')):>10}",
+        "-" * width,
+        "",
+        # The banner line: title on the left, obs count on the right, 78 wide.
+        f"{str(e.get('title') or 'Difference-in-differences regression'):<56}"
+        f"{'Number of obs = ' + format(int(nobs), ','):>22}",
+        f"Data type: {e.get('datatype', '')}",
+    ]
+    return lines
+
+
+def _did_time(value: Any) -> str:
+    """Times print as integers when whole, otherwise as given."""
+
+    if value is None:
+        return "."
+    number = float(value)
+    return f"{int(round(number))}" if abs(number - round(number)) < 1e-9 else f"{number:g}"
+
+
 def _is_xtreg_panel(result: Any) -> bool:
     """Whether this is an ``xtreg`` fit whose header is the panel block, not ANOVA.
 
@@ -1134,7 +1211,11 @@ def _stata_summary(result: Any) -> str:
     # ``svy`` results store a pseudo-R2 / an R-squared that must NOT be
     # accompanied by Stata's OLS "Adj R-squared / Root MSE" pair, and ``qreg``
     # has no log-likelihood at all.
-    if _is_xtreg_panel(result):
+    if _is_didregress(result):
+        # ``didregress`` prints the treatment/time table INSTEAD of any ANOVA block, then
+        # its estimate table carries an ``ATET`` group header and a trailing Note.
+        lines = list(_did_header_block(result, nobs))
+    elif _is_xtreg_panel(result):
         # ``xtreg`` prints the panel header INSTEAD of the sums-of-squares table, so this
         # branch comes first: the ANOVA test would otherwise claim the fit, since xtreg
         # stores mss/rss like any other linear model.
@@ -1524,9 +1605,16 @@ def _stata_summary(result: Any) -> str:
     if str((getattr(result, "e", None) or {}).get("vce") or "").strip() == "cluster":
         _n_clust = _e_float(result, "N_clust")
         if np.isfinite(_n_clust):
+            # The DID family names the variable with ``e(group)``; other commands store it
+            # under ``e(_cluster_names)``. Both spellings are read, since without the name
+            # the note says "adjusted for 200 clusters" and a reader cannot tell which
+            # variable was clustered on.
+            _cluster_var = _cluster_variable(result) or str(
+                (getattr(result, "e", None) or {}).get("group") or ""
+            )
             _cluster_note = (
                 f"(Std. err. adjusted for {int(_n_clust):,} clusters"
-                f"{' in ' + _cluster_var if (_cluster_var := _cluster_variable(result)) else ''})"
+                f"{' in ' + _cluster_var if _cluster_var else ''})"
             )
     if _cluster_note:
         lines.append(f"{_cluster_note:>{row_width}}")
@@ -1545,7 +1633,11 @@ def _stata_summary(result: Any) -> str:
     # the SPLIT form between the header and the rows. Measured from ``svy: regress``:
     # lines 11 and 18 carry no ``+``, line 14 does.
     _split_rule = "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
-    _border_rule = "-" * row_width if block == "svy" else _split_rule
+    # The survey AND DID families border their tables with full-width rules; every other
+    # family uses the split form.
+    _border_rule = (
+        "-" * row_width if (block == "svy" or _is_didregress(result)) else _split_rule
+    )
     # The rule AFTER the header is always the split form, even for the survey family.
     lines.append(_split_rule)
     # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second
@@ -1561,9 +1653,42 @@ def _stata_summary(result: Any) -> str:
     #             x1 |   .0033665   ...
     # The separator is ``#`` in this package's parameter names and ``:`` in others, so
     # both are accepted rather than assuming one.
+    # ``didregress`` groups its one reported coefficient under an "ATET" header and names
+    # the treatment variable on a row of its own, with the comparison in parentheses:
+    #
+    #   ATET         |
+    #        treated |
+    #      (1 vs 0)  |  -.0745254   ...
+    #
+    # The coefficient carries the treatment name, so the row label is derived from it
+    # rather than invented.
+    _did_treatment = ""
+    if _is_didregress(result):
+        _did_treatment = str((getattr(result, "e", None) or {}).get("_did_treatment") or "")
     _EQUATION_PREFIXES = ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
+    if _is_didregress(result) and names:
+        # The ATET header, then the treatment variable on its own row, then the single
+        # comparison row. Stata reports ONLY the treatment coefficient here -- covariates
+        # are adjusted for, not shown -- so the table is built from the first parameter.
+        # No rule here: the header's own rule was already emitted above the loop, and
+        # adding another produced two consecutive identical rules.
+        # Group headers are LEFT aligned in a 12-wide field then a space and the pipe;
+        # the comparison row is right-aligned in 11. Both put the pipe at column 13.
+        lines.append(f"{'ATET':<12} |")
+        lines.append(f"{'treated':>12} |")
+        lines.append(
+            f"{'(1 vs 0)':>11}  |"
+            f"{_stata_coef(params[0], coef_w)}"
+            f"{_stata_coef(bse[0], se_w)}"
+            f"{_stata_stat(stats_[0], stat_w)}"
+            f"{_stata_pvalue(pvalues[0], p_w)}"
+            f"{_stata_coef(lower[0], ci_lo_w)}"
+            f"{_stata_coef(upper[0], ci_hi_w)}"
+        )
+        # No closing rule either: the trailing border is appended once, after the loop.
+        names = []
     for index, name in enumerate(names):
         group = ""
         bare = name
@@ -1590,6 +1715,14 @@ def _stata_summary(result: Any) -> str:
         )
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
+
+    if _is_didregress(result):
+        # ``didregress`` closes with a note naming what the ATET was adjusted for.
+        # Captured: "Note: ATET estimate adjusted for covariates, group effects, and time
+        # effects." -- 77 characters, no trailing rule.
+        lines.append(
+            "Note: ATET estimate adjusted for covariates, group effects, and time effects."
+        )
 
     # Stata's panel estimators print a decomposition block UNDER the coefficient
     # table.  The keys are confirmed by ``xtreg_fe.json``:

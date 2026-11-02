@@ -425,16 +425,25 @@ def test_summary_renders_in_stata_style(pooled):
 
     text = pooled.summary(style="stata")
     assert "Number of obs" in text
-    assert "1,600" not in text  # westata's renderer does not add separators
-    assert "1600" in text
+    # Stata DOES group thousands here: the captured ``didregress`` line reads
+    # "Number of obs = 1,600". The old assertion required the ungrouped "1600", which the
+    # capture contradicts.
+    assert "1,600" in text
     assert "Coefficient" in text
-    assert "Std. err." in text
+    # The DID table is a robust one, so its column header is the lower-case spelling.
+    assert "std. err." in text
     assert "[95% conf. interval]" in text
+    # And the pieces unique to this command's layout.
+    assert "Treatment and time information" in text
+    assert "ATET" in text
+    assert "Data type:" in text
     # The command name is no longer printed as a "Model:" row (Stata has no such row),
     # so it is checked where it actually lives.
     assert "didregress" in str(pooled.model_name)
-    # The coefficient row itself is present with Stata's digits.
-    row = next(line for line in text.splitlines() if line.strip().startswith("treated"))
+    # The coefficient lives on the "(1 vs 0)" row, under an "ATET" group header -- the
+    # treatment variable gets a label row of its own, with no numbers on it. Looking for a
+    # line that merely starts with "treated" finds that label and not the estimate.
+    row = next(line for line in text.splitlines() if line.strip().startswith("(1 vs 0)"))
     assert "1.18613" in row
 
 

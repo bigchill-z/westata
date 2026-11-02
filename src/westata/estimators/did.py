@@ -327,6 +327,17 @@ class _DidFEOLS(FEOLS):
         # model-name setter (results/base.py is outside this module's write
         # scope), so the command label is applied here.
         results._model_name = self.MODEL_NAME
+        # ``e(cmd)`` follows too. FEOLS sets it to "reghdfe" because every estimate it
+        # produces IS a reghdfe fit -- but this command reports itself as ``didregress``,
+        # and a reader (or a do-file branching on e(cmd)) would otherwise see the wrong
+        # command name in the result object.
+        results.e["cmd"] = self.MODEL_NAME
+        results.e["title"] = self.BANNER
+        results.e["datatype"] = self.DATATYPE
+        # The "Treatment and time information" block is attached by the CALLER
+        # (``Didregress.fit``), which is where the treatment/group/time NAMES live: this
+        # FEOLS subclass is handed arrays only, and looking for them here raised
+        # AttributeError on every DID fit.
         return results
 
 
@@ -335,6 +346,11 @@ class _RepeatedCrossSectionFEOLS(_DidFEOLS):
 
     K_FIXEF = "full"
     MODEL_NAME = "didregress"
+    #: The banner Stata prints above the table, and the "Data type:" line under it.
+    #: Measured from ``didregress (y x1) (treated), group(unit) time(period)``:
+    #: "Difference-in-differences regression" / "Data type: Repeated cross-sectional".
+    BANNER = "Difference-in-differences regression"
+    DATATYPE = "Repeated cross-sectional"
 
 
 class _PanelFEOLS(_DidFEOLS):
@@ -342,9 +358,45 @@ class _PanelFEOLS(_DidFEOLS):
 
     K_FIXEF = "nonnested"
     MODEL_NAME = "xtdidregress"
+    BANNER = "Difference-in-differences regression"
+    # Measured from the captured xtdidregress run: the line reads exactly "Longitudinal".
+    DATATYPE = "Longitudinal"
 
 
 # -------------------------------------------------------------------- estimator
+def _treatment_time_info(
+    frame: Any, treatment: str, group: str, time: str
+) -> dict[str, Any]:
+    """Counts and time ranges for the treatment/control arms.
+
+    Stata prints one row per group level and the min/max time in each arm. Returns an
+    empty dict when any of the three columns is unavailable, so the block is omitted
+    rather than filled with made-up numbers.
+    """
+
+    columns = getattr(frame, "columns", [])
+    if not all(name in columns for name in (treatment, group, time)):
+        return {}
+    try:
+        per_group = frame.groupby(group, observed=True)[treatment].max()
+        control_units = int((per_group == 0).sum())
+        treated_units = int((per_group != 0).sum())
+        control_times = frame.loc[frame[group].isin(per_group[per_group == 0].index), time]
+        treated_times = frame.loc[frame[group].isin(per_group[per_group != 0].index), time]
+        return {
+            "time_name": str(time),
+            "treatment_name": str(treatment),
+            "control_units": control_units,
+            "treated_units": treated_units,
+            "control_min": float(control_times.min()) if len(control_times) else None,
+            "control_max": float(control_times.max()) if len(control_times) else None,
+            "treated_min": float(treated_times.min()) if len(treated_times) else None,
+            "treated_max": float(treated_times.max()) if len(treated_times) else None,
+        }
+    except Exception:  # pragma: no cover - defensive
+        return {}
+
+
 class Didregress:
     """Two-way fixed-effects difference-in-differences (Stata ``didregress``).
 
@@ -688,6 +740,20 @@ class Didregress:
             warnings.warn(str(record.message), record.category, stacklevel=2)
 
         self._finalize(results, model.capture, canonical, sample)
+        # The "Treatment and time information" block above the estimate. Attached HERE
+        # because the treatment/group/time names live on this object; the FEOLS subclass
+        # that produces the numbers only ever sees arrays.
+        results.e["_did_info"] = _treatment_time_info(
+            self._data, self._treatment, self._group, self._time
+        )
+        # ``e(vce)``/``e(vcetype)``: measured from the captured run -- "cluster"/"Robust".
+        # Both were absent, so the renderer drew neither the "adjusted for N clusters" note
+        # nor the "Robust" banner above the column header.
+        results.e["vce"] = "cluster" if canonical == "cluster" else canonical
+        results.e["vcetype"] = "Robust" if canonical == "cluster" else ""
+        # The clustering variable's NAME, so the note reads "in unit" as Stata prints it.
+        results.e["group"] = str(self._group)
+        results.e["_cluster_names"] = [str(self._group)]
         return results
 
     # -------------------------------------------------------------- sampling

@@ -1083,17 +1083,9 @@ def _stata_summary(result: Any) -> str:
         )
         lines.append(f"{'Prob > chi2':<21} = {_fixed(p_chi2, 4):>10}")
     elif block == "svy":
-        # Survey models report their Wald F only when a model test exists; the
-        # mean/total/proportion estimators have none (e(F) is absent).
-        chi2 = _e_float(result, "chi2")
-        fv = _e_float(result, "F")
-        pv = _e_float(result, "p")
-        if np.isfinite(fv) and np.isfinite(pv):
-            lines.append(
-                f"{'F(' + _df_label(df_model) + ', ' + _df_label(df_resid) + ')':<21}"
-                f" = {_fixed(fv, 2):>10}"
-            )
-            lines.append(f"{'Prob > F':<21} = {_fixed(pv, 4):>10}")
+        # Already rendered by the survey block below, as part of its two-column header.
+        # Emitting the F here as well printed it twice, once stacked and once paired.
+        pass
     elif dist == "z" or _reports_a_chi2_test(result):
         # Stata's likelihood/IV estimators print a Wald chi2 model test rather than an F
         # test (e.g. ``ivregress``: "Wald chi2(2) = 90.76").
@@ -1367,26 +1359,60 @@ def _stata_summary(result: Any) -> str:
             # Degenerate case: no deviation lines, still report the pseudo-R2.
             lines.append(f"{'Pseudo R2':<21} = {_fixed(pseudo_r2, 4):>10}")
     elif block == "svy":
-        # Stata's survey header: strata / PSUs / obs / population size / design
-        # df.  Every number is already in e() (survey.py:634-644).
+        # Stata's survey header is TWO-COLUMN and 78 wide, with the banner on a line of
+        # its own above it. Captured from ``svy: regress y x1 x2``:
+        #
+        #   Survey: Linear regression
+        #
+        #   Number of strata =  8                      Number of obs   =    576
+        #   Number of PSUs   = 48                      Population size =    576
+        #                                              Design df       =     40
+        #                                              F(2, 39)        =   0.02
+        #                                              Prob > F        = 0.9767
+        #                                              R-squared       = 0.0001
+        #
+        # Left column 54, right column 24 (label 15, " =", value 6). The previous
+        # rendering stacked the left pair above F/Prob/R2 and paired only the first two
+        # rows, so the columns did not line up with anything.
         n_strata = _e_float(result, "N_strata")
         n_psu = _e_float(result, "N_psu")
         n_pop = _e_float(result, "N_pop")
-        if np.isfinite(n_strata):
-            lines.append(
-                f"{'Number of strata':<21} = {_fixed(n_strata, 0):>10}"
-                f"   {'Number of obs':<17} = {nobs:>8d}"
-            )
-        if np.isfinite(n_psu):
-            lines.append(
-                f"{'Number of PSUs':<21} = {_fixed(n_psu, 0):>10}"
-                f"   {'Population size':<17} = {_fixed(n_pop, 6):>10}"
-            )
-        if np.isfinite(df_resid):
-            lines.append(f"{'Design df':<21} = {_df_label(df_resid):>10}")
         r2 = _e_float(result, "r2")
+
+        def _cell(label: str, value: str) -> str:
+            return f"{label:<15} = {value:>6}"
+
+        def _row(left: str, right: str = "") -> str:
+            return f"{left:<54}{right}".rstrip()
+
+        rows: list[str] = []
+        if np.isfinite(n_strata):
+            rows.append(_row(f"Number of strata = {int(round(n_strata)):>2}",
+                             _cell("Number of obs", f"{nobs:,.0f}")))
+        if np.isfinite(n_psu):
+            # ``Population size`` prints as an INTEGER when the weights sum to a whole
+            # number -- "576", not "576.000000"; six decimals was a formatting bug.
+            pop = f"{n_pop:,.0f}" if np.isfinite(n_pop) and abs(n_pop - round(n_pop)) < 1e-9                 else (f"{n_pop:.6g}" if np.isfinite(n_pop) else ".")
+            rows.append(_row(f"Number of PSUs   = {int(round(n_psu)):>2}",
+                             _cell("Population size", pop)))
+        if np.isfinite(df_resid):
+            rows.append(_row("", _cell("Design df", f"{int(round(df_resid))}")))
+        # The F test's denominator is Design df - df_m + 1: measured, ``svy: regress y x1``
+        # gives F(1, 40) and ``... y x1 x2`` gives F(2, 39) on the same design.
+        fvalue = _e_float(result, "F")
+        p_f = _e_float(result, "p")
+        if np.isfinite(fvalue):
+            f_denom = df_resid - df_model + 1 if np.isfinite(df_resid) else float("nan")
+            rows.append(
+                _row("", _cell(
+                    f"F({_df_label(df_model)}, {_df_label(f_denom)})", f"{fvalue:.2f}"
+                ))
+            )
+        if np.isfinite(p_f):
+            rows.append(_row("", _cell("Prob > F", f"{p_f:.4f}")))
         if np.isfinite(r2):
-            lines.append(f"{'R-squared':<21} = {_fixed(r2, 4):>10}")
+            rows.append(_row("", _cell("R-squared", f"{r2:.4f}")))
+        lines.extend(rows)
     # ``block == "none"`` prints nothing: Stata prints no goodness-of-fit block
     # for arima / arch / xtgls, so an empty one is the faithful rendering.
     lines.append("")
@@ -1515,7 +1541,13 @@ def _stata_summary(result: Any) -> str:
         _banner_width = 37 if len(_vcetype) > len("Robust") else 35
         lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_width - name_width - 2}}")
     lines.append(header)
-    lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
+    # The survey family borders its table with FULL-WIDTH rules top and bottom, and keeps
+    # the SPLIT form between the header and the rows. Measured from ``svy: regress``:
+    # lines 11 and 18 carry no ``+``, line 14 does.
+    _split_rule = "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
+    _border_rule = "-" * row_width if block == "svy" else _split_rule
+    # The rule AFTER the header is always the split form, even for the survey family.
+    lines.append(_split_rule)
     # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second
     # equation's parameters with an ``inflate:``/``select:`` prefix. Stata does NOT print
     # that prefix: it prints a GROUP HEADER and then the bare names, which is why the
@@ -1556,10 +1588,8 @@ def _stata_summary(result: Any) -> str:
             f"{_stata_coef(lower[index], ci_lo_w)}"
             f"{_stata_coef(upper[index], ci_hi_w)}"
         )
-    # The rule that CLOSES the coefficient table is the split form ("-------------+----"),
-    # matching the one that opened it; a full-width rule made the table end in a way Stata
-    # never prints.
-    lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
+    # The closing rule matches the OPENING one.
+    lines.append(_border_rule)
 
     # Stata's panel estimators print a decomposition block UNDER the coefficient
     # table.  The keys are confirmed by ``xtreg_fe.json``:

@@ -641,6 +641,17 @@ class _SvyCommand:
             "rank": len(self._param_names),
             "singleunit": self._layout.singleunit,
             "vce": "linearized",
+            # ``e(vcetype)`` and ``e(title)``: measured from ``svy: regress`` --
+            # e(vcetype)="Linearized" (which also labels the column-header banner) and
+            # e(title)="Survey: Linear regression". Neither was stored, so the banner
+            # fell back to a generic string and no "Linearized" row was drawn.
+            "vcetype": "Linearized",
+            "title": _SURVEY_TITLES.get(self._model_name, ""),
+            # ``e(depvar)``: the row-name column of the table is headed with the dependent
+            # variable, and the survey results had none, so that column printed blank.
+            # Not every survey command stores a formula (``SvyMean`` has a variable list),
+            # so this is read defensively rather than assuming one shape.
+            "depvar": _survey_depvar(self),
         }
         if extra:
             e.update(dict(extra))
@@ -936,6 +947,39 @@ def _align_sample(
         return sample, layout
     reduced = sample.iloc[positions]
     return reduced, design.layout(reduced)
+
+
+#: ``e(title)`` per survey command, measured by reading the first line each prints.
+#: ``svy: estimate`` prints "Survey: Linear regression" and the binary/count variants
+#: follow the same "Survey: <model>" shape, so the mapping is written out rather than
+#: derived -- a derived name would drift the moment a new command is added.
+def _survey_depvar(command: Any) -> str:
+    """The dependent variable of a survey command, for the table's row-name column.
+
+    ``svy: regress``/``logit`` carry a formula; ``svy: mean``/``total``/``proportion``
+    carry a variable list instead. Returns an empty string when neither is available,
+    which leaves the column blank rather than raising.
+    """
+
+    formula = getattr(command, "_formula", None)
+    if isinstance(formula, str) and "~" in formula:
+        return formula.split("~", 1)[0].strip()
+    for attribute in ("_variables", "_depvar", "_response"):
+        value = getattr(command, attribute, None)
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, (list, tuple)) and value:
+            return str(value[0])
+    return ""
+
+
+_SURVEY_TITLES = {
+    "svy: regress": "Survey: Linear regression",
+    "svy: logit": "Survey: Logistic regression",
+    "svy: mean": "Survey: Mean estimation",
+    "svy: total": "Survey: Total estimation",
+    "svy: proportion": "Survey: Proportion estimation",
+}
 
 
 class SvyRegress(_SvyCommand):

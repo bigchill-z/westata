@@ -163,11 +163,22 @@ def _frames() -> dict[str, pd.DataFrame]:
     # Heckman needs a binary selection indicator that is NOT degenerate; intreg needs a
     # (low, high) interval pair whose low < high everywhere.
     panel["selected"] = (panel["x1"] + panel["x2"] > 0).astype(int)
+    # The zero-TRUNCATED models reject observations at the limit, so they need counts that
+    # are strictly positive. ycount has zeros; ypos does not.
+    panel["ypos"] = panel["ycount"] + 1
     interval = panel.copy()
     interval["lo"] = panel["y"] - 0.5
     interval["hi"] = panel["y"] + 0.5
 
-    return {"panel": panel, "cross": cross, "interval": interval}
+    tsseries = pd.DataFrame(
+        {"y": rng.normal(size=n), "t": np.arange(1, n + 1)}
+    )
+    return {
+        "panel": panel,
+        "cross": cross,
+        "interval": interval,
+        "tsseries": tsseries,
+    }
 
 
 FRAMES = _frames()
@@ -175,6 +186,7 @@ PANEL = FRAMES["panel"]
 CROSS = FRAMES["cross"]
 SELECTED = FRAMES["panel"]
 INTERVAL = FRAMES["interval"]
+TSSERIES = FRAMES["tsseries"]
 
 DESIGN = ws.SurveyDesign(psu="psu", strata="stratum", weights="w")
 
@@ -260,6 +272,58 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.Didregress.from_formula(
              "y", "treated", PANEL, group="unit", time="period",
              covariates=["x1"]).fit()),
+        # --- third batch: everything else the registry knows about ---
+        ("arima", "arima y, arima(1,0,0)",
+         lambda: ws.ARIMA(TSSERIES["y"].to_numpy(), order=(1, 0, 0)).fit()),
+        ("frontier", "frontier y x1",
+         lambda: ws.Frontier.from_formula("y ~ x1", PANEL).fit()),
+        ("nl", "nl (y = {b0} * exp(-{b1} * x1))",
+         lambda: ws.Nl.from_formula(
+             "y = {b0} * exp(-{b1} * x1)", PANEL,
+             start={"b0": 1.0, "b1": 0.1}).fit()),
+        ("reghdfe", "reghdfe y x1, absorb(unit)",
+         lambda: ws.FEOLS.from_formula("y ~ x1", PANEL).fit()),
+        ("tnbreg", "tnbreg ypos x1, ll(0)",
+         lambda: ws.TruncatedNegativeBinomial.from_formula(
+             "ypos ~ x1", PANEL, lower=0).fit()),
+        ("zinb", "zinb ycount x1, inflate(x1)",
+         lambda: ws.ZeroInflatedNegativeBinomial.from_formula(
+             "ycount ~ x1", PANEL, inflate="x1").fit()),
+        ("ztp", "ztp ypos x1",
+         lambda: ws.TruncatedPoisson.from_formula(
+             "ypos ~ x1", PANEL, lower=0).fit()),
+        ("xtdidregress", "xtdidregress (y x1) (treated), group(unit) time(period)",
+         lambda: ws.Xtdidregress.from_formula(
+             "y", "treated", PANEL, group="unit", time="period",
+             covariates=["x1"]).fit()),
+        ("xtivreg_fe", "xtivreg y x1 (x2 = z), fe",
+         lambda: ws.XtIvreg.from_formula(
+             "y ~ x1 + (x2 = z)", PANEL, entity="unit", time="period",
+             method="fe").fit()),
+        ("xtlogit_re", "xtlogit ybin x1, re",
+         lambda: ws.XtLogit.from_formula(
+             "ybin ~ x1", PANEL, entity="unit", method="re").fit()),
+        ("xtlogit_pa", "xtlogit ybin x1, pa",
+         lambda: ws.XtLogit.from_formula(
+             "ybin ~ x1", PANEL, entity="unit", method="pa").fit()),
+        ("xtnbreg_fe", "xtnbreg ycount x1, fe",
+         lambda: ws.XtNbreg.from_formula(
+             "ycount ~ x1", PANEL, entity="unit", method="fe").fit()),
+        ("xtpoisson_fe", "xtpoisson ycount x1, fe",
+         lambda: ws.XtPoisson.from_formula(
+             "ycount ~ x1", PANEL, entity="unit", method="fe").fit()),
+        ("xtprobit_re", "xtprobit ybin x1, re",
+         lambda: ws.XtProbit.from_formula(
+             "ybin ~ x1", PANEL, entity="unit", method="re").fit()),
+        ("xttobit", "xttobit y x1, ll(-1)",
+         lambda: ws.XtTobit.from_formula(
+             "y ~ x1", PANEL, entity="unit", lower=-1.0).fit()),
+        ("xtreg_re", "xtreg y x1, re",
+         lambda: ws.RandomEffects.from_formula(
+             "y ~ x1", PANEL, entity="unit", time="period").fit()),
+        ("xtreg_be", "xtreg y x1, be",
+         lambda: ws.BetweenOLS.from_formula(
+             "y ~ x1", PANEL, entity="unit", time="period").fit()),
     ]
     return rows
 
@@ -304,8 +368,21 @@ def _stata_block(command: str) -> list[str]:
     )
     with StataSession() as stata:
         # intreg's bound columns only exist on INTERVAL; everything else uses PANEL.
-        stata.push(INTERVAL if command.split()[0] == "intreg" else PANEL)
+        # A few commands need their own frame: intreg's bounds live on INTERVAL, and
+        # arima refuses a panel outright.
+        _frame_name = {"intreg": INTERVAL, "arima": TSSERIES}
+        stata.push(_frame_name.get(command.split()[0], PANEL))
+        # ``xtset`` needs unit/period; the time-series frame for arima has neither, and
+        # Stata errors with "variable unit not found" before the command even runs.
+        _uses_time_series = command.split()[0] == "arima"
         for setup in STATA_SETUP:
+            if _uses_time_series:
+                # A pure time-series frame has no unit/period/stratum/psu/weight columns,
+                # so BOTH setup lines would fail; run tsset instead.
+                if setup.startswith("xtset"):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        stata.run("tsset t")
+                continue
             with contextlib.redirect_stdout(io.StringIO()):
                 stata.run(setup)
         buffer = io.StringIO()

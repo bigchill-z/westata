@@ -79,16 +79,34 @@ def test_cluster_is_recorded(frame) -> None:
     assert fitted.e["vce"] == "cluster"
 
 
-@pytest.mark.parametrize("hc", ["HC1", "HC2", "HC3"])
+@pytest.mark.parametrize("hc", ["HC2", "HC3"])
 def test_the_hc_tokens_are_lowercase(frame, hc: str) -> None:
+    """``hc2``/``hc3`` keep their own names.
+
+    ``HC1`` is deliberately NOT in this list: Stata has no ``vce(hc1)``. Its HC1 is
+    spelled ``vce(robust)`` and stores ``e(vce)="robust"``, so asserting "hc1" here would
+    pin a token Stata cannot produce. That case is covered separately below.
+    """
+
     assert _fit(frame, hc).e["vce"] == hc.lower()
+
+
+def test_hc1_is_spelled_robust(frame) -> None:
+    """The package's ``HC1`` IS Stata's ``vce(robust)`` -- verified numerically and by
+    the macro. Stata rejects ``vce(hc1)`` as a non-existent option."""
+
+    fitted = _fit(frame, "HC1")
+
+    assert fitted.e["vce"] == "robust"
+    assert fitted.e["vcetype"] == "Robust"
 
 
 # --------------------------------------------------------------- e(vcetype)
 def test_the_vcetype_is_capitalised(frame) -> None:
     """The value Stata's own ``if`` statements compare against."""
 
-    assert _fit(frame).e["vcetype"] == "Ols"
+    # Empty, not "Ols" -- see the note on _stata_vcetype_label.
+    assert _fit(frame).e["vcetype"] == ""
 
 
 def test_cluster_vcetype_is_capitalised(frame) -> None:
@@ -97,9 +115,13 @@ def test_cluster_vcetype_is_capitalised(frame) -> None:
     assert fitted.e["vcetype"] == "Cluster"
 
 
-@pytest.mark.parametrize("hc", ["HC1", "HC2", "HC3"])
+@pytest.mark.parametrize("hc", ["HC2", "HC3"])
 def test_the_hc_vcetype_is_two_words(frame, hc: str) -> None:
-    """``"Robust HC2"`` -- capitalised, with the ``HC`` part upper-case as well."""
+    """``"Robust HC2"`` -- capitalised, with the ``HC`` part upper-case as well.
+
+    ``HC1`` is excluded because its vcetype is the single word ``"Robust"``; only the
+    hc2/hc3 estimators are named after their option.
+    """
 
     assert _fit(frame, hc).e["vcetype"] == f"Robust {hc.upper()}"
 
@@ -166,7 +188,12 @@ def test_the_help_file_lists_both_macros() -> None:
     "raw,expected_token",
     [
         ("nonrobust", "ols"),
-        ("HC1", "hc1"),
+        # Stata has NO ``vce(hc1)``: the option is ``vce(robust)``, and that is the
+        # estimator this package calls HC1. Checked against StataNow 19.5 --
+        # ``regress, vce(hc1)`` is rejected as a non-existent option, while
+        # ``vce(robust)`` stores e(vce)="robust". Reporting "hc1" put a token in the
+        # macro that Stata can never produce.
+        ("HC1", "robust"),
         ("cluster", "cluster"),
         ("hac", "hac"),
     ],
@@ -178,8 +205,12 @@ def test_the_token_helper(raw: str, expected_token: str) -> None:
 @pytest.mark.parametrize(
     "raw,expected_title",
     [
-        ("nonrobust", "Ols"),
-        ("HC1", "Robust HC1"),
+        # e(vcetype) is EMPTY for least squares: ``regress y s`` leaves it blank, and
+        # Stata's own ado compares it against "Robust" to choose a display path, so a
+        # fabricated "Ols" is actively misleading.
+        ("nonrobust", ""),
+        # ``vce(robust)`` yields exactly "Robust"; only the hc2/hc3 forms are two words.
+        ("HC1", "Robust"),
         ("cluster", "Cluster"),
         ("hac", "Hac"),
     ],

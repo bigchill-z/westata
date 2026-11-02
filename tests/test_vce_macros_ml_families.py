@@ -99,7 +99,8 @@ def test_regress_keeps_the_ols_default(frame) -> None:
 
     fitted = BUILDERS["regress"](frame)
     assert fitted.e["vce"] == "ols"
-    assert fitted.e["vcetype"] == "Ols"
+    # EMPTY, not "Ols": ``regress y s`` leaves e(vcetype) blank in Stata.
+    assert fitted.e["vcetype"] == ""
 
 
 def test_the_two_families_disagree(frame) -> None:
@@ -133,8 +134,11 @@ def test_the_robust_case_still_capitalises(frame, command: str) -> None:
     else:
         fitted = ws.OrderedLogit.from_formula("yord ~ x", frame).fit(cov_type="HC1")
 
-    assert fitted.e["vce"] == "hc1"
-    assert fitted.e["vcetype"] == "Robust HC1"
+    # ``cov_type="HC1"`` is Stata's ``vce(robust)``, and Stata stores exactly
+    # "robust"/"Robust" for it -- there is no ``vce(hc1)`` option to name. Only the
+    # hc2/hc3 estimators carry their option name into e(vce) and get a two-word vcetype.
+    assert fitted.e["vce"] == "robust"
+    assert fitted.e["vcetype"] == "Robust"
 
 
 # ------------------------------------------------------------ the evidence

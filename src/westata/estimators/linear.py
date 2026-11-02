@@ -85,7 +85,12 @@ def _stata_vce_label(cov_type: Any, *, ml: bool = False) -> str:
         "ols": "ols",
         "oim": "oim",
         "hc0": "hc0",
-        "hc1": "hc1",
+        # Stata has NO ``vce(hc1)``: the option is ``vce(robust)``, and that is the
+        # estimator this package calls HC1. Verified: ``regress, vce(hc1)`` is rejected
+        # outright, ``vce(robust)`` sets e(vce)="robust", while ``vce(hc2)`` sets
+        # e(vce)="hc2" and e(vcetype)="Robust HC2". Reporting "hc1" put a token in
+        # e(vce) that Stata can never produce.
+        "hc1": "robust",
         "hc2": "hc2",
         "hc3": "hc3",
         "robust": "robust",
@@ -118,7 +123,11 @@ def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
 
     token = _stata_vce_label(cov_type, ml=ml)
     if token == "ols":
-        return "Ols"
+        # Stata leaves e(vcetype) EMPTY for an ordinary least-squares fit: measured with
+        # ``regress y s`` -> e(vce)="ols", e(vcetype)="". Returning "Ols" invented a value
+        # Stata never stores, and it is the string Stata's own code compares against
+        # ("Robust") when choosing a display path.
+        return ""
     if token == "oim":
         return "OIM"
     if token in ("hc0", "hc1", "hc2", "hc3"):

@@ -511,6 +511,22 @@ def _anova_available(result: Any) -> bool:
     show and must fall back to the stacked header.
     """
 
+    # A ROBUST fit prints NO sums-of-squares table at all. Captured from
+    # ``regress y s expr tenure smsa rns, vce(robust)``:
+    #
+    #   Linear regression                     Number of obs     =        758
+    #                                         F(5, 752)         =      22.03
+    #                                         Prob > F          =     0.0000
+    #                                         R-squared         =     0.1232
+    #                                         Root MSE          =     .34552
+    #
+    # -- a two-column block and nothing else. The ANOVA rows, Adj R-squared and Total
+    # disappear; only R-squared and Root MSE survive. So availability depends on the
+    # variance estimator, not only on which scalars exist.
+    _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    if _vcetype.lower().startswith("robust"):
+        return False
+
     mss = _e_float(result, "mss")
     rss = _e_float(result, "rss")
     return bool(np.isfinite(mss) and np.isfinite(rss) and rss >= 0.0)
@@ -813,7 +829,21 @@ def _stata_summary(result: Any) -> str:
     # recorded per command (transcribed from each ado), so use it when present and fall
     # back to the generic banner only where the command publishes none (``poisson``).
     banner = str((getattr(result, "e", None) or {}).get("title") or "").strip()
-    lines.append(banner if banner else "Stata-style regression results")
+    # A ROBUST ols fit puts the banner on the FIRST ROW OF ITS TWO-COLUMN BLOCK rather
+    # than on a line of its own:
+    #
+    #   Linear regression                     Number of obs     =        758
+    #
+    # so appending it here as well printed it twice -- once alone and once paired.
+    _block_for_banner = _header_block_kind(result)
+    _vcetype_for_banner = str(
+        (getattr(result, "e", None) or {}).get("vcetype") or ""
+    ).strip()
+    _robust_banner = _block_for_banner == "ols" and _vcetype_for_banner.lower().startswith(
+        "robust"
+    )
+    if not _robust_banner:
+        lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
     #
     #     Linear regression, absorbing indicators
@@ -874,13 +904,17 @@ def _stata_summary(result: Any) -> str:
     # ml prints its own two-column header below, so these generic single-column
     # lines are skipped for it -- otherwise every ML command shows its statistics twice,
     # once stacked and once paired.
-    if block not in ("svy", "ml"):
+    # A robust ols fit prints its own two-column block below (see the ``block == "ols"``
+    # branch), so the generic single-column lines are skipped for it.
+    _robust_vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    _is_robust_ols = block == "ols" and _robust_vcetype.lower().startswith("robust")
+    if block not in ("svy", "ml") and not _is_robust_ols:
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if block in ("quantile", "ml"):
+    if block in ("quantile", "ml") or _is_robust_ols:
         pass
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
@@ -1000,9 +1034,40 @@ def _stata_summary(result: Any) -> str:
             lines.append("")
             lines.extend(cluster_summary)
     elif block == "ols":
-        lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
-        lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
-        lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")
+        # Reached when the ANOVA table is unavailable -- for a ROBUST fit that is Stata's
+        # own behaviour, and its header is a two-column block 78 wide with FIVE rows and
+        # no Adj R-squared:
+        #
+        #   Linear regression                     Number of obs     =        758
+        #                                         F(5, 752)         =      22.03
+        #                                         Prob > F          =     0.0000
+        #                                         R-squared         =     0.1232
+        #                                         Root MSE          =     .34552
+        #
+        # Left column 48, right column 30 (label 18, " =", value 10).
+        _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+        if _vcetype.lower().startswith("robust"):
+            _banner = str((getattr(result, "e", None) or {}).get("title") or "Linear regression")
+            _rows: list[tuple[str, str]] = [
+                ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
+            ]
+            if np.isfinite(fvalue):
+                _rows.append(
+                    (f"F({_df_label(df_model)}, {_df_label(df_resid)})", _fixed(fvalue, 2))
+                )
+            if np.isfinite(p_f):
+                _rows.append(("Prob > F", _fixed(p_f, 4)))
+            if np.isfinite(rsquared):
+                _rows.append(("R-squared", _fixed(rsquared, 4)))
+            if np.isfinite(rmse):
+                _rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
+            for index, (label, value) in enumerate(_rows):
+                left = _banner if index == 0 else ""
+                lines.append(f"{left:<48}{label:<18}= {value:>10}".rstrip())
+        else:
+            lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
+            lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
+            lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")
     elif block == "ml":
         # Stata's likelihood header is a TWO-COLUMN block 78 wide, not a stack of lines.
         # Captured from a live ``logit``:
@@ -1181,15 +1246,34 @@ def _stata_summary(result: Any) -> str:
         or (getattr(result, "e", None) or {}).get("depvar")
         or ""
     )
+    # A ROBUST fit changes two things in Stata's table, both measured:
+    #
+    #   1. the column header becomes ``std. err.`` in LOWER case (the ordinary fit prints
+    #      ``Std. err.``), and
+    #   2. an extra ``Robust`` banner row is inserted above the header, ending at the same
+    #      column as the ``Coefficient`` header.
+    #
+    #   '             |               Robust'
+    #   '           y | Coefficient  std. err.      t    P>|t|  ...'
+    #
+    # ``e(vcetype)`` is the macro that says which: Stata sets it to "Robust"/"Robust HC2"
+    # etc. for those fits and leaves it EMPTY for plain ols.
+    _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    _is_robust = _vcetype.lower().startswith("robust")
+    se_header = "std. err." if _is_robust else "Std. err."
     header = (
         f"{response_label:>{name_width}} | "
         f"{'Coefficient':>{coef_w - 1}}"
-        f"{'Std. err.':>{se_w}}"
+        f"{se_header:>{se_w}}"
         f"{stat_label:>{stat_w - 2}}"
         f"{p_label:>{p_w + 1}}"
         f"{_ci_label(getattr(result, 'level', None)):>{ci_lo_w + ci_hi_w}}"
     )
     lines.append("-" * row_width)
+    if _is_robust:
+        # Ends at the same column as the ``Coefficient`` header: the banner row is the
+        # name column, the pipe, then the label right-aligned to the coefficient field.
+        lines.append(f"{'':>{name_width}} |{_vcetype:>{coef_w + se_w - 1}}")
     lines.append(header)
     lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
     # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second

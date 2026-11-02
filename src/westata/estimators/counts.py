@@ -821,6 +821,17 @@ class _ZeroInflatedBase(_CountBase):
             "n_zero": int(np.sum(y == 0.0)),
             "n_nonzero": int(np.sum(y != 0.0)),
         }
+        # ``e(title)``: the banner Stata prints above the table. Taken from the command's
+        # own help file (``zip.sthlp:25``: "Zero-inflated Poisson regression") rather than
+        # derived from the class name, because the two disagree for ``zinb`` and ``ztp``.
+        _titles = {
+            "zip": "Zero-inflated Poisson regression",
+            "zinb": "Zero-inflated negative binomial regression",
+            "ztp": "Zero-truncated Poisson regression",
+        }
+        _command = str(getattr(self, "_stata_command", "") or "").strip().lower()
+        if _command in _titles:
+            scalars["title"] = _titles[_command]
         if self._inflate_exog is None:
             scalars["inflate"] = "none"
         else:

@@ -254,6 +254,60 @@ class StataResults:
         """
 
         names = [str(name) for name in self._param_names]
+
+        # MULTI-EQUATION models (``zip``, ``zinb``, ``heckman``, ``etregress``) store the
+        # second equation's parameters prefixed. Stata prints one BLOCK per equation, each
+        # ending with its own constant:
+        #
+        #     y            |          inflate      |
+        #            x1    |                 x1    |
+        #          _cons   |               _cons   |
+        #
+        # Sorting all constants to the very end put the main equation's _cons AFTER the
+        # inflate block, which is not Stata's layout. Each equation is sorted on its own.
+        #: Stata's equation names for multi-equation models. An interaction term also
+        #: contains ``#`` (``weight#length``), so the marker alone cannot decide: only a
+        #: KNOWN equation name counts, otherwise ``weight#length`` would be treated as an
+        #: equation called "weight" and the constant would be reordered wrongly.
+        _EQUATION_NAMES = frozenset({"inflate", "select", "tobit", "y1", "y2", "y3", "y4"})
+
+        def _equation_of(name: str) -> str:
+            for marker in ("#", ":"):
+                if marker in name:
+                    head = name.split(marker, 1)[0]
+                    if head in _EQUATION_NAMES:
+                        return head
+            return ""
+
+        equations = list(dict.fromkeys(_equation_of(name) for name in names))
+        if len(equations) > 1:
+            ordered_all: list[int] = []
+            for equation in equations:
+                members = [
+                    index
+                    for index, name in enumerate(names)
+                    if _equation_of(name) == equation
+                ]
+
+                def _bare(index: int) -> str:
+                    text = names[index]
+                    for marker in ("#", ":"):
+                        if marker in text:
+                            text = text.split(marker, 1)[1]
+                    return text.strip().lower()
+
+                ordered_all.extend(
+                    index
+                    for index in members
+                    if _bare(index) not in self._STATA_CONSTANT_NAMES
+                )
+                ordered_all.extend(
+                    index
+                    for index in members
+                    if _bare(index) in self._STATA_CONSTANT_NAMES
+                )
+            return ordered_all
+
         constants = [
             index
             for index, name in enumerate(names)

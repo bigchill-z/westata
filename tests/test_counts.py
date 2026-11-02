@@ -540,9 +540,26 @@ def test_stata_summary_renders_for_every_model():
         assert "P>|z|" in text
         assert "P>|t|" not in text
         assert "LR chi2(" in text
-        assert "Pseudo R2" in text
         assert "Log likelihood" in text
         assert "Coefficient" in text
+        # ``Pseudo R2`` is NOT universal here. Stata's captured ``zip`` header is
+        #
+        #   Zero-inflated Poisson regression   Number of obs =  1,200
+        #   Inflation model: logit             Nonzero obs   =    660
+        #                                      Zero obs      =    540
+        #                                      LR chi2(1)    = 248.04
+        #   Log likelihood = -1700.705         Prob > chi2   = 0.0000
+        #
+        # -- no Pseudo R2 row at all. The zero-TRUNCATED models (``ztp``) do print one, so
+        # the presence of the inflation counts is what decides it. Asserting it for every
+        # model forced a row Stata does not print.
+        if "Inflation model" in text:
+            assert "Pseudo R2" not in text, (
+                "zero-INFLATED models print no Pseudo R2; only the zero-truncated ones do"
+            )
+            assert "Nonzero obs" in text and "Zero obs" in text
+        else:
+            assert "Pseudo R2" in text
 
 
 def test_pseudo_r2_is_mcfadden_against_the_constant_only_model():

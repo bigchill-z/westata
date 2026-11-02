@@ -275,16 +275,31 @@ def _constant_last_order(names: list[str]) -> list[int]:
     """
 
     constants = ("intercept", "const", "_cons")
-    order = [
-        index
-        for index, name in enumerate(names)
-        if str(name).strip().lower() not in constants
-    ]
-    order.extend(
-        index
-        for index, name in enumerate(names)
-        if str(name).strip().lower() in constants
-    )
+
+    def _equation(name: str) -> str:
+        """The equation a name belongs to, so each can be ordered independently."""
+        for marker in ("#", ":"):
+            if marker in str(name):
+                return str(name).split(marker, 1)[0]
+        return ""
+
+    def _bare(name: str) -> str:
+        text = str(name)
+        for marker in ("#", ":"):
+            if marker in text:
+                text = text.split(marker, 1)[1]
+        return text.strip().lower()
+
+    # Sort WITHIN each equation. A multi-equation model has one constant per equation and
+    # Stata puts each at the end of its own block; ordering them all together moved the
+    # main equation's constant down into the inflate group.
+    order: list[int] = []
+    for equation in dict.fromkeys(_equation(name) for name in names):
+        members = [
+            index for index, name in enumerate(names) if _equation(name) == equation
+        ]
+        order.extend(index for index in members if _bare(names[index]) not in constants)
+        order.extend(index for index in members if _bare(names[index]) in constants)
     return order
 
 
@@ -856,13 +871,16 @@ def _stata_summary(result: Any) -> str:
     # For the survey family Stata's header *is* the design block: it prints
     # "Number of obs" inside it (paired with Number of strata) and no separate
     # standalone line, so the generic line is suppressed there.
-    if block != "svy":
+    # ml prints its own two-column header below, so these generic single-column
+    # lines are skipped for it -- otherwise every ML command shows its statistics twice,
+    # once stacked and once paired.
+    if block not in ("svy", "ml"):
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if block == "quantile":
+    if block in ("quantile", "ml"):
         pass
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
@@ -986,10 +1004,71 @@ def _stata_summary(result: Any) -> str:
         lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
         lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")
     elif block == "ml":
-        lines.append(f"{'Log likelihood':<21} = {_fixed(_e_float(result, 'll'), 4):>10}")
+        # Stata's likelihood header is a TWO-COLUMN block 78 wide, not a stack of lines.
+        # Captured from a live ``logit``:
+        #
+        #   Logistic regression                          Number of obs =    400
+        #                                                LR chi2(2)    =   3.27
+        #                                                Prob > chi2   = 0.1951
+        #   Log likelihood = -275.60445                  Pseudo R2     = 0.0059
+        #
+        # Left column 56 wide (banner, log likelihood); right column 22 (label 14, " =",
+        # value 7). What the package printed before was a single 34-wide column, which is
+        # why this header never lined up with anything.
+        # The banner is e(title), not the command name: Stata prints
+        # "Logistic regression", not "logit".
+        _banner = str((getattr(result, "e", None) or {}).get("title") or "")
+        ml_left: list[str] = [_banner or str(result.model_name or "")]
+        ml_right: list[tuple[str, str]] = [
+            ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
+        ]
+        # Zero-inflated models put THREE extra rows in the right column before the chi2
+        # test, and label the model on the left with its inflation equation. Captured:
+        #
+        #   Zero-inflated Poisson regression            Number of obs =  1,200
+        #   Inflation model: logit                      Nonzero obs   =    660
+        #                                               Zero obs      =    540
+        #                                               LR chi2(1)    = 248.04
+        #   Log likelihood = -1700.705                  Prob > chi2   = 0.0000
+        n_zero = _e_float(result, "n_zero")
+        n_nonzero = _e_float(result, "n_nonzero")
+        if np.isfinite(n_nonzero):
+            ml_left.append("Inflation model: logit")
+            ml_right.append(("Nonzero obs", f"{n_nonzero:,.0f}"))
+        if np.isfinite(n_zero):
+            ml_right.append(("Zero obs", f"{n_zero:,.0f}"))
+        chi2 = _e_float(result, "chi2")
+        p_chi2 = _e_float(result, "p")
+        if np.isfinite(chi2):
+            ml_right.append(
+                (f"{chi2_type or 'LR'} chi2({_df_label(df_model)})", _fixed(chi2, 2))
+            )
+        if np.isfinite(p_chi2):
+            ml_right.append(("Prob > chi2", _fixed(p_chi2, 4)))
         pseudo_r2 = _e_float(result, "r2_p")
-        if np.isfinite(pseudo_r2):
-            lines.append(f"{'Pseudo R2':<21} = {_fixed(pseudo_r2, 4):>10}")
+        ll = _e_float(result, "ll")
+        # Stata pairs ``Log likelihood`` with ``Pseudo R2`` when there is one -- but the
+        # zero-inflated models print NO Pseudo R2, so there the log likelihood sits on the
+        # ``Prob > chi2`` row instead. Both arrangements occur, so the target row is decided
+        # by whether a Pseudo R2 exists rather than assumed.
+        # ``e(r2_p)`` EXISTS for the zero-inflated models but Stata does not print it: the
+        # captured ``zip`` header has Nonzero obs / Zero obs / LR chi2 / Prob > chi2 and no
+        # Pseudo R2, while ``ztp`` (zero-TRUNCATED, not zero-inflated) does print one. So
+        # the deciding fact is the presence of the inflation counts, not of r2_p.
+        _is_zero_inflated = np.isfinite(_e_float(result, "n_nonzero"))
+        _pairs_with_pseudo = np.isfinite(pseudo_r2) and not _is_zero_inflated
+        if _pairs_with_pseudo:
+            ml_right.append(("Pseudo R2", _fixed(pseudo_r2, 4)))
+        while len(ml_left) < (len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)):
+            ml_left.append("")
+        if np.isfinite(ll):
+            ml_left.append("Log likelihood = " + ("%.8g" % ll))
+        for index, line in enumerate(ml_left):
+            right = ""
+            if index < len(ml_right):
+                label, value = ml_right[index]
+                right = f"{label:<14}= {value:>6}"
+            lines.append(f"{line:<56}{right}".rstrip())
     elif block == "quantile":
         # Stata's qreg header (p8_outputs.txt:20-22): the title carries the
         # quantile, then two deviation lines with Pseudo R2 on the right.  There
@@ -1073,7 +1152,19 @@ def _stata_summary(result: Any) -> str:
     # so the fields are 11, 11, 9, 8, 13 and 12 wide after the pipe. Guessing these (12,
     # 12, 8, 8, 12, 12) produced an 80-character line against Stata's 78 and shifted every
     # column; the numbers were right and the table still looked wrong.
-    name_width = max([12, *(len(name) for name in names)])
+    # Width from the DISPLAYED names, not the stored ones. A multi-equation model stores
+    # ``inflate#Intercept`` (18 characters) but prints it as ``_cons`` inside an
+    # ``inflate`` block, so sizing on the stored spelling made the table 83 wide instead
+    # of 78 and pushed every column right.
+    def _display_length(name: str) -> int:
+        text = str(name)
+        for marker in ("#", ":"):
+            head, sep, tail = text.partition(marker)
+            if sep and head in ("inflate", "select", "tobit"):
+                return len(tail)
+        return len(text)
+
+    name_width = max([12, *(_display_length(name) for name in names)])
     coef_w, se_w, stat_w, p_w, ci_lo_w, ci_hi_w = 11, 11, 9, 8, 13, 12
     row_width = (
         name_width + 2 + coef_w + se_w + stat_w + p_w + ci_lo_w + ci_hi_w
@@ -1101,9 +1192,39 @@ def _stata_summary(result: Any) -> str:
     lines.append("-" * row_width)
     lines.append(header)
     lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
+    # Multi-equation models (``zip``/``zinb``/``heckman``/``etregress``) store the second
+    # equation's parameters with an ``inflate:``/``select:`` prefix. Stata does NOT print
+    # that prefix: it prints a GROUP HEADER and then the bare names, which is why the
+    # prefixed version made the name column 18 wide instead of 13 and shifted the table.
+    #
+    #   y            |
+    #             x1 |    .559456   ...
+    #          _cons |   .4039659   ...
+    #   -------------+----...
+    #   inflate      |
+    #             x1 |   .0033665   ...
+    # The separator is ``#`` in this package's parameter names and ``:`` in others, so
+    # both are accepted rather than assuming one.
+    _EQUATION_PREFIXES = ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
+    _GROUP_CONSTANTS = ("intercept", "const", "_cons")
+    seen_groups: set[str] = set()
     for index, name in enumerate(names):
+        group = ""
+        bare = name
+        for prefix in _EQUATION_PREFIXES:
+            if name.startswith(prefix):
+                group = prefix[:-1]
+                bare = name[len(prefix):]
+                break
+        if group and group not in seen_groups:
+            seen_groups.add(group)
+            lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
+            lines.append(f"{group:<{name_width}} |")
+        # Inside an equation block the constant is still spelled ``_cons``.
+        if bare.strip().lower() in _GROUP_CONSTANTS:
+            bare = "_cons"
         lines.append(
-            f"{name:>{name_width}} |"
+            f"{bare:>{name_width}} |"
             f"{_stata_coef(params[index], coef_w)}"
             f"{_stata_coef(bse[index], se_w)}"
             f"{_stata_stat(stats_[index], stat_w)}"

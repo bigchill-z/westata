@@ -298,6 +298,14 @@ def _command_title(command: str) -> str:
         # ``ereturn local title``, unlike the two above.
         "ologit": "Ordered logistic regression",
         "oprobit": "Ordered probit regression",
+        # ``zip.sthlp:25``, ``zinb.sthlp:25``, ``ztp.sthlp``: the banner each command
+        # prints. Verified against the help files rather than inferred from the name --
+        # ``zinb`` has no ``ereturn local title`` in its ado, so the sthlp header is the
+        # authority.
+        "zip": "Zero-inflated Poisson regression",
+        "zinb": "Zero-inflated negative binomial regression",
+        "ztp": "Zero-truncated Poisson regression",
+        "tnbreg": "Truncated negative binomial regression",
     }
     return titles.get(command.strip().lower(), "")
 

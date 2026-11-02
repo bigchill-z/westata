@@ -329,6 +329,19 @@ def _quadratic_form(params: np.ndarray, cov: np.ndarray) -> float:
         return float("nan")
 
 
+#: ``e(title)`` per ``ivregress`` estimator -- the banner each prints. Measured by running
+#: all three against StataNow 19.5:
+#:
+#:   Instrumental-variables 2SLS regression
+#:   Instrumental-variables LIML regression
+#:   Instrumental-variables GMM regression
+_IV_TITLES = {
+    "ivregress 2sls": "Instrumental-variables 2SLS regression",
+    "ivregress liml": "Instrumental-variables LIML regression",
+    "ivregress gmm": "Instrumental-variables GMM regression",
+}
+
+
 class IV2SLS:
     """Two-stage least squares (Stata ``ivregress 2sls``).
 
@@ -1144,6 +1157,26 @@ class IV2SLS:
             "mss": tss - rss,
             "tss": tss,
             "k_endog": int(self._X_endog.shape[1]),
+            # Stata's banner and the two footer lines naming the variable roles:
+            #
+            #   Instrumental-variables 2SLS regression       Number of obs   =   100
+            #   ...
+            #   Endogenous: x2
+            #   Exogenous:  x1 z
+            #
+            # Measured from ``ivregress 2sls y x1 (x2 = z)``.
+            "title": _IV_TITLES.get(str(self._stata_command), ""),
+            "endog": list(getattr(self, "_endog_names", [])),
+            "exog": [
+                name
+                for name in [
+                    *getattr(self, "_exog_names", []),
+                    *getattr(self, "_instr_names", []),
+                ]
+                # The intercept is an exog column in the design but Stata does not name it
+                # in the footer: "Exogenous:  x1 z", not "Exogenous:  _cons x1 z".
+                if str(name).strip().lower() not in ("intercept", "_cons", "const")
+            ],
         }
         e.update(self._extra_estimator_scalars(ref, canonical))
         if clusters is not None:

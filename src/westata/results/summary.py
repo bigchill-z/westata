@@ -1063,7 +1063,10 @@ def _anova_available(result: Any) -> bool:
         return False
     # The PCSE/GLS panel commands print their own design block and NO sums-of-squares
     # table: measured, ``xtpcse`` goes straight from the design rows to the coefficient
-    # header.
+    # header. The ``ivregress`` estimators are the same: they store mss/rss but Stata
+    # prints a two-column header with Wald chi2 and no ANOVA rows.
+    if str(getattr(result, "model_name", "") or "").startswith("ivregress"):
+        return False
     if str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls"):
         return False
 
@@ -1394,10 +1397,13 @@ def _stata_summary(result: Any) -> str:
     # "ml" is deliberately NOT in this gate: the ML branch renders its banner itself, and
     # including it left a blank first row on every ML command. Only tobit/truncreg embed
     # the banner in their own block (tobit keeps it on row 0, truncreg replaces it with the
-    # Limit row), and ``quantile`` merges it with Number of obs.
+    # Limit row), ``quantile`` merges it with Number of obs, and ivregress puts it on the
+    # first row of its own two-column header.
     _banner_in_block = block == "quantile" or str(
         getattr(result, "model_name", "") or ""
-    ) in ("tobit", "truncreg")
+    ) in ("tobit", "truncreg") or str(
+        getattr(result, "model_name", "") or ""
+    ).startswith("ivregress")
     if not _robust_banner and not _banner_in_block:
         lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
@@ -1471,19 +1477,28 @@ def _stata_summary(result: Any) -> str:
     # ``xtpcse``/``xtgls`` print the design block above, which already carries
     # "Number of obs" in its right column.
     _pcse_family = str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
+    # ``ivregress`` prints its own four-row two-column block (see its branch below), so
+    # the generic single-column lines would duplicate every one of them.
+    _iv_family = str(getattr(result, "model_name", "") or "").startswith("ivregress")
     # ``quantile`` prints "Number of obs" beside its banner inside its own branch, so the
     # generic line is skipped here for it too.
     if (
         block not in ("svy", "ml", "newey", "arch", "quantile")
         and not _is_robust_ols
         and not _pcse_family
+        and not _iv_family
     ):
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if block in ("quantile", "ml", "newey") or _is_robust_ols or _pcse_family:
+    if (
+        block in ("quantile", "ml", "newey")
+        or _is_robust_ols
+        or _pcse_family
+        or _iv_family
+    ):
         pass
     elif block == "arch":
         # BEFORE the chi2 test: ``arch`` sets e(chi2type)="Wald", so the generic chi2
@@ -1675,6 +1690,40 @@ def _stata_summary(result: Any) -> str:
         # is not needed either -- the design block ends with its own, and two in a row
         # separated the table from its header.
         lines.pop() if lines and lines[-1] == "" else None
+    elif str(getattr(result, "model_name", "") or "").startswith("ivregress"):
+        # ``ivregress`` prints a four-row two-column header and NO sums of squares,
+        # whatever the method:
+        #
+        #   Instrumental-variables 2SLS regression       Number of obs   =   100
+        #                                               Wald chi2(2)    =   0.71
+        #                                               Prob > chi2     = 0.7013
+        #                                               Root MSE        = 1.5071
+        #
+        # Left column 50, right 28 (label 18, "= ", value 6). R-squared and Adj R-squared
+        # are NOT printed even though the estimator stores them.
+        _iv_rows: list[tuple[str, str]] = [
+            ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
+        ]
+        _wald = _e_float(result, "chi2")
+        _p_wald = _e_float(result, "p")
+        _iv_df = _e_float(result, "df_m")
+        # e(p) is not stored by the IV estimators; Stata derives it from the Wald
+        # statistic. Computing it here rather than storing it keeps the estimator's e()
+        # unchanged while still printing the row Stata prints.
+        if not np.isfinite(_p_wald) and np.isfinite(_wald) and np.isfinite(_iv_df):
+            _p_wald = float(stats.chi2.sf(_wald, _iv_df))
+        if np.isfinite(_wald):
+            _iv_rows.append((f"Wald chi2({_df_label(_iv_df)})", f"{_wald:.2f}"))
+        if np.isfinite(_p_wald):
+            _iv_rows.append(("Prob > chi2", f"{_p_wald:.4f}"))
+        if np.isfinite(rmse):
+            _iv_rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
+        _iv_banner = str((getattr(result, "e", None) or {}).get("title") or "")
+        for _index, (_label, _value) in enumerate(_iv_rows):
+            _left = _iv_banner if _index == 0 else ""
+            # Left 50, label 16, "= ", value 10 -- measured from
+            # "Instrumental-variables 2SLS regression     Number of obs   =        100".
+            lines.append(f"{_left:<50}{_label:<16}= {_value:>10}".rstrip())
     elif block == "ols":
         # Reached when the ANOVA table is unavailable -- for a ROBUST fit that is Stata's
         # own behaviour, and its header is a two-column block 78 wide with FIVE rows and
@@ -2365,6 +2414,22 @@ def _stata_summary(result: Any) -> str:
         lines.append(
             "Note: ATET estimate adjusted for covariates, group effects, and time effects."
         )
+
+    if str(getattr(result, "model_name", "") or "").startswith("ivregress"):
+        # ``ivregress`` names the variable roles under the table, on two unaligned lines:
+        #
+        #   Endogenous: x2
+        #   Exogenous:  x1 z
+        #
+        # Note the single space after "Endogenous:" and the double after "Exogenous:" --
+        # Stata pads the shorter label so the variable lists start together.
+        _e = getattr(result, "e", None) or {}
+        _endog = [str(name) for name in (_e.get("endog") or [])]
+        _exog = [str(name) for name in (_e.get("exog") or [])]
+        if _endog:
+            lines.append("Endogenous: " + " ".join(_endog))
+        if _exog:
+            lines.append("Exogenous:  " + " ".join(_exog))
 
     # Stata's panel estimators print a decomposition block UNDER the coefficient
     # table.  The keys are confirmed by ``xtreg_fe.json``:

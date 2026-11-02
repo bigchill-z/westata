@@ -510,9 +510,16 @@ def test_summary_stata_renders():
     text = IV2SLS.from_formula(OVER, df).fit().summary(style="stata")
     # Stata's ivregress table reports z / P>|z|, not t (see [R] ivregress,
     # Example 1: "Wald chi2(2) = 90.76" with a z column).
-    for token in ["Coefficient", "Std. err.", "P>|z|", "Number of obs", "R-squared"]:
+    #
+    # It does NOT print R-squared, even though the estimator stores one. Measured from a
+    # live ``ivregress 2sls y x1 (x2 = z)``: the header is Number of obs / Wald chi2 /
+    # Prob > chi2 / Root MSE and nothing else, and the table closes with the
+    # Endogenous/Exogenous footer.
+    for token in ["Coefficient", "Std. err.", "P>|z|", "Number of obs", "Wald chi2"]:
         assert token in text
+    assert "R-squared" not in text
     assert "P>|t|" not in text
+    assert "Endogenous:" in text and "Exogenous:" in text
 
 
 def test_iv_uses_normal_distribution_like_stata():

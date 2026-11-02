@@ -49,6 +49,13 @@ VERIFIED = {
     "svy: mean": "62-wide estimate table, 12/12 lines character-exact vs p12",
     "svy: total": "same block, 4/4 lines exact (Total label)",
     "svy: proportion": "level rows + Logit-scaled interval, 6/6 lines exact",
+    "ivregress 2sls": "4-row Wald header + Endog/Exog footer, MATCH",
+    "ivregress liml": "same block, banner measured",
+    "ivregress gmm": "same block, banner measured",
+    "ologit": "threshold rows without z/P + separator rule, MATCH",
+    "oprobit": "same, MATCH",
+    "poisson": "ML header, MATCH",
+    "probit": "ML header, MATCH",
 }
 
 

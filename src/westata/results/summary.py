@@ -766,6 +766,146 @@ def _did_time(value: Any) -> str:
     return f"{int(round(number))}" if abs(number - round(number)) < 1e-9 else f"{number:g}"
 
 
+def _svy_estimate_table(
+    result: Any, lines: list[str], names: list[str]
+) -> str:
+    """The 62-wide table ``svy: mean``/``total``/``proportion`` print.
+
+    Captured at ``p12_outputs.txt:11-16``. The frame is 62 columns, the name column 12
+    plus a pipe, and the right half splits 11 / 11 / 26 for estimate, standard error and
+    confidence interval. There are NO t and P columns -- Stata prints none for these
+    commands, so their presence in the shared table was the visible tell.
+
+    ``lines`` already holds the survey design block; it is extended here.
+    """
+
+    estimate_label = _svy_estimate_label(result)
+    name_width = max([12, *(len(str(name)) for name in names)])
+    total_width = 62
+    right_width = total_width - name_width - 2
+    est_w, se_w, ci_w = 11, 11, right_width - 22
+
+    params = np.asarray(result.params, dtype=float)
+    bse = np.asarray(result.bse, dtype=float)
+    ci = result.conf_int()
+    lower = np.asarray(ci["lower"], dtype=float)
+    upper = np.asarray(ci["upper"], dtype=float)
+    level = getattr(result, "level", None)
+
+    def _ci_label(level_value: Any) -> str:
+        if level_value is None:
+            return "[95% conf. interval]"
+        try:
+            pct = float(level_value) * 100.0
+        except (TypeError, ValueError):
+            return "[95% conf. interval]"
+        text = f"{pct:g}"
+        return f"[{text}% conf. interval]"
+
+    _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
+    lines.append("-" * total_width)
+    if _vcetype:
+        # Measured: the banner's label ENDS at column 37, not at the header's right edge.
+        lines.append(f"{'':>{name_width}} |{_vcetype:>{37 - name_width - 2}}")
+    # Column positions measured from the capture: "Mean" starts at 21, "std. err." at 28,
+    # "[95% conf. interval]" at 42. Composing them from field widths put the boundaries one
+    # space either side of Stata's, so they are laid out by absolute offset instead.
+    # Measured across all three commands: the estimate label is RIGHT-aligned to column
+    # 25 (Mean 21-24, Total 20-24, Proportion 15-24), while "std. err." sits at 28 and
+    # "[95% ..." at 42 regardless of the label's length. Laying it out from a fixed LEFT
+    # edge put Total and Proportion in the wrong columns.
+    _ci_text = _ci_label(level)
+    _label_field = 25 - name_width - 2
+    lines.append(
+        f"{'':>{name_width}} |"
+        + f"{estimate_label:>{_label_field}}"
+        + " " * (28 - 25)
+        + "std. err."
+        + " " * (42 - 28 - len("std. err."))
+        + _ci_text
+    )
+    lines.append("-" * (name_width + 1) + "+" + "-" * (total_width - name_width - 2))
+    # ``svy: proportion`` names its rows after the LEVELS (0, 1) under a group header
+    # carrying the variable name, not ``binary=0``/``binary=1``:
+    #
+    #   binary       |
+    #           0    |   .4903781   ...
+    #           1    |   .5096219   ...
+    # KNOWN GAP, not silently tolerated: for ``svy: proportion`` the interval bounds do
+    # not match Stata. Measured on the p12 design -- Stata prints .4287728/.5522769 for
+    # the level 0 proportion, this package .4283092/.5524469. Neither 1.96*se nor
+    # t(40)*se reproduces Stata's half-width (.06175205), so Stata is applying something
+    # else (an interval on a transformed scale, most likely the logit one that its
+    # "Logit" secondary header advertises). Until that is established, this command's
+    # POINT ESTIMATE and standard error match Stata exactly and its interval does not.
+    # Recorded rather than approximated: a plausibly-shaped wrong interval is harder to
+    # notice than an obviously missing one.
+    _proportion_var = ""
+    _level_rows = False
+    if str(getattr(result, "model_name", "") or "") == "svy: proportion" and names:
+        _proportion_var = str(names[0]).split("=", 1)[0]
+        lines.append(f"{_proportion_var:<{name_width}} |")
+        names = [str(n).split("=", 1)[-1] for n in names]
+        # The level rows put the pipe at the same column 13 as every other row, which
+        # leaves an extra space for a single-character level ("0", "1").
+        _level_rows = True
+
+    for index, name in enumerate(names):
+        # Each value ENDS at a fixed column, measured from the capture: estimate at 25,
+        # standard error at 36, and the two interval bounds at 50 and 62. Aligning runs
+        # between those endpoints instead produced a 61-wide row with the interval shifted.
+        # A level row puts its label right-aligned at column 11 and then two spaces and
+        # the pipe; using ``name_width`` (12) overshot by one and made the row 63 wide.
+        _name_cell = (
+            f"{str(name):>11}  |" if _level_rows else f"{str(name):>{name_width}} |"
+        )
+        lines.append(
+            _name_cell
+            + f"{_stata_coef(params[index], 25 - name_width - 2)}"
+            + f"{_stata_coef(bse[index], 36 - 25)}"
+            + f"{_stata_coef(lower[index], 50 - 36)}"
+            + f"{_stata_coef(upper[index], 62 - 50)}"
+        )
+    lines.append("-" * total_width)
+    return chr(10).join(lines)
+
+
+def _is_svy_estimate(result: Any) -> bool:
+    """Whether this is a survey ESTIMATE command (mean/total/proportion).
+
+    These print a different table from ``svy: regress``: no Coefficient/t/P columns, a
+    "Mean (or Total/Proportion)" column instead, and a 62-wide table rather than 78.
+    Captured at ``p12_outputs.txt:11-16``:
+
+      --------------------------------------------------------------
+                   |             Linearized
+                   |       Mean   std. err.     [95% conf. interval]
+      -------------+------------------------------------------------
+                 y |   1.061347   .0873402      .8848254    1.237868
+      --------------------------------------------------------------
+
+    Recognised by the registered model name, not by the parameter count, because a
+    one-variable ``svy: regress`` also has a single coefficient.
+    """
+
+    return str(getattr(result, "model_name", "") or "") in (
+        "svy: mean",
+        "svy: total",
+        "svy: proportion",
+    )
+
+
+def _svy_estimate_label(result: Any) -> str:
+    """The column heading these commands use: Mean, Total or Proportion."""
+
+    name = str(getattr(result, "model_name", "") or "")
+    return {
+        "svy: mean": "Mean",
+        "svy: total": "Total",
+        "svy: proportion": "Proportion",
+    }.get(name, "Estimate")
+
+
 def _is_xtreg_panel(result: Any) -> bool:
     """Whether this is an ``xtreg`` fit whose header is the panel block, not ANOVA.
 
@@ -1674,6 +1814,44 @@ def _stata_summary(result: Any) -> str:
         n_pop = _e_float(result, "N_pop")
         r2 = _e_float(result, "r2")
 
+        # The survey ESTIMATE commands use a NARROWER design block (62 wide, left 34)
+        # than ``svy: regress`` (78, left 54), because their table is narrower.
+        # Captured: "Number of strata =  8             Number of obs   =        576".
+        if _is_svy_estimate(result):
+            # Right half is 28 wide: label 16, "= ", value 9. Measured from
+            # "Number of obs   =        576".
+            def _cell_narrow(label: str, value: str) -> str:
+                return f"{label:<16}={value:>11}"
+
+            def _row_narrow(left: str, right: str = "") -> str:
+                return f"{left:<34}{right}".rstrip()
+
+            narrow: list[str] = []
+            if np.isfinite(n_strata):
+                narrow.append(
+                    _row_narrow(
+                        f"Number of strata = {int(round(n_strata)):>2}",
+                        _cell_narrow("Number of obs", f"{nobs:,.0f}"),
+                    )
+                )
+            if np.isfinite(n_psu):
+                # ``Population size`` keeps SIX decimals here: measured, the captured run
+                # reads "837.592551", not the rounded "837.593" the regress block prints.
+                pop = f"{n_pop:,.6f}" if np.isfinite(n_pop) else "."
+                narrow.append(
+                    _row_narrow(
+                        f"Number of PSUs   = {int(round(n_psu)):>2}",
+                        _cell_narrow("Population size", pop),
+                    )
+                )
+            if np.isfinite(df_resid):
+                narrow.append(
+                    _row_narrow("", _cell_narrow("Design df", f"{int(round(df_resid))}"))
+                )
+            lines.extend(narrow)
+            lines.append("")
+            return _svy_estimate_table(result, lines, names)
+
         def _cell(label: str, value: str) -> str:
             return f"{label:<15} = {value:>6}"
 
@@ -1758,6 +1936,13 @@ def _stata_summary(result: Any) -> str:
         return len(text)
 
     name_width = max([12, *(_display_length(name) for name in names)])
+
+    # The survey ESTIMATE commands (``svy: mean``/``total``/``proportion``) print a
+    # different table: no t/P columns, one estimate column, and a 62-wide frame rather
+    # than 78. Handled here because the row VALUES differ in count, not just in spelling.
+    if _is_svy_estimate(result):
+        return _svy_estimate_table(result, lines, names)
+
     coef_w, se_w, stat_w, p_w, ci_lo_w, ci_hi_w = 11, 11, 9, 8, 13, 12
     row_width = (
         name_width + 2 + coef_w + se_w + stat_w + p_w + ci_lo_w + ci_hi_w

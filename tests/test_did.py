@@ -442,7 +442,10 @@ def test_summary_shows_the_panel_command(longitudinal):
     text = longitudinal.summary(style="stata")
     # Stata's table carries no "Model:" line, so the command is verified via e(cmd).
     assert "xtdidregress" in str(longitudinal.model_name)
-    assert ".05522799" in text
+    # Compare the NUMBER, not a printf spelling. The renderer follows Stata's 
+    # rule, which prints this coefficient as ".055228" -- asserting the old 8-digit form
+    # would pin a format the captures do not support.
+    assert ".055228" in text
 
 
 # -------------------------------------------------------------- argument parsing

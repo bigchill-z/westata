@@ -111,15 +111,46 @@ def _cell(value: float, width: int, digits: int = 7) -> str:
     return f"{_num(value, digits):>{width}}"
 
 
-def _stata_coef(value: float, width: int) -> str:
-    """Stata coefficient format: 7 significant digits, no leading zero."""
+def _stata_number(value: float, width: int = 9) -> str:
+    """Stata's ``%9.0g``: the widest representation that fits, no leading zero.
 
-    text = _num(value, 7)
-    if text.startswith("0."):
-        text = text[1:]
-    elif text.startswith("-0."):
-        text = "-" + text[2:]
+    This is NOT ``%.7g``. Stata picks the precision that fills the field, so the number
+    of significant digits varies with magnitude -- ``.1236469`` (7) beside ``.0133633``
+    (6) and ``.000947`` (3). A fixed ``%.7g`` gets the first right and the second wrong
+    (``.01336326``), which is why the columns looked misaligned even though the values
+    were correct.
+
+    Verified against Stata's own ``display %9.0g`` on the same inputs:
+
+        0.1236468764 -> .1236469        0.0009470056 -> .000947
+        0.0133632566 -> .0133633        -0.02220731  -> -.0222073
+        1.0231784    -> 1.023178
+
+    The width counts the BODY only; Stata does not charge the minus sign against it, so
+    ``-.0222073`` is eight characters in a nine-wide field.
+    """
+
+    if value is None or not np.isfinite(value):
+        return f"{'.':>{width}}"
+
+    text = ""
+    for precision in range(width, 0, -1):
+        text = f"%.{precision}g" % value
+        # Stata never prints a leading zero: ``.5``, not ``0.5``.
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        body = text[1:] if text.startswith("-") else text
+        if len(body) <= width - 1:
+            break
     return f"{text:>{width}}"
+
+
+def _stata_coef(value: float, width: int) -> str:
+    """Stata coefficient format: the ``%9.0g`` rule, right-aligned in ``width``."""
+
+    return _stata_number(value, 9).rjust(width)
 
 
 def _stata_stat(value: float, width: int) -> str:
@@ -502,26 +533,38 @@ def _anova_block(
     # no-constant case (where it equals N).
     total_df = float(df_model + df_resid)
 
+    # Stata's ANOVA columns, measured from a live capture (78 characters wide, ``+`` at
+    # column 13). The tokens END at fixed columns: SS 26, df 36, MS 48, right-hand value 78.
+    #
+    #   '       Model |  12.6190573         5  2.52381146   Prob > F        =    0.0000'
+    #                    ^16      ^26  ^34  ^36 ^38     ^48  ^50              ^70   ^78
+    #
+    # SS/MS use the same ``%9.0g`` rule as the coefficient table -- nine significant digits
+    # here, not a fixed decimal count, which is why ``12.6190573`` sits beside ``.34552``.
     def _ss(value: float) -> str:
-        return f"{value:>12.7g}" if np.isfinite(value) else "."
+        return (_stata_number(value, 11) if np.isfinite(value) else f"{'.':>11}")
+
+    def _df_cell(df: float) -> str:
+        # Stata puts the df right-aligned in 10 with a trailing space, then the MS field.
+        return (f"{df:>10.0f}" if np.isfinite(df) else f"{'.':>10}") + " "
 
     def _ms(value: float, df: float) -> str:
         if not np.isfinite(value) or not np.isfinite(df) or df <= 0:
-            return f"{'.':>{11}}"
-        return f"{value / df:>11.7g}"
+            return f"{'.':>11}"
+        return _stata_number(value / df, 11)
 
     left = [
         "      Source |       SS           df       MS",
         "-------------+----------------------------------",
-        f"       Model | {_ss(mss)} {df_model:>10.0f}  {_ms(mss, df_model)}",
-        f"    Residual | {_ss(rss)} {df_resid:>10.0f}  {_ms(rss, df_resid)}",
+        f"       Model | {_ss(mss)}{_df_cell(df_model)}{_ms(mss, df_model)}",
+        f"    Residual | {_ss(rss)}{_df_cell(df_resid)}{_ms(rss, df_resid)}",
         "-------------+----------------------------------",
-        f"       Total | {_ss(total_ss)} {total_df:>10.0f}  {_ms(total_ss, total_df)}",
+        f"       Total | {_ss(total_ss)}{_df_cell(total_df)}{_ms(total_ss, total_df)}",
     ]
     _chi2_value = _e_float(result, "chi2")
     _chi2_pvalue = _e_float(result, "p")
     right = [
-        f"Number of obs   = {nobs:>10d}",
+        f"Number of obs   = {nobs:>9d}",
         # ``xtpcse``/``xtgls`` report a ``Wald chi2`` MODEL test even though their
         # coefficient tests use t or z.  The captured run shows both at once
         # (``p9_outputs.txt:504-506`` beside a ``z``/``P>|z|`` table), and Stata records
@@ -536,16 +579,16 @@ def _anova_block(
             if _reports_a_chi2_test(result)
             else [
                 f"F({_df_label(df_model)}, {_df_label(df_resid)})".ljust(16)
-                + f"= {('. ' if not np.isfinite(fvalue) else f'{fvalue:>7.2f}'):>10}",
-                f"Prob > F        = {('.' if not np.isfinite(p_f) else f'{p_f:.4f}'):>10}",
+                + f"= {('. ' if not np.isfinite(fvalue) else f'{fvalue:>7.2f}'):>9}",
+                f"Prob > F        = {('.' if not np.isfinite(p_f) else f'{p_f:.4f}'):>9}",
             ]
         ),
-        f"R-squared       = {('.' if not np.isfinite(rsquared) else f'{rsquared:.4f}'):>10}",
-        f"Adj R-squared   = {('.' if not np.isfinite(rsquared_adj) else f'{rsquared_adj:.4f}'):>10}",
-        f"Root MSE        = {('.' if not np.isfinite(rmse) else f'{rmse:.4f}'):>10}",
+        f"R-squared       = {('.' if not np.isfinite(rsquared) else f'{rsquared:.4f}'):>9}",
+        f"Adj R-squared   = {('.' if not np.isfinite(rsquared_adj) else f'{rsquared_adj:.4f}'):>9}",
+        f"Root MSE        = {_stata_number(rmse, 7).strip().rjust(9) if np.isfinite(rmse) else '.'.rjust(9)}",
     ]
     rendered = [
-        f"{left_line:<45}   {right_line}".rstrip()
+        f"{left_line:<51}{right_line}".rstrip()
         for left_line, right_line in zip(left, right)
     ]
     return lines + rendered
@@ -1006,23 +1049,67 @@ def _stata_summary(result: Any) -> str:
     # i.e. ``Coefficient`` (not ``Coef.``), ``Std. err.`` with a LOWERCASE ``err``, and
     # ``[95% conf. interval]`` all lowercase.  Round 237 capitalised the last two from
     # ``design.md:209``; the real captures outrank that document, so they are restored.
-    name_width = max([8, *(len(name) for name in names)])
-    coef_w, se_w, stat_w, p_w, ci_w = 12, 12, 8, 8, 12
-    row_width = name_width + 3 + coef_w + 1 + se_w + 1 + stat_w + 1 + p_w + 1 + 2 * ci_w + 1
+    #
+    # WIDTHS ARE NOT NEGOTIABLE. They used to be (12, 12, 8, 8, 12), which made every row
+    # 80 characters wide against Stata's 78 and pushed every column one place right. The
+    # numbers were correct and the table still looked wrong, which is the failure a reader
+    # notices first.
+    #
+    # Measured from a live ``regress`` capture (the ``+`` of the rule sits at column 13,
+    # total width 78), the header keywords END at these columns:
+    #
+    #     Coefficient        ends 26      Std. err.   ends 37
+    #     t                  ends 43      P>|t|       ends 53
+    #     [95% conf. interval]  ends 78
+    #
+    # which makes the value columns 12, 10, 6, 10 and 25 wide after the ``|`` at 13.
+    # Every width below was read off a live ``regress`` capture by locating where each
+    # number ENDS. The ``|`` sits at column 13 and the line is 78 wide:
+    #
+    #     hdr  '           y | Coefficient  Std. err.      t    P>|t|  [95% ...]'
+    #     row  '           s |   .1236469   .0133633     9.25   0.000  ...'
+    #          tokens end at   25          36         45      53       66     78
+    #
+    # so the fields are 11, 11, 9, 8, 13 and 12 wide after the pipe. Guessing these (12,
+    # 12, 8, 8, 12, 12) produced an 80-character line against Stata's 78 and shifted every
+    # column; the numbers were right and the table still looked wrong.
+    name_width = max([12, *(len(name) for name in names)])
+    coef_w, se_w, stat_w, p_w, ci_lo_w, ci_hi_w = 11, 11, 9, 8, 13, 12
+    row_width = (
+        name_width + 2 + coef_w + se_w + stat_w + p_w + ci_lo_w + ci_hi_w
+    )
+    # Stata labels the row-name column with the DEPENDENT VARIABLE, right-aligned:
+    #
+    #     '           y | Coefficient  Std. err.      t    P>|t|  ...'
+    #
+    # It used to be blank, which was the one place the table did not match. The name comes
+    # from `response_name`/`e(depvar)`; with neither available the column stays empty
+    # rather than showing an invented label.
+    response_label = str(
+        getattr(result, "response_name", None)
+        or (getattr(result, "e", None) or {}).get("depvar")
+        or ""
+    )
     header = (
-        f"{'':<{name_width}} | {'Coefficient':>{coef_w}} {'Std. err.':>{se_w}} "
-        f"{stat_label:>{stat_w}} {p_label:>{p_w}} "
-        f"{_ci_label(getattr(result, 'level', None)):>{2 * ci_w + 1}}"
+        f"{response_label:>{name_width}} | "
+        f"{'Coefficient':>{coef_w - 1}}"
+        f"{'Std. err.':>{se_w}}"
+        f"{stat_label:>{stat_w - 2}}"
+        f"{p_label:>{p_w + 1}}"
+        f"{_ci_label(getattr(result, 'level', None)):>{ci_lo_w + ci_hi_w}}"
     )
     lines.append("-" * row_width)
     lines.append(header)
     lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
     for index, name in enumerate(names):
         lines.append(
-            f"{name:<{name_width}} | {_stata_coef(params[index], coef_w)} "
-            f"{_stata_coef(bse[index], se_w)} {_stata_stat(stats_[index], stat_w)} "
-            f"{_stata_pvalue(pvalues[index], p_w)} "
-            f"{_stata_coef(lower[index], ci_w)} {_stata_coef(upper[index], ci_w)}"
+            f"{name:>{name_width}} |"
+            f"{_stata_coef(params[index], coef_w)}"
+            f"{_stata_coef(bse[index], se_w)}"
+            f"{_stata_stat(stats_[index], stat_w)}"
+            f"{_stata_pvalue(pvalues[index], p_w)}"
+            f"{_stata_coef(lower[index], ci_lo_w)}"
+            f"{_stata_coef(upper[index], ci_hi_w)}"
         )
     lines.append("-" * row_width)
 

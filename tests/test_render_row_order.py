@@ -285,9 +285,16 @@ def test_the_anova_sums_of_squares_match_the_stored_scalars(frame) -> None:
     residual_line = next(line for line in rendered.splitlines() if "Residual |" in line)
     total_line = next(line for line in rendered.splitlines() if "Total |" in line)
 
-    assert f"{e['mss']:.7g}" in model_line
-    assert f"{e['rss']:.7g}" in residual_line
-    assert f"{e['mss'] + e['rss']:.7g}" in total_line
+    # Compare VALUES, not a printf spelling. The renderer uses Stata's %9.0g rule,
+    # which picks the precision that fills the field -- an assertion written as
+    # f"{value:.7g}" passes only while the two agree, and it failed the moment the
+    # formatter was corrected to match Stata.
+    def _ss_on(line: str) -> float:
+        return float(line.split("|")[1].split()[0])
+
+    assert _ss_on(model_line) == pytest.approx(e["mss"], rel=1e-8)
+    assert _ss_on(residual_line) == pytest.approx(e["rss"], rel=1e-8)
+    assert _ss_on(total_line) == pytest.approx(e["mss"] + e["rss"], rel=1e-8)
 
 
 def test_the_total_row_has_n_minus_one_degrees_of_freedom(frame) -> None:
@@ -318,10 +325,13 @@ def test_each_mean_square_is_the_ratio_of_its_row(frame) -> None:
     residual_line = next(line for line in rendered.splitlines() if "Residual |" in line)
     total_line = next(line for line in rendered.splitlines() if "Total |" in line)
 
-    assert f"{e['mss'] / e['df_m']:.7g}" in model_line
-    assert f"{e['rss'] / e['df_r']:.7g}" in residual_line
+    def _ms_on(line: str) -> float:
+        return float(line.split("|")[1].split()[2])
+
+    assert _ms_on(model_line) == pytest.approx(e["mss"] / e["df_m"], rel=1e-8)
+    assert _ms_on(residual_line) == pytest.approx(e["rss"] / e["df_r"], rel=1e-8)
     total_df = e["df_m"] + e["df_r"]
-    assert f"{(e['mss'] + e['rss']) / total_df:.7g}" in total_line
+    assert _ms_on(total_line) == pytest.approx((e["mss"] + e["rss"]) / total_df, rel=1e-8)
 
 
 def test_the_ml_family_still_gets_the_stacked_header(frame) -> None:

@@ -28,9 +28,8 @@ warnings.filterwarnings("ignore")
 
 from westata.results.summary import _HEADER_BLOCK  # noqa: E402
 
-#: svy: proportion is deliberately absent: its point estimate and standard error
-#: match, but its CONFIDENCE INTERVAL does not (.4283092 vs Stata's .4287728 on the p12
-#: design) and the transform Stata uses is not yet established.
+#:svy: proportion is verified including its interval, which is built on the LOGIT
+#:scale and mapped back (the reason Stata prints a second Logit header).
 #:
 #: Commands whose rendered table has been diffed line by line against a Stata capture
 #: and found to match (allowing for the numbers themselves differing when the sample is
@@ -49,6 +48,7 @@ VERIFIED = {
     "arch": "ARCH header + OPG banner (coefficient NAMES still differ)",
     "svy: mean": "62-wide estimate table, 12/12 lines character-exact vs p12",
     "svy: total": "same block, 4/4 lines exact (Total label)",
+    "svy: proportion": "level rows + Logit-scaled interval, 6/6 lines exact",
 }
 
 

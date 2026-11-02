@@ -806,6 +806,28 @@ def _sorted_levels(column: pd.Series) -> list[Any]:
         return sorted(observed, key=str)
 
 
+class _LogitScale:
+    """log(p / (1-p)) with its inverse and derivative, for transformed intervals.
+
+    Kept as an object rather than three free functions so the pair used by
+    ``conf_int`` cannot be mismatched.
+    """
+
+    @staticmethod
+    def __call__(values: Any) -> np.ndarray:
+        arr = np.clip(np.asarray(values, dtype=float), 1e-15, 1 - 1e-15)
+        return np.log(arr / (1.0 - arr))
+
+    def derivative(self, values: Any) -> np.ndarray:
+        arr = np.clip(np.asarray(values, dtype=float), 1e-15, 1 - 1e-15)
+        return 1.0 / (arr * (1.0 - arr))
+
+    @staticmethod
+    def inverse(values: Any) -> np.ndarray:
+        arr = np.asarray(values, dtype=float)
+        return 1.0 / (1.0 + np.exp(-arr))
+
+
 class SvyProportion(SvyMean):
     """Weighted proportions of a categorical variable (``svy: proportion``).
 
@@ -879,13 +901,21 @@ class SvyProportion(SvyMean):
     def fit(self) -> StataResults:
         covariance = self._layout.linearized_variance(self.influence())
         first = self._indicators[:, 0]
-        return self._results(
+        results = self._results(
             self._params,
             covariance,
             resid=first - self._params[0],
             fitted=first,
             df_model=0.0,
         )
+        # Stata's ``svy: proportion`` builds its interval on the LOGIT scale and
+        # transforms back -- that is what the secondary "Logit" header advertises.
+        # Verified numerically on the p12 design: logit-scale t interval mapped back gives
+        # .4287728/.5522769, matching the capture exactly, where the linear interval
+        # (.4283092/.5524469) does not.
+        results._ci_transform = _LogitScale()
+        results._ci_inverse = _LogitScale().inverse
+        return results
 
 
 # ---------------------------------------------------------------------------

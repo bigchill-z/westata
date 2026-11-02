@@ -806,7 +806,12 @@ def _svy_estimate_table(
     lines.append("-" * total_width)
     if _vcetype:
         # Measured: the banner's label ENDS at column 37, not at the header's right edge.
-        lines.append(f"{'':>{name_width}} |{_vcetype:>{37 - name_width - 2}}")
+        banner = f"{'':>{name_width}} |{_vcetype:>{37 - name_width - 2}}"
+        # ``svy: proportion`` carries a SECOND banner label, "Logit", starting at column
+        # 49: it names the scale its interval is built on.
+        if str(getattr(result, "model_name", "") or "") == "svy: proportion":
+            banner = banner.ljust(49) + "Logit"
+        lines.append(banner)
     # Column positions measured from the capture: "Mean" starts at 21, "std. err." at 28,
     # "[95% conf. interval]" at 42. Composing them from field widths put the boundaries one
     # space either side of Stata's, so they are laid out by absolute offset instead.
@@ -844,7 +849,8 @@ def _svy_estimate_table(
     _level_rows = False
     if str(getattr(result, "model_name", "") or "") == "svy: proportion" and names:
         _proportion_var = str(names[0]).split("=", 1)[0]
-        lines.append(f"{_proportion_var:<{name_width}} |")
+        # The variable name sits right-aligned at column 12, not left-aligned.
+        lines.append(f"{_proportion_var:>12} |")
         names = [str(n).split("=", 1)[-1] for n in names]
         # The level rows put the pipe at the same column 13 as every other row, which
         # leaves an extra space for a single-character level ("0", "1").

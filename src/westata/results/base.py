@@ -776,11 +776,26 @@ class StataResults:
 
         params_arr = self._params.to_numpy()
         bse_arr = self._bse.to_numpy()
+
+        # Some estimators build the interval on a TRANSFORMED scale and map it back --
+        # ``svy: proportion`` is one: Stata's interval for a proportion is computed in
+        # log-odds and transformed, which is why its table carries a second "Logit"
+        # header. The hooks below are optional and default to the identity, so every
+        # other estimator keeps the plain linear interval.
+        transform = getattr(self, "_ci_transform", None)
+        inverse = getattr(self, "_ci_inverse", None)
+        if transform is not None and inverse is not None:
+            centre = transform(params_arr)
+            scale = transform.derivative(params_arr) * bse_arr if hasattr(
+                transform, "derivative"
+            ) else bse_arr
+            lower = inverse(centre - critical * scale)
+            upper = inverse(centre + critical * scale)
+        else:
+            lower = params_arr - critical * bse_arr
+            upper = params_arr + critical * bse_arr
         return pd.DataFrame(
-            {
-                "lower": params_arr - critical * bse_arr,
-                "upper": params_arr + critical * bse_arr,
-            },
+            {"lower": lower, "upper": upper},
             index=pd.Index(self._param_names, dtype=object),
         )
 

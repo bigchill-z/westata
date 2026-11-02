@@ -23,6 +23,7 @@ The lesson is narrow and worth keeping: **"not found by grep in the ado" is not 
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -78,7 +79,11 @@ def test_the_stata_banner_uses_that_title(frame, command: str) -> None:
     """The renderer reads the macro, so the banner follows automatically."""
 
     fitted = BUILDERS[command](frame)
-    banner = render_summary(fitted, style="stata").splitlines()[0].strip()
+    first_line = render_summary(fitted, style="stata").splitlines()[0].strip()
+    # The ML header is a TWO-COLUMN block: the banner shares its first line with
+    # "Number of obs" (measured against Stata). Split on the run of spaces between the
+    # two columns rather than assuming the banner owns the whole line.
+    banner = re.split(r"\s{2,}", first_line)[0].strip()
 
     assert banner == EXPECTED[command]
 

@@ -272,7 +272,7 @@ _HEADER_BLOCK: dict[str, str] = {
     "xtpoisson, re": "ml",
     "xtnbreg, fe": "ml",
     "frontier": "ml",
-    "arima": "none",
+    "arima": "arch",
     "arch": "arch",
     "qreg": "quantile",
     "sqreg": "quantile",
@@ -1431,16 +1431,16 @@ def _stata_summary(result: Any) -> str:
     ) or _block_for_banner == "newey"
     # ``quantile`` prints its banner on the SAME line as Number of obs (see its branch),
     # so the standalone line is skipped for it just as it is for a robust ols fit.
-    # "ml" is deliberately NOT in this gate: the ML branch renders its banner itself, and
-    # including it left a blank first row on every ML command. Only tobit/truncreg embed
-    # the banner in their own block (tobit keeps it on row 0, truncreg replaces it with the
-    # Limit row), ``quantile`` merges it with Number of obs, and ivregress puts it on the
-    # first row of its own two-column header.
-    _banner_in_block = block == "quantile" or str(
-        getattr(result, "model_name", "") or ""
-    ) in ("tobit", "truncreg") or str(
-        getattr(result, "model_name", "") or ""
-    ).startswith("ivregress")
+    # "ml" IS in this gate: the ML branch's own block starts with the banner
+    # (``ml_left[0]``), so printing it again here duplicated it. An earlier round removed
+    # "ml" from this set because including it left a blank first row -- that was a
+    # different bug (the stranded separator after the banner was replaced), since fixed by
+    # the blank-trimming below, not a reason to print the banner twice.
+    _banner_in_block = (
+        block in ("quantile", "ml")
+        or str(getattr(result, "model_name", "") or "") in ("tobit", "truncreg")
+        or str(getattr(result, "model_name", "") or "").startswith("ivregress")
+    )
     if not _robust_banner and not _banner_in_block:
         lines.append(banner if banner else "Stata-style regression results")
     # ``areg`` prints a SECOND title line naming what it absorbed:
@@ -1551,7 +1551,13 @@ def _stata_summary(result: Any) -> str:
         #   Sample: 1 thru 800                      Number of obs     =        800
         #                                           Wald chi2(.)      =          .
         #   Log likelihood = -1039.235              Prob > chi2       =          .
-        _chi2df = "."
+        # ``arch`` prints a LITERAL dot here (e(df_m) is not reported for that model), but
+        # ``arima`` -- which shares this header shape -- prints its real count. Measured:
+        # "Wald chi2(1)" for arima, "Wald chi2(.)" for arch.
+        if str(getattr(result, "model_name", "") or "") == "arima":
+            _chi2df = _df_label(df_model)
+        else:
+            _chi2df = "."
         lines.append(
             f"{'Sample: 1 thru ' + str(nobs):<48}"
             f"{'Number of obs':<18}= {nobs:>10d}"
@@ -2028,7 +2034,10 @@ def _stata_summary(result: Any) -> str:
         # tobit/truncreg replace the banner row, which leaves the standalone blank
         # separator that preceded it stranded at the top of the block. Stata's header
         # starts with the banner line and has no leading blank.
-        if _is_tobit or _is_truncreg:
+        # The banner is now rendered ONLY by the ml block (``ml_left[0]``), which leaves the
+        # blank separator that used to follow the standalone banner stranded at the top.
+        # Trimming it is what makes the first line the banner again.
+        if _is_tobit or _is_truncreg or block == "ml":
             while lines and not lines[0].strip():
                 lines.pop(0)
     elif block == "quantile":

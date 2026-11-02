@@ -581,9 +581,27 @@ class _CountBase(_DiscreteBase):
             scalars["k_aux"] = 1
         return scalars
 
+    #: ``e(title)`` per command -- the banner Stata prints above the table. Measured from
+    #: live runs; NOT derived from the class name, because the two disagree for several
+    #: (``TruncatedPoisson.from_formula(..., lower=0)`` is ``tpoisson``, not ``ztp``).
+    _COUNT_TITLES: dict[str, str] = {
+        "zip": "Zero-inflated Poisson regression",
+        "zinb": "Zero-inflated negative binomial regression",
+        "ztp": "Zero-truncated Poisson regression",
+        "tnbreg": "Truncated negative binomial regression",
+        "poisson": "Poisson regression",
+        "nbreg": "Negative binomial regression",
+    }
+
     def _extra_scalars(self) -> dict[str, Any]:
         """Model-specific extra ``e()`` scalars, merged in by subclasses."""
 
+        # The title lives here, in the COMMON base, not in the zero-inflated subclass:
+        # ztp/tnbreg go through the truncated branch and never saw a title when the map
+        # sat in the inflated one.
+        name = str(getattr(self, "_stata_command", "") or "").strip().lower()
+        if name in self._COUNT_TITLES:
+            return {"title": self._COUNT_TITLES[name]}
         return {}
 
     # -- fit ---------------------------------------------------------------
@@ -817,21 +835,15 @@ class _ZeroInflatedBase(_CountBase):
 
     def _extra_scalars(self) -> dict[str, Any]:
         y = self._y
-        scalars: dict[str, Any] = {
-            "n_zero": int(np.sum(y == 0.0)),
-            "n_nonzero": int(np.sum(y != 0.0)),
-        }
-        # ``e(title)``: the banner Stata prints above the table. Taken from the command's
-        # own help file (``zip.sthlp:25``: "Zero-inflated Poisson regression") rather than
-        # derived from the class name, because the two disagree for ``zinb`` and ``ztp``.
-        _titles = {
-            "zip": "Zero-inflated Poisson regression",
-            "zinb": "Zero-inflated negative binomial regression",
-            "ztp": "Zero-truncated Poisson regression",
-        }
-        _command = str(getattr(self, "_stata_command", "") or "").strip().lower()
-        if _command in _titles:
-            scalars["title"] = _titles[_command]
+        # Start from the base class, which owns the e(title) map shared by ALL count
+        # models -- duplicating the map here is how ztp/tnbreg came to have no title.
+        scalars: dict[str, Any] = dict(super()._extra_scalars())
+        scalars.update(
+            {
+                "n_zero": int(np.sum(y == 0.0)),
+                "n_nonzero": int(np.sum(y != 0.0)),
+            }
+        )
         if self._inflate_exog is None:
             scalars["inflate"] = "none"
         else:
@@ -1009,11 +1021,17 @@ class _TruncatedBase(_CountBase):
         return (names + [f"param{i + 1}" for i in range(count)])[:count]
 
     def _extra_scalars(self) -> dict[str, Any]:
-        return {
-            "truncation_point": self._lower,
-            "lower": self._lower,
-            "upper": self._upper,
-        }
+        # Start from the base class's entries (which carry e(title)) and add the
+        # truncation bookkeeping. Returning a fresh dict here silently dropped the title.
+        scalars = dict(super()._extra_scalars())
+        scalars.update(
+            {
+                "truncation_point": self._lower,
+                "lower": self._lower,
+                "upper": self._upper,
+            }
+        )
+        return scalars
 
     # -- predict -----------------------------------------------------------
     #: ``ztp``/``tpoisson``/``tnbreg`` accept only ``n``, ``xb`` and ``stdp``;

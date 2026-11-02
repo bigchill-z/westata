@@ -289,9 +289,12 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("zinb", "zinb ycount x1, inflate(x1)",
          lambda: ws.ZeroInflatedNegativeBinomial.from_formula(
              "ycount ~ x1", PANEL, inflate="x1").fit()),
+        # Stata's ``ztp`` truncates at ZERO, which on the positive-count scale means the
+        # lower limit is 1 -- passing lower=0 selects the general ``tpoisson`` instead and
+        # the banners differ.
         ("ztp", "ztp ypos x1",
          lambda: ws.TruncatedPoisson.from_formula(
-             "ypos ~ x1", PANEL, lower=0).fit()),
+             "ypos ~ x1", PANEL, lower=1.0).fit()),
         ("xtdidregress", "xtdidregress (y x1) (treated), group(unit) time(period)",
          lambda: ws.Xtdidregress.from_formula(
              "y", "treated", PANEL, group="unit", time="period",

@@ -187,6 +187,8 @@ class ARIMA:
 
         e: dict[str, Any] = {
             "N": nobs_estimated,
+            # ``e(title)``: measured from ``arima y, arima(1,0,0)`` -- "ARIMA regression".
+            "title": "ARIMA regression",
             "ll": float(result.llf),
             "aic": float(result.aic),
             "bic": float(result.bic),

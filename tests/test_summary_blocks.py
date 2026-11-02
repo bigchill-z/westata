@@ -142,7 +142,18 @@ def test_svy_mean_prints_no_model_f_test() -> None:
 
 # ----------------------------------------------------- models with no fit block
 def test_arima_prints_no_r_squared_placeholder() -> None:
-    """Stata prints no goodness-of-fit block for arima."""
+    """Stata's arima header has no R-squared and no Root MSE -- but DOES log likelihood.
+
+    Measured from ``arima y, arima(1,0,0)``: the block is
+
+      Sample: 1 thru 100                    Number of obs     =
+                                            Wald chi2(1)      =
+      Log likelihood = -145.8048            Prob > chi2       =
+
+    so "Log likelihood" IS printed, on the left of the two-column block. The old assertion
+    required it absent, which the capture contradicts; the two that genuinely do not appear
+    are R-squared and Root MSE.
+    """
 
     rng = np.random.default_rng(5)
     y = np.zeros(200)
@@ -152,4 +163,5 @@ def test_arima_prints_no_r_squared_placeholder() -> None:
 
     assert "R-squared" not in text
     assert "Root MSE" not in text
-    assert "Log likelihood" not in text
+    assert "Log likelihood" in text
+    assert "Wald chi2" in text

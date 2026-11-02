@@ -22,6 +22,8 @@ can be mistaken for the other again.
 
 from __future__ import annotations
 
+import re
+
 from pathlib import Path
 
 import numpy as np
@@ -86,7 +88,11 @@ def test_the_title_matches_the_ado(frame, command: str) -> None:
 @pytest.mark.parametrize("command", sorted(BUILDERS))
 def test_the_stata_banner_uses_that_title(frame, command: str) -> None:
     fitted = BUILDERS[command](frame)
-    banner = render_summary(fitted, style="stata").splitlines()[0].strip()
+    first_line = render_summary(fitted, style="stata").splitlines()[0].strip()
+    # The ML header is a two-column block, so the banner shares its first line with
+    # "Number of obs" (measured against Stata). Split on the run of spaces between the
+    # columns instead of assuming the banner owns the whole line.
+    banner = re.split(r"\s{2,}", first_line)[0].strip()
 
     assert banner == EXPECTED[command]
 

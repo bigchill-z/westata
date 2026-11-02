@@ -1002,7 +1002,7 @@ class XtGls:
                 "xtgls: the design matrix dropped rows; filter the data first"
             )
         codes, sizes = _panel_labels(kept_frame, entity, command)
-        return cls(
+        model = cls(
             kept_frame[lhs].to_numpy(dtype=float),
             X,
             codes,
@@ -1013,6 +1013,11 @@ class XtGls:
             nmk=nmk,
             model_data=kept_frame.reset_index(drop=True),
         )
+        # The design block names these; without them its Group/Time rows printed ".".
+        model._entity_name = str(entity)
+        model._time_name = "" if time is None else str(time)
+        model._depvar_name = lhs
+        return model
 
     # ------------------------------------------------------------------- fit
     def fit(
@@ -1494,7 +1499,7 @@ class XtPcse:
             )
         codes, sizes = _panel_labels(kept_frame, entity, command)
         periods = _panel_periods(kept_frame, time, command)
-        return cls(
+        model = cls(
             kept_frame[lhs].to_numpy(dtype=float),
             X,
             codes,
@@ -1505,6 +1510,13 @@ class XtPcse:
             periods=periods,
             model_data=kept_frame.reset_index(drop=True),
         )
+        # The panel design block above the table names these two variables, and they were
+        # not stored anywhere -- the block printed "." for both even though the caller
+        # supplied them.
+        model._entity_name = str(entity)
+        model._time_name = "" if time is None else str(time)
+        model._depvar_name = lhs
+        return model
 
     # ------------------------------------------------------------------- fit
     def fit(
@@ -1561,6 +1573,23 @@ class XtPcse:
         e: dict[str, Any] = {
             "N": int(nobs),
             "N_g": int(self._sizes.size),
+            # The design block names both variables; without these the header printed "."
+            # in the Group/Time rows even though the caller passed them.
+            "ivar": str(getattr(self, "_entity_name", "") or ""),
+            "tvar": str(getattr(self, "_time_name", "") or ""),
+            # Stata's banner for this command. Measured from the captured run:
+            # "Linear regression, correlated panels corrected standard errors (PCSEs)".
+            # Without it the header fell back to a generic string.
+            "title": "Linear regression, correlated panels corrected standard errors (PCSEs)",
+            # ``e(vcetype)`` labels the banner row above the column header. Measured:
+            # "Panel-corrected". Without it the table drew no banner at all.
+            # NOTE: only ``xtpcse`` has it -- ``xtgls`` prints no banner row and keeps the
+            # capitalised "Std. err." header, so this key must not be set for it.
+            "vcetype": "Panel-corrected",
+            "vce": "pcse",
+            # ``e(depvar)``: the table's row-name column is headed with the dependent
+            # variable; without it that column printed blank.
+            "depvar": str(getattr(self, "_depvar_name", "") or ""),
             "df_m": float(df_m),
             "df_r": float(df_resid),
             "rank": int(k),

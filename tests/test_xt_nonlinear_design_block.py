@@ -115,7 +115,11 @@ def test_xtpcse_still_has_the_full_block(xtpcse_fit) -> None:
 
     block = _panel_design_block(xtpcse_fit)
 
-    assert len(block) >= 10
+    # NINE lines, not ten. The captured block (p9_outputs.txt:499-505) is
+    # Panels / Autocorrelation(min) / avg / max / 3x "Estimated ..." -- seven -- plus the
+    # Group and Time rows. Counting a blank separator line as part of the block inflated
+    # the expected number by one.
+    assert len(block) == 9
     assert any("Time variable:" in entry for entry in block)
     assert any("Estimated covariances" in entry for entry in block)
     assert any("Estimated coefficients" in entry for entry in block)
@@ -156,5 +160,7 @@ def test_the_estimation_table_survives(xtlogit_fit) -> None:
     rendered = render_summary(xtlogit_fit, style="stata")
 
     assert "Coefficient" in rendered
+    # ``xtlogit`` is an ORDINARY table: capitalised "Std. err.", no banner row. Only
+    # xtpcse's header is the lower-case spelling.
     assert "Std. err." in rendered
     assert "P>|z|" in rendered

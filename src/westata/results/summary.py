@@ -377,6 +377,9 @@ def _panel_design_block(result: Any) -> list[str]:
     entity = str(e_macros.get("ivar") or e_macros.get("panelvar") or "").strip()
     timevar = str(e_macros.get("tvar") or e_macros.get("timevar") or "").strip()
     panels = str(e_macros.get("panels") or "").strip()
+    #: "Autocorrelation: no autocorrelation" on the xtpcse block. Stored under
+    #: ``e(corr)`` when the estimator records one; the default wording otherwise.
+    autocorr = str(e_macros.get("autocorrelation") or e_macros.get("corrtype") or "").strip()
 
     # ``xtpcse``/``xtgls`` print the FULL block: group/time variable, panel count,
     # per-group extremes, and the three "estimated ..." counts.
@@ -394,26 +397,66 @@ def _panel_design_block(result: Any) -> list[str]:
     # xtpcse rows for a plain xtlogit produced three lines of ``.``, so the two shapes
     # are kept separate rather than unified.
     if model_name in ("xtpcse", "xtgls"):
-        lines: list[str] = []
+        # A TWO-COLUMN block 78 wide. Measured from ``xtpcse y x1``: the left half holds
+        # the panel structure and the "Estimated ..." counts, the right half the fit
+        # statistics, and the two interleave row by row:
+        #
+        #   Group variable:   firm              Number of obs     =        700
+        #   Time variable:    year              Number of groups  =        100
+        #   Panels:           correlated (balanced)   Obs per group:
+        #   Autocorrelation:  no autocorrelation            min =          7
+        #                                                   avg =          7
+        #                                                   max =          7
+        #   Estimated covariances      =      5050   R-squared         =     0.2144
+        #   Estimated autocorrelations =         0   Wald chi2(1)      =     178.20
+        #   Estimated coefficients     =         2   Prob > chi2       =     0.0000
+        #
+        # Stacking the left rows first printed them in a different order from the right
+        # ones, so nothing lined up.
+        LEFT = 48
+
+        def _left(pairs: list[tuple[str, str]]) -> str:
+            # The left half is exactly 48 columns wide: label 18, value padded to 30.
+            text = ""
+            for label, value in pairs:
+                text += f"{label:<18}{value:<30}"
+            return text[:48].ljust(48)
+
+        def _right(label: str, value: str) -> str:
+            return f"{label:<18}= {value:>10}"
+
+        def _number4(key: str) -> str:
+            value = _e_float(result, key)
+            return f"{value:.4f}" if np.isfinite(value) else "."
+
+        def _number2(key: str) -> str:
+            value = _e_float(result, key)
+            return f"{value:.2f}" if np.isfinite(value) else "."
+
+        lines: list[str] = [
+            _left([("Group variable:", entity or ".")])
+            + _right("Number of obs", _number("N")),
+            _left([("Time variable:", timevar or ".")])
+            + _right("Number of groups", _number("N_g")),
+        ]
+        # The right column starts one row LATE: "Obs per group:" heads it on the Panels
+        # row, and the min/avg/max rows follow.
+        # ``panels`` records only "correlated"; Stata prints the balance in parentheses
+        # after it. Derived from the group sizes rather than assumed.
+        _balanced = ""
+        _gmin, _gmax = _e_float(result, "g_min"), _e_float(result, "g_max")
+        if np.isfinite(_gmin) and np.isfinite(_gmax):
+            _balanced = " (balanced)" if abs(_gmin - _gmax) < 1e-9 else " (unbalanced)"
         lines.append(
-            f"{'Group variable:':<18}{entity or '.':<14}"
-            f"{'Number of obs':<18}= {_number('N'):>10}"
+            _left([("Panels:", (panels or ".") + _balanced)]) + f"{'Obs per group:':>14}"
         )
         lines.append(
-            f"{'Time variable:':<18}{timevar or '.':<14}"
-            f"{'Number of groups':<18}= {_number('N_g'):>10}"
+            _left([("Autocorrelation:", autocorr or "no autocorrelation")])
+            + f"{'min':>17} = {_number('g_min'):>10}"
         )
-        lines.append(f"{'Panels:':<18}{panels or '.'}")
-        lines.append(f"{'':<18}{'Obs per group:':>32}")
-        lines.append(f"{'':<50}{'min':>5} = {_number('g_min'):>11}")
-        lines.append(f"{'':<50}{'avg':>5} = {_number('g_avg'):>11}")
-        lines.append(f"{'':<50}{'max':>5} = {_number('g_max'):>11}")
-        lines.append(f"{'Estimated covariances':<28}= {_number('n_sigma'):>12}")
-        lines.append(f"{'Estimated autocorrelations':<28}= {_number('n_cr'):>12}")
-        # ``Estimated coefficients`` counts the estimated betas; fall back to the
-        # design's column count when ``e(k)`` is absent, which is what the quantity
-        # means.  This row belongs to the xtpcse/xtgls block only -- the xt NON-LINEAR
-        # shape above does not print it.
+        for label, key in (("avg", "g_avg"), ("max", "g_max")):
+            lines.append(f"{'':<{LEFT}}{label:>17} = {_number(key):>10}")
+        # The three "Estimated ..." rows sit opposite the fit statistics.
         coefficients = e_macros.get("k")
         if coefficients is None:
             design = getattr(result, "design_matrix", None)
@@ -422,10 +465,42 @@ def _panel_design_block(result: Any) -> list[str]:
                     coefficients = int(np.asarray(design[0]).shape[1])
                 except (TypeError, ValueError, IndexError):
                     coefficients = None
-        if coefficients is None:
-            lines.append(f"{'Estimated coefficients':<28}= {'':>12}")
-        else:
-            lines.append(f"{'Estimated coefficients':<28}= {int(coefficients):>12}")
+        # "Estimated covariances" is the number of UNIQUE elements of the panel
+        # covariance matrix, G(G+1)/2 -- not ``e(n_sigma)``, which is the count of common
+        # PERIODS used to divide the cross-products. They are different quantities and
+        # sharing the key printed 7 against Stata's 5050.
+        _n_groups = _e_float(result, "N_g")
+        _n_cov = (
+            int(round(_n_groups * (_n_groups + 1) / 2)) if np.isfinite(_n_groups) else None
+        )
+        est_rows = [
+            ("Estimated covariances", str(_n_cov) if _n_cov is not None else "."),
+            ("Estimated autocorrelations", _number("n_cr")),
+            (
+                "Estimated coefficients",
+                str(int(coefficients)) if coefficients is not None else "",
+            ),
+        ]
+        fit_rows = [
+            ("R-squared", _number4("r2")),
+            (
+                f"Wald chi2({_df_label(_e_float(result, 'df_m'))})",
+                _number2("chi2"),
+            ),
+            ("Prob > chi2", _number4("p")),
+        ]
+        for (est_label, est_value), (fit_label, fit_value) in zip(est_rows, fit_rows):
+            lines.append(
+                # Left half exactly 48: label 26, "= ", value right-aligned in 9, then
+                # padding -- measured from "Estimated covariances      =      5050".
+                # Measured by character position rather than by field widths: in
+                # "Estimated covariances      =      5050" the "=" sits at column 27 and
+                # the number ENDS at 38, so the left half is "label, =, value ending at
+                # 38" padded to 48. Composing it from label/value widths kept landing one
+                # column off.
+                f"{est_label:<27}" + "=" + f"{est_value:>10}" + " " * 10
+                + _right(fit_label, fit_value)
+            )
     else:
         # The xt NON-LINEAR shape: group variable + group count, then the per-group
         # extremes.  No time-variable line, no ``Panels:``, no "Estimated ..." rows --
@@ -524,6 +599,12 @@ def _four(value: Any) -> str:
     """Four decimals, or ``.`` when the value is missing -- Stata's fit-statistic form."""
 
     return f"{float(value):.4f}" if np.isfinite(value) else "."
+
+
+def _pcse_family_for_header(result: Any) -> bool:
+    """Whether this command prints its own panel design block (xtpcse/xtgls)."""
+
+    return str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
 
 
 def _is_didregress(result: Any) -> bool:
@@ -751,6 +832,11 @@ def _anova_available(result: Any) -> bool:
     # variance estimator, not only on which scalars exist.
     _vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
     if _vcetype:
+        return False
+    # The PCSE/GLS panel commands print their own design block and NO sums-of-squares
+    # table: measured, ``xtpcse`` goes straight from the design rows to the coefficient
+    # header.
+    if str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls"):
         return False
 
     mss = _e_float(result, "mss")
@@ -1067,8 +1153,13 @@ def _stata_summary(result: Any) -> str:
     ).strip()
     # ``newey`` has its own two-column block, so its banner is paired there too and must
     # not also be printed as a standalone line.
+    # ``xtpcse`` keeps its OWN banner line (the long "Linear regression, correlated
+    # panels corrected standard errors (PCSEs)" string) and prints the design block under
+    # it; its "Panel-corrected" row is a table banner, not a reason to drop the title.
     _robust_banner = (
-        _block_for_banner in ("ols", "newey") and bool(_vcetype_for_banner)
+        _block_for_banner in ("ols", "newey")
+        and bool(_vcetype_for_banner)
+        and not _pcse_family_for_header(result)
     ) or _block_for_banner == "newey"
     if not _robust_banner:
         lines.append(banner if banner else "Stata-style regression results")
@@ -1135,16 +1226,21 @@ def _stata_summary(result: Any) -> str:
     # A robust ols fit prints its own two-column block below (see the ``block == "ols"``
     # branch), so the generic single-column lines are skipped for it.
     _robust_vcetype = str((getattr(result, "e", None) or {}).get("vcetype") or "").strip()
-    _is_robust_ols = block == "ols" and bool(_robust_vcetype)
+    _is_robust_ols = (
+        block == "ols" and bool(_robust_vcetype) and not _pcse_family_for_header(result)
+    )
     # ``newey`` also prints its own two-column block (see the ``block == "newey"``
     # branch), so it is excluded from the generic single-column lines as well.
-    if block not in ("svy", "ml", "newey") and not _is_robust_ols:
+    # ``xtpcse``/``xtgls`` print the design block above, which already carries
+    # "Number of obs" in its right column.
+    _pcse_family = str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
+    if block not in ("svy", "ml", "newey") and not _is_robust_ols and not _pcse_family:
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if block in ("quantile", "ml", "newey") or _is_robust_ols:
+    if block in ("quantile", "ml", "newey") or _is_robust_ols or _pcse_family:
         pass
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
@@ -1307,6 +1403,12 @@ def _stata_summary(result: Any) -> str:
         if cluster_summary:
             lines.append("")
             lines.extend(cluster_summary)
+    elif block == "ols" and _pcse_family_for_header(result):
+        # ``xtpcse``/``xtgls`` print NOTHING here: their design block above already
+        # carried the fit statistics. The blank line normally appended after this branch
+        # is not needed either -- the design block ends with its own, and two in a row
+        # separated the table from its header.
+        lines.pop() if lines and lines[-1] == "" else None
     elif block == "ols":
         # Reached when the ANOVA table is unavailable -- for a ROBUST fit that is Stata's
         # own behaviour, and its header is a two-column block 78 wide with FIVE rows and
@@ -1345,9 +1447,12 @@ def _stata_summary(result: Any) -> str:
                 lines.append("")
                 lines.extend(cluster_summary)
         else:
-            lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
-            lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
-            lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")
+            # ``xtpcse``/``xtgls`` already printed R-squared inside their design block,
+            # so the fallback block is skipped for them.
+            if not _pcse_family_for_header(result):
+                lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
+                lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
+                lines.append(f"{'Root MSE':<21} = {_fixed(rmse, 4):>10}")
     elif block == "ml":
         # Stata's likelihood header is a TWO-COLUMN block 78 wide, not a stack of lines.
         # Captured from a live ``logit``:
@@ -1626,8 +1731,12 @@ def _stata_summary(result: Any) -> str:
         # field: measured, "Robust" ends at 35 and "Newey-West" at 37, and both start
         # after the pipe at 13. Right-aligning to a fixed width reproduces both, whereas
         # deriving an offset from the label length put Newey-West two characters long.
-        _banner_width = 37 if len(_vcetype) > len("Robust") else 35
-        lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_width - name_width - 2}}")
+        # The banner's right edge is fixed per label, measured rather than derived:
+        # "Robust" ends at 35, "Newey-West" at 37, "Panel-corrected" at 40. Written as an
+        # explicit map because offsets computed from the label length kept landing short.
+        _BANNER_END = {"Robust": 35, "Newey-West": 37, "Panel-corrected": 40}
+        _banner_end = _BANNER_END.get(_vcetype, name_width + 2 + len(_vcetype))
+        lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_end - name_width - 2}}")
     lines.append(header)
     # The survey family borders its table with FULL-WIDTH rules top and bottom, and keeps
     # the SPLIT form between the header and the rows. Measured from ``svy: regress``:

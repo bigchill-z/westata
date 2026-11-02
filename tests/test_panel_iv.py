@@ -869,7 +869,11 @@ def test_e_contains_the_standard_keys(build) -> None:
 def test_summary_renders_in_stata_style(build) -> None:
     result = build()
     text = result.summary(style="stata")
-    for token in ("Coefficient", "Std. err.", "P>|z|", "Number of obs"):
+    # ``xtpcse`` is the one command here whose column header is the ROBUST spelling
+    # ("std. err."), because it also prints a "Panel-corrected" banner row -- see the
+    # capture at p9_outputs.txt:509. The other three keep "Std. err.".
+    se_token = "std. err." if result.model_name == "xtpcse" else "Std. err."
+    for token in ("Coefficient", se_token, "P>|z|", "Number of obs"):
         assert token in text, token
 
 

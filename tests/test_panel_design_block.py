@@ -102,7 +102,11 @@ def test_the_estimated_coefficient_count_is_a_number(pcse_fit) -> None:
     block = _panel_design_block(pcse_fit)
     line = next(entry for entry in block if "Estimated coefficients" in entry)
 
-    assert line.rstrip().endswith("2")
+    # The row is the LEFT half of a two-column line -- Stata puts a fit statistic
+    # ("Prob > chi2") opposite it -- so the count is not at the end of the string. Read
+    # the value between the "=" and the start of the right column (column 48).
+    left = line[:48]
+    assert left.rstrip().endswith("2")
 
 
 # ------------------------------------------------ the block is command-specific
@@ -152,6 +156,15 @@ def test_the_estimation_table_is_still_there(pcse_fit) -> None:
     rendered = render_summary(pcse_fit, style="stata")
 
     assert "Coefficient" in rendered
-    assert "Std. err." in rendered
+    # ``xtpcse`` is a ROBUST-style table: it prints the "Panel-corrected" banner and
+    # spells the column "std. err." -- unlike ``xtgls``, which has no banner and keeps
+    # "Std. err.". Both spellings are in the captures (p9_outputs.txt:509 and :484).
+    assert "std. err." in rendered
+    assert "Panel-corrected" in rendered
     assert "_cons" in rendered
-    assert "Source |" in rendered
+    # NO sums-of-squares table. The captured ``xtpcse`` run (p9_outputs.txt:506-509) goes
+    # straight from the last "Estimated ..." row to the table rule and the coefficient
+    # header -- there is no Source/SS/df/MS block. Asserting one pinned a table Stata does
+    # not print.
+    assert "Source |" not in rendered
+    assert "Source" not in rendered.split("Coefficient")[0].split("Estimated")[-1]

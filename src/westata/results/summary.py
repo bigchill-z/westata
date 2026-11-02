@@ -1796,6 +1796,37 @@ def _stata_summary(result: Any) -> str:
         #          Upper = +inf                Wald chi2(2)      =       4.16
         #
         # ``e(llopt)``/``e(ulopt)`` hold them, or are absent when that side is unbounded.
+        _is_tobit = str(getattr(result, "model_name", "") or "") == "tobit"
+        if _is_tobit:
+            _lower = _e_float(result, "llopt")
+            _upper = _e_float(result, "ulopt")
+            # The banner keeps row 0; the Limit rows start at row 1, beside "Uncensored"
+            # and "Left-censored". Replacing row 0 (as truncreg does) put them one row
+            # too high.
+            while len(ml_left) < 3:
+                ml_left.append("")
+            # Row 2, beside "Left-censored" -- row 1 stays blank beside "Uncensored".
+            ml_left[2] = "Limits: Lower = " + (
+                f"{_lower:>4g}" if np.isfinite(_lower) else "   ."
+            )
+            ml_left.append(
+                "        Upper = " + (f"{_upper:>4g}" if np.isfinite(_upper) else "+inf")
+            )
+            _unc = _e_float(result, "N_unc")
+            _lc = _e_float(result, "N_lc")
+            _rc = _e_float(result, "N_rc")
+            _counts: list[tuple[str, str]] = []
+            if np.isfinite(_unc):
+                _counts.append(("Uncensored", f"{int(_unc):,}"))
+            if np.isfinite(_lc):
+                _counts.append(("Left-censored", f"{int(_lc):,}"))
+            if np.isfinite(_rc):
+                _counts.append(("Right-censored", f"{int(_rc):,}"))
+            # ``Number of obs`` stays first; the counts follow it. Inserting at 1 keeps
+            # row 0 as Number of obs -- inserting at 0 pushed it to the top of the block,
+            # which is what put "Uncensored" on the banner row.
+            ml_right[1:1] = _counts
+
         if str(getattr(result, "model_name", "") or "") == "truncreg":
             # The banner row is REPLACED by "Limit: Lower = ...", not followed by it:
             # Stata prints the banner once, as the title above the table, and the Limit
@@ -1830,7 +1861,14 @@ def _stata_summary(result: Any) -> str:
         # column left to keep the block 78 wide -- and the value field shrinks with it
         # ("Number of obs     =  85": value in 4 columns, not 6).
         _is_truncreg = str(getattr(result, "model_name", "") or "") == "truncreg"
-        _left_width = 48 if _is_truncreg else 56
+        # tobit's right column starts at 52 with a 17-wide label and a 5-wide value
+        # ("Right-censored =      0"); truncreg uses 48 / 18 / 4; the rest 56 / 14 / 6.
+        if _is_tobit:
+            _left_width = 52
+        elif _is_truncreg:
+            _left_width = 48
+        else:
+            _left_width = 56
         for index, line in enumerate(ml_left):
             right = ""
             if index < len(ml_right):
@@ -1838,11 +1876,22 @@ def _stata_summary(result: Any) -> str:
                 # Measured: truncreg's right column is label 18 + "= " + value 4
                 # ("Number of obs     =  85"), where the other ML commands use label 14
                 # + value 6. The block is the same 78 wide either way.
-                if _is_truncreg:
+                if _is_tobit:
+                    _censoring = label.endswith("censored") or label == "Uncensored"
+                    if _censoring:
+                        # Seven extra columns of indent put the label at 59; the value is
+                        # right-aligned to the block's end at 78.
+                        right = f"{'':>7}{label} = {value:>6}"
+                    else:
+                        right = f"{label:<18}= {value:>4}"
+                elif _is_truncreg:
                     right = f"{label:<18}= {value:>4}"
                 else:
                     right = f"{label:<14}= {value:>6}"
-            lines.append(f"{line:<{_left_width}}{right}".rstrip())
+            if _is_tobit and line and not right:
+                lines.append(line.rstrip())
+            else:
+                lines.append(f"{line:<{_left_width}}{right}".rstrip())
     elif block == "quantile":
         # Stata's qreg header (p8_outputs.txt:20-22): the title carries the
         # quantile, then two deviation lines with Pseudo R2 on the right.  There
@@ -2182,6 +2231,8 @@ def _stata_summary(result: Any) -> str:
     _did_treatment = ""
     if _is_didregress(result):
         _did_treatment = str((getattr(result, "e", None) or {}).get("_did_treatment") or "")
+    #: Guards the single rule that separates slopes from ordinal thresholds.
+    _cut_rule_emitted = False
     _EQUATION_PREFIXES = ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
@@ -2221,15 +2272,40 @@ def _stata_summary(result: Any) -> str:
         # Inside an equation block the constant is still spelled ``_cons``.
         if bare.strip().lower() in _GROUP_CONSTANTS:
             bare = "_cons"
-        lines.append(
-            f"{bare:>{name_width}} |"
-            f"{_stata_coef(params[index], coef_w)}"
-            f"{_stata_coef(bse[index], se_w)}"
-            f"{_stata_stat(stats_[index], stat_w)}"
-            f"{_stata_pvalue(pvalues[index], p_w)}"
-            f"{_stata_coef(lower[index], ci_lo_w)}"
-            f"{_stata_coef(upper[index], ci_hi_w)}"
-        )
+        # Ordinal models report their THRESHOLDS (/cut1, /cut2, ...) with no test
+        # statistic: Stata leaves both the z and P columns blank for those rows, because
+        # a cut point is a nuisance parameter, not a hypothesis about a slope. Measured
+        # from ``ologit yord x1 x2``:
+        #
+        #   /cut1 |   -.699741   .2145721                     -1.120295   -.2791874
+        #   /cut2 |   .7037455   .2148227                      .2827008     1.12479
+        #
+        # Printing z and P there invented two numbers Stata does not show.
+        _is_cut_row = bare.strip().startswith("cut") or bare.strip().startswith("/cut")
+        if _is_cut_row and not _cut_rule_emitted:
+            # One rule separates the slopes from the thresholds, before the first cut row.
+            lines.append(_split_rule)
+            _cut_rule_emitted = True
+        if _is_cut_row:
+            lines.append(
+                f"{bare:>{name_width}} |"
+                f"{_stata_coef(params[index], coef_w)}"
+                f"{_stata_coef(bse[index], se_w)}"
+                f"{'':>{stat_w}}"
+                f"{'':>{p_w}}"
+                f"{_stata_coef(lower[index], ci_lo_w)}"
+                f"{_stata_coef(upper[index], ci_hi_w)}"
+            )
+        else:
+            lines.append(
+                f"{bare:>{name_width}} |"
+                f"{_stata_coef(params[index], coef_w)}"
+                f"{_stata_coef(bse[index], se_w)}"
+                f"{_stata_stat(stats_[index], stat_w)}"
+                f"{_stata_pvalue(pvalues[index], p_w)}"
+                f"{_stata_coef(lower[index], ci_lo_w)}"
+                f"{_stata_coef(upper[index], ci_hi_w)}"
+            )
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
 

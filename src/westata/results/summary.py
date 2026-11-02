@@ -502,6 +502,24 @@ def _header_block_kind(result: Any) -> str:
     return "ml"
 
 
+def _cluster_variable(result: Any) -> str:
+    """The name of the variable clustered on, for Stata's "in <var>" note.
+
+    Stored under ``_cluster_names`` when the covariance was built, because the display
+    path needs the NAME while the estimator only needs the labels. An unnamed cluster
+    (a bare array) yields an empty string so the note degrades to
+    "(adjusted for N clusters)" instead of inventing a variable name.
+    """
+
+    for key in ("_cluster_names", "clustvar", "cluster"):
+        value = (getattr(result, "e", None) or {}).get(key)
+        if isinstance(value, (list, tuple)) and value:
+            return str(value[0])
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def _anova_available(result: Any) -> bool:
     """Whether the model+residual sums of squares are all present.
 
@@ -1064,6 +1082,12 @@ def _stata_summary(result: Any) -> str:
             for index, (label, value) in enumerate(_rows):
                 left = _banner if index == 0 else ""
                 lines.append(f"{left:<48}{label:<18}= {value:>10}".rstrip())
+            # ``clustertable`` must survive this branch too: the multiway combination
+            # table is independent of which variance estimator was used, and attaching it
+            # only in the ANOVA branch made it vanish for every clustered fit.
+            if cluster_summary:
+                lines.append("")
+                lines.extend(cluster_summary)
         else:
             lines.append(f"{'R-squared':<21} = {_fixed(rsquared, 4):>10}")
             lines.append(f"{'Adj R-squared':<21} = {_fixed(rsquared_adj, 4):>10}")
@@ -1269,6 +1293,25 @@ def _stata_summary(result: Any) -> str:
         f"{p_label:>{p_w + 1}}"
         f"{_ci_label(getattr(result, 'level', None)):>{ci_lo_w + ci_hi_w}}"
     )
+    # A CLUSTERED fit prints a note above the rule saying how many clusters were used.
+    # Captured from ``regress y s, vce(cluster g)``:
+    #
+    #                                        (Std. err. adjusted for 30 clusters in g)
+    #   ------------------------------------------------------------------------------
+    #
+    # right-aligned to the full 78 columns. Without it a reader cannot tell which
+    # variable was clustered on, which is the single most important thing to know about a
+    # clustered fit.
+    _cluster_note = ""
+    if str((getattr(result, "e", None) or {}).get("vce") or "").strip() == "cluster":
+        _n_clust = _e_float(result, "N_clust")
+        if np.isfinite(_n_clust):
+            _cluster_note = (
+                f"(Std. err. adjusted for {int(_n_clust):,} clusters"
+                f"{' in ' + _cluster_var if (_cluster_var := _cluster_variable(result)) else ''})"
+            )
+    if _cluster_note:
+        lines.append(f"{_cluster_note:>{row_width}}")
     lines.append("-" * row_width)
     if _is_robust:
         # Ends at the same column as the ``Coefficient`` header: the banner row is the

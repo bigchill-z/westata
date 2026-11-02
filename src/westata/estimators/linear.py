@@ -132,6 +132,16 @@ def _stata_vcetype_label(cov_type: Any, *, ml: bool = False) -> str:
         return "OIM"
     if token in ("hc0", "hc1", "hc2", "hc3"):
         return f"Robust {token.upper()}"
+    if token == "cluster":
+        # ``vce(cluster g)`` stores e(vcetype)="Robust", NOT "Cluster". Measured:
+        #
+        #   regress y s, vce(cluster g)
+        #     e(vce)="cluster"  e(vcetype)="Robust"
+        #
+        # The macro names the ESTIMATOR FAMILY (which table header to draw), not the
+        # option: the clustered table is labelled "Robust" above the column header, and
+        # the cluster count appears on its own line instead.
+        return "Robust"
     return token[:1].upper() + token[1:]
 
 
@@ -163,6 +173,11 @@ def _cluster_dimension_labels(groups: Any, n_dimensions: int) -> list[str]:
 
     if isinstance(groups, pd.DataFrame) and groups.shape[1] >= n_dimensions:
         return [str(name) for name in groups.columns[:n_dimensions]]
+    # A Series knows its own name -- ``df["g"]`` carries "g". Using it lets the clustered
+    # output say "in g", as Stata does; falling back to a placeholder printed "in group",
+    # which is a name the caller never wrote.
+    if isinstance(groups, pd.Series) and groups.name and n_dimensions == 1:
+        return [str(groups.name)]
     if n_dimensions == 1:
         return ["group"]
     return [f"dim{index + 1}" for index in range(n_dimensions)]

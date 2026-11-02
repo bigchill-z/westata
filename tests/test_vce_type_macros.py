@@ -109,10 +109,17 @@ def test_the_vcetype_is_capitalised(frame) -> None:
     assert _fit(frame).e["vcetype"] == ""
 
 
-def test_cluster_vcetype_is_capitalised(frame) -> None:
+def test_cluster_vcetype_is_robust(frame) -> None:
+    """``vce(cluster g)`` stores e(vcetype)="Robust", not "Cluster".
+
+    Measured: the macro names the ESTIMATOR FAMILY (which table header to draw), so the
+    clustered table gets the "Robust" banner row while the cluster count goes on its own
+    line above the rule.
+    """
+
     fitted = _fit(frame, "cluster", {"groups": frame["g"]})
 
-    assert fitted.e["vcetype"] == "Cluster"
+    assert fitted.e["vcetype"] == "Robust"
 
 
 @pytest.mark.parametrize("hc", ["HC2", "HC3"])
@@ -211,7 +218,8 @@ def test_the_token_helper(raw: str, expected_token: str) -> None:
         ("nonrobust", ""),
         # ``vce(robust)`` yields exactly "Robust"; only the hc2/hc3 forms are two words.
         ("HC1", "Robust"),
-        ("cluster", "Cluster"),
+        # e(vcetype) is "Robust" for a clustered fit too -- see the note below.
+        ("cluster", "Robust"),
         ("hac", "Hac"),
     ],
 )

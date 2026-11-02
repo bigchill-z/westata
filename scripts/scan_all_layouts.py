@@ -68,6 +68,12 @@ _BANNER_PREFIXES = (
     "Truncated regression",
     "Zero-inflated Poisson regression",
     "Zero-inflated negative binomial regression",
+    "Robust regression",
+    "Heckman selection model",
+    "Interval regression",
+    "Errors-in-variables regression",
+    "Simultaneous quantile regression",
+    "Median regression",
 )
 
 
@@ -150,12 +156,21 @@ def _frames() -> dict[str, pd.DataFrame]:
     panel["psu"] = np.tile(np.arange(20), len(panel) // 20)
     panel["w"] = np.ones(len(panel))
     panel["t"] = np.arange(1, len(panel) + 1)
-    return {"panel": panel, "cross": cross}
+    # Heckman needs a binary selection indicator that is NOT degenerate; intreg needs a
+    # (low, high) interval pair whose low < high everywhere.
+    panel["selected"] = (panel["x1"] + panel["x2"] > 0).astype(int)
+    interval = panel.copy()
+    interval["lo"] = panel["y"] - 0.5
+    interval["hi"] = panel["y"] + 0.5
+
+    return {"panel": panel, "cross": cross, "interval": interval}
 
 
 FRAMES = _frames()
 PANEL = FRAMES["panel"]
 CROSS = FRAMES["cross"]
+SELECTED = FRAMES["panel"]
+INTERVAL = FRAMES["interval"]
 
 DESIGN = ws.SurveyDesign(psu="psu", strata="stratum", weights="w")
 
@@ -200,6 +215,47 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.Logit.from_formula("ybin ~ x1", PANEL).fit(cov_type="HC1")),
         ("ivregress_2sls", "ivregress 2sls y x1 (x2 = z)",
          lambda: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
+        # --- second batch: the families not covered by the first scan ---
+        ("heckman", "heckman y x1, select(selected = x1 x2)",
+         lambda: ws.Heckman.from_formula(
+             "y ~ x1 + select(selected ~ x1 + x2)", SELECTED).fit()),
+        ("intreg", "intreg lo hi x1",
+         lambda: ws.Intreg.from_formula("lo hi ~ x1", INTERVAL).fit()),
+        ("etregress", "etregress y x1, treat(treated = x1 x2)",
+         lambda: ws.Etregress.from_formula(
+             "y ~ x1 + treat(treated ~ x1 + x2)", PANEL).fit()),
+        ("sqreg", "sqreg y x1, quantiles(.25 .5 .75)",
+         lambda: ws.Sqreg.from_formula("y ~ x1", PANEL).fit()),
+        ("bsqreg", "bsqreg y x1, quantile(.5)",
+         lambda: ws.Bsqreg.from_formula("y ~ x1", PANEL).fit()),
+        ("rreg", "rreg y x1",
+         lambda: ws.RobustRegression.from_formula("y ~ x1", PANEL).fit()),
+        ("eivreg", "eivreg y x1 x2, reliab(x1 0.7)",
+         lambda: ws.Eivreg.from_formula("y ~ x1 + x2", PANEL,
+                                        reliab={"x1": 0.7}).fit()),
+        ("xtlogit_fe", "xtlogit ybin x1, fe",
+         lambda: ws.XtLogit.from_formula("ybin ~ x1", PANEL, entity="unit",
+                                         method="fe").fit()),
+        ("svy_mean", "svy: mean y",
+         lambda: ws.SvyMean.from_frame(["y"], CROSS, DESIGN).fit()),
+        ("svy_total", "svy: total y",
+         lambda: ws.SvyTotal.from_frame(["y"], CROSS, DESIGN).fit()),
+        ("svy_logit", "svy: logit ybin x1",
+         lambda: ws.SvyLogit.from_frame("ybin ~ x1", CROSS, DESIGN).fit()),
+        ("xtpcse", "xtpcse y x1",
+         lambda: ws.XtPcse.from_formula("y ~ x1", PANEL, entity="unit",
+                                        time="period").fit()),
+        ("xtgls", "xtgls y x1, panels(heteroskedastic)",
+         lambda: ws.XtGls.from_formula("y ~ x1", PANEL, entity="unit",
+                                       time="period",
+                                       panels="heteroskedastic").fit()),
+        ("xtreg_fe", "xtreg y x1, fe",
+         lambda: ws.PanelOLS.from_formula("y ~ x1", PANEL, entity="unit",
+                                          time="period").fit()),
+        ("didregress", "didregress (y x1) (treated), group(unit) time(period)",
+         lambda: ws.Didregress.from_formula(
+             "y", "treated", PANEL, group="unit", time="period",
+             covariates=["x1"]).fit()),
     ]
     return rows
 
@@ -235,13 +291,20 @@ def _stata_block(command: str) -> list[str]:
         "note:",
         "Fitting ",
         "Grid node ",
+        "convergence not achieved",
+        "Huber iteration",
+        "Biweight iteration",
+        "(fitting base model)",
+        "(bootstrap",
+        "(running ",
         "Refining ",
         "Iteration ",
         "(setting ",
         "(switching ",
     )
     with StataSession() as stata:
-        stata.push(PANEL)
+        # intreg's bound columns only exist on INTERVAL; everything else uses PANEL.
+        stata.push(INTERVAL if command.split()[0] == "intreg" else PANEL)
         for setup in STATA_SETUP:
             with contextlib.redirect_stdout(io.StringIO()):
                 stata.run(setup)
@@ -250,7 +313,8 @@ def _stata_block(command: str) -> list[str]:
             stata.run(command)
         text = buffer.getvalue()
     lines = [line.rstrip() for line in text.splitlines()]
-    lines = [line for line in lines if not line.startswith(noise)]
+    lines = [line for line in lines if not line.strip().startswith(noise)]
+    lines = [line for line in lines if "Bootstrap replications" not in line]
     # "(15 obs truncated)" appears at the START of a footer line and is a note about the
     # sample, not part of the table.
     lines = [line for line in lines if "obs truncated" not in line]

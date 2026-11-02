@@ -1774,6 +1774,10 @@ class Heckman:
         grad_lambda[k + m + 1] = rho * sigma
 
         e: dict[str, Any] = {
+        # ``e(title)``: measured from a live run -- "Heckman selection model".
+        "title": "Heckman selection model",
+        # ``e(title)``: measured from a live run -- "Interval regression".
+        "title": "Interval regression",
             "N": int(y.size),
             "N_selected": n_selected,
             # The selection equation's regressor names, so ``predict, psel``/``mills``/

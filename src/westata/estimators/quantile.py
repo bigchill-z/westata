@@ -751,6 +751,8 @@ class RobustRegression:
 
         e: dict[str, Any] = {
             "N": n_used,
+            # ``e(title)``: measured, "Robust regression".
+            "title": "Robust regression",
             "df_m": float(df_m),
             "df_r": df_r,
             "rank": k,

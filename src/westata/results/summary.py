@@ -1067,6 +1067,10 @@ def _anova_available(result: Any) -> bool:
     # prints a two-column header with Wald chi2 and no ANOVA rows.
     if str(getattr(result, "model_name", "") or "").startswith("ivregress"):
         return False
+    # ``rreg`` prints no ANOVA either: measured, its header is Number of obs / F / Prob > F
+    # and nothing else, exactly like a vce(robust) regress.
+    if str(getattr(result, "model_name", "") or "") == "rreg":
+        return False
     if str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls"):
         return False
 

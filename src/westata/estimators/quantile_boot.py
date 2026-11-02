@@ -98,6 +98,11 @@ class Sqreg:
         model._model_data = data.loc[kept_index].reset_index(drop=True)
         return model
 
+    def _banner(self, reps: int) -> str:
+        """The banner Stata prints. ``Bsqreg`` overrides it."""
+
+        return "Simultaneous quantile regression"
+
     def fit(
         self,
         cov_type: str | None = None,
@@ -153,6 +158,9 @@ class Sqreg:
 
         e: dict[str, Any] = {
             "N": n,
+            # ``e(title)``: measured. ``sqreg`` prints "Simultaneous quantile regression";
+            # ``bsqreg`` prints "<quantile> regression, bootstrap(N) SEs".
+            "title": self._banner(reps),
             "df_m": float(k - 1),
             "df_r": float(n - k),
             "quantiles": list(self._quantiles),
@@ -290,6 +298,22 @@ class Bsqreg(Sqreg):
     """
 
     _stata_command = "bsqreg"
+
+    def _banner(self, reps: int) -> str:
+        """Stata names the quantile and the bootstrap count in the banner.
+
+        Measured: ``bsqreg y x1, quantile(.5)`` prints
+        "Median regression, bootstrap(20) SEs"; other quantiles substitute their own
+        wording ("<q> Quantile regression, bootstrap(N) SEs").
+        """
+
+        _quantile = float(self._quantiles[0])
+        _base = (
+            "Median regression"
+            if abs(_quantile - 0.5) < 1e-12
+            else f"{_quantile:g} Quantile regression"
+        )
+        return f"{_base}, bootstrap({int(reps)}) SEs"
 
     def __init__(
         self,

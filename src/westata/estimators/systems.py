@@ -1127,6 +1127,8 @@ class Eivreg:
             pvalue = float(stats.f.sf(statistic, len(slopes), dof))
 
         e: dict[str, Any] = {
+        # ``e(title)``: measured from a live run -- "Errors-in-variables regression".
+        "title": "Errors-in-variables regression",
             "N": n,
             "df_m": float(len(slopes)),
             "df_r": float(dof),

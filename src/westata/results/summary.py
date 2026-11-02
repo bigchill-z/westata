@@ -244,7 +244,7 @@ _HEADER_BLOCK: dict[str, str] = {
     "xtnbreg, fe": "ml",
     "frontier": "ml",
     "arima": "none",
-    "arch": "none",
+    "arch": "arch",
     "qreg": "quantile",
     "sqreg": "quantile",
     "bsqreg": "quantile",
@@ -1316,7 +1316,11 @@ def _stata_summary(result: Any) -> str:
     # ``xtpcse``/``xtgls`` print the design block above, which already carries
     # "Number of obs" in its right column.
     _pcse_family = str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
-    if block not in ("svy", "ml", "newey") and not _is_robust_ols and not _pcse_family:
+    if (
+        block not in ("svy", "ml", "newey", "arch")
+        and not _is_robust_ols
+        and not _pcse_family
+    ):
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
@@ -1324,6 +1328,29 @@ def _stata_summary(result: Any) -> str:
     # would read as a missing value rather than "not applicable".
     if block in ("quantile", "ml", "newey") or _is_robust_ols or _pcse_family:
         pass
+    elif block == "arch":
+        # BEFORE the chi2 test: ``arch`` sets e(chi2type)="Wald", so the generic chi2
+        # branch would claim it and print "Wald chi2(Nah)" in one column.
+        # ``arch`` prints a two-column block 78 wide:
+        #
+        #   Sample: 1 thru 800                      Number of obs     =        800
+        #                                           Wald chi2(.)      =          .
+        #   Log likelihood = -1039.235              Prob > chi2       =          .
+        _chi2df = "."
+        lines.append(
+            f"{'Sample: 1 thru ' + str(nobs):<48}"
+            f"{'Number of obs':<18}= {nobs:>10d}"
+        )
+        lines.append(
+            f"{'':<48}{'Wald chi2(' + _chi2df + ')':<18}= {'.':>10}"
+        )
+        _ll = _e_float(result, "ll")
+        # Six decimals: measured, Stata prints "-1039.235" (not the full float).
+        # ``%.7g`` gives "-1039.235", which is what Stata prints; more digits is too many.
+        _ll_text = (
+            "Log likelihood = " + "%.7g" % _ll if np.isfinite(_ll) else ""
+        )
+        lines.append(f"{_ll_text:<48}{'Prob > chi2':<18}= {'.':>10}")
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
         # "Wald chi2" for logit/probit/ivregress, "LR chi2" for tobit.
@@ -1816,7 +1843,13 @@ def _stata_summary(result: Any) -> str:
         # The banner's right edge is fixed per label, measured rather than derived:
         # "Robust" ends at 35, "Newey-West" at 37, "Panel-corrected" at 40. Written as an
         # explicit map because offsets computed from the label length kept landing short.
-        _BANNER_END = {"Robust": 35, "Newey-West": 37, "Panel-corrected": 40}
+        _BANNER_END = {
+            "Robust": 35,
+            "Newey-West": 37,
+            "Panel-corrected": 40,
+            # arch's variance-estimator banner ends one column short of "Robust".
+            "OPG": 34,
+        }
         _banner_end = _BANNER_END.get(_vcetype, name_width + 2 + len(_vcetype))
         lines.append(f"{'':>{name_width}} |{_vcetype:>{_banner_end - name_width - 2}}")
     lines.append(header)

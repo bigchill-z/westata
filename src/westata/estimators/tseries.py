@@ -2073,6 +2073,9 @@ class GARCH:
         self._vol = vol
         self._dist = dist
         self._mean = mean
+        # The series' own name, for ``e(depvar)`` and for the mean-equation group label.
+        # Stata heads the table with it and prints it again as the first group row.
+        self._depvar_name = str(getattr(self._y, "name", "") or "")
 
     # -- covariance conventions ------------------------------------------
     _COV_TYPES = {
@@ -2200,7 +2203,16 @@ class GARCH:
             "bic": float(result.bic),
             "chi2type": "Wald",
             "rank": params.size,
-            "df_m": max(params.size - 1, 0),
+            # ``arch`` reports "Wald chi2(.)" -- the degrees of freedom are NOT printed as a
+            # number, because the test is over the mean-equation coefficients and Stata
+            # does not fill them in for this model. Storing NaN makes the renderer print
+            # "(. )" as Stata does, instead of inventing a count.
+            "df_m": float("nan"),
+            # ``e(title)``: measured, "ARCH family regression".
+            "title": "ARCH family regression",
+            # ``e(depvar)``: measured, "r" -- the series' own name. The table is headed
+            # with it and Stata prints it again as the first group label.
+            "depvar": str(self._depvar_name or "y"),
             "converged": int(converged),
             "vcetype": covariance,
             # Stata's e(archi): the presample variance the recursion starts from.

@@ -7067,6 +7067,30 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
   留给后续：**只要把 `xtreg, fe` 的 `predict xb`/`predict u` 语义在 westata 内精确复刻，
   这条公式就是现成的。**
 
+* **第 56 轮：把 `predict xb + predict u` 的性质测清楚了（仍未复刻）**
+
+  在 Stata 里对 `xtreg x2 x1 z, fe` 分别 `predict xb` / `predict u` 后实测：
+
+  | 量 | 值 |
+  |---|---|
+  | `mean(xb)` | **.09701**，恰好等于 `mean(x2)` |
+  | `mean(u)` | 0 |
+  | `_cons` | .12561 ≠ `mean(x2)` |
+  | `xb + u` 减 `x2` 的**均值** | 0 |
+  | `xb + u` 减 `x2` 的**标准差** | **.9103**（极差 −2.79..3.17）|
+
+  也就是说 `xb + u` 与 `x2` 的差别**不是一个常数偏移，而是纯组内变异**：两者组均值一致，
+  逐元素不同。逐一排除的关系：
+
+  * `xb + u ≠ x2`
+  * `xb + u ≠ x2 − 组效应`
+  * `xb ≠ x2 − u`
+  * 中心化后仍不等（`max|combo_c − x2_c| = 3.17`）
+
+  结论：`predict u` 在 `xtreg, fe` 里不是"原始残差"，`predict xb` 也不等于"组内拟合”。
+  要复刻必须先精确确定这两个 predict 的定义（可能涉及 `e(sample)` 与组内变换的交互），
+  **本轮没有做到，因此没有代码改动**——再次说明：不拿 0.5% 的近似值凑数。
+
 * 顺带确认：`sigma_u` 来自 `xtivreg.ado:806-838` 的 **Swamy–Arora** 公式
   `sig_u2 = (ubPub − (n−K)·sig_e2) / (N′ − tr)`，`tr` 是 `glsaccum` 的矩阵迹；
   用 `tr = K` 近似会得到**负方差**，所以这条也依赖 theta/GLS 那一套。

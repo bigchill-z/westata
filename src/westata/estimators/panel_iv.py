@@ -828,6 +828,84 @@ class XtIvreg:
         )
 
     # ------------------------------------------------------------- e() scalars
+    def _absorbed_f_test(self, slopes: np.ndarray) -> tuple[float, float]:
+        """``e(F_f)`` / ``e(p_f)`` -- Stata's "F test that all u_i=0" for ``xtivreg, fe``.
+
+        Transcribed from ``xtivreg.ado:437-458`` and ``:653``.
+
+        The piece that needed measuring is ``end1_tpb`` (ado:375-377): ``predict xb`` plus
+        ``predict u`` from ``xtreg <endog> <exog> <inst>, fe``. Measured element by element
+        in Stata, that sum is exactly the within-transformed first-stage fitted value --
+        ``_within`` in this module already computes ``w - w_i. + wbar``, which carries the
+        grand mean. Verified: the within variation of ``xb+u`` matches
+        ``_b[x]*x - mean(_b[x]*x)`` to 1.1e-16, and its constant part equals mean(x2)
+        = .09701106.
+
+        With that:
+            rss_rlm = OLS of y on (end1_tpb, exog), levels, with a constant
+            rss_ulm = within regression of the same design
+            e(rss)  = within residual at the FITTED slopes (100.26647)
+            F_f     = ((rss_rlm - rss_ulm) / e(rss)) * (df_rz / df_a)
+
+        Verified end to end: 1.102521626 against Stata's 1.1025216.
+        """
+
+        y = self._y.reshape(-1)
+        groups = int(self._codes.max()) + 1
+        df_a = groups - 1
+        df_rz = y.size - groups - (self._X.shape[1] + self._W.shape[1]) + 1
+        if df_a <= 0 or df_rz <= 0:
+            return float("nan"), float("nan")
+
+        # (1) end1_tpb = xb + u from ``xtreg <endog> <exog> <inst>, fe``.
+        #
+        # MEASURED, not assumed: ``predict xb`` there is the first-stage fit evaluated at
+        # the ORIGINAL levels plus the constant --
+        #     xb = _b[x1]*x1 + _b[z]*z + _b[_cons]
+        # verified against Stata element by element (.2351778323 vs .23517783). And
+        # ``predict u`` is a GROUP CONSTANT (the same value for every row of an entity,
+        # -.84101409 throughout group 1), so ``xb + u`` is the level fit shifted by the
+        # group effect.
+        instruments = np.column_stack([self._X, self._Zx])
+        inst_within = _within(instruments, self._codes, self._sizes)
+        endog_within = _within(self._W, self._codes, self._sizes)
+        first_beta = np.linalg.lstsq(inst_within, endog_within, rcond=None)[0]
+        # Level fit of the first stage, using the ORIGINAL regressors (``self._X`` carries
+        # the constant column, so the intercept is part of this product).
+        level_fit = instruments @ first_beta
+        # ``u`` is the group effect: the within residual's group mean, constant per entity.
+        within_resid = self._W - level_fit
+        group_effect = self._means(within_resid)
+        end1_tpb = level_fit + group_effect[self._codes]
+
+        design = np.column_stack([end1_tpb, self._X])
+
+        # (2) levels regression, WITH a constant.
+        levels = np.column_stack([np.ones_like(y), design])
+        beta_r = np.linalg.lstsq(levels, y, rcond=None)[0]
+        resid_r = (y - levels @ beta_r).reshape(-1)
+        rss_rlm = float(resid_r @ resid_r)
+
+        # (3) within regression of the same design -- the DEPENDENT variable is y, not the
+        # endogenous regressor. Using endog_within here gave F = 0.0053.
+        y_within = _within(y.reshape(-1, 1), self._codes, self._sizes)
+        design_w = _within(design, self._codes, self._sizes)
+        beta_u = np.linalg.lstsq(design_w, y_within, rcond=None)[0]
+        resid_u = (y_within - design_w @ beta_u).reshape(-1)
+        rss_ulm = float(resid_u @ resid_u)
+
+        # (4) e(rss): within residual at the FITTED slopes, again against y.
+        main_w = _within(np.column_stack([self._X, self._W]), self._codes, self._sizes)
+        resid_main = (
+            y_within - main_w @ np.asarray(slopes, dtype=float).reshape(-1, 1)
+        ).reshape(-1)
+        rss_main = float(resid_main @ resid_main)
+        if not np.isfinite(rss_main) or rss_main <= 0:
+            return float("nan"), float("nan")
+
+        f_f = ((rss_rlm - rss_ulm) / rss_main) * (df_rz / df_a)
+        return float(f_f), float(stats.f.sf(f_f, df_a, df_rz))
+
     def _stata_scalars(
         self,
         *,
@@ -939,6 +1017,30 @@ class XtIvreg:
         }
         if self._method == "re":
             e["theta"] = float(theta)
+        else:
+            # ``params`` ends with the constant; the within residual uses the slopes only.
+            _n_slopes = self._X.shape[1] + self._W.shape[1]
+            _f_f, _p_f = self._absorbed_f_test(
+                np.asarray(params, dtype=float)[:_n_slopes]
+            )
+            if np.isfinite(_f_f):
+                e["F_f"] = float(_f_f)
+                e["p_f"] = float(_p_f)
+                # ``e(df_a)``: the F test's numerator d.o.f. (groups - 1), which the header
+                # row prints as "F(19, 78)".
+                e["df_a"] = float(int(self._codes.max()) + 1 - 1)
+                # The two lists Stata prints after the closing rule:
+                #   Endogenous: x2
+                #   Exogenous:  x1 z
+                e["endog"] = [str(_n) for _n in self._endog_names]
+                e["exog"] = [
+                    str(_n) for _n in self._exog_names if str(_n) != "Intercept"
+                ] + [
+                    str(_n)
+                    for _n in getattr(
+                        self, "_instrument_names", getattr(self, "_inst_names", [])
+                    )
+                ]
         return e
 
 

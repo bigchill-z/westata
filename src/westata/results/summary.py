@@ -3602,8 +3602,11 @@ def _stata_summary(result: Any) -> str:
             "and time effects."
         )
 
-    if str(getattr(result, "model_name", "") or "").startswith("ivregress"):
-        # ``ivregress`` names the variable roles under the table, on two unaligned lines:
+    if str(getattr(result, "model_name", "") or "").startswith(
+        ("ivregress", "xtivreg")
+    ):
+        # ``ivregress`` AND ``xtivreg`` name the variable roles under the table, on two
+        # unaligned lines:
         #
         #   Endogenous: x2
         #   Exogenous:  x1 z
@@ -3689,6 +3692,13 @@ def _stata_summary(result: Any) -> str:
                 f"F test that all u_i=0: F({_df_label(df_a)}, "
                 f"{_df_label(df_resid)}) = {f_f:.2f}"
             )
+            # ``xtivreg`` spells it without the space after the comma -- measured:
+            # " F test that all u_i=0: F(19,78)  =     1.10".
+            if str(getattr(result, "model_name", "") or "").startswith("xtivreg"):
+                text = (
+                    f" F test that all u_i=0: F({_df_label(df_a)},"
+                    f"{_df_label(df_resid)})  = {f_f:>8.2f}"
+                )
             if np.isfinite(p_f_test):
                 # ``Prob > F`` starts at column 61 and the line ends at 78, so the left
                 # part is padded to 61 rather than computed from the tail's length --
@@ -3697,6 +3707,10 @@ def _stata_summary(result: Any) -> str:
                 lines.append(f"{text:<61}{tail}")
             else:
                 lines.append(text)
+            # ``xtivreg`` closes with a full-width rule AFTER the F row, then the
+            # Endogenous/Exogenous lines -- measured.
+            if str(getattr(result, "model_name", "") or "").startswith("xtivreg"):
+                lines.append(_border_rule)
         else:
             # No "F test that all u_i=0" row (the RE estimator has none), but Stata still
             # closes the sigma/rho block with a full-width rule.

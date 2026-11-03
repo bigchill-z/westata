@@ -2775,6 +2775,60 @@ def _stata_summary(result: Any) -> str:
     #: flag because the random-effects block needs one rule per auxiliary name (/lnsig2u,
     #: then sigma_u), not one for the whole table.
     _rule_done: set[str] = set()
+    # ``arch`` names its parameters "mu", "omega", "alpha[1]", "beta[1]" -- the backend's
+    # spelling. Stata nests them instead:
+    #
+    #   y            |
+    #          _cons |   .0162927   ...
+    #   -------------+------------------------------
+    #   ARCH         |
+    #           arch |
+    #            L1. |   -.046348   ...
+    #              garch |
+    #            L1. |   .5624728   ...
+    #          _cons |   .4867155   ...
+    #
+    # Written here as "GROUP:SUB:bare" so the generic group machinery emits the levels;
+    # a name with no sub-label is "GROUP:bare".
+    _ARCH_NAMES = {
+        "mu": "y:_cons",
+        "omega": "ARCH:_cons",
+        "alpha": "ARCH:arch:L1.",
+        "beta": "ARCH:garch:L1.",
+        "gamma": "ARCH:garch:L1.",
+    }
+
+    def _arch_rewrite(name: str) -> str:
+        base, _sep, lag = str(name).partition("[")
+        mapped = _ARCH_NAMES.get(base)
+        if not mapped:
+            return ""
+        # Multi-lag models keep the index: alpha[2] -> "L2.".
+        if lag and mapped.endswith("L1."):
+            return mapped[:-3] + f"L{lag.rstrip(']')}."
+        return mapped
+
+    _is_arch_shape = str(getattr(result, "model_name", "") or "") == "arch"
+    if _is_arch_shape and any(_arch_rewrite(name) for name in names):
+        # ORDER: Stata prints the ARCH group as arch.L1, garch.L1, then _cons -- the
+        # variance parameters first, the constant last. Sorting by the rewritten name
+        # would put "_cons" first, so the group is ordered explicitly.
+        _arch_order = {"ARCH:arch:": 0, "ARCH:garch": 1, "ARCH:_cons": 2, "y:_cons": -1}
+
+        def _arch_rank(name: str) -> int:
+            rewritten = _arch_rewrite(name)
+            for key, rank in _arch_order.items():
+                if rewritten.startswith(key.rstrip(":")):
+                    return rank
+            return 9
+
+        _pairs = [
+            (_arch_rank(name), _arch_rewrite(name) or str(name)) for name in names
+        ]
+        _pairs.sort(key=lambda item: item[0])
+        names = [name for _rank, name in _pairs]
+        _EQUATION_PREFIXES = ("y:", "ARCH:")
+
     # ``sqreg``/``bsqreg`` name their parameters "q0.25#x1" -- quantile, then the variable.
     # Stata instead prints a GROUP LABEL ("q25") and a bare name ("x1") under it, so the
     # prefix is rewritten to the generic equation form here, and the label loses its
@@ -2805,11 +2859,16 @@ def _stata_summary(result: Any) -> str:
             {f"{group}:" for group in _sqreg_names.values() if group}
         ) + ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
     else:
+        # Keep the arch prefixes if they were set above; otherwise the standard set.
         _EQUATION_PREFIXES = (
-            "inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:"
+            ("y:", "ARCH:")
+            if _is_arch_shape
+            else ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
         )
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
+    #: Sub-labels already emitted inside an arch group ("arch", "garch").
+    _arch_subs_seen: set[str] = set()
     if _is_didregress(result) and names:
         # The ATET header, then the treatment variable on its own row, then the single
         # comparison row. Stata reports ONLY the treatment coefficient here -- covariates
@@ -2848,12 +2907,21 @@ def _stata_summary(result: Any) -> str:
                 "sqreg",
                 "bsqreg",
             )
-            if seen_groups or not _is_sqreg_shape:
+            # arch's FIRST group ("y") follows the header rule, exactly like sqreg's.
+            if seen_groups or not (_is_sqreg_shape or _is_arch_shape):
                 lines.append(
                     "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
                 )
             seen_groups.add(group)
             lines.append(f"{group:<{name_width}} |")
+        # ``arch`` nests one level further: "ARCH" then a sub-label ("arch"/"garch") then
+        # the lag ("L1."). The sub-label row is emitted once per distinct sub-label.
+        if _is_arch_shape and ":" in bare:
+            _sub, _rest = bare.split(":", 1)
+            if _sub and _sub not in _arch_subs_seen:
+                _arch_subs_seen.add(_sub)
+                lines.append(f"{_sub:>{name_width}} |")
+            bare = _rest
         # Inside an equation block the constant is still spelled ``_cons``.
         if bare.strip().lower() in _GROUP_CONSTANTS:
             bare = "_cons"

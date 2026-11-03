@@ -201,17 +201,30 @@ def _frames() -> dict[str, pd.DataFrame]:
             "t": np.arange(1, n + 1),
         }
     )
+    # A series with genuine VOLATILITY CLUSTERING: iid normal data makes Stata's arch
+    # report "flat log likelihood encountered, cannot find uphill direction", because the
+    # ARCH term is not identified. The variance follows its own AR(1) process instead.
+    _innov = rng.normal(size=400)
+    _var = np.empty(400)
+    _var[0] = 1.0
+    for _i in range(1, 400):
+        _var[_i] = 0.05 + 0.9 * _var[_i - 1] + 0.05 * _innov[_i - 1] ** 2
+    archseries = pd.DataFrame(
+        {"y": _innov * np.sqrt(_var), "t": np.arange(1, 401)}
+    )
     return {
         "panel": panel,
         "cross": cross,
         "interval": interval,
         "tsseries": tsseries,
+        "archseries": archseries,
     }
 
 
 FRAMES = _frames()
 PANEL = FRAMES["panel"]
 CROSS = FRAMES["cross"]
+ARCHSERIES = FRAMES["archseries"]
 SELECTED = FRAMES["panel"]
 INTERVAL = FRAMES["interval"]
 TSSERIES = FRAMES["tsseries"]
@@ -260,8 +273,13 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("ivregress_2sls", "ivregress 2sls y x1 (x2 = z)",
          lambda: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
         # --- registry entries the earlier batches missed ---
-        ("arch", "arch y, arch(1) garch(1)",
-         lambda: ws.GARCH(TSSERIES["y"].to_numpy(), p=1, q=1).fit()),
+        # arch(1) ALONE, not arch(1) garch(1): the garch term needs a panel setup the
+        # single-series frame cannot provide (r(430)). The series also needs VOLATILITY
+        # CLUSTERING -- iid normals give "flat log likelihood, cannot find uphill
+        # direction" on the Stata side, which is a property of the data, not the layout.
+        # ARCHSERIES is built with an AR(1) variance process for that reason.
+        ("arch", "arch y, arch(1)",
+         lambda: ws.GARCH(ARCHSERIES["y"].to_numpy(), p=1, q=0).fit()),
         # newey requires REGULARLY spaced time, which a panel is not (period repeats).
         # The single-series frame is the right input, and Stata's newey agrees.
         ("newey", "newey y x1, lag(2)",
@@ -408,6 +426,9 @@ def _stata_block(command: str) -> list[str]:
         "Fitting ",
         # xttobit announces its two-stage start: "Obtaining starting values for full model:".
         "Obtaining starting",
+        # arch/arima announce gaps in the time series before their header.
+        "Number of gaps in sample",
+        "Note: Conditioning reset",
         "Grid node ",
         # Standardisation-parameter iteration lines from the random-effects ML commands:
         # "tau =  0.0    Log likelihood = -69.197758". Without this the header comparison
@@ -430,13 +451,18 @@ def _stata_block(command: str) -> list[str]:
         # intreg's bound columns only exist on INTERVAL; everything else uses PANEL.
         # A few commands need their own frame: intreg's bounds live on INTERVAL, and
         # arima refuses a panel outright.
-        _frame_name = {"intreg": INTERVAL, "arima": TSSERIES, "newey": TSSERIES}
+        _frame_name = {
+            "intreg": INTERVAL,
+            "arima": TSSERIES,
+            "newey": TSSERIES,
+            "arch": ARCHSERIES,
+        }
         stata.push(_frame_name.get(command.split()[0], PANEL))
         # ``xtset`` needs unit/period; the time-series frame for arima has neither, and
         # Stata errors with "variable unit not found" before the command even runs.
         # Both arima and newey run on a single series, which has no unit/period/stratum
         # columns -- so xtset and svyset would fail before the command even runs.
-        _uses_time_series = command.split()[0] in ("arima", "newey")
+        _uses_time_series = command.split()[0] in ("arima", "newey", "arch")
         for setup in STATA_SETUP:
             if _uses_time_series:
                 # A pure time-series frame has no unit/period/stratum/psu/weight columns,

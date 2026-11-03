@@ -2297,6 +2297,43 @@ def _stata_summary(result: Any) -> str:
         sum_adev = _e_float(result, "sum_adev")
         q_v = _e_float(result, "q_v")
         pseudo_r2 = _e_float(result, "r2_p")
+        # ``sqreg``/``bsqreg`` are MULTI-quantile and print a different block again: the
+        # banner, then one line per quantile carrying its pseudo R2. Measured:
+        #
+        #   Simultaneous quantile regression        Number of obs =        100
+        #     bootstrap(20) SEs                     .25 Pseudo R2 =     0.0018
+        #                                           .50 Pseudo R2 =     0.0077
+        #                                           .75 Pseudo R2 =     0.0033
+        #
+        # No deviation lines -- those belong to single-quantile ``qreg`` only.
+        _r2_by_q = (getattr(result, "e", None) or {}).get("r2_p_by_quantile") or []
+        if _r2_by_q:
+            _quantiles = list((getattr(result, "e", None) or {}).get("quantiles") or [])
+            _reps = _e_float(result, "reps")
+            _banner_sq = str((getattr(result, "e", None) or {}).get("title") or "")
+            lines.append(
+                f"{_banner_sq:<52}{'Number of obs':<14}= {nobs:>11d}"
+            )
+            for _index, (_q, _r2v) in enumerate(zip(_quantiles, _r2_by_q)):
+                _left = (
+                    f"  bootstrap({int(_reps)}) SEs"
+                    if _index == 0 and np.isfinite(_reps)
+                    else ""
+                )
+                # Stata drops the leading zero: ".25 Pseudo R2", not "0.25 Pseudo R2".
+                _q_text = f"{_q:g}"
+                if _q_text.startswith("0."):
+                    _q_text = _q_text[1:]
+                _label = f"{_q_text:>4} Pseudo R2"
+                lines.append(f"{_left:<52}{_label:<14}= {_r2v:>11.4f}")
+            # The coefficient header carries a "Bootstrap" banner row, and the caller adds
+            # the blank line -- emitting one here too produced two.
+            lines.append(f"{'':>13} |{'Bootstrap':>24}")
+            # Set the single-quantile scalars to missing so the branches BELOW skip
+            # their deviation lines -- this block replaced them.
+            sum_rdev = float("nan")
+            sum_adev = float("nan")
+            pseudo_r2 = float("nan")
         # Stata puts the banner and "Number of obs" on the SAME line, left-aligned pair:
         #
         #   Median regression              Number of obs =        100
@@ -2321,7 +2358,10 @@ def _stata_summary(result: Any) -> str:
         # "Number of obs =        100": the label is 14 wide then "= " and an 11-wide
         # value, so the "=" lands at column 66. The OLS header's 18-wide label field put
         # it four columns further right.
-        lines.append(f"{_banner_text:<52}{'Number of obs':<14}= {nobs:>11d}")
+        # The multi-quantile block above already emitted the banner + Number of obs, so
+        # the single-quantile line is skipped for those commands.
+        if not _r2_by_q:
+            lines.append(f"{_banner_text:<52}{'Number of obs':<14}= {nobs:>11d}")
         if np.isfinite(sum_rdev):
             about = f" (about {_num(q_v, 8)})" if np.isfinite(q_v) else ""
             lines.append(f"  Raw sum of deviations {_num(sum_rdev, 7)}{about}")
@@ -2654,7 +2694,39 @@ def _stata_summary(result: Any) -> str:
     #: flag because the random-effects block needs one rule per auxiliary name (/lnsig2u,
     #: then sigma_u), not one for the whole table.
     _rule_done: set[str] = set()
-    _EQUATION_PREFIXES = ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
+    # ``sqreg``/``bsqreg`` name their parameters "q0.25#x1" -- quantile, then the variable.
+    # Stata instead prints a GROUP LABEL ("q25") and a bare name ("x1") under it, so the
+    # prefix is rewritten to the generic equation form here, and the label loses its
+    # decimal point ("q0.25" -> "q25").
+    def _sqreg_group(name: str) -> str:
+        head, sep, tail = str(name).partition("#")
+        if not sep or not head.startswith("q"):
+            return ""
+        _value = head[1:]
+        if _value.startswith("0."):
+            _value = _value[1:]
+        # ".5" must become "q50", not "q5" -- the digits are a PERCENT label, so a single
+        # decimal place is padded back to two.
+        _digits = _value.split(".")[1] if "." in _value else _value
+        if len(_digits) == 1:
+            _digits = _digits + "0"
+        return "q" + _digits
+
+    _sqreg_names = {str(name): _sqreg_group(name) for name in names}
+    if any(_sqreg_names.values()):
+        names = [
+            (_sqreg_group(name) + ":" + str(name).partition("#")[2])
+            if _sqreg_group(name)
+            else str(name)
+            for name in names
+        ]
+        _EQUATION_PREFIXES = tuple(
+            {f"{group}:" for group in _sqreg_names.values() if group}
+        ) + ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
+    else:
+        _EQUATION_PREFIXES = (
+            "inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:"
+        )
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
     if _is_didregress(result) and names:
@@ -2687,8 +2759,19 @@ def _stata_summary(result: Any) -> str:
                 bare = name[len(prefix):]
                 break
         if group and group not in seen_groups:
+            # The FIRST group needs a rule for the EQUATION-prefixed models (zip's "y |" /
+            # "inflate |" blocks are separated from the coefficients above them), but NOT
+            # for sqreg, whose first group follows the header's own rule already. Making
+            # this unconditional broke zip when it fixed sqreg; the two shapes differ.
+            _is_sqreg_shape = str(getattr(result, "model_name", "") or "") in (
+                "sqreg",
+                "bsqreg",
+            )
+            if seen_groups or not _is_sqreg_shape:
+                lines.append(
+                    "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
+                )
             seen_groups.add(group)
-            lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
             lines.append(f"{group:<{name_width}} |")
         # Inside an equation block the constant is still spelled ``_cons``.
         if bare.strip().lower() in _GROUP_CONSTANTS:

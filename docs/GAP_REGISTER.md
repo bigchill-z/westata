@@ -94,7 +94,7 @@
 | `estat gof` | ✅ 已实现（`poisson` 专属） | `result.estat_gof()`；公式抄自 `poisgof.ado`，含易漏的 `Σ lngamma(1+y)` 项；**`nbreg` 刻意拒绝**（Stata 无此命令） |
 | `estat ic` | ✅ 已实现 | `result.estat_ic()`；四准则公式抄自 `estimates.ado:985-1002`；`df` 默认 `rank(V)`。**注意 `e(aic)` 与 `estat ic` 的 AIC 本就不同**（差 `N(1+log2π)`），见 §8.20.12 |
 | `estat vif` | ✅ 已实现（线性模型） | `result.estat_vif()`；公式抄自 `vif.ado`，支持 `uncentered`/`nosort`；无常数模型与非线性模型按 Stata 行为拒绝 |
-| `estat hettest` | ✅ 已实现（线性模型） | `result.estat_hettest()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`；robust/cluster VCE 与 pweight 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29 |
+| `estat hettest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_hettest()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`。**无变量列表 = 拟合值**（`hettest.ado:110-115`），不是“全部回归元”——这曾是与 Stata 不一致的根因；`rhs=True` 才是全部 `e(b)` 回归元。`variables` 按**原始数据变量名**解析（`rep78` 是原始 1-5 列，df=1），否则按设计列名。估计权重被辅助回归复用（`fweight`/`iweight` 的 `e(N)=sum(w)`）。robust/cluster VCE、pweight 与 `noconstant` 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29；单回归元时按 `hettest.ado:126-128` 静默丢弃。90 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/hettest_auto.json`） |
 | `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_ovtest()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True` |
 | `estat firststage` | ✅ 已实现 | `result.estat_firststage()`；列定义抄自 `ivregress_estat.ado`，含 Shea's partial R²（多内生变量时）。**`r(mineig)` 与 `r(mineigcv)` 已实现**（Cragg-Donald 最小特征值 + Stock-Yogo 三张表逐字抄录），见 §8.20.48 |
 | `estat overid` | ✅ 已实现 | `result.estat_overid()`；Sargan + Basmann（2SLS/LIML）、Hansen J（GMM）、**Wooldridge score（稳健/HAC）**；辅助回归须用**全部工具**（含外生）。LIML 在稳健/HAC 下按 Stata 拒绝，见 §8.20.14、§8.20.30、§8.20.46 |
@@ -6897,6 +6897,37 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 > 文档记录意图，捕获记录 Stata 实际打印的内容。
 
 第 237 轮发现的**硬编码 `95%`** 问题是对的，保留（`_ci_label` 随 `level` 变化）。
+
+---
+
+## 8.5 表格布局对齐的边界（第 18–32 轮）
+
+从第 18 轮起，用 `scripts/scan_all_layouts.py` 逐命令比对 westata 渲染与真实 Stata
+输出。它把「还有多少没对上」变成一个可复现的数字，而不是靠记忆。
+
+**当前结果：47 个命令纳入扫描，33 个匹配**（MATCH 或 SKELETON——后者指文本骨架一致、
+只有数字位数不同）。匹配的判定带一道**自检验**：两侧表格线数量不同即判为 `SUSPECT`
+而不计入匹配，因为被过滤掉的一行会伪装成布局缺陷。
+
+### 剩下的 4 项不是排版问题
+
+这四项的布局差异是**功能缺失的结果**。只调排版永远补不上：
+
+| 命令 | 缺的东西 | 为什么不能只改排版 |
+|---|---|---|
+| `reghdfe` | 吸收固定效应压根没实现（`FEOLS.from_formula` 无 `absorb` 参数） | 输出的是 OLS 的 ANOVA 表；要的是 HDFE 块 + 吸收自由度表 |
+| `xtivreg, fe` | `F test that all u_i=0` | 需要 2SLS 意义上的组内 R²。**实测**：现有 `rss` 是 2SLS 残差平方和，`tss_within` 是组内离差平方和，相除得 −0.895，不是 Stata 的 1.10 |
+| `etregress` | `/athrho`、`/lnsigma`、`rho`/`sigma`/`lambda` 派生块、`LR test of indep. eqns.` | 需要三个派生参数及其标准误 |
+| `tnbreg` | `LR test of alpha=0` | 是 **chi-bar-squared 混合分布**检验，p 值不能按 `chi2(1)` 算 |
+
+我没有为这几项编造数字。`xtivreg` 的 F 检验我试着按 `xtreg` 的公式复现，得到 −1.18，
+**说明两个估计器的口径不同**，于是停手记录，而不是把 −1.18 印成一个 F 统计量。
+
+### 关于「匹配」的口径
+
+`SKELETON` 与 `MATCH` 都不代表**数值正确**。`xtlogit, re` 的布局已对齐，但它的
+`e(sigma_u)` 是 `.0037` 而 Stata 是 `.0000243`，`/lnsig2u` 是 `−11.18` 而 Stata 是
+`−21.25`。**布局一致不等于结果正确**，两者必须分开报告。
 
 ---
 

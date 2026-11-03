@@ -866,6 +866,11 @@ class Mvreg:
 
         e: dict[str, Any] = {
             "N": n,
+            # ``e(title)``: measured from a live ``mvreg y ybin = x1``. mvreg prints NO
+            # banner -- its table opens straight at "Equation Obs Parms RMSE" -- so this
+            # string is not rendered; it is recorded because e(title) is the documented
+            # macro and callers read it.
+            "title": "Multivariate regression",
             "k_eq": equations,
             "k": k,
             "rank": total,

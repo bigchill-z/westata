@@ -373,6 +373,8 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         # The formula's "| unit" block IS the absorb() equivalent. Without it westata
         # estimated a plain OLS while Stata absorbed the unit effects -- two different
         # models, so the headers could never agree.
+        ("mvreg", "mvreg y ybin = x1",
+         lambda: ws.Mvreg.from_formula("y ybin = x1", PANEL).fit()),
         ("areg", "areg y x1, absorb(unit)",
          lambda: ws.Areg.from_formula("y ~ x1", PANEL, absorb="unit").fit()),
         ("xtabond", "xtabond y x1",

@@ -839,7 +839,17 @@ def _iv_family_for_header(result: Any) -> bool:
 #: the model-test gate -- and every time a family was added, one of the two was missed,
 #: duplicating statistics above the table. That happened for xtpcse, ivregress and eivreg.
 _OWN_HEADER_BLOCKS = frozenset({"svy", "ml", "newey", "arch", "quantile"})
-_OWN_HEADER_MODELS = ("xtpcse", "xtgls", "eivreg")
+_OWN_HEADER_MODELS = (
+    "xtpcse",
+    "xtgls",
+    "eivreg",
+    # Each of these draws its header in its own branch (see the elif chain), so the
+    # generic single-column statistics must be skipped or they appear above the block.
+    "areg",
+    "xtabond",
+    "sureg",
+    "mvreg",
+)
 
 
 def _is_gee_shape(result: Any) -> bool:
@@ -1948,6 +1958,41 @@ def _stata_summary(result: Any) -> str:
         lines = list(_xtreg_header_block(result, nobs))
         # Everything appended before this point described a header that is not being
         # printed; the panel block replaces it wholesale.
+    elif str(getattr(result, "model_name", "") or "") == "mvreg":
+        # ``mvreg`` opens at an EQUATION SUMMARY table with NO banner. Measured:
+        #
+        #   Equation             Obs   Parms        RMSE    "R-sq"      F
+        #   --------------------------------------------------------------
+        #   y                    100       2    .9908529    0.0157   1.567
+        #   ybin                 100       2    .5044859    0.0023   .2295
+        #
+        # Note "Parms" (mvreg) vs "Params" (sureg) -- a real spelling difference.
+        _mv_e = getattr(result, "e", None) or {}
+        _mv_outcomes = list(_mv_e.get("outcomes") or [])
+        _mv_n = int(_mv_e.get("N") or nobs)
+        _mv_r2_header = '"R-sq"'
+        # Stata's own header line for this table is NOT aligned with the rows beneath it
+        # (it is 70 columns wide, the rows are 62), so it is copied verbatim rather than
+        # derived from column widths -- deriving it produced a table that was internally
+        # consistent but different from Stata's.
+        lines = [
+            'Equation             Obs   Parms        RMSE    "R-sq"          F      P>F',
+            "-" * 58,
+        ]
+        for _eq in _mv_outcomes:
+            _rmse_eq = _e_float(result, f"rmse_{_eq}")
+            _r2_eq = _e_float(result, f"r2_{_eq}")
+            _f_eq = _e_float(result, f"F_{_eq}")
+            _p_eq = _e_float(result, f"p_{_eq}")
+            lines.append(
+                f"{str(_eq):<21}{_mv_n:>9}{int(df_model) + 1:>6}"
+                f"{_stata_number(_rmse_eq, 7).strip():>13}"
+                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>8}"
+                f"{(_stata_number(_f_eq, 7).strip() if np.isfinite(_f_eq) else '.'):>10}"
+                f"{(_four(_p_eq) if np.isfinite(_p_eq) else '.'):>8}"
+            )
+        # No closing rule either: the coefficient table's own header rule follows the blank
+        # line, and adding one here produced two consecutive rules.
     elif str(getattr(result, "model_name", "") or "") == "xtabond":
         lines = _xtabond_header_block(result, nobs)
     elif str(getattr(result, "model_name", "") or "") == "sureg":
@@ -3074,21 +3119,56 @@ def _stata_summary(result: Any) -> str:
         # ``etregress``/``heckman`` name their two equations "y#..." / "treat#..." (and
         # "select#..." for heckman), which is the same two-level shape as zip's
         # "inflate#" blocks -- measured against their coefficient tables.
+        #
+        # ``mvreg``/``sureg`` use the OUTCOME NAMES as the equation prefix ("y:x1",
+        # "ybin:x1"), so their prefixes are built from the actual parameter names rather
+        # than from a fixed list -- a fixed "y:" entry matched only the first outcome and
+        # left the rest as flat rows.
+        _prefixes = [
+            "inflate#",
+            "inflate:",
+            "select#",
+            "select:",
+            "tobit#",
+            "tobit:",
+            "y#",
+            "y:",
+            "treat#",
+            "treat:",
+        ]
+        _known_outcomes = set(
+            str(_x)
+            for _x in ((getattr(result, "e", None) or {}).get("outcomes")
+                       or (getattr(result, "e", None) or {}).get("equations")
+                       or [])
+        )
+        for _name in names:
+            _text = str(_name)
+            # The renderer sees ``stata_param_names``, which spells the equation separator
+            # "#"; accept both spellings.
+            #
+            # ONLY an equation prefix may be lifted. A ``#`` also means an INTERACTION
+            # ("x1#x2"), and treating that as a group split turned the row "x1#x2" into a
+            # group header "x1" plus a row "x2", silently breaking every table with an
+            # interaction. A head is accepted as an equation when it is a known equation
+            # word, appears with a ":" spelling somewhere, or names an outcome listed in
+            # e(outcomes)/e(equations) -- which is how mvreg's "ybin" is recognised.
+            for _sep in (":", "#"):
+                if _sep not in _text:
+                    continue
+                _head = _text.partition(_sep)[0]
+                if not _head:
+                    break
+                _is_equation = (
+                    _head in ("y", "treat", "select", "inflate", "tobit", "ARCH")
+                    or _head in _known_outcomes
+                    or any(str(other).startswith(f"{_head}:") for other in names)
+                )
+                if _is_equation and f"{_head}{_sep}" not in _prefixes:
+                    _prefixes.append(f"{_head}{_sep}")
+                break
         _EQUATION_PREFIXES = (
-            ("y:", "ARCH:")
-            if _is_arch_shape
-            else (
-                "inflate#",
-                "inflate:",
-                "select#",
-                "select:",
-                "tobit#",
-                "tobit:",
-                "y#",
-                "y:",
-                "treat#",
-                "treat:",
-            )
+            ("y:", "ARCH:") if _is_arch_shape else tuple(_prefixes)
         )
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
@@ -3139,6 +3219,10 @@ def _stata_summary(result: Any) -> str:
             _is_sqreg_shape = str(getattr(result, "model_name", "") or "") in (
                 "sqreg",
                 "bsqreg",
+                # mvreg's equation blocks follow the header's own rule, like sqreg's.
+                "mvreg",
+                # same for sureg: its first equation row follows the header's rule.
+                "sureg",
             )
             # arch's FIRST group ("y") follows the header rule, exactly like sqreg's.
             if seen_groups or not (_is_sqreg_shape or _is_arch_shape):

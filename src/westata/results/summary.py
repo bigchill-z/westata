@@ -2529,7 +2529,10 @@ def _stata_summary(result: Any) -> str:
     if _is_didregress(result):
         _did_treatment = str((getattr(result, "e", None) or {}).get("_did_treatment") or "")
     #: Guards the single rule that separates slopes from ordinal thresholds.
-    _cut_rule_emitted = False
+    #: Names that have already had their split rule emitted. A SET rather than a single
+    #: flag because the random-effects block needs one rule per auxiliary name (/lnsig2u,
+    #: then sigma_u), not one for the whole table.
+    _rule_done: set[str] = set()
     _EQUATION_PREFIXES = ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
@@ -2569,6 +2572,11 @@ def _stata_summary(result: Any) -> str:
         # Inside an equation block the constant is still spelled ``_cons``.
         if bare.strip().lower() in _GROUP_CONSTANTS:
             bare = "_cons"
+        # Stata stores auxiliary parameters WITHOUT a slash in e(b) but DISPLAYS them with
+        # one: /cut1, /lnalpha, /lnsig2u. ``stata_param_names`` strips it to match e(b), so
+        # it is put back here, for display only.
+        if bare.strip() in ("lnsig2u", "lnalpha", "lnsigma"):
+            bare = "/" + bare.strip()
         # Ordinal models report their THRESHOLDS (/cut1, /cut2, ...) with no test
         # statistic: Stata leaves both the z and P columns blank for those rows, because
         # a cut point is a nuisance parameter, not a hypothesis about a slope. Measured
@@ -2586,19 +2594,29 @@ def _stata_summary(result: Any) -> str:
             or _bare_name.startswith("/cut")
             or _bare_name in ("/sigma", "sigma", "/lnsigma")
             or _bare_name.startswith("var(e.")
+            # The random-effects ML commands report their variance parameter as
+            # ``/lnsig2u`` in a block of its own, after the coefficients. Measured from
+            # ``xtlogit ybin x1, re``:
+            #
+            #   _cons      |   .0097016   .2012351     0.05   0.962
+            #   -------------+------------------------------------------------
+            #   /lnsig2u   |  -21.25042   1245.243                     -2461.882
+            #   -------------+------------------------------------------------
+            #   sigma_u    |   .0000243    .015127                             0
+            #   rho        |   1.79e-10   2.23e-07                             0
+            or _bare_name in ("lnsig2u", "/lnsig2u")
         )
-        # Ordinal thresholds AND tobit's scale both get a split rule before them -- the
-        # scan showed the rule between _cons and var(e.y) as well. Only the suppression of
-        # the z/P columns is shared; the rule applies to the whole nuisance block.
+        # Ordinal thresholds, tobit's scale AND the random-effects variance parameter each
+        # get a split rule before them; only the suppression of the z/P columns is shared.
         _needs_rule = (
             _bare_name.startswith("cut")
             or _bare_name.startswith("/cut")
             or _bare_name.startswith("var(e.")
-            or _bare_name in ("/sigma", "sigma", "/lnsigma")
+            or _bare_name in ("/sigma", "sigma", "/lnsigma", "lnsig2u", "/lnsig2u")
         )
-        if _is_cut_row and _needs_rule and not _cut_rule_emitted:
+        if _is_cut_row and _needs_rule and _bare_name not in _rule_done:
             lines.append(_split_rule)
-            _cut_rule_emitted = True
+            _rule_done.add(_bare_name)
         if _is_cut_row:
             # Ordinal thresholds are padded to name_width then a space; tobit's scale is
             # padded to name_width + 1 with NO space, so its pipe sits one column right:

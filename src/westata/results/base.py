@@ -315,14 +315,18 @@ class StataResults:
         ]
         # Auxiliary parameters: Stata stores them without the display slash, so
         # recognise the leading "/" of the internal spelling. ``var(e.<depvar>)`` is
-        # tobit's scale and carries no slash at all -- leaving it out of this list put it
-        # BEFORE ``_cons`` in the table, where Stata prints it after.
+        # tobit's scale and carries no slash at all. The variance/dispersion parameters of
+        # the random-effects ML commands are stored as ``lnsig2u``/``lnalpha`` and are
+        # displayed WITH a slash -- Stata orders them after the constant:
+        #
+        #   x1 / _cons / /lnsig2u / sigma_u / rho
         auxiliary = [
             index
             for index, name in enumerate(names)
             if name.startswith("/")
             or name.startswith("cut")
             or name.startswith("var(e.")
+            or name in ("lnsig2u", "lnalpha", "lnsigma")
         ]
         taken = set(constants) | set(auxiliary)
         slopes = [index for index in range(len(names)) if index not in taken]

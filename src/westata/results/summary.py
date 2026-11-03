@@ -2177,6 +2177,18 @@ def _stata_summary(result: Any) -> str:
                 ml_left.append("")
             ml_left.append("Dispersion: mean")
 
+        # ``etregress`` names its estimator on the row under the banner, opposite the chi2
+        # test:
+        #
+        #   Linear regression with endogenous treatment        Number of obs =
+        #   Estimator: Maximum likelihood                      Wald chi2   =
+        #   Log likelihood = -196.48097                        Prob > chi2 =
+        _estimator_name = str(
+            (getattr(result, "e", None) or {}).get("estimator_name") or ""
+        ).strip()
+        if _estimator_name and len(ml_left) >= 1:
+            ml_left.insert(1, "Estimator: " + _estimator_name)
+
         while len(ml_left) < (len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)):
             ml_left.append("")
         if np.isfinite(ll):

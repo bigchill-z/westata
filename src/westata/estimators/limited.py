@@ -2272,6 +2272,12 @@ class Etregress:
         e: dict[str, Any] = {
             "N": int(n),
             "N_treated": int(treated.sum()),
+            # ``e(title)``: measured -- "Linear regression with endogenous treatment".
+            "title": "Linear regression with endogenous treatment",
+            # The header's second line names the estimator: "Estimator: Maximum likelihood"
+            # for the ML fit, "Estimator: Two-step" for the control-function one. Which one
+            # this branch is decides it, so each caller sets its own value below.
+            "estimator_name": "Maximum likelihood",
             # Treatment-equation regressor names for the treatment predictions; see the
             # control-function branch for why ``e()`` and not an attribute.
             "treat_varlist": " ".join(str(name) for name in self._treatment_names),
@@ -2418,6 +2424,11 @@ class Etregress:
         e: dict[str, Any] = {
             "N": n,
             "N_treated": int(self._treated.sum()),
+            # Same banner as the ML branch, but the header's second line differs: this is
+            # the control-function (two-step) estimator. Measured from
+            # ``etregress ..., twostep``: "Estimator: Two-step".
+            "title": "Linear regression with endogenous treatment",
+            "estimator_name": "Two-step",
             # Treatment-equation regressor names, so ``predict`` can rebuild the probit
             # design for ptrt/xbtrt/yctrt/ycntrt/cte.  ``e()`` holds scalars and strings
             # only, and the treatment design is not the outcome design --

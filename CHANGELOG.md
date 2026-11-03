@@ -73,6 +73,69 @@ two factor-variable models, the `r(mtest)` family for two models, and the three
 refusals. All 90 match to `rel < 1e-9`. The tests read that file, so they can no
 longer pass by agreeing with the implementation's own reading of the ado.
 
+## [0.0.5] — 2026-11-04
+
+### Fixed — every estimator table now matches Stata's rendered layout (59/59)
+
+`scripts/scan_all_layouts.py` runs each command in a real Stata session and diffs its
+printed table against what `summary(style="stata")` produces, line by line. **59 scan
+specifications, 59 matching** — covering all 53 registered estimation commands plus their
+variants. `MATCH` means character-identical; `SKELETON` means the same text skeleton with
+only digit counts differing (different random samples must differ there).
+
+The comparison carries a **truncation guard**: if the two sides contain a different number
+of table rules the verdict is `SUSPECT` and the command is not counted as matching. That
+guard earned its place in round 42, when `ologit`/`oprobit` had silently regressed from
+`MATCH` to seven rules: a split-rule bookkeeping change keyed on parameter NAME gave every
+ordinal threshold (`/cut1`..`/cut4`) its own rule instead of one for the family.
+
+**Coverage is itself a test.** `scripts/audit_registry_coverage.py` requires every entry in
+`tests/conformance/registry.yml` to be either exercised by the scan or listed in a
+`NO_TABLE` map with a stated reason, and exits non-zero otherwise;
+`tests/test_registry_coverage_audit.py` runs it in the suite. This exists because the figure
+reported during the sweep was twice measured against the wrong denominator — once using the
+53-entry header map as if it were the whole registry (94 entries), and once while three E3
+commands (`areg`, `xtabond`, `sureg`) had no scan spec at all and were silently never
+compared.
+
+Representative fixes, each traced to a measured difference rather than a guess:
+
+* `areg` printed a Source/SS table Stata does not print for it, and dropped the
+  `clustertable` for clustered fits when its header branch was replaced;
+* `xtabond` used the command name as its banner and emitted no design block at all;
+* `sureg`/`mvreg` printed generic OLS statistics instead of their equation summary tables
+  ("Params" in one, "Parms" in the other) — and the equation-prefix logic, once built, had
+  to stop treating `x1#x2` (an interaction) as an equation split;
+* `reghdfe` needed its HDFE header and the absorbed-degrees-of-freedom table, plus
+  `e(absorbed_names)` parsed from the formula's `|` block;
+* `manova` had no table whatsoever — `ManovaResult` only defined `__str__`;
+* `arima` needed `ARMA`/`ar`/`L1.` nesting and `/sigma` keeping its z and p columns;
+* `xtlogit, pa` needed the GEE banner merged into its first row and a 78-wide geometry;
+* `intreg` needed `sigma` derived from `/lnsigma` by the delta method;
+* `etregress`/`heckman` needed the `/athrho`+`/lnsigma` pair under one rule plus the
+  rho/sigma/lambda derived block; the scan had also been comparing Stata's default (ML)
+  against the package's default (control function) — a comparison of two different
+  estimators;
+* `xtivreg, fe`'s `F test that all u_i=0` required two measurements: `end1_tpb` is
+  `predict xb` + `predict u` from `xtreg, fe` (`xb` at the ORIGINAL levels plus the
+  constant; `u` a group constant), and the within regression's dependent variable is `y`,
+  not the endogenous regressor. `F_f` now reproduces 1.102521616 against Stata's
+  1.1025216.
+
+Several conclusions recorded during the sweep were wrong and are retracted in
+`docs/GAP_REGISTER.md` §8.5: `reghdfe` "does not implement absorption" (it does — the
+formula's `|` block), `etregress` "needs athrho implemented" (the ML path existed), and
+`tnbreg`'s chi-bar-squared test "cannot be computed" (`2*(ll-ll_0)` with a 50:50 mixture
+tail reproduces Stata digit for digit). Two of those three had the SCAN, not the code, as
+the root cause.
+
+### Known limitation (not fixed, recorded)
+
+`xtlogit, re` renders the right layout but its `e(sigma_u)` is `.0037` where Stata reports
+`.0000243`, and `/lnsig2u` is `−11.18` against `−21.25`. **A matching table does not mean
+the numbers behind it are right**, and this entry is here so that distinction stays
+visible.
+
 ## [0.0.4] — 2026-11-02
 
 ### Added — `Areg`: Stata's `areg` as its own command, and `PanelOLS` weights

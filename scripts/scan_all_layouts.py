@@ -124,8 +124,18 @@ def _compare(stata_lines: list[str], ours: list[str]) -> tuple[str, str]:
     stata_lines = _drop_banners(stata_lines)
     ours = _drop_banners(ours)
 
-    _state_rules = sum(1 for line in stata_lines if line.startswith("---"))
-    _west_rules = sum(1 for line in ours if line.startswith("---"))
+    # Rules may be INDENTED: manova's separators start with spaces
+    # ("          -----------+---"), so a startswith("---") test counted Stata's as zero
+    # while westata's flush-left ones counted normally.
+    def _rules(rows: list[str]) -> int:
+        return sum(
+            1
+            for line in rows
+            if line.lstrip().startswith("---") or line.lstrip().startswith("-+-")
+        )
+
+    _state_rules = _rules(stata_lines)
+    _west_rules = _rules(ours)
     if _state_rules != _west_rules:
         return (
             "SUSPECT",
@@ -241,6 +251,15 @@ FRAMES = _frames()
 PANEL = FRAMES["panel"]
 CROSS = FRAMES["cross"]
 ARCHSERIES = FRAMES["archseries"]
+
+
+def _manova_frame() -> pd.DataFrame:
+    """PANEL plus a 3-level factor, which is what manova needs (a numeric regressor is
+    rejected: "'x1' is a treatment factor and must ...")."""
+
+    frame = PANEL.copy()
+    frame["grp"] = (frame["period"] % 3).astype(int)
+    return frame
 SELECTED = FRAMES["panel"]
 INTERVAL = FRAMES["interval"]
 TSSERIES = FRAMES["tsseries"]
@@ -373,6 +392,8 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         # The formula's "| unit" block IS the absorb() equivalent. Without it westata
         # estimated a plain OLS while Stata absorbed the unit effects -- two different
         # models, so the headers could never agree.
+        ("manova", "manova y ybin = grp",
+         lambda: ws.Manova.from_formula("y ybin = grp", _manova_frame()).fit()),
         ("mvreg", "mvreg y ybin = x1",
          lambda: ws.Mvreg.from_formula("y ybin = x1", PANEL).fit()),
         ("areg", "areg y x1, absorb(unit)",
@@ -494,7 +515,12 @@ def _stata_block(command: str) -> list[str]:
             "newey": TSSERIES,
             "arch": ARCHSERIES,
         }
-        stata.push(_frame_name.get(command.split()[0], PANEL))
+        # manova needs the same extra factor column the westata side uses.
+        stata.push(
+            _manova_frame()
+            if command.startswith("manova")
+            else _frame_name.get(command.split()[0], PANEL)
+        )
         # ``xtset`` needs unit/period; the time-series frame for arima has neither, and
         # Stata errors with "variable unit not found" before the command even runs.
         # Both arima and newey run on a single series, which has no unit/period/stratum

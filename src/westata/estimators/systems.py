@@ -1413,6 +1413,107 @@ class ManovaResult:
         )
         return np.sqrt(np.maximum(variance, 0.0))
 
+    def summary(self, style: str = "stata") -> str:
+        """Stata's ``manova`` table for one factor.
+
+        Measured against a live ``manova y ybin = grp``:
+
+                               W = Wilks' lambda      L = Lawley-Hotelling trace
+                               P = Pillai's trace     R = Roy's largest root
+
+                      Source | Statistic        df    F(df1,     df2) =     F
+                  -----------+----------------------------------------------------
+                         grp |W   0.8981         2      4.0    192.0     2.65
+                             |P   0.1021                4.0    194.0     2.61
+                             |L   0.1133                4.0    190.0     2.69
+                             |R   0.1120                2.0     97.0     5.43
+                             |------------------------------------------------
+                    Residual |                  97
+                  -----------+----------------------------------------------------
+                       Total |                  99
+                  ----------------------------------------------------------------
+                               e = exact, a = approximate, u = upper bound on F
+
+        The statistics come from ``self.statistics``; they were already computed but
+        never rendered, so ``manova`` had no table at all.
+        """
+
+        stats_map = dict(self.statistics)
+        n_eq = int(self.n_equations or 1)
+        df_h = float(self.df)
+        df_e = float(self.df_error)
+        # Roy's largest root is stored as theta = lambda/(1+lambda); Stata PRINTS lambda
+        # itself. Verified: 0.10068 / (1 - 0.10068) = 0.11195 against Stata's 0.1120.
+        _roy_raw = float(stats_map.get("roy_largest_root", float("nan")))
+        if np.isfinite(_roy_raw) and abs(1.0 - _roy_raw) > 1e-12:
+            _roy_printed = _roy_raw / (1.0 - _roy_raw)
+        else:
+            _roy_printed = float("nan")
+        # Denominator d.o.f. per statistic, as Stata's Rao approximations print them --
+        # they differ per row, which is why each gets its own value:
+        #   W: 192.0 at df1=4   P: 194.0   L: 190.0   R: 97.0 at df1=2
+        rows = [
+            ("W", "wilks_lambda", None),
+            ("P", "pillai_trace", None),
+            ("L", "lawley_hotelling_trace", None),
+            ("R", "roy_largest_root", None),
+        ]
+        detail = {
+            "W": (self.df1, self.df2, self.F),
+            # Only Wilks' row has verified d.f. and F. The other three need Stata's Rao
+            # approximations, and I could not reproduce the printed denominators
+            # (P 194.0, L 190.0, R 97.0) from (p, df_h, df_e): the standard (s, m, n) form
+            # gives 189/187, and fitting the rest would be guessing coefficients to make a
+            # number appear. Their rows therefore print the STATISTIC only -- which is
+            # verified to four decimals -- with the d.f. and F left blank rather than
+            # filled with figures that happen to fit one example.
+            "P": (float("nan"), float("nan"), float("nan")),
+            "L": (float("nan"), float("nan"), float("nan")),
+            "R": (float("nan"), float("nan"), float("nan")),
+        }
+
+        width = 76
+        _nobs_text = "Number of obs = " + str(int(self.nobs)).rjust(10)
+        lines = [
+            # Stata prints "Number of obs" FIRST, then the two legend lines.
+            _nobs_text.rjust(42),
+            "",
+            f"{'':>23}W = Wilks' lambda      L = Lawley-Hotelling trace",
+            f"{'':>23}P = Pillai's trace     R = Roy's largest root",
+            "",
+            f"{'Source':>21} | {'Statistic':<11}{'df':>4}"
+            f"{'F(df1,':>12}{'df2) =':>9}{'F':>7}",
+            "-" * 11 + "-+-" + "-" * (width - 14),
+        ]
+        for _code, _key, _default in rows:
+            _value = (
+                _roy_printed
+                if _code == "R"
+                else stats_map.get(_key, _default)
+            )
+            _df1, _df2, _f_inner = detail[_code]
+            _df1_text = f"{_df1:>10.1f}" if np.isfinite(_df1) else " " * 10
+            _df2_text = f"{_df2:>9.1f}" if np.isfinite(_df2) else " " * 9
+            if _code == "W":
+                lines.append(
+                    f"{self.term:>18}{' |W':<13}"
+                    f"{_value:>8.4f}{df_h:>10.0f}{_df1_text}{_df2_text}{self.F:>7.2f}"
+                )
+            else:
+                lines.append(
+                    f"{'':>18}{' |' + _code:<13}{_value:>8.4f}{'':>10}"
+                    f"{_df1_text}{_df2_text}{'':>7}"
+                )
+        lines.append(f"{'':>18} |" + "-" * (width - 21))
+        lines.append(f"{'Residual':>21} |{df_e:>19.0f}")
+        lines.append("-" * 11 + "-+-" + "-" * (width - 14))
+        lines.append(f"{'Total':>21} |{(df_h + df_e):>19.0f}")
+        lines.append("-" * width)
+        lines.append(
+            f"{'':>23}e = exact, a = approximate, u = upper bound on F"
+        )
+        return "\n".join(lines)
+
     def __str__(self) -> str:
         return (
             f"MANOVA {self.term}\n"

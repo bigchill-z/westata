@@ -2577,6 +2577,29 @@ def _stata_summary(result: Any) -> str:
         # it is put back here, for display only.
         if bare.strip() in ("lnsig2u", "lnalpha", "lnsigma"):
             bare = "/" + bare.strip()
+        # ``arima`` reports its innovation variance as ``/sigma`` (the MACRO value), while
+        # the backend's parameter is named ``sigma2``. Measured from
+        # ``arima y, arima(1,0,0)``: "      /sigma |   1.039853   .0824649    12.61".
+        # NOTE this row KEEPS its z and P columns -- unlike tobit's scale, which has none --
+        # so it must not be added to the nuisance list below.
+        if bare.strip() == "sigma2":
+            bare = "/sigma"
+        # Stata nests an ARMA term under a group header and a lag row:
+        #
+        #   ARMA         |
+        #           ar   |
+        #          L1.   |  -.1187992   .1018412  ...
+        #
+        # while the backend names it "ar.L1". Split it so the existing group-header
+        # mechanism emits the two levels.
+        if "." in bare and bare.split(".", 1)[0] in ("ar", "ma", "sar", "sma"):
+            _term, _lag = bare.split(".", 1)
+            # The ARMA block is bounded by a split rule of its own. It is not emitted by
+            # the loop's group-header logic, which only knows about equation prefixes.
+            lines.append(_split_rule)
+            lines.append(f"{'ARMA':<{name_width}} |")
+            lines.append(f"{_term:>{name_width}} |")
+            bare = _lag + "."
         # Ordinal models report their THRESHOLDS (/cut1, /cut2, ...) with no test
         # statistic: Stata leaves both the z and P columns blank for those rows, because
         # a cut point is a nuisance parameter, not a hypothesis about a slope. Measured
@@ -2592,7 +2615,13 @@ def _stata_summary(result: Any) -> str:
         _is_cut_row = (
             _bare_name.startswith("cut")
             or _bare_name.startswith("/cut")
-            or _bare_name in ("/sigma", "sigma", "/lnsigma")
+            or (
+                _bare_name in ("/sigma", "sigma", "/lnsigma")
+                # arima's ``/sigma`` DOES carry a z statistic and a p-value -- it is a
+                # hypothesis about the innovation variance -- while tobit's and
+                # truncreg's do not. Measured in both directions.
+                and str(getattr(result, "model_name", "") or "") != "arima"
+            )
             or _bare_name.startswith("var(e.")
             # The random-effects ML commands report their variance parameter as
             # ``/lnsig2u`` in a block of its own, after the coefficients. Measured from
@@ -2615,6 +2644,15 @@ def _stata_summary(result: Any) -> str:
             or _bare_name in ("/sigma", "sigma", "/lnsigma", "lnsig2u", "/lnsig2u")
         )
         if _is_cut_row and _needs_rule and _bare_name not in _rule_done:
+            lines.append(_split_rule)
+            _rule_done.add(_bare_name)
+        # arima's /sigma keeps its test statistic (so it is NOT a nuisance row) but still
+        # gets a split rule before it, measured. Handled separately for that reason.
+        if (
+            str(getattr(result, "model_name", "") or "") == "arima"
+            and _bare_name == "/sigma"
+            and _bare_name not in _rule_done
+        ):
             lines.append(_split_rule)
             _rule_done.add(_bare_name)
         if _is_cut_row:
@@ -2661,13 +2699,23 @@ def _stata_summary(result: Any) -> str:
     #
     # Only the commands that report /lnsig2u do this; xtreg's sigma_u/rho stay in the
     # decomposition block below the table.
+    #: Commands whose auxiliary parameter is followed by a DERIVED row inside the table.
+    #: Both shapes were measured:
+    #:   /lnsig2u -> sigma_u, rho      (random-effects logit/probit)
+    #:   /lnalpha -> alpha             (truncated negative binomial)
     _has_re_variance = any(
         str(name).strip() in ("lnsig2u", "/lnsig2u") for name in names
     )
-    if _has_re_variance:
+    _has_alpha = any(str(name).strip() in ("lnalpha", "/lnalpha") for name in names)
+    if _has_re_variance or _has_alpha:
         # A split rule separates the coefficient block from the derived rows, measured.
         lines.append(_split_rule)
-        for _row_name, _key in (("sigma_u", "sigma_u"), ("rho", "rho")):
+        _derived = (
+            (("sigma_u", "sigma_u"), ("rho", "rho"))
+            if _has_re_variance
+            else (("alpha", "alpha"),)
+        )
+        for _row_name, _key in _derived:
             _value = _e_float(result, _key)
             if not np.isfinite(_value):
                 continue

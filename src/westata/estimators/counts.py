@@ -600,9 +600,16 @@ class _CountBase(_DiscreteBase):
         # ztp/tnbreg go through the truncated branch and never saw a title when the map
         # sat in the inflated one.
         name = str(getattr(self, "_stata_command", "") or "").strip().lower()
+        scalars: dict[str, Any] = {}
         if name in self._COUNT_TITLES:
-            return {"title": self._COUNT_TITLES[name]}
-        return {}
+            scalars["title"] = self._COUNT_TITLES[name]
+        # ``e(depvar)``: the row-name column of the table is headed with the response
+        # variable. The counts never stored it, so the column printed blank where Stata
+        # prints "ypos".
+        _response = str(getattr(self, "_response_name", "") or "")
+        if _response:
+            scalars["depvar"] = _response
+        return scalars
 
     # -- fit ---------------------------------------------------------------
     def _optimizer_tolerance(self, tol: float) -> float:
@@ -1014,6 +1021,10 @@ class _TruncatedBase(_CountBase):
         y = data.loc[kept_index, lhs].to_numpy(dtype=float)
         model = cls(y, X, lower=lower, upper=upper, param_names=names)
         model._model_data = data.loc[kept_index].reset_index(drop=True)
+        # This override builds the design itself, so it must record the response name too:
+        # the base class does it for the ordinary count models, and without it e(depvar) is
+        # absent and the table's row-name column prints blank.
+        model._response_name = lhs
         return model
 
     def _extra_param_names(self, count: int) -> list[str]:

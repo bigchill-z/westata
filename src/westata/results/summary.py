@@ -2243,35 +2243,53 @@ def _stata_summary(result: Any) -> str:
         # than ``svy: regress`` (78, left 54), because their table is narrower.
         # Captured: "Number of strata =  8             Number of obs   =        576".
         if _is_svy_estimate(result):
-            # Right half is 28 wide: label 16, "= ", value 9. Measured from
-            # "Number of obs   =        576".
-            def _cell_narrow(label: str, value: str) -> str:
-                return f"{label:<16}={value:>11}"
-
-            def _row_narrow(left: str, right: str = "") -> str:
-                return f"{left:<34}{right}".rstrip()
+            # The block is 62 columns wide, but the SPLIT between its halves adapts to the
+            # value: measured, "Number of obs   =        576" puts the right half at 34
+            # while "Number of obs   = 100" puts it at 41. Both rows are still 62 wide.
+            # So the right half is built at its natural size and the left is padded to
+            # whatever remains, instead of a fixed 34/28 split.
+            def _row_narrow(left: str, label: str = "", value: str = "") -> str:
+                if not label:
+                    return left.rstrip()
+                # Two of these rows pad the value differently, and both were measured:
+                #   "Number of obs   = 100"     value occupies its own width
+                #   "Design df       =  15"     value carries ONE extra leading space
+                # so the field is len(value) for the first and len(value) + 1 for the
+                # second. Applying one rule to both left one row a column short.
+                _padded = label in ("Design df",)
+                right = f"{label:<16}= {' ' + value if _padded else value}"
+                pad = max(4, 62 - len(right) - len(left))
+                return f"{left}{' ' * pad}{right}".rstrip()
 
             narrow: list[str] = []
             if np.isfinite(n_strata):
                 narrow.append(
                     _row_narrow(
                         f"Number of strata = {int(round(n_strata)):>2}",
-                        _cell_narrow("Number of obs", f"{nobs:,.0f}"),
+                        "Number of obs",
+                        f"{nobs:,.0f}",
                     )
                 )
             if np.isfinite(n_psu):
-                # ``Population size`` keeps SIX decimals here: measured, the captured run
-                # reads "837.592551", not the rounded "837.593" the regress block prints.
-                pop = f"{n_pop:,.6f}" if np.isfinite(n_pop) else "."
+                # ``Population size`` prints SIX decimals when the weighted total is
+                # fractional ("837.592551") but a plain integer when it is not ("100") --
+                # measured in both directions, not a fixed format.
+                if not np.isfinite(n_pop):
+                    pop = "."
+                elif abs(n_pop - round(n_pop)) < 1e-9:
+                    pop = f"{int(round(n_pop)):,}"
+                else:
+                    pop = f"{n_pop:,.6f}"
                 narrow.append(
                     _row_narrow(
                         f"Number of PSUs   = {int(round(n_psu)):>2}",
-                        _cell_narrow("Population size", pop),
+                        "Population size",
+                        pop,
                     )
                 )
             if np.isfinite(df_resid):
                 narrow.append(
-                    _row_narrow("", _cell_narrow("Design df", f"{int(round(df_resid))}"))
+                    _row_narrow("", "Design df", f"{int(round(df_resid))}")
                 )
             lines.extend(narrow)
             lines.append("")

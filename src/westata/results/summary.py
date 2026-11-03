@@ -807,6 +807,28 @@ def _iv_family_for_header(result: Any) -> bool:
     return str(getattr(result, "model_name", "") or "").startswith("ivregress")
 
 
+#: Blocks that draw their own header INSTEAD of the generic single-column statistics.
+#: A block-name entry covers every command routed to that layout; a model-name entry
+#: covers a single command that shares a layout with commands that do NOT draw their own.
+#:
+#: Each of these used to be its own literal, repeated in BOTH the "Number of obs" gate and
+#: the model-test gate -- and every time a family was added, one of the two was missed,
+#: duplicating statistics above the table. That happened for xtpcse, ivregress and eivreg.
+_OWN_HEADER_BLOCKS = frozenset({"svy", "ml", "newey", "arch", "quantile"})
+_OWN_HEADER_MODELS = ("xtpcse", "xtgls", "eivreg")
+
+
+def _prints_own_header_block(result: Any, block: str) -> bool:
+    """Whether the command draws its own header, so generic statistics must be skipped."""
+
+    if block in _OWN_HEADER_BLOCKS:
+        return True
+    model_name = str(getattr(result, "model_name", "") or "")
+    if model_name.startswith("ivregress"):
+        return True
+    return model_name in _OWN_HEADER_MODELS
+
+
 def _is_didregress(result: Any) -> bool:
     """Whether this is a ``didregress``/``xtdidregress`` fit."""
 
@@ -1639,50 +1661,33 @@ def _stata_summary(result: Any) -> str:
         and not _pcse_family_for_header(result)
         and not _iv_family_for_header(result)
     )
-    # ``newey`` also prints its own two-column block (see the ``block == "newey"``
-    # branch), so it is excluded from the generic single-column lines as well.
-    # ``xtpcse``/``xtgls`` print the design block above, which already carries
-    # "Number of obs" in its right column.
-    _pcse_family = str(getattr(result, "model_name", "") or "") in ("xtpcse", "xtgls")
-    # ``ivregress`` prints its own four-row two-column block (see its branch below), so
-    # the generic single-column lines would duplicate every one of them.
-    _iv_family = str(getattr(result, "model_name", "") or "").startswith("ivregress")
-    # ``eivreg`` prints its own two-column block (reliability table on the left, fit
-    # statistics on the right), so the generic single-column lines would duplicate them.
-    _eiv_family = str(getattr(result, "model_name", "") or "") == "eivreg"
-    # ``quantile`` prints "Number of obs" beside its banner inside its own branch, so the
-    # generic line is skipped here for it too.
-    if (
-        block not in ("svy", "ml", "newey", "arch", "quantile")
-        and not _is_robust_ols
-        and not _pcse_family
-        and not _iv_family
-        and not _eiv_family
-    ):
+    # ONE predicate for "this command draws its own header block". Every new block-shaped
+    # family used to need edits in two separate gates here (the Number of obs line and the
+    # model-test line), and missing one produced duplicated statistics above the table.
+    # That happened three times -- xtpcse, ivregress, eivreg -- so the condition lives in a
+    # single place now.
+    _own_header = _prints_own_header_block(result, block)
+    if not _own_header and not _is_robust_ols:
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
     # print no F test at all (Stata's qreg header is just Number of obs plus the
     # deviation lines), and printing "F(1, 72) = ." there is noise a scraper
     # would read as a missing value rather than "not applicable".
-    if (
-        block in ("quantile", "ml", "newey")
-        or _is_robust_ols
-        or _pcse_family
-        or _iv_family
-        or _eiv_family
-    ):
-        pass
-    elif block == "arch":
+    if block == "arch":
+        # This branch DRAWS the arch/arima header. ``arch`` is in
+        # ``_OWN_HEADER_BLOCKS`` so the generic statistics above are skipped; this branch
+        # is what replaces them, so it must come FIRST -- putting the bare "already
+        # handled" test ahead of it swallowed the whole header.
+        #
         # BEFORE the chi2 test: ``arch`` sets e(chi2type)="Wald", so the generic chi2
         # branch would claim it and print "Wald chi2(Nah)" in one column.
-        # ``arch`` prints a two-column block 78 wide:
         #
         #   Sample: 1 thru 800                      Number of obs     =        800
         #                                           Wald chi2(.)      =          .
         #   Log likelihood = -1039.235              Prob > chi2       =          .
-        # ``arch`` prints a LITERAL dot here (e(df_m) is not reported for that model), but
-        # ``arima`` -- which shares this header shape -- prints its real count. Measured:
-        # "Wald chi2(1)" for arima, "Wald chi2(.)" for arch.
+        # ``arch`` prints a LITERAL dot for the chi2 degrees of freedom (e(df_m) is not
+        # reported for that model), but ``arima`` -- which shares this header shape --
+        # prints its real count. Measured: "Wald chi2(1)" for arima, "Wald chi2(.)" for arch.
         if str(getattr(result, "model_name", "") or "") == "arima":
             _chi2df = _df_label(df_model)
         else:
@@ -1695,12 +1700,13 @@ def _stata_summary(result: Any) -> str:
             f"{'':<48}{'Wald chi2(' + _chi2df + ')':<18}= {'.':>10}"
         )
         _ll = _e_float(result, "ll")
-        # Six decimals: measured, Stata prints "-1039.235" (not the full float).
         # ``%.7g`` gives "-1039.235", which is what Stata prints; more digits is too many.
         _ll_text = (
             "Log likelihood = " + "%.7g" % _ll if np.isfinite(_ll) else ""
         )
         lines.append(f"{_ll_text:<48}{'Prob > chi2':<18}= {'.':>10}")
+    elif _own_header or _is_robust_ols:
+        pass
     elif chi2_type:
         # Stata chooses the model test per estimator: "F" for regress,
         # "Wald chi2" for logit/probit/ivregress, "LR chi2" for tobit.

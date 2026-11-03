@@ -1441,13 +1441,17 @@ class Frontier:
             )
 
         X, names, kept = build_design(formula, data)
-        return cls(
+        model = cls(
             data.loc[kept, lhs].to_numpy(dtype=float),
             X,
             param_names=names,
             distribution=distribution,
             model_data=data.loc[kept].reset_index(drop=True),
         )
+        # The table's row-name column is headed with the dependent variable; without this
+        # it printed blank.
+        model._response_name = lhs
+        return model
 
     # -------------------------------------------------------------------- fit
     def fit(
@@ -1629,6 +1633,13 @@ class Frontier:
             "df_m": wald_df,
             "df_r": float(n - k),
             "rank": k + 2,
+            # ``e(title)``: measured from ``frontier y x1`` -- "Stoc. frontier
+            # normal/half-normal model". The distribution is named in the banner and this
+            # class implements the half-normal one only, so the string is fixed rather
+            # than interpolated from a parameter with a single legal value.
+            "title": "Stoc. frontier normal/half-normal model",
+            # ``e(depvar)`` heads the coefficient table's row-name column.
+            "depvar": str(getattr(self, "_response_name", "") or ""),
             "ll": llf,
             "ll_0": ll_ols,
             "chi2": wald,

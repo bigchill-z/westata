@@ -1599,8 +1599,11 @@ def _stata_summary(result: Any) -> str:
         or str(getattr(result, "model_name", "") or "") in ("tobit", "truncreg")
         or str(getattr(result, "model_name", "") or "").startswith("ivregress")
     )
-    if not _robust_banner and not _banner_in_block:
-        lines.append(banner if banner else "Stata-style regression results")
+    # A MISSING banner means Stata prints no banner for this command -- ``nl`` starts
+    # straight at the Source/SS table. The old fallback put "Stata-style regression
+    # results" on that line, a string Stata never prints anywhere.
+    if not _robust_banner and not _banner_in_block and banner:
+        lines.append(banner)
     # ``areg`` prints a SECOND title line naming what it absorbed:
     #
     #     Linear regression, absorbing indicators
@@ -1823,9 +1826,8 @@ def _stata_summary(result: Any) -> str:
         # title lines are rebuilt so the block starts where Stata's does -- with the
         # banner and a blank line, since Stata prints no ``Model:``/
         # ``Covariance type:`` row before its table.
-        lines = [
-            banner if banner else "Stata-style regression results",
-        ]
+        # An empty banner means Stata prints none (``nl``); the list starts empty then.
+        lines = [banner] if banner else []
         # ``title2`` (areg's "Absorbed variable: ...") was appended to the earlier ``lines``
         # list, which this branch REPLACES -- the same trap the design block below hit. It
         # has to be re-attached here or the subtitle disappears exactly when the ANOVA

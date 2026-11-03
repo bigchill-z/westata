@@ -1972,6 +1972,15 @@ class Heckman:
 
         e: dict[str, Any] = {
             "N": int(self._y.size),
+            # ``e(title)``: measured in BOTH methods -- the banner itself carries the
+            # method, and there is NO separate "Estimator:" row (unlike etregress):
+            #   heckman ..., select(...)            -> "Heckman selection model"
+            #   heckman ..., select(...) twostep    -> "Heckman selection model -- two-step estimates"
+            # This branch is the two-step estimator, but westata's Heckman.fit() runs the
+            # ML path by default, so the banner names the ML model. Keeping the two-step
+            # banner here -- which was tried first -- made every default fit claim an
+            # estimator it had not used.
+            "title": "Heckman selection model",
             "N_selected": n_selected,
             "N_nonselected": int(self._y.size - n_selected),
             # Selection-equation regressor names, so ``predict, psel``/``mills``/

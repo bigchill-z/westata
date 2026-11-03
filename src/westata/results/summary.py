@@ -2860,10 +2860,24 @@ def _stata_summary(result: Any) -> str:
         ) + ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
     else:
         # Keep the arch prefixes if they were set above; otherwise the standard set.
+        # ``etregress``/``heckman`` name their two equations "y#..." / "treat#..." (and
+        # "select#..." for heckman), which is the same two-level shape as zip's
+        # "inflate#" blocks -- measured against their coefficient tables.
         _EQUATION_PREFIXES = (
             ("y:", "ARCH:")
             if _is_arch_shape
-            else ("inflate#", "inflate:", "select#", "select:", "tobit#", "tobit:")
+            else (
+                "inflate#",
+                "inflate:",
+                "select#",
+                "select:",
+                "tobit#",
+                "tobit:",
+                "y#",
+                "y:",
+                "treat#",
+                "treat:",
+            )
         )
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()

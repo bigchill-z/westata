@@ -236,6 +236,13 @@ _HEADER_BLOCK: dict[str, str] = {
     "ivregress gmm": "ols",
     "reghdfe": "ols",
     "xtreg, fe": "ols",
+    # These three were registered in the conformance suite at E3 but had NO header entry,
+    # so they fell through to the generic path and never took part in the layout sweep.
+    # Measured: areg prints the same two-column block as regress; xtabond prints the
+    # panel design block (Group variable / Time variable / Obs per group).
+    "areg": "ols",
+    "xtabond": "ols",
+    "sureg": "ols",
     "xtreg, re": "ols",
     "xtreg, be": "ols",
     "xtreg, fd": "ols",
@@ -1118,6 +1125,66 @@ def _is_xtreg_panel(result: Any) -> bool:
     return bool(has_groups and has_decomposition)
 
 
+def _xtabond_header_block(result: Any, nobs: int) -> list[str]:
+    """The panel design block ``xtabond`` prints (measured against a live run).
+
+      Arellano\u2013Bond dynamic panel-data estimation Number of obs     =        60
+      Group variable: unit                          Number of groups  =        20
+      Time variable: period
+                                                    Obs per group:
+                                                                  min =         3
+                                                                  avg =       3.0
+                                                                  max =         3
+
+      Number of instruments =      8                Wald chi2(2)      =      0.09
+                                                    Prob > chi2       =    0.9560
+      One-step results
+    """
+
+    e = getattr(result, "e", None) or {}
+    entity = str(e.get("ivar") or "").strip() or "."
+    time_name = str(e.get("tvar") or "").strip()
+    n_groups = _e_float(result, "N_g")
+    n_instr = _e_float(result, "instruments")
+    chi2_v = _e_float(result, "chi2")
+    p_v = _e_float(result, "p")
+    df_m = _e_float(result, "df_m")
+    g_min = _e_float(result, "g_min")
+    g_avg = _e_float(result, "g_avg")
+    g_max = _e_float(result, "g_max")
+    # Balanced panels: the per-group count is N / groups. Stata prints these on the
+    # Obs-per-group rows; the macros are absent on this estimator.
+    if not np.isfinite(g_min) and np.isfinite(n_groups) and n_groups > 0:
+        g_min = g_avg = g_max = float(nobs) / float(n_groups)
+
+    def _right(label: str, value: str) -> str:
+        return f"{label:<17}= {value:>7}"
+
+    _ab_banner = "Arellano\u2013Bond dynamic panel-data estimation"
+    lines = [
+        f"{_ab_banner:<48}" + _right("Number of obs", f"{int(nobs)}"),
+        f"{('Group variable: ' + entity):<48}"
+        + _right("Number of groups", f"{int(n_groups)}" if np.isfinite(n_groups) else "."),
+        f"{('Time variable: ' + time_name) if time_name else '':<48}".rstrip(),
+        f"{'':<48}{'Obs per group:':>17}",
+        f"{'':<48}{'min':>14} = {int(g_min):>7}" if np.isfinite(g_min) else "",
+        f"{'':<48}{'avg':>14} = {g_avg:>7.1f}" if np.isfinite(g_avg) else "",
+        f"{'':<48}{'max':>14} = {int(g_max):>7}" if np.isfinite(g_max) else "",
+        "",
+    ]
+    if np.isfinite(n_instr) or np.isfinite(chi2_v):
+        lines.append(
+            f"{('Number of instruments = ' + f'{int(n_instr):>6}') if np.isfinite(n_instr) else '':<48}"
+            + _right(f"Wald chi2({_df_label(df_m)})", f"{chi2_v:.2f}")
+        )
+        if np.isfinite(p_v):
+            lines.append(f"{'':<48}" + _right("Prob > chi2", _four(p_v)))
+        lines.append("One-step results")
+    return [line for line in lines if line != ""] + (
+        [""] if np.isfinite(n_instr) or np.isfinite(chi2_v) else []
+    )
+
+
 def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     """The two-column panel header Stata's ``xtreg`` prints instead of ANOVA."""
 
@@ -1881,6 +1948,83 @@ def _stata_summary(result: Any) -> str:
         lines = list(_xtreg_header_block(result, nobs))
         # Everything appended before this point described a header that is not being
         # printed; the panel block replaces it wholesale.
+    elif str(getattr(result, "model_name", "") or "") == "xtabond":
+        lines = _xtabond_header_block(result, nobs)
+    elif str(getattr(result, "model_name", "") or "") == "sureg":
+        # ``sureg`` opens with an EQUATION SUMMARY table and no fit statistics. Measured:
+        #
+        #   Seemingly unrelated regression
+        #   --------------------------------------------------------------
+        #   Equation             Obs   Params         RMSE  "R-squared"
+        #   --------------------------------------------------------------
+        #   y                    100        1     .9808943      0.0157
+        #   ybin                 100        1     .4994156      0.0023
+        #   --------------------------------------------------------------
+        _sureg_e = getattr(result, "e", None) or {}
+        _sureg_title = str(_sureg_e.get("title") or "Seemingly unrelated regression")
+        _sureg_names = list(_sureg_e.get("equations") or [])
+        _r2_header = '"R-squared"'
+        lines = [_sureg_title, "-" * 62,
+                 f"{'Equation':<18}{'Obs':>7}{'Params':>9}{'RMSE':>13}"
+                 f"{_r2_header:>13}",
+                 "-" * 62]
+        for _eq in _sureg_names:
+            _rmse_eq = _e_float(result, f"rmse_{_eq}")
+            _r2_eq = _e_float(result, f"r2_{_eq}")
+            _k_eq = _e_float(result, f"k_{_eq}")
+            # ``e(N)`` is the TOTAL across equations; the table reports the per-equation
+            # count, which for a balanced system is N / k_eq.
+            _n_eq = int(nobs // max(int(_e_float(result, "k_eq")), 1))
+            lines.append(
+                f"{str(_eq):<18}{_n_eq:>7}"
+                f"{(int(_k_eq) + 1) if np.isfinite(_k_eq) else 1:>9}"
+                f"{_stata_number(_rmse_eq, 7).strip():>13}"
+                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>13}"
+            )
+        lines.append("-" * 62)
+    elif str(getattr(result, "model_name", "") or "") == "areg":
+        # ``areg`` prints a TWO-COLUMN header instead of the Source/SS table, like reghdfe
+        # but with its own left column. Measured:
+        #
+        #   Linear regression, absorbing indicators     Number of obs     =    100
+        #   Absorbed variable: unit                     No. of categories =     20
+        #                                               F(1, 79)          =   0.05
+        #                                               Prob > F          = 0.8297
+        #                                               R-squared         = 0.2890
+        #                                               Adj R-squared     = 0.1089
+        #                                               Root MSE          = 0.9380
+        #
+        # Right column starts at 52, label 18 wide, "=" at 71.
+        _areg_rows: list[tuple[str, str]] = [
+            ("Number of obs", f"{int(nobs):,}"),
+        ]
+        _k_absorb = _e_float(result, "k_absorb")
+        if np.isfinite(_k_absorb):
+            _areg_rows.append(("No. of categories", f"{int(_k_absorb)}"))
+        if np.isfinite(fvalue):
+            _areg_rows.append(
+                (f"F({_df_label(df_model)}, {_df_label(df_resid)})", f"{fvalue:.2f}")
+            )
+        if np.isfinite(p_f):
+            _areg_rows.append(("Prob > F", _four(p_f)))
+        if np.isfinite(rsquared):
+            _areg_rows.append(("R-squared", _four(rsquared)))
+        if np.isfinite(rsquared_adj):
+            _areg_rows.append(("Adj R-squared", _four(rsquared_adj)))
+        if np.isfinite(rmse):
+            _areg_rows.append(("Root MSE", f"{rmse:.4f}"))
+        _areg_title = str((getattr(result, "e", None) or {}).get("title") or "")
+        _areg_title2 = str((getattr(result, "e", None) or {}).get("title2") or "")
+        lines = []
+        for _index, (_label, _value) in enumerate(_areg_rows):
+            _left = _areg_title if _index == 0 else (_areg_title2 if _index == 1 else "")
+            lines.append(f"{_left:<52}{_label:<18}= {_value:>5}".rstrip())
+        # ``clustertable`` belongs after the header block and before the coefficients, the
+        # same place the ANOVA branch puts it. Omitting it here dropped the table for every
+        # clustered areg fit -- the branch replaced the one that used to emit it.
+        if cluster_summary:
+            lines.append("")
+            lines.extend(cluster_summary)
     elif str(getattr(result, "model_name", "") or "") == "reghdfe":
         # ``reghdfe`` prints a TWO-COLUMN header instead of a Source/SS table, then a block
         # naming the absorbed effects. Measured:

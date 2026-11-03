@@ -315,8 +315,14 @@ def test_the_absorbed_variable_line_is_the_second_line() -> None:
     result = ws.Areg.from_formula("y ~ x1", _panel(), absorb="firm").fit()
     lines = result.summary(style="stata").splitlines()
 
-    assert lines[0] == "Linear regression, absorbing indicators"
+    # Measured from a live ``areg y x1, absorb(unit)``: the banner SHARES its row with
+    # "Number of obs", and "Absorbed variable:" shares the next row with "No. of
+    # categories". This assertion used to demand the banner alone on line 0, which is the
+    # shape of a different command -- areg prints no Source/SS table at all.
+    assert lines[0].startswith("Linear regression, absorbing indicators")
+    assert "Number of obs" in lines[0]
     assert "Absorbed variable: firm" in lines[1]
+    assert "No. of categories" in lines[1]
 
 
 def test_reghdfe_prints_no_absorbed_variable_line() -> None:

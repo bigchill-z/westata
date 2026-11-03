@@ -259,7 +259,7 @@ class XtAbond:
                 f"counts vary between {counts.min()} and {counts.max()}"
             )
         exogenous = [name for name in names if name != "Intercept"]
-        return cls(
+        model = cls(
             data.loc[kept, lhs].to_numpy(dtype=float),
             X,
             data.loc[kept, entity].to_numpy(),
@@ -270,6 +270,11 @@ class XtAbond:
             system=system,
             model_data=data.loc[kept].reset_index(drop=True),
         )
+        # The panel design block names both variables ("Group variable: unit",
+        # "Time variable: period"); without these the rows printed "." and blank.
+        model._entity_name = str(entity)
+        model._time_name = str(time)
+        return model
 
     # ------------------------------------------------------------------ fit
     def fit(
@@ -426,6 +431,13 @@ class XtAbond:
 
         e: dict[str, Any] = {
             "N": int(n_rows),
+            # ``e(title)``: measured from a live ``xtabond y x1``. The banner names the
+            # estimator and carries an EN DASH, like the newey label.
+            "title": "Arellano\u2013Bond dynamic panel-data estimation",
+            # The panel design block reads these two macros for "Group variable:" and
+            # "Time variable:".
+            "ivar": str(getattr(self, "_entity_name", "") or ""),
+            "tvar": str(getattr(self, "_time_name", "") or ""),
             "N_g": int(len(instrument_sets)),
             # ``instruments`` is Stata's ``e(zrank)``: the "Number of instruments"
             # the estimator prints.  Stata's total is one larger than the number

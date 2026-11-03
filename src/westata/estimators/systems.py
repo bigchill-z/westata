@@ -647,6 +647,8 @@ class Sureg:
 
         e: dict[str, Any] = {
             "N": n,
+            # ``e(title)``: measured from a live ``sureg (y x1) (ybin x1)``.
+            "title": "Seemingly unrelated regression",
             "k_eq": equations,
             "k": total,
             "rank": total,

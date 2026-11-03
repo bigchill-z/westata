@@ -631,6 +631,9 @@ class XtIvreg:
         # The panel header names the grouping variable ("Group variable: unit"); without
         # this the row printed blank.
         model._entity_name = str(entity)
+        # ``e(depvar)`` heads the coefficient table's row-name column; likewise blank
+        # without it.
+        model._depvar_name = str(depvar)
         return model
 
     # ------------------------------------------------------ variance components
@@ -893,6 +896,8 @@ class XtIvreg:
                 str(getattr(self, "_method", "") or "").strip().lower(), ""
             ),
             # The panel header's "Group variable:" row reads this macro.
+            # ``e(depvar)`` heads the coefficient table's row-name column.
+            "depvar": str(getattr(self, "_depvar_name", "") or ""),
             "group": str(getattr(self, "_entity_name", "") or ""),
             # e(df_m) is the number of *reported* parameters other than the
             # constant.  For xtivreg, re this is exactly Stata's value (2 for the

@@ -1136,9 +1136,17 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     # numbers. The 2SLS residuals do not admit Stata's within-R2 definition, so the value
     # is genuinely not reported -- printing the estimator's own number would show a figure
     # Stata deliberately blanks.
-    _is_xtivreg = str(getattr(result, "model_name", "") or "").startswith("xtivreg")
+    # ``xtivreg, FE`` prints a LITERAL MISSING VALUE for the within R-squared -- the 2SLS
+    # residuals do not admit Stata's within-R2 definition -- but ``xtivreg, RE`` prints a
+    # real number. Measured in both directions:
+    #   xtivreg y x1 (x2 = z), fe   ->  "Within  =      ."
+    #   xtivreg y x1 (x2 = z), re   ->  "Within  = 0.0150"
+    # So the blanking is keyed on the METHOD, not on the family.
+    _iv_fe_blanks_within = (
+        str(getattr(result, "model_name", "") or "") == "xtivreg, fe"
+    )
     decomposition = [
-        ("Within", float("nan") if _is_xtivreg else r2_w),
+        ("Within", float("nan") if _iv_fe_blanks_within else r2_w),
         ("Between", r2_b),
         ("Overall", r2_o),
     ]
@@ -1183,7 +1191,8 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     lines.append("")
     # ``xtivreg`` reports a WALD chi2 where the other panel estimators report an F:
     # measured, "Wald chi2(2)" / "Prob > chi2" against xtreg's "F(1, 149)" / "Prob > F".
-    _uses_wald = _is_xtivreg
+    # This applies to BOTH methods -- unlike the Within-R2 blanking, which is fe-only.
+    _uses_wald = str(getattr(result, "model_name", "") or "").startswith("xtivreg")
     if np.isfinite(fvalue):
         if _uses_wald:
             _test_label = f"Wald chi2({_df_label(df_model)})"
@@ -1191,7 +1200,16 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
             _test_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
         lines.append(row("", stat(_test_label, f"{fvalue:.2f}")))
     left_corr = ""
-    if np.isfinite(corr):
+    # The RE estimator ASSUMES zero correlation between the effects and the regressors --
+    # that is what makes it random-effects -- so it prints the assumption rather than a
+    # number, and with a different label ("X", not "Xb"):
+    #
+    #   xtivreg ..., re   corr(u_i, X) = 0 (assumed)
+    #   xtivreg ..., fe   corr(u_i, Xb) = -0.0833
+    _model_name = str(getattr(result, "model_name", "") or "")
+    if _model_name.startswith("xtivreg") and _model_name.endswith(", re"):
+        left_corr = "corr(u_i, X) = 0 (assumed)"
+    elif np.isfinite(corr):
         left_corr = f"corr(u_i, Xb) = {_four(corr)}"
     if np.isfinite(p_f):
         _p_label = "Prob > chi2" if _uses_wald else "Prob > F"

@@ -186,7 +186,16 @@ def _frames() -> dict[str, pd.DataFrame]:
     panel["t"] = np.arange(1, len(panel) + 1)
     # Heckman needs a binary selection indicator that is NOT degenerate; intreg needs a
     # (low, high) interval pair whose low < high everywhere.
-    panel["selected"] = (panel["x1"] + panel["x2"] > 0).astype(int)
+    #
+    # A DETERMINISTIC rule (x1 + x2 > 0) is degenerate: the selection equation can be
+    # driven to a corner and Stata returns coefficients in the 80s with standard errors of
+    # 1e8. The latent index carries its own disturbance, and the outcome is shifted by the
+    # selection so rho is identified.
+    _sel_latent = panel["x1"] + panel["x2"] + rng.normal(size=n)
+    panel["selected"] = (_sel_latent > 0).astype(int)
+    # A SEPARATE outcome for heckman: "y" is used by a dozen already-matching commands and
+    # shifting it would move all of their numbers for no reason.
+    panel["ysel"] = panel["y"].to_numpy() + 0.6 * (_sel_latent > 0).astype(float)
     # The zero-TRUNCATED models reject observations at the limit, so they need counts that
     # are strictly positive. ycount has zeros; ypos does not.
     panel["ypos"] = panel["ycount"] + 1
@@ -212,6 +221,13 @@ def _frames() -> dict[str, pd.DataFrame]:
     archseries = pd.DataFrame(
         {"y": _innov * np.sqrt(_var), "t": np.arange(1, 401)}
     )
+    # A count series with a GENUINE zero-inflation structure: ``ycount`` averages 2.3 with
+    # only 9 zeros in 100, so an inflation equation on it is not identified and zinb fails
+    # with a singular information matrix. This one has an excess of zeros driven by x1.
+    _zi_lambda = np.exp(0.5 + 0.4 * panel["x1"].to_numpy())
+    _zi_count = rng.poisson(_zi_lambda)
+    _zi_zero = rng.random(n) < 0.35
+    panel["yzicount"] = np.where(_zi_zero, 0, _zi_count)
     return {
         "panel": panel,
         "cross": cross,
@@ -299,9 +315,11 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.XtPoisson.from_formula(
              "ycount ~ x1", PANEL, entity="unit", method="re").fit()),
         # --- second batch: the families not covered by the first scan ---
-        ("heckman", "heckman y x1, select(selected = x1 x2)",
+        # ysel, not y: the outcome must be shifted by the selection for rho to be
+        # identified. With a zero-shift outcome Stata itself returns a corner solution.
+        ("heckman", "heckman ysel x1, select(selected = x1 x2)",
          lambda: ws.Heckman.from_formula(
-             "y ~ x1 + select(selected ~ x1 + x2)", SELECTED).fit()),
+             "ysel ~ x1 + select(selected ~ x1 + x2)", SELECTED).fit()),
         ("intreg", "intreg lo hi x1",
          lambda: ws.Intreg.from_formula("lo hi ~ x1", INTERVAL).fit()),
         ("etregress", "etregress y x1, treat(treated = x1 x2)",
@@ -353,9 +371,12 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("tnbreg", "tnbreg ypos x1, ll(0)",
          lambda: ws.TruncatedNegativeBinomial.from_formula(
              "ypos ~ x1", PANEL, lower=0).fit()),
-        ("zinb", "zinb ycount x1, inflate(x1)",
+        # yzicount, not ycount: the latter has 9 zeros in 100 and an inflation equation
+        # on it is not identified (singular information matrix in westata). This series
+        # has an excess of zeros that x1 actually drives, so both parts are estimable.
+        ("zinb", "zinb yzicount x1, inflate(x1)",
          lambda: ws.ZeroInflatedNegativeBinomial.from_formula(
-             "ycount ~ x1", PANEL, inflate="x1").fit()),
+             "yzicount ~ x1", PANEL, inflate="x1").fit()),
         # Stata's ``ztp`` truncates at ZERO, which on the positive-count scale means the
         # lower limit is 1 -- passing lower=0 selects the general ``tpoisson`` instead and
         # the banners differ.

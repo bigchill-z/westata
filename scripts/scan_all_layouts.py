@@ -195,7 +195,11 @@ def _frames() -> dict[str, pd.DataFrame]:
     interval["hi"] = panel["y"] + 0.5
 
     tsseries = pd.DataFrame(
-        {"y": rng.normal(size=n), "t": np.arange(1, n + 1)}
+        {
+            "y": rng.normal(size=n),
+            "x1": rng.normal(size=n),
+            "t": np.arange(1, n + 1),
+        }
     )
     return {
         "panel": panel,
@@ -255,6 +259,27 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.Logit.from_formula("ybin ~ x1", PANEL).fit(cov_type="HC1")),
         ("ivregress_2sls", "ivregress 2sls y x1 (x2 = z)",
          lambda: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
+        # --- registry entries the earlier batches missed ---
+        ("arch", "arch y, arch(1) garch(1)",
+         lambda: ws.GARCH(TSSERIES["y"].to_numpy(), p=1, q=1).fit()),
+        # newey requires REGULARLY spaced time, which a panel is not (period repeats).
+        # The single-series frame is the right input, and Stata's newey agrees.
+        ("newey", "newey y x1, lag(2)",
+         lambda: ws.newey("y ~ x1", TSSERIES, lag=2,
+                          time=TSSERIES["t"].to_numpy())),
+        ("ivregress_liml", "ivregress liml y x1 (x2 = z)",
+         lambda: ws.IVLIML.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
+        ("ivregress_gmm", "ivregress gmm y x1 (x2 = z)",
+         lambda: ws.IVGMM.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
+        ("svy_proportion", "svy: proportion ybin",
+         lambda: ws.SvyProportion.from_frame(["ybin"], CROSS, DESIGN).fit()),
+        ("xtivreg_re", "xtivreg y x1 (x2 = z), re",
+         lambda: ws.XtIvreg.from_formula(
+             "y ~ x1 + (x2 = z)", PANEL, entity="unit", time="period",
+             method="re").fit()),
+        ("xtpoisson_re", "xtpoisson ycount x1, re",
+         lambda: ws.XtPoisson.from_formula(
+             "ycount ~ x1", PANEL, entity="unit", method="re").fit()),
         # --- second batch: the families not covered by the first scan ---
         ("heckman", "heckman y x1, select(selected = x1 x2)",
          lambda: ws.Heckman.from_formula(
@@ -405,11 +430,13 @@ def _stata_block(command: str) -> list[str]:
         # intreg's bound columns only exist on INTERVAL; everything else uses PANEL.
         # A few commands need their own frame: intreg's bounds live on INTERVAL, and
         # arima refuses a panel outright.
-        _frame_name = {"intreg": INTERVAL, "arima": TSSERIES}
+        _frame_name = {"intreg": INTERVAL, "arima": TSSERIES, "newey": TSSERIES}
         stata.push(_frame_name.get(command.split()[0], PANEL))
         # ``xtset`` needs unit/period; the time-series frame for arima has neither, and
         # Stata errors with "variable unit not found" before the command even runs.
-        _uses_time_series = command.split()[0] == "arima"
+        # Both arima and newey run on a single series, which has no unit/period/stratum
+        # columns -- so xtset and svyset would fail before the command even runs.
+        _uses_time_series = command.split()[0] in ("arima", "newey")
         for setup in STATA_SETUP:
             if _uses_time_series:
                 # A pure time-series frame has no unit/period/stratum/psu/weight columns,

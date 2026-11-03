@@ -2553,6 +2553,10 @@ def _stata_summary(result: Any) -> str:
         # explicit map because offsets computed from the label length kept landing short.
         _BANNER_END = {
             "Robust": 35,
+            # The EN DASH (U+2013) is what Stata prints; an ASCII hyphen here silently
+            # missed the lookup and left the banner unpadded. Both spellings are accepted
+            # so a caller that supplied an ASCII hyphen still lines up.
+            "Newey\u2013West": 37,
             "Newey-West": 37,
             "Panel-corrected": 40,
             # arch's variance-estimator banner ends one column short of "Robust".

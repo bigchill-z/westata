@@ -1166,6 +1166,11 @@ class IV2SLS:
             #
             # Measured from ``ivregress 2sls y x1 (x2 = z)``.
             "title": _IV_TITLES.get(str(self._stata_command), ""),
+            # ``ivregress gmm`` is the ONLY IV method that sets e(vcetype) -- measured:
+            # 2sls and liml store "", while gmm stores "Robust" because its weight matrix
+            # is estimated robustly. That macro is what draws the banner row above the
+            # coefficient header, so without it the gmm table was missing that row.
+            "vcetype": "Robust" if self._stata_command == "ivregress gmm" else "",
             "endog": list(getattr(self, "_endog_names", [])),
             "exog": [
                 name

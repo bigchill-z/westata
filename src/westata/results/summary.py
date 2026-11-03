@@ -1908,6 +1908,11 @@ def _stata_summary(result: Any) -> str:
             # Left 50, label 16, "= ", value 10 -- measured from
             # "Instrumental-variables 2SLS regression     Number of obs   =        100".
             lines.append(f"{_left:<50}{_label:<16}= {_value:>10}".rstrip())
+        # ``ivregress gmm`` adds one unaligned line UNDER the two-column block naming its
+        # weight matrix. Measured: "GMM weight matrix: Robust" -- the default, and the
+        # only form this package implements (IVGMM takes no weight-matrix option).
+        if str(getattr(result, "model_name", "") or "") == "ivregress gmm":
+            lines.append("GMM weight matrix: Robust")
     elif str(getattr(result, "model_name", "") or "") == "eivreg":
         # ``eivreg`` prints a RELIABILITY TABLE on the left and the fit statistics on the
         # right, sharing rows. Measured:
@@ -2188,6 +2193,20 @@ def _stata_summary(result: Any) -> str:
         ).strip()
         if _estimator_name and len(ml_left) >= 1:
             ml_left.insert(1, "Estimator: " + _estimator_name)
+
+        # ``tnbreg`` names its truncation point on the row under the banner:
+        #
+        #   Truncated negative binomial regression      Number of obs =
+        #   Truncation point = 0                        LR chi2(1)    =
+        _truncation = _e_float(result, "truncation_point")
+        if (
+            str(getattr(result, "model_name", "") or "") == "tnbreg"
+            and np.isfinite(_truncation)
+            and len(ml_left) >= 1
+        ):
+            ml_left.insert(
+                1, "Truncation point = " + f"{_truncation:g}"
+            )
 
         while len(ml_left) < (len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)):
             ml_left.append("")
@@ -2837,6 +2856,25 @@ def _stata_summary(result: Any) -> str:
 
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
+
+    if _has_alpha:
+        # ``xtpoisson, re`` and ``tnbreg`` close with a likelihood-ratio test of the
+        # dispersion parameter. The statistic is chi-BAR-squared -- a 50:50 mixture of
+        # chi2(0) and chi2(1) -- because the null sits on the boundary of the parameter
+        # space, so the p-value is HALF the ordinary chi2(1) tail. Measured on
+        # ``xtpoisson ycount x1, re``: 2*(ll - ll_0) = 3.7927 against Stata's
+        # "chibar2(01) = 3.79", and 0.5*chi2.sf(3.79, 1) = 0.0257 against its "0.026".
+        _ll_v = _e_float(result, "ll")
+        _ll0_v = _e_float(result, "ll_0")
+        if np.isfinite(_ll_v) and np.isfinite(_ll0_v):
+            _lr = 2.0 * (_ll_v - _ll0_v)
+            _p_lr = 0.5 * float(stats.chi2.sf(_lr, 1))
+            # A rule separates the derived alpha row from the test, and the closing rule
+            # already follows it -- measured, Stata prints both.
+            lines.insert(len(lines) - 1, _split_rule)
+            _text = f"LR test of alpha=0: chibar2(01) = {_lr:.2f}"
+            _tail = f"Prob >= chibar2 = {_p_lr:.3f}"
+            lines.append(f"{_text:<{row_width - len(_tail) - 1}}{_tail}")
 
     if _is_didregress(result):
         # ``didregress`` closes with a note naming what the ATET was adjusted for.

@@ -476,7 +476,12 @@ def test_nl_reports_stata_style_summary():
 
     assert "Number of obs" in text
     assert "R-squared" in text
-    assert "Root MSE" in text
+    # ``nl`` reports the RESIDUAL DEVIANCE where the OLS-shaped commands report Root MSE.
+    # Measured from ``nl (y = {b0} * exp(-{b1} * x1))``: Stata prints
+    # "Res. dev.       =   279.3424" and prints no Root MSE row at all. This assertion
+    # used to require "Root MSE", which belongs to a different command's table.
+    assert "Res. dev." in text
+    assert "Root MSE" not in text
     assert "P>|t|" in text
     assert "/b0" in text
     assert "/b1" in text

@@ -1310,8 +1310,23 @@ def _anova_block(
     #
     # SS/MS use the same ``%9.0g`` rule as the coefficient table -- nine significant digits
     # here, not a fixed decimal count, which is why ``12.6190573`` sits beside ``.34552``.
+    #: ``nl``'s ANOVA table is one column narrower in the SS field than regress's: its
+    #: "SS" header ends at 22 where regress's ends at 23, and its values sit in 10 rather
+    #: than 11. Measured against both tables directly.
+    _ss_width = 10 if str(getattr(result, "model_name", "") or "") == "nl" else 11
+    _is_nl = str(getattr(result, "model_name", "") or "") == "nl"
+    #: ``nl`` reports the residual deviance where every other OLS-shaped command reports
+    #: Root MSE. The labels differ in length ("Res. dev." 9, "Root MSE" 8) so the field is
+    #: padded rather than hard-coded, keeping "=" at column 17 for both.
+    _fit_label = "Res. dev." if _is_nl else "Root MSE"
+    _fit_value = _e_float(result, "deviance") if _is_nl else rmse
+
     def _ss(value: float) -> str:
-        return (_stata_number(value, 11) if np.isfinite(value) else f"{'.':>11}")
+        return (
+            _stata_number(value, _ss_width)
+            if np.isfinite(value)
+            else f"{'.':>{_ss_width}}"
+        )
 
     def _df_cell(df: float) -> str:
         # Stata puts the df right-aligned in 10 with a trailing space, then the MS field.
@@ -1322,8 +1337,15 @@ def _anova_block(
             return f"{'.':>11}"
         return _stata_number(value / df, 11)
 
+    # The header's SS/df/MS columns follow the same width: nl's are one narrower, and its
+    # "SS" gap is a column further left to match the values below it.
+    _anova_header = (
+        "      Source |       SS           df       MS"
+        if _ss_width == 11
+        else "      Source |      SS            df       MS"
+    )
     left = [
-        "      Source |       SS           df       MS",
+        _anova_header,
         "-------------+----------------------------------",
         f"       Model | {_ss(mss)}{_df_cell(df_model)}{_ms(mss, df_model)}",
         f"    Residual | {_ss(rss)}{_df_cell(df_resid)}{_ms(rss, df_resid)}",
@@ -1354,12 +1376,28 @@ def _anova_block(
         ),
         f"R-squared       = {('.' if not np.isfinite(rsquared) else f'{rsquared:.4f}'):>9}",
         f"Adj R-squared   = {('.' if not np.isfinite(rsquared_adj) else f'{rsquared_adj:.4f}'):>9}",
-        f"Root MSE        = {_stata_number(rmse, 7).strip().rjust(9) if np.isfinite(rmse) else '.'.rjust(9)}",
+        f"{_fit_label:<16}= {_stata_number(_fit_value, 7).strip().rjust(9) if np.isfinite(_fit_value) else '.'.rjust(9)}",
     ]
+    # ``nl``'s right column starts one row LOWER than regress's: its first row carries
+    # only "Source | SS df MS" (45 wide, no statistics beside it) and "Number of obs"
+    # appears on the second. Measured against both. So the right column is offset by one
+    # for nl and the first left row is emitted alone.
+    #
+    # The left side is padded to at least the right column's length, NOT the other way
+    # round: zipping a shortened left against a full right silently DROPPED the tail of
+    # the statistics (adj R-squared, then Res. dev.) instead of leaving the cells blank.
+    _right_offset = 1 if _is_nl else 0
+    _left_rows = left if not _right_offset else [left[0]] + left[1:]
+    _pad = max(0, len(right) + _right_offset - len(_left_rows))
+    _left_rows = _left_rows + [""] * _pad
     rendered = [
         f"{left_line:<51}{right_line}".rstrip()
-        for left_line, right_line in zip(left, right)
+        for left_line, right_line in zip(
+            _left_rows[_right_offset:], right
+        )
     ]
+    if _right_offset:
+        rendered.insert(0, left[0])
     return lines + rendered
     """Return which goodness-of-fit block Stata prints for this estimator."""
 
@@ -2026,7 +2064,14 @@ def _stata_summary(result: Any) -> str:
             _is_rreg = str(getattr(result, "model_name", "") or "") == "rreg"
             if np.isfinite(rsquared) and not _is_rreg:
                 _rows.append(("R-squared", _fixed(rsquared, 4)))
-            if np.isfinite(rmse) and not _is_rreg:
+            # ``nl`` reports the RESIDUAL DEVIANCE where regress reports Root MSE. Measured:
+            #   nl        "Res. dev.     =   279.3424"   (e(deviance) = 279.3424)
+            #   regress   "Root MSE      =   .9879483"
+            _deviance = _e_float(result, "deviance")
+            _is_nl = str(getattr(result, "model_name", "") or "") == "nl"
+            if _is_nl and np.isfinite(_deviance):
+                _rows.append(("Res. dev.", _stata_number(_deviance, 7).strip()))
+            elif np.isfinite(rmse) and not _is_rreg:
                 _rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
             for index, (label, value) in enumerate(_rows):
                 left = _banner if index == 0 else ""

@@ -111,10 +111,34 @@ def _drop_banners(lines: list[str]) -> list[str]:
 
 
 def _compare(stata_lines: list[str], ours: list[str]) -> tuple[str, str]:
-    """Return (verdict, detail) for one command."""
+    """Return (verdict, detail) for one command.
+
+    A truncation guard runs FIRST: if the two sides disagree about how many table rules
+    they contain, or one side is implausibly short, the verdict is SUSPECT rather than a
+    confident match. Rounds 18 and 23 both lost time to a filtered-out line making a
+    correct renderer look broken, and round 25 to a single-capture coincidence hiding a
+    real one; the guard is what turns either failure into a visible warning instead of a
+    silent MATCH.
+    """
 
     stata_lines = _drop_banners(stata_lines)
     ours = _drop_banners(ours)
+
+    _state_rules = sum(1 for line in stata_lines if line.startswith("---"))
+    _west_rules = sum(1 for line in ours if line.startswith("---"))
+    if _state_rules != _west_rules:
+        return (
+            "SUSPECT",
+            f"table rules differ: Stata {_state_rules}, westata {_west_rules} "
+            f"(a filtered or dropped row looks like a layout bug otherwise)",
+        )
+    if len(stata_lines) < 3 or len(ours) < 3:
+        return (
+            "SUSPECT",
+            f"implausibly short block: Stata {len(stata_lines)} lines, "
+            f"westata {len(ours)}",
+        )
+
     if [l.rstrip() for l in stata_lines] == [l.rstrip() for l in ours]:
         return "MATCH", ""
     state = [l.rstrip() for l in stata_lines]
@@ -434,7 +458,14 @@ def main(argv: list[str]) -> int:
             f"{label}" + (f"  [{detail}]" if detail else "")
         )
 
-    for verdict in ("MATCH", "SKELETON", "DIFFERS", "RUNFAIL", "STATAFAIL"):
+    for verdict in (
+        "MATCH",
+        "SKELETON",
+        "DIFFERS",
+        "SUSPECT",
+        "RUNFAIL",
+        "STATAFAIL",
+    ):
         entries = verdicts.get(verdict, [])
         if not entries:
             continue

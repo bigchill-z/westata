@@ -64,9 +64,23 @@ def test_hettest_methods_run(linear, method) -> None:
 
 @pytest.mark.parametrize("mtest", ["bonferroni", "holm", "sidak", "noadjust"])
 def test_hettest_mtest_methods_run(linear, mtest) -> None:
-    """``_mtest.ado:84`` lists exactly these four."""
+    """``_mtest.ado:84`` lists exactly these four.
 
-    assert linear.estat_hettest(mtest=mtest) is not None
+    ``rhs=True`` keeps the auxiliary regression multi-column, which is the only
+    case where ``mtest()`` produces a family at all (``hettest.ado:126-128``
+    drops it for a single regressor, silently).
+    """
+
+    assert linear.estat_hettest(mtest=mtest, rhs=True) is not None
+
+
+@pytest.mark.parametrize("mtest", ["bonferroni", "holm", "sidak"])
+def test_hettest_mtest_single_regressor_drops_the_family(linear, mtest) -> None:
+    """Stata does not error here: it reports only the simultaneous test."""
+
+    rendered = linear.estat_hettest(mtest=mtest)
+
+    assert type(rendered).__name__ == "HetTestResult", mtest
 
 
 @pytest.mark.parametrize(
@@ -122,12 +136,21 @@ def test_hettest_methods_differ(linear) -> None:
 
 
 def test_mtest_adjusts_the_p_values(linear) -> None:
-    """``_mtest`` multiplies p-values; leaving them untouched means it did nothing."""
+    """``_mtest`` multiplies p-values; leaving them untouched means it did nothing.
 
-    unadjusted = linear.estat_hettest()
-    adjusted = linear.estat_hettest(mtest="holm")
+    ``rhs=True`` is required: the varlist-less default is a ONE-column auxiliary
+    regression (the fitted values), and ``hettest.ado:126-128`` silently drops
+    ``mtmethod`` in that case -- Stata returns no ``r(mtest)`` at all.  So the
+    default call cannot demonstrate the adjustment; a multi-regressor family can.
+    """
+
+    unadjusted = linear.estat_hettest(mtest="noadjust", rhs=True)
+    adjusted = linear.estat_hettest(mtest="holm", rhs=True)
 
     assert str(unadjusted) != str(adjusted)
+    assert not np.allclose(
+        unadjusted.table["p"].to_numpy(), adjusted.table["adjustp"].to_numpy()
+    )
 
 
 def test_vif_nosort_changes_the_row_order(linear) -> None:

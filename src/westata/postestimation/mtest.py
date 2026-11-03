@@ -201,6 +201,7 @@ def mtest_statistics(
     residuals_squared_ui: np.ndarray,
     design: np.ndarray,
     names: Sequence[str],
+    weights: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run the per-regressor auxiliary regressions of ``hettest.ado:170-176``.
 
@@ -208,11 +209,18 @@ def mtest_statistics(
     residual ``ui`` on that single column, and the statistic is that
     regression's ``e(mss)/2`` -- not the statistic from the full model.
 
+    ``weights`` is the estimation weight vector: the ado passes ``wgt`` to every
+    one of these regressions (``hettest.ado:176``), so a weighted fit's family
+    uses weighted ``e(mss)`` too.  Omitting it leaves the family unweighted while
+    the simultaneous test is weighted -- two statistics from one fit that no
+    longer describe the same test.
+
     Returns ``(statistics, dfs, pvalues)``.
     """
 
     ui = np.asarray(residuals_squared_ui, dtype=float).reshape(-1)
     matrix = np.asarray(design, dtype=float)
+    w = None if weights is None else np.asarray(weights, dtype=float).reshape(-1)
     statistics: list[float] = []
     dfs: list[float] = []
     pvalues: list[float] = []
@@ -221,12 +229,21 @@ def mtest_statistics(
         single = matrix[:, column : column + 1]
         # Add a constant, as _regress would.
         single = np.column_stack([np.ones(ui.size), single])
-        coefficients, *_ = np.linalg.lstsq(single, ui, rcond=None)
-        fitted = single @ coefficients
-        resid = ui - fitted
-        rss = float(resid @ resid)
-        centred = ui - ui.mean()
-        tss = float(centred @ centred)
+        if w is None:
+            coefficients, *_ = np.linalg.lstsq(single, ui, rcond=None)
+            resid = ui - single @ coefficients
+            rss = float(resid @ resid)
+            centred = ui - ui.mean()
+            tss = float(centred @ centred)
+        else:
+            root = np.sqrt(w)
+            coefficients, *_ = np.linalg.lstsq(
+                single * root[:, None], ui * root, rcond=None
+            )
+            resid = ui - single @ coefficients
+            rss = float((w * resid * resid).sum())
+            mean_w = float((w * ui).sum() / w.sum())
+            tss = float((w * (ui - mean_w) ** 2).sum())
         mss = tss - rss
         statistic = mss / 2.0
         df = float(single.shape[1] - 1)

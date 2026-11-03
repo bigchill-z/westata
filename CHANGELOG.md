@@ -9,7 +9,69 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed — `estat hettest` did not match Stata (`method="iid"` and the default)
+
+`result.estat_hettest()` and `result.estat_hettest(method="iid")` returned numbers
+that disagreed with Stata's `estat hettest` / `estat hettest, iid`. The cause was
+not arithmetic — the auxiliary regression, the statistic formulas and the
+standardisation were all right. It was **which columns the auxiliary regression
+used**.
+
+`hettest.ado:110-115` says, in the clearest possible terms:
+
+```stata
+if "`varlist'" == "" {    // use fitted values
+    tempvar z
+    qui _predict double `z' if `touse'
+    local varlist `z'
+}
+```
+
+The package treated `variables=None` as "every regressor" instead. On
+`regress mpg weight foreign` those two readings give:
+
+| call | Stata | westata (before) | westata (now) |
+|---|---|---|---|
+| `estat hettest` | 7.8901385636, chi2(1) | 24.1734740727, chi2(2) | 7.8901385636, chi2(1) |
+| `estat hettest, iid` | 2.5303870865, chi2(1) | 7.7524933353, chi2(2) | 2.5303870865, chi2(1) |
+| `estat hettest, rhs` | 24.1734740727, chi2(2) | *(unreachable)* | 24.1734740727, chi2(2) |
+
+Both numbers look like ordinary test statistics, which is what made this
+survive: nothing errored, and no existing test could catch it because the test
+suite compared against a second hand-transcription of the same ado — written
+from the same misreading, so test and code agreed with each other and disagreed
+with Stata.
+
+Four more defects came out of checking the same ado line by line:
+
+* **`rhs` was not implemented.** It is how Stata asks for the multi-regressor
+  test, and without it the `rhs` column above had no spelling at all.
+* **A varlist names SOURCE variables.** `estat hettest rep78` after
+  `regress mpg weight i.rep78` regresses on the raw 1-5 column: chi2(1) =
+  12.7679378754. The `e(b)` dummies give 24.3032013861 on chi2(5). Naming
+  design columns only made the raw-variable spelling unreachable.
+* **Weights were ignored.** `hettest.ado:103-105,138` passes `` `wgt' `` to
+  `_regress`, so the auxiliary regression is weighted too. On an `aweight=rep78`
+  fit the iid statistic is 3.5160742742 (not 2.5303870865) and `fstat`'s
+  denominator is 67 (not 72); on `fweight`/`iweight`, `e(N)` is `sum(w)` = 235,
+  so `df_r` is 233.
+* **`noconstant` was not refused.** Stata answers `estat hettest` after
+  `regress, noconstant` with r(301), "not appropriate after regress, nocons".
+
+And one behaviour that looked like a bug but is Stata's:
+**`mtest()` is silently dropped for a single-regressor auxiliary regression**
+(`hettest.ado:126-128`). Since the no-varlist default is a single column, the
+package was returning a `mtest` family where Stata returns only the simultaneous
+test and no `r(mtest)` matrix at all. `estat_hettest(mtest=...)` now does the
+same; pass `rhs=True` to get a family.
+
+**How this was verified.** `scripts/capture_hettest_fixtures.py` runs
+`tests/data/auto.dta` through real StataNow 19.5 and commits 90 cases to
+`tests/conformance/stata_fixtures/hettest_auto.json`: three models ×
+{fitted, rhs, explicit varlist} × {normal, iid, fstat}, the four weight types,
+two factor-variable models, the `r(mtest)` family for two models, and the three
+refusals. All 90 match to `rel < 1e-9`. The tests read that file, so they can no
+longer pass by agreeing with the implementation's own reading of the ado.
 
 ## [0.0.4] — 2026-11-02
 

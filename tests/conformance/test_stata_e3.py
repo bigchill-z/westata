@@ -211,6 +211,27 @@ def test_fixtures_record_the_stata_command():
 
 
 def test_fixture_files_are_valid_json():
+    """Every fixture must be one of the two supported shapes.
+
+    The ``StataCapture`` files record full ``e(b)``/``e(V)``; the hettest fixture
+    is a *value* fixture (``cases``: one ``r()`` per Stata run) because
+    ``estat hettest`` reports scalars, not a coefficient vector -- a capture with
+    empty ``b``/``V`` would satisfy the old assertion while proving nothing.
+    Both shapes are validated here rather than letting the newer one slip by.
+    """
+
     for path in FIXTURES.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if "cases" in payload:
+            assert {
+                "cases",
+                "ado",
+                "stata_version",
+                "refusals",
+            }.issubset(payload), path.name
+            assert payload["cases"], f"{path.name} has no cases"
+            for key, value in payload["cases"].items():
+                assert len(key.split("|")) == 4, (path.name, key)
+                assert len(value) == 4, (path.name, key)
+            continue
         assert {"b", "V", "scalars", "names"}.issubset(payload), path.name

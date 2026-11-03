@@ -581,8 +581,10 @@ class StataResults:
     def estat_hettest(self, **kwargs: Any) -> Any:
         """Stata's ``estat hettest`` -- Breusch-Pagan / Cook-Weisberg.
 
-        Refuses, like Stata, after a robust or clustered VCE and on pweighted
-        data.
+        With no ``variables`` the auxiliary regression is on the FITTED VALUES,
+        which is Stata's no-varlist behaviour; ``rhs=True`` uses every regressor.
+        Refuses, like Stata, after a robust or clustered VCE, on pweighted data
+        and after a ``noconstant`` fit.
         """
 
         from westata.postestimation.hettest import estat_hettest

@@ -69,13 +69,23 @@ def test_fixtures_record_how_much_data_they_describe() -> None:
     """Each fixture names its sample; not all ship a ``datasignature``.
 
     ``areg.json`` and the panel fixtures carry ``datasignature: N:k:h1:h2`` from
-    Stata; the IV and count fixtures do not, but every one records ``N`` in its
-    scalars. What matters is that the sample SIZE is always recoverable, because
-    that is the parameter a test would need to rebuild the data.
+    Stata; the IV and count fixtures do not, but every ``StataCapture`` fixture
+    records ``N`` in its scalars. What matters is that the sample SIZE is always
+    recoverable, because that is the parameter a test would need to rebuild the data.
+
+    ``hettest_auto.json`` is the one fixture of a different shape: it records
+    ``r()`` SCALARS from ``estat hettest``, which has no ``e(N)`` of its own and
+    comes with no ``b``/``V``. Its sample is named by ``dataset`` instead (the
+    shipped ``auto.dta``), and the case count is what bounds the evidence, so that
+    is checked here rather than forcing an ``e(N)`` that Stata does not report.
     """
 
     data = _fixtures()
     for name, payload in data.items():
+        if "cases" in payload:
+            assert payload.get("dataset"), name
+            assert payload["cases"], name
+            continue
         scalars = payload.get("scalars", {})
         assert "N" in scalars, name
         assert float(scalars["N"]) > 0, name

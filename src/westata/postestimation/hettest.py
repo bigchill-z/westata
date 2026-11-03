@@ -19,18 +19,32 @@ Stata's ``estat hettest``.  The algorithm is transcribed from ``hettest.ado``
     elif "`fstat'" { F   = e(F)       ; df_m/df_r }
     else           { chi2 = e(mss)/2  ; df = e(df_m) }   // the DEFAULT
 
-Two details decide whether the number is right:
+Four details decide whether the number is right, and each is a plausible way to
+be wrong:
 
-* The auxiliary regression is of the **standardised squared residual** on the
-  regressors (or on the fitted values when no varlist is given).  The divisor
-  ``e(rss)/e(N)`` is the ML residual variance, not ``rss/(N-K)``.
+* **No varlist means the FITTED VALUES** (``hettest.ado:110-115``).  It does not
+  mean "every regressor".  On ``regress mpg weight foreign`` the two differ:
+  fitted values give ``chi2(1) = 2.53``, all regressors give ``chi2(2) = 7.75``.
+  Both look like ordinary answers, so the mistake is silent; this module
+  previously defaulted to all regressors and returned the wrong one.
+* The auxiliary regression is of the **standardised squared residual**.  The
+  divisor ``e(rss)/e(N)`` is the ML residual variance, and ``e(N)`` is the
+  weighted observation count -- not ``rss/(N-K)`` and not the row count.
 * The default statistic is ``e(mss)/2`` -- the model sum of squares of that
   auxiliary regression halved -- which equals ``N * R2 / 2`` only when the
   auxiliary regression is uncentred.  Using ``N * R2`` (the ``iid`` variant) as
   the default would be wrong by a factor of two on the same fit.
+* **The estimation weights are reused** (``hettest.ado:103-105, 138``): the
+  auxiliary regression is ``_regress ui varlist `wgt'``.  Dropping ``wgt``
+  changes both the statistic and its degrees of freedom on any weighted fit.
 
-``hettest.ado`` refuses three situations, all reproduced here: ``pweight``ed
-data, a robust or clustered VCE, and ``normal`` combined with ``iid``/``fstat``.
+``hettest.ado`` refuses four situations, all reproduced here: ``pweight``ed
+data, a robust or clustered VCE, a ``noconstant`` fit, and ``normal`` combined
+with ``iid``/``fstat``.
+
+Reference values for every branch, captured from StataNow 19.5, live in
+``tests/conformance/stata_fixtures/hettest_auto.json``; the test suite compares
+against that file rather than against a second transcription of this ado.
 """
 
 from __future__ import annotations
@@ -67,11 +81,23 @@ class HetTestResult:
     df_denom:
         Denominator df, only for ``method="fstat"``.
     variables:
-        The regressors the auxiliary regression used.  Empty means the fitted
-        values were used (Stata's default when no varlist is given).
+        The auxiliary regressors used.  Empty means the fitted values were used,
+        which is Stata's behaviour with no varlist.
+    label:
+        Stata's ``Variable:``/``Variables:`` line, e.g. ``"Fitted values of mpg"``
+        or ``"All independent variables"``.
     """
 
-    __slots__ = ("method", "statistic", "df", "pvalue", "df_denom", "variables")
+    __slots__ = (
+        "method",
+        "statistic",
+        "df",
+        "pvalue",
+        "df_denom",
+        "variables",
+        "label",
+        "plural",
+    )
 
     def __init__(
         self,
@@ -82,6 +108,8 @@ class HetTestResult:
         pvalue: float,
         df_denom: float | None = None,
         variables: Sequence[str] = (),
+        label: str = "",
+        plural: bool = False,
     ) -> None:
         self.method = method
         self.statistic = float(statistic)
@@ -89,6 +117,8 @@ class HetTestResult:
         self.pvalue = float(pvalue)
         self.df_denom = None if df_denom is None else float(df_denom)
         self.variables = list(variables)
+        self.label = str(label)
+        self.plural = bool(plural)
 
     def __repr__(self) -> str:
         return (
@@ -100,12 +130,17 @@ class HetTestResult:
         label = "F" if self.method == "fstat" else "chi2"
         lines = [
             "",
-            "Breusch-Pagan/Cook-Weisberg test for heteroskedasticity",
+            "Breusch\u2013Pagan/Cook\u2013Weisberg test for heteroskedasticity",
             "Assumption: "
             + ("Normal error terms" if self.method == "normal" else "i.i.d. error terms"),
-            "H0: Constant variance",
-            "",
         ]
+        if self.label:
+            # ``hettest.ado:258`` prints ``Variable`s':``.  The plural ``s`` is set
+            # ONLY in the non-fitted branch and only when the varlist has more than
+            # one word (``:118-120``), so the fitted-values line is always singular
+            # -- Stata prints "Variable: Fitted values of mpg", not "Variables:".
+            lines.append(f"{'Variables' if self.plural else 'Variable'}: {self.label}")
+        lines.extend(["", "H0: Constant variance", ""])
         if self.method == "fstat" and self.df_denom is not None:
             lines.append(
                 f"{'F(' + f'{self.df:g}' + ', ' + f'{self.df_denom:g}' + ')':<20}"
@@ -154,10 +189,13 @@ def _check_guards(result: Any) -> None:
             f"or clustered VCE (this result used {cov_type})"
         )
     # ``e(wtype)`` pweight: westata records the weight type on the result when
-    # one was used.
+    # one was used.  ``pweight`` implies a robust VCE here, so the check above
+    # normally fires first; this keeps the refusal explicit for a pweighted fit
+    # whose VCE was overridden.
     weight_type = getattr(result, "_weight_type", None)
     if weight_type is None:
-        weight_type = getattr(getattr(result, "model", None), "_weight_type", None)
+        spec = getattr(result, "weight_spec", None)
+        weight_type = getattr(spec, "weight_type", None)
     if str(weight_type or "").strip().lower() == "pweight":
         raise ValueError(
             "estat hettest is not appropriate with pweighted data"
@@ -204,27 +242,196 @@ def _check_guards(result: Any) -> None:
                 "regress/areg/xtreg-style fits only."
             )
 
+    # ``estat hettest`` after ``regress, noconstant`` is r(301), "not appropriate
+    # after regress, nocons" -- the test presupposes a constant.  Without this
+    # check the fit above passes the sums-of-squares guard and a finite number is
+    # returned for a model Stata refuses.
+    design = getattr(result, "design_matrix", None)
+    if design is not None:
+        names = [str(name) for name in design[1]]
+        if names and not any(_is_constant(name) for name in names):
+            raise ValueError(
+                "estat hettest is not appropriate after a noconstant fit: Stata "
+                "reports 'not appropriate after regress, nocons' (r(301)), "
+                "because the test is defined from a centred decomposition."
+            )
+
 
 def _auxiliary_regression(
-    left: np.ndarray, design: np.ndarray
+    left: np.ndarray,
+    design: np.ndarray,
+    weights: np.ndarray | None = None,
 ) -> tuple[float, float, float, float]:
-    """OLS of ``left`` on ``design``; returns ``(r2, mss, rss, df_m)``."""
+    """Weighted OLS of ``left`` on ``design``; returns ``(r2, mss, rss, df_m)``.
+
+    ``hettest.ado:138`` runs ``_regress ui varlist `wgt'``, so when the fit was
+    weighted the auxiliary regression is weighted too.  ``e(r2)``/``e(mss)``/
+    ``e(rss)`` are then the weighted quantities, with the total sum of squares
+    taken about the *weighted* mean.
+    """
 
     with_constant = any(np.ptp(design[:, j]) == 0.0 for j in range(design.shape[1]))
     if not with_constant:
         design = np.column_stack([np.ones(left.size), design])
-    coefficients, *_ = np.linalg.lstsq(design, left, rcond=None)
-    fitted = design @ coefficients
-    resid = left - fitted
-    rss = float(resid @ resid)
-    # e(mss) is the model sum of squares about the mean, so it needs the
-    # centred total -- the same decomposition OLS uses.
-    centred = left - left.mean()
-    tss = float(centred @ centred)
+
+    if weights is None:
+        coefficients, *_ = np.linalg.lstsq(design, left, rcond=None)
+        resid = left - design @ coefficients
+        rss = float(resid @ resid)
+        centred = left - left.mean()
+        tss = float(centred @ centred)
+    else:
+        w = np.asarray(weights, dtype=float).reshape(-1)
+        root = np.sqrt(w)
+        coefficients, *_ = np.linalg.lstsq(
+            design * root[:, None], left * root, rcond=None
+        )
+        resid = left - design @ coefficients
+        rss = float((w * resid * resid).sum())
+        total_w = float(w.sum())
+        mean_w = float((w * left).sum() / total_w)
+        tss = float((w * (left - mean_w) ** 2).sum())
+
     mss = tss - rss
     r2 = (mss / tss) if tss > 0 else float("nan")
     df_m = int(design.shape[1] - 1)  # slopes only, matching e(df_m)
     return r2, mss, rss, df_m
+
+
+def _weight_vector(result: Any, n_rows: int) -> np.ndarray | None:
+    """The estimation weights, aligned to the residual vector.
+
+    ``StataResults.weight_spec`` holds them; a result that did not keep a
+    specification is unweighted.  A length mismatch is a bug in the result
+    object, not something to paper over with ``None``, because silently dropping
+    the weights reproduces exactly the defect this module used to have.
+    """
+
+    spec = getattr(result, "weight_spec", None)
+    if spec is None or getattr(spec, "weights", None) is None:
+        return None
+    weights = np.asarray(spec.weights, dtype=float).reshape(-1)
+    if weights.size != n_rows:
+        raise ValueError(
+            f"the estimation weights have {weights.size} entries but there are "
+            f"{n_rows} residuals; the result's weight specification is not "
+            "aligned with its sample"
+        )
+    return weights
+
+
+def _effective_n(result: Any, weights: np.ndarray | None, n_rows: int) -> float:
+    """``e(N)`` for a weighted fit: ``sum(w)`` for fweight/iweight, rows for aweight.
+
+    ``e(N)`` is what ``hettest.ado:108`` divides ``e(rss)`` by and what
+    ``:144`` multiplies ``e(r2)`` by, so using the row count on an fweighted fit
+    is wrong by ``sum(w)/rows``.
+    """
+
+    if weights is None:
+        return float(n_rows)
+    spec = getattr(result, "weight_spec", None)
+    effective = getattr(spec, "effective_n", None)
+    if effective is not None:
+        return float(effective)
+    return float(weights.sum())
+
+
+def _ancillary_label(
+    result: Any, used_names: Sequence[str], *, rhs: bool, fitted: bool
+) -> str:
+    """Stata's ``Variable:``/``Variables:`` line for this auxiliary regression."""
+
+    if rhs:
+        # ``hettest.ado:121-123``: with ``rhs`` the caption is always this,
+        # regardless of what else the varlist named.
+        return "All independent variables"
+    if fitted:
+        depvar = getattr(result, "response_name", None)
+        if depvar is None:
+            e = getattr(result, "e", None)
+            depvar = e.get("depvar") if e is not None else None
+        return f"Fitted values of {depvar}" if depvar else "Fitted values"
+    return " ".join(used_names)
+
+
+def _source_variable_design(
+    result: Any, requested: Sequence[str], names: Sequence[str]
+) -> tuple[np.ndarray, list[str]] | None:
+    """Build the auxiliary design from SOURCE data variables, if possible.
+
+    This is the distinction that ``hettest.ado:138`` makes and that a purely
+    design-column view gets wrong: the varlist names **data variables**, so
+    ``estat hettest rep78`` after ``regress mpg weight i.rep78`` regresses ``ui``
+    on the single raw 1-5 column (``e(df_m)`` = 1, chi2 = 12.77), not on the four
+    treatment dummies in ``e(b)`` (chi2 = 24.27).  Verified on StataNow 19.5.
+
+    Returns ``None`` when the model did not retain its data, or when a requested
+    name is not a column of it -- the caller then falls back to design columns so
+    an explicit ``e(b)`` name (``"foreign[T.Foreign]"``) keeps working.
+    """
+
+    model_data = getattr(result, "model_data", None)
+    if model_data is None or not hasattr(model_data, "columns"):
+        return None
+    frame = model_data
+    if len(frame) != np.asarray(result.resid, dtype=float).size:
+        return None
+
+    columns: list[np.ndarray] = []
+    used: list[str] = []
+    for wanted in requested:
+        if wanted not in frame.columns:
+            return None
+        series = frame[wanted]
+        # Check the SERIES dtype, not ``to_numpy()``: pandas turns a categorical
+        # into an object array, so testing the array would miss every labelled
+        # Stata variable and fall through to the string branch.
+        if isinstance(series.dtype, pd.CategoricalDtype):
+            # A value-labelled Stata variable is numeric with a value label;
+            # ``estat hettest foreign`` therefore uses the raw 0/1 codes, not the
+            # dummies.  On the auto data that is chi2(1) = 7.66936122444203594,
+            # whereas ``rhs`` (the e(b) columns) gives chi2(2) = 7.7524933353.
+            numeric = np.asarray(series.cat.codes.to_numpy(), dtype=float)
+        elif series.dtype.kind in ("U", "S", "O"):
+            # A true string variable: ``_regress ui make`` is r(109) in Stata.
+            raise ValueError(
+                f"estat hettest: {wanted!r} is a string variable; Stata's "
+                "_regress rejects it with a type mismatch (r(109))"
+            )
+        else:
+            numeric = np.asarray(series.to_numpy(), dtype=float)
+        # Stata's `_regress ui varlist` always adds a constant, so a raw
+        # continuous/numeric variable contributes exactly ONE column.
+        columns.append(numeric)
+        used.append(wanted)
+    design = np.column_stack(columns)
+    return design, used
+
+
+def _stata_row_labels(result: Any, used_names: Sequence[str]) -> list[str]:
+    """Row names for ``r(mtest)``, in Stata's ``e(b)`` spelling.
+
+    ``hettest.ado:139`` takes the names from ``e(b)``'s column stripes, so a
+    factor row prints as ``foreign`` where the design column here is
+    ``foreign[T.Foreign]``.  ``stata_param_names`` owns that mapping -- and it
+    refuses when a factor term is genuinely ambiguous, which is the right answer
+    for a table whose rows are meant to match ``r(mtest)``; falling back to the
+    design spelling keeps the table usable either way.
+    """
+
+    try:
+        # ``stata_param_names`` is in Stata's e(b) ORDER, so it must be zipped
+        # against the permuted design names (``_stata_order``), not the raw ones.
+        design_names = [str(name) for name in result.design_matrix[1]]
+        order = result._stata_order()
+        mapping = {
+            design_names[position]: stata_name
+            for position, stata_name in zip(order, result.stata_param_names)
+        }
+    except (AttributeError, NotImplementedError, TypeError):
+        return list(used_names)
+    return [mapping.get(name, name) for name in used_names]
 
 
 def estat_hettest(
@@ -232,6 +439,7 @@ def estat_hettest(
     *,
     method: str = "normal",
     variables: Sequence[str] | None = None,
+    rhs: bool = False,
     mtest: str | None = None,
 ) -> Any:
     """Stata's ``estat hettest`` (Breusch-Pagan / Cook-Weisberg).
@@ -239,21 +447,31 @@ def estat_hettest(
     Parameters
     ----------
     result:
-        A fitted linear result that retained its design and residuals.
+        A fitted linear result that retained its design, residuals and weights.
     method:
         ``"normal"`` (default) reports ``e(mss)/2``; ``"iid"`` reports
         ``e(N)*e(r2)``; ``"fstat"`` reports the auxiliary regression's ``F``.
-        Stata rejects ``normal`` combined with the other two, and so does this.
     variables:
-        Regressors for the auxiliary regression.  ``None`` uses every
-        non-constant regressor; an empty sequence uses the fitted values, which
-        is Stata's behaviour when no varlist is given.
+        Design columns for the auxiliary regression, named exactly as they appear
+        in ``result.design_matrix[1]`` (a factor level is e.g.
+        ``"foreign[T.Foreign]"``).  ``None`` or an empty sequence regresses on
+        the **fitted values**, which is Stata's behaviour with no varlist -- it
+        is not "all regressors"; use ``rhs=True`` for that.
+    rhs:
+        Stata's ``, rhs``: add every non-constant regressor to the auxiliary
+        regression (``hettest.ado:69-76``).  Combines with ``variables`` as a
+        union, exactly as the ado does.
+    mtest:
+        Request the per-regressor multiple-testing table.  As in
+        ``hettest.ado:126-128``, a single-regressor auxiliary regression drops
+        ``mtest()`` silently and only the simultaneous test is returned.
 
     Raises
     ------
     ValueError
-        For a robust/clustered VCE, for pweighted data, for an inconsistent
-        ``method``/option combination, or when the design was not retained.
+        For a robust/clustered VCE, pweighted data, a noconstant fit, an
+        inconsistent ``method``/option combination, or when the design was not
+        retained.
     """
 
     normalized = str(method).strip().lower()
@@ -297,54 +515,105 @@ def estat_hettest(
             f"the design has {matrix.shape[0]} rows but there are {nobs} residuals"
         )
 
+    weights = _weight_vector(result, nobs)
+    effective_n = _effective_n(result, weights, nobs)
+
     # ui = resid^2 / (e(rss)/e(N)) -- the ML residual variance, per hettest.ado.
-    rss_total = float(resid @ resid)
-    scale = rss_total / float(nobs)
+    # ``e(rss)`` is the WEIGHTED residual sum of squares for a weighted fit, and
+    # ``e(N)`` the weighted count, so the scale uses both.
+    e = getattr(result, "e", {}) or {}
+    rss_model = float(e.get("rss", float(resid @ resid)))
+    scale = rss_model / effective_n
     if scale <= 0.0:
         raise ValueError("estat hettest needs a positive residual variance")
     squared = resid**2 / scale
 
-    # Choose the auxiliary regressors.
+    # ----------------------------------------------------- auxiliary regressors
+    # ``variables is None`` / ``[]`` -> fitted values (hettest.ado:110-115).
     slope_columns = [j for j in range(len(names)) if not _is_constant(names[j])]
-    used_names: list[str] = []
-    if variables is None:
-        design_columns = slope_columns
-        used_names = [names[j] for j in slope_columns]
-    else:
-        requested = [str(v) for v in variables]
-        if not requested:
-            # No varlist: regress on the fitted values, as hettest.ado does.
-            coefficients = np.asarray(result.params, dtype=float).reshape(-1)
-            if coefficients.size != matrix.shape[1]:
-                raise ValueError(
-                    "estat hettest cannot rebuild the fitted values: "
-                    f"{coefficients.size} coefficients for "
-                    f"{matrix.shape[1]} design columns"
-                )
-            design_columns = None
-            used_names = []
-        else:
-            lookup = {names[j]: j for j in range(len(names))}
-            missing = [v for v in requested if v not in lookup]
-            if missing:
-                raise ValueError(
-                    f"estat hettest: unknown regressor(s) {missing}; "
-                    f"available: {names}"
-                )
-            design_columns = [lookup[v] for v in requested]
-            used_names = requested
+    lookup = {names[j]: j for j in range(len(names))}
 
-    if design_columns is None:
+    explicit: list[str] = []
+    if variables is not None:
+        explicit = [str(v) for v in variables]
+
+    # ``rhs`` appends every e(b) name except ``_cons`` to the varlist, then
+    # de-duplicates (``hettest.ado:69-76, 76``).
+    requested = list(explicit)
+    if rhs:
+        for column in slope_columns:
+            if names[column] not in requested:
+                requested.append(names[column])
+
+    missing = [v for v in requested if v not in lookup]
+    source: tuple[np.ndarray, list[str]] | None = None
+    if missing:
+        # Not an e(b) name.  It may still be a SOURCE variable -- Stata's varlist
+        # names data variables, so ``hettest rep78`` after ``i.rep78`` means the
+        # raw column, not the dummies.  Resolve when the model kept its data.
+        if not rhs:
+            source = _source_variable_design(result, missing, names)
+        if source is None:
+            raise ValueError(
+                f"estat hettest: unknown regressor(s) {missing}; available: {names}. "
+                "Pass the raw data variable name (e.g. 'rep78', which Stata uses "
+                "as one column) or an e(b) design column (e.g. 'foreign[T.Foreign]'); "
+                "use rhs=True for every regressor."
+            )
+
+    fitted_values = not requested
+    if fitted_values:
         coefficients = np.asarray(result.params, dtype=float).reshape(-1)
+        if coefficients.size != matrix.shape[1]:
+            raise ValueError(
+                "estat hettest cannot rebuild the fitted values: "
+                f"{coefficients.size} coefficients for "
+                f"{matrix.shape[1]} design columns"
+            )
         aux_design = (matrix @ coefficients).reshape(-1, 1)
+        used_columns: list[int] = []
+        used_names: list[str] = []
+    elif source is not None:
+        # Requested SOURCE variables (e.g. ["rep78"]) -> raw data columns.  Stata
+        # mixes them with e(b) names in one varlist; when only source names were
+        # given this is the whole design.
+        source_design, source_names = source
+        resolved = [v for v in requested if v in lookup]
+        if resolved:
+            remainder = matrix[:, [lookup[v] for v in resolved]]
+            aux_design = np.column_stack([source_design, remainder])
+            used_columns = [lookup[v] for v in resolved]
+            used_names = list(source_names) + resolved
+        else:
+            aux_design = source_design
+            used_columns = []
+            used_names = list(source_names)
     else:
-        if not design_columns:
-            raise ValueError("estat hettest needs at least one regressor")
-        aux_design = matrix[:, design_columns]
+        used_columns = [lookup[v] for v in requested]
+        used_names = list(requested)
+        aux_design = matrix[:, used_columns]
 
-    if mtest is not None:
-        # ``hettest.ado:160-190``: ONE auxiliary regression per regressor, each
-        # giving that variable's own e(mss)/2, then _mtest adjusts the family.
+    r2, mss, rss_aux, df_m = _auxiliary_regression(squared, aux_design, weights)
+    if df_m <= 0:
+        raise ValueError(
+            "estat hettest needs at least one regressor in the auxiliary "
+            "regression to have a non-zero degrees of freedom"
+        )
+
+    label = _ancillary_label(result, used_names, rhs=rhs, fitted=fitted_values)
+    # ``hettest.ado:117-120, 258``: the plural ``s`` is set in the NON-fitted
+    # branch only, and only when the varlist has more than one word.  So the
+    # fitted-values line is always "Variable:", ``, rhs`` on a one-regressor model
+    # is "Variable: All independent variables", and two regressors is "Variables:".
+    # Verified on StataNow 19.5.
+    plural_label = (not fitted_values) and df_m > 1
+
+    # ------------------------------------------------------------------ mtest
+    # ``hettest.ado:126-128`` clears ``mtmethod`` when the auxiliary regression
+    # has ONE regressor.  The no-varlist default always does, so ``mtest()``
+    # there is silently ignored and only the simultaneous test is reported --
+    # verified against StataNow 19.5, which returns no ``r(mtest)`` at all.
+    if mtest is not None and df_m >= 2:
         import pandas as pd
 
         from westata.postestimation.mtest import (
@@ -353,38 +622,25 @@ def estat_hettest(
             mtest_statistics,
         )
 
-        if design_columns is None:
-            raise ValueError(
-                "estat hettest, mtest() needs an explicit set of regressors; a "
-                "varlist-less call regresses on the fitted values, which is a "
-                "single column"
-            )
-        per_variable = matrix[:, design_columns]
+        per_variable = matrix[:, used_columns]
         statistics, dfs, pvalues = mtest_statistics(
-            squared, per_variable, used_names
+            squared, per_variable, used_names, weights
         )
         method_key = str(mtest).strip().lower()
+        # ``r(mtest)``'s row names come from ``e(b)``'s stripes, so label them
+        # Stata's way (``weight foreign``) rather than patsy's.
         frame = pd.DataFrame(
-            {
-                "chi2": statistics,
-                "df": dfs,
-                "p": pvalues,
-            },
-            index=pd.Index(list(used_names), name="Variable"),
+            {"chi2": statistics, "df": dfs, "p": pvalues},
+            index=pd.Index(_stata_row_labels(result, used_names), name="Variable"),
         )
         if method_key != "noadjust":
             frame["adjustp"] = adjust_pvalues(pvalues, method_key)
         return MTestResult(frame, method_key)
 
-    r2, mss, _rss_aux, df_m = _auxiliary_regression(squared, aux_design)
-    if df_m <= 0:
-        raise ValueError(
-            "estat hettest needs at least one regressor in the auxiliary "
-            "regression to have a non-zero degrees of freedom"
-        )
-
     if normalized == "iid":
-        statistic = float(nobs * r2)
+        # ``chi2 = e(N)*e(r2)``; e(N) is the AUXILIARY regression's observation
+        # count, which is the weighted count for a weighted fit.
+        statistic = float(effective_n * r2)
         pvalue = float(stats.chi2.sf(statistic, df_m))
         return HetTestResult(
             method="iid",
@@ -392,16 +648,18 @@ def estat_hettest(
             df=df_m,
             pvalue=pvalue,
             variables=used_names,
+            label=label,
+            plural=plural_label,
         )
 
     if normalized == "fstat":
         # The F form reports the auxiliary regression's own F and df_r.
-        denominator = float(nobs - aux_design.shape[1] - 1)
+        denominator = float(effective_n - df_m - 1)
         if denominator <= 0:
             raise ValueError(
                 "estat hettest, fstat needs positive residual degrees of freedom"
             )
-        f_stat = (mss / df_m) / (_rss_aux / denominator) if _rss_aux > 0 else float("inf")
+        f_stat = (mss / df_m) / (rss_aux / denominator) if rss_aux > 0 else float("inf")
         return HetTestResult(
             method="fstat",
             statistic=float(f_stat),
@@ -409,6 +667,8 @@ def estat_hettest(
             pvalue=float(stats.f.sf(f_stat, df_m, denominator)),
             df_denom=denominator,
             variables=used_names,
+            label=label,
+            plural=plural_label,
         )
 
     # Default: chi2 = e(mss)/2.
@@ -419,4 +679,6 @@ def estat_hettest(
         df=df_m,
         pvalue=float(stats.chi2.sf(statistic, df_m)),
         variables=used_names,
+        label=label,
+        plural=plural_label,
     )

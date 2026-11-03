@@ -1647,6 +1647,9 @@ def _stata_summary(result: Any) -> str:
     # ``ivregress`` prints its own four-row two-column block (see its branch below), so
     # the generic single-column lines would duplicate every one of them.
     _iv_family = str(getattr(result, "model_name", "") or "").startswith("ivregress")
+    # ``eivreg`` prints its own two-column block (reliability table on the left, fit
+    # statistics on the right), so the generic single-column lines would duplicate them.
+    _eiv_family = str(getattr(result, "model_name", "") or "") == "eivreg"
     # ``quantile`` prints "Number of obs" beside its banner inside its own branch, so the
     # generic line is skipped here for it too.
     if (
@@ -1654,6 +1657,7 @@ def _stata_summary(result: Any) -> str:
         and not _is_robust_ols
         and not _pcse_family
         and not _iv_family
+        and not _eiv_family
     ):
         lines.append(f"{'Number of obs':<21} = {nobs:>10d}")
     # The model-level test is also estimator-specific.  ``quantile`` results
@@ -1665,6 +1669,7 @@ def _stata_summary(result: Any) -> str:
         or _is_robust_ols
         or _pcse_family
         or _iv_family
+        or _eiv_family
     ):
         pass
     elif block == "arch":
@@ -1897,6 +1902,63 @@ def _stata_summary(result: Any) -> str:
             # Left 50, label 16, "= ", value 10 -- measured from
             # "Instrumental-variables 2SLS regression     Number of obs   =        100".
             lines.append(f"{_left:<50}{_label:<16}= {_value:>10}".rstrip())
+    elif str(getattr(result, "model_name", "") or "") == "eivreg":
+        # ``eivreg`` prints a RELIABILITY TABLE on the left and the fit statistics on the
+        # right, sharing rows. Measured:
+        #
+        #                        Assumed
+        #       Variable     reliability
+        #   ----------------------------          Number of obs     =        100
+        #             x1          0.7000          F(  2,        97) =       0.93
+        #              *          1.0000          Prob > F          =     0.3984
+        #                                          R-squared         =     0.0299
+        #                                          Root MSE          =    .988738
+        #
+        # Left column 48; the table itself is 28 wide. The "*" row is Stata's marker for
+        # the variables taken as measured without error, always 1.0000.
+        _reliab = (getattr(result, "e", None) or {}).get("reliab") or {}
+        _left_rows: list[str] = ["", "     Assumed", "    Variable     reliability"]
+        for _name, _rel in _reliab.items():
+            _left_rows.append(f"  {str(_name):>10}{float(_rel):>16.4f}")
+        # Every variable in the model that is NOT listed stays 1.0000 under the "*" row.
+        _listed = {
+            str(name).split("[T.", 1)[0]
+            for name in names
+            if str(name).strip().lower() not in ("intercept", "_cons", "const")
+        } - {str(k) for k in _reliab}
+        if _listed:
+            _left_rows.append(f"  {'*':>10}{1.0:>16.4f}")
+
+        _right_rows: list[tuple[str, str]] = [
+            ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
+        ]
+        if np.isfinite(fvalue):
+            _right_rows.append(
+                (
+                    f"F({_df_label(df_model)}, {_df_label(df_resid)})",
+                    f"{fvalue:.2f}",
+                )
+            )
+        if np.isfinite(p_f):
+            _right_rows.append(("Prob > F", _four(p_f)))
+        if np.isfinite(rsquared):
+            _right_rows.append(("R-squared", _four(rsquared)))
+        if np.isfinite(rmse):
+            _right_rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
+
+        # The table's rule is drawn on the LEFT and the right column starts on that same
+        # row; the first two left rows carry no right-hand text.
+        for _index, _left in enumerate(_left_rows):
+            _right_index = _index - 2
+            if _right_index == 0:
+                _dash = "-" * 28
+                _label, _value = _right_rows[0]
+                lines.append(f"{_dash:<48}{_label:<18}= {_value:>10}".rstrip())
+            elif _right_index > 0 and _right_index < len(_right_rows):
+                _label, _value = _right_rows[_right_index]
+                lines.append(f"{'':<48}{_label:<18}= {_value:>10}".rstrip())
+            else:
+                lines.append(_left.rstrip())
     elif block == "ols":
         # Reached when the ANOVA table is unavailable -- for a ROBUST fit that is Stata's
         # own behaviour, and its header is a two-column block 78 wide with FIVE rows and
@@ -2707,14 +2769,33 @@ def _stata_summary(result: Any) -> str:
         str(name).strip() in ("lnsig2u", "/lnsig2u") for name in names
     )
     _has_alpha = any(str(name).strip() in ("lnalpha", "/lnalpha") for name in names)
-    if _has_re_variance or _has_alpha:
+    # ``xttobit`` reports /sigma_u and /sigma_e as ORDINARY coefficient rows and then a
+    # single derived rho row -- a third shape, measured:
+    #
+    #   /sigma_u |   .2597131   .1647344     1.58   0.115
+    #   /sigma_e |   .9258212   .0831754    11.13   0.000
+    # -----------+--------------------------------------------------
+    #        rho |   .0729518   .0907106
+    #
+    # The decomposition block below the table would print sigma_u/sigma_e a SECOND time,
+    # so it is suppressed for these commands and only rho is added inside the table.
+    _has_sigma_pair = any(
+        str(name).strip() in ("sigma_u", "/sigma_u") for name in names
+    ) and any(str(name).strip() in ("sigma_e", "/sigma_e") for name in names)
+    if _has_re_variance or _has_alpha or _has_sigma_pair:
         # A split rule separates the coefficient block from the derived rows, measured.
         lines.append(_split_rule)
-        _derived = (
-            (("sigma_u", "sigma_u"), ("rho", "rho"))
-            if _has_re_variance
-            else (("alpha", "alpha"),)
-        )
+        # Three shapes, each measured: the random-effects logit/probit add sigma_u + rho,
+        # the truncated negative binomial adds alpha, and xttobit adds ONLY rho (its
+        # sigma_u/sigma_e are already ordinary coefficient rows).
+        if _has_re_variance:
+            _derived = (("sigma_u", "sigma_u"), ("rho", "rho"))
+        elif _has_alpha:
+            _derived = (("alpha", "alpha"),)
+        else:
+            _derived = (("rho", "rho"),)
+            # xttobit's rho sits under its OWN split rule, after the sigma_e row.
+            lines.append(_split_rule)
         for _row_name, _key in _derived:
             _value = _e_float(result, _key)
             if not np.isfinite(_value):
@@ -2798,7 +2879,11 @@ def _stata_summary(result: Any) -> str:
         )
     # Commands that report /lnsig2u already printed sigma_u/rho INSIDE the table, so the
     # decomposition block below it would duplicate them.
-    if panel_rows and not _has_re_variance:
+    # Suppressed for every command that already printed these rows inside the table --
+    # otherwise sigma_u/sigma_e appear twice.
+    if panel_rows and not (
+        _has_re_variance or _has_alpha or _has_sigma_pair
+    ):
         # Do NOT add a rule here: the ftest branch below emits its own full-width rule
         # before the "F test that all u_i=0" line, and adding one too produced two
         # consecutive rules where Stata has one.

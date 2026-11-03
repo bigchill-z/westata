@@ -381,17 +381,30 @@ def _treatment_time_info(
         per_group = frame.groupby(group, observed=True)[treatment].max()
         control_units = int((per_group == 0).sum())
         treated_units = int((per_group != 0).sum())
-        control_times = frame.loc[frame[group].isin(per_group[per_group == 0].index), time]
-        treated_times = frame.loc[frame[group].isin(per_group[per_group != 0].index), time]
+        # The header's Time block is the range of TREATMENT ONSET periods, not of the time
+        # variable. Measured: on a frame where both arms span period 0..4 but the treated
+        # units switch on at period 2, Stata prints Control Minimum/Maximum = 0/0 and
+        # Treatment Minimum/Maximum = 2/2. Reporting the raw period range instead gave
+        # 0/4 for both arms -- plausible numbers under the wrong meaning.
+        _treated_rows = frame.loc[
+            frame[group].isin(per_group[per_group != 0].index)
+            & (frame[treatment].astype(float) > 0)
+        ]
+        _onset = (
+            _treated_rows.groupby(group, observed=True)[time].min()
+            if len(_treated_rows)
+            else None
+        )
         return {
             "time_name": str(time),
             "treatment_name": str(treatment),
             "control_units": control_units,
             "treated_units": treated_units,
-            "control_min": float(control_times.min()) if len(control_times) else None,
-            "control_max": float(control_times.max()) if len(control_times) else None,
-            "treated_min": float(treated_times.min()) if len(treated_times) else None,
-            "treated_max": float(treated_times.max()) if len(treated_times) else None,
+            # Control units are never treated, so their onset is 0 on both ends.
+            "control_min": 0.0 if control_units else None,
+            "control_max": 0.0 if control_units else None,
+            "treated_min": float(_onset.min()) if _onset is not None else None,
+            "treated_max": float(_onset.max()) if _onset is not None else None,
         }
     except Exception:  # pragma: no cover - defensive
         return {}

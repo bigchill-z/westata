@@ -2996,9 +2996,18 @@ def _stata_summary(result: Any) -> str:
             or _bare_name.startswith("var(e.")
             or _bare_name in ("/sigma", "sigma", "/lnsigma", "lnsig2u", "/lnsig2u")
         )
-        if _is_cut_row and _needs_rule and _bare_name not in _rule_done:
-            lines.append(_split_rule)
-            _rule_done.add(_bare_name)
+        if _is_cut_row and _needs_rule:
+            # Deduplicated by CLASS, not by name: the ordinal thresholds are /cut1../cut4 and
+            # keying on the name gave EACH one its own rule, turning a 4-rule table into a
+            # 7-rule one. One rule per family of nuisance rows is what Stata prints.
+            _rule_key = (
+                "cut"
+                if _bare_name.startswith("cut") or _bare_name.startswith("/cut")
+                else _bare_name
+            )
+            if _rule_key not in _rule_done:
+                lines.append(_split_rule)
+                _rule_done.add(_rule_key)
         # arima's /sigma keeps its test statistic (so it is NOT a nuisance row) but still
         # gets a split rule before it, measured. Handled separately for that reason.
         if (
@@ -3158,11 +3167,18 @@ def _stata_summary(result: Any) -> str:
             lines.append(f"{_text:<{row_width - len(_tail) - 1}}{_tail}")
 
     if _is_didregress(result):
-        # ``didregress`` closes with a note naming what the ATET was adjusted for.
-        # Captured: "Note: ATET estimate adjusted for covariates, group effects, and time
-        # effects." -- 77 characters, no trailing rule.
+        # ``didregress`` closes with a note naming what the ATET was adjusted for. The WORD
+        # for the first adjustment depends on the command, measured in both:
+        #   didregress      "... covariates, group effects, and time effects."
+        #   xtdidregress    "... covariates, panel effects, and time effects."
+        _did_word = (
+            "panel"
+            if str(getattr(result, "model_name", "") or "") == "xtdidregress"
+            else "group"
+        )
         lines.append(
-            "Note: ATET estimate adjusted for covariates, group effects, and time effects."
+            f"Note: ATET estimate adjusted for covariates, {_did_word} effects, "
+            "and time effects."
         )
 
     if str(getattr(result, "model_name", "") or "").startswith("ivregress"):

@@ -2281,6 +2281,17 @@ class Etregress:
         e: dict[str, Any] = {
             "N": int(n),
             "N_treated": int(treated.sum()),
+            # ``e(chi2)``/``e(chi2type)``/``e(p)``: the header's "Wald chi2(k)" row. Stata
+            # reports a joint Wald test of the TREATMENT-equation regressors -- m = 2 here,
+            # matching "Wald chi2(2)". Without these macros the row was absent from the ML
+            # header altogether, which left the two-column block one row short.
+            "chi2type": "Wald",
+            "chi2": _wald_statistic(theta, covariance, list(range(k, k + m))),
+            "p": float(
+                stats.chi2.sf(
+                    _wald_statistic(theta, covariance, list(range(k, k + m))), m
+                )
+            ),
             # ``e(title)``: measured -- "Linear regression with endogenous treatment".
             "title": "Linear regression with endogenous treatment",
             # The header's second line names the estimator: "Estimator: Maximum likelihood"
@@ -2347,7 +2358,18 @@ class Etregress:
         maxiter: int = 200,
         strict: bool = False,
     ) -> StataResults:
-        """Estimate by the control-function (two-step) procedure."""
+        """Estimate by the control-function (two-step) procedure.
+
+        NOTE ON THE DEFAULT. Stata's bare ``etregress`` runs MAXIMUM LIKELIHOOD, so its
+        header says "Estimator: Maximum likelihood" and reports /athrho and /lnsigma. This
+        method defaults to ``control`` instead, which is a deliberate, separate decision:
+        switching the default was tried and broke 16 tests across predict, margins and the
+        treatment-statistics suite, because the ML and control-function paths do not write
+        the same e() macros (r2_p, cmd, the five margins types). Changing which estimator
+        runs is an estimator decision with its own verification burden, not part of aligning
+        the rendered table. ``method="ml"`` selects the ML fit explicitly and renders with
+        Stata's ML header.
+        """
 
         normalized = str(method).strip().lower()
         if normalized in ("ml", "mle", "maximumlikelihood"):

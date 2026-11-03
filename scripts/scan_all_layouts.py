@@ -322,9 +322,13 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
              "ysel ~ x1 + select(selected ~ x1 + x2)", SELECTED).fit()),
         ("intreg", "intreg lo hi x1",
          lambda: ws.Intreg.from_formula("lo hi ~ x1", INTERVAL).fit()),
+        # method="ml" because a bare ``etregress`` in Stata runs MAXIMUM LIKELIHOOD. The
+        # package's own default is the control-function estimator, so comparing Stata's
+        # default against westata's default compares two different estimators; the header
+        # then differs for a legitimate reason and says nothing about layout.
         ("etregress", "etregress y x1, treat(treated = x1 x2)",
          lambda: ws.Etregress.from_formula(
-             "y ~ x1 + treat(treated ~ x1 + x2)", PANEL).fit()),
+             "y ~ x1 + treat(treated ~ x1 + x2)", PANEL).fit(method="ml")),
         ("sqreg", "sqreg y x1, quantiles(.25 .5 .75)",
          lambda: ws.Sqreg.from_formula("y ~ x1", PANEL).fit()),
         ("bsqreg", "bsqreg y x1, quantile(.5)",

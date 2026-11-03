@@ -2307,7 +2307,11 @@ def _stata_summary(result: Any) -> str:
                 1, "Truncation point = " + f"{_truncation:g}"
             )
 
-        while len(ml_left) < (len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)):
+        # ``ml_left`` is padded so that appending the log likelihood makes it exactly ONE
+        # row longer than ``ml_right`` (the ll row has no right-hand partner). Derived from
+        # the CURRENT left length, since the "Estimator:" row inserted above changes it.
+        _target_before_ll = len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)
+        while len(ml_left) < _target_before_ll:
             ml_left.append("")
         if np.isfinite(ll):
             ml_left.append("Log likelihood = " + ("%.8g" % ll))
@@ -2904,6 +2908,12 @@ def _stata_summary(result: Any) -> str:
         )
         # No closing rule either: the trailing border is appended once, after the loop.
         names = []
+    # ``etregress``/``heckman`` fit on this path store ``sigma`` as a coefficient, but the
+    # table prints it in the DERIVED block below (with its delta-method standard error), so
+    # the plain coefficient row is skipped here. Without this the row appeared twice.
+    _skip_sigma_row = any(
+        str(name).strip() in ("athrho", "/athrho") for name in names
+    )
     for index, name in enumerate(names):
         group = ""
         bare = name
@@ -2912,6 +2922,8 @@ def _stata_summary(result: Any) -> str:
                 group = prefix[:-1]
                 bare = name[len(prefix):]
                 break
+        if _skip_sigma_row and str(bare).strip() in ("sigma", "/sigma"):
+            continue
         if group and group not in seen_groups:
             # The FIRST group needs a rule for the EQUATION-prefixed models (zip's "y |" /
             # "inflate |" blocks are separated from the coefficients above them), but NOT
@@ -3008,7 +3020,19 @@ def _stata_summary(result: Any) -> str:
             _bare_name.startswith("cut")
             or _bare_name.startswith("/cut")
             or _bare_name.startswith("var(e.")
-            or _bare_name in ("/sigma", "sigma", "/lnsigma", "lnsig2u", "/lnsig2u")
+            or (
+                _bare_name in ("/sigma", "sigma", "/lnsigma", "lnsig2u", "/lnsig2u")
+                # ``etregress``/``heckman`` print /athrho and /lnsigma CONSECUTIVELY under
+                # one rule, while intreg puts a rule between the coefficients and /lnsigma.
+                # Keying on the name alone gave etregress a rule in the middle of its pair.
+                and not (
+                    _bare_name in ("/lnsigma", "lnsigma")
+                    and any(
+                        str(other).strip() in ("athrho", "/athrho")
+                        for other in names
+                    )
+                )
+            )
         )
         if _is_cut_row and _needs_rule:
             # Deduplicated by CLASS, not by name: the ordinal thresholds are /cut1../cut4 and
@@ -3096,6 +3120,64 @@ def _stata_summary(result: Any) -> str:
     _has_sigma_pair = any(
         str(name).strip() in ("sigma_u", "/sigma_u") for name in names
     ) and any(str(name).strip() in ("sigma_e", "/sigma_e") for name in names)
+    # ``etregress``/``heckman`` finish with /athrho + /lnsigma (whose pair shares ONE rule,
+    # handled above) and then a block of THREE derived rows -- rho, sigma, lambda -- each of
+    # which carries a standard error. Measured:
+    #
+    #   /athrho |   .9118269   .3745088     2.43   0.015
+    #   /lnsigma|   .1248372   .1344003     0.93   0.353
+    # ----------+----------------------------------------------------
+    #       rho |   .7220079   .1792791
+    #     sigma |   1.132964   .1522707
+    #    lambda |    .818009   .3020312
+    #
+    # All three follow from the two coefficients by the delta method:
+    #   rho = tanh(athrho), sigma = exp(lnsigma), lambda = rho * sigma
+    _has_athrho = any(str(name).strip() in ("athrho", "/athrho") for name in names)
+    if _has_athrho:
+        _a_index = next(
+            index
+            for index, name in enumerate(names)
+            if str(name).strip() in ("athrho", "/athrho")
+        )
+        _l_index = next(
+            (
+                index
+                for index, name in enumerate(names)
+                if str(name).strip() in ("lnsigma", "/lnsigma")
+            ),
+            None,
+        )
+        _a_b, _a_se = float(params[_a_index]), float(bse[_a_index])
+        _rho_v = float(np.tanh(_a_b))
+        _rho_se = _a_se * (1.0 - _rho_v**2)
+        _sig_v = _sig_se = float("nan")
+        if _l_index is not None:
+            _l_b, _l_se = float(params[_l_index]), float(bse[_l_index])
+            _sig_v = float(np.exp(_l_b))
+            _sig_se = _l_se * _sig_v
+        # The rule before this block was already emitted by the /lnsigma handling; adding
+        # a second one produced two consecutive rules.
+        if not (lines and lines[-1].startswith("---") and "+" in lines[-1]):
+            lines.append(_split_rule)
+        _derived_rows = [("rho", _rho_v, _rho_se), ("sigma", _sig_v, _sig_se)]
+        if np.isfinite(_rho_v) and np.isfinite(_sig_v):
+            _lam_v = _rho_v * _sig_v
+            # delta method on rho*sigma, treating the two as independent
+            _lam_se = float(
+                np.sqrt((_sig_v**2) * (_rho_se**2) + (_rho_v**2) * (_sig_se**2))
+            )
+            _derived_rows.append(("lambda", _lam_v, _lam_se))
+        for _row_name, _value, _se_v in _derived_rows:
+            if not np.isfinite(_value):
+                continue
+            lines.append(
+                f"{_row_name:>{name_width}} |"
+                f"{_stata_coef(_value, coef_w)}"
+                f"{_stata_coef(_se_v, se_w)}"
+                f"{'':>{stat_w}}{'':>{p_w}}{'':>{ci_lo_w}}{'':>{ci_hi_w}}"
+            )
+
     if _has_re_variance or _has_alpha or _has_sigma_pair:
         # A split rule separates the coefficient block from the derived rows, measured.
         lines.append(_split_rule)
@@ -3133,7 +3215,7 @@ def _stata_summary(result: Any) -> str:
     # ``intreg lo hi x1``:  sigma .9373584 / se .0724253 / CI .8056332..1.090621,
     # reproduced exactly from exp(b) and exp(b +/- 1.96*se).
     if any(str(name).strip() in ("lnsigma", "/lnsigma") for name in names) and not (
-        _has_re_variance or _has_alpha or _has_sigma_pair
+        _has_re_variance or _has_alpha or _has_sigma_pair or _has_athrho
     ):
         _lns_index = next(
             index
@@ -3253,7 +3335,7 @@ def _stata_summary(result: Any) -> str:
     # Suppressed for every command that already printed these rows inside the table --
     # otherwise sigma_u/sigma_e appear twice.
     if panel_rows and not (
-        _has_re_variance or _has_alpha or _has_sigma_pair
+        _has_re_variance or _has_alpha or _has_sigma_pair or _has_athrho
     ):
         # Do NOT add a rule here: the ftest branch below emits its own full-width rule
         # before the "F test that all u_i=0" line, and adding one too produced two

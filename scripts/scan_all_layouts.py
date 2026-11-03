@@ -370,8 +370,11 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.Nl.from_formula(
              "y = {b0} * exp(-{b1} * x1)", PANEL,
              start={"b0": 1.0, "b1": 0.1}).fit()),
+        # The formula's "| unit" block IS the absorb() equivalent. Without it westata
+        # estimated a plain OLS while Stata absorbed the unit effects -- two different
+        # models, so the headers could never agree.
         ("reghdfe", "reghdfe y x1, absorb(unit)",
-         lambda: ws.FEOLS.from_formula("y ~ x1", PANEL).fit()),
+         lambda: ws.FEOLS.from_formula("y ~ x1 | unit", PANEL).fit()),
         ("tnbreg", "tnbreg ypos x1, ll(0)",
          lambda: ws.TruncatedNegativeBinomial.from_formula(
              "ypos ~ x1", PANEL, lower=0).fit()),

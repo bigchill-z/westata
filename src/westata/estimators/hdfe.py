@@ -820,6 +820,18 @@ class FEOLS:
         if absorbed_levels is not None:
             e["k_absorb"] = float(absorbed_levels)
             e["df_a_initial"] = float(absorbed_levels)
+            # The NAMES of the absorbed effects, for the "Absorbed degrees of freedom"
+            # table reghdfe prints below its coefficient table. Parsed from the formula's
+            # fixed-effect block ("y ~ x | firm + year"), since pyfixest does not expose
+            # them on the result and e(absorbed) (the collinear-variable list) is a
+            # different thing entirely.
+            _fe_block = str(self._formula).split("|", 1)
+            if len(_fe_block) == 2:
+                e["absorbed_names"] = [
+                    part.strip()
+                    for part in _fe_block[1].split("+")
+                    if part.strip()
+                ]
             # ``areg`` and ``reghdfe`` disagree here, and both fixtures prove it:
             #
             #   areg.json         df_a = 29 = k_absorb - 1     (30 groups)

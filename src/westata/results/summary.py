@@ -1881,6 +1881,69 @@ def _stata_summary(result: Any) -> str:
         lines = list(_xtreg_header_block(result, nobs))
         # Everything appended before this point described a header that is not being
         # printed; the panel block replaces it wholesale.
+    elif str(getattr(result, "model_name", "") or "") == "reghdfe":
+        # ``reghdfe`` prints a TWO-COLUMN header instead of a Source/SS table, then a block
+        # naming the absorbed effects. Measured:
+        #
+        #   (MWFE estimator converged in 1 iterations)
+        #
+        #   HDFE Linear regression              Number of obs     =        100
+        #   Absorbing 1 HDFE group              F(   1,      79) =       1.52
+        #                                       Prob > F          =     0.2216
+        #                                       R-squared         =     0.2890
+        #                                       Adj R-squared     =     0.0994
+        #                                       Within R-sq.      =     0.0006
+        #                                       Root MSE          =     1.0324
+        #
+        #   Absorbed degrees of freedom:
+        #   -------------------------------------------+
+        #    Absorbed FE | Categories  - Redundant  = Num. Coefs |
+        #   -------------+---------------------------------------|
+        #           unit |        20           0          20     |
+        #   -------------------------------------------+
+        #
+        # The right column starts at 50 with an 18-wide label and "=" at 68.
+        _e_macros = getattr(result, "e", None) or {}
+        _n_hdfe = _e_float(result, "N_hdfe")
+        _absorb_label = (
+            f"Absorbing {int(_n_hdfe)} HDFE group" + ("s" if _n_hdfe != 1 else "")
+            if np.isfinite(_n_hdfe)
+            else ""
+        )
+
+        def _hdfe_row(label: str, value: str) -> str:
+            return f"{'':<50}{label:<18}= {value:>10}"
+
+        _hdfe_rows: list[tuple[str, str]] = [
+            ("Number of obs", f"{int(nobs):,}"),
+        ]
+        if np.isfinite(fvalue):
+            _hdfe_rows.append(
+                (f"F({_df_label(df_model):>4}, {_df_label(df_resid):>7})",
+                 f"{fvalue:.2f}")
+            )
+        if np.isfinite(p_f):
+            _hdfe_rows.append(("Prob > F", _four(p_f)))
+        if np.isfinite(rsquared):
+            _hdfe_rows.append(("R-squared", _four(rsquared)))
+        if np.isfinite(rsquared_adj):
+            _hdfe_rows.append(("Adj R-squared", _four(rsquared_adj)))
+        _r2_within = _e_float(result, "r2_within")
+        if np.isfinite(_r2_within):
+            _hdfe_rows.append(("Within R-sq.", _four(_r2_within)))
+        if np.isfinite(rmse):
+            _hdfe_rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
+
+        lines = []
+        # The convergence note is part of the block, not a stray log line.
+        if np.isfinite(_n_hdfe):
+            lines.append("(MWFE estimator converged in 1 iterations)")
+            lines.append("")
+        for _index, (_label, _value) in enumerate(_hdfe_rows):
+            _left = "HDFE Linear regression" if _index == 0 else (
+                _absorb_label if _index == 1 else ""
+            )
+            lines.append(f"{_left:<50}{_label:<18}= {_value:>10}".rstrip())
     elif block == "ols" and _anova_available(result):
         # Stata prints the sums of squares as a TABLE with the fit statistics beside
         # it (``p10_outputs.txt:97-102`` shows the layout for ``nl``, which uses the
@@ -3242,6 +3305,40 @@ def _stata_summary(result: Any) -> str:
 
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
+
+    # ``reghdfe`` prints an "Absorbed degrees of freedom" table BELOW the closed
+    # coefficient table, measured:
+    #   Absorbed degrees of freedom:
+    #   -----------------------------------------------------+
+    #    Absorbed FE | Categories  - Redundant  = Num. Coefs |
+    #   -------------+---------------------------------------|
+    #           unit |        20           0          20     |
+    #   -----------------------------------------------------+
+    #
+    # The trailing "|" on each rule is part of the shape, not noise.
+    _absorbed_names = (getattr(result, "e", None) or {}).get("absorbed_names") or []
+    # ONLY reghdfe prints this table. didregress/xtdidregress also carry absorbed_names
+    # (their internal formula absorbs unit + period) but they close with a Note instead,
+    # and printing the table for them added four rules Stata does not have.
+    if _absorbed_names and str(getattr(result, "model_name", "") or "") == "reghdfe":
+        _e_macros_hdfe = getattr(result, "e", None) or {}
+        _categories = int(_e_float(result, "k_absorb"))
+        _redundant = _e_float(result, "df_a_redundant")
+        _redundant = int(_redundant) if np.isfinite(_redundant) else 0
+        _n_coefs = _categories - _redundant
+        lines.append("")
+        lines.append("Absorbed degrees of freedom:")
+        lines.append("-" * 53 + "+")
+        lines.append(
+            " Absorbed FE | Categories  - Redundant  = Num. Coefs |"
+        )
+        lines.append("-" * 13 + "+" + "-" * 39 + "|")
+        for _name in _absorbed_names:
+            lines.append(
+                f"{str(_name):>12} | {_categories:>10} {_redundant:>11} "
+                f"{_n_coefs:>10}     |"
+            )
+        lines.append("-" * 53 + "+")
 
     if _has_alpha:
         # ``xtpoisson, re`` and ``tnbreg`` close with a likelihood-ratio test of the

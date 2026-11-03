@@ -2648,6 +2648,42 @@ def _stata_summary(result: Any) -> str:
                 f"{_stata_coef(lower[index], ci_lo_w)}"
                 f"{_stata_coef(upper[index], ci_hi_w)}"
             )
+    # The random-effects ML commands continue the coefficient table with two derived rows
+    # INSIDE the same table (not as a block below it), each preceded by a split rule:
+    #
+    #   -------------+----------------------------------------------------
+    #      /lnsig2u |  -21.25042   1245.243                     -2461.882
+    #   -------------+----------------------------------------------------
+    #       sigma_u |   .0000243    .015127                             0
+    #           rho |   1.79e-10   2.23e-07                             0
+    #   ------------------------------------------------------------------
+    #   LR test of rho=0: chibar2(01) = 0.00         Prob >= chibar2 = 1.0000
+    #
+    # Only the commands that report /lnsig2u do this; xtreg's sigma_u/rho stay in the
+    # decomposition block below the table.
+    _has_re_variance = any(
+        str(name).strip() in ("lnsig2u", "/lnsig2u") for name in names
+    )
+    if _has_re_variance:
+        # A split rule separates the coefficient block from the derived rows, measured.
+        lines.append(_split_rule)
+        for _row_name, _key in (("sigma_u", "sigma_u"), ("rho", "rho")):
+            _value = _e_float(result, _key)
+            if not np.isfinite(_value):
+                continue
+            # No test statistic on these rows: they are transforms of the coefficient
+            # above, not hypotheses. Stata leaves z and P blank and prints the interval's
+            # lower bound as 0 with the upper one missing.
+            lines.append(
+                f"{_row_name:>{name_width}} |"
+                f"{_stata_coef(_value, coef_w)}"
+                f"{'':>{se_w}}"
+                f"{'':>{stat_w}}"
+                f"{'':>{p_w}}"
+                f"{'0':>{ci_lo_w}}"
+                f"{'.':>{ci_hi_w}}"
+            )
+
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
 
@@ -2712,7 +2748,12 @@ def _stata_summary(result: Any) -> str:
             f"{'rho':>12} | {_panel_stat(rho):>10}"
             f"   (fraction of variance due to u_i)"
         )
-    if panel_rows:
+    # Commands that report /lnsig2u already printed sigma_u/rho INSIDE the table, so the
+    # decomposition block below it would duplicate them.
+    if panel_rows and not _has_re_variance:
+        # Do NOT add a rule here: the ftest branch below emits its own full-width rule
+        # before the "F test that all u_i=0" line, and adding one too produced two
+        # consecutive rules where Stata has one.
         lines.extend(panel_rows)
         # ``corr(u_i, Xb)`` is NOT repeated here: the xtreg header block already printed
         # it, on the same row as Prob > F. Emitting it again below the table put it where
@@ -2745,6 +2786,10 @@ def _stata_summary(result: Any) -> str:
                 lines.append(f"{text:<61}{tail}")
             else:
                 lines.append(text)
+        else:
+            # No "F test that all u_i=0" row (the RE estimator has none), but Stata still
+            # closes the sigma/rho block with a full-width rule.
+            lines.append(_border_rule)
 
     return "\n".join(lines)
 

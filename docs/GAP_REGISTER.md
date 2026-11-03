@@ -6905,7 +6905,8 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 从第 18 轮起，用 `scripts/scan_all_layouts.py` 逐命令比对 westata 渲染与真实 Stata
 输出。它把「还有多少没对上」变成一个可复现的数字，而不是靠记忆。
 
-**当前结果：54 个扫描规格（覆盖全部 53 个注册命令），53 个匹配。** 匹配分两档：
+**当前结果：59 个扫描规格，58 个匹配；注册表 94 条全部有归属（59 条被扫描，35 条在
+`scripts/audit_registry_coverage.py` 的 `NO_TABLE` 清单里逐条写明理由）。** 匹配分两档：
 `MATCH` 指逐字符一致，`SKELETON` 指文本骨架一致、只有数字位数不同（不同随机样本的
 必然结果）。判定带一道**自检验**：两侧表格线数量不同即判为 `SUSPECT` 而不计入匹配，
 因为被过滤掉的一行会伪装成布局缺陷——这道守卫在第 42 轮抓到过一个静默回归
@@ -6916,6 +6917,25 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 | 命令 | 缺的东西 | 为什么不能只改排版 |
 |---|---|---|
 | `xtivreg, fe` | `F test that all u_i=0` 行 | 见下 |
+
+### 覆盖审计（第 52 轮加入的守卫）
+
+`scripts/audit_registry_coverage.py` 把「哪些命令根本没被检查过」变成可失败的检查：
+注册表每一条必须**要么被扫描覆盖，要么在 `NO_TABLE` 里写明不覆盖的理由**，否则退出码 1。
+`tests/test_registry_coverage_audit.py` 把它接进测试套件。
+
+加这个守卫的原因很具体：本目标两次报出过**分母错误**的完成度——
+
+1. 用 `_HEADER_BLOCK` 的 53 个条目当作「全部命令」，而注册表有 94 条；
+2. `areg`/`xtabond`/`sureg` 三个 **E3** 命令压根没有扫描规格，静默走了通用渲染路径，
+   从未被比对过。
+
+审计首轮就抓出一条我自己写错的账：`estat hettest`（E3）没有归属。查证后确认它打印的是
+三行**结果文本**（`H0: Constant variance` / `chi2(1) = 1.60` / `Prob > chi2 = 0.2063`），
+不是回归表格，本就不属于表格布局范畴；数值另行动态核对过，与 Stata 一致。
+
+同轮还纠正了一条描述错误：`jackknife` 一度被写成「未实现」，实际包里有一个 `Jackknife`
+**辅助类**（接收已构建好的设计矩阵），与 Stata 的 `jackknife:` 前缀不是一回事。
 
 ### `xtivreg, fe` 的 F 检验：已定位到 Stata 源码的确切公式
 

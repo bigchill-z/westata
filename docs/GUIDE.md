@@ -20,7 +20,7 @@ standard errors, at full double precision — not from comparing printed output.
 - **A reproducible check.** `retest/` re-runs the comparison against live Stata; `tests/` replays the
   committed captures without needing a licence.
 
-Current counts: **52 E3, 26 E2, 15 E1** across 93
+Current counts: **53 E3, 26 E2, 15 E1** across 94
 registry entries. The E1 entries are listed with their measured numbers in
 [Known deviations](#known-deviations).
 

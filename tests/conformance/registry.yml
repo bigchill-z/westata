@@ -1101,3 +1101,16 @@
   verified_by: lead
   date: 2026-10-30
   notes: "E1: no Stata fixture. The test is the standard Mundlak/Augmented-RE form, and the group means are what carry any correlation between the unobserved effect and x, so the joint test IS a test of that correlation. Two API facts surfaced while building it and are worth recording: model_name is Stata's spelling ('xtreg, re'), and panel_entity holds CODED GROUP LABELS rather than a column name -- so entity= and time= must be passed explicitly, because the result object cannot rebuild the augmented formula on its own."
+
+- command: estat hettest
+  level: E3
+  tolerance: 1.0e-9
+  sources:
+    - type: published_output
+      ref: "hettest.ado v3.4.4 (StataNow 19.5): 90 cases captured by scripts/capture_hettest_fixtures.py into tests/conformance/stata_fixtures/hettest_auto.json -- 3 models x {fitted, rhs, explicit varlist} x {normal, iid, fstat}, all four weight types, two factor-variable models, r(mtest) for two models, and the three refusals"
+      dataset: auto.dta
+    - type: invariant
+      ref: "test_estat_hettest compares every case against the captured fixture at rel<1e-9; the fitted-values branch and the rhs branch are asserted to DISAGREE on the same fit, which is the defect this entry was created for"
+  verified_by: lead
+  date: 2026-11-03
+  notes: "E3: every branch agrees with a real StataNow 19.5 run to rel<1e-9, and the fixture is byte-reproducible from the script. E3 rather than E2 because the agreement is on r() scalars at full precision and covers the refusals too. Four behaviours are load-bearing and were each wrong before this round: (1) no varlist means the FITTED VALUES (hettest.ado:110-115), not every regressor; (2) a varlist names SOURCE data variables, so 'rep78' is the raw 1-5 column (chi2(1)=12.7679) rather than the e(b) dummies (chi2(5)=24.3032); (3) the estimation weights are reused by the auxiliary regression (hettest.ado:103-105,138), so fweight/iweight use e(N)=sum(w)=235 and df_r=233; (4) mtest() is silently dropped for a single-regressor auxiliary regression (hettest.ado:126-128). The pre-fix suite compared against a second hand-transcription of the same ado and therefore agreed with the implementation's own misreading; see docs/TESTING_SOP.md."

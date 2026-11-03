@@ -26,7 +26,7 @@ this in Python, do I get the same numbers Stata would print?*
 |---|---|
 | Tests | **4167 passing** |
 | Commands covered | 93 registry entries |
-| Evidence | **52 × E3**, 26 × E2, 15 × E1 |
+| Evidence | **53 × E3**, 26 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
@@ -173,7 +173,7 @@ guesses, because guessing silently changes the VCE.
 
 | Level | Meaning | Count |
 |---|---|---|
-| E3 | Agrees with full-precision `e(b)`/`e(V)` from real Stata, on every invocation the independent sweep exercised | 52 |
+| E3 | Agrees with full-precision `e(b)`/`e(V)` from real Stata, on every invocation the independent sweep exercised | 53 |
 | E2 | Approximate, or exact only on a subset of invocations: real but bounded differences | 26 |
 | E1 | Materially differs on at least one measured invocation, or not covered by the sweep | 9 |
 
@@ -291,6 +291,9 @@ docs/              design spec and implementation plans
   example outputs cannot drift from it.
 - **Comparing westata with Stata**: [`docs/USING_WITH_STATA.md`](docs/USING_WITH_STATA.md) —
   which quantities are interchangeable and which are not, for the four E2 commands.
+- **Fixing a mismatch against Stata**: [`docs/TESTING_SOP.md`](docs/TESTING_SOP.md) —
+  the procedure for turning "our number differs" into a committed fixture captured from
+  real Stata, plus the six traps that produced wrong-but-green tests here.
 - Evidence registry: [`tests/conformance/registry.yml`](tests/conformance/registry.yml) —
   per-command level, measured gap, and reasoning.
 - Known gaps: [`docs/GAP_REGISTER.md`](docs/GAP_REGISTER.md) — what is deliberately

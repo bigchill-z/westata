@@ -3104,6 +3104,37 @@ def _stata_summary(result: Any) -> str:
                 f"{'.':>{ci_hi_w}}"
             )
 
+    # ``intreg`` ends its table with a derived sigma row under /lnsigma -- but unlike the
+    # rho/alpha rows this one DOES carry a standard error and a confidence interval, all
+    # reachable by the delta method from /lnsigma. Measured against
+    # ``intreg lo hi x1``:  sigma .9373584 / se .0724253 / CI .8056332..1.090621,
+    # reproduced exactly from exp(b) and exp(b +/- 1.96*se).
+    if any(str(name).strip() in ("lnsigma", "/lnsigma") for name in names) and not (
+        _has_re_variance or _has_alpha or _has_sigma_pair
+    ):
+        _lns_index = next(
+            index
+            for index, name in enumerate(names)
+            if str(name).strip() in ("lnsigma", "/lnsigma")
+        )
+        _lns_b = float(params[_lns_index])
+        _lns_se = float(bse[_lns_index])
+        _sig_value = float(np.exp(_lns_b))
+        _sig_se = _lns_se * _sig_value
+        _sig_lo = float(np.exp(_lns_b - 1.959963984540054 * _lns_se))
+        _sig_hi = float(np.exp(_lns_b + 1.959963984540054 * _lns_se))
+        # A split rule separates /lnsigma from the derived sigma row, measured.
+        lines.append(_split_rule)
+        lines.append(
+            f"{'sigma':>{name_width}} |"
+            f"{_stata_coef(_sig_value, coef_w)}"
+            f"{_stata_coef(_sig_se, se_w)}"
+            f"{'':>{stat_w}}"
+            f"{'':>{p_w}}"
+            f"{_stata_coef(_sig_lo, ci_lo_w)}"
+            f"{_stata_coef(_sig_hi, ci_hi_w)}"
+        )
+
     # The closing rule matches the OPENING one.
     lines.append(_border_rule)
 

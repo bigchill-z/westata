@@ -635,7 +635,15 @@ def _panel_design_block(result: Any) -> list[str]:
         _gavg = _per_group.get("avg", _e_float(result, "g_avg"))
         _gmax = _per_group.get("max", _e_float(result, "g_max"))
 
-        def _count(value: Any, label: str) -> str:
+        # Geometry, measured from ``xtlogit ybin x1, pa`` (every row is 78 wide):
+        #   right column starts at 53, its label field is 17, "=" sits at 70, value 7;
+        #   the min/avg/max rows right-align their 3-letter label to 66.
+        #   The left column puts its value IMMEDIATELY after the colon -- "Group
+        #   variable: unit", not the extra padding the panel block uses.
+        def _gee_right(label: str, value: str) -> str:
+            return f"{label:<17}= {value:>7}"
+
+        def _gee_count(value: Any, label: str) -> str:
             if value is None or not np.isfinite(value):
                 text = "."
             elif label == "avg":
@@ -644,18 +652,27 @@ def _panel_design_block(result: Any) -> list[str]:
                 text = f"{int(round(float(value)))}"
             return f"{label:>19} = {text:>6}"
 
+        _banner_gee = str(e_macros.get("title") or "") or "GEE population-averaged model"
         lines = [
-            f"{'Group variable:':<18}{entity or '.':<35}"
-            f"{'Number of groups':<17}= {_number('N_g'):>7}",
-            f"{'Family:':<18}{str(e_macros.get('family') or '.')}"
-            f"{'Obs per group:':>34}",
-            f"{'Link:':<18}{str(e_macros.get('link') or '.')}"
-            + _count(_gmin, "min"),
-            f"{'Correlation:':<18}{str(e_macros.get('corr') or '.')}"
-            + _count(_gavg, "avg"),
-            f"{'':<53}" + _count(_gmax, "max"),
-            f"{'':<53}{'Wald chi2(' + _df_label(_e_float(result, 'df_m')) + ')':<17}"
-            f" = {_e_float(result, 'chi2'):>6.2f}",
+            # The banner shares its row with Number of obs -- this row was missing
+            # entirely before, leaving the banner stranded on a line of its own.
+            f"{_banner_gee:<53}"
+            + _gee_right("Number of obs", f"{int(_e_float(result, 'N'))}"),
+            f"{'Group variable: ' + (entity or '.'):<53}"
+            + _gee_right("Number of groups", _number("N_g")),
+            # Label/value pairs on the left with the Obs-per-group heading beside them.
+            f"{'Family: ' + str(e_macros.get('family') or '.'):<53}"
+            + f"{'Obs per group:':>14}",
+            f"{'Link: ' + str(e_macros.get('link') or '.'):<53}"
+            + _gee_count(_gmin, "min"),
+            f"{'Correlation: ' + str(e_macros.get('corr') or '.'):<53}"
+            + _gee_count(_gavg, "avg"),
+            f"{'':<53}" + _gee_count(_gmax, "max"),
+            f"{'':<53}"
+            + _gee_right(
+                f"Wald chi2({_df_label(_e_float(result, 'df_m'))})",
+                f"{_e_float(result, 'chi2'):.2f}",
+            ),
         ]
         _scale = _e_float(result, "scale")
         _scale_text = (
@@ -663,7 +680,7 @@ def _panel_design_block(result: Any) -> list[str]:
         )
         _p_gee = _e_float(result, "p")
         if np.isfinite(_p_gee):
-            lines.append(f"{_scale_text:<53}{'Prob > chi2':<17} = {_p_gee:>6.4f}")
+            lines.append(f"{_scale_text:<53}" + _gee_right("Prob > chi2", f"{_p_gee:.4f}"))
         elif _scale_text:
             lines.append(_scale_text)
     else:
@@ -816,6 +833,20 @@ def _iv_family_for_header(result: Any) -> bool:
 #: duplicating statistics above the table. That happened for xtpcse, ivregress and eivreg.
 _OWN_HEADER_BLOCKS = frozenset({"svy", "ml", "newey", "arch", "quantile"})
 _OWN_HEADER_MODELS = ("xtpcse", "xtgls", "eivreg")
+
+
+def _is_gee_shape(result: Any) -> bool:
+    """Whether this is the GEE population-averaged block (``xtlogit ..., pa``).
+
+    Identified by the macros the block is built from, not by model_name: the shape needs
+    a family, a link AND a correlation structure together, and no other layout has all
+    three.
+    """
+
+    e_macros = getattr(result, "e", None) or {}
+    return all(
+        str(e_macros.get(key) or "").strip() for key in ("family", "link", "corr")
+    )
 
 
 def _prints_own_header_block(result: Any, block: str) -> bool:
@@ -1636,6 +1667,9 @@ def _stata_summary(result: Any) -> str:
         block in ("quantile", "ml")
         or str(getattr(result, "model_name", "") or "") in ("tobit", "truncreg")
         or str(getattr(result, "model_name", "") or "").startswith("ivregress")
+        # The GEE block (xtlogit, pa) puts the banner on its FIRST row beside
+        # "Number of obs", so a standalone banner line above it is a duplicate.
+        or _is_gee_shape(result)
     )
     # A MISSING banner means Stata prints no banner for this command -- ``nl`` starts
     # straight at the Source/SS table. The old fallback put "Stata-style regression

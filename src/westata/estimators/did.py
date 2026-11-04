@@ -395,14 +395,24 @@ def _treatment_time_info(
             if len(_treated_rows)
             else None
         )
+        # Control units never switch on, so Stata labels their Time block with the START of
+        # the panel -- both ends. Measured on the report's C12-10 case (140,432 rows, year
+        # 1650..1911): Stata prints "Control Minimum 1650 / Maximum 1650" and
+        # "Treatment Minimum 1826 / Maximum 1826".
+        #
+        # This replaces a hardcoded 0.0/0.0, which came from a small synthetic frame whose
+        # periods happened to start at 0 -- a coincidence that looked like a rule.
+        _control_rows = frame.loc[frame[group].isin(per_group[per_group == 0].index)]
+        _control_start = (
+            float(_control_rows[time].min()) if len(_control_rows) else None
+        )
         return {
             "time_name": str(time),
             "treatment_name": str(treatment),
             "control_units": control_units,
             "treated_units": treated_units,
-            # Control units are never treated, so their onset is 0 on both ends.
-            "control_min": 0.0 if control_units else None,
-            "control_max": 0.0 if control_units else None,
+            "control_min": _control_start,
+            "control_max": _control_start,
             "treated_min": float(_onset.min()) if _onset is not None else None,
             "treated_max": float(_onset.max()) if _onset is not None else None,
         }

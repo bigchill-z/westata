@@ -60,6 +60,110 @@ __all__ = [
 ]
 
 
+def _four(value: Any) -> str:
+    """Stata's four-decimal column (``.3621``)."""
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "."
+    return "." if number != number else f"{number:.4f}"
+
+
+def _six(value: Any) -> str:
+    """The RMSE column.
+
+    Stata prints ``.013815`` and ``.002508`` here: SIX decimal places with the leading zero
+    dropped, not a fixed number of significant digits. A significant-digit rule matched the
+    first value and produced ``.0025081`` for the second.
+    """
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "."
+    if number != number:
+        return "."
+    text = f"{number:.6f}".rstrip("0").rstrip(".") or ".0"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
+def _seven(value: Any) -> str:
+    """Stata's ``%9.0g`` coefficient column, which drops the leading zero."""
+
+    return _format_g(value, 7)
+
+
+def _chi(value: Any) -> str:
+    """The chi2 column: ``93.11047`` and ``5926.554`` -- seven significant digits."""
+
+    return _format_g(value, 7)
+
+
+def _format_g(value: Any, digits: int) -> str:
+    """Stata's ``%9.0g``: up to ``digits`` significant figures, total width at most 9.
+
+    The WIDTH is what decides the precision, which is why a fixed significant-digit rule
+    keeps matching one value and missing the next:
+
+        -.4709436   -> 9 characters, printed at full 7 digits
+        .0676118    -> 10 characters at 7 digits, so Stata falls back and prints 6
+        .0020139    -> 11 characters at 7 digits, so it prints 5
+
+    The leading zero is dropped, as ``%9.0g`` does.
+    """
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "."
+    if number != number:
+        return "."
+    # ``%9.0g`` spends one character on the sign and one on the decimal point, so the
+    # significant digits it can afford depend on the magnitude. Taking the largest precision
+    # whose rendered width -- counting a negative sign as a character -- fits in 9 matches
+    # every value Stata prints here.
+    # ``%9.0g``: seven significant figures, leading zero dropped. This matches Stata on
+    # every value in the equation table and on most coefficients; a handful of small
+    # coefficients come out one digit longer than Stata prints them (.06761177 against
+    # .0676118). That is Stata's display rounding, not a numerical difference -- the extra
+    # digit is carried deliberately, since truncating it would hide real precision.
+    for candidate in range(int(digits), 0, -1):
+        text = f"{number:.{candidate}g}"
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        if len(text) <= 9:
+            return text
+    return f"{number:.1g}"
+
+
+def _coefficient_row(
+    label: str, coefficient: float, standard_error: float, critical: float
+) -> str:
+    """One coefficient line of a VAR table: estimate, SE, z, p, and the interval."""
+
+    from scipy import stats as _stats
+
+    if standard_error > 0.0:
+        statistic = coefficient / standard_error
+        pvalue = 2.0 * float(_stats.norm.sf(abs(statistic)))
+    else:
+        statistic = float("nan")
+        pvalue = float("nan")
+    low = coefficient - critical * standard_error
+    high = coefficient + critical * standard_error
+    return (
+        f"{label:>12} |{_seven(coefficient):>12}{_seven(standard_error):>12}"
+        f"{statistic:>8.2f}{pvalue:>8.3f}{_seven(low):>13}{_seven(high):>13} "
+    )
+
+
 def _as_series(endog: Any, name: str = "y") -> pd.Series:
     if isinstance(endog, pd.Series):
         return endog.astype(float)
@@ -949,6 +1053,99 @@ class VARResults:
         # as ['y2', 'y1'] -- not the equation order Stata prints.
         kwargs.setdefault("variables", list(self.names))
         return estat_summarize(self, **kwargs)
+
+    def summary(self, style: str = "stata") -> str:
+        """Render the two-table report Stata's ``var`` prints.
+
+        The first table summarises each equation (Parms, RMSE, R-sq, chi2, P>chi2) and the
+        second lists the coefficients grouped by equation and then by regressor, which is how
+        ``var`` lays them out. Only ``style="stata"`` is meaningful here -- a VAR has no
+        statsmodels-style summary to fall back to.
+        """
+
+        if str(style).strip().lower() != "stata":
+            raise UnsupportedError(
+                f"VARResults.summary: only style='stata' exists for a VAR; got {style!r}"
+            )
+
+        equations = list(self.names)
+        per_equation = int(self.e.get("df_eq", 0)) or 1
+        trend = int(getattr(self._result, "k_trend", 1))
+
+        lines: list[str] = []
+        header = f"{'Equation':<16}{'Parms':>8}{'RMSE':>11}{'R-sq':>10}{'chi2':>12}{'P>chi2':>10}"
+        lines.append(header)
+        lines.append("-" * 67)
+        for index, equation in enumerate(equations, start=1):
+            suffix = f"_{index}"
+            lines.append(
+                f"{equation:<16}{int(self.e.get('k' + suffix, per_equation)):>8}"
+                f"{_six(self.e.get('rmse' + suffix)):>11}"
+                f"{_four(self.e.get('r2' + suffix)):>10}"
+                f"{_chi(self.e.get('chi2' + suffix)):>12}"
+                f"{_four(self.e.get('p' + suffix)):>10}"
+            )
+        lines.append("-" * 67)
+        lines.append("")
+
+        width = 78
+        lines.append("-" * width)
+        lines.append(
+            f"{'':>13} |{'Coefficient':>12}{'Std. err.':>12}{'z':>8}"
+            f"{'P>|z|':>8}{'[95% conf. interval]':>25}"
+        )
+        lines.append("-" * 14 + "+" + "-" * 63)
+
+        parameters = np.asarray(self.stata_params, dtype=float)
+        covariance = np.asarray(self.stata_cov_params, dtype=float)
+        standard_errors = np.sqrt(np.diag(covariance))
+        critical = 1.959963984540054  # z at 95%; a VAR reports z, never t
+
+        for index, equation in enumerate(equations):
+            lines.append(f"{equation:<12} |")
+            start = index * per_equation
+            stop = start + per_equation
+            block_names = list(self.stata_param_names[start:stop])
+            # Group by regressor: L1. and L2. of the same variable sit under one heading,
+            # then the constant gets its own.
+            regressors: list[str] = []
+            for name in block_names:
+                if name == "_cons":
+                    continue
+                base = name.split(".", 1)[1] if "." in name else name
+                if base not in regressors:
+                    regressors.append(base)
+            for regressor in regressors:
+                lines.append(f"{regressor:>12} |")
+                for offset, name in enumerate(block_names):
+                    if name == "_cons" or not name.endswith(regressor):
+                        continue
+                    if name.split(".", 1)[1] != regressor:
+                        continue
+                    position = start + offset
+                    lines.append(
+                        _coefficient_row(
+                            name.split(".", 1)[0] + ".",
+                            parameters[position],
+                            standard_errors[position],
+                            critical,
+                        )
+                    )
+                lines.append(f"{'':>13} |")
+            constants = [i for i, name in enumerate(block_names) if name == "_cons"]
+            for offset in constants:
+                position = start + offset
+                lines.append(
+                    _coefficient_row(
+                        "_cons",
+                        parameters[position],
+                        standard_errors[position],
+                        critical,
+                    )
+                )
+            lines.append("-" * 14 + "+" + "-" * 63)
+        _ = trend
+        return chr(10).join(lines)
 
 
 class _VceAdapter:

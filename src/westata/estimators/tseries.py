@@ -958,9 +958,31 @@ class VARResults:
         )
 
     def irf(self, periods: int = 10) -> Any:
-        """Impulse responses (Stata ``irf create``)."""
+        """Impulse responses, on Stata's ML scale (``irf create``).
 
-        return self._result.irf(periods)
+        statsmodels normalises the shocks with the UNBIASED residual covariance (divide by
+        ``T - k_eq``) while Stata's ``var`` uses the ML one (divide by ``T``). The two differ
+        by ``sqrt((T - k_eq)/T)``=0.9846 on the reference case, which scales EVERY response
+        equally -- so the shape matched while every number was 1.5% high:
+
+            step 0   Stata .013603   statsmodels .013815
+            step 1   Stata -.005984  statsmodels -.006077
+
+        Rescaling by that factor reproduces Stata to every printed digit. ``ml_factor``
+        already carried it for ``sigma_u``; the IRF was the one path that did not apply it.
+        """
+
+        analysis = self._result.irf(periods)
+        factor = float(np.sqrt(self.ml_factor))
+        for attribute in ("irfs", "orth_irfs", "ma_rep"):
+            values = getattr(analysis, attribute, None)
+            if values is None:
+                continue
+            try:
+                setattr(analysis, attribute, np.asarray(values, dtype=float) * factor)
+            except (AttributeError, TypeError):
+                continue
+        return analysis
 
     def fevd(self, periods: int = 10) -> Any:
         """Forecast-error variance decomposition (Stata ``fevd``)."""

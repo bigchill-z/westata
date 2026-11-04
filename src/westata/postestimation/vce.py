@@ -58,18 +58,35 @@ def _display_name(name: str) -> str:
 
 
 def _format_entry(value: float, width: int) -> str:
-    """Stata prints covariances in ``%10.0g``-ish form, no leading zero."""
+    """Stata's ``%10.0g`` cell: no leading zero, at most ten characters.
+
+    The WIDTH decides the precision, not a fixed significant-digit count -- the same rule
+    that governs every other Stata column. On the reference covariance matrix:
+
+        .0168814     prints at 7 significant figures (8 characters)
+        .01251233    at 8 (because it still fits in 10)
+        -.00338524   at 6 (10 characters at 7, so Stata falls back)
+
+    A single significant-digit rule produced ``-.003385236`` where Stata prints
+    ``-.00338524``.
+    """
 
     if value is None or not np.isfinite(value):
         return f"{'.':>{width}}"
-    text = f"{value:.7g}"
-    if text.startswith("0."):
-        text = text[1:]
-    elif text.startswith("-0."):
-        text = "-" + text[2:]
-    elif text in ("0", "-0"):
-        text = "0"
-    return f"{text:>{width}}"
+    number = float(value)
+    if number == 0.0:
+        return "0".rjust(width)
+    for digits in range(8, 0, -1):
+        text = f"{number:.{digits}g}"
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        if text.endswith(".0"):
+            text = text[:-2]
+        if len(text) <= 10:
+            return text.rjust(width)
+    return f"{number:.1g}".rjust(width)
 
 
 class VceMatrix:
@@ -87,9 +104,21 @@ class VceMatrix:
         ``"covariance"`` or ``"correlation"``.
     """
 
-    __slots__ = ("names", "values", "kind")
+    __slots__ = ("names", "values", "kind", "model_label", "response_label")
 
-    def __init__(self, names: Sequence[str], values: np.ndarray, kind: str) -> None:
+    def __init__(
+        self,
+        names: Sequence[str],
+        values: np.ndarray,
+        kind: str,
+        model_label: str = "",
+        response_label: str = "",
+    ) -> None:
+        #: Estimator name for the title ("Covariance matrix of coefficients of logit
+        #: model") and the dependent-variable name heading the column block. Both come
+        #: from the fit; empty when the caller did not supply them.
+        self.model_label = str(model_label)
+        self.response_label = str(response_label)
         labels = list(names)
         matrix = np.asarray(values, dtype=float)
         if matrix.shape != (len(labels), len(labels)):
@@ -136,20 +165,57 @@ class VceMatrix:
             f"{label:>{width}}" for label in labels
         )
 
+        # Stata's layout, measured from a live ``estat vce`` after ``logit y x1 x2``::
+        #
+        #     Covariance matrix of coefficients of logit model
+        #                  | y
+        #             e(V) |         x1          x2       _cons
+        #     -------------+-----------------------------------
+        #     y            |
+        #               x1 |   .0168817
+        #               x2 | -.00338524   .01251233
+        #            _cons |  .00121321  -.00025332   .01065644
+        #
+        # Three pieces were missing entirely: the title names the MODEL, the column
+        # block is headed by the dependent variable on its own line, and the row labels
+        # sit under an "e(V)" caption. Without them the matrix is present but a reader
+        # cannot tell which model or equation it belongs to.
+        model = self.model_label.strip()
         title = (
-            "Covariance matrix"
-            if self.kind == "covariance"
-            else "Correlation matrix of coefficients"
+            f"Covariance matrix of coefficients of {model} model"
+            if model and self.kind == "covariance"
+            else (
+                "Covariance matrix"
+                if self.kind == "covariance"
+                else "Correlation matrix of coefficients"
+            )
         )
-        lines = [title, "", header, "-" * len(header)]
+        lead = 12  # "        e(V) " puts the pipe at column 13
+        lines = [title]
+        if self.response_label:
+            lines.append(f"{'':>{lead}} | {self.response_label}")
+        # Stata's column fields are 11 wide, set by its %10.0g cells, not by the longest
+        # label -- deriving the width from the labels widened the whole matrix.
+        # Stata's column fields are 11 wide and right-aligned; the header row's fields
+        # are one wider than the value rows because of how Stata pads the label block.
+        cell = 11
+        lines.append(
+            f"{'e(V)':>{lead}} |" + "".join(f"{label:>{cell}}" for label in labels)
+        )
+        lines.append("-" * lead + "+" + "-" * (len(lines[-1]) - lead - 1))
+        if self.response_label:
+            lines.append(f"{self.response_label:<{lead}} |")
         for row, label in enumerate(labels):
             # Stata prints the lower triangle; the upper triangle is blank.
+            # Stata stops each row AT the diagonal -- it does not pad the trailing
+            # columns with blanks. Padding them made every line end with spaces and the
+            # row widths disagree with Stata's.
             cells = "".join(
-                _format_entry(matrix[row, col], width) if col <= row else " " * width
-                for col in range(len(labels))
+                _format_entry(matrix[row, col], cell)
+                for col in range(row + 1)
             )
-            lines.append(f"{label:<{name_width}}{cells}")
-        return "\n".join(lines)
+            lines.append(f"{label:>{lead}} |{cells}")
+        return chr(10).join(lines)
 
 
 def estat_vce(result: Any, *, correlation: bool = False) -> VceMatrix:
@@ -191,7 +257,17 @@ def estat_vce(result: Any, *, correlation: bool = False) -> VceMatrix:
     if len(order) == cov.shape[0] and order != list(range(len(order))):
         cov = cov[np.ix_(order, order)]
     if not correlation:
-        return VceMatrix(names, cov, "covariance")
+        return VceMatrix(
+            names,
+            cov,
+            "covariance",
+        model_label=str(getattr(result, "model_name", "") or ""),
+        response_label=str(
+            getattr(result, "response_name", None)
+            or (getattr(result, "e", None) or {}).get("depvar")
+            or ""
+        ),
+        )
 
     diagonal = np.sqrt(np.diag(cov))
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -200,4 +276,14 @@ def estat_vce(result: Any, *, correlation: bool = False) -> VceMatrix:
     # A variable is not correlated with itself in Stata's ``vce, correlation``.
     corr = np.asarray(corr, dtype=float)
     np.fill_diagonal(corr, 0.0)
-    return VceMatrix(names, corr, "correlation")
+    return VceMatrix(
+        names,
+        corr,
+        "correlation",
+        model_label=str(getattr(result, "model_name", "") or ""),
+        response_label=str(
+            getattr(result, "response_name", None)
+            or (getattr(result, "e", None) or {}).get("depvar")
+            or ""
+        ),
+    )

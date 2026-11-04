@@ -166,14 +166,36 @@ class LfitResult:
         self.model_label = str(model_label)
 
     def __str__(self) -> str:
-        header = f"Goodness-of-fit test after {self.model_label} model"
+        """Reproduce ``estat gof`` exactly::
+
+            Goodness-of-fit test after logistic model
+            Variable: y
+                  Number of observations =    500
+            Number of covariate patterns =    500
+                       Pearson chi2(497) = 500.43
+                             Prob > chi2 = 0.4484
+
+        Two observations lines were missing entirely, and the two statistic lines were
+        indented where Stata starts them at column 1 with the label right-aligned in 31.
+        """
+
+        lines = [f"Goodness-of-fit test after {self.model_label} model"]
         if self.depvar:
-            header += f"\nVariable: {self.depvar}"
-        return (
-            f"{header}\n"
-            f"  Pearson chi2({self.df:g}) = {self.chi2:.4f}\n"
-            f"  Prob > chi2        = {self.pvalue:.4f}"
-        )
+            lines.append(f"Variable: {self.depvar}")
+        # Every line is 37 characters with "=" at column 29, measured from Stata's output:
+        # the label is right-aligned in 29 fields and the value in 7.
+        def _stat_line(label: str, rendered: str) -> str:
+            """Place ``label`` right-aligned in 29, then " = ", then the value in 7."""
+
+            # "=" lands at column 29 when the label is right-aligned in 28 and the
+            # value right-aligned in 7; verified against Stata's 37-character lines.
+            return f"{label:>28} ={rendered:>7}"
+
+        lines.append(_stat_line("Number of observations", f"{self.n_obs:.0f}"))
+        lines.append(_stat_line("Number of covariate patterns", f"{self.patterns:.0f}"))
+        lines.append(_stat_line(f"Pearson chi2({self.df:g})", f"{self.chi2:.2f}"))
+        lines.append(_stat_line("Prob > chi2", f"{self.pvalue:.4f}"))
+        return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """Flatten to the ``r()`` names ``lfit.ado:91-98`` returns.

@@ -106,7 +106,9 @@ def test_estat_vce_renders_lower_triangle_only(auto) -> None:
     assert "Covariance matrix" in text
     # The first labelled data row must not contain a value in the last column
     # (that is the upper triangle), which Stata leaves blank.
-    rows = [line for line in text.splitlines() if line.startswith("_cons")]
+    # Row labels are RIGHT-aligned in Stata's 12-character label column, so the _cons row
+    # begins with spaces rather than with the name.
+    rows = [line for line in text.splitlines() if line.strip().startswith("_cons")]
     assert len(rows) == 1
     assert "foreign[T.Foreign]" not in rows[0].split("_cons", 1)[1]
 

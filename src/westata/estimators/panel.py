@@ -552,12 +552,20 @@ class PanelOLS:
 
         y, X = self._design()
         self._kept_index = self._data.index
+        # A regressor that is constant WITHIN every entity (or every period) is fully
+        # absorbed by the fixed effects. Stata drops it and marks it "omitted"; the backend
+        # raises AbsorbingEffectError instead, which turns a perfectly ordinary
+        # specification into a hard failure. Measured on cao_chen.dta where ``prerebel`` is
+        # constant within county: `xtreg rug_after maize prerebel, fe` runs in Stata and
+        # reports only ``maize``, while westata refused to fit at all.
+        X, omitted = self._drop_absorbed_columns(X, entity_effects, time_effects)
+        if omitted:
+            self._omitted_columns = tuple(omitted)
         backend_cov, clusters, n_clust = self._resolve_cov(cov_type, cov_kwds)
         settings = resolve_ssc(ssc)
 
         model = self._build_model(y, X, entity_effects, time_effects)
         ref = self._fit_backend(model, backend_cov, clusters, settings)
-
         params = np.asarray(ref.params, dtype=float).reshape(-1)
         param_names = [str(name) for name in ref.params.index]
         cov = np.asarray(ref.cov, dtype=float)
@@ -723,6 +731,70 @@ class PanelOLS:
             np.asarray(x_frame, dtype=float), index=kept, columns=list(x_frame.columns)
         )
         return y, X
+
+    def _drop_absorbed_columns(
+        self,
+        X: pd.DataFrame,
+        entity_effects: bool,
+        time_effects: bool,
+    ) -> tuple[pd.DataFrame, list[str]]:
+        """Remove regressors that the fixed effects absorb entirely.
+
+        A column with no variation inside any entity (or period) is collinear with the
+        effects and cannot be estimated. Stata drops it and prints it as ``(omitted)``; the
+        backend raises ``AbsorbingEffectError`` instead, turning an ordinary specification
+        into a hard failure. Measured on cao_chen.dta, where ``prerebel`` is constant within
+        county: Stata's ``xtreg rug_after maize prerebel, fe`` runs and reports only
+        ``maize``, while westata refused to fit at all.
+
+        Detection uses the within-group variance over exactly the effects being included, so
+        a model without entity effects never loses a column for that reason.
+        """
+
+        absorbed: list[str] = []
+        keep = X.copy()
+
+        def constant_within(labels: np.ndarray) -> list[str]:
+            counts = np.bincount(labels)
+            if counts.size == 0 or np.any(counts == 0):
+                return []
+            found: list[str] = []
+            for column in keep.columns:
+                # The intercept is constant within every group by definition, but the backend
+                # needs it: linearmodels uses it to decide whether the model is a fixed-effect
+                # regression at all. Dropping it silently changed every R-squared.
+                if str(column) == "Intercept":
+                    continue
+                values = keep[column].to_numpy(dtype=float)
+                means = np.bincount(labels, weights=values) / counts
+                deviation = values - means[labels]
+                if float(np.max(np.abs(deviation))) < 1e-12:
+                    found.append(str(column))
+            return found
+
+        # The panel index is a (entity, time) MultiIndex, so the group labels come from its
+        # levels rather than from named columns.
+        def level_codes(position: int) -> np.ndarray | None:
+            try:
+                level = keep.index.get_level_values(position)
+            except (IndexError, AttributeError):
+                return None
+            codes = pd.factorize(level)[0]
+            return codes if codes.size == len(keep) else None
+
+        if entity_effects:
+            entity_codes = level_codes(0)
+            if entity_codes is not None:
+                absorbed.extend(constant_within(entity_codes))
+        if time_effects:
+            time_codes = level_codes(1)
+            if time_codes is not None:
+                absorbed.extend(constant_within(time_codes))
+
+        absorbed = list(dict.fromkeys(absorbed))
+        if absorbed:
+            keep = keep.drop(columns=absorbed)
+        return keep, absorbed
 
     def _build_model(
         self,

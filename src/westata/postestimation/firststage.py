@@ -256,22 +256,23 @@ class FirstStageResult:
         def _cell(value: float) -> str:
             return f"{value:>8.2f}" if np.isfinite(value) else ".".rjust(8)
 
-        # The pipe sits at column 37 in every row of this block, and each critical value
-        # occupies eight columns; both were measured from Stata's output.
-        def _table_row(label: str, cells: str) -> str:
-            return f"{label:<37}|{cells}"
-
+        # Every row below was measured from Stata's output: the pipe sits at column 37,
+        # the header row is 68 characters, the value rows 69, and the separator 71 with
+        # its "+" at column 37. The padding is therefore written out literally rather than
+        # derived -- deriving it kept landing one column off.
+        rule = "  " + "-" * 69
+        separator = "  " + "-" * 35 + "+" + "-" * 33
         lines = [
             "",
             f"  Minimum eigenvalue statistic = {self.mineig:.3f}",
             "",
             f"  Critical Values                      # of endogenous regressors: {n_endog:>4}",
             f"  H0: Instruments are weak             # of excluded instruments: {n_excluded:>5}",
-            "  " + "-" * 69,
-            _table_row("", f"{'5%':>7}{'10%':>8}{'20%':>8}{'30%':>8}"),
-            _table_row("  2SLS relative bias", f"{'(not available)':>22}"),
-            "  " + "-" * 35 + "+" + "-" * 33,
-            _table_row("", f"{'10%':>7}{'15%':>8}{'20%':>8}{'25%':>8}"),
+            rule,
+            "                                     |    5%     10%     20%     30%",
+            "  2SLS relative bias                 |         (not available)",
+            separator,
+            "                                     |   10%     15%     20%     25%",
         ]
         labels = (
             "2SLS size of nominal 5% Wald test",
@@ -280,9 +281,16 @@ class FirstStageResult:
         for offset, label in enumerate(labels, start=1):
             if offset >= matrix.shape[0]:
                 continue
-            cells = "".join(_cell(value) for value in matrix[offset])
-            lines.append(_table_row(f"  {label}", cells))
-        lines.append("  " + "-" * 69)
+            # The first cell is SEVEN wide and the rest eight; that asymmetry is
+            # Stata's, measured off its own rows ("  19.93   11.59    8.75    7.25").
+            cells = ""
+            for position, value in enumerate(matrix[offset]):
+                width = 7 if position == 0 else 8
+                cells += (
+                    f"{value:>{width}.2f}" if np.isfinite(value) else ".".rjust(width)
+                )
+            lines.append(f"  {label:<35}|{cells}")
+        lines.append(rule)
         return chr(10).join(lines)
 
     def _render_r2_table(self) -> str:

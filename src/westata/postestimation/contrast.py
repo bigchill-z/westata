@@ -41,6 +41,7 @@ from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from westata.errors import UnsupportedError
 from westata.postestimation.lincom import LincomResult, run_lincom
@@ -418,6 +419,46 @@ def _check_adjust(adjust: Any) -> None:
     )
 
 
+class ContrastResult(list):
+    """Contrasts plus Stata's joint Wald test.
+
+    ``contrast`` in Stata prints an ANOVA-style block by default::
+
+        Contrasts of marginal linear predictions
+        Margins: asbalanced
+        ------------------------------------------------
+                     |         df           F        P>F
+        -------------+----------------------------------
+               iqgrp |          3        5.90     0.0006
+        ------------------------------------------------
+         Denominator |        751
+
+    and only ``contrast ..., nowald`` prints the per-comparison coefficients. The list
+    behaviour is unchanged -- iterating still yields one :class:`LincomResult` per row --
+    so existing callers keep working; the joint test is additional information.
+    """
+
+    def __init__(self, rows, *, term, fvalue, df, pvalue, df_denom):
+        super().__init__(rows)
+        self.term = term
+        self.fvalue = float(fvalue)
+        self.df = int(df)
+        self.pvalue = float(pvalue)
+        self.df_denom = float(df_denom)
+
+    def __str__(self) -> str:
+        lines = [
+            "Contrasts of marginal linear predictions",
+            "",
+            "-" * 48,
+            f"{'':>13} |{'df':>10}{'F':>12}{'P>F':>11}",
+            "-" * 14 + "+" + "-" * 33,
+            f"{self.term:>13} |{self.df:>10}{self.fvalue:>12.2f}{self.pvalue:>11.4f}",
+            "-" * 48,
+        ]
+        return chr(10).join(lines)
+
+
 def _run(
     result: Any,
     comparisons: list[tuple[str, str, np.ndarray]],
@@ -451,6 +492,7 @@ def contrast(
     method: str = "r",
     *,
     level: float = 0.95,
+    nowald: bool = False,
 ) -> list[LincomResult]:
     """ANOVA-style contrasts of a factor variable's estimated means.
 
@@ -533,7 +575,38 @@ def contrast(
                 )
             )
 
-    return _run(result, comparisons, level=level)
+    rows = _run(result, comparisons, level=level)
+    if nowald:
+        return rows
+    # Stata's default output is the joint Wald/F block; ``nowald`` prints the rows instead.
+    # The F statistic is the quadratic form of the constrained contrasts, taken jointly.
+    params = np.asarray(result.params, dtype=float).reshape(-1)
+    cov = np.asarray(result.cov_params(), dtype=float)
+    matrix = np.vstack([weights for _label, _text, weights in comparisons])
+    difference = matrix @ params
+    if difference.size == 0:
+        return rows
+    try:
+        middle = np.linalg.inv(matrix @ cov @ matrix.T)
+    except np.linalg.LinAlgError:
+        middle = np.linalg.pinv(matrix @ cov @ matrix.T)
+    statistic = float(difference @ middle @ difference)
+    degrees = int(difference.size)
+    df_denom = float(getattr(result, "df_resid", np.nan))
+    if str(getattr(result, "dist", "t")).lower() == "z":
+        pvalue = float(stats.chi2.sf(statistic, degrees))
+        fvalue = statistic / degrees
+    else:
+        fvalue = statistic / degrees
+        pvalue = float(stats.f.sf(fvalue, degrees, df_denom))
+    return ContrastResult(
+        rows,
+        term=str(factor.variable),
+        fvalue=fvalue,
+        df=degrees,
+        pvalue=pvalue,
+        df_denom=df_denom,
+    )
 
 
 def pwcompare(

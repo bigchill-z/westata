@@ -1114,3 +1114,16 @@
   verified_by: lead
   date: 2026-11-03
   notes: "E3: every branch agrees with a real StataNow 19.5 run to rel<1e-9, and the fixture is byte-reproducible from the script. E3 rather than E2 because the agreement is on r() scalars at full precision and covers the refusals too. Four behaviours are load-bearing and were each wrong before this round: (1) no varlist means the FITTED VALUES (hettest.ado:110-115), not every regressor; (2) a varlist names SOURCE data variables, so 'rep78' is the raw 1-5 column (chi2(1)=12.7679) rather than the e(b) dummies (chi2(5)=24.3032); (3) the estimation weights are reused by the auxiliary regression (hettest.ado:103-105,138), so fweight/iweight use e(N)=sum(w)=235 and df_r=233; (4) mtest() is silently dropped for a single-regressor auxiliary regression (hettest.ado:126-128). The pre-fix suite compared against a second hand-transcription of the same ado and therefore agreed with the implementation's own misreading; see docs/TESTING_SOP.md."
+
+- command: estat imtest
+  level: E3
+  tolerance: 1.0e-9
+  sources:
+    - type: published_output
+      ref: "imtest.ado v2.1.5 (StataNow 19.5): 20 cases captured by scripts/capture_imtest_fixtures.py into tests/conformance/stata_fixtures/imtest_auto.json -- 5 models x {float default, double} x {,white, decomposition}, covering indicator, multi-continuous and multi-indicator designs"
+      dataset: auto.dta
+    - type: invariant
+      ref: "test_estat_imtest asserts df comes from the auxiliary regression's RANK, not its column count: White's df is 4 on mpg~weight+foreign (not 5), 9 on a three-continuous model, 14 on a two-indicator model. test_every_captured_value compares all ten r() scalars against the capture at rel<1e-9, in double precision."
+  verified_by: lead
+  date: 2026-11-04
+  notes: "E3 against `estat imtest, white double`. The df defect this round fixed was silent: the statistic was already correct, but chi2_h/chi2_t used the NOMINAL column count instead of the rank, so an indicator's squared column (x^2 == x for x in {0,1}) was counted as a degree of freedom Stata had dropped. On mpg~weight+foreign that is df 5 against Stata's 4, which inflates the p-value and can flip a rejection. One precision caveat is recorded rather than emulated: imtest.ado:35 computes in FLOAT unless `,double` is given, so Stata's own two captures differ around 1e-8 (default 9.794147910432786 vs double 9.794148277797737). This module computes in double, so it matches `,double` to 1e-12 and the float default only to 1e-8; reproducing float32 accumulation bit-for-bit would make the answer depend on rounding order, which is a property of Stata's storage type rather than of the statistic. Both columns are committed in the fixture so the gap stays documented. See docs/TESTING_SOP.md."

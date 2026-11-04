@@ -9,6 +9,55 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+### Fixed — `estat imtest, white` reported one degree of freedom too many
+
+`result.estat_imtest(white=True)` disagreed with Stata's `estat imtest, white`.
+The statistic was right; the **degrees of freedom** were not, and that changed
+the p-value and the verdict.
+
+`imtest.ado:101` regresses the squared residual on ``rhs rhs2``, where ``rhs2``
+holds ``x_i*x_j`` for every pair. The ``rhs2`` block therefore contains
+``x_i^2`` for every regressor — and an indicator satisfies ``x^2 == x``, so its
+square is **exactly collinear** with the regressor itself. Stata's ``_regress``
+drops it and reports the reduced ``e(df_m)``. The package counted nominal
+columns instead:
+
+| on `regress mpg weight foreign` | Stata | before | after |
+|---|---|---|---|
+| White `chi2` | 9.7941482778 | 9.7941482778 | 9.7941482778 |
+| White `df` | **4** | **5 (wrong)** | **4** |
+| p-value | 0.0440 | 0.0813 | 0.0440 |
+
+`chi2tail(d, x)` rises with `d`, so the extra degree of freedom **nearly doubled
+the p-value** and moved a 5%-level rejection to a non-rejection. Six nominal
+auxiliary columns do not imply six degrees of freedom.
+
+The same rule applies to all four decomposition components, which also route
+through ``e(df_m)``; ``df_t`` was 8 against Stata's 7 for the same reason. Both
+now use ``np.linalg.matrix_rank(design) - 1``.
+
+**A precision caveat, recorded rather than emulated.** ``imtest.ado:35`` sets
+``local type = cond("`double'" != "", "double", "float")``, so Stata's DEFAULT
+run is single precision and its own two captures differ around the 8th
+significant digit: ``9.794147910432786`` (default) against
+``9.794148277797737`` (``, double``). This module computes in double, so it
+agrees with ``estat imtest, white double`` to 1e-12 and with the default only to
+~1e-8. That is deliberate — reproducing float32 accumulation bit-for-bit would
+make the answer depend on summation order, which is a property of Stata's
+storage type rather than of the statistic. Both columns are committed so the
+difference stays documented instead of argued about.
+
+**Verification.** ``scripts/capture_imtest_fixtures.py`` runs a real StataNow
+19.5 and commits 20 cases to
+``tests/conformance/stata_fixtures/imtest_auto.json``: five models × {float
+default, double} × {``,white``, decomposition}, spanning a single continuous
+regressor, three continuous regressors (no column collapses), an indicator, a
+price equation, and a two-indicator model. All ten ``r()`` scalars match
+``, double`` at ``rel < 1e-9``. The df guard has two controls: a
+continuous-only model must keep its nominal df (9), and a two-indicator model
+must collapse more than one column (14, against 28 nominal). Mutation check: put
+``shape[1] - 1`` back and five tests go red.
+
 ### Fixed — `estat hettest` did not match Stata (`method="iid"` and the default)
 
 `result.estat_hettest()` and `result.estat_hettest(method="iid")` returned numbers

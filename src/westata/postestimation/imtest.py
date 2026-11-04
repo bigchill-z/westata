@@ -136,8 +136,16 @@ class ImTestResult:
         )
 
     def __str__(self) -> str:
+        # Layout measured from StataNow 19.5 (imtest.ado:157-184): a full 50-wide
+        # rule opens the table, the header rule spans 21 + "+" + 28, and the
+        # closing rule is the FULL width again -- not a second header rule.  The
+        # previous version omitted the opening and closing full rules.
+        rule = "-" * 50
         lines = []
         if self.white is not None:
+            # ``imtest.ado:152`` prints this block through ``_di_chi2test``,
+            # whose layout is the compact 4-space / single-space form below --
+            # NOT the wide ``label<pad>=value`` form used elsewhere.
             lines.extend(
                 [
                     "",
@@ -145,9 +153,8 @@ class ImTestResult:
                     "H0: Homoskedasticity",
                     "Ha: Unrestricted heteroskedasticity",
                     "",
-                    f"{'chi2(' + f'{self.white_df:g}' + ')':<20}"
-                    f" = {self.white:>8.2f}",
-                    f"{'Prob > chi2':<20} = {self.white_pvalue:>8.4f}",
+                    f"    chi2({self.white_df:g}) = {self.white:>6.2f}",
+                    f"Prob > chi2 = {self.white_pvalue:.4f}",
                 ]
             )
         lines.extend(
@@ -155,7 +162,11 @@ class ImTestResult:
                 "",
                 "Cameron & Trivedi's decomposition of IM-test",
                 "",
-                f"{'Source':>20} |{'chi2':>11}{'df':>7}{'p':>11}",
+                rule,
+                # Header column widths measured from the log: chi2 11 wide, df 7,
+                # p 10.  The p column had been printed wider, which shifted every
+                # p-value one space to the right of Stata's table.
+                f"{'Source':>20} |{'chi2':>11}{'df':>7}{'p':>10}",
                 "-" * 21 + "+" + "-" * 28,
             ]
         )
@@ -167,14 +178,14 @@ class ImTestResult:
         for label, statistic, df in rows:
             lines.append(
                 f"{label:>20} |{statistic:>11.2f}{df:>7.0f}"
-                f"{self._pvalue(statistic, df):>11.4f}"
+                f"{self._pvalue(statistic, df):>10.4f}"
             )
         lines.append("-" * 21 + "+" + "-" * 28)
         lines.append(
             f"{'Total':>20} |{self.total:>11.2f}{self.df_total:>7.0f}"
-            f"{self._pvalue(self.total, self.df_total):>11.4f}"
+            f"{self._pvalue(self.total, self.df_total):>10.4f}"
         )
-        lines.append("-" * 21 + "+" + "-" * 28)
+        lines.append(rule)
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, float]:
@@ -197,17 +208,30 @@ class ImTestResult:
 
 
 def _uncentred_chi2(y: np.ndarray, design: np.ndarray) -> tuple[float, float]:
-    """``N*(1 - rss/uss)`` and the design's slope count.
+    """``N*(1 - rss/uss)`` and the design's EFFECTIVE slope count.
 
     ``uss`` is the UNCENTRED sum of squares of ``y``, matching
     ``summarize y2; scalar uss = r(sum)`` in the ado.
+
+    The degrees of freedom are ``e(df_m)`` of the auxiliary regression, which is
+    the design's RANK minus one -- not the nominal column count.  The difference
+    is not academic: the ``rhs2`` block contains ``x_i^2`` for every regressor,
+    and an indicator variable satisfies ``x^2 == x``, so its square is exactly
+    collinear with the regressor itself.  Stata's ``_regress`` drops it and
+    reports the reduced ``e(df_m)``; a code path that counts columns instead
+    reports one degree of freedom too many and a too-large p-value.
+
+    Measured on ``regress mpg weight foreign``: Stata's White test reports
+    ``df = 4``, not the 5 that six nominal auxiliary columns would imply.
     """
 
     coefficients, *_ = np.linalg.lstsq(design, y, rcond=None)
     resid = y - design @ coefficients
     rss = float(resid @ resid)
     uss = float(y @ y)
-    df = float(design.shape[1] - 1)  # slopes only, as e(df_m)
+    # The rank decides the degrees of freedom, exactly as _regress does.
+    rank = int(np.linalg.matrix_rank(design))
+    df = float(rank - 1)
     if uss <= 0.0:
         return float("nan"), df
     return float(y.size * (1.0 - rss / uss)), df
@@ -241,15 +265,28 @@ def estat_imtest(
 
     Notes
     -----
-    Weights and ``cluster()`` are refused because ``imtest.ado:15-24`` refuses
+    Weights and ``cluster()`` are refused because ``imtest.ado:18-25`` refuses
     them; there the statistic would be computed from the unweighted residual
     geometry and mean something else.
+
+    **Precision.** ``imtest.ado:35`` computes in FLOAT unless ``, double`` is
+    given, so Stata's DEFAULT ``r(chi2)`` differs from an exact computation in
+    roughly the 8th significant digit -- measured on ``regress mpg weight
+    foreign``: default ``9.794147910432786`` against ``, double``
+    ``9.794148277797737``.  This module always computes in double precision,
+    which means it agrees with ``estat imtest, white double`` to machine
+    precision and with the default only to ~1e-8.  That is deliberate: float32
+    accumulation is a property of Stata's storage type, not of the statistic,
+    and emulating it bit-for-bit would make the answer depend on rounding order.
+    The committed fixture records BOTH columns
+    (``tests/conformance/stata_fixtures/imtest_auto.json``) so the difference is
+    documented rather than argued about.
     """
 
     model_name = str(getattr(result, "model_name", "") or "").strip().lower()
     if model_name != "regress":
         raise NotImplementedError(
-            "imtest is only possible after regress: imtest.ado:13-16 rejects "
+            "imtest is only possible after regress: imtest.ado:13-17 rejects "
             f"every other e(cmd); got {model_name or 'an unnamed model'!r}"
         )
 
@@ -257,7 +294,7 @@ def estat_imtest(
     if cov_type in ("hc0", "hc1", "hc2", "hc3", "robust") or "cluster" in cov_type:
         raise ValueError(
             "imtest does not support weighted or clustered estimation: "
-            f"imtest.ado:17-24 rejects e(wtype) and e(clustvar); got {cov_type}"
+            f"imtest.ado:18-25 rejects e(wtype) and e(clustvar); got {cov_type}"
         )
 
     if design is None:
@@ -301,6 +338,11 @@ def estat_imtest(
     s2 = float(resid @ resid) / n
 
     # --- White's original test -------------------------------------------
+    # ``imtest.ado:99-106``: regress the SQUARED residual on ``rhs rhs2`` and
+    # report ``e(N)*e(r2)`` with ``e(df_m)``.  ``e(r2)`` is the CENTRED R-squared
+    # of that regression, and ``e(df_m)`` is its rank minus one -- the same
+    # rank rule the decomposition uses, which is why an indicator's squared
+    # column being dropped moves the df.
     white_stat = None
     white_df = None
     if white:
@@ -312,7 +354,7 @@ def estat_imtest(
         centred_total = float((target - target.mean()) @ (target - target.mean()))
         r2 = 1.0 - rss / centred_total if centred_total > 0 else float("nan")
         white_stat = float(n * r2)
-        white_df = float(design_full.shape[1] - 1)
+        white_df = float(int(np.linalg.matrix_rank(design_full)) - 1)
 
     # --- decomposition ----------------------------------------------------
     # heteroskedasticity: regress on slopes AND their cross-products

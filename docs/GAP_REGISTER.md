@@ -100,7 +100,7 @@
 | `estat overid` | ✅ 已实现 | `result.estat_overid()`；Sargan + Basmann（2SLS/LIML）、Hansen J（GMM）、**Wooldridge score（稳健/HAC）**；辅助回归须用**全部工具**（含外生）。LIML 在稳健/HAC 下按 Stata 拒绝，见 §8.20.14、§8.20.30、§8.20.46 |
 | `estat endogenous` | ✅ 已实现（全内生变量） | `result.estat_endogenous()`；Durbin + Wu-Hausman、**robwool/acwool（稳健/HAC）**、**regF（增广回归，解锁 cluster）**。LIML 拒绝、GMM 的 C 统计量未实现（有阻塞证据），见 §8.20.15、§8.20.35、§8.20.36、§8.20.47 |
 | `estat classification` | ✅ 已实现（logit/probit） | `result.estat_classification()`；2×2 表 + 9 个百分比，抄自 `lstat.ado`；支持 `cutoff()`，见 §8.20.18 |
-| `estat imtest` | ✅ 已实现（线性模型） | `result.estat_imtest()`；Cameron-Trivedi 三项分解 + 可选 White 检验，抄自 `imtest.ado`；white 与 hetero 分量实测相等（7e-15），见 §8.20.19 |
+| `estat imtest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_imtest(white=...)`；Cameron-Trivedi 三项分解 + 可选 White 检验，抄自 `imtest.ado`。**自由度取自辅助回归的实际秩，而非列数**——指示变量的平方 `x²==x` 与自身完全共线，Stata 的 `_regress` 会丢弃它，`mpg~weight+foreign` 的 White 检验是 `df=4` 而不是按列数算出的 5（这是此前的缺陷：统计量对、df 与 p 值错）。Stata 默认用 **float** 精度（`imtest.ado:35`），本实现用 double，故与 `,double` 一致到 1e-12、与默认精度差约 1e-8（差异已记录在 fixture 中，不复刻 float32 累加）。20 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/imtest_auto.json`），见 §8.20.19 |
 | `estat summarize` | ✅ 已实现 | `result.estat_summarize()`；列定义照 `estat_summ.ado`；`fweight` 改变 Obs 且 sd 等于展开数据。**aweight/pweight/iweight 归一化到 `sum(w)=N`（尺度不变），估计权重自动沿用**，见 §8.20.20、§8.20.34、§8.20.49 |
 | `estat auc` | ✅ 已实现（logit/probit） | `result.estat_auc()`；AUC = Mann-Whitney U/(n₁n₀)，与 `lroc.ado:47-49` 的梯形法等价；`r(N)` 已补，见 §8.20.74 |
 | `estat weakrobust` | ⚠️ 部分实现 | `result.estat_weakrobust()`；**Anderson-Rubin 已实现**（受限 F，闭式可验；其分布不依赖工具强度）。**CLR 刻意拒绝**（需模拟条件分布，Stata 为无源码内置）。过度识别模型默认拒绝（Stata 默认报 CLR），须显式 `ar=True`。`betanull()` 支持按名/按位置，见 §8.20.83 |
@@ -1658,6 +1658,56 @@ total  = chi2_h + chi2_s + chi2_k
 这不是我抄对公式的证据，而是**两条独立构造路径互相印证**：若任一辅助回归的
 设计矩阵写错（漏掉交叉项、漏掉常数、多余项），两者会立刻分离。
 测试 `test_heteroskedasticity_equals_whites_statistic` 钉住这一点。
+
+#### 第 202 轮修复：自由度必须取实际秩，不是列数
+
+用户报告 `estat_imtest(white=True)` 与 `estat imtest, white` 不一致。实测后
+统计量本身已经对到 1e-8（那 1e-8 是 Stata 默认 float 精度造成的，见下），
+**真正的错误在自由度**：
+
+`mpg ~ weight + foreign` 名义上构造 1 + 2 + 3 = 6 个辅助列
+（`weight`、`foreign`、`weight²`、`weight·foreign`、`foreign²`，再加常数）。
+但 `foreign` 是 0/1，满足 `foreign² == foreign`，**完全共线**；Stata 的
+`_regress` 丢弃该列，`e(df_m)` 因此是 4。原实现按 `design.shape[1] - 1`
+算成 5。
+
+| | Stata | 修复前 | 修复后 |
+|---|---|---|---|
+| White `chi2` | 9.7941482778 | 9.7941482778 | 9.7941482778 |
+| White `df` | **4** | **5（错）** | **4** |
+| p 值 | 0.0440 | 0.0813（偏大） | 0.0440 |
+
+**这不是小数位问题**：`chi2tail(d, x)` 随 `d` 增大而增大，所以 df 多算一位会把
+p 值从 0.044 抬到 0.081——足以让结论从「5% 下拒绝异方差」翻成「不拒绝」，方向恰好
+是更保守、更容易漏掉真实的异方差。
+
+修法是 `np.linalg.matrix_rank(design) - 1`，与 `_regress` 的口径一致。三个模型
+的验证：单连续（`df=2`）、三连续（`df=9`，无列坍缩）、双指示变量（`df=14`，
+坍缩五列）。`test_continuous_only_model_keeps_the_nominal_dof` 是防止"永远减一"
+这个错误修法的对照组。
+
+#### 精度：Stata 默认是 float，本实现是 double
+
+`imtest.ado:35`：`local type = cond("`double'" != "", "double", "float")`。
+所以 Stata 自己的两次捕获就不同：
+
+| | `chi2` |
+|---|---|
+| `estat imtest, white`（默认 float） | 9.794147910432786 |
+| `estat imtest, white double` | 9.794148277797737 |
+
+本实现算 double，因此与 `, double` 一致到 **1e-12**、与默认值差 **3.8e-8**。
+**这是有意选择，不是缺陷**：float32 累加是 Stata 存储类型的行为，逐位复刻会让
+结果依赖求和顺序。fixture 两列都存，差异被记录而不是被争论。
+
+#### 验证方式
+
+`scripts/capture_imtest_fixtures.py` 跑真实 StataNow 19.5，捕获
+**20 个用例**（5 个模型 × {float, double} × {`,white`, 分解}）到
+`tests/conformance/stata_fixtures/imtest_auto.json`。全部 10 个 `r()` 标量
+对照 `, double` 在 **rel < 1e-9** 内吻合。
+
+变异检查：把 `matrix_rank` 改回 `shape[1] - 1`，5 条测试立刻变红。
 
 #### 已验证
 

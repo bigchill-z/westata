@@ -65,6 +65,11 @@ NO_TABLE = {
     # a TABLE-layout sweep. Its numbers were cross-checked anyway: westata returns
     # statistic 1.6 / p 0.2063 against Stata's "chi2(1) = 1.60" / "Prob > chi2 = 0.2063".
     "estat hettest": "prints result text, not a table; statistic and p verified equal",
+    # estat imtest prints White's test plus a FIXED-format decomposition table whose
+    # header is literal text, so a generic TABLE-layout sweep has nothing to compare
+    # against. Its numbers and its layout are both pinned instead, against a captured
+    # Stata log, in tests/test_estat_imtest.py (test_output_layout_matches_stata).
+    "estat imtest": "prints fixed-format result text, not an estimation table",
     # r-class tests: the package returns a statistic, not a table, by design.
     "xtunitroot ips": "r-class test: returns PanelUnitRootResult (no table); stats verified",
     "xtunitroot llc": "r-class test: returns PanelUnitRootResult (no table); stats verified",

@@ -213,25 +213,26 @@ def test_fixtures_record_the_stata_command():
 def test_fixture_files_are_valid_json():
     """Every fixture must be one of the two supported shapes.
 
-    The ``StataCapture`` files record full ``e(b)``/``e(V)``; the hettest fixture
-    is a *value* fixture (``cases``: one ``r()`` per Stata run) because
-    ``estat hettest`` reports scalars, not a coefficient vector -- a capture with
-    empty ``b``/``V`` would satisfy the old assertion while proving nothing.
-    Both shapes are validated here rather than letting the newer one slip by.
+    The ``StataCapture`` files record full ``e(b)``/``e(V)``.  The rest are
+    *value* fixtures -- ``cases`` mapping a case id to the ``r()`` values Stata
+    reported -- because ``estat hettest``/``estat imtest`` return scalars, not a
+    coefficient vector; a capture with empty ``b``/``V`` would satisfy the old
+    assertion while proving nothing.
+
+    The two value fixtures differ in their per-case layout (hettest stores a
+    4-element list keyed by ``model|weight|kind|method``; imtest stores a dict
+    of ten scalars keyed by ``model|precision|kind``), so the shared requirement
+    is only that provenance is recorded and the cases are non-empty.  Their own
+    modules check the contents in detail.
     """
 
     for path in FIXTURES.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         if "cases" in payload:
-            assert {
-                "cases",
-                "ado",
-                "stata_version",
-                "refusals",
-            }.issubset(payload), path.name
+            assert {"cases", "ado", "stata_version"}.issubset(payload), path.name
             assert payload["cases"], f"{path.name} has no cases"
             for key, value in payload["cases"].items():
-                assert len(key.split("|")) == 4, (path.name, key)
-                assert len(value) == 4, (path.name, key)
+                assert "|" in key, (path.name, key)
+                assert value, (path.name, key)
             continue
         assert {"b", "V", "scalars", "names"}.issubset(payload), path.name

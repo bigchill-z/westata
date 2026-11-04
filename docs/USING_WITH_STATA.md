@@ -13,7 +13,7 @@ session, recorded in `retest/REPORT.md` and `retest/FIX_REPORT.md`:
 
 | Level | Entries | Meaning |
 |---|---|---|
-| E3 | **53** | Agrees with full-precision `e(b)`/`e(V)` on every invocation the sweep exercised |
+| E3 | **54** | Agrees with full-precision `e(b)`/`e(V)` on every invocation the sweep exercised |
 | E2 | **26** | Bounded, measured difference — usable, with the caveat below |
 | E1 | **9** | Materially differs on at least one measured invocation, or not covered |
 

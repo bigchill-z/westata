@@ -50,19 +50,33 @@ def test_estat_ic_works(vecm_fit) -> None:
     assert str(rendered)
 
 
-def test_estat_ic_names_the_command(vecm_fit) -> None:
-    """The Model column must say ``vec``, not a dot."""
+def test_estat_ic_prints_a_dot_in_the_model_cell(vecm_fit) -> None:
+    """Measured: ``estat ic`` prints ``.`` there, for every estimation command."""
 
     rendered = str(vecm_fit.estat_ic())
-
-    assert "vec" in rendered
+    rows = [
+        line
+        for line in rendered.splitlines()
+        if "|" in line and "Model" not in line and set(line) != {"-", "+"}
+    ]
+    assert rows, rendered
+    for row in rows:
+        assert row.split("|", 1)[0].strip() == ".", row
 
 
 def test_estat_ic_reports_the_criteria(vecm_fit) -> None:
+    """Stata prints AIC and BIC only -- no AICc, no CAIC.
+
+    Those two numbers are still computed and reachable as attributes, but a live ``estat ic``
+    shows a seven-column table, so printing them made the layout differ from Stata's.
+    """
+
     text = str(vecm_fit.estat_ic())
 
-    for column in ("AIC", "BIC", "AICc", "CAIC"):
+    for column in ("AIC", "BIC"):
         assert column in text, column
+    for absent in ("AICc", "CAIC"):
+        assert absent not in text, absent
 
 
 def test_the_parameter_count_is_e_k(vecm_fit) -> None:

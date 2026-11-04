@@ -166,11 +166,20 @@ def test_there_is_no_aic_after_a_non_likelihood_result() -> None:
         estat_ic(unit_root)
 
 
-def test_output_has_the_four_criteria_columns(linear_fit) -> None:
+def test_output_has_the_two_criteria_columns_stata_prints(linear_fit) -> None:
+    """``estat ic`` prints AIC and BIC; AICc and CAIC are not in the table.
+
+    Measured against a live run: the table has seven columns (Model, N, ll(null), ll(model),
+    df, AIC, BIC). Printing the other two made the layout differ from Stata's even though both
+    numbers are correct -- they remain available as attributes.
+    """
+
     text = str(linear_fit.estat_ic())
 
-    for label in ("AIC", "BIC", "AICc", "CAIC"):
+    for label in ("AIC", "BIC"):
         assert label in text
+    for absent in ("AICc", "CAIC"):
+        assert absent not in text
     assert "ll(null)" in text
     assert "ll(model)" in text
 

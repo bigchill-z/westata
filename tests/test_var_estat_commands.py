@@ -49,11 +49,18 @@ def test_cmd_is_stored(var_fit) -> None:
     assert var_fit.e["cmd"] == "var"
 
 
-def test_the_model_column_names_the_command(var_fit) -> None:
-    rendered = str(var_fit.estat_ic())
+def test_the_model_column_is_a_dot(var_fit) -> None:
+    """A live ``estat ic`` after ``var`` prints ``.`` in the Model cell, not ``var``."""
 
-    assert "var" in rendered
-    assert rendered.count("|") >= 2
+    rendered = str(var_fit.estat_ic())
+    rows = [
+        line
+        for line in rendered.splitlines()
+        if "|" in line and "Model" not in line and set(line) != {"-", "+"}
+    ]
+    assert rows, rendered
+    for row in rows:
+        assert row.split("|", 1)[0].strip() == ".", row
 
 
 # ------------------------------------------------------------- estat ic
@@ -65,10 +72,19 @@ def test_estat_ic_works(var_fit) -> None:
 
 
 def test_estat_ic_reports_the_information_criteria(var_fit) -> None:
+    """Stata's ``estat ic`` prints AIC and BIC only.
+
+    It does NOT print AICc or CAIC -- a live run after ``var dinf unem, lags(1/2)`` shows the
+    seven-column table. Both numbers remain available as attributes; they are simply not part
+    of this table, and printing them made the layout differ from Stata's.
+    """
+
     text = str(var_fit.estat_ic())
 
-    for column in ("AIC", "BIC", "AICc", "CAIC"):
+    for column in ("AIC", "BIC"):
         assert column in text, column
+    for absent in ("AICc", "CAIC"):
+        assert absent not in text, absent
 
 
 def test_the_table_reports_TOTALS_not_the_per_observation_macros(var_fit) -> None:
@@ -87,11 +103,12 @@ def test_the_table_reports_TOTALS_not_the_per_observation_macros(var_fit) -> Non
     rendered = str(var_fit.estat_ic())
     reported = var_fit.estat_ic()
 
-    # The table holds the total, which is N times the per-observation macro.
+    # The table holds the total, which is N times the per-observation macro. The AIC/BIC
+    # columns print FOUR decimals (Stata shows -109.2389), so compare on that scale.
     total = float(var_fit.e["aic"]) * reported.n
-    assert f"{total:.5f}" in rendered
+    assert f"{total:.4f}" in rendered
     # And the macro on its own is NOT what is printed.
-    assert f"{float(var_fit.e['aic']):.5f}" not in rendered
+    assert f"{float(var_fit.e['aic']):.4f}" not in rendered
 
 
 def test_the_bic_total_follows_the_same_scaling(var_fit) -> None:
@@ -101,7 +118,7 @@ def test_the_bic_total_follows_the_same_scaling(var_fit) -> None:
     reported = var_fit.estat_ic()
 
     total = float(var_fit.e["sbic"]) * reported.n
-    assert f"{total:.5f}" in rendered
+    assert f"{total:.4f}" in rendered
 
 
 def test_the_parameter_count_is_e_k(var_fit) -> None:

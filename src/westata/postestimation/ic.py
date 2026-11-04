@@ -104,37 +104,56 @@ class IcResult:
         return self.render()
 
     def render(self) -> str:
-        header = (
-            f"       Model |{'N':>11}{'ll(null)':>13}{'ll(model)':>13}"
-            f"{'df':>8}{'AIC':>13}{'BIC':>13}{'AICc':>13}{'CAIC':>13}"
-        )
-        rule = "-" * 13 + "+" + "-" * 77
-        # Stata labels the row with the COMMAND that produced the estimates
-        # (``regress``, ``logit``, ...), not a literal dot.  A dot is printed only
-        # when the caller built the result without a model name.
-        label = self.model if self.model else "."
+        """Reproduce ``estat ic`` exactly.
 
-        def _cell(value: float) -> str:
+        Measured against a live ``estat ic`` after ``reg consumption temp price income``::
+
+            Akaike's information criterion and Bayesian information criterion
+
+            -----------------------------------------------------------------------------
+                   Model |          N   ll(null)  ll(model)      df        AIC        BIC
+            -------------+---------------------------------------------------------------
+                       . |         30   39.57876   58.61944       4  -109.2389  -103.6341
+            -----------------------------------------------------------------------------
+            Note: BIC uses N = number of observations. See [R] IC note.
+
+        Three things were wrong before:
+
+        * the table carried AICc and CAIC columns that ``estat ic`` does not print;
+        * the row was labelled with the command (``regress``) where Stata prints a dot;
+        * the title line and the note wording differed.
+
+        ``aicc``/``caic`` remain available as attributes -- they are useful numbers, they
+        are simply not part of this table.
+        """
+
+        title = "Akaike's information criterion and Bayesian information criterion"
+        header = (
+            f"{'Model':>12} |{'N':>11}{'ll(null)':>11}{'ll(model)':>11}"
+            f"{'df':>8}{'AIC':>11}{'BIC':>11}"
+        )
+        rule = "-" * 13 + "+" + "-" * 63
+
+        def _cell(value: float, width: int, decimals: int) -> str:
             """``.`` for a missing statistic, never ``nan``.
 
-            ``var`` does not store ``e(ll_0)`` (``var.sthlp`` lists no such scalar), so
-            ``ll(null)`` is genuinely absent -- and Stata prints ``.`` there.  Formatting
-            the NaN directly printed the literal text ``nan``, which reads as a number.
+            ``var`` does not store ``e(ll_0)``, so ``ll(null)`` is genuinely absent and
+            Stata prints ``.`` there.
             """
 
-            return "." if not np.isfinite(value) else f"{value:.4f}"
+            if not np.isfinite(value):
+                return ".".rjust(width)
+            return f"{value:.{decimals}f}".rjust(width)
 
         row = (
-            f"{label:>12} |{self.n:>11.0f}{_cell(self.ll_null):>13}"
-            f"{_cell(self.ll_model):>13}{self.df:>8.0f}"
-            f"{self.aic:>13.5f}{self.bic:>13.5f}"
-            f"{self.aicc:>13.5f}{self.caic:>13.5f}"
+            f"{'.':>12} |{self.n:>11.0f}"
+            f"{_cell(self.ll_null, 11, 5)}{_cell(self.ll_model, 11, 5)}"
+            f"{self.df:>8.0f}"
+            f"{_cell(self.aic, 11, 4)}{_cell(self.bic, 11, 4)}"
         )
-        note = (
-            "Note: BIC, AICc, and CAIC use N = e(N). "
-            "See [R] IC note."
-        )
-        return "\n".join(["", header, rule, row, rule, "", note])
+        note = "Note: BIC uses N = number of observations. See [R] IC note."
+        full_rule = "-" * 13 + "+" + "-" * 63
+        return chr(10).join(["", title, "", full_rule, header, full_rule, row, full_rule, note])
 
     def to_frame(self) -> pd.DataFrame:
         """The single row as a DataFrame with Stata's column names."""

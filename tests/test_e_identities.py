@@ -531,17 +531,19 @@ def test_the_N_cds_block_counts_every_singleton_pattern() -> None:
 
 
 def test_r2_and_ll_are_internally_consistent_for_panel_fits(frame) -> None:
-    """The decomposition holds for a panel fit, but against ``r2_o``, not ``r2``.
+    """``xtreg, fe`` mixes two scales, and the identities follow from that.
 
-    ``xtreg, fe`` stores SEVERAL R-squared values and they answer different
-    questions:
+    ``e(r2)`` = ``e(r2_w)`` is the WITHIN R-squared while ``e(r2_o)`` is the OVERALL one.
+    The sums of squares follow suit -- checked against a live ``xtreg y x1, fe`` on a
+    60 x 5 frame:
 
-    * ``e(r2)`` = ``e(r2_w)`` -- the WITHIN R-squared;
-    * ``e(r2_o)`` -- the OVERALL R-squared.
+        e(tss) = 604.64155                     <- RAW total
+        e(rss) = 216.16809, e(mss) = 78.087606 <- WITHIN scale
+        mss + rss = 294.2557                   <- equals the WITHIN tss, not e(tss)
 
-    ``e(mss)``/``e(rss)``/``e(tss)`` describe the pooled regression, so they
-    decompose ``r2_o``.  Asserting the identity against ``r2`` failed with 0.0088
-    against 0.2244 -- both correct numbers for different questions.
+    This test previously asserted ``mss + rss == tss`` and ``r2_o == mss/tss``. Neither
+    holds in Stata, and both held in westata only because ``mss`` was being computed as
+    ``tss - rss`` -- a number no Stata run produces. Pinning the real relations instead:
     """
 
     panel = frame.assign(
@@ -552,10 +554,12 @@ def test_r2_and_ll_are_internally_consistent_for_panel_fits(frame) -> None:
     ).fit()
     e = result.e
 
-    # The sums of squares are mutually consistent ...
-    assert e["mss"] + e["rss"] == pytest.approx(e["tss"], rel=1e-10)
-    # ... and they decompose the OVERALL R-squared.
-    assert e["r2_o"] == pytest.approx(e["mss"] / e["tss"], rel=1e-10)
-    # The within R-squared is a different quantity.
+    # The within-scaled sums decompose the WITHIN total, which is a separate key.
+    assert e["mss"] + e["rss"] == pytest.approx(e["tss_within"], rel=1e-10)
+    # The raw total is larger than that, and is NOT the base of the decomposition.
+    assert e["tss"] > e["tss_within"]
+    assert e["mss"] > 0.0 and e["rss"] > 0.0
+    # The within R-squared is a different quantity from the overall one.
     assert e["r2"] == pytest.approx(e["r2_w"], rel=1e-12)
     assert not np.isclose(e["r2"], e["r2_o"], rtol=1e-3)
+    assert 0.0 <= e["r2_o"] <= 1.0

@@ -119,19 +119,28 @@ def test_r2_o_is_the_overall_r2_and_differs(fe_result) -> None:
     assert 0.0 <= e["r2_o"] <= 1.0
 
 
-def test_the_between_r2_of_a_single_regressor_is_one(panel_frame) -> None:
-    """With ONE regressor the between regression fits the group means exactly.
+def test_the_between_r2_of_a_single_regressor_matches_stata(panel_frame) -> None:
+    """``r2_b`` is the squared correlation of the ENTITY MEANS, not a saturated fit.
 
-    Any number of groups and one slope plus an intercept is a saturated fit on the
-    entity means, so ``r2_b == 1``.  It looks suspicious but is a consequence of
-    the design, not a bug -- recording it keeps it from being "fixed".
+    This test used to assert ``r2_b == 1.0``, reasoning that one slope plus an intercept
+    fits the entity means exactly. That reasoning is wrong: the "fit" it described included
+    the absorbed group effects, which is what the old ``response - resid`` reconstruction of
+    ``fitted`` mixed in. Stata reports the correlation between ȳᵢ and x̄ᵢb WITHOUT those
+    effects, and on this exact frame a live ``xtreg y x1, fe`` gives
+
+        r2_w .31233018   r2_b .00137234   r2_o .15142355
+
+    So the assertion is pinned to Stata's value rather than to a claimed identity, and the
+    comment that used to say "keeps it from being fixed" is gone -- it was protecting a bug.
     """
 
     result = ws.PanelOLS.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 
-    assert result.e["r2_b"] == pytest.approx(1.0, rel=1e-10)
+    assert result.e["r2_b"] == pytest.approx(0.00137234, rel=1e-4)
+    assert result.e["r2_w"] == pytest.approx(0.31233018, rel=1e-6)
+    assert result.e["r2_o"] == pytest.approx(0.15142355, rel=1e-6)
 
 
 def test_the_between_r2_is_below_one_with_two_regressors(fe_result) -> None:

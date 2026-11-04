@@ -1284,9 +1284,18 @@ class PanelOLS:
         rss = float(resid @ resid)
         if self._stores_totals or self._stores_mss:
             tss = float(np.sum((y - y.mean()) ** 2))
-            out["mss"] = tss - rss
+            tss_within = float(np.sum((y - y_bar[codes]) ** 2))
+            # Stata's panel fits mix TWO scales, and it is not an accident:
+            #   e(tss) is the raw total sum of squares,
+            #   e(rss) and e(mss) are on the WITHIN scale.
+            # Measured on a 60x5 frame: tss 604.64155, rss 216.16809, mss 78.087606 -- and
+            # mss + rss = 294.2557 = the within tss, NOT e(tss). Computing mss as
+            # tss - rss instead gave 388.47345, which no Stata run produces.
+            if tss_within > 0 and abs(1.0 - rss / tss_within) < 1.0:
+                out["mss"] = tss_within - rss
+            else:
+                out["mss"] = tss - rss
             if self._stores_totals:
-                tss_within = float(np.sum((y - y_bar[codes]) ** 2))
                 tss_between = float(np.sum((y_bar - y.mean()) ** 2))
                 out["tss"] = tss
                 out["tss_within"] = tss_within
@@ -1295,8 +1304,32 @@ class PanelOLS:
                     out["r2_within"] = 1.0 - rss / tss_within
 
         r2_w = _squared_correlation(fitted - f_bar[codes], y - y_bar[codes])
-        r2_b = _squared_correlation(f_bar, y_bar)
-        r2_o = _squared_correlation(fitted, y)
+        # Stata's r2_b and r2_o are squared correlations involving the linear predictor on
+        # the ORIGINAL scale (its entity means, and y itself). ``fitted`` reaches here as
+        # ``response - resid``, which is NOT that predictor for the WITHIN estimator: its
+        # backend residuals are already group-demeaned, so the subtraction mixes scales and
+        # reports r2_b = 1.0000 / r2_o = .9638 where Stata reports .6650 / .7135 (measured
+        # on lin_1992.dta; C12-01 of the 0.0.6 gap report).
+        #
+        # Recomputing the level predictor from the design leaves r2_w untouched -- it is
+        # defined on deviations and is correct either way -- and leaves other estimators
+        # alone, because there ``X @ params`` equals ``fitted``.
+        _level_fitted = fitted
+        if design is not None and params is not None:
+            _matrix = np.asarray(design[0], dtype=float)
+            _params = np.asarray(params, dtype=float).reshape(-1)
+            if _matrix.ndim == 2 and _matrix.shape[0] == fitted.size:
+                if _matrix.shape[1] == _params.size:
+                    _level_fitted = _matrix @ _params
+                elif _matrix.shape[1] - 1 == _params.size:
+                    # The design carries an intercept column the estimator absorbed; the
+                    # constant does not shift a correlation, so dropping it is harmless.
+                    _level_fitted = _matrix[:, 1:] @ _params
+        if _level_fitted.size != fitted.size or not np.all(np.isfinite(_level_fitted)):
+            _level_fitted = fitted
+
+        r2_b = _squared_correlation(_entity_means(_level_fitted), y_bar)
+        r2_o = _squared_correlation(_level_fitted, y)
         for key, value in (("r2_w", r2_w), ("r2_b", r2_b), ("r2_o", r2_o)):
             if np.isfinite(value):
                 out[key] = float(value)

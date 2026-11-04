@@ -920,9 +920,51 @@ class StataResults:
 
     @property
     def aic(self) -> float:
-        """AIC from ``e(aic)``; NaN when not recorded."""
+        """AIC on the statsmodels scale: ``-2*llf + 2*k``.
 
-        return self._e_scalar("aic")
+        ``e(aic)`` stores the Gaussian-deviance form ``N log(rss/N) + 2k``, which omits the
+        ``N(1 + log 2pi)`` constant that ``e(llf)`` carries. The two differ by exactly that
+        constant, and the gap grows with N -- on icecream.dta it is 85.1 (-194.37519 stored
+        against -109.23887 from both ``sm.OLS(...).fit().aic`` and ``estat ic``).
+
+        ``result.aic`` was returning the stored number, so a caller consuming it with
+        statsmodels semantics got a value 85 too small while ``e["aic"]`` and ``estat_ic``
+        stayed self-consistent. The property now follows statsmodels (and Stata's
+        ``estat ic``, which agree), and ``e["aic"]`` keeps the package's own convention for
+        anyone who reads the raw macro.
+        """
+
+        stored = self._e_scalar("aic")
+        # Only recompute when the stored number is the package's OWN Gaussian-deviance
+        # value. An estimator that stores a genuine ``e(aic)`` (``_aic_is_stata``) -- or a
+        # hand-built ``StataResults`` whose caller set it explicitly -- must keep it, since
+        # a stored macro always wins over a derived default.
+        if getattr(self, "e", {}).get("_aic_is_stata", None) is not False:
+            return stored
+        llf = self._e_scalar("ll")
+        if np.isfinite(llf):
+            parameters = float(self._e_scalar("df_m")) + 1.0
+            if np.isfinite(parameters):
+                return float(-2.0 * llf + 2.0 * parameters)
+        return stored
+
+    @property
+    def bic(self) -> float:
+        """BIC on the statsmodels scale: ``-2*llf + k*log(nobs)``.
+
+        Same reasoning as :attr:`aic`: ``e(bic)`` uses the Gaussian-deviance form.
+        """
+
+        stored = self._e_scalar("bic")
+        if getattr(self, "e", {}).get("_aic_is_stata", None) is not False:
+            return stored
+        llf = self._e_scalar("ll")
+        nobs = float(self.nobs) if np.isfinite(float(self.nobs)) else float("nan")
+        if np.isfinite(llf) and np.isfinite(nobs):
+            parameters = float(self._e_scalar("df_m")) + 1.0
+            if np.isfinite(parameters):
+                return float(-2.0 * llf + parameters * np.log(nobs))
+        return stored
 
     @property
     def converged(self) -> bool:
@@ -963,12 +1005,6 @@ class StataResults:
         """
 
         return self._e_scalar("gradient_norm")
-
-    @property
-    def bic(self) -> float:
-        """BIC from ``e(bic)``; NaN when not recorded."""
-
-        return self._e_scalar("bic")
 
     # ------------------------------------------------------------------
     # Postestimation

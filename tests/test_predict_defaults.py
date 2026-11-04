@@ -89,6 +89,23 @@ def test_every_table_entry_names_a_supported_type(model_name: str) -> None:
     assert default_predict_kind(model_name) in supported_types(model_name)
 
 
+def test_reghdfe_is_absent_from_the_default_table() -> None:
+    """``reghdfe`` cannot predict, so listing a default for it would be a lie.
+
+    With absorbed fixed effects the stored design matrix keeps an ``Intercept`` column while
+    the parameter vector does not (the FE absorb it): on ``y ~ x | g`` the design has 2
+    columns and ``params`` has 1, so ``X @ params`` does not dimension-check. An earlier
+    revision of this change added a ``reghdfe`` registration and a matching table entry; the
+    suite's own "no predict types" contract caught it, and the entries were removed.
+    """
+
+    from westata.postestimation.predict import supported_types
+
+    assert "reghdfe" not in DEFAULT_PREDICT
+    with pytest.raises(Exception):
+        supported_types("reghdfe")
+
+
 def test_the_two_entry_points_agree() -> None:
     """``StataResults.predict`` and the free function must resolve the same default.
 

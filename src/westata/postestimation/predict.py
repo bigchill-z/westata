@@ -110,15 +110,6 @@ SUPPORTED_TYPES: dict[str, tuple[str, ...]] = {
     "xtreg, re": ("xb", "stdp", "stdf", "residuals", "fitted"),
     "xtreg, be": ("xb", "stdp", "stdf", "residuals", "fitted"),
     "xtreg, fd": ("xb", "stdp", "stdf", "residuals", "fitted"),
-    # ``reghdfe`` had an entry in the DEFAULT_PREDICT table while being absent here, so
-    # ``res.predict()`` on a FEOLS fit raised "no prediction types registered". The
-    # mismatch only surfaced when a test asserted that every default names a supported
-    # type -- which is exactly what such an assertion is for.
-    #
-    # ``reghdfe``'s postestimation is ``reghdfe_p.ado``; it offers xb, residuals, and the
-    # fitted value. ``d`` (the absorbed-variable effect) is deliberately NOT listed: it is
-    # not computed here, and advertising a type that raises is worse than leaving it out.
-    "reghdfe": ("xb", "stdp", "stdf", "residuals", "fitted"),
     # ``logit_postestimation.sthlp:209`` / ``probit_postestimation.sthlp:149``:
     # "``score`` calculates the equation-level score, the first derivative of the log
     # likelihood ..." -- SINGULAR, one variable per observation.
@@ -235,7 +226,11 @@ DEFAULT_PREDICT: dict[str, str] = {
     "ivregress 2sls": "xb",
     "ivregress liml": "xb",
     "ivregress gmm": "xb",
-    "reghdfe": "xb",
+    # NOTE: no "reghdfe" entry. It cannot support predict at all: with absorbed fixed
+    # effects the stored design matrix still carries an ``Intercept`` column while the
+    # parameter vector does not (the FE absorb it), so ``X @ params`` does not even
+    # dimension-check -- measured on ``y ~ x | g``, where the design has 2 columns and
+    # ``params`` has 1. Listing it here would advertise a default that cannot run.
     "xtreg, fe": "xb",
     "xtreg, re": "xb",
     "xtreg, be": "xb",

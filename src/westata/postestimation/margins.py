@@ -474,6 +474,7 @@ def margins(
     dyex: Sequence[str] | str | None = None,
     eydx: Sequence[str] | str | None = None,
     at: Mapping[str, Any] | None = None,
+    atmeans: bool = False,
     over: str | None = None,
     exog: np.ndarray | None = None,
     param_names: Sequence[str] | None = None,
@@ -520,6 +521,27 @@ def margins(
     exog = np.asarray(exog, dtype=float)
     names = list(param_names)
     factor_set = set(factor_vars or ())
+
+    # ``atmeans`` fixes every covariate at its SAMPLE MEAN and reports a CONDITIONAL marginal
+    # effect there, which is a different number from the average marginal effect -- measured
+    # on grilic's logit: s is -.0135868 at the means against -.0135532 averaged. Stata prints
+    # the means it used under "At:", so the values are not a hidden detail.
+    if atmeans:
+        if at:
+            raise ValueError(
+                "margins accepts at= or atmeans=True, not both: atmeans fixes EVERY covariate "
+                "at its mean, so an explicit at= would contradict it"
+            )
+        means: dict[str, float] = {}
+        position_by_name = {str(name): index for index, name in enumerate(names)}
+        for name, position in position_by_name.items():
+            if str(name) == "Intercept":
+                continue
+            base = str(name).split("[")[0]
+            if base in means:
+                continue
+            means[base] = float(np.mean(exog[:, position]))
+        at = means
 
     # ``margins`` averages over the ESTIMATION SAMPLE, and under ``fweight`` Stata's sample
     # is the EXPANDED one. The design matrix holds the collapsed rows (24 for the titanic

@@ -1253,6 +1253,28 @@ class StataResults:
     # ------------------------------------------------------------------
     # Presentation
     # ------------------------------------------------------------------
+    @property
+    def odds_ratios(self) -> pd.Series:
+        """``exp(params)`` -- the odds ratios ``logit, or`` prints.
+
+        Only meaningful for a model whose link is log-odds; other families raise rather than
+        returning a number that has no interpretation. ``conf_int()`` can be exponentiated
+        alongside it to get Stata's odds-ratio interval.
+        """
+
+        from westata.errors import UnsupportedError
+
+        name = str(getattr(self, "model_name", "") or "").lower()
+        if name not in {"logit", "ologit", "mlogit", "clogit", "xtlogit", "exlogistic"}:
+            raise UnsupportedError(
+                f"odds_ratios exists only for log-odds models; {name!r} is not one"
+            )
+        return pd.Series(
+            np.exp(np.asarray(self.params, dtype=float)),
+            index=self.params.index,
+            name="odds_ratio",
+        )
+
     def summary(self, style: str = "statsmodels") -> str:
         """Render a text summary.
 

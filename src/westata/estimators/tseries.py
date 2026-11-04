@@ -985,9 +985,63 @@ class VARResults:
         return analysis
 
     def fevd(self, periods: int = 10) -> Any:
-        """Forecast-error variance decomposition (Stata ``fevd``)."""
+        """Forecast-error variance decomposition (Stata ``irf table fevd``).
 
-        return self._result.fevd(periods)
+        The numbers already matched Stata; what was missing was any way to read them. The raw
+        statsmodels object carries ``decomp`` shaped ``(shock, period, response)``, which is
+        NOT the intuitive ``(period, response, shock)`` -- indexing it the intuitive way
+        silently reads the wrong cell, as happened while pinning this. ``fevd_table`` below
+        returns the same numbers in Stata's layout.
+        """
+
+        analysis = self._result.fevd(periods)
+        decomposition = np.asarray(analysis.decomp, dtype=float)
+        if decomposition.ndim == 3:
+            # Move the shock axis last so [period, response, shock] reads as expected.
+            analysis.westata_decomp = np.transpose(decomposition, (1, 2, 0))
+        return analysis
+
+    def fevd_table(self, periods: int = 10) -> Any:
+        """Stata's ``irf table fevd``: one row per step, one column per (shock, response).
+
+        Columns are ordered and labelled the way ``irf table fevd`` prints them: every
+        (impulse, response) pair in turn, with the impulse varying fastest.
+        """
+
+        import pandas as _pd
+
+        analysis = self._result.fevd(periods)
+        decomposition = np.asarray(analysis.decomp, dtype=float)
+        if decomposition.ndim != 3:
+            raise ConsistencyError(
+                f"fevd: expected a 3-D decomposition; got shape {decomposition.shape}"
+            )
+        # ``decomp`` is laid out (RESPONSE, period, IMPULSE). Verified by reading a cell and
+        # matching it to Stata: decomp[0, 1, :] = [.878729, .121271], where .878729 is
+        # dinf<-dinf and .121271 is dinf<-unem -- so axis 0 is the response and axis 2 the
+        # impulse. Assuming the reverse put every number in the wrong column while leaving the
+        # table looking like a plausible decomposition.
+        responses, steps, shocks = decomposition.shape
+        names = list(self.names)
+        columns: dict[tuple[str, str], np.ndarray] = {}
+        for impulse in range(shocks):
+            for response in range(responses):
+                columns[(names[impulse], names[response])] = decomposition[
+                    response, :, impulse
+                ]
+        frame = _pd.DataFrame(columns)
+        # pandas keeps a MultiIndex's own ordering; sort explicitly so the columns read
+        # (dinf->dinf), (dinf->unem), (unem->dinf), (unem->unem) as Stata prints them.
+        # Labels are (IMPULSE, RESPONSE) and the response varies fastest, so the pairs read
+        # (dinf->dinf), (dinf->unem), (unem->dinf), (unem->unem) -- the order Stata prints.
+        ordered = [
+            (names[impulse], names[response])
+            for impulse in range(shocks)
+            for response in range(responses)
+        ]
+        frame = frame.loc[:, ordered]
+        frame.index.name = "step"
+        return frame
 
     def forecast(self, steps: int = 1) -> np.ndarray:
         """Out-of-sample forecast (Stata ``fcast``).

@@ -85,12 +85,13 @@ def test_corrgram_q_matches_wntestq_at_the_same_order(fitted) -> None:
     assert grid.rows[-1].q == pytest.approx(portmanteau.q, rel=1e-12)
 
 
-def test_bgodfrey_is_not_exposed() -> None:
-    """It is deliberately absent: no formula reproduced Stata's numbers.
+def test_bgodfrey_now_lives_in_its_own_module() -> None:
+    """It used to be absent; it is implemented in postestimation/bgodfrey.py.
 
-    Measured multipliers needed to hit Stata's 4.237/4.487/4.775/5.099 at lags 1-4 were
-    26.12/24.58/25.52/23.35 -- inconsistent, so the auxiliary regression differs rather
-    than the scaling. Shipping a 1%-off statistic would be worse than not shipping it.
+    Earlier revisions of this file recorded that no formula reproduced Stata's numbers. That
+    was true of the six variants tried, and false as a conclusion: the definition is written
+    out in ``bgodfrey.ado:163-196`` and reproducing it needed one detail -- lagged residuals
+    are ZERO-filled rather than dropped. See tests/test_bgodfrey.py.
     """
 
-    assert not hasattr(ws, "estat_bgodfrey")
+    assert hasattr(ws, "estat_bgodfrey")

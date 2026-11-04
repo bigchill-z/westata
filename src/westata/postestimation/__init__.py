@@ -42,6 +42,7 @@ from westata.postestimation.xttest0 import XtTest0Result, xttest0
 from westata.postestimation.varsoc import VarSocResult, varsoc
 from westata.postestimation.varstable import VarStableResult, varstable
 from westata.postestimation.varwle import VarWleResult, varwle
+from westata.postestimation.bgodfrey import BgTestResult, estat_bgodfrey
 from westata.postestimation.serial import (
     Correlogram,
     DurbinWatsonResult,
@@ -96,6 +97,8 @@ __all__ = [
     "estat_corrgram",
     "estat_dwatson",
     "wntestq",
+    "BgTestResult",
+    "estat_bgodfrey",
     "SummarizeResult",
     "estat_summarize",
     "MTEST_METHODS",

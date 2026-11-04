@@ -23,11 +23,33 @@ regression per treatment arm and averages the predicted counterfactuals:
 which gives 1.592426 / 44.257040 / 45.849466 / 1.635659 against Stata's 1.592426 / 44.25704 /
 45.84947 / 1.635659.
 
-**What is NOT reproduced**: the robust standard errors. Three influence-function forms were
-tried -- the basic one (0.1839496), one adding the coefficient-uncertainty term (0.1839496,
-unchanged, because the term as written was dimensionally wrong), and a corrected version
-(0.1827790) -- all against Stata's 0.2430606. The estimator's exact M-estimation form was not
-recovered, so ``se``/``z``/``p``/the interval are NaN and a test pins them that way, the same
+**What is NOT reproduced**: the robust standard errors.
+
+Six influence-function forms were tried against three different samples, with Stata's value as
+the target each time:
+
+===========================================  =========================  ==========
+form                                          result on seed 20261105   ratio
+===========================================  =========================  ==========
+fitted counterfactuals treated as data        0.0146934                  0.060
+outcome scores + coefficient terms            0.1827790                  0.752
+  same, on seeds 11 and 22                                              0.814 / 0.761
+the above plus a heuristic p-hat term         0.2436296                  1.002
+full GMM with the treatment-proportion moment 0.6288181                  2.587
+  same, on seeds 11 and 22                                              3.005 / 2.860
+===========================================  =========================  ==========
+
+The third row is the interesting one: adding ``-(t/p - (1-t)/(1-p)) * ATE`` to the influence
+function lands within 0.2% on the first seed, but 2% high on seed 11 and 2.5% low on seed 22.
+A term that is right on one sample and wrong in both directions on others is a coincidence, not
+a derivation -- so it is not shipped.
+
+The right place to look is ``_teffects_ra_gmm.ado``, which is readable and shows the estimator
+is a GMM over BOTH the outcome equations and a treatment equation. A GMM form was built (last
+row) but its Jacobian normalisation is wrong by roughly a factor of 2.6, so it is further off
+than the simpler approximation.
+
+``se``/``z``/``p``/the interval therefore stay NaN, and a test pins them that way -- the same
 call made for ``rdrobust``.
 """
 

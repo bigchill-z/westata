@@ -10,6 +10,8 @@ from westata.expressions.explist import (
     parse_exp_list,
 )
 from westata.estimators import (
+    PraisResult,
+    prais,
     LlcResult,
     levin_lin_chu,
     IpsResult,
@@ -218,6 +220,8 @@ __all__ = [
     "Intreg",
     "Truncreg",
     "HausmanResult",
+    "PraisResult",
+    "prais",
     "LRTestResult",
     "pwcompare",
     "contrast",

@@ -19,6 +19,19 @@ from scipy import stats
 __all__ = ["LincomResult", "run_lincom"]
 
 
+
+def _lincom_g(value: float) -> str:
+    """Stata's ``%9.0g``: seven significant figures, leading zero dropped."""
+
+    number = float(value)
+    text = f"{number:.7g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
 @dataclass(frozen=True)
 class LincomResult:
     """One linear combination, shaped like Stata's ``lincom`` output."""
@@ -34,20 +47,82 @@ class LincomResult:
     expression: str
     eform: bool = False
     label: str = ""
+    #: Dependent-variable name for the leftmost column of Stata's table
+    #: ("consumption | Coefficient ..."). Empty when the caller did not supply one.
+    response_name: str = ""
 
     def __str__(self) -> str:
-        stat_label = "z" if self.distribution == "z" else "t"
-        lines = [self.expression]
-        lines.append(
-            f"{'':>12}{'Coef.':>12}{'Std. err.':>12}{stat_label:>8}"
-            f"{'P>|' + stat_label + '|':>8}{'[95% conf. interval]':>28}"
+        """Reproduce ``lincom`` exactly::
+
+            ( 1)  temp + price = 0
+            ------------------------------------------------------------------------------
+            consumption | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+            -------------+----------------------------------------------------------------
+                    (1) |  -1.040955   .8344249    -1.25   0.223     -2.75614    .6742303
+            ------------------------------------------------------------------------------
+
+        The old rendering dropped the ``( 1)`` marker and the three rules, and labelled the
+        estimate column ``Coef.`` where Stata writes ``Coefficient`` -- the same numbers in
+        a table that is visibly not Stata's.
+        """
+
+        statistic_label = "z" if self.distribution == "z" else "t"
+        response = str(getattr(self, "response_name", "") or "")
+        marker = f"( 1)  {self.expression}"
+        full_rule = "-" * 78
+
+        # Measured off a live ``lincom temp + price``: the header is 77 characters with
+        # "Coefficient" at column 14, "Std. err." at 27, the t statistic at 42 and the
+        # interval label at 57; the estimate row starts its value at column 15. The rule
+        # lines are 78.
+        # Both lines are 77 characters. Rather than derive a width per column (which kept
+        # matching one field and shifting the next), each value is placed at the column
+        # Stata prints it in, measured from a live ``lincom temp + price``:
+        #
+        #   header: Coefficient@14 Std. err.@27 t@42 P>|t|@47 [95% conf. interval]@57
+        #   row:    estimate ends@26, se ends@38, t ends@45, p ends@52,
+        #           lower ends@68, upper ends@77
+        def _place(pieces: list[str], text: str, end_column: int) -> None:
+            """Append ``text`` so that it ENDS at ``end_column``."""
+
+            used = sum(len(piece) for piece in pieces)
+            gap = end_column - used - len(text)
+            pieces.append(" " * max(gap, 0) + text)
+
+        # Stata's name column is 11 characters plus a space before the pipe:
+        # "consumption | Coefficient ..." -- the pipe sits at index 12, so the field is 11.
+        # ``_place`` treats its argument as the index ONE PAST the last character, matching
+        # Python slice notation, so the columns below are Stata's positions plus one.
+        # Target columns are Stata's own, verified field by field:
+        #   header  Coefficient 14-24, Std. err. 27-35, t 42, P>|t| 47-51, CI 57-76
+        #   row     estimate 15-23, se 27-35, t 39-43, p 47-51, lo 57-64, hi 69-76
+        header_pieces = [f"{response:<11} |"]
+        _place(header_pieces, "Coefficient", 25)
+        _place(header_pieces, "Std. err.", 36)
+        _place(header_pieces, statistic_label, 43)
+        _place(header_pieces, "P>|" + statistic_label + "|", 52)
+        _place(header_pieces, "[95% conf. interval]", 77)
+        header = "".join(header_pieces)
+
+        row_pieces = [f"{'(1)':>11} |"]
+        _place(row_pieces, _lincom_g(self.estimate), 24)
+        _place(row_pieces, _lincom_g(self.std_err), 35)
+        _place(row_pieces, f"{self.statistic:.2f}", 44)
+        _place(row_pieces, f"{self.pvalue:.3f}", 52)
+        _place(row_pieces, _lincom_g(self.ci_lower), 65)
+        _place(row_pieces, _lincom_g(self.ci_upper), 77)
+        row = "".join(row_pieces)
+
+        return chr(10).join(
+            [
+                marker,
+                full_rule,
+                header,
+                "-" * 13 + "+" + "-" * 64,
+                row,
+                full_rule,
+            ]
         )
-        lines.append(
-            f"{self.label or '':<12}{self.estimate:>12.7g}{self.std_err:>12.7g}"
-            f"{self.statistic:>8.2f}{self.pvalue:>8.3f}"
-            f"{self.ci_lower:>14.7g}{self.ci_upper:>14.7g}"
-        )
-        return "\n".join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """Flatten to the ``r()`` names ``lincom.sthlp:182-189`` returns.
@@ -86,6 +161,7 @@ def run_lincom(
     level: float = 0.95,
     eform: bool = False,
     label: str = "",
+    response_name: str = "",
 ) -> LincomResult:
     """Evaluate ``weights @ b`` with its standard error and interval.
 
@@ -155,4 +231,5 @@ def run_lincom(
         expression=expression,
         eform=eform,
         label=label,
+        response_name=str(response_name or ""),
     )

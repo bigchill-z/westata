@@ -28,6 +28,16 @@ from scipy import stats
 __all__ = ["WaldTest", "build_contrast", "run_wald_test"]
 
 
+def _space_after_marker(line: str) -> str:
+    """Stata writes ``( 1)  temp = 0`` -- two spaces after the closing parenthesis."""
+
+    close = line.find(")")
+    if close < 0:
+        return line
+    head, tail = line[: close + 1], line[close + 1 :].lstrip()
+    return f"{head}  {tail}"
+
+
 @dataclass(frozen=True)
 class WaldTest:
     """One Wald test, rendered the way Stata prints it.
@@ -71,17 +81,38 @@ class WaldTest:
         lines: list[str] = []
         text = str(self.constraint or "").strip()
         if text:
-            lines.extend(f"  {line.strip()}" for line in text.splitlines() if line.strip())
+            # Stata indents the restriction by two spaces and leaves TWO spaces after the
+            # ``( 1)`` marker: "  ( 1)  temp = 0". One space made the line a character short.
+            lines.extend(
+                "  " + _space_after_marker(line.strip())
+                for line in text.splitlines()
+                if line.strip()
+            )
             lines.append("")
+        # Measured from a live ``test temp=0``::
+        #
+        #           ( 1)  temp = 0
+        #                 F(  1,    26) =   60.25
+        #                      Prob > F =    0.0000
+        #
+        # The F label starts at column 6 and pads BOTH bracketed fields ("  1", "    26"),
+        # the value is right-aligned in 8 after " = ", and the probability line starts at
+        # column 11 with the value right-aligned in 10. The old code printed no indentation,
+        # no padding, and aligned Prob with a hard-coded run of spaces inside the label.
         if self.distribution == "F":
-            head = f"F({self.df:g}, {self.df_denom:g}) = {self.statistic:10.2f}"
-            tail = f"Prob > F        = {self.pvalue:10.4f}"
+            head = (
+                f"      F({self.df:>3.0f},{self.df_denom:>6.0f}) = "
+                f"{self.statistic:>7.2f}"
+            )
+            tail = f"           Prob > F = {self.pvalue:>9.4f}"
         else:
-            head = f"chi2({self.df:g}) = {self.statistic:10.2f}"
-            tail = f"Prob > chi2     = {self.pvalue:10.4f}"
+            head = (
+                f"      chi2({self.df:>3.0f}) = {self.statistic:>7.2f}"
+            )
+            tail = f"           Prob > chi2 = {self.pvalue:>9.4f}"
         lines.append(head)
         lines.append(tail)
-        return "\n".join(lines)
+        return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """Flatten to the ``r()`` names Stata returns for a Wald test.

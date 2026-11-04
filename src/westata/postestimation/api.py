@@ -378,6 +378,13 @@ def lincom_as_stata(
         expression=f"{expression} = 0",
         level=level,
         eform=False,
+        # Stata heads the table with the DEPENDENT VARIABLE ("consumption | Coefficient
+        # ..."), not a blank cell. Without this the header's left column stayed empty.
+        response_name=str(
+            getattr(result, "response_name", None)
+            or (getattr(result, "e", None) or {}).get("depvar")
+            or ""
+        ),
     )
     if constant == 0.0 and not eform:
         return unshifted

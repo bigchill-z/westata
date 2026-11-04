@@ -1072,6 +1072,22 @@ class StataResults:
                     self._predict_unavailable_message()
                 )
             exog = stored[0]
+            # Under ``fweight`` the design matrix holds the COLLAPSED rows while ``resid``
+            # and ``fittedvalues`` hold the EXPANDED sample -- 24 against 2201 on the
+            # titanic logit. That mismatch made ``estat classification`` refuse with
+            # "the residual and prediction vectors do not align", and it would silently
+            # mis-align any caller that pairs ``predict()`` with the residuals (C11-07).
+            #
+            # Expanding here restores the invariant that every per-observation vector on
+            # the result has the same length.
+            _freq = getattr(self, "freq_weights", None)
+            if _freq is not None:
+                _freq = np.asarray(_freq, dtype=float).reshape(-1)
+                _matrix = np.asarray(exog)
+                if _freq.size == _matrix.shape[0] and np.all(np.isfinite(_freq)):
+                    _repeats = np.rint(_freq).astype(int)
+                    if np.all(_repeats >= 0) and int(_repeats.sum()) > 0:
+                        exog = np.repeat(_matrix, _repeats, axis=0)
         else:
             exog = self._as_design_for_predict(exog)
         return predict(self, exog, kind, **kwargs)

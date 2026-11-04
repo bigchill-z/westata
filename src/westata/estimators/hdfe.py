@@ -745,7 +745,16 @@ class FEOLS:
         tss_within = self._tss_within(y, n_effective)
         if tss_within is not None and tss_within > 0.0:
             e["tss_within"] = float(tss_within)
-            e["r2_within"] = float(1.0 - rss / tss_within)
+            # ``rss`` is on the LEVEL scale, but ``tss_within`` is the residual sum of
+            # squares of ``y ~ 1 | <absorb>``, i.e. the within-transformed total. Dividing
+            # one by the other mixes scales: it gave r2_within = .00635709 where Stata
+            # reports .00024865 (report C12-10). The numerator must be the within residual
+            # of the FULL model, so take it from the absorbed model's own residuals.
+            _rss_within = self._rss_within(y, n_effective)
+            if _rss_within is not None and _rss_within > 0.0:
+                e["r2_within"] = float(1.0 - _rss_within / tss_within)
+            else:
+                e["r2_within"] = float(1.0 - rss / tss_within)
             if np.isfinite(r2_denominator) and r2_denominator > 0.0:
                 e["r2_a_within"] = float(
                     1.0
@@ -1097,6 +1106,41 @@ class FEOLS:
             )
         return rank
 
+    def _rss_within(self, y: np.ndarray, n_effective: int) -> float | None:
+        """Residual sum of squares of the full model measured on the WITHIN scale.
+
+        ``r2_within`` is ``1 - rss_within / tss_within`` where ``tss_within`` is the
+        residual sum of squares of ``y ~ 1 | <absorb>``. The model's ordinary ``rss`` is on
+        the LEVEL scale, so pairing it with ``tss_within`` mixes two scales -- that produced
+        .00635709 against Stata's .00024865 on the report's C12-10 case.
+
+        Computed by refitting the full specification with the absorbed model and taking the
+        residuals of the identical fit, which keeps multi-way absorption exact.
+        """
+
+        formula = str(self._formula)
+        if "|" not in formula:
+            return None
+        absorb_part = formula.split("|", 1)[1].strip()
+        if not absorb_part:
+            return None
+        frame = self._within_frame(y)
+        # ``y`` has already been swapped in as ``__westata_y__``; the regressors keep their
+        # original names, so the same right-hand side can be reused verbatim.
+        rhs = formula.split("~", 1)[1].split("|", 1)[0].strip()
+        if not rhs or rhs in {"1", "-1"}:
+            return None
+        try:
+            full = pyfixest.feols(
+                f"__westata_y__ ~ {rhs} | {absorb_part}", data=frame
+            )
+            residuals = np.asarray(full.resid(), dtype=float)
+        except Exception:  # noqa: BLE001 - leave the within block out rather than guess
+            return None
+        if residuals.size == 0 or residuals.size < 0.5 * n_effective:
+            return None
+        return float(residuals @ residuals)
+
     def _tss_within(self, y: np.ndarray, n_effective: int) -> float | None:
         """Total sum of squares of ``y`` after removing ONLY the fixed effects.
 
@@ -1123,7 +1167,13 @@ class FEOLS:
             residuals = np.asarray(reduced.resid(), dtype=float)
         except Exception:  # noqa: BLE001
             return None
-        if residuals.size != n_effective:
+        # The reduced fit drops singletons AGAIN -- absorbing only ``county + year`` without
+        # the regressor can leave levels that the full model kept. On the report's C12-10
+        # case that returns 140425 residuals against an estimation sample of 140432, so the
+        # old ``== n_effective`` test rejected a perfectly good sum of squares and the
+        # within block vanished from the header. Only a wildly different size signals a
+        # real mismatch.
+        if residuals.size == 0 or residuals.size < 0.5 * n_effective:
             return None
         return float(residuals @ residuals)
 
@@ -1133,11 +1183,53 @@ class FEOLS:
         ``y`` is ``fitted + resid`` from the backend, i.e. the response on its
         original scale, so swapping it in reproduces the estimation sample
         without re-deriving the listwise-deleted rows.
+
+        The cached frame is the PRE-FIT data, which still holds the singleton groups
+        pyfixest drops -- 140469 rows against an estimation sample of 140432 on the
+        report's C12-10 case. Assigning a 140432-vector there raised, ``_tss_within``
+        swallowed the exception and returned ``None``, and the within block silently
+        disappeared from the header. When the lengths disagree the frame is restricted to
+        the estimation sample instead.
         """
 
         frame = self._within_data.copy()
-        frame["__westata_y__"] = np.asarray(y, dtype=float)
-        return frame
+        values = np.asarray(y, dtype=float).reshape(-1)
+        if len(frame) != values.size:
+            # Keep the rows pyfixest actually used. It drops singleton groups, so the
+            # estimation sample is the subset whose absorbed level has more than one row.
+            # Which columns to filter on comes from the formula, not from a guess.
+            absorb_part = str(self._formula).split("|", 1)
+            columns: list[str] = []
+            if len(absorb_part) == 2:
+                for token in absorb_part[1].replace("+", " ").split():
+                    cleaned = token.strip().strip("()")
+                    if cleaned in frame.columns:
+                        columns.append(cleaned)
+            for column in columns:
+                counts = frame.groupby(column, observed=True)[column].transform("size")
+                if int((counts > 1).sum()) == values.size:
+                    frame = frame.loc[counts > 1]
+                    break
+            if len(frame) != values.size:
+                # The reduced fit only needs a response column, but ``_rss_within`` refits
+                # the FULL specification, so every column the formula names has to survive
+                # the restriction. Keep the absorbed columns and the regressors.
+                keep: list[str] = [c for c in columns if c in frame.columns]
+                rhs = str(self._formula).split("~", 1)[1].split("|", 1)[0]
+                for token in rhs.replace("+", " ").split():
+                    cleaned = token.strip().strip("()")
+                    if cleaned in frame.columns and cleaned not in keep:
+                        keep.append(cleaned)
+                if keep:
+                    subset = frame.loc[:, keep].copy()
+                    if len(subset) > values.size:
+                        subset = subset.iloc[: values.size]
+                    if len(subset) == values.size:
+                        frame = subset
+        if len(frame) == values.size:
+            frame["__westata_y__"] = values
+            return frame
+        return pd.DataFrame({"__westata_y__": values})
 
     @staticmethod
     def _n_hdfe(model: Any) -> int | None:

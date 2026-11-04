@@ -721,6 +721,15 @@ class _DiscreteBase:
         )
         if response:
             results.response_name = str(response)
+        # Post-estimation commands that average over the SAMPLE must expand frequency
+        # weights: Stata's ``margins``/``estat clas`` work on the fweight-expanded
+        # observation set, not the collapsed rows. Without this the titanic logit was
+        # averaged over 24 rows while Stata averaged over 2201, putting every marginal
+        # effect 4-5% off (C11-03 in the 0.0.6 gap report).
+        if getattr(self, "_freq_weights", None) is not None:
+            results.freq_weights = np.asarray(
+                self._freq_weights, dtype=float
+            ).reshape(-1)
         return results
 
     # ------------------------------------------------------------ housekeeping

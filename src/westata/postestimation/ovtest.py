@@ -86,7 +86,22 @@ class OvTestResult:
         )
 
     def __str__(self) -> str:
-        return "\n".join(
+        """Reproduce ``estat ovtest`` exactly::
+
+            Ramsey RESET test for omitted variables
+            Omitted: Powers of fitted values of consumption
+            H0: Model has no omitted variables
+            F(3, 23) =   3.08
+            Prob > F = 0.0474
+
+        The label column is NOT padded to a fixed width -- ``F(3, 23)`` is followed straight
+        away by `` = `` and the value right-aligned in eight. Left-aligning the label in a
+        20-character field produced ``F(3, 23)             =     3.08``, which is the same
+        numbers in a visibly different table.
+        """
+
+        label = f"F({self.df:g}, {self.df_denom:g})"
+        return chr(10).join(
             [
                 "",
                 "Ramsey RESET test for omitted variables",
@@ -94,9 +109,11 @@ class OvTestResult:
                 "",
                 "H0: Model has no omitted variables",
                 "",
-                f"{'F(' + f'{self.df:g}' + ', ' + f'{self.df_denom:g}' + ')':<20}"
-                f" = {self.statistic:>8.2f}",
-                f"{'Prob > F':<20} = {self.pvalue:>8.4f}",
+                # Both lines are 17 characters: the value is right-aligned in SIX after
+                # "X = ". Seven characters made "F(3, 23) =    3.08" one column wider than
+                # Stata's "F(3, 23) =   3.08".
+                f"{label} = {self.statistic:>6.2f}",
+                f"Prob > F = {self.pvalue:>6.4f}",
             ]
         )
 
@@ -151,6 +168,18 @@ def _fit_and_test(
     v = cov[np.ix_(sub, sub)]
     wald = float(b @ np.linalg.solve(v, b))
     return wald / df_num, df_num, df_denom
+
+
+
+def _fitted_label(result: Any) -> str:
+    """``fitted values of <depvar>``, as ``estat ovtest`` prints it."""
+
+    response = str(
+        getattr(result, "response_name", None)
+        or (getattr(result, "e", None) or {}).get("depvar")
+        or ""
+    ).strip()
+    return f"fitted values of {response}" if response else "fitted values"
 
 
 def estat_ovtest(
@@ -250,7 +279,10 @@ def estat_ovtest(
             df=df_num,
             df_denom=df_denom,
             pvalue=float(stats.f.sf(statistic, df_num, df_denom)),
-            omitted="fitted values",
+            # Stata names the dependent variable at the end: "Powers of fitted values of
+            # consumption". Without it the line reads "Powers of fitted values", which is a
+            # different sentence rather than a shortened one.
+            omitted=_fitted_label(result),
         )
 
     # ``, rhs``: powers of each continuous regressor.

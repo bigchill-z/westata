@@ -79,7 +79,9 @@ def test_an_unlabelled_variable_gets_an_empty_cell(fitted) -> None:
     _, result = fitted
 
     rendered = str(result.estat_summarize(labels={"y": "Outcome variable"}))
-    x1_line = next(line for line in rendered.splitlines() if line.startswith("x1"))
+    # The name column is RIGHT-aligned (Stata pads it to 14), so the row begins with spaces
+    # rather than with the variable name.
+    x1_line = next(line for line in rendered.splitlines() if line.strip().startswith("x1"))
 
     # The x1 row must not repeat its own name in the label position.
     assert x1_line.count("x1") == 1, x1_line

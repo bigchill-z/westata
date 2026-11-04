@@ -141,18 +141,27 @@ class HetTestResult:
             # -- Stata prints "Variable: Fitted values of mpg", not "Variables:".
             lines.append(f"{'Variables' if self.plural else 'Variable'}: {self.label}")
         lines.extend(["", "H0: Constant variance", ""])
+        # Stata prints these two lines INDENTED by four spaces with no padded label column::
+        #
+        #         chi2(1) =   3.64
+        #     Prob > chi2 = 0.0563
+        #
+        # so the statistic lines up under "H0:" rather than starting at column 1. Padding the
+        # label to 20 characters produced "chi2(1)              =     3.64" -- same numbers,
+        # visibly different table, which is exactly the kind of difference this round exists
+        # to remove.
         if self.method == "fstat" and self.df_denom is not None:
-            lines.append(
-                f"{'F(' + f'{self.df:g}' + ', ' + f'{self.df_denom:g}' + ')':<20}"
-                f" = {self.statistic:>8.2f}"
-            )
-            lines.append(f"{'Prob > F':<20} = {self.pvalue:>8.4f}")
+            statistic_label = f"F({self.df:g}, {self.df_denom:g})"
+            probability_label = "Prob > F"
         else:
-            lines.append(
-                f"{label + '(' + f'{self.df:g}' + ')':<20} = {self.statistic:>8.2f}"
-            )
-            lines.append(f"{'Prob > ' + label:<20} = {self.pvalue:>8.4f}")
-        return "\n".join(lines)
+            statistic_label = f"{label}({self.df:g})"
+            probability_label = f"Prob > {label}"
+        # The statistic is indented four spaces; the probability line is NOT. Measured:
+        # "    chi2(1) =   3.64" and "Prob > chi2 = 0.0563", both 20 characters. Indenting
+        # the second made it 24.
+        lines.append(f"    {statistic_label} = {self.statistic:>6.2f}")
+        lines.append(f"{probability_label} = {self.pvalue:>6.4f}")
+        return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """The ``r()`` scalars Stata returns for this variant."""

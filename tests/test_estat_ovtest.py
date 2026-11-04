@@ -107,9 +107,19 @@ def test_rhs_option_uses_powers_of_the_regressors(fit) -> None:
     assert rendered.omitted == "independent variables"
 
 
-def test_default_omitted_label_says_fitted_values(fit) -> None:
+def test_default_omitted_label_names_the_dependent_variable(fit) -> None:
+    """Stata prints "Powers of fitted values OF <depvar>", not "Powers of fitted values".
+
+    Measured on icecream.dta: ``Omitted: Powers of fitted values of consumption``. The old
+    assertion pinned the shorter phrase, which is a different sentence rather than a
+    truncation of the same one.
+    """
+
     _, result = fit
-    assert result.estat_ovtest().omitted == "fitted values"
+    label = result.estat_ovtest().omitted
+
+    assert label.startswith("fitted values")
+    assert " of " in label, label
 
 
 def test_pvalue_is_upper_tail_f(fit) -> None:

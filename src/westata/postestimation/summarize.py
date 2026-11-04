@@ -175,6 +175,33 @@ def _weighted_summary(
     }
 
 
+
+def _stata_g(value: float, width: int = 8) -> str:
+    """Stata's column format for these statistics: leading zero dropped, at most 8 characters.
+
+    The WIDTH decides the precision, not a fixed significant-digit count -- which is why a
+    single rule kept matching one column and missing the next:
+
+        .3594333   8 chars at 7 significant figures
+        .0657905   9 chars at 7, so Stata falls back to 6
+        .0083425   10 at 7 and 9 at 6, so it prints 5
+        16.42192   8 chars at 7
+
+    Fitting them all to 8 characters reproduces every cell of the reference table.
+    """
+
+    number = float(value)
+    for digits in range(7, 0, -1):
+        text = f"{number:.{digits}g}"
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        if len(text) <= width:
+            return text
+    return f"{number:.1g}"
+
+
 class SummarizeResult:
     """The ``estat summarize`` table.
 
@@ -190,7 +217,10 @@ class SummarizeResult:
         "min", "avg", "max"}``.
     """
 
-    __slots__ = ("table", "n_obs", "clusters", "noheader", "labels")
+    #: ``command`` is the estimator name for the header line ("Estimation sample regress").
+    #: It cannot sit beside ``__slots__`` as a class-level default -- Python rejects that --
+    #: so it is initialised in ``__init__``.
+    __slots__ = ("table", "n_obs", "clusters", "noheader", "labels", "command")
 
     def __init__(
         self,
@@ -223,6 +253,7 @@ class SummarizeResult:
                 "estat summarize: labels must be a mapping of variable name to label; "
                 f"got {type(labels).__name__}"
             )
+        self.command = ""
 
     def __repr__(self) -> str:
         return (
@@ -230,13 +261,43 @@ class SummarizeResult:
         )
 
     def __str__(self) -> str:
+        """Reproduce ``estat summarize`` exactly::
+
+              Estimation sample regress                Number of obs =         30
+              -------------------------------------------------------------------
+                  Variable |         Mean      Std. dev.         Min          Max
+              -------------+-----------------------------------------------------
+               consumption |     .3594333      .0657905         .256         .548
+
+        Differences from what westata printed before:
+
+        * no header line naming the estimation command, so the Number of obs floated alone;
+        * an ``Obs`` column Stata does not show (every row is the same count);
+        * four-decimal formatting (``0.3594``) where Stata uses ``%9.0g`` (``.3594333``);
+        * a 16-character name column where Stata uses 13.
+        """
+
         if self.noheader:
             lines = [""]
         else:
-            lines = ["", f"{'':<4}Number of obs = {self.n_obs:>10,.0f}", ""]
+            command = str(getattr(self, "command", "") or "").strip()
+            title = f"  Estimation sample {command}".rstrip()
+            lines = [
+                "",
+                # Stata places "Number of obs" at column 43 and right-aligns the value in
+                # 11, giving a 69-character line. A 23-wide field pushed the label eight
+                # columns right of where Stata prints it.
+                f"{title:<43}{'Number of obs =':>15}{self.n_obs:>11,.0f}",
+                "  " + "-" * 67,
+            ]
+        # Column widths measured from Stata's log: the name right-aligned in 14 (pipe
+        # immediately after), then Mean 13, Std. dev. 15, Min 12, Max 13 -- 69 columns in
+        # all. One column short moved "Std" off Stata's position 35 and shortened the rule.
+        # Every column position measured from Stata's header: Mean at 25, Std. dev. at 35,
+        # Min at 53, Max at 66, total width 69.
         header = (
-            f"{'Variable':<16}|{'Obs':>9}{'Mean':>12}{'Std. dev.':>12}"
-            f"{'Min':>12}{'Max':>12}"
+            f"{'Variable':>14} |{'Mean':>13}{'Std. dev.':>15}"
+            f"{'Min':>12}{'Max':>13}"
         )
         # ``estat_summarize.sthlp:90``: "labels displays variable labels".  The column is
         # appended AFTER the statistics so the numeric columns keep their positions --
@@ -244,17 +305,27 @@ class SummarizeResult:
         if self.labels:
             header += f"  {'Label'}"
         lines.append(header)
-        lines.append("-" * len(header))
+        # Measured from Stata's log: 2 spaces + 13 dashes + "+" + 53 dashes = 69
+        # characters, the same width as the header and the data rows.
+        lines.append("  " + "-" * 13 + "+" + "-" * 53)
         for name, row in self.table.iterrows():
             # Stata prints ``.`` for a missing statistic, never ``nan``.  A
             # non-numeric variable has only ``Obs``; its numeric cells are missing.
-            def _cell(value: float) -> str:
-                return "." if value is None or not np.isfinite(value) else f"{value:.4f}"
+            def _cell(value: float, width: int) -> str:
+                """``%9.0g`` formatting: seven significant digits, leading zero dropped."""
+
+                if value is None or not np.isfinite(value):
+                    return ".".rjust(width)
+                return _stata_g(value).rjust(width)
 
             rendered = (
-                f"{str(name):<16}|{row['Obs']:>9.0f}{_cell(row['Mean']):>12}"
-                f"{_cell(row['Std. Dev.']):>12}{_cell(row['Min']):>12}"
-                f"{_cell(row['Max']):>12}"
+                f"{str(name):>14} |{_cell(row['Mean'], 13)}"
+                # Widths are measured from Stata's own rows. Std. Dev. needs 14 (the
+                # header's extra column is absorbed by the label) and Min needs 13, not 12;
+                # at 12 the row came out 68 characters instead of 69 and Min sat one column
+                # left of Stata's position 52.
+                f"{_cell(row['Std. Dev.'], 14)}{_cell(row['Min'], 13)}"
+                f"{_cell(row['Max'], 13)}"
             )
             if self.labels:
                 # An unlabelled variable gets an EMPTY cell.  Falling back to the name
@@ -558,6 +629,10 @@ def estat_summarize(
         }
 
     n_obs = float(result.nobs) if hasattr(result, "nobs") else float(len(frame))
-    return SummarizeResult(
+    built = SummarizeResult(
         table, n_obs, clusters, noheader=noheader, labels=labels
     )
+    # Stata heads the table with "Estimation sample <command>"; the name comes from the fit
+    # the summary was taken over, which the constructor does not otherwise receive.
+    built.command = str(getattr(result, "model_name", "") or "") if result is not None else ""
+    return built

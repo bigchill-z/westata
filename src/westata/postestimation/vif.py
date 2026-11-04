@@ -130,14 +130,30 @@ class VifResult:
         return self.render()
 
     def render(self) -> str:
-        header = f"    {'Variable':<12}|       VIF       1/VIF"
+        """Reproduce ``estat vif`` exactly::
+
+                Variable |       VIF       1/VIF
+            -------------+----------------------
+                    temp |      1.14    0.873845
+                  income |      1.14    0.873984
+                   price |      1.04    0.965555
+            -------------+----------------------
+                Mean VIF |      1.11
+
+        The name column is right-aligned in a 12-character field and the header is spelled
+        ``    Variable |``, one space before the pipe. Left-aligning the header produced
+        ``    Variable    |``, which pushed the pipe one column right and misaligned the whole
+        table against Stata's.
+        """
+
+        header = f"{'Variable':>12} |       VIF       1/VIF"
         rule = "-" * 13 + "+" + "-" * 22
         lines = ["", header, rule]
         for name, value, tol in zip(self.names, self.vif, self.tolerance):
-            lines.append(f"    {name:<12}|{value:>10.2f}    {tol:>8.6f}")
+            lines.append(f"{name:>12} |{value:>10.2f}    {tol:>8.6f}")
         lines.append(rule)
-        lines.append(f"    {'Mean VIF':<12}|{self.mean_vif:>10.2f}")
-        return "\n".join(lines)
+        lines.append(f"{'Mean VIF':>12} |{self.mean_vif:>10.2f}")
+        return chr(10).join(lines)
 
     def to_frame(self) -> pd.DataFrame:
         """The table as a DataFrame indexed by regressor name."""

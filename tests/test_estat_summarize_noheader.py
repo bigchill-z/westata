@@ -51,7 +51,9 @@ def test_the_column_headings_survive(result) -> None:
 
     rendered = str(fitted.estat_summarize(noheader=True))
 
-    for heading in ("Variable", "Obs", "Mean", "Std. dev.", "Min", "Max"):
+    # Stata's estat summarize has no "Obs" column -- every row shares the estimation-sample
+    # size, which the header line already reports.
+    for heading in ("Variable", "Mean", "Std. dev.", "Min", "Max"):
         assert heading in rendered, heading
 
 

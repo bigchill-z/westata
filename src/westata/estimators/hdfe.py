@@ -578,6 +578,13 @@ class FEOLS:
         # Retained so ``_tss_within`` can refit the intercept-only absorbed model
         # on the same estimation sample.
         self._within_data = data.reset_index(drop=True)
+        # PyFixest records the rows it dropped as a frozenset of positions in the input
+        # frame (missing values AND singleton groups). That is the ONLY authoritative
+        # description of the estimation sample: re-deriving it by filtering on "level has
+        # more than one row" reproduced 140432 of 140469 on the report's C12-10 case but
+        # lost a further 7 rows when refitted, because singleton removal interacts across
+        # the two absorbed dimensions and is applied iteratively.
+        self._dropped_rows = getattr(model, "_na_index", None)
         names = [str(name) for name in model.coef().index]
         params = np.asarray(model.coef().to_numpy(), dtype=float)
         cov = np.asarray(model._vcov, dtype=float)
@@ -1180,53 +1187,37 @@ class FEOLS:
     def _within_frame(self, y: np.ndarray) -> pd.DataFrame:
         """The estimation frame with the response replaced by ``y``.
 
-        ``y`` is ``fitted + resid`` from the backend, i.e. the response on its
-        original scale, so swapping it in reproduces the estimation sample
-        without re-deriving the listwise-deleted rows.
+        ``y`` is ``fitted + resid`` from the backend, i.e. the response on its original
+        scale, so it has one entry per OBSERVATION IN THE ESTIMATION SAMPLE -- 140432 on the
+        report's C12-10 case, against 140469 rows in the pre-fit frame. PyFixest drops 37
+        of those 37 as missing values or singleton groups, and it drops them ITERATIVELY
+        across the absorbed dimensions, so reproducing the subset by filtering
+        "level appears more than once" keeps 140432 rows whose subsequent refit silently
+        loses a further 7.
 
-        The cached frame is the PRE-FIT data, which still holds the singleton groups
-        pyfixest drops -- 140469 rows against an estimation sample of 140432 on the
-        report's C12-10 case. Assigning a 140432-vector there raised, ``_tss_within``
-        swallowed the exception and returned ``None``, and the within block silently
-        disappeared from the header. When the lengths disagree the frame is restricted to
-        the estimation sample instead.
+        ``_dropped_rows`` (PyFixest's own ``_na_index``) is the authoritative list, so the
+        frame is rebuilt from it and the response lands on exactly the rows the model used.
         """
 
         frame = self._within_data.copy()
         values = np.asarray(y, dtype=float).reshape(-1)
         if len(frame) != values.size:
-            # Keep the rows pyfixest actually used. It drops singleton groups, so the
-            # estimation sample is the subset whose absorbed level has more than one row.
-            # Which columns to filter on comes from the formula, not from a guess.
-            absorb_part = str(self._formula).split("|", 1)
-            columns: list[str] = []
-            if len(absorb_part) == 2:
-                for token in absorb_part[1].replace("+", " ").split():
-                    cleaned = token.strip().strip("()")
-                    if cleaned in frame.columns:
-                        columns.append(cleaned)
-            for column in columns:
-                counts = frame.groupby(column, observed=True)[column].transform("size")
-                if int((counts > 1).sum()) == values.size:
-                    frame = frame.loc[counts > 1]
-                    break
-            if len(frame) != values.size:
-                # The reduced fit only needs a response column, but ``_rss_within`` refits
-                # the FULL specification, so every column the formula names has to survive
-                # the restriction. Keep the absorbed columns and the regressors.
-                keep: list[str] = [c for c in columns if c in frame.columns]
-                rhs = str(self._formula).split("~", 1)[1].split("|", 1)[0]
-                for token in rhs.replace("+", " ").split():
-                    cleaned = token.strip().strip("()")
-                    if cleaned in frame.columns and cleaned not in keep:
-                        keep.append(cleaned)
-                if keep:
-                    subset = frame.loc[:, keep].copy()
-                    if len(subset) > values.size:
-                        subset = subset.iloc[: values.size]
-                    if len(subset) == values.size:
-                        frame = subset
+            dropped = getattr(self, "_dropped_rows", None)
+            if dropped:
+                keep = np.ones(len(frame), dtype=bool)
+                positions = np.asarray(sorted(int(i) for i in dropped), dtype=int)
+                positions = positions[(positions >= 0) & (positions < len(frame))]
+                keep[positions] = False
+                if int(keep.sum()) == values.size:
+                    frame = frame.loc[keep]
         if len(frame) == values.size:
+            frame["__westata_y__"] = values
+            return frame
+        if len(frame) > values.size:
+            # Last resort: the frame is longer than the response and the dropped set could
+            # not be matched exactly. Restricting by position keeps the response aligned
+            # with the leading rows, which is right whenever the dropped rows are trailing.
+            frame = frame.iloc[: values.size].copy()
             frame["__westata_y__"] = values
             return frame
         return pd.DataFrame({"__westata_y__": values})

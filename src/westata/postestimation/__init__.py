@@ -39,6 +39,7 @@ from westata.postestimation.hettest import HetTestResult, estat_hettest
 from westata.postestimation.ic import IcResult, estat_ic
 from westata.postestimation.imtest import ImTestResult, estat_imtest
 from westata.postestimation.xttest0 import XtTest0Result, xttest0
+from westata.postestimation.varsoc import VarSocResult, varsoc
 from westata.postestimation.serial import (
     Correlogram,
     DurbinWatsonResult,
@@ -81,6 +82,8 @@ __all__ = [
     "estat_imtest",
     "XtTest0Result",
     "xttest0",
+    "VarSocResult",
+    "varsoc",
     "Correlogram",
     "DurbinWatsonResult",
     "PortmanteauResult",

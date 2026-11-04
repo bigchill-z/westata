@@ -1,0 +1,136 @@
+"""VAR stability: Stata's ``varstable``.
+
+Reference from a live ``varstable`` after ``var dinf unem, lags(1/2)`` on macro_swatson.dta::
+
+          Eigenvalue        |   Modulus
+    ------------------------+-------------
+         .82182             |    .82182
+         .7970223           |    .797022
+        -.2258777 + .6292178i |  .668533
+        -.2258777 - .6292178i |  .668533
+
+    All the eigenvalues lie inside the unit circle.
+    VAR satisfies stability condition.
+
+The eigenvalues are those of the COMPANION matrix, not of the per-equation coefficient
+matrices. ``np.linalg.eigvals(result.coefs)`` returns 2 values for a bivariate VAR(2) while
+``varstable`` lists 4 -- one per ``lags * equations`` -- and they are different numbers.
+
+Stata prints the eigenvalues in DESCENDING ORDER OF MODULUS, which is why the two complex
+pair members come last rather than being sorted by their real parts.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+
+from westata.errors import ConsistencyError
+
+__all__ = ["VarStableResult", "varstable"]
+
+
+@dataclass(frozen=True)
+class VarStableResult:
+    """``varstable``: eigenvalues of the companion matrix."""
+
+    eigenvalues: tuple[complex, ...]
+    modulus: tuple[float, ...]
+
+    @property
+    def stable(self) -> bool:
+        """True when every eigenvalue lies strictly inside the unit circle."""
+
+        return all(value < 1.0 for value in self.modulus)
+
+    def to_frame(self) -> Any:
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                "Eigenvalue": list(self.eigenvalues),
+                "Modulus": list(self.modulus),
+            }
+        )
+
+    def __str__(self) -> str:
+        result = [
+            "   Eigenvalue stability condition",
+            "",
+            f"{'Eigenvalue':>24} | {'Modulus':>10}",
+            "-" * 25 + "+" + "-" * 12,
+        ]
+        for value, magnitude in zip(self.eigenvalues, self.modulus):
+            result.append(f"{_format_complex(value):>24} | {magnitude:>10.6g}")
+        result.append("-" * 25 + "+" + "-" * 12)
+        if self.stable:
+            result.append("   All the eigenvalues lie inside the unit circle.")
+            result.append("   VAR satisfies stability condition.")
+        else:
+            result.append("   At least one eigenvalue lies on or outside the unit circle.")
+            result.append("   VAR does NOT satisfy stability condition.")
+        return "\n".join(result)
+
+
+def _format_complex(value: complex) -> str:
+    """Render an eigenvalue the way Stata does: real part, then ``± .xxxxi``."""
+
+    real = float(value.real)
+    imaginary = float(value.imag)
+    if abs(imaginary) < 1e-12:
+        return f"{real:.7g}"
+    sign = "+" if imaginary >= 0 else "-"
+    return f"{real:.7g} {sign} {abs(imaginary):.7g}i"
+
+
+def varstable(result: Any) -> VarStableResult:
+    """Eigenvalues of the VAR's companion matrix, as ``varstable``.
+
+    ``result`` must be a fitted VAR exposing ``coefs`` with shape ``(lags, K, K)``.
+    """
+
+    inner = getattr(result, "_result", result)
+    coefficients = getattr(inner, "coefs", None)
+    if coefficients is None:
+        raise ConsistencyError(
+            "varstable: the result does not expose the VAR coefficient matrices"
+        )
+
+    coefs = np.asarray(coefficients, dtype=float)
+    if coefs.ndim != 3:
+        raise ConsistencyError(
+            f"varstable: expected coefficient matrices shaped (lags, K, K); got {coefs.shape}"
+        )
+    lags, equations, _ = coefs.shape
+    if lags < 1:
+        raise ConsistencyError("varstable: the VAR has no lags")
+
+    top = np.hstack([coefs[index] for index in range(lags)])
+    if lags == 1:
+        companion = top
+    else:
+        lower_rows = equations * (lags - 1)
+        companion = np.vstack(
+            [
+                top,
+                np.hstack(
+                    [
+                        np.eye(lower_rows),
+                        np.zeros((lower_rows, equations)),
+                    ]
+                ),
+            ]
+        )
+
+    values = np.linalg.eigvals(companion)
+    magnitudes = np.abs(values)
+    # Stata lists them by DESCENDING modulus; ties keep the numpy order.
+    order = np.argsort(-magnitudes, kind="stable")
+    ordered_values = tuple(complex(values[i]) for i in order)
+    ordered_modulus = tuple(float(magnitudes[i]) for i in order)
+
+    return VarStableResult(
+        eigenvalues=ordered_values, modulus=ordered_modulus
+    )

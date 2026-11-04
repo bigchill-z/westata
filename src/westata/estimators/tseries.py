@@ -369,7 +369,18 @@ class VAR:
     def _make_model(self, lags: int) -> Any:
         from statsmodels.tsa.vector_ar.var_model import VAR as _SMVAR
 
-        return _SMVAR(self._data).fit(lags, trend=self._trend, ic=None)
+        # statsmodels takes the equation names from the DataFrame's columns; there is no
+        # ``endog_names`` argument. Passing bare ndarray data made its results label the
+        # equations y0, y1, ..., so ``granger_causality('dinf', ['unem'])`` failed with
+        # "'dinf' is not in list" even though the wrapper knew the names.
+        return _SMVAR(self._named_data()).fit(lags, trend=self._trend, ic=None)
+
+    def _named_data(self) -> Any:
+        """The endogenous data as a DataFrame carrying the equation names."""
+
+        if isinstance(self._data, pd.DataFrame):
+            return self._data
+        return pd.DataFrame(np.asarray(self._data), columns=list(self._names))
 
     def select_order(self, maxlags: int = 4) -> pd.DataFrame:
         """Report AIC/BIC/HQIC/FPE for each candidate lag order.
@@ -380,7 +391,7 @@ class VAR:
 
         from statsmodels.tsa.vector_ar.var_model import VAR as _SMVAR
 
-        model = _SMVAR(self._data)
+        model = _SMVAR(self._named_data())
         selection = model.select_order(maxlags=maxlags, trend=self._trend)
         # ``LagOrderResults`` stores the full criterion paths in ``ics``; the
         # ``aic``/``bic`` attributes are only the minimising lag.

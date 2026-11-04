@@ -7123,7 +7123,7 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 
 #### 该数值缺陷已修复（自适应 Gauss–Hermite 的常数项写错）
 
-修复在 0.0.5 发布之后完成，**尚未随任何已发布版本发出**。
+修复随 **0.0.6** 发布（0.0.5 在修复之前发出）。
 
 根因不在估计方法，而在积分器 `_adaptive_log_integral_batch` 的 log 被积函数少了一项：
 

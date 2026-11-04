@@ -73,6 +73,61 @@ two factor-variable models, the `r(mtest)` family for two models, and the three
 refusals. All 90 match to `rel < 1e-9`. The tests read that file, so they can no
 longer pass by agreeing with the implementation's own reading of the ado.
 
+## [0.0.6] — 2026-11-04
+
+### Fixed — `xtlogit, re` reported `e(sigma_u)` 150x too large
+
+`xtlogit, re` returned `e(sigma_u) = .0037` where Stata reports `.0000243`, and
+`/lnsig2u = -11.18` against Stata's `-21.25`. The estimator was fine; the adaptive
+Gauss-Hermite integrator it shares with `xtprobit, re` and `xttobit` was not.
+
+`_adaptive_log_integral_batch` re-centres each panel and evaluates at
+`sqrt(2)*scale*x + mu`, so its log integrand has to carry the importance ratio between that
+proposal and the prior:
+
+```
+log f(tau) - 0.5*log(pi) + log w
+           - log(sigma) + log(scale)      <- Jacobian of u -> x
+           - 0.5*(tau/sigma)**2 + x**2    <- proposal over prior
+```
+
+It carried `-log(sigma) - 0.5*log(2*pi)` instead — `log(scale)` was missing. That made the
+fixed-point iteration run the wrong way: each pass narrowed the scale, which narrowed the
+effective weights, which narrowed the scale again. Measured trace: `.7071, .5774, .5,
+.4472, ... .18`, never settling. As `sigma -> 0` the objective grew to ~`1e8`, so the
+optimiser stopped at `lnsig2u = -11.18` instead of near `-21`.
+
+How it was pinned down: a **constant** conditional log-likelihood must integrate to that
+constant for every sigma, because the Gaussian integrates to one. The old code returned
+`-5.0055` at `sigma = 1` and `-1205` at `sigma = 1e-8`. Working that closed form backwards
+gave the missing terms.
+
+Verification is against closed forms and `scipy.integrate.quad`, not against the previous
+output:
+
+| check | result |
+|---|---|
+| constant integrand, sigma 1.5 / 1 / 0.5 / 0.01 / 1e-4 | returns the constant exactly |
+| Gaussian (centred, off-centre) and logistic vs `quad` | ~1e-16 |
+| `xtlogit, re`, real random effect | `sigma_u` 2.4047049 vs Stata 2.4040464; `ll` matches to 6 d.p. |
+| `xtprobit, re`, same frame | 1.3880278 vs 1.3879297 |
+| `xttobit`, same frame | 1.2921733 vs 1.2921733 (identical) |
+
+On a frame where the random effect is genuinely absent, `sigma_u` now stays below `1e-5`
+and `e(ll)` equals the pooled logit's likelihood, which is the correct limit as
+`sigma_u -> 0`.
+
+Two things worth reading in `docs/GAP_REGISTER.md` §8.5:
+
+* **A guard that passes against the buggy code is not a guard.** The first convergence tests
+  used a frame with `sigma_u ~ 2.4` and passed unchanged against the pre-fix file, because
+  the two versions agree there. The defect only appears as the variance goes to zero. The
+  tests were moved to the frame where it was observed and re-checked: 2 of 3 fail against
+  the old code.
+* On the scan frame the residual `sigma_u` difference is a **flat likelihood**, not an
+  error: `lnsig2u = -25, -30, -40` all give the same `ll`, and that value equals the pooled
+  logit's likelihood exactly. Every `sigma_u` on that plateau is equally correct.
+
 ## [0.0.5] — 2026-11-04
 
 ### Fixed — every estimator table now matches Stata's rendered layout (59/59)

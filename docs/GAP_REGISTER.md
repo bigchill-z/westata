@@ -7117,9 +7117,39 @@ p6p7_outputs.txt:18 (logit)  y | Coefficient  Std. err.      z  P>|z|  [95% conf
 
 ### 关于「匹配」的口径
 
-`SKELETON` 与 `MATCH` 都不代表**数值正确**。`xtlogit, re` 的布局已对齐，但它的
-`e(sigma_u)` 是 `.0037` 而 Stata 是 `.0000243`，`/lnsig2u` 是 `−11.18` 而 Stata 是
-`−21.25`。**布局一致不等于结果正确**，两者必须分开报告。
+`SKELETON` 与 `MATCH` 都不代表**数值正确**。`xtlogit, re` 的布局早已对齐，但它的
+`e(sigma_u)` 曾是 `.0037` 而 Stata 是 `.0000243`——**布局一致不等于结果正确**，两者必须
+分开报告。
+
+#### 该数值缺陷已在 0.0.6 修复（自适应 Gauss–Hermite 的常数项写错）
+
+根因不在估计方法，而在积分器 `_adaptive_log_integral_batch` 的 log 被积函数少了一项：
+
+```python
+# 错误
+log f(tau) + (-log sigma - 0.5 log 2pi) - 0.5(tau/sigma)^2 + x^2 + log w
+# 正确
+log f(tau) + (-0.5 log pi) + log w - log sigma + log scale
+            - 0.5(tau/sigma)^2 + x^2
+```
+
+漏掉 `+log(scale)`、误用 `-0.5log(2pi)` 之后，定点迭代中 `scale` **单调收缩到 0** 而
+不收敛——实测轨迹 `.7071, .5774, .5, .4472, … .18` 一路下行。sigma→0 时目标函数暴涨到
+`1e8`，收益函数的解因此停在错误的 `lnsig2u`。
+
+修复后的验证（不是与自己的旧输出比，而是与闭式和 `scipy.integrate.quad` 比）：
+
+| 检验 | 结果 |
+|---|---|
+| 常数被积函数在 sigma = 1.5 / 1 / 0.5 / 0.01 / 1e-4 下 | 精确返回该常数（旧实现在 1e-8 时给出 −602.9）|
+| 高斯（居中/偏心）与 logistic 被积函数 vs `quad` | 误差 ~1e-16 |
+| 真实随机效应数据上的 `xtlogit, re` | `sigma_u` 2.2448 vs Stata 2.2445；`ll` −117.917638 vs −117.91764 |
+
+`tests/test_adaptive_gh_integrator.py` 用闭式把这些常数固定住，共 15 个用例。
+
+**一处仍然"不同"但并非缺陷**：扫描数据的随机效应方差≈0 时，似然面在 `lnsig2u` 方向是
+**平坦平台**（实测 lnsig2u = −25/−30/−40 给出同一个 ll，且该平台值精确等于 pooled logit
+的似然）。此时任何 sigma_u 都同样"正确"；westata 落在平台更内侧，ll 反而略优于 Stata。
 
 ### 另一个没有妥协的地方
 

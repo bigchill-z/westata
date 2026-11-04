@@ -86,12 +86,33 @@ class LRTestResult:
     pvalue: float
     ll_unrestricted: float
     ll_restricted: float
+    #: Names for the "Assumption: <restricted> nested within <unrestricted>" line.
+    #: Empty by default so positional construction keeps working.
+    restricted_name: str = ""
+    unrestricted_name: str = ""
 
     def __str__(self) -> str:
-        return (
-            f"Likelihood-ratio test\n"
-            f"  LR chi2({self.df:g}) = {self.statistic:.2f}\n"
-            f"  Prob > chi2     = {self.pvalue:.4f}"
+        """Reproduce ``lrtest`` exactly::
+
+            Likelihood-ratio test
+            Assumption: . nested within big
+            LR chi2(1) = 949.95
+            Prob > chi2 = 0.0000
+
+        The "Assumption:" line states which model is nested within which and was missing
+        entirely -- without it the output gives a statistic with no statement of what was
+        compared. The two statistic lines are NOT indented; Stata starts them at column 1.
+        """
+
+        restricted = str(self.restricted_name or ".")
+        unrestricted = str(self.unrestricted_name or ".")
+        return chr(10).join(
+            [
+                "Likelihood-ratio test",
+                f"Assumption: {restricted} nested within {unrestricted}",
+                f"LR chi2({self.df:g}) = {self.statistic:.2f}",
+                f"Prob > chi2 = {self.pvalue:.4f}",
+            ]
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -291,12 +312,18 @@ def lrtest(unrestricted: Any, restricted: Any) -> LRTestResult:
     # df > 0 here: equal counts raised above and fewer parameters was swapped.
     pvalue = float(stats.chi2.sf(statistic, df))
 
+    # Stata's "Assumption: <restricted> nested within <unrestricted>" line names the two
+    # models. Stata uses the name given to ``estimates store`` (or "." for the active
+    # estimate); westata has no store mechanism, so the estimator name is the closest
+    # equivalent and at least identifies which fit each side is.
     return LRTestResult(
         statistic=float(statistic),
         df=df,
         pvalue=pvalue,
         ll_unrestricted=float(ll_unrestricted),
         ll_restricted=float(ll_restricted),
+        restricted_name=str(getattr(restricted, "model_name", "") or ""),
+        unrestricted_name=str(getattr(unrestricted, "model_name", "") or ""),
     )
 
 

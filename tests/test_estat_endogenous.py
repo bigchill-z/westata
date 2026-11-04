@@ -189,4 +189,5 @@ def test_output_names_both_statistics(iv_fit) -> None:
     assert "Tests of endogeneity" in text
     assert "Durbin" in text
     assert "Wu-Hausman" in text
-    assert "variables are exogenous" in text
+    # Stata capitalises the noun: "H0: Variables are exogenous".
+    assert "Variables are exogenous" in text

@@ -66,6 +66,18 @@ def _is_constant(name: str) -> bool:
     return str(name).strip().lower() in _CONSTANT_NAMES
 
 
+def _six_g(value: float) -> str:
+    """Stata's ``%9.0g`` column: six significant figures, leading zero dropped."""
+
+    number = float(value)
+    text = f"{number:.6g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
 class EndogenousResult:
     """Durbin and Wu endogeneity tests.
 
@@ -122,16 +134,29 @@ class EndogenousResult:
         )
 
     def __str__(self) -> str:
-        return "\n".join(
+        """Reproduce ``estat endogenous`` exactly::
+
+            Tests of endogeneity
+            H0: Variables are exogenous
+            Durbin (score) chi2(1)          =  192.536  (p = 0.0000)
+            Wu-Hausman F(1,396)             =  367.505  (p = 0.0000)
+
+        Two details: the null line capitalises "Variables", and "=" sits at column 32 (a
+        32-wide label field plus a space). Both statistics print at six significant figures,
+        so the Durbin value shows 192.536 rather than 192.5357.
+        """
+
+        durbin_label = f"Durbin (score) chi2({self.wu_df:g})"
+        wu_label = f"Wu-Hausman F({self.wu_df:g},{self.wu_df_denom:g})"
+        return chr(10).join(
             [
                 "",
                 "Tests of endogeneity",
-                "H0: variables are exogenous",
-                "",
-                f"{'Durbin (score) chi2(' + f'{self.wu_df:g}' + ')':<26}"
-                f"= {self.durbin:>9.4f}  (p = {self.durbin_pvalue:.4f})",
-                f"{'Wu-Hausman F(' + f'{self.wu_df:g}' + ',' + f'{self.wu_df_denom:g}' + ')':<26}"
-                f"= {self.wu:>9.4f}  (p = {self.wu_pvalue:.4f})",
+                "H0: Variables are exogenous",
+                f"{durbin_label:<31} = {_six_g(self.durbin):>8}"
+                f"  (p = {self.durbin_pvalue:.4f})",
+                f"{wu_label:<31} = {_six_g(self.wu):>8}"
+                f"  (p = {self.wu_pvalue:.4f})",
             ]
         )
 

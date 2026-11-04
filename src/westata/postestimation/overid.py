@@ -106,21 +106,30 @@ class OverIdResult:
         )
 
     def __str__(self) -> str:
-        lines = [
-            "",
-            "Tests of overidentifying restrictions:",
-            "",
-            f"{self.test + ' chi2(' + f'{self.df:g}' + ')':<26}"
-            f" = {self.statistic:>9.4f}",
-            f"{'Prob > chi2':<26} = {self.pvalue:>9.4f}",
-        ]
+        """Reproduce ``estat overid`` exactly::
+
+            Tests of overidentifying restrictions:
+            Sargan (score) chi2(1) =  1.20073  (p = 0.2732)
+            Basmann chi2(1)        =   1.1923  (p = 0.2749)
+
+        Two formats were wrong before: the statistic and its p-value were on SEPARATE
+        lines, where Stata puts "  (p = x.xxxx)" on the same line, and the Sargan row was
+        labelled without the "(score)" qualifier Stata prints.
+        """
+
+        label = "Sargan (score)" if self.test == "Sargan" else self.test
+        sargan_row = (
+            f"{label + ' chi2(' + f'{self.df:g}' + ')':<22}"
+            f" = {self.statistic:>8.5f}  (p = {self.pvalue:.4f})"
+        )
+        lines = ["", "Tests of overidentifying restrictions:", sargan_row]
         if self.basmann is not None:
-            lines.append(
-                f"{'Basmann chi2(' + f'{self.df:g}' + ')':<26}"
-                f" = {self.basmann:>9.4f}"
+            basmann_row = (
+                f"{'Basmann chi2(' + f'{self.df:g}' + ')':<22}"
+                f" = {self.basmann:>8.4f}  (p = {self.basmann_pvalue:.4f})"
             )
-            lines.append(f"{'Prob > chi2':<26} = {self.basmann_pvalue:>9.4f}")
-        return "\n".join(lines)
+            lines.append(basmann_row)
+        return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """The ``r()`` scalars Stata returns."""
@@ -438,9 +447,21 @@ def estat_overid(
     sargan = max(sargan, 0.0)
 
     # --- Basmann finite-sample variant ----------------------------------
-    # k counts every estimated coefficient in the structural equation:
-    # included exogenous (including the constant) plus the endogenous ones.
-    k = exog.shape[1] + n_endog
+    # k is the number of coefficients in the AUXILIARY regression, not in the structural
+    # equation. ``ivregress_estat.ado:169-174``:
+    #
+    #     qui _regress `resids' `allinst' if `touse' `wt', `constant'
+    #     ...
+    #     mat `basmann' = e(b)
+    #     _ms_omit_info `basmann'
+    #     local k = colsof(`basmann') - `r(k_omit)'
+    #     scalar `basmann' = `sargan'*(e(N)-`k')/(e(N) - `sargan')
+    #
+    # ``allinst`` is the constant plus every instrument, so k = design.shape[1]. Counting
+    # the structural equation's parameters instead (constant + exogenous + endogenous = 3
+    # here) gave 1.1953 against Stata's 1.1923; the auxiliary regression has four columns
+    # and reproduces 1.1923 exactly.
+    k = int(design.shape[1])
     denominator = n - sargan
     if denominator > 0.0 and n > k:
         basmann = sargan * (n - k) / denominator

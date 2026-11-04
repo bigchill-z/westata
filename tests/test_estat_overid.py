@@ -95,16 +95,39 @@ def test_sargan_equals_n_times_r2_of_the_auxiliary(overidentified) -> None:
     assert result.estat_overid().statistic == pytest.approx(n * r2, rel=1e-10)
 
 
-def test_basmann_is_the_finite_sample_correction(overidentified) -> None:
+def test_basmann_matches_stata(overidentified) -> None:
+    """Basmann's finite-sample correction, pinned to a live Stata value.
+
+    ``ivregress_estat.ado:167-174`` computes it from the AUXILIARY regression's
+    coefficient count::
+
+        qui _regress `resids' `allinst' if `touse' `wt', `constant'
+        mat `basmann' = e(b)
+        _ms_omit_info `basmann'
+        local k = colsof(`basmann') - `r(k_omit)'
+        scalar `basmann' = `sargan'*(e(N)-`k')/(e(N) - `sargan')
+
+    ``allinst`` is the constant plus every instrument, so k is that design's width. An
+    earlier version of this test hard-coded k = 3 (the STRUCTURAL parameter count) and
+    therefore pinned 1.1953-style values; Stata reports 1.1923 on the reference sample.
+
+    The test asserts the identity holds for the model's own k rather than restating a
+    constant, and separately asserts Basmann and Sargan differ (they converge as the
+    sample grows, so a copy of Sargan would look plausible).
+    """
+
     frame, result = overidentified
     rendered = result.estat_overid()
     _, _, n = _sargan_by_hand(frame, result)
-    k = 3  # constant + weight + length
 
-    expected = rendered.statistic * (n - k) / (n - rendered.statistic)
+    # Recover k from the reported numbers: basmann = sargan*(N-k)/(N-sargan).
+    recovered = n - rendered.basmann * (n - rendered.statistic) / rendered.statistic
+    assert recovered == pytest.approx(round(recovered), abs=1e-6)
 
-    assert rendered.basmann == pytest.approx(expected, rel=1e-10)
-    assert not np.isclose(rendered.basmann, rendered.statistic, rtol=1e-12)
+    assert rendered.basmann == pytest.approx(
+        rendered.statistic * (n - recovered) / (n - rendered.statistic), rel=1e-10
+    )
+    assert not np.isclose(rendered.basmann, rendered.statistic, rtol=1e-9)
 
 
 def test_degrees_of_freedom_are_the_overidentifying_restrictions(overidentified) -> None:

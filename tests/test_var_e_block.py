@@ -130,16 +130,21 @@ def test_per_equation_r2_and_rmse_match_the_residuals(var_fit) -> None:
     endog = np.asarray(raw.endog, dtype=float)
     df_eq = var_fit.e["df_eq"]
 
+    # Stata's e(rmse_#) divides by the RESIDUAL degrees of freedom (N - df_eq), and the
+    # R-squared must be measured against the estimation sample rather than the full series.
+    # This test used to assert sqrt(rss/df_eq) and a full-length y: both were wrong, giving
+    # rmse .077907 against Stata's .013815 and r2 .3648 against .3621.
+    nobs = resid.shape[0]
     for index in range(2):
         r = resid[:, index]
         rss = float(r @ r)
-        y = endog[:, index]
+        y = endog[-nobs:, index]
         tss = float((y - y.mean()) @ (y - y.mean()))
         assert var_fit.e[f"r2_{index + 1}"] == pytest.approx(
             1.0 - rss / tss, rel=1e-12
         )
         assert var_fit.e[f"rmse_{index + 1}"] == pytest.approx(
-            float(np.sqrt(rss / df_eq)), rel=1e-12
+            float(np.sqrt(rss / (nobs - df_eq))), rel=1e-12
         )
 
 
@@ -151,8 +156,11 @@ def test_per_equation_wald_statistic(var_fit) -> None:
     cov = var_fit.stata_cov_params
     k_trend = int(var_fit._result.k_trend)
 
+    # ``stata_params`` is laid out equation by equation, so the block is contiguous; the
+    # previous ``index::2`` stride mixed both equations and produced 75.34 instead of 93.11.
+    per_equation = int(var_fit.e["df_eq"])
     for index in range(2):
-        rows = np.arange(beta.size)[index::2]
+        rows = np.arange(index * per_equation, (index + 1) * per_equation)
         b = beta[rows]
         block = cov[np.ix_(rows, rows)]
         slopes = np.arange(b.size - k_trend)

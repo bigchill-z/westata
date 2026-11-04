@@ -712,11 +712,19 @@ class VARResults:
             payload["obs" + suffix] = float(observations)
             equation_resid = residuals[:, index]
             rss = float(equation_resid @ equation_resid)
-            # rmse uses Stata's per-equation degrees of freedom.
+            # Stata's e(rmse_#) is sqrt(rss / (N - df_eq)): the residual degrees of freedom
+            # are the OBSERVATIONS minus the per-equation parameter count. Dividing by df_eq
+            # itself gave .077907 for dinf where Stata reports .013815 -- a factor of 5.6,
+            # which is large enough to be obvious once checked and easy to miss in a table.
+            residual_dof = float(observations - df_eq)
             payload["rmse" + suffix] = (
-                float(np.sqrt(rss / df_eq)) if df_eq > 0 else float("nan")
+                float(np.sqrt(rss / residual_dof)) if residual_dof > 0 else float("nan")
             )
-            response = endog[:, index]
+            # ``endog`` is the FULL series (166 rows) while the residuals cover the
+            # estimation sample (164); R-squared must use the latter or it is computed
+            # against the wrong centring. Using the full series gave .3648 for dinf where
+            # Stata reports .3621.
+            response = endog[-observations:, index]
             centred = response - response.mean()
             tss = float(centred @ centred)
             payload["r2" + suffix] = (
@@ -736,7 +744,12 @@ class VARResults:
             # deterministic terms.
             stata_beta = self.stata_params.to_numpy(dtype=float)
             stata_cov = self.stata_cov_params
-            per_equation = np.arange(stata_beta.size)[index::neqs]
+            # ``stata_param_names`` is laid out EQUATION BY EQUATION (all of equation 1's
+            # parameters, then equation 2's), not interleaved. Striding by ``neqs`` picked a
+            # mixture of both equations and gave 75.34 / 794.82 where Stata reports
+            # 93.11047 / 5926.554.
+            block = int(df_eq)
+            per_equation = np.arange(index * block, (index + 1) * block)
             beta_block = stata_beta[per_equation]
             cov_block = stata_cov[np.ix_(per_equation, per_equation)]
             slopes = np.arange(beta_block.size - k_trend)

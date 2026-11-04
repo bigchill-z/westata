@@ -38,6 +38,14 @@ from westata.postestimation.gof import GofResult, estat_gof
 from westata.postestimation.hettest import HetTestResult, estat_hettest
 from westata.postestimation.ic import IcResult, estat_ic
 from westata.postestimation.imtest import ImTestResult, estat_imtest
+from westata.postestimation.serial import (
+    Correlogram,
+    DurbinWatsonResult,
+    PortmanteauResult,
+    estat_corrgram,
+    estat_dwatson,
+    wntestq,
+)
 from westata.postestimation.ovtest import OvTestResult, estat_ovtest
 from westata.postestimation.mtest import MTEST_METHODS, MTestResult, adjust_pvalues
 from westata.postestimation.overid import OverIdResult, estat_overid
@@ -70,6 +78,12 @@ __all__ = [
     "estat_classification",
     "ImTestResult",
     "estat_imtest",
+    "Correlogram",
+    "DurbinWatsonResult",
+    "PortmanteauResult",
+    "estat_corrgram",
+    "estat_dwatson",
+    "wntestq",
     "SummarizeResult",
     "estat_summarize",
     "MTEST_METHODS",

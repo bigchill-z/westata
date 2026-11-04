@@ -1,26 +1,31 @@
-"""Tests for ``r(mineig)`` -- the Cragg-Donald minimum eigenvalue.
+"""Tests for ``r(mineig)`` -- the Cragg-Donald minimum eigenvalue STATISTIC.
 
-``FirstStage`` returns ``r(mineig)`` (``ivregress_estat.ado:777-778``, computed by
-the Mata builtin ``_iv_craggdonald_wrk``). It is the minimum eigenvalue of the
-canonical-correlation matrix between the endogenous regressors and the
-residualised excluded instruments.
+``estat firststage`` reports ``r(mineig)``, and a live run settles what scale it is on::
 
-**Why a number is reportable here although the Mata source is unreadable.** With
-ONE endogenous regressor the matrix is 1x1, so its only eigenvalue *is* the
-squared canonical correlation -- the first stage's partial R-squared. And the
-partial-F identity ties that to the printed F:
+    . quietly ivregress 2sls y x (endog = z1 z2)
+    . quietly estat firststage
+    . display r(mineig)
+    332.35528
 
-    partial_r2 = F / (F + N - k)
+That is 332.355, NOT a number in [0, 1]. The quantity inside the Mata routine is the
+smallest eigenvalue of the canonical-correlation matrix -- 0.6267 here, which IS the
+first-stage partial R-squared when there is one endogenous regressor -- but Stata does not
+print that; it prints the rescaled statistic.
 
-So at (1 endog, 1 instrument) three independently computed quantities must agree.
-That is what these tests pin. Beyond one endogenous regressor the eigenvalue
-problem is genuinely larger and no self-check exists; that part is recorded as
-unverified rather than claimed.
+The two are related exactly by
 
-A bug this anchor caught: when a model has no included exogenous regressors,
-``_ols`` returns a zero fit for an empty design, so ``_residualise`` left the
-columns uncentred. The eigenvalue then came out 0.21434 against a partial R2 of
-0.21110 — a 1.5% gap that only the identity could reveal.
+    statistic = eig / (1 - eig) * df_denom / df_num
+              = 0.6266654 / 0.3733346 * 396 / 2
+              = 332.3553
+
+which coincides with the first-stage F here. An earlier version of this file asserted that
+``r(mineig)`` lay in [0, 1] and equalled the partial R-squared; both are true of the raw
+eigenvalue and false of the value Stata reports, so those assertions pinned the wrong
+quantity and were replaced.
+
+A bug these tests DID catch and still guard: with no included exogenous regressors,
+``_ols`` returns a zero fit for an empty design, so ``_residualise`` left the columns
+uncentred and the eigenvalue came out 0.21434 against a partial R-squared of 0.21110.
 """
 
 from __future__ import annotations
@@ -50,15 +55,24 @@ def _frame(n=400, seed=1, n_instr=1, n_endog=1, include_exog=False):
     return pd.DataFrame(data)
 
 
-def test_mineig_equals_the_partial_r2_with_one_endogenous_regressor() -> None:
-    """The canonical matrix is 1x1, so its eigenvalue IS the partial R-squared."""
+def test_mineig_scales_the_partial_r2_by_the_degrees_of_freedom() -> None:
+    """Stata prints the STATISTIC, not the raw eigenvalue.
+
+    Live check: ``r(mineig)`` is 332.35528 while the partial R-squared is 0.6267. The two
+    are linked exactly by ``statistic = eig/(1-eig) * df_denom/df_num``, which is what this
+    assertion pins.
+    """
 
     frame = _frame()
     first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
 
-    assert first_stage.mineig == pytest.approx(
-        float(first_stage.partial_r2[0]), rel=1e-12
+    partial = float(first_stage.partial_r2[0])
+    expected = (
+        partial / (1.0 - partial)
+        * float(first_stage.df_denom[0])
+        / float(first_stage.df_num[0])
     )
+    assert first_stage.mineig == pytest.approx(expected, rel=1e-12)
 
 
 def test_mineig_satisfies_the_partial_f_identity() -> None:
@@ -72,10 +86,11 @@ def test_mineig_satisfies_the_partial_f_identity() -> None:
     frame = _frame()
     first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
 
+    # With one instrument the Cragg-Donald statistic coincides with the first-stage F, so
+    # this test compares the two rather than re-deriving the eigenvalue.
     f_stat = float(first_stage.f[0])
-    implied = f_stat / (f_stat + float(first_stage.df_denom[0]))
 
-    assert first_stage.mineig == pytest.approx(implied, rel=1e-12)
+    assert first_stage.mineig == pytest.approx(f_stat, rel=1e-12)
 
 
 def test_the_three_quantities_agree_to_machine_precision() -> None:
@@ -85,11 +100,14 @@ def test_the_three_quantities_agree_to_machine_precision() -> None:
     mineig = first_stage.mineig
     partial = float(first_stage.partial_r2[0])
     f_stat = float(first_stage.f[0])
-    # Stata's denominator, not the auxiliary regression's ``N - k``.
-    from_f = f_stat / (f_stat + float(first_stage.df_denom[0]))
+    scaled = (
+        partial / (1.0 - partial)
+        * float(first_stage.df_denom[0])
+        / float(first_stage.df_num[0])
+    )
 
-    assert mineig == pytest.approx(partial, rel=1e-12)
-    assert mineig == pytest.approx(from_f, rel=1e-12)
+    assert mineig == pytest.approx(scaled, rel=1e-12)
+    assert mineig == pytest.approx(f_stat, rel=1e-12)
 
 
 def test_the_identity_holds_with_included_exogenous_regressors() -> None:
@@ -100,20 +118,27 @@ def test_the_identity_holds_with_included_exogenous_regressors() -> None:
         ws.IV2SLS.from_formula("y ~ w + [x1 ~ z1]", frame).fit().estat_firststage()
     )
 
-    assert first_stage.mineig == pytest.approx(
-        float(first_stage.partial_r2[0]), rel=1e-12
+    partial = float(first_stage.partial_r2[0])
+    expected = (
+        partial / (1.0 - partial)
+        * float(first_stage.df_denom[0])
+        / float(first_stage.df_num[0])
     )
+    assert first_stage.mineig == pytest.approx(expected, rel=1e-12)
 
 
-def test_mineig_is_between_zero_and_one() -> None:
-    """It is a squared canonical correlation, so it is bounded by [0, 1]."""
+def test_mineig_is_a_non_negative_statistic() -> None:
+    """It is the rescaled eigenvalue, so it is non-negative -- and NOT bounded by 1.
+
+    Stata reports 332.355 on the reference sample, so an upper bound of 1 would be wrong.
+    """
 
     for seed in (1, 2, 3):
         frame = _frame(seed=seed)
         first_stage = (
             ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
         )
-        assert 0.0 <= first_stage.mineig <= 1.0, seed
+        assert first_stage.mineig >= 0.0, seed
 
 
 def test_mineig_matches_a_hand_built_eigenvalue_with_two_endogenous() -> None:
@@ -145,7 +170,16 @@ def test_mineig_matches_a_hand_built_eigenvalue_with_two_endogenous() -> None:
     s_zz = instr_r.T @ instr_r
     s_ez = endog_r.T @ instr_r
     middle = np.linalg.solve(s_ee, s_ez) @ np.linalg.solve(s_zz, s_ez.T)
-    expected = float(np.min(np.real(np.linalg.eigvals(middle))))
+    smallest = float(np.min(np.real(np.linalg.eigvals(middle))))
+
+    # The reported value is the rescaled statistic, not the eigenvalue: the same
+    # eig/(1-eig) * df_denom/df_num conversion that the 1x1 case validates against two
+    # independent identities.
+    expected = (
+        smallest / (1.0 - smallest)
+        * float(first_stage.df_denom[0])
+        / float(first_stage.df_num[0])
+    )
 
     assert first_stage.mineig == pytest.approx(expected, rel=1e-10)
 

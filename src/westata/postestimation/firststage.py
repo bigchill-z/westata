@@ -214,31 +214,159 @@ class FirstStageResult:
         # ``all`` (``sthlp:408-412``) asks for the R-squared block "regardless of whether
         # the model contains one or more endogenous regressors", so it wins.
         if self.show_all:
-            return self._render_r2_table()
+            return self._render_r2_table() + self._render_mineig_block()
         if len(self.endog) > 1 and self.shea is not None:
             return self._render_shea_table()
-        return self._render_r2_table()
+        return self._render_r2_table() + self._render_mineig_block()
+
+    def _render_mineig_block(self) -> str:
+        """The Stock-Yogo block Stata prints UNDER the summary table::
+
+            Minimum eigenvalue statistic = 332.355
+
+            Critical Values                      # of endogenous regressors:    1
+            H0: Instruments are weak             # of excluded instruments:     2
+            ---------------------------------------------------------------------
+                                                 |    5%     10%     20%     30%
+            2SLS relative bias                   |         (not available)
+            -------------------------------------+---------------------------------
+                                                 |   10%     15%     20%     25%
+            2SLS size of nominal 5% Wald test     |  19.93   11.59    8.75    7.25
+            LIML size of nominal 5% Wald test     |   8.68    5.33    4.42    3.92
+            ---------------------------------------------------------------------
+
+        The numbers were already computed and stored -- ``r(mineigcv)`` reproduces Stata's
+        19.93 / 11.59 / 8.75 / 7.25 exactly -- but nothing rendered them, so
+        ``estat firststage`` stopped after the summary table and never reported whether the
+        instruments are weak, which is the whole point of running it.
+        """
+
+        if self.mineig is None or self.mineigcv is None:
+            return ""
+
+        matrix = np.atleast_2d(self.mineigcv)
+        n_endog = len(self.endog)
+        # ``df_num`` for the first stage is the number of excluded instruments: the joint F
+        # tests exactly those.
+        n_excluded = int(np.atleast_1d(self.df_num)[0])
+
+        # Layout measured from Stata's block: the label column is 37 characters wide
+        # including the two-space indent, the pipe sits at column 37, and each critical
+        # value occupies 8 columns (giving a 69-character rule).
+        def _cell(value: float) -> str:
+            return f"{value:>8.2f}" if np.isfinite(value) else ".".rjust(8)
+
+        # The pipe sits at column 37 in every row of this block, and each critical value
+        # occupies eight columns; both were measured from Stata's output.
+        def _table_row(label: str, cells: str) -> str:
+            return f"{label:<37}|{cells}"
+
+        lines = [
+            "",
+            f"  Minimum eigenvalue statistic = {self.mineig:.3f}",
+            "",
+            f"  Critical Values                      # of endogenous regressors: {n_endog:>4}",
+            f"  H0: Instruments are weak             # of excluded instruments: {n_excluded:>5}",
+            "  " + "-" * 69,
+            _table_row("", f"{'5%':>7}{'10%':>8}{'20%':>8}{'30%':>8}"),
+            _table_row("  2SLS relative bias", f"{'(not available)':>22}"),
+            "  " + "-" * 35 + "+" + "-" * 33,
+            _table_row("", f"{'10%':>7}{'15%':>8}{'20%':>8}{'25%':>8}"),
+        ]
+        labels = (
+            "2SLS size of nominal 5% Wald test",
+            "LIML size of nominal 5% Wald test",
+        )
+        for offset, label in enumerate(labels, start=1):
+            if offset >= matrix.shape[0]:
+                continue
+            cells = "".join(_cell(value) for value in matrix[offset])
+            lines.append(_table_row(f"  {label}", cells))
+        lines.append("  " + "-" * 69)
+        return chr(10).join(lines)
 
     def _render_r2_table(self) -> str:
-        header = (
-            f"  {'Variable':<14}|{'R-sq.':>8}{'Adjusted':>10}"
-            f"{'Partial':>10}{'F':>10}{'Prob > F':>10}"
+        """Reproduce Stata's R-squared block exactly::
+
+            First-stage regression summary statistics
+            --------------------------------------------------------------------------
+                         |            Adjusted      Partial
+                Variable |   R-sq.       R-sq.        R-sq.      F(2,396)   Prob > F
+            -------------+------------------------------------------------------------
+                   endog |  0.6288      0.6260       0.6267       332.355    0.0000
+            --------------------------------------------------------------------------
+
+        Stata prints a two-line header (the "Adjusted / Partial" words sit on the line
+        ABOVE "R-sq." and "R-sq."), the F column is labelled with its degrees of freedom
+        ("F(2,396)"), and the F statistic carries three decimals where the R-squared
+        columns carry four. The old single-line header could not express any of that.
+        """
+
+        # ``df_num``/``df_denom`` are per-equation arrays; the heading carries the first
+        # equation's degrees of freedom, which is what Stata prints for the block.
+        first_df = np.atleast_1d(self.df_num)[0]
+        first_denom = np.atleast_1d(self.df_denom)[0]
+        f_label = f"F({first_df:g},{first_denom:g})"
+
+        def _place(pieces: list[str], text: str, end_column: int) -> None:
+            """Append ``text`` so its last character sits at ``end_column - 1``."""
+
+            used = sum(len(piece) for piece in pieces)
+            pieces.append(" " * max(end_column - used - len(text), 0) + text)
+
+        # Every start/end column below was measured from Stata's own output:
+        #
+        #   top   "|" 13-14, "Adjusted" 26-34, "Partial" 40-47                 (47 wide)
+        #   hdr   "Variable" 4-12, "|" 13, "R-sq." 17-22, ... "Prob > F" 64-72 (72 wide)
+        #   row   name ends 12, "|" at 13, r2 16-22, adj 28-34,
+        #         partial 41-47, F 54-61, p 65-71                              (71 wide)
+        #   rules 74 wide
+        #
+        # Stata's header rows are FIXED text apart from the F label, so they are written
+        # out literally; only the data rows need placement.
+        rule = "-" * 74
+        header_top = "             |            Adjusted      Partial"
+        # Built by placing each field at its measured column: the pipe at 13, the three
+        # "R-sq." headings starting at 17 / 30 / 43, the F label ending at 61 and
+        # "Prob > F" ending at 72. Writing the padding out by hand kept drifting by one
+        # or three columns depending on the F label's width.
+        def _row(pieces: list[tuple[str, int]]) -> str:
+            text = ""
+            for value, end_column in pieces:
+                text += " " * max(end_column - len(text) - len(value), 0) + value
+            return text
+
+        header_bottom = _row(
+            [
+                ("Variable", 12),
+                ("|", 14),
+                ("R-sq.", 22),
+                ("R-sq.", 34),
+                ("R-sq.", 47),
+                (f_label, 61),
+                ("Prob > F", 72),
+            ]
         )
         lines = [
             "",
             "First-stage regression summary statistics",
-            "",
-            header,
-            "-" * 14 + "+" + "-" * 46,
+            rule,
+            header_top,
+            header_bottom,
+            "-" * 13 + "+" + "-" * 60,
         ]
         for i, name in enumerate(self.endog):
-            lines.append(
-                f"  {name:<14}|{self.r2[i]:>8.4f}{self.adj_r2[i]:>10.4f}"
-                f"{self.partial_r2[i]:>10.4f}{self.f[i]:>10.4}"
-                f"{self.pvalue[i]:>10.4f}"
-            )
-        lines.append("-" * 14 + "+" + "-" * 46)
-        return "\n".join(lines)
+            row_pieces: list[str] = []
+            _place(row_pieces, name, 12)
+            _place(row_pieces, "|", 14)
+            _place(row_pieces, f"{self.r2[i]:.4f}", 22)
+            _place(row_pieces, f"{self.adj_r2[i]:.4f}", 34)
+            _place(row_pieces, f"{self.partial_r2[i]:.4f}", 47)
+            _place(row_pieces, f"{self.f[i]:.3f}", 61)
+            _place(row_pieces, f"{self.pvalue[i]:.4f}", 71)
+            lines.append("".join(row_pieces))
+        lines.append(rule)
+        return chr(10).join(lines)
 
     def _render_shea_table(self) -> str:
         """The multi-endogenous default: Shea's partial R-squared.
@@ -564,7 +692,22 @@ def estat_firststage(
             eigenvalues = np.real(np.linalg.eigvals(middle))
             finite = eigenvalues[np.isfinite(eigenvalues)]
             if finite.size:
-                mineig = float(np.min(finite))
+                # ``r(mineig)`` is the Cragg-Donald STATISTIC, not the raw eigenvalue. With
+                # one endogenous regressor the 1x1 eigenvalue is the partial R-squared
+                # (0.6267 here) while Stata prints 332.355 -- the same number as the
+                # first-stage F. The two are related by
+                #     F = eig/(1-eig) * df_denom/df_num
+                # which reproduces 332.3552767 from 0.6266654, confirming the identity on
+                # this sample rather than assuming it. Dividing by (1 - eig) and rescaling
+                # is therefore the correct conversion.
+                smallest = float(np.min(finite))
+                remainder = 1.0 - smallest
+                if remainder > 0.0:
+                    numerator_dof = float(rows[0]["df_num"])
+                    denominator_dof = float(rows[0]["df_denom"])
+                    mineig = smallest / remainder * denominator_dof / numerator_dof
+                else:
+                    mineig = float("nan")
         except np.linalg.LinAlgError:  # pragma: no cover - singular blocks
             mineig = None
 

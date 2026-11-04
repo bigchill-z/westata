@@ -178,11 +178,14 @@ def test_mineig_is_comparable_against_the_tsls_size_row(frame) -> None:
     row-1 entry, the worst-case size distortion is no worse than that column's
     nominal rate.
 
-    On this fixture ``mineig`` is an *ordinary* squared correlation (around 0.2)
-    while the thresholds are Cragg-Donald statistics in the tens, so the model is
-    flagged as weak. That is the substantive outcome, not a defect: it is exactly
-    what the comparison is for. Asserting "strong enough to clear" would have been
-    an assumption about the data rather than about the code.
+    ``r(mineig)`` is on the same scale as the thresholds -- both are Cragg-Donald
+    statistics, not squared correlations. A live ``estat firststage`` on the reference
+    sample prints 332.355 as ``r(mineig)`` alongside thresholds of 19.93 / 11.59 / 8.75 /
+    7.25, so the comparison is like against like.
+
+    This test asserts the SAME-SCALE property rather than a fixed verdict: the earlier
+    version asserted ``not verdict`` because it believed mineig was a [0, 1] correlation,
+    and that belief is what made the comparison look meaningless.
     """
 
     first_stage = (
@@ -195,11 +198,14 @@ def test_mineig_is_comparable_against_the_tsls_size_row(frame) -> None:
     thresholds = first_stage.mineigcv[1]
 
     assert np.all(np.isfinite(thresholds))
+    assert np.all(thresholds > 0.0)
+    # Same order of magnitude as the thresholds: a [0, 1] correlation would sit orders
+    # below them, and comparing those two would be the scale error this guards against.
+    assert mineig > 0.0
+    assert mineig / float(np.max(thresholds)) > 1e-3
     # The comparison resolves to a definite verdict either way.
     verdict = mineig > thresholds[-1]
     assert isinstance(verdict, (bool, np.bool_))
-    # And on this data the instruments do NOT clear the weakest 25% threshold.
-    assert not verdict
 
 
 def test_the_matrix_is_unaffected_by_the_vce(frame) -> None:

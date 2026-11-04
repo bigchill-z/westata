@@ -1499,6 +1499,7 @@ class VECM:
             lags=int(self._lags),
             coint_rank=int(self._rank),
             deterministic=deterministic,
+            endog=np.asarray(self._data, dtype=float),
         )
 
 
@@ -1520,6 +1521,9 @@ class VECMResults:
     lags: int
     coint_rank: int
     deterministic: str
+    #: Retained so post-estimation (``veclmar``) can rebuild the lagged levels without the
+    #: caller having to hand the data back in.
+    endog: Any = None
 
     @property
     def nobs(self) -> int:

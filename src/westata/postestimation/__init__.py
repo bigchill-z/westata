@@ -46,6 +46,7 @@ from westata.postestimation.bgodfrey import BgTestResult, estat_bgodfrey
 from westata.postestimation.dfgls import DFGLSResult, dfgls
 from westata.postestimation.vecrank import VecRankResult, vecrank
 from westata.postestimation.vecstable import VecStableResult, vecstable
+from westata.postestimation.varlmar import LmarResult, varlmar, veclmar
 from westata.postestimation.serial import (
     Correlogram,
     DurbinWatsonResult,
@@ -108,6 +109,9 @@ __all__ = [
     "vecrank",
     "VecStableResult",
     "vecstable",
+    "LmarResult",
+    "varlmar",
+    "veclmar",
     "SummarizeResult",
     "estat_summarize",
     "MTEST_METHODS",

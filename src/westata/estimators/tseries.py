@@ -2483,7 +2483,7 @@ def unitroot(
     test: str = "adf",
     regression: str = "c",
     maxlag: int | None = None,
-    autolag: str = "AIC",
+    autolag: str | None = None,
 ) -> UnitRootResult:
     """Unit-root test (Stata ``dfuller`` / ``pperron`` / ``kpss``).
 
@@ -2494,8 +2494,11 @@ def unitroot(
     regression:
         Deterministic terms: ``"c"``, ``"n"``, ``"ct"``, ``"ctt"``.
     autolag:
-        Lag selection for ``"adf"``; ``None`` uses ``maxlag`` verbatim (Stata's
-        ``lags(#)``), a criterion name selects it the statsmodels way.
+        Lag selection for ``"adf"``. ``None`` (the default) means "use exactly
+        ``maxlag`` lags", which is Stata's behaviour: ``dfuller`` uses ``lags(0)``
+        unless asked otherwise. A criterion name selects the lag the statsmodels
+        way, which is a DIFFERENT test from Stata's default -- on macro_swatson's
+        ``inf`` column, AIC selection reported -2.571 against Stata's -3.718.
 
     Notes
     -----
@@ -2514,9 +2517,11 @@ def unitroot(
 
         # ``result_object=True`` is the forward-compatible API; the tuple form
         # is deprecated in statsmodels 0.15 and will change layout.
+        # ``maxlag=None`` lets statsmodels choose (floor(12*(n/100)^0.25) = 14 here); Stata
+        # uses 0. Passing 0 explicitly is what makes ``dfuller`` reproducible.
         outcome = adfuller(
             series,
-            maxlag=maxlag,
+            maxlag=0 if maxlag is None else int(maxlag),
             regression=regression,
             autolag=autolag,
             result_object=True,

@@ -12,6 +12,7 @@ from westata.expressions.explist import (
 from westata.estimators import (
     PraisResult,
     prais,
+    rdrobust,
     LlcResult,
     levin_lin_chu,
     IpsResult,
@@ -233,6 +234,7 @@ __all__ = [
     "HausmanResult",
     "PraisResult",
     "prais",
+    "rdrobust",
     "LRTestResult",
     "pwcompare",
     "contrast",

@@ -44,6 +44,7 @@ from westata.estimators.limited import (
 from westata.estimators.linear import OLS
 from westata.estimators.newey import NeweyWestResult, check_time_spacing, newey
 from westata.estimators.prais import PraisResult, prais, prais_winsten
+from westata.estimators.rdrobust import RdRobustResult, rdrobust
 from westata.estimators.panel_dynamic import XtAbond
 from westata.estimators.panel_nonlinear import (
     XtLogit,
@@ -148,6 +149,8 @@ __all__ = [
     "PraisResult",
     "prais",
     "prais_winsten",
+    "RdRobustResult",
+    "rdrobust",
     "check_time_spacing",
     "IV2SLS",
     "IVLIML",

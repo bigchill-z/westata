@@ -34,13 +34,19 @@ import pandas as pd
 
 from westata.errors import UnsupportedError
 from westata.postestimation.predict import (
+    DEFAULT_PREDICT as _DEFAULT_PREDICT,
+)
+from westata.postestimation.predict import (
+    default_predict_kind as _default_predict_kind,
+)
+from westata.postestimation.predict import (
     family_slopes,
     ordered_structure,
     predict,
     prediction_family,
 )
 
-__all__ = ["MarginsResult", "margins"]
+__all__ = ["DEFAULT_PREDICT", "MarginsResult", "default_predict_kind", "margins"]
 
 
 @dataclass
@@ -452,30 +458,12 @@ def _row_from_statistic(
 #: Stata's own ``e(marginsok)`` for tobit lists ``default XB Pr(passthru)
 #: E(passthru) YStar(passthru)``, i.e. ``xb`` is the flagged default.  Reporting
 #: ``e(a,b)`` here would silently answer a different question from Stata's.
-DEFAULT_PREDICT: dict[str, str] = {
-    "regress": "xb",
-    "ivregress 2sls": "xb",
-    "ivregress liml": "xb",
-    "ivregress gmm": "xb",
-    "reghdfe": "xb",
-    "xtreg, fe": "xb",
-    "xtreg, re": "xb",
-    "xtreg, be": "xb",
-    "xtreg, fd": "xb",
-    "logit": "pr",
-    "probit": "pr",
-    "poisson": "n",
-    "nbreg": "n",
-    "ologit": "pr",
-    "oprobit": "pr",
-    "tobit": "xb",
-}
-
-
-def default_predict_kind(model_name: str) -> str:
-    """Return the prediction type ``margins`` differentiates by default."""
-
-    return DEFAULT_PREDICT.get(model_name, "xb")
+#: ``model_name -> the predict type Stata assumes`` -- re-exported from
+#: :mod:`westata.postestimation.predict`, which now owns the single copy. ``margins`` and
+#: ``StataResults.predict`` disagreed for several releases because each had its own default;
+#: keeping one table is what makes the two entry points agree by construction.
+DEFAULT_PREDICT = _DEFAULT_PREDICT
+default_predict_kind = _default_predict_kind
 
 
 def margins(

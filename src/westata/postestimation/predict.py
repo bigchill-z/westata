@@ -110,6 +110,15 @@ SUPPORTED_TYPES: dict[str, tuple[str, ...]] = {
     "xtreg, re": ("xb", "stdp", "stdf", "residuals", "fitted"),
     "xtreg, be": ("xb", "stdp", "stdf", "residuals", "fitted"),
     "xtreg, fd": ("xb", "stdp", "stdf", "residuals", "fitted"),
+    # ``reghdfe`` had an entry in the DEFAULT_PREDICT table while being absent here, so
+    # ``res.predict()`` on a FEOLS fit raised "no prediction types registered". The
+    # mismatch only surfaced when a test asserted that every default names a supported
+    # type -- which is exactly what such an assertion is for.
+    #
+    # ``reghdfe``'s postestimation is ``reghdfe_p.ado``; it offers xb, residuals, and the
+    # fitted value. ``d`` (the absorbed-variable effect) is deliberately NOT listed: it is
+    # not computed here, and advertising a type that raises is worse than leaving it out.
+    "reghdfe": ("xb", "stdp", "stdf", "residuals", "fitted"),
     # ``logit_postestimation.sthlp:209`` / ``probit_postestimation.sthlp:149``:
     # "``score`` calculates the equation-level score, the first derivative of the log
     # likelihood ..." -- SINGULAR, one variable per observation.
@@ -206,6 +215,49 @@ SUPPORTED_TYPES: dict[str, tuple[str, ...]] = {
     "ztp": ("xb", "n", "stdp"),
     "tnbreg": ("xb", "n", "stdp"),
 }
+
+
+#: ``model_name -> the predict type Stata assumes when no option is given``.
+#:
+#: Stata prints "(option pr assumed; Pr(survive))" after a bare ``predict`` on a logit and
+#: "(option n assumed; predicted number of events)" on a poisson; only linear models assume
+#: ``xb``. This table is the authority for that default, and it is THE ONLY copy --
+#: ``StataResults.predict``, :func:`predict` and ``margins`` all read it, so the three entry
+#: points cannot drift apart again.
+#:
+#: They did drift: ``StataResults.predict`` hardcoded ``kind="xb"`` while ``margins`` used
+#: this table, so ``res.predict()`` on a logit returned log-odds by default -- neither
+#: Stata's meaning nor statsmodels' (``sm.Logit.predict`` returns probabilities). Feeding
+#: log-odds into a classifier silently produced a Brier score ~15x too large on the titanic
+#: fweight fit (gap report 0.0.6 §3.5).
+DEFAULT_PREDICT: dict[str, str] = {
+    "regress": "xb",
+    "ivregress 2sls": "xb",
+    "ivregress liml": "xb",
+    "ivregress gmm": "xb",
+    "reghdfe": "xb",
+    "xtreg, fe": "xb",
+    "xtreg, re": "xb",
+    "xtreg, be": "xb",
+    "xtreg, fd": "xb",
+    "logit": "pr",
+    "probit": "pr",
+    "poisson": "n",
+    "nbreg": "n",
+    "ologit": "pr",
+    "oprobit": "pr",
+    "tobit": "xb",
+}
+
+
+def default_predict_kind(model_name: str) -> str:
+    """The predict type Stata assumes for ``model_name`` when no option is given.
+
+    Falls back to ``"xb"``, which is also what ``supported_types`` reports first for every
+    model, so an unlisted estimator keeps the old behaviour.
+    """
+
+    return DEFAULT_PREDICT.get(str(model_name), "xb")
 
 
 #: Panel fixed-effects components.  ``xtreg_postestimation.sthlp:127-134``:
@@ -1706,7 +1758,7 @@ def _unsupported_reason(model_name: str, kind: str, allowed: Any) -> str:
 def predict(
     result: Any,
     exog: np.ndarray,
-    kind: str = "xb",
+    kind: str | None = None,
     *,
     lower: float | None = None,
     upper: float | None = None,
@@ -1725,6 +1777,12 @@ def predict(
         ``"stdf"`` are the prediction standard errors (``[R] predict``): the
         standard error of the linear prediction, and of the forecast, which adds
         the residual variance.
+
+        When ``None`` the type follows Stata's per-model default
+        (:func:`default_predict_kind`): ``xb`` for linear models, ``pr`` for
+        logit/probit/ordinal, ``n`` for count models.  It used to default to ``xb``
+        everywhere, which made a bare ``res.predict()`` return log-odds on a logit --
+        neither Stata's meaning nor statsmodels'.
     lower, upper:
         Censoring limits, required by the ``tobit`` types ``e`` and ``ystar``.
         When omitted, ``result.e["llopt"]``/``result.e["ulopt"]`` are used (the older
@@ -1736,6 +1794,11 @@ def predict(
     """
 
     model_name = str(getattr(result, "model_name", ""))
+    # ``kind=None`` means "whatever Stata would assume". Resolving it HERE as well as in
+    # ``StataResults.predict`` keeps both entry points identical; that is the invariant the
+    # two used to violate.
+    if kind is None:
+        kind = default_predict_kind(model_name)
     normalized = str(kind).strip()
 
     # A model that owns its prediction semantics takes precedence, and it also

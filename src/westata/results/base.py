@@ -1051,7 +1051,7 @@ class StataResults:
 
         return margins(self, **kwargs)
 
-    def predict(self, exog: Any = None, kind: str = "xb", **kwargs: Any) -> Any:
+    def predict(self, exog: Any = None, kind: str | None = None, **kwargs: Any) -> Any:
         """Typed prediction (Stata ``predict, <type>``).
 
         Parameters
@@ -1060,10 +1060,21 @@ class StataResults:
             Design matrix; defaults to the stored estimation design.
         kind:
             ``"xb"``, ``"pr"``, ``"n"``, ``"e"``, ``"ystar"``, ``"residuals"``,
-            depending on the model.
+            depending on the model.  ``None`` (the default) means "whatever Stata
+            assumes", resolved by
+            :func:`westata.postestimation.predict.default_predict_kind`: ``xb`` for
+            linear models, ``pr`` for logit/probit/ordinal, ``n`` for count models.
+
+            It used to default to ``"xb"`` for every estimator, so a bare
+            ``logit_result.predict()`` returned log-odds -- neither Stata's meaning
+            (Stata assumes ``pr`` and says so) nor statsmodels' (``sm.Logit.predict``
+            returns probabilities). Pass ``kind="xb"`` for the old behaviour.
         """
 
-        from westata.postestimation.predict import predict
+        from westata.postestimation.predict import default_predict_kind, predict
+
+        if kind is None:
+            kind = default_predict_kind(str(getattr(self, "model_name", "")))
 
         if exog is None:
             stored = getattr(self, "design_matrix", None)

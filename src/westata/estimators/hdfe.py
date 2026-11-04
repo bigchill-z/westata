@@ -339,6 +339,21 @@ class FEOLS:
         )
 
         self._fit_cluster_columns = cluster_columns
+        # Keep the RAW cluster labels as well. ``_resolve_cluster_columns`` may synthesise
+        # column names (``__westata_cluster_0__``) that exist only on the working copy, so
+        # the absorbed-degrees-of-freedom nesting test needs the values, not the names.
+        from westata.vce.dispatch import cluster_labels_from_kwds
+
+        _raw_labels = cluster_labels_from_kwds(cov_kwds) if cov_type == "cluster" else None
+        if _raw_labels is not None and not isinstance(_raw_labels, str):
+            _raw = np.asarray(_raw_labels)
+            if _raw.ndim == 1 and _raw.size == len(data):
+                self._fit_cluster_labels = pd.Series(_raw, index=data.index)
+            else:
+                self._fit_cluster_labels = None
+        else:
+            self._fit_cluster_labels = None
+
         vcov = self._pyfixest_vcov(effective_cov_type, cluster_columns)
         ssc_dict = self._pyfixest_ssc(ssc, effective_cov_type)
 
@@ -843,7 +858,16 @@ class FEOLS:
             # path serves both.
             redundant = float(max((n_hdfe or 1) - 1, 0))
             e["df_a_redundant"] = redundant
-            e["df_a_nested"] = 0.0
+            # An absorbed effect NESTED WITHIN A CLUSTER VARIABLE contributes no degrees of
+            # freedom: every one of its coefficients is collinear with a cluster dummy, so
+            # reghdfe marks it redundant and prints 0 Num. Coefs. Measured on the report's
+            # C12-10 case -- 550 counties, 262 years, clustered on county -- Stata prints
+            #
+            #   county |  536   536   0  *     (nested within cluster)
+            #   year   |  262     1 261
+            #
+            # and e(df_a) = 261. Counting both partitions gave 797 here.
+            e["df_a_nested"] = float(self._nested_absorbed_levels(model, data))
             drop_constant = 1.0 if self._absorb_df_drops_constant else 0.0
             e["df_a"] = float(
                 absorbed_levels - (e["df_a_nested"] + redundant + drop_constant)
@@ -1151,6 +1175,55 @@ class FEOLS:
         except (AttributeError, TypeError, ValueError):
             return None
         return total if 0 < total <= nobs else None
+
+    def _nested_absorbed_levels(self, model: Any, data: pd.DataFrame) -> int:
+        """Absorbed levels nested within a cluster variable.
+
+        reghdfe treats an absorbed effect as redundant when each of its levels sits inside a
+        single cluster: its coefficients are then collinear with the cluster structure and
+        contribute nothing to ``e(df_a)``. Detected the standard way -- the number of
+        distinct (cluster, absorbed) pairs equals the number of absorbed levels.
+
+        Returns 0 when nothing is nested or when the information is unavailable, so models
+        without clustering keep their previous behaviour.
+        """
+
+        labels = getattr(self, "_fit_cluster_labels", None)
+        if labels is None or len(labels) != len(data):
+            return 0
+
+        counts = getattr(model, "_k_fe", None)
+        if counts is None:
+            return 0
+        try:
+            pairs = list(zip(counts.index, counts.to_numpy()))
+        except (AttributeError, TypeError, ValueError):
+            return 0
+
+        cluster_values = pd.Series(np.asarray(labels), index=data.index)
+        nested = 0
+        for raw_name, raw_count in pairs:
+            name = str(raw_name)
+            if name.startswith("__fixed_effect__(") and name.endswith(")"):
+                name = name[len("__fixed_effect__(") : -1]
+            variable = str(name).lstrip("_")
+            column = variable if variable in data.columns else None
+            if column is None:
+                continue
+            # Nesting means each level of the absorbed effect belongs to exactly one
+            # cluster: the number of distinct clusters per level is 1 everywhere. Counting
+            # distinct (cluster, level) pairs does NOT work -- for the absorbed level that
+            # coincides with the cluster it equals the level count, and for an independent
+            # one it equals nobs.
+            per_level = (
+                pd.DataFrame({"c": cluster_values, "a": data[column]})
+                .drop_duplicates()
+                .groupby("a", observed=True)["c"]
+                .nunique()
+            )
+            if len(per_level) > 0 and int(per_level.max()) == 1:
+                nested += int(raw_count)
+        return nested
 
     @staticmethod
     def _rank_full(model: Any, nobs: int) -> int:

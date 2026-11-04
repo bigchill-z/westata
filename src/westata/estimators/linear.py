@@ -554,6 +554,13 @@ class OLS:
         if df_model == 0:
             # Stata reports e(F) = 0 for the intercept-only model (``regress y``).
             fvalue = 0.0
+        elif tested and df_t < df_model:
+            # Too few residual degrees of freedom for the tested restrictions: the
+            # covariance is rank-deficient in exactly the directions being tested, which
+            # is what produced F = -1.73e+16 here. Stata prints "." instead. Measured on
+            # lin_1992 with 33 province dummies and 28 clusters, ``reg ltvfo ... i.province,
+            # vce(cluster province)`` reports "F(6, 27) = ." and "Prob > F = .".
+            fvalue = float("nan")
         elif tested:
             fvalue = _wald_f(np.asarray(beta, dtype=float), cov, tested)
         else:

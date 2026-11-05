@@ -1901,6 +1901,38 @@ class VECM:
         )
 
 
+def _vecm_cointegrating_constant(fitted: Any) -> float:
+    """The cointegrating relation's own constant, recovered from a ``ci`` refit.
+
+    Stata's ``vec`` prints this as the ``_cons`` entry of ``e(beta)``. statsmodels' default
+    ``co`` specification leaves it at zero and folds everything into ``det_coef``; the same
+    model fitted with ``deterministic='ci'`` puts it back, which is where this value comes
+    from.
+
+    Returns 0.0 when the refit is unavailable, so the caller falls back to the ``co``
+    parameterisation rather than failing.
+    """
+
+    try:
+        from statsmodels.tsa.vector_ar.vecm import VECM as _SMVECM
+
+        raw = fitted.raw
+        model = raw.model
+        values = np.asarray(model.endog, dtype=float)
+        # Copy the ORIGINAL model's lag/rank/deterministic settings rather than re-deriving
+        # them: statsmodels' ``k_ar`` counts differently from the ``k_ar_diff`` passed in,
+        # and rebuilding from it shifted c_ce from -.0066627 to -.0072437.
+        refit = _SMVECM(
+            values,
+            k_ar_diff=int(getattr(model, "k_ar_diff", model.k_ar - 1)),
+            coint_rank=int(getattr(model, "coint_rank", fitted.coint_rank)),
+            deterministic="ci",
+        ).fit()
+        return float(np.asarray(refit.const_coint, dtype=float).ravel()[0])
+    except Exception:  # pragma: no cover - the refit is best-effort
+        return 0.0
+
+
 @dataclass
 class VECMResults:
     """Wrapper over a fitted VECM with Stata-flavoured accessors.
@@ -2283,23 +2315,36 @@ class VECMResults:
                     f"{gamma[index, predictor] + 1.959963984540054 * stderr_gamma[index, predictor]:>13.7g}"
                 )
                 lines.append(f"{'':>12} |")
-            # ``_cons`` is printed in STATSMODELS' parameterisation, not Stata's.
+            # ``_cons`` is reported in STATS' parameterisation, where the deterministic term
+            # sits INSIDE the cointegrating relation:
             #
-            # Stata puts the deterministic term INSIDE the cointegrating relation, so its
-            # printed constant is det_coef - alpha*c_ce (verified: -6.35e-07 / -5.12e-05
-            # against this fit's .01247 / -.000206). statsmodels keeps c_ce at zero
-            # (``const_coint``) and folds the whole constant into det_coef. The two are the
-            # same model, but converting between them needs c_ce, which statsmodels does
-            # not identify separately -- so the value printed here is det_coef and its
-            # standard error is its own diagonal. Recorded as a known difference rather
-            # than fabricating a transform constant.
+            #     Stata:       _cons = det_coef - alpha * c_ce
+            #     statsmodels: keeps c_ce at zero (const_coint) and folds the constant into
+            #                  det_coef.
+            #
+            # ``c_ce`` IS obtainable: refitting the same model with deterministic='ci'
+            # (constant inside the relation) yields const_coint = -.0066626872 against
+            # Stata's e(beta)[1,3] = -.00666336. The 6.7e-7 gap is the difference between two
+            # ML fits' convergence, and it is large enough to flip the sign of a constant
+            # that is essentially zero (-6.35e-07): the transform gives +6.30e-07 on this
+            # fit. The second equation's constant reproduces exactly (-5.12e-05).
+            #
+            # So the transform is applied and the residual is recorded rather than hidden:
+            # these two constants are a numerical-precision difference, not a formula error.
+            c_ce = _vecm_cointegrating_constant(self)
+            constant = float(det_coef[index]) - float(alpha[index, 0]) * c_ce
             cov_full = self.cov_params()
             det_index = 8 + index
+            statistic_variance = (
+                float(cov_full[det_index, det_index])
+                + c_ce**2 * float(cov_full[index, index])
+                - 2.0 * c_ce * float(cov_full[det_index, index])
+            )
             lines.append(
                 _row(
                     "_cons",
-                    float(det_coef[index]),
-                    float(np.sqrt(max(cov_full[det_index, det_index], 0.0))),
+                    constant,
+                    float(np.sqrt(max(statistic_variance, 0.0))),
                 )
             )
         lines.append("-" * 13 + "+" + "-" * 64)

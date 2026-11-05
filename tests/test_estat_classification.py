@@ -228,7 +228,9 @@ def test_explicit_inputs_match_the_defaults(logit_fit) -> None:
 def test_output_mentions_the_cutoff_and_nine_lines(logit_fit) -> None:
     text = str(logit_fit[1].estat_classification())
 
-    assert "Classified + if predicted Pr(D) >= 0.5" in text
+    # Stata prints the cutoff as ".5" -- the leading zero is dropped. This assertion used
+    # to require "0.5", which no Stata output contains.
+    assert "Classified + if predicted Pr(D) >= .5" in text
     for label in (
         "Sensitivity",
         "Specificity",

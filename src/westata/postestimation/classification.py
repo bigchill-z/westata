@@ -47,6 +47,40 @@ __all__ = ["ClassificationResult", "estat_classification"]
 _SUPPORTED = frozenset({"logit", "probit", "logistic"})
 
 
+def _stata_cutoff(value: float) -> str:
+    """Stata's ``.5`` rather than Python's ``0.5`` -- the leading zero is dropped."""
+
+    text = f"{float(value):g}"
+    if text.startswith("0."):
+        return text[1:]
+    if text.startswith("-0."):
+        return "-" + text[2:]
+    return text
+
+
+#: What Stata prints as the model family in ``estat classification``'s title line. It says
+#: "Logistic" for BOTH ``logit`` and ``logistic`` -- ``logit.capitalize()`` would give
+#: "Logit", which no Stata output contains.
+_MODEL_WORDS = {
+    "logit": "Logistic",
+    "logistic": "Logistic",
+    "probit": "Probit",
+}
+
+
+def _model_word(name: str) -> str:
+    """The model family as the heading line spells it."""
+
+    key = str(name).strip().lower()
+    return _MODEL_WORDS.get(key, str(name).capitalize())
+
+
+def _percent_text(value: float) -> str:
+    """A rate as Stata prints it: two decimals and a literal percent sign."""
+
+    return f"{float(value):.2f}%"
+
+
 class ClassificationResult:
     """The ``estat classification`` table and its nine percentages.
 
@@ -78,6 +112,8 @@ class ClassificationResult:
         "negative_predictive_value",
         "false_positive_classified",
         "false_negative_classified",
+        "model_label",
+        "depvar",
     )
 
     def __init__(
@@ -94,8 +130,15 @@ class ClassificationResult:
         negative_predictive_value: float,
         false_positive_classified: float,
         false_negative_classified: float,
+        model_label: str = "",
+        depvar: str = "",
     ) -> None:
         self.table = table
+        #: Estimator family and dependent variable, needed for the two heading lines
+        #: ("Logistic model for y" and "True D defined as y != 0"). Empty when the
+        #: caller did not supply them.
+        self.model_label = str(model_label)
+        self.depvar = str(depvar)
         self.cutoff = float(cutoff)
         self.percent_correct = float(percent_correct)
         self.sensitivity = float(sensitivity)
@@ -115,41 +158,117 @@ class ClassificationResult:
         )
 
     def __str__(self) -> str:
+        """Reproduce ``estat classification`` exactly::
+
+            Logistic model for y
+
+                          -------- True --------
+            Classified |         D            ~D  |      Total
+            -----------+--------------------------+-----------
+                 +     |       208            77  |        285
+                 -     |        61           154  |        215
+            -----------+--------------------------+-----------
+               Total   |       269           231  |        500
+
+            Classified + if predicted Pr(D) >= .5
+            True D defined as y != 0
+            --------------------------------------------------
+            Sensitivity                     Pr( +| D)   77.32%
+            ...
+            --------------------------------------------------
+            Correctly classified                        72.40%
+            --------------------------------------------------
+
+        Geometry measured from that output, every line 50 characters wide:
+
+        * the classification table has three cells per row at endings 22, 36 and 50,
+          with the pipe at column 11 and 38 and a THREE-part separator;
+        * the row labels are CENTRED in eleven characters (``     +     |``), while the
+          header's ``Classified |`` is left-aligned;
+        * the nine rates put the label at column 0, the ``Pr(...)`` code at 32 and the
+          value right-aligned in the last six columns (44-49).
+
+        The old renderer printed a flat four-column table with ``Classified +`` /
+        ``Classified -`` row labels and no title line, and padded every rate label to 38
+        characters. The numbers were right in all nine rates; the table was not Stata's.
+        """
+
         t = self.table.to_numpy()
         a, b, ab = t[0]
         c, d, cd = t[1]
         ac_total, bd_total, total = t[2]
-        lines = [
-            "",
-            f"Classified + if predicted Pr(D) >= {self.cutoff:g}",
-            "True D defined as the response != 0",
-            "-" * 50,
-            f"{'':<9}{'|':>4}{'D':>10}{'~D':>10}{'Total':>10}",
-            "-" * 50,
-            f"{'Classified +':<12}{a:>10.0f}{b:>10.0f}{ab:>10.0f}",
-            f"{'Classified -':<12}{c:>10.0f}{d:>10.0f}{cd:>10.0f}",
-            "-" * 50,
-            f"{'Total':<12}{ac_total:>10.0f}{bd_total:>10.0f}{total:>10.0f}",
-            "-" * 50,
-            f"{'Sensitivity':<38}{'Pr( +| D)':>22}{self.sensitivity:>8.2f}%",
-            f"{'Specificity':<38}{'Pr( -|~D)':>22}{self.specificity:>8.2f}%",
-            f"{'Positive predictive value':<38}{'Pr( D| +)':>22}"
-            f"{self.positive_predictive_value:>8.2f}%",
-            f"{'Negative predictive value':<38}{'Pr(~D| -)':>22}"
-            f"{self.negative_predictive_value:>8.2f}%",
-            "-" * 50,
-            f"{'False + rate for true ~D':<38}{'Pr( +|~D)':>22}"
-            f"{self.false_positive_rate:>8.2f}%",
-            f"{'False - rate for true D':<38}{'Pr( -| D)':>22}"
-            f"{self.false_negative_rate:>8.2f}%",
-            f"{'False + rate for classified +':<38}{'Pr(~D| +)':>22}"
-            f"{self.false_positive_classified:>8.2f}%",
-            f"{'False - rate for classified -':<38}{'Pr( D| -)':>22}"
-            f"{self.false_negative_classified:>8.2f}%",
-            "-" * 50,
-            f"{'Correctly classified':<60}{self.percent_correct:>8.2f}%",
-            "-" * 50,
-        ]
+
+        title = (
+            f"{_model_word(self.model_label)} model for {self.depvar}"
+            if self.model_label and self.depvar
+            else ""
+        )
+
+        rule = "-" * 50
+        table_rule = "-" * 11 + "+" + "-" * 26 + "+" + "-" * 11
+
+        # Cells end at columns 21, 35 and 49 with the second pipe at 38, measured from
+        # Stata's own rows: label 0-10, pipe 11, cell1 12-21, cell2 22-35, two spaces,
+        # pipe 38, cell3 39-49.
+        def _row(label: str, first: float, second: float, third: float) -> str:
+            return (
+                f"{label:^11}|{first:>10.0f}{second:>14.0f}  |{third:>11.0f}"
+            )
+
+        lines = [""]
+        if title:
+            lines.extend([title, ""])
+        lines.extend(
+            [
+                "              -------- True --------",
+                f"{'Classified':<11}|{'D':>10}{'~D':>14}  |{'Total':>11}",
+                table_rule,
+                _row("+", a, b, ab),
+                _row("-", c, d, cd),
+                table_rule,
+                _row("Total", ac_total, bd_total, total),
+                "",
+                f"Classified + if predicted Pr(D) >= {_stata_cutoff(self.cutoff)}",
+                f"True D defined as {self.depvar or 'the response'} != 0",
+                rule,
+            ]
+        )
+
+        def _rate(label: str, code: str, value: float) -> str:
+            return f"{label:<32}{code:<12}{_percent_text(value):>6}"
+
+        lines.extend(
+            [
+                _rate("Sensitivity", "Pr( +| D)", self.sensitivity),
+                _rate("Specificity", "Pr( -|~D)", self.specificity),
+                _rate(
+                    "Positive predictive value",
+                    "Pr( D| +)",
+                    self.positive_predictive_value,
+                ),
+                _rate(
+                    "Negative predictive value",
+                    "Pr(~D| -)",
+                    self.negative_predictive_value,
+                ),
+                rule,
+                _rate("False + rate for true ~D", "Pr( +|~D)", self.false_positive_rate),
+                _rate("False - rate for true D", "Pr( -| D)", self.false_negative_rate),
+                _rate(
+                    "False + rate for classified +",
+                    "Pr(~D| +)",
+                    self.false_positive_classified,
+                ),
+                _rate(
+                    "False - rate for classified -",
+                    "Pr( D| -)",
+                    self.false_negative_classified,
+                ),
+                rule,
+                f"{'Correctly classified':<44}{_percent_text(self.percent_correct):>6}",
+                rule,
+            ]
+        )
         return "\n".join(lines)
 
     def to_frame(self) -> pd.DataFrame:
@@ -280,4 +399,12 @@ def estat_classification(
         negative_predictive_value=_percent(d, c + d),
         false_positive_classified=_percent(b, a + b),
         false_negative_classified=_percent(c, c + d),
+        # Stata heads the table with the estimator family and names the dependent
+        # variable in the "True D defined as ..." line.
+        model_label=str(getattr(result, "model_name", "") or ""),
+        depvar=str(
+            getattr(result, "response_name", None)
+            or (getattr(result, "e", None) or {}).get("depvar")
+            or ""
+        ),
     )

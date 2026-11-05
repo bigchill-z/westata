@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -609,13 +609,110 @@ def contrast(
     )
 
 
+class PwCompareTable(list):
+    """A whole ``pwcompare`` table: N pairwise contrasts rendered as ONE Stata table.
+
+    Subclasses ``list`` for the same reason :class:`MarginsTable` does -- ``pwcompare``
+    has always returned a plain list of :class:`LincomResult` and callers index, iterate
+    and ``len`` it. Subclassing keeps all of that while giving the collection a
+    ``__str__``, so a call renders a table instead of a list-of-dataclass repr.
+
+    Reference, from a live ``pwcompare grp`` after ``regress consumption i.grp temp``::
+
+        Pairwise comparisons of marginal linear predictions
+        Margins: asbalanced
+        --------------------------------------------------------------
+                     |                                 Unadjusted
+                     |   Contrast   Std. err.     [95% conf. interval]
+        -------------+------------------------------------------------
+                 grp |
+             2 vs 1  |  -.0035617   .0194151     -.0434699    .0363465
+             3 vs 1  |   .0112906   .0194011     -.0285889    .0511701
+             3 vs 2  |   .0148523   .0193778     -.0249792    .0546839
+        --------------------------------------------------------------
+
+    Measured geometry: table lines are 62 characters with the pipe at column 13; the
+    contrast ends at 25, the standard error at 36, the lower bound at 50 and the upper
+    bound at 62.
+    """
+
+    #: Field endings, exclusive, measured from Stata's rows.
+    _END_CONTRAST = 25
+    _END_STDERR = 36
+    _END_LOWER = 50
+    _END_UPPER = 62
+    _WIDTH = 62
+
+    def __init__(
+        self,
+        rows: Sequence[LincomResult],
+        *,
+        term: str = "",
+        margin_label: str = "asbalanced",
+        comparison: str = "Unadjusted",
+    ) -> None:
+        super().__init__(rows)
+        self.term = str(term)
+        self.margin_label = str(margin_label)
+        self.comparison = str(comparison)
+
+    def __str__(self) -> str:
+        return self.render()
+
+    @staticmethod
+    def _cell(value: float, end_column: int, used: int, decimals: int) -> str:
+        """``value`` right-aligned so that it ends at ``end_column``.
+
+        These cells use SEVEN DECIMAL PLACES with trailing zeros dropped, like the
+        ``margins`` table -- ``-.0035617`` and ``.0194151`` are seven decimals each.
+        """
+
+        text = "." if value is None or not np.isfinite(value) else f"{value:.{decimals}f}"
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        return " " * max(end_column - used - len(text), 0) + text
+
+    def render(self) -> str:
+        if not self:
+            return ""
+        rule = "-" * self._WIDTH
+        lines = [
+            "Pairwise comparisons of marginal linear predictions",
+        ]
+        if self.margin_label:
+            lines.append(f"Margins: {self.margin_label}")
+        lines.extend(
+            [
+                rule,
+                f"{'':<13}|{self.comparison:>43}",
+                f"{'':<13}|   Contrast   Std. err.     [95% conf. interval]",
+                "-" * 13 + "+" + "-" * (self._WIDTH - 14),
+            ]
+        )
+        if self.term:
+            lines.append(f"{self.term:>12} |")
+        for row in self:
+            text = f"{row.label:>11}  |"
+            text += self._cell(row.estimate, self._END_CONTRAST, len(text), 7)
+            text += self._cell(row.std_err, self._END_STDERR, len(text), 7)
+            text += self._cell(row.ci_lower, self._END_LOWER, len(text), 7)
+            text += self._cell(row.ci_upper, self._END_UPPER, len(text), 7)
+            lines.append(text)
+        lines.append(rule)
+        return "\n".join(lines)
+
+
 def pwcompare(
     result: Any,
     term: str,
     *,
     level: float = 0.95,
     adjust: str | None = None,
-) -> list[LincomResult]:
+) -> Any:
     """All pairwise differences between the levels of a factor variable.
 
     Row ``(i, j)`` with ``j > i`` reports ``level_j - level_i``, so a factor with
@@ -640,7 +737,6 @@ def pwcompare(
     factor = _resolve_factor(result, term)
     _require_complete_levels(factor, "pwcompare")
     n_params = np.asarray(result.params, dtype=float).reshape(-1).size
-
     comparisons: list[tuple[str, str, np.ndarray]] = []
     for index, low in enumerate(factor.levels):
         for high in factor.levels[index + 1 :]:
@@ -652,4 +748,6 @@ def pwcompare(
                 )
             )
 
-    return _run(result, comparisons, level=level)
+    return PwCompareTable(
+        _run(result, comparisons, level=level), term=str(term)
+    )

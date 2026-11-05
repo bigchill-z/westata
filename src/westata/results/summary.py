@@ -2960,6 +2960,17 @@ def _stata_summary(result: Any) -> str:
         or (getattr(result, "e", None) or {}).get("depvar")
         or ""
     )
+    # ``mvreg`` is the exception: it fits several outcomes at once, so Stata leaves the
+    # name column of the header BLANK and names each equation on its own block row below:
+    #
+    #                | Coefficient  Std. err.      t    P>|t|  ...
+    #   -------------+------------------------------------------------------------
+    #   y1           |
+    #
+    # westata printed the outcome list there ("y1 y2 | Coefficient ..."), which duplicates
+    # the equation rows and occupies a cell Stata leaves empty.
+    if str(getattr(result, "model_name", "") or "") == "mvreg":
+        response_label = ""
     # A ROBUST fit changes two things in Stata's table, both measured:
     #
     #   1. the column header becomes ``std. err.`` in LOWER case (the ordinary fit prints

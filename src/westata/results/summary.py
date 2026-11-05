@@ -859,6 +859,26 @@ def _four(value: Any) -> str:
     return f"{float(value):.4f}" if np.isfinite(value) else "."
 
 
+def _stata_abbreviated(name: str) -> str:
+    """Stata's six-character display name: first four characters, ``~``, last one.
+
+    Stata shortens a variable name inside a label cell to a FIXED width of six. Measured on
+    ``tobit`` with two different names::
+
+        food_exp      -> food~p
+        abcdefghijklm -> abcd~m
+
+    An eight-character name is shortened exactly like a thirteen-character one, so the rule
+    is a fixed target width rather than "shorten only when it overflows the cell". The cut is
+    at SIX characters: ``income`` (six) is printed untouched, ``abcdefg`` (seven) is not.
+    """
+
+    text = str(name)
+    if len(text) <= 6:
+        return text
+    return text[:4] + "~" + text[-1]
+
+
 def _pcse_family_for_header(result: Any) -> bool:
     """Whether this command prints its own panel design block (xtpcse/xtgls)."""
 
@@ -2978,7 +2998,16 @@ def _stata_summary(result: Any) -> str:
                 return len(tail)
         return len(text)
 
-    name_width = max([12, *(_display_length(name) for name in names)])
+    # The name column grows with the longest name, as it always has -- several tables in
+    # this file rely on that (long factor names, interaction terms). The ONE row that does
+    # not participate is the ``var(e.<y>)`` scale row: Stata fixes its pipe at column 13 and
+    # abbreviates the variable name to six characters, so that row is built separately in
+    # the row loop and must not widen the table. Measured -- a ``tobit`` whose response is
+    # ``food_exp`` still prints a standard 78-character table.
+    _ordinary_names = [
+        name for name in names if not str(name).startswith("var(e.")
+    ]
+    name_width = max([12, *(_display_length(name) for name in _ordinary_names)])
 
     # The survey ESTIMATE commands (``svy: mean``/``total``/``proportion``) print a
     # different table: no t/P columns, one estimate column, and a 62-wide frame rather
@@ -3504,8 +3533,18 @@ def _stata_summary(result: Any) -> str:
             #   '       /cut1 |'   ordinal
             #   '     var(e.y)|'   tobit scale
             _scale_label = _bare_name.startswith("var(e.")
+            if _scale_label:
+                # "var(e.food_exp)" -> "var(e.food~p)": Stata shortens the variable name
+                # inside the label to six characters. Measured in both directions -- an
+                # eight-character and a thirteen-character name shorten the same way.
+                _inner = _bare_name[len("var(e.") :].rstrip(")")
+                bare = "var(e." + _stata_abbreviated(_inner) + ")"
             _name_cell = (
-                f"{bare:>{name_width + 1}}|"
+                # The scale row's pipe sits at column 13 REGARDLESS of the table's own name
+                # width: measured, "var(e.food~p)|" has no space before the pipe while the
+                # banner's "  food_exp |" puts it one column further right. Deriving it from
+                # name_width made the row wider than 78 whenever a name overflowed that.
+                f"{bare:>12}|"
                 if _scale_label
                 else f"{bare:>{name_width}} |"
             )
@@ -3521,12 +3560,30 @@ def _stata_summary(result: Any) -> str:
                 # comes out asymmetric about the estimate (1.060043 sits below its own
                 # interval's midpoint) -- on the raw scale Stata's interval is not
                 # symmetric, so a plus/minus construction cannot be right.
+                #
+                # The scale is logarithmic AND the critical value is a t with e(df_r)
+                # degrees of freedom, NOT the normal's 1.96. Measured on
+                # ``tobit food_exp income, ll(0)`` (n = 40, no censoring, df_r = 39):
+                #
+                #   Stata :  var(e.food~p)|  7612.629  1702.236   4842.936   11966.32
+                #   1.96  :                                             4911.303    11799.65
+                #   t(39) :                                             4842.935    11966.32
+                #
+                # Recovering the implied z from Stata's bounds gives 2.022691 on BOTH sides,
+                # and t.ppf(0.975, 39) = 2.022691 exactly -- which is what identified the
+                # distribution. Using df_r rather than n-1 matters whenever the model carries
+                # more than one regressor.
                 sigma = float(params[index])
                 sigma_se = float(bse[index])
                 variance = sigma**2
                 variance_se = 2.0 * sigma * sigma_se
+                _df_r = _e_float(result, "df_r")
+                if np.isfinite(_df_r) and _df_r > 0.0:
+                    critical = float(stats.t.ppf(0.975, _df_r))
+                else:
+                    critical = 1.959963984540054
                 if variance > 0.0 and np.isfinite(variance_se) and variance_se > 0.0:
-                    shift = 1.96 * variance_se / variance
+                    shift = critical * variance_se / variance
                     lines.append(
                         _name_cell
                         + f"{_stata_coef(variance, coef_w)}"

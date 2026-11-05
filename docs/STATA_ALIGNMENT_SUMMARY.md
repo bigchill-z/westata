@@ -154,13 +154,61 @@ arima 是 σ 尺度 + 正态 1.96；两者规则不同，此前用「方差区�
 | `vecrank lags(1)` | 报错拒绝 | 映射到 `k_ar_diff=0` 时后端给 `173.8827/2.8945`，Stata 是 `172.50341/1.2744366`；移位样本后第一个对、第二个错。**4 次尝试未定，选择报错而非近似值** |
 | `estat bgodfrey`（早期）| 后已实现 | 曾两次判定「无法复现」。真相是源码在 `ado/base/b/bgodfrey.ado`，我一直未查。**「找不到公式」不等于「公式不可得」** |
 | `xttest0` 不平衡面板 | 报错拒绝 | 平衡面板公式在不平衡数据上差 2.5%。**一度误判为公式错误，实为用错数据** |
-| RD（`rdrobust`）| **点估计已实现**，推断与带宽未实现 | 标准误为 CCT 形式，6 次尝试未复现 |
-| 合成控制（`synth`/`synth2`）| 未实现 | 同上 |
-| 回归控制（`rcm`）| 未实现 | 同上 |
-| `teffects ra` | **点估计已实现**，标准误未实现 | 同上 |
+| RD（`rdrobust`）| **点估计已实现且精确**（真实数据 9 位）；标准误与带宽未实现 | 见下方专项 |
+| 合成控制（`synth`/`synth2`）| **未实现，但源码可得** | 见下方专项：此前记「SSC 未安装」是**错的** |
+| 回归控制（`rcm`）| 未实现 | 未查用户 ado 路径 |
+| `teffects ra` | **点估计已实现**，标准误未实现 | 见下方专项 |
 | **`teffects psmatch`（C15-01/C15-02）** | **点估计已实现**（第 52 轮）| 见下方专项说明；AI-robust 标准误仍未复现 |
-| `tebalance` / `xtserial` | 未实现 | SSC 包未安装，无源码 |
+| `tebalance` / `xtserial` | 未实现 | **已确认**用户 ado 路径下确实不存在 |
 | `cov_params()` 返回 DataFrame | **暂不修复** | 会破坏 `cov_params()[0,0]` 索引方式，属破坏性 API 变更；用户已明确暂不处理 |
+
+### 用户 ado 路径专项（第 60–61 轮）——一条一直找错的路径
+
+**此前所有「SSC 包未安装、无源码」的判断，都只查了 Stata 安装目录**：
+
+```
+D:\Program Files\StataNow19\ado\base\   ← 一直只查这里
+```
+
+实际路径是：
+
+```
+C:\Users\zjl\ado\plus\   ← 用户 ado，含大量可读源码
+    r/rdrobust.ado       (1331 行)   rdbwselect.ado (876 行)
+    r/reghdfe.ado + reghdfe.mata     ← 连 Mata 都是文本
+    s/synth.ado (931 行)  synth2.ado (968 行)  synth_ll.ado
+    f/ftools*.mata、estout/esttab/estpost 全家桶
+```
+
+**影响**：`synth`、`synth2`、`reghdfe`、`rcm` 的源码**一直可得**，此前被误记为「无源码」。
+`tebalance`/`xtserial` 已复查确认确实不存在。
+
+### `rdrobust` 专项
+
+点估计**精确**：`rdrobust diff border, c(30) h(5) b(8)` 的 `tau_cl` westata 与 Stata 都是
+`121.297562295`，真实数据、九位有效数字。
+
+标准误未复现，且**这次是真正的边界**：`rdrobust.ado` 写明了组装公式
+`V_tau_cl = scalepar²·deriv!²·(V_cl_l+V_cl_r)[deriv+1,deriv+1]`（已验证
+`sqrt((V_cl_l+V_cl_r)[1,1]) = 69.2861818` = Stata `se_tau_cl 69.2861819408`），
+但构造 `V_cl_l`/`V_cl_r` 的 `rdrobust_vce` **只存在于编译后的 `l/lrdrobust.mlib`**，
+整个 ado 树没有任何 `.mata` 文本。CR1 候选公式全部不匹配（`w²res²`→38.16、
+`w·res²`→240.47、`w·res²·n`→1202.33，目标 496.95）。故 `se`/`z`/`ci` 保持 NaN。
+
+### `synth` 专项
+
+**源码可得但尚未实现**。实测参照（`synth_smoking.dta`，
+`synth cigsale lnincome age15to24 beer retprice, trunit(3) trperiod(1989) nested`）：
+
+```
+非零权重：state 4 = 0.631, state 5 = 0.369（其余 36 个州为 0），权重和 = 1
+```
+
+已尝试的实现：单纯形约束（`Σw=1, w≥0`）下最小化预测变量加权距离，得到
+`state4=0.6054, state5=0.3533, state21=0.0412` —— **主要结构对，但多出一个州且分布有偏**。
+
+原因是 `synth` 用**嵌套优化**（外层优化预测变量权重 `V`、内层优化 `W`），且预测变量的
+构造涉及 `xperiod`/`mspeperiod` 的默认值逻辑，尚未完整还原。按纪律**不发布**近似实现。
 
 ### `teffects psmatch` 专项（报告 P0，第 52 轮）——**点估计已攻克**
 

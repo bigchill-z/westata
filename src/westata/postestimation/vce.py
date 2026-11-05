@@ -76,7 +76,7 @@ def _format_entry(value: float, width: int) -> str:
     number = float(value)
     if number == 0.0:
         return "0".rjust(width)
-    for digits in range(8, 0, -1):
+    for digits in range(7, 0, -1):
         text = f"{number:.{digits}g}"
         if text.startswith("0."):
             text = text[1:]
@@ -84,7 +84,7 @@ def _format_entry(value: float, width: int) -> str:
             text = "-" + text[2:]
         if text.endswith(".0"):
             text = text[:-2]
-        if len(text) <= 10:
+        if len(text) <= 10 - (0 if digits <= 6 else 1):
             return text.rjust(width)
     return f"{number:.1g}".rjust(width)
 
@@ -198,11 +198,17 @@ class VceMatrix:
         # label -- deriving the width from the labels widened the whole matrix.
         # Stata's column fields are 11 wide and right-aligned; the header row's fields
         # are one wider than the value rows because of how Stata pads the label block.
-        cell = 11
+        # Each cell is TWELVE characters: the value right-aligned in 11 then one space.
+        # Splitting Stata's own rows into 12-character slices reproduces them exactly:
+        #   '  .00121321 ' | ' -.00025332 ' | '  .01065644'
+        padding = 12
         lines.append(
-            f"{'e(V)':>{lead}} |" + "".join(f"{label:>{cell}}" for label in labels)
+            f"{'e(V)':>{lead}} |" + " ".join(f"{label:>11}" for label in labels)
         )
-        lines.append("-" * lead + "+" + "-" * (len(lines[-1]) - lead - 1))
+        # The separator is the SAME width as the header line: 13 dashes, "+", then the
+        # rest. A one-shorter version was within a character of right and therefore easy
+        # to miss.
+        lines.append("-" * (lead + 1) + "+" + "-" * (len(lines[-1]) - lead - 2))
         if self.response_label:
             lines.append(f"{self.response_label:<{lead}} |")
         for row, label in enumerate(labels):
@@ -210,8 +216,8 @@ class VceMatrix:
             # Stata stops each row AT the diagonal -- it does not pad the trailing
             # columns with blanks. Padding them made every line end with spaces and the
             # row widths disagree with Stata's.
-            cells = "".join(
-                _format_entry(matrix[row, col], cell)
+            cells = " ".join(
+                _format_entry(matrix[row, col], 11)
                 for col in range(row + 1)
             )
             lines.append(f"{label:>{lead}} |{cells}")

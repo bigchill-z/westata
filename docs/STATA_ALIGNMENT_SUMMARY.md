@@ -40,6 +40,25 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### B 类核实结果（第 85–86 轮）
+
+报告把 B 类（39 项）整体标为「布局适配（设计约束，非缺陷）」并注明「排版不同」。逐项实测后：
+
+**已与 Stata 逐字符一致的（报告仍标注「布局不同」，属过时记录）：**
+
+| 项 | 核对结果 |
+|---|---|
+| C09-03 `estat vif` | VIF/1-VIF 数值与列宽完全一致 |
+| C09-02 `estat ovtest` | 标题、`Omitted:` 行、`H0:` 行、`F(3, 18) =   3.54` 全部一致 |
+| C07-01 `estat hettest` | `Variable: Fitted values of y`、`chi2(1) =   6.62` 一致 |
+| C07-03 `estat imtest, white` | 数值与 Cameron-Trivedi 分解表逐行一致 |
+| C09-01 `estat ic` | **第 85 轮修复**（4 位小数 + 全宽首尾规则线），8/8 行一致 |
+| C04-03 `ereturn list` | **第 72 轮实现** |
+
+**仍未对齐的一项**：C05-07 `lincom` 的表头 —— Stata 是 `           y | Coefficient`（`|` 在第 13 列），
+westata 是 `y           | Coefficient`（响应名左对齐）。第 86 轮尝试修正时反复差 1 个字符，
+**已回滚**（`_place` 的列语义是按「结束列」定位，与左字段宽度耦合，需要重写该表头的构造方式而非调参数）。
+
 ### 普通 OLS 多一行标题：已修复（第 83 轮）
 
 报告 C04-01 把 OLS 归为 A 类「可直接替代」，括注「westata 多一行标题」。实测确认差异为真：

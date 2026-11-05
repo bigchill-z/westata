@@ -68,7 +68,8 @@ class LincomResult:
 
         statistic_label = "z" if self.distribution == "z" else "t"
         response = str(getattr(self, "response_name", "") or "")
-        marker = f"( 1)  {self.expression}"
+        # Stata indents the constraint marker by ONE space: " ( 1)  k + l = 0".
+        marker = f" ( 1)  {self.expression}"
         full_rule = "-" * 78
 
         # Measured off a live ``lincom temp + price``: the header is 77 characters with
@@ -89,28 +90,34 @@ class LincomResult:
             gap = end_column - used - len(text)
             pieces.append(" " * max(gap, 0) + text)
 
-        # Stata's name column is 11 characters plus a space before the pipe:
-        # "consumption | Coefficient ..." -- the pipe sits at index 12, so the field is 11.
-        # ``_place`` treats its argument as the index ONE PAST the last character, matching
-        # Python slice notation, so the columns below are Stata's positions plus one.
-        # Target columns are Stata's own, verified field by field:
-        #   header  Coefficient 14-24, Std. err. 27-35, t 42, P>|t| 47-51, CI 57-76
-        #   row     estimate 15-23, se 27-35, t 39-43, p 47-51, lo 57-64, hi 69-76
-        header_pieces = [f"{response:<11} |"]
-        _place(header_pieces, "Coefficient", 25)
-        _place(header_pieces, "Std. err.", 36)
-        _place(header_pieces, statistic_label, 43)
-        _place(header_pieces, "P>|" + statistic_label + "|", 52)
-        _place(header_pieces, "[95% conf. interval]", 77)
+        # Columns taken from Stata's own line, measured with str.index()/re.finditer so
+        # nothing is derived:
+        #
+        #   '           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]'
+        #   '         (1) |   1.075205   .1159063     9.28   0.000     .8341646    1.316245'
+        #
+        #     header ends: y 12, Coefficient 26, Std. err. 37, t 44, P>|t| 53, CI 78
+        #     row    ends: (1) 14, estimate 25, se 36, t 45, p 53, lo 66, hi 78
+        #
+        # The response name is RIGHT-aligned so it finishes at column 12 and the pipe lands at
+        # 13; building it as ``f"{response:<11} |"`` left-aligned the name against the table
+        # edge and shifted the pipe to 12. ``_place``'s argument is the index one past the
+        # last character, hence the "+1" between the table above and the calls below.
+        header_pieces = [f"{response:>12} |"]
+        _place(header_pieces, "Coefficient", 26)
+        _place(header_pieces, "Std. err.", 37)
+        _place(header_pieces, statistic_label, 44)
+        _place(header_pieces, "P>|" + statistic_label + "|", 53)
+        _place(header_pieces, "[95% conf. interval]", 78)
         header = "".join(header_pieces)
 
-        row_pieces = [f"{'(1)':>11} |"]
-        _place(row_pieces, _lincom_g(self.estimate), 24)
-        _place(row_pieces, _lincom_g(self.std_err), 35)
-        _place(row_pieces, f"{self.statistic:.2f}", 44)
-        _place(row_pieces, f"{self.pvalue:.3f}", 52)
-        _place(row_pieces, _lincom_g(self.ci_lower), 65)
-        _place(row_pieces, _lincom_g(self.ci_upper), 77)
+        row_pieces = [f"{'(1)':>12} |"]
+        _place(row_pieces, _lincom_g(self.estimate), 25)
+        _place(row_pieces, _lincom_g(self.std_err), 36)
+        _place(row_pieces, f"{self.statistic:.2f}", 45)
+        _place(row_pieces, f"{self.pvalue:.3f}", 53)
+        _place(row_pieces, _lincom_g(self.ci_lower), 66)
+        _place(row_pieces, _lincom_g(self.ci_upper), 78)
         row = "".join(row_pieces)
 
         return chr(10).join(

@@ -154,6 +154,34 @@ def _stata_number(value: float, width: int = 9) -> str:
         elif text.startswith("-0."):
             text = "-" + text[2:]
         body = text[1:] if text.startswith("-") else text
+        # Stata prefers FIXED notation and falls back to an exponent only when the fixed
+        # form cannot fit the field. C's ``%g`` (and therefore Python's) switches to an
+        # exponent once the exponent drops below -4, which is why a standard error of
+        # .0000249 came out as ``2.49e-05`` where Stata prints ``.0000249``.
+        #
+        # Reconstruct the fixed form by walking DECIMAL PLACES and keeping the longest one
+        # that fits the field: for 2.486e-05 that is 7 places -> .0000249 (eight chars),
+        # which is exactly Stata's value. Formatting at full precision (.12f) would give
+        # .000024861206 -- thirteen chars, too wide, and therefore rejected.
+        if "e" in body:
+            best = ""
+            for decimals in range(1, 20):
+                fixed = f"{value:.{decimals}f}".rstrip("0").rstrip(".")
+                if fixed.startswith("0."):
+                    fixed = fixed[1:]
+                elif fixed.startswith("-0."):
+                    fixed = "-" + fixed[2:]
+                fixed_body = fixed[1:] if fixed.startswith("-") else fixed
+                # A fixed form that has collapsed to "0" or "." has LOST the value entirely;
+                # keep the exponential text in that case (e.g. 1.23e-12, where no decimal
+                # count under 12 produces a nonzero fixed string that fits).
+                if fixed_body in ("", "0", "."):
+                    continue
+                if 0 < len(fixed_body) <= width - 1:
+                    best = fixed
+            if best:
+                text = best
+                body = best[1:] if best.startswith("-") else best
         if len(body) <= width - 1:
             break
     return f"{text:>{width}}"

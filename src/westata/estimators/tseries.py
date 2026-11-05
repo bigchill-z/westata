@@ -941,18 +941,25 @@ class VARResults:
             CausalityTestResults,
         )
 
+        # ``causing`` may be a single NAME or a list of names. ``list("unem")`` splits a
+        # string into characters, so passing a bare name used to raise
+        # ``ValueError: 'u' is not in list`` from statsmodels -- the method was unusable
+        # for the one-covariate case that ``vargranger`` exercises most often.
+        causing_names = [causing] if isinstance(causing, str) else list(causing)
+        caused_name = str(caused)
+
         kind = str(statistic).strip().lower()
         if kind in ("f", "f-test"):
             # statsmodels' F test, deliberately unscaled: it is its own
             # convention (df2 already carries T - k_eq), not Stata's.
-            return self._result.test_causality(caused, list(causing), kind="f")
+            return self._result.test_causality(caused_name, causing_names, kind="f")
         if kind not in ("chi2", "wald", "chisq"):
             raise ValueError(
                 f"var: granger causality statistic must be 'chi2' (Stata's "
                 f"vargranger) or 'F' (statsmodels' convention), got {statistic!r}"
             )
 
-        outcome = self._result.test_causality(caused, list(causing), kind="wald")
+        outcome = self._result.test_causality(caused_name, causing_names, kind="wald")
         inflation = 1.0 / self.ml_factor if self.ml else 1.0
         statistic_value = float(outcome.test_statistic) * inflation
         df_value = int(outcome.df)

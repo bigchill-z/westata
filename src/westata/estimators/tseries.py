@@ -2378,7 +2378,12 @@ class GARCH:
         self._mean = mean
         # The series' own name, for ``e(depvar)`` and for the mean-equation group label.
         # Stata heads the table with it and prints it again as the first group row.
-        self._depvar_name = str(getattr(self._y, "name", "") or "")
+        #
+        # Read it from the CALLER's object, not from ``self._y``: ``_as_series`` builds a
+        # fresh Series and names it "y" when the input carried no name, so reading it back
+        # gave "y" for every arch fit and the mean-equation block was headed "y |" instead
+        # of the variable's name. Measured: ``arch dinf, arch(1)`` prints "dinf |".
+        self._depvar_name = str(getattr(endog, "name", "") or "")
 
     # -- covariance conventions ------------------------------------------
     _COV_TYPES = {

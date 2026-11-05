@@ -2707,17 +2707,27 @@ def _stata_summary(result: Any) -> str:
         # it four columns further right.
         # The multi-quantile block above already emitted the banner + Number of obs, so
         # the single-quantile line is skipped for those commands.
+        # Geometry measured from a live ``qreg lnw s expr tenure, quantile(.5)``. Every
+        # line is 78 characters:
+        #
+        #   'Median regression                                   Number of obs =        758'
+        #   '  Raw sum of deviations   130.68 (about 5.684)'
+        #   '  Min sum of deviations   105.07                    Pseudo R2     =     0.1960'
+        #
+        # The banner occupies 52; "Number of obs" ends at 64 with "=" at 66 and the value
+        # right-aligned to 78. The deviation values start at column 26, and "Pseudo R2"
+        # starts at 52 -- the same column the Number-of-obs label starts at.
         if not _r2_by_q:
-            lines.append(f"{_banner_text:<52}{'Number of obs':<14}= {nobs:>11d}")
+            lines.append(f"{_banner_text:<52}{'Number of obs':<13} = {nobs:>10d}")
         if np.isfinite(sum_rdev):
             about = f" (about {_num(q_v, 8)})" if np.isfinite(q_v) else ""
-            lines.append(f"  Raw sum of deviations {_num(sum_rdev, 7)}{about}")
-        if np.isfinite(sum_adev):
-            left = f"  Min sum of deviations {_num(sum_adev, 7)}"
-            # Stata right-aligns Pseudo R2 in the same column block as the
-            # Number of obs value; pad to a fixed gutter so the two lines line up.
             lines.append(
-                left.ljust(40) + f"{'Pseudo R2':<13} = {_fixed(pseudo_r2, 4):>10}"
+                f"  {'Raw sum of deviations':<22}{_num(sum_rdev, 7):>8}{about}"
+            )
+        if np.isfinite(sum_adev):
+            left = f"  {'Min sum of deviations':<22}{_num(sum_adev, 7):>8}"
+            lines.append(
+                left.ljust(52) + f"{'Pseudo R2':<9}     = {_fixed(pseudo_r2, 4):>10}"
             )
         if np.isfinite(pseudo_r2) and not np.isfinite(sum_adev):
             # Degenerate case: no deviation lines, still report the pseudo-R2.

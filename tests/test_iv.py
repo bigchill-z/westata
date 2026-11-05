@@ -511,13 +511,21 @@ def test_summary_stata_renders():
     # Stata's ivregress table reports z / P>|z|, not t (see [R] ivregress,
     # Example 1: "Wald chi2(2) = 90.76" with a z column).
     #
-    # It does NOT print R-squared, even though the estimator stores one. Measured from a
-    # live ``ivregress 2sls y x1 (x2 = z)``: the header is Number of obs / Wald chi2 /
-    # Prob > chi2 / Root MSE and nothing else, and the table closes with the
-    # Endogenous/Exogenous footer.
+    # It DOES print R-squared. This assertion used to require the opposite, claiming a
+    # live ``ivregress 2sls`` showed only Number of obs / Wald chi2 / Prob > chi2 /
+    # Root MSE. A live run shows five rows:
+    #
+    #     Instrumental-variables 2SLS regression       Number of obs   =   400
+    #                                                 Wald chi2(2)    =   1674.42
+    #                                                 Prob > chi2     =     0.0000
+    #                                                 R-squared       =     0.8923
+    #                                                 Root MSE        =      1.064
+    #
+    # Adj R-squared really is absent; only the R-squared half of the old claim was wrong.
     for token in ["Coefficient", "Std. err.", "P>|z|", "Number of obs", "Wald chi2"]:
         assert token in text
-    assert "R-squared" not in text
+    assert "R-squared" in text
+    assert "Adj R-squared" not in text
     assert "P>|t|" not in text
     assert "Endogenous:" in text and "Exogenous:" in text
 

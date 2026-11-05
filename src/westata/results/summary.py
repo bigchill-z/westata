@@ -2219,16 +2219,22 @@ def _stata_summary(result: Any) -> str:
         # separated the table from its header.
         lines.pop() if lines and lines[-1] == "" else None
     elif str(getattr(result, "model_name", "") or "").startswith("ivregress"):
-        # ``ivregress`` prints a four-row two-column header and NO sums of squares,
+        # ``ivregress`` prints a five-row two-column header and NO sums of squares,
         # whatever the method:
         #
-        #   Instrumental-variables 2SLS regression       Number of obs   =   100
-        #                                               Wald chi2(2)    =   0.71
-        #                                               Prob > chi2     = 0.7013
-        #                                               Root MSE        = 1.5071
+        #   Instrumental-variables 2SLS regression       Number of obs   =   400
+        #                                               Wald chi2(2)    =   1674.42
+        #                                               Prob > chi2     =     0.0000
+        #                                               R-squared       =     0.8923
+        #                                               Root MSE        =      1.064
         #
-        # Left column 50, right 28 (label 18, "= ", value 6). R-squared and Adj R-squared
-        # are NOT printed even though the estimator stores them.
+        # Left column 50, right 28 (label 18, "= ", value 6).
+        #
+        # ``R-squared`` IS printed. An earlier version of this block omitted it, on the
+        # stated belief that "R-squared and Adj R-squared are NOT printed even though the
+        # estimator stores them" -- a live ``ivregress 2sls`` shows the line, with the
+        # stored ``e(r2)`` as its value. Adj R-squared genuinely is not printed, and that
+        # half of the old note was right.
         _iv_rows: list[tuple[str, str]] = [
             ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
         ]
@@ -2244,6 +2250,10 @@ def _stata_summary(result: Any) -> str:
             _iv_rows.append((f"Wald chi2({_df_label(_iv_df)})", f"{_wald:.2f}"))
         if np.isfinite(_p_wald):
             _iv_rows.append(("Prob > chi2", f"{_p_wald:.4f}"))
+        # Order matters: Stata puts R-squared between Prob > chi2 and Root MSE.
+        _iv_r2 = _e_float(result, "r2")
+        if np.isfinite(_iv_r2):
+            _iv_rows.append(("R-squared", f"{_iv_r2:.4f}"))
         if np.isfinite(rmse):
             _iv_rows.append(("Root MSE", _stata_number(rmse, 7).strip()))
         _iv_banner = str((getattr(result, "e", None) or {}).get("title") or "")

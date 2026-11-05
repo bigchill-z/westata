@@ -2485,15 +2485,60 @@ class GARCH:
 
         params = np.asarray(result.params, dtype=float)
         names = list(result.params.index)
+        # The ``arch`` package reports the variance-equation parameters as
+        # ['omega', 'alpha[1]', ...], with the constant FIRST. Stata prints the ARCH block
+        # in the opposite order -- the ARCH and GARCH terms first, and the constant LAST as
+        # its "_cons" row:
+        #
+        #   ARCH         |
+        #           arch |
+        #            L1. |   .4201012   ...   <- alpha[1]
+        #          _cons |   .0001802   ...   <- omega
+        #
+        # Rendering in the package's order put ``_cons`` on alpha[1] and ``L1.`` on omega,
+        # i.e. a row LABEL sitting on the wrong number. Reordering here, once, keeps the
+        # two in step rather than teaching the renderer a per-parameter mapping.
+        _mean_names = [
+            name
+            for name in names
+            if not (
+                name == "omega"
+                or name.startswith("alpha[")
+                or name.startswith("beta[")
+                or name.startswith("gamma[")
+            )
+        ]
+        _variance_order = (
+            [name for name in names if name.startswith("alpha[")]
+            + [name for name in names if name.startswith("gamma[")]
+            + [name for name in names if name.startswith("beta[")]
+            + [name for name in names if name == "omega"]
+        )
+        _stata_order = _mean_names + _variance_order
+        _permutation: list[int] | None = None
+        # The OPG covariance is built from the PARAMETER VECTOR, so it has to be computed
+        # in the package's own order and permuted afterwards. Passing the already-reordered
+        # vector made the scores line up with the wrong parameters and every standard error
+        # came out wrong (.1471562 became 122.6474).
+        _package_params = params.copy()
+        if _stata_order != names:
+            _permutation = [names.index(name) for name in _stata_order]
+            params = params[_permutation]
+            names = _stata_order
         if backcast is None:
             # Keep the package's backcast visible in e(archi) instead of a NaN.
             backcast = getattr(model, "_backcast", None)
         if covariance == "OPG":
-            cov = _opg_covariance(model, params, backcast)
+            cov = _opg_covariance(model, _package_params, backcast)
         else:
             # ``arch`` exposes the parameter covariance as ``param_cov``, not the
             # statsmodels-style ``cov_params()``.
             cov = np.asarray(result.param_cov, dtype=float)
+        # Same reordering for the covariance, or the standard errors would stay attached to
+        # the package's parameter order while the estimates moved to Stata's -- which is
+        # exactly the kind of silent mismatch this fix exists to remove.
+        if _permutation is not None:
+            cov = np.asarray(cov, dtype=float)[np.ix_(_permutation, _permutation)]
         nobs = int(result.nobs)
 
         def _pick(prefix: str) -> tuple[float, ...]:

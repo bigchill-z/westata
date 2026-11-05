@@ -195,20 +195,37 @@ C:\Users\zjl\ado\plus\   ← 用户 ado，含大量可读源码
 整个 ado 树没有任何 `.mata` 文本。CR1 候选公式全部不匹配（`w²res²`→38.16、
 `w·res²`→240.47、`w·res²·n`→1202.33，目标 496.95）。故 `se`/`z`/`ci` 保持 NaN。
 
-### `synth` 专项
+### `synth` 专项（第 61–62 轮）
 
-**源码可得但尚未实现**。实测参照（`synth_smoking.dta`，
-`synth cigsale lnincome age15to24 beer retprice, trunit(3) trperiod(1989) nested`）：
+**源码基本可得，算法结构已还原，但尚未实现到精确。**
+
+`s/synth.ado`（931 行）与 **`s/synth_ll.ado`（36 行，可读）** 给出了核心算法：
 
 ```
-非零权重：state 4 = 0.631, state 5 = 0.369（其余 36 个州为 0），权重和 = 1
+内层 QP（给定 V）：  H = Xco' · V · Xco
+                     c = -(Xtr' · V · Xco)'
+                     约束 Σw = 1, 0 ≤ w ≤ 1
+外层损失：           loss = (Ztr - Zco·w)'(Ztr - Zco·w)
 ```
 
-已尝试的实现：单纯形约束（`Σw=1, w≥0`）下最小化预测变量加权距离，得到
-`state4=0.6054, state5=0.3533, state21=0.0412` —— **主要结构对，但多出一个州且分布有偏**。
+**X = 预测变量，Z = 处理前各期结果变量路径**——内层用 X、外层用 Z，这是关键。
+V 由 `getabs` 归一化（`|b|/Σ|b|`），初值来自 `regsval`（回归法）。
 
-原因是 `synth` 用**嵌套优化**（外层优化预测变量权重 `V`、内层优化 `W`），且预测变量的
-构造涉及 `xperiod`/`mspeperiod` 的默认值逻辑，尚未完整还原。按纪律**不发布**近似实现。
+实测参照（`synth_smoking.dta`，`synth cigsale lnincome age15to24 beer retprice,
+trunit(3) trperiod(1989)`）：
+
+| 选项 | 非零权重 |
+|---|---|
+| **`nested`** | **state 4 = 0.631, state 5 = 0.369**（仅 2 个） |
+| 默认（回归 V） | state 4 = 0.555, 5 = 0.306, 6 = 0.105, 21 = 0.034（4 个） |
+
+已实现的嵌套优化（外层 Nelder-Mead + 内层 SLSQP QP）得到
+`state 4 = 0.5419, state 5 = 0.4581`——**选对了两个州**（默认路径会选出 4 个），
+但比例与 Stata 的 `0.631/0.369` 不同，说明外层 V 未找到全局最优。
+
+`regsval`/`normalize`/`getabs` 均定义在二进制
+`l/lsynth_mata_subr.mlib` 中，无文本源码；`synth_ll.ado` 虽可读但只覆盖内层。
+按纪律**不发布**近似实现。
 
 ### `teffects psmatch` 专项（报告 P0，第 52 轮）——**点估计已攻克**
 

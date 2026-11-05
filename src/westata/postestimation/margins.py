@@ -565,6 +565,31 @@ def _analytic_ordered_margin(
     return value, gradient
 
 
+def _per_observation_derivative(
+    result: Any, exog: np.ndarray, kind: str, position: int, *, outcome: int | None = None
+) -> np.ndarray:
+    """``d g(x_i b) / d x_position`` at EACH observation.
+
+    Needed for elasticities, which average the per-observation elasticity rather than
+    multiplying averaged pieces together (see the ``_scale`` comment). The analytic slope
+    ``g'(eta) * b_j`` is the same expression ``_analytic_marginal_effect`` averages, so it is
+    reused here rather than differentiated a second way.
+    """
+
+    family = prediction_family(result, kind)
+    params = np.asarray(result.params, dtype=float).reshape(-1)
+    n_columns = exog.shape[1]
+    if family is None or not 0 <= position < n_columns:
+        # Fall back to the numeric route's average, broadcast back over the sample.
+        value, _ = _statistic_and_gradient(
+            result, exog, kind, derivative_with_respect_to=position, outcome=outcome
+        )
+        return np.full(exog.shape[0], float(value))
+    eta = exog @ params[:n_columns]
+    first, _ = family_slopes(family, eta)
+    return np.asarray(first, dtype=float) * float(params[position])
+
+
 def _analytic_marginal_effect(
     result: Any, exog: np.ndarray, kind: str, position: int, *, outcome: int | None = None
 ) -> tuple[float, np.ndarray] | None:
@@ -1181,8 +1206,32 @@ def _marginal_effects(
         per_observation = (
             covariate / prediction if elasticity_form == "eyex" else 1.0 / prediction
         )
+        # The elasticity is the average of the PER-OBSERVATION elasticities, not the
+        # average derivative times the average factor. Those differ whenever the derivative
+        # and the factor covary -- which they do, since both carry the fitted probability.
+        #
+        # Measured on ``logit treat age education re74 re75`` then ``margins, eyex(age)``:
+        #
+        #   Stata                        .1992726  = mean(dy_i * x_i / p_i)
+        #   mean(dy_i)*mean(x_i/p_i)     .1996857  <- 0.2% high: the E[ab] vs E[a]E[b] gap
+        #
+        # The per-observation derivative is recomputed here rather than reusing the averaged
+        # ``estimate``; the gradient keeps the averaged factor, which is what the delta
+        # method needs.
+        beta_derivative, _ = _statistic_and_gradient(
+            result,
+            subset,
+            predict_kind,
+            derivative_with_respect_to=position,
+            outcome=outcome,
+        )
+        derivative_per_observation = _per_observation_derivative(
+            result, subset, predict_kind, position, outcome=outcome
+        )
         factor = float(np.mean(per_observation))
-        return estimate * factor, gradient * factor
+        combined = float(np.mean(derivative_per_observation * per_observation))
+        _ = beta_derivative
+        return combined, gradient * factor
 
     for name in requested:
         if name not in names:

@@ -81,10 +81,12 @@ class WaldTest:
         lines: list[str] = []
         text = str(self.constraint or "").strip()
         if text:
-            # Stata indents the restriction by two spaces and leaves TWO spaces after the
-            # ``( 1)`` marker: "  ( 1)  temp = 0". One space made the line a character short.
+            # Stata indents the restriction by ONE space and leaves TWO after the ``( 1)``
+            # marker: " ( 1)  k = .1". Measured from a live ``test k = 0.1`` on
+            # cobb_douglas.dta -- the earlier comment claimed two leading spaces, and with
+            # them the line sat a character right of Stata's.
             lines.extend(
-                "  " + _space_after_marker(line.strip())
+                " " + _space_after_marker(line.strip())
                 for line in text.splitlines()
                 if line.strip()
             )
@@ -99,17 +101,24 @@ class WaldTest:
         # the value is right-aligned in 8 after " = ", and the probability line starts at
         # column 11 with the value right-aligned in 10. The old code printed no indentation,
         # no padding, and aligned Prob with a hard-coded run of spaces inside the label.
+        # Indentation measured from a live ``test k = 0.1``:
+        #
+        #   '       F(  1,    21) =    1.98'    <- F ends at column 8, value ends at 26
+        #   '            Prob > F =    0.1744'  <- Prob ends at column 18, value at 34
+        #
+        # Seven leading spaces before F and twelve before Prob. The earlier version used six
+        # and eleven, which put both lines one character left of Stata's.
         if self.distribution == "F":
             head = (
-                f"      F({self.df:>3.0f},{self.df_denom:>6.0f}) = "
+                f"       F({self.df:>3.0f},{self.df_denom:>6.0f}) = "
                 f"{self.statistic:>7.2f}"
             )
-            tail = f"           Prob > F = {self.pvalue:>9.4f}"
+            tail = f"            Prob > F = {self.pvalue:>9.4f}"
         else:
             head = (
-                f"      chi2({self.df:>3.0f}) = {self.statistic:>7.2f}"
+                f"       chi2({self.df:>3.0f}) = {self.statistic:>7.2f}"
             )
-            tail = f"           Prob > chi2 = {self.pvalue:>9.4f}"
+            tail = f"            Prob > chi2 = {self.pvalue:>9.4f}"
         lines.append(head)
         lines.append(tail)
         return chr(10).join(lines)
@@ -280,5 +289,12 @@ def describe_constraint(
         if zero_rhs and r[i] == 0:
             lines.append(f"({i + 1:2d}) {expression} = 0")
         else:
-            lines.append(f"({i + 1:2d}) {expression} = {r[i]:g}")
+            # Stata drops the leading zero on the right-hand side: "k = .1", not "k = 0.1".
+            # ``:g`` alone gives "0.1"; the same stripping used by %9.0g is applied here.
+            _rhs = f"{r[i]:g}"
+            if _rhs.startswith("0."):
+                _rhs = _rhs[1:]
+            elif _rhs.startswith("-0."):
+                _rhs = "-" + _rhs[2:]
+            lines.append(f"({i + 1:2d}) {expression} = {_rhs}")
     return "\n".join(lines)

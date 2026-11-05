@@ -46,7 +46,71 @@ from westata.postestimation.predict import (
     prediction_family,
 )
 
-__all__ = ["DEFAULT_PREDICT", "MarginsResult", "default_predict_kind", "margins"]
+__all__ = [
+    "DEFAULT_PREDICT",
+    "MarginsResult",
+    "MarginsTable",
+    "default_predict_kind",
+    "margins",
+]
+
+
+#: The 78-character fields of Stata's margins table, measured off a live run. Each value
+#: is right-aligned so that it ENDS at the given exclusive column, which is what makes a
+#: 10-character estimate and an 8-character one line up under the same heading.
+_MARGIN_END_ESTIMATE = 25
+_MARGIN_END_STDERR = 36
+_MARGIN_END_STATISTIC = 45
+_MARGIN_END_PVALUE = 53
+_MARGIN_END_LOWER = 66
+_MARGIN_END_UPPER = 78
+_MARGIN_WIDTH = 78
+
+
+def _margin_number(value: float, end_column: int, used: int) -> str:
+    """``value`` right-aligned so that it ends at ``end_column``.
+
+    Margins cells use SEVEN DECIMAL PLACES with trailing zeros dropped -- not a
+    significant-digit rule. Verified against every number in the reference table:
+
+        .0135531672 -> .0135532      .0282773592 -> .0282774
+        .0075124809 -> .0075125      .0011710248 -> .001171
+
+    A six-significant-figure rule reproduces the first and third but gives ``.00751248``
+    and ``.00117102`` for the second and fourth, which is what Stata does NOT print.
+    Values too wide for seven decimals fall back to significant figures.
+    """
+
+    if value is None or not np.isfinite(value):
+        text = "."
+    else:
+        number = float(value)
+        text = f"{number:.7f}"
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        if len(text) > 9:
+            # Too wide for the cell: fall back to significant figures that fit.
+            for digits in range(7, 0, -1):
+                candidate = f"{number:.{digits}g}"
+                if candidate.startswith("0."):
+                    candidate = candidate[1:]
+                elif candidate.startswith("-0."):
+                    candidate = "-" + candidate[2:]
+                if len(candidate) <= 9:
+                    text = candidate
+                    break
+    return " " * max(end_column - used - len(text), 0) + text
+
+
+def _margin_rate(value: float, decimals: int, end_column: int, used: int) -> str:
+    """A fixed-decimal field (statistic, p-value) right-aligned to ``end_column``."""
+
+    text = "." if value is None or not np.isfinite(value) else f"{value:.{decimals}f}"
+    return " " * max(end_column - used - len(text), 0) + text
 
 
 @dataclass
@@ -61,13 +125,40 @@ class MarginsResult:
     ci_lower: float
     ci_upper: float
     prediction: str = ""
+    #: Table context, stamped onto every row by ``margins()``: the heading, the sample
+    #: size, the VCE label, the prediction expression and the ``wrt`` list. They describe
+    #: the whole table rather than this row, but keeping them here lets a single-row
+    #: result render itself without a separate container.
+    title: str = ""
+    nobs: float = float("nan")
+    vce_label: str = ""
+    expression: str = ""
+    variables: tuple[str, ...] = ()
+    column_label: str = ""
+    stat_label: str = "z"
 
     def __str__(self) -> str:
-        return (
-            f"{self.label:<24}{self.estimate:>12.7g}{self.std_err:>12.7g}"
-            f"{self.statistic:>8.2f}{self.pvalue:>8.3f}"
-            f"{self.ci_lower:>14.7g}{self.ci_upper:>14.7g}"
-        )
+        """Reproduce Stata's margins table for a single row.
+
+        Reference (``margins, dydx(s)`` after a logit, n = 758)::
+
+            Average marginal effects                                   Number of obs = 758
+            Model VCE: OIM
+            Expression: Pr(rns), predict()
+            dy/dx wrt:  s
+            ------------------------------------------------------------------------------
+                         |            Delta-method
+                         |      dy/dx   std. err.      z    P>|z|     [95% conf. interval]
+            -------------+----------------------------------------------------------------
+                       s |  -.0135532   .0075125    -1.80   0.071    -.0282774     .001171
+            ------------------------------------------------------------------------------
+
+        Every line is 78 characters. The rule of the table is that each value is
+        right-aligned to a fixed END column (25, 36, 45, 53, 66, 78), which is what makes
+        a ten-character estimate and an eight-character one line up under one heading.
+        """
+
+        return MarginsTable([self]).render()
 
     def to_dict(self) -> dict[str, float]:
         """Flatten to the rows of Stata's ``r(table)``.
@@ -90,6 +181,151 @@ class MarginsResult:
             "ll": float(self.ci_lower),
             "ul": float(self.ci_upper),
         }
+
+
+class MarginsTable(list):
+    """A whole ``margins`` table: N rows rendered as ONE Stata table.
+
+    Subclasses ``list`` on purpose. ``margins()`` has always returned a plain list when it
+    produced several rows and a bare result when it produced one, and callers rely on that
+    -- ``isinstance(x, list)`` is asserted in the test suite. Subclassing keeps every one of
+    those behaviours (iteration, indexing, ``len``) while giving the table a ``__str__``, so
+    a multi-term call finally renders instead of printing a list of dataclass reprs.
+
+    A single-row call still returns a bare :class:`MarginsResult`, which is not a list; its
+    ``__str__`` builds a one-row ``MarginsTable`` and renders that, so both shapes print the
+    same table.
+    """
+
+    def __str__(self) -> str:
+        """Print the table rather than the list-of-dataclasses repr.
+
+        A ``list`` subclass inherits ``list.__repr__``, so without this override a
+        multi-term call would still print ``[MarginsResult(...), ...]``.
+        """
+
+        return self.render()
+
+    def render(self) -> str:
+        """Stata's full margins table."""
+
+        if not self:
+            return ""
+        first = self[0]
+        rule = "-" * _MARGIN_WIDTH
+
+        lines: list[str] = []
+        if first.title:
+            # "…effects" padded to column 59, then the sample size in three columns.
+            lines.append(
+                f"{first.title:<59}Number of obs = {first.nobs:>3.0f}"
+            )
+        if first.vce_label:
+            lines.append(f"Model VCE: {first.vce_label}")
+        if first.expression:
+            lines.append(f"Expression: {first.expression}")
+        if first.variables:
+            # Stata writes "dy/dx wrt:" followed by TWO spaces before the list.
+            lines.append(f"{first.column_label} wrt:  " + " ".join(first.variables))
+        lines.extend(
+            [
+                rule,
+                f"{'':<13}|{'Delta-method':>24}",
+                self._header(first),
+                "-" * 13 + "+" + "-" * (_MARGIN_WIDTH - 14),
+            ]
+        )
+        for row in self:
+            lines.append(self._row(row))
+        lines.append(rule)
+        return "\n".join(lines)
+
+    @staticmethod
+    def _header(first: MarginsResult) -> str:
+        """The two-line header, whose only variable parts are the column and stat labels."""
+
+        column = first.column_label or "dy/dx"
+        stat = first.stat_label or "z"
+        return (
+            f"{'':<13}|{column:>11}   std. err.      {stat}"
+            f"    P>|{stat}|     [95% conf. interval]"
+        )
+
+    @staticmethod
+    def _row(row: MarginsResult) -> str:
+        """One data line, every value ending at its measured column."""
+
+        # Stata labels a single predictive margin "_cons"; the upstream row calls it
+        # "margin", which is not a name any Stata table shows.
+        label = row.label
+        if label == "margin":
+            label = "_cons"
+        text = f"{label:>12} |"
+        text += _margin_number(row.estimate, _MARGIN_END_ESTIMATE, len(text))
+        text += _margin_number(row.std_err, _MARGIN_END_STDERR, len(text))
+        text += _margin_rate(row.statistic, 2, _MARGIN_END_STATISTIC, len(text))
+        text += _margin_rate(row.pvalue, 3, _MARGIN_END_PVALUE, len(text))
+        text += _margin_number(row.ci_lower, _MARGIN_END_LOWER, len(text))
+        text += _margin_number(row.ci_upper, _MARGIN_END_UPPER, len(text))
+        return text
+
+
+def _finish_margins(
+    rows: list[MarginsResult],
+    result: Any,
+    *,
+    variables: Sequence[str] = (),
+    column_label: str = "",
+) -> Any:
+    """Stamp the table context onto every row and wrap a multi-row result.
+
+    Stata prints ONE table per ``margins`` call, so the heading, sample size, VCE label and
+    prediction expression belong to the table rather than to a row. They are stored on each
+    row anyway (a row can then render itself) and the rows are returned as a
+    :class:`MarginsTable` when there is more than one.
+
+    Anything this function cannot determine is left EMPTY, which omits the line entirely.
+    That is deliberate: printing "Model VCE: OIM" for a model whose VCE was never checked
+    would assert something the code does not know.
+    """
+
+    if not rows:
+        return rows
+    model = str(getattr(result, "model_name", "") or "").lower()
+    depvar = str(
+        getattr(result, "response_name", None)
+        or (getattr(result, "e", None) or {}).get("depvar")
+        or ""
+    )
+    cov_type = str(getattr(result, "cov_type", "") or "").lower()
+    total = getattr(result, "nobs", None)
+    if total is None:
+        total = len(getattr(result, "resid", []) or [])
+
+    # Only the cases that have been checked against Stata are labelled.
+    ml_models = {"logit", "probit", "logistic", "cloglog", "ologit", "oprobit"}
+    if model in ml_models and cov_type in {"", "nonrobust"}:
+        vce_label = "OIM"
+    else:
+        vce_label = ""
+    if model in ml_models and depvar:
+        expression = f"Pr({depvar}), predict()"
+    elif model in {"ols", "regress"}:
+        expression = "Linear prediction, predict()"
+    else:
+        expression = ""
+    title = (
+        "Average marginal effects" if column_label else "Predictive margins"
+    )
+    for row in rows:
+        row.title = title
+        row.nobs = float(total)
+        row.vce_label = vce_label
+        row.expression = expression
+        row.variables = tuple(variables)
+        row.column_label = column_label or "Margin"
+        row.stat_label = "z" if model in ml_models else "t"
+    return rows[0] if len(rows) == 1 else MarginsTable(rows)
 
 
 def _statistic_and_gradient(
@@ -642,11 +878,19 @@ def margins(
         # They are computed per observation and then averaged -- which is what Stata
         # does and what makes ``eyex``/``eydx`` different from a rescaled ``dydx``.
         requested = None
-        for candidate in (dyex, eyex, eydx):
+        #: What Stata prints as the column heading for each elasticity form. ``dydx`` is
+        #: handled further down; these three are the semi- and full-elasticity variants.
+        elastic_label = ""
+        for candidate, form_name in (
+            (dyex, "dy/ex"),
+            (eyex, "ey/ex"),
+            (eydx, "ey/dx"),
+        ):
             if candidate is not None:
                 requested = (
                     [candidate] if isinstance(candidate, str) else list(candidate)
                 )
+                elastic_label = form_name
                 break
         if requested is None:  # pragma: no cover - the caller always passes one
             raise ValueError("margins needs a derivative form")
@@ -667,7 +911,9 @@ def margins(
             outcome=outcome,
             elasticity_form=form,
         )
-        return rows[0] if len(rows) == 1 else rows
+        return _finish_margins(
+            rows, result, variables=requested, column_label=elastic_label
+        )
 
     # Stata differentiates the response, not the linear index: logit/probit
     # marginals are on the probability scale and count models on the mean scale.
@@ -708,21 +954,20 @@ def margins(
             result, exog, names, over=over, level=level, predict_kind=kind,
             outcome=outcome,
         )
-    else:
-        requested = [dydx] if isinstance(dydx, str) else list(dydx)
-        rows = _marginal_effects(
-            result,
-            exog,
-            names,
-            requested,
-            factor_set=factor_set,
-            over=over,
-            level=level,
-            predict_kind=kind,
-            outcome=outcome,
-        )
-
-    return rows[0] if len(rows) == 1 else rows
+        return _finish_margins(rows, result)
+    requested = [dydx] if isinstance(dydx, str) else list(dydx)
+    rows = _marginal_effects(
+        result,
+        exog,
+        names,
+        requested,
+        factor_set=factor_set,
+        over=over,
+        level=level,
+        predict_kind=kind,
+        outcome=outcome,
+    )
+    return _finish_margins(rows, result, variables=requested, column_label="dy/dx")
 
 
 def _at_scenarios(at: Mapping[str, Any]) -> list[dict[str, Any]]:

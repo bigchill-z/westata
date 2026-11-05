@@ -19,7 +19,7 @@ from westata.postestimation.modeltests import (
     lrtest,
 )
 from westata.postestimation.nonlinear import nlcom, testnl
-from westata.postestimation.margins import MarginsResult, margins
+from westata.postestimation.margins import MarginsResult, MarginsTable, margins
 from westata.postestimation.predict import SUPPORTED_TYPES, predict, supported_types
 from westata.postestimation.tests import (
     WaldTest,
@@ -129,6 +129,7 @@ __all__ = [
     "WaldTest",
     "LincomResult",
     "MarginsResult",
+    "MarginsTable",
     "SUPPORTED_TYPES",
     "build_contrast",
     "describe_constraint",

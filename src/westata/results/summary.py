@@ -2853,21 +2853,37 @@ def _stata_summary(result: Any) -> str:
             lines.append("")
             return _svy_estimate_table(result, lines, names)
 
+        # Measured from a live ``svy: regress`` on a 20-strata / 200-PSU design: every
+        # line is 78 characters, the LEFT "=" sits at 17, and the right half starts at
+        # column 50 with its "=" at 66 and a TEN-wide value ending at 78:
+        #
+        #   'Number of strata =  20                            Number of obs   =        400'
+        #   'Number of PSUs   = 200                            Population size = 509.791159'
+        #   '                                                  Design df       =        180'
+        #
+        # The old split was left 54 / label 15 / value 6, which put the right half four
+        # columns right and clipped values to six characters.
         def _cell(label: str, value: str) -> str:
-            return f"{label:<15} = {value:>6}"
+            return f"{label:<16}= {value:>10}"
 
         def _row(left: str, right: str = "") -> str:
-            return f"{left:<54}{right}".rstrip()
+            return f"{left:<50}{right}".rstrip()
 
         rows: list[str] = []
         if np.isfinite(n_strata):
-            rows.append(_row(f"Number of strata = {int(round(n_strata)):>2}",
+            rows.append(_row(f"Number of strata = {int(round(n_strata)):>3}",
                              _cell("Number of obs", f"{nobs:,.0f}")))
         if np.isfinite(n_psu):
             # ``Population size`` prints as an INTEGER when the weights sum to a whole
-            # number -- "576", not "576.000000"; six decimals was a formatting bug.
-            pop = f"{n_pop:,.0f}" if np.isfinite(n_pop) and abs(n_pop - round(n_pop)) < 1e-9                 else (f"{n_pop:.6g}" if np.isfinite(n_pop) else ".")
-            rows.append(_row(f"Number of PSUs   = {int(round(n_psu)):>2}",
+            # number -- "576", not "576.000000" -- and with SIX DECIMALS when they do not
+            # ("509.791159"). ``%g`` gave 509.791, truncating real digits.
+            if not np.isfinite(n_pop):
+                pop = "."
+            elif abs(n_pop - round(n_pop)) < 1e-9:
+                pop = f"{int(round(n_pop)):,}"
+            else:
+                pop = f"{n_pop:,.6f}"
+            rows.append(_row(f"Number of PSUs   = {int(round(n_psu)):>3}",
                              _cell("Population size", pop)))
         if np.isfinite(df_resid):
             rows.append(_row("", _cell("Design df", f"{int(round(df_resid))}")))

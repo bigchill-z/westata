@@ -117,16 +117,33 @@ class OverIdResult:
         labelled without the "(score)" qualifier Stata prints.
         """
 
+        # BOTH statistics print SIX decimals with no leading zero, and the two rows must
+        # use the same format. Measured from a live ``estat overid`` after a two-instrument
+        # 2SLS fit::
+        #
+        #   Sargan (score) chi2(1) =  .779145  (p = 0.3774)
+        #   Basmann chi2(1)        =  .772859  (p = 0.3793)
+        #
+        # The earlier code used %8.5f for Sargan and %8.4f for Basmann, so the two rows
+        # disagreed in precision AND both carried a leading zero Stata never prints.
+        def _statistic(value: float) -> str:
+            text = f"{float(value):.6f}"
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            return text
+
         label = "Sargan (score)" if self.test == "Sargan" else self.test
         sargan_row = (
-            f"{label + ' chi2(' + f'{self.df:g}' + ')':<22}"
-            f" = {self.statistic:>8.5f}  (p = {self.pvalue:.4f})"
+            f"  {label + ' chi2(' + f'{self.df:g}' + ')':<22}"
+            f" =  {_statistic(self.statistic)}  (p = {self.pvalue:.4f})"
         )
         lines = ["", "Tests of overidentifying restrictions:", sargan_row]
         if self.basmann is not None:
             basmann_row = (
-                f"{'Basmann chi2(' + f'{self.df:g}' + ')':<22}"
-                f" = {self.basmann:>8.4f}  (p = {self.basmann_pvalue:.4f})"
+                f"  {'Basmann chi2(' + f'{self.df:g}' + ')':<22}"
+                f" =  {_statistic(self.basmann)}  (p = {self.basmann_pvalue:.4f})"
             )
             lines.append(basmann_row)
         return chr(10).join(lines)

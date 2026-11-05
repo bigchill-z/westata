@@ -102,6 +102,7 @@ from westata.errors import (
     WestataError,
 )
 from westata.postestimation import (
+    format_ereturn_list,
     rcm,
     tebalance_summarize,
     HausmanResult,
@@ -245,6 +246,7 @@ __all__ = [
     "teffects_psmatch",
     "tebalance_summarize",
     "rcm",
+    "format_ereturn_list",
     "LRTestResult",
     "pwcompare",
     "contrast",

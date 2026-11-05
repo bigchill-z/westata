@@ -21,6 +21,7 @@ from westata.postestimation.modeltests import (
 from westata.postestimation.nonlinear import nlcom, testnl
 from westata.postestimation.margins import MarginsResult, MarginsTable, margins
 from westata.postestimation.predict import SUPPORTED_TYPES, predict, supported_types
+from westata.postestimation.ereturn import format_ereturn_list
 from westata.postestimation.rcm import RcmResult, rcm
 from westata.postestimation.tebalance import (
     BalanceRow,

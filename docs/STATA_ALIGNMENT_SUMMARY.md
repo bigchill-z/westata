@@ -167,7 +167,7 @@ arima 是 σ 尺度 + 正态 1.96；两者规则不同，此前用「方差区�
 
 | 项目 | 成因 | 证据 |
 |---|---|---|
-| `synth` / `synth2` | `regsval`/`normalize`/`getabs` 在二进制 `lsynth_mata_subr.mlib` | 内层 QP 公式已从 `synth_ll.ado` 还原，选对州但对不对比例 |
+| `synth` / `synth2` | `regsval`/`normalize`/`getabs` 在二进制 `lsynth_mata_subr.mlib` | 内层 QP 公式已从 `synth_ll.ado` 还原；Mata 函数**可枚举可调用**但脱离 `synth.ado` 全局状态时返回空矩阵（第 70 轮实测）|
 | `rdrobust` SE | `rdrobust_vce` 在二进制 `lrdrobust.mlib` | 组装公式已验证 `sqrt((V_l+V_r)[1,1])` = Stata SE |
 | `teffects ra` SE | sandwich 在内置 `gmm` | 三种影响函数均低 2.9–3.4%，缺项而非缩放错 |
 | `xtserial` | 两个 ado 路径下均不存在 | 已按第 61 轮教训复查用户 ado 路径 |

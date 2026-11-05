@@ -62,7 +62,19 @@ def render_summary(result: Any, style: str = "statsmodels") -> str:
 
     normalized = _normalize_style(style)
     if normalized == "stata":
-        return _stata_summary(result)
+        text = _stata_summary(result)
+        # Stata prefixes the table with one note per absorbed regressor, e.g.
+        #   note: canal omitted because of collinearity.
+        # and the header follows immediately - no blank line between. The rendered table
+        # starts with a blank line of its own, so it is stripped before the note goes on.
+        omitted = tuple(getattr(result, "omitted_columns", ()) or ())
+        if omitted:
+            notes = "".join(
+                f"note: {name} omitted because of collinearity.{chr(10)}"
+                for name in omitted
+            )
+            text = notes + text.lstrip(chr(10))
+        return text
     return _statsmodels_summary(result)
 
 
@@ -3221,7 +3233,29 @@ def _stata_summary(result: Any) -> str:
     _skip_sigma_row = any(
         str(name).strip() in ("athrho", "/athrho") for name in names
     )
+    # An absorbed regressor prints as "<name> |          0  (omitted)" in the position it
+    # held in the specification. Only panel and areg fits can carry these, so the guards
+    # below are empty for every other model and nothing changes there.
+    _omitted_names = tuple(getattr(result, "omitted_columns", ()) or ())
+    _omitted_slots: dict[str, list[str]] = {}
+    _trailing_omitted: list[str] = []
+    if _omitted_names:
+        _all_names = tuple(getattr(result, "all_columns", ()) or ())
+        _surviving = set(names)
+        _pending: list[str] = []
+        for _column in _all_names:
+            if _column in _omitted_names:
+                _pending.append(_column)
+            elif _column in _surviving:
+                _omitted_slots[_column] = _pending
+                _pending = []
+        _trailing_omitted = _pending
     for index, name in enumerate(names):
+        for _omitted in _omitted_slots.get(str(name), ()):
+            # Measured from ``xtreg maize canal disaster, fe``: the name is right-aligned in
+            # the usual column, the coefficient prints as a bare 0, and "(omitted)" follows
+            # after two spaces where the standard error would be.
+            lines.append(f"{_omitted:>{name_width}} |{'0':>11}  (omitted)")
         group = ""
         bare = name
         for prefix in _EQUATION_PREFIXES:

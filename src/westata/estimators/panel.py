@@ -558,6 +558,11 @@ class PanelOLS:
         # specification into a hard failure. Measured on cao_chen.dta where ``prerebel`` is
         # constant within county: `xtreg rug_after maize prerebel, fe` runs in Stata and
         # reports only ``maize``, while westata refused to fit at all.
+        # Capture the ORIGINAL design column order before any column is dropped: Stata
+        # prints an absorbed regressor as ``<name> |          0  (omitted)`` in the
+        # position it occupied in the specification, so the row can only be put back if
+        # its original neighbours are known.
+        original_columns = [str(name) for name in X.columns]
         X, omitted = self._drop_absorbed_columns(X, entity_effects, time_effects)
         if omitted:
             self._omitted_columns = tuple(omitted)
@@ -665,6 +670,13 @@ class PanelOLS:
                 results.e["depvar"] = response
         except (AttributeError, IndexError):  # pragma: no cover
             pass
+        #: Regressors the fixed effects absorbed entirely. The backend refuses such a fit,
+        #: so this package drops the column; Stata instead keeps it in the table with a
+        #: zero coefficient and prints a note. Stored here so the summary renderer can put
+        #: both back -- without it the table silently loses a variable the caller named.
+        if omitted:
+            results.omitted_columns = tuple(omitted)
+            results.all_columns = tuple(original_columns)
         return results
 
     # -------------------------------------------------------------- internals

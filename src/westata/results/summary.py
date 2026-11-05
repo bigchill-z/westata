@@ -2070,12 +2070,17 @@ def _stata_summary(result: Any) -> str:
             _areg_rows.append(("Adj R-squared", _four(rsquared_adj)))
         if np.isfinite(rmse):
             _areg_rows.append(("Root MSE", f"{rmse:.4f}"))
+        # Right column: left field 50, label 19, "=" at 69, value right-aligned in 7 so it
+        # ends at 78. Measured from a live ``areg maize canal disaster, absorb(county)``,
+        # where every one of the seven lines is 78 characters with "=" at column 69.
+        # The previous widths (52 / 18 / 5) put "=" one column right and clipped the wider
+        # values -- ``147,506`` is seven characters and a five-wide field cannot hold it.
         _areg_title = str((getattr(result, "e", None) or {}).get("title") or "")
         _areg_title2 = str((getattr(result, "e", None) or {}).get("title2") or "")
         lines = []
         for _index, (_label, _value) in enumerate(_areg_rows):
             _left = _areg_title if _index == 0 else (_areg_title2 if _index == 1 else "")
-            lines.append(f"{_left:<52}{_label:<18}= {_value:>5}".rstrip())
+            lines.append(f"{_left:<51}{_label:<18}= {_value:>7}".rstrip())
         # ``clustertable`` belongs after the header block and before the coefficients, the
         # same place the ANOVA branch puts it. Omitting it here dropped the table for every
         # clustered areg fit -- the branch replaced the one that used to emit it.

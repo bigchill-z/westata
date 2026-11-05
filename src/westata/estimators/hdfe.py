@@ -1005,6 +1005,26 @@ class FEOLS:
         )
         # Reported, not hidden: absorbed regressors are part of the result.
         results.absorbed = absorbed
+        # A regressor that collinearity removed is printed by Stata as
+        # "<name> |          0  (omitted)" in the position it held in the SPECIFICATION,
+        # with a "note: <name> omitted because of collinearity." line above the header.
+        # PyFixest keeps the names in ``_collin_vars`` and the original order in ``_fml``,
+        # so both can be reconstructed; without them the row simply vanished from the
+        # table and the caller was never told a named variable had been dropped.
+        if absorbed:
+            results.omitted_columns = tuple(absorbed)
+            _formula = str(getattr(model, "_fml", "") or "")
+            _ordered: list[str] = []
+            if "~" in _formula:
+                _rhs = _formula.split("~", 1)[1].split("|", 1)[0]
+                _ordered = [
+                    token
+                    for token in _rhs.replace("+", " ").split()
+                    if token and token not in {"1", "0"} and not token.startswith("C(")
+                ]
+            if not _ordered:
+                _ordered = list(names) + list(absorbed)
+            results.all_columns = tuple(_ordered)
         #: The estimation frame and design, retained so ``estat summarize`` and
         #: ``estat vif`` can run.  ``reghdfe`` supports both; without them the two
         #: commands refused with "the estimation-sample data was not retained",
@@ -1851,6 +1871,37 @@ class Areg(FEOLS):
         codes, levels = pd.factorize(groups, sort=True)
         n_groups = len(levels)
         y_values = np.asarray(y, dtype=float)
+
+        # ``data`` is the FULL frame while ``y`` is already the ESTIMATION sample, so the
+        # design below has to be cut to the same rows or the two cannot be multiplied.
+        # The sample is whatever PyFixest kept: ``self._dropped_rows`` is its own
+        # ``_na_index``, the only authoritative list (re-deriving it from "level appears
+        # more than once" loses rows when singletons interact across absorbed dimensions).
+        #
+        # This only bites when rows ARE dropped -- a panel with no singletons has equal
+        # lengths and takes the fast path. On cao_chen.dta 3144 of 150650 rows are
+        # singletons, and without this the product raised a shape error.
+        if len(y_values) != len(data):
+            dropped = getattr(self, "_dropped_rows", None)
+            if dropped is None:
+                raise ConsistencyError(
+                    "areg: the response covers "
+                    f"{len(y_values)} rows but the frame has {len(data)}, and the "
+                    "estimation sample is unknown, so the intercept cannot be recovered"
+                )
+            keep = np.setdiff1d(
+                np.arange(len(data)),
+                np.fromiter((int(position) for position in dropped), dtype=int),
+            )
+            if keep.size != len(y_values):
+                raise ConsistencyError(
+                    "areg: the estimation sample recovered from the dropped rows covers "
+                    f"{keep.size} rows but the response has {len(y_values)}"
+                )
+            data = data.iloc[keep]
+            groups = np.asarray(data[self._absorbed_names[0]])
+            codes, levels = pd.factorize(groups, sort=True)
+            n_groups = len(levels)
 
         # Full design: slopes, then one dummy per absorbed group.
         design = np.column_stack(

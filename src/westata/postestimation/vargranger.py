@@ -54,18 +54,57 @@ class VarGrangerResult:
     def __str__(self) -> str:
         """Stata's boxed table, to the character."""
 
-        # Measured from Stata: 70 characters per row, bars at columns 2 / 41 / 69.
-        # Left block is [3:41] (38 wide), right block [42:69] (27 wide).
-        #   header right: '   chi2     df Prob > chi2 '
-        #   data right  : '  48.123     2    0.000    '
+        # Every row is 70 characters. Positions measured with repr() on Stata's own output:
+        #   '  |          Equation           Excluded |   chi2     df Prob > chi2 |'
+        #   '  |              dinf               unem |  48.123     2    0.000    |'
+        #
+        #   column 2  = '|'        column 41 = '|'        column 69 = '|'
+        #   left  block [3:41]   = 38 chars: Equation ends at 21, Excluded at 40
+        #   right block [42:69]  = 27 chars: chi2 ends at 50, df at 56, p at 68
+        #
+        # Fields are placed by ABSOLUTE column rather than by accumulating widths; the latter
+        # kept drifting because each block's own trailing space belongs to a different field.
+
+        # Layout taken from Stata's own lines, character by character:
+        #   '  |          Equation           Excluded |   chi2     df Prob > chi2 |'
+        #   '  |              dinf               unem |  48.123     2    0.000    |'
+        #   '  |--------------------------------------+---------------------------|'
+        #   '  +-----------------------------------------------------------------+'
+        # Bars at 2, 41 and 69; the separator bar "|" at 41 splits 38 + 27.
+        _LEFT, _RIGHT = 38, 27
+
+        # Stata's own template, kept verbatim so the alignment cannot drift again:
+        #   '  |          Equation           Excluded |   chi2     df Prob > chi2 |'
+        # Fields are placed by ABSOLUTE column, computed once from that line:
+        _TEMPLATE = "  |          Equation           Excluded |   chi2     df Prob > chi2 |"
+        _left_end = 41   # the bar at column 41
+        _right_end = 70  # rows are 70 characters; the closing bar sits at index 69
+
+        def _place(equation: str, excluded: str, chi2: str, df: str, p: str) -> str:
+            # Column ends taken from the template: equation 20, excluded 40,
+            # chi2 50, df 56, p 68.
+            row = [" "] * _right_end
+            # Column ends read directly off Stata's lines (index+len from the template):
+            # Equation 21, Excluded 40, chi2 50, df 56, p 65.
+            for text, end in (
+                (equation, 21),
+                (excluded, 40),
+                (chi2, 50 if len(chi2) > 4 else 49),
+                (df, 56),
+                (p, 65 if len(p) <= 5 else 68),
+            ):
+                start_at = end - len(text)
+                for offset, character in enumerate(text):
+                    row[start_at + offset] = character
+            row[2] = "|"
+            row[_left_end] = "|"
+            row[_right_end - 1] = "|"  # column 69
+            return "".join(row)
+
         lines = [
             "   Granger causality Wald tests",
             "  +" + "-" * 65 + "+",
-            "  |"
-            + f"{'Equation':>20}{'Excluded':>17} "
-            + "|"
-            + f"{'chi2':>8} {'df':>5} {'Prob > chi2':>12} "
-            + "|",
+            _place("Equation", "Excluded", "chi2", "df", "Prob > chi2"),
             "  |" + "-" * 38 + "+" + "-" * 27 + "|",
         ]
         previous: str | None = None
@@ -73,11 +112,13 @@ class VarGrangerResult:
             if previous is not None and row.equation != previous:
                 lines.append("  |" + "-" * 38 + "+" + "-" * 27 + "|")
             lines.append(
-                "  |"
-                + f"{row.equation:>20}{row.excluded:>17} "
-                + "|"
-                + f"{row.chi2:>8.3f} {row.df:>5.0f} {row.pvalue:>11.3f}"
-                + "    |"
+                _place(
+                    row.equation,
+                    row.excluded,
+                    f"{row.chi2:.3f}",
+                    f"{row.df:.0f}",
+                    f"{row.pvalue:.3f}",
+                )
             )
             previous = row.equation
         lines.append("  +" + "-" * 65 + "+")

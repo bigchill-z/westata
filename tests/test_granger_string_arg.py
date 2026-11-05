@@ -85,3 +85,31 @@ def test_vargranger_renders_the_heading_and_all_four_data_rows(fitted) -> None:
     assert rendered.count("ALL") == 2
     assert "48.123" in rendered
     assert "9.009" in rendered
+
+
+def test_vargranger_matches_stata_character_for_character(fitted) -> None:
+    """The whole rendered table, taken from a live ``vargranger`` on this fit.
+
+    Geometry was the hard part and is worth pinning: rows are 70 characters with bars at
+    columns 2, 41 and 69; the equation ends at 21, the excluded name at 40, the chi2 VALUE at
+    50, df at 56 and the p VALUE at 65, while the header's ``chi2`` and ``Prob > chi2`` end at
+    49 and 68. Header and data rows therefore need slightly different column ends, which is
+    why a single width formula kept drifting by one space.
+    """
+
+    from westata.postestimation.vargranger import vargranger
+
+    expected = [
+        "   Granger causality Wald tests",
+        "  +-----------------------------------------------------------------+",
+        "  |          Equation           Excluded |   chi2     df Prob > chi2 |",
+        "  |--------------------------------------+---------------------------|",
+        "  |              dinf               unem |  48.123     2    0.000    |",
+        "  |              dinf                ALL |  48.123     2    0.000    |",
+        "  |--------------------------------------+---------------------------|",
+        "  |              unem               dinf |   9.009     2    0.011    |",
+        "  |              unem                ALL |   9.009     2    0.011    |",
+        "  +-----------------------------------------------------------------+",
+    ]
+    rendered = str(vargranger(fitted)).splitlines()
+    assert rendered == expected

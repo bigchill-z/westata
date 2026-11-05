@@ -1971,40 +1971,46 @@ def _stata_summary(result: Any) -> str:
         # Everything appended before this point described a header that is not being
         # printed; the panel block replaces it wholesale.
     elif str(getattr(result, "model_name", "") or "") == "mvreg":
-        # ``mvreg`` opens at an EQUATION SUMMARY table with NO banner. Measured:
+        # ``mvreg`` opens at an EQUATION SUMMARY table with NO banner. Measured from a
+        # live ``mvreg y1 y2 = x1 x2``:
         #
-        #   Equation             Obs   Parms        RMSE    "R-sq"      F
-        #   --------------------------------------------------------------
-        #   y                    100       2    .9908529    0.0157   1.567
-        #   ybin                 100       2    .5044859    0.0023   .2295
+        #   Equation             Obs   Parms        RMSE    "R-sq"          F      P>F
+        #   --------------------------------------------------------------------------
+        #   y1                   300       3    .9551445    0.7921   565.6674   0.0000
+        #   y2                   300       3    .9587217    0.6899   330.3333   0.0000
+        #   --------------------------------------------------------------------------
         #
         # Note "Parms" (mvreg) vs "Params" (sureg) -- a real spelling difference.
+        #
+        # Every line is 74 characters, and the value fields END at 24, 32, 44, 54, 65
+        # and 74. The rules, the field widths and both precisions were wrong before:
+        # RMSE printed five significant figures (.95514) where Stata prints seven
+        # decimals (.9551445), and F printed two decimals (565.67) against 565.6674.
         _mv_e = getattr(result, "e", None) or {}
         _mv_outcomes = list(_mv_e.get("outcomes") or [])
         _mv_n = int(_mv_e.get("N") or nobs)
-        _mv_r2_header = '"R-sq"'
-        # Stata's own header line for this table is NOT aligned with the rows beneath it
-        # (it is 70 columns wide, the rows are 62), so it is copied verbatim rather than
-        # derived from column widths -- deriving it produced a table that was internally
-        # consistent but different from Stata's.
+        _mv_rule = "-" * 74
         lines = [
-            'Equation             Obs   Parms        RMSE    "R-sq"          F      P>F',
-            "-" * 58,
+            "Equation             Obs   Parms        RMSE    \"R-sq\"          F      P>F",
+            _mv_rule,
         ]
         for _eq in _mv_outcomes:
             _rmse_eq = _e_float(result, f"rmse_{_eq}")
             _r2_eq = _e_float(result, f"r2_{_eq}")
             _f_eq = _e_float(result, f"F_{_eq}")
             _p_eq = _e_float(result, f"p_{_eq}")
+            _rmse_text = f"{_rmse_eq:.7f}" if np.isfinite(_rmse_eq) else "."
+            if _rmse_text.startswith("0."):
+                _rmse_text = _rmse_text[1:]
+            _f_text = f"{_f_eq:.4f}" if np.isfinite(_f_eq) else "."
             lines.append(
-                f"{str(_eq):<21}{_mv_n:>9}{int(df_model) + 1:>6}"
-                f"{_stata_number(_rmse_eq, 7).strip():>13}"
-                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>8}"
-                f"{(_stata_number(_f_eq, 7).strip() if np.isfinite(_f_eq) else '.'):>10}"
-                f"{(_four(_p_eq) if np.isfinite(_p_eq) else '.'):>8}"
+                f"{str(_eq):<18}{_mv_n:>6}{int(df_model) + 1:>8}"
+                f"{_rmse_text:>12}"
+                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>10}"
+                f"{_f_text:>11}"
+                f"{(_four(_p_eq) if np.isfinite(_p_eq) else '.'):>9}"
             )
-        # No closing rule either: the coefficient table's own header rule follows the blank
-        # line, and adding one here produced two consecutive rules.
+        lines.append(_mv_rule)
     elif str(getattr(result, "model_name", "") or "") == "xtabond":
         lines = _xtabond_header_block(result, nobs)
     elif str(getattr(result, "model_name", "") or "") == "sureg":

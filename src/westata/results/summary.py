@@ -3945,6 +3945,27 @@ def _stata_summary(result: Any) -> str:
             # closes the sigma/rho block with a full-width rule.
             lines.append(_border_rule)
 
+    # ``areg`` closes with its own absorbed-indicator test, and the wording is NOT xtreg's.
+    # Measured from ``areg maize canal disaster, absorb(county)``:
+    #
+    #   F test of absorbed indicators: F(562, 146942) = 155.133       Prob > F = 0.000
+    #
+    # Three details differ from the xtreg line: the phrase ("of absorbed indicators" vs
+    # "that all u_i=0"), the F value's THREE decimals (155.133, not 155.13), and the p-value
+    # SITTING ON THE SAME LINE rather than right-aligned against column 61.
+    if str(getattr(result, "model_name", "") or "") == "areg":
+        f_absorb = _e_float(result, "F_absorb")
+        if np.isfinite(f_absorb):
+            df_a = _e_float(result, "df_a")
+            p_absorb = _e_float(result, "p_absorb")
+            if not np.isfinite(p_absorb):
+                p_absorb = float(stats.f.sf(f_absorb, df_a, df_resid))
+            lines.append(
+                f"F test of absorbed indicators: F({_df_label(df_a)}, "
+                f"{_df_label(df_resid)}) = {f_absorb:.3f}"
+                f"       Prob > F = {p_absorb:.3f}"
+            )
+
     return "\n".join(lines)
 
 

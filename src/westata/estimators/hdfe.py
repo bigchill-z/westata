@@ -1684,6 +1684,19 @@ class Areg(FEOLS):
         # Set BEFORE the super() call: the fit that follows reads it to decide whether to
         # compute the absorbed-indicator F test at all.
         self._suppress_absorb_test = bool(noabsorb)
+        # ``areg`` reports one FEWER absorbed degree of freedom than ``reghdfe``, because it
+        # prints the intercept separately and the constant therefore consumes one of the
+        # indicator's degrees of freedom. Measured on the report's areg case (563 counties,
+        # canal absorbed):
+        #
+        #   areg : e(k_absorb) = 563   e(df_a) = 562   F_absorb = 155.13312
+        #
+        # The class-level comment above documents this convention, but the flag was never
+        # overridden here, so Areg inherited FEOLS' False and reported df_a = 563. That one
+        # degree of freedom was the entire reason F_absorb read 154.85758 instead of Stata's
+        # 155.13312 -- the R-squared values feeding it (r2 = .37677468, r2_c = .00699759)
+        # already matched exactly.
+        self._absorb_df_drops_constant = True
         super().__init__(combined, data, weights=weights, weight_type=weight_type)
         #: ``e(absvar)``: ``areg`` records the absorbed variable's NAME, which is what
         #: ``e(title2)`` is built from.

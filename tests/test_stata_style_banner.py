@@ -69,7 +69,6 @@ def _banner(rendered: str) -> str:
 @pytest.mark.parametrize(
     "builder,expected",
     [
-        (lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(), "Linear regression"),
         (
             lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),
             "Logistic regression",
@@ -83,10 +82,41 @@ def _banner(rendered: str) -> str:
             "Tobit regression",
         ),
     ],
-    ids=["regress", "logit", "probit", "tobit"],
+    ids=["logit", "probit", "tobit"],
 )
 def test_the_banner_is_the_commands_title(frame, builder, expected: str) -> None:
     assert _banner(render_summary(builder(frame), style="stata")) == expected
+
+
+def test_plain_regress_prints_no_banner(frame) -> None:
+    """``regress`` stores ``e(title) = "Linear regression"`` but never prints it.
+
+    Measured from a live ``regress y k``: the table opens directly at
+    "      Source |       SS           df       MS". The ROBUST variant DOES print the title,
+    heading its two-column block -- so the banner is not absent from the command altogether,
+    only from the plain form.
+
+    This test used to be part of the parametrised list above, asserting "Linear regression"
+    was the banner. That pinned the extra header line the gap report's C04-01 flagged.
+    """
+
+    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    rendered = render_summary(fitted, style="stata")
+
+    assert fitted.e["title"] == "Linear regression"
+    assert "Linear regression" not in rendered
+    # The renderer prefixes one blank line; Stata's own output has it too.
+    first = next(line for line in rendered.splitlines() if line.strip())
+    assert first.lstrip().startswith("Source")
+
+
+def test_robust_regress_does_print_the_banner(frame) -> None:
+    """The counterpart: with a robust VCE the title heads the two-column block."""
+
+    fitted = ws.OLS.from_formula("y ~ x", frame).fit(cov_type="HC1")
+    rendered = render_summary(fitted, style="stata")
+
+    assert "Linear regression" in rendered
 
 
 def test_poisson_uses_its_own_title(frame) -> None:

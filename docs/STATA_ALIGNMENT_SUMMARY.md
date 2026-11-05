@@ -40,37 +40,28 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
-### 未解决的一处排版差异：普通 OLS 多一行标题（第 81 轮，已停止排查）
+### 普通 OLS 多一行标题：已修复（第 83 轮）
 
-报告 C04-01 把 OLS 归为 A 类「可直接替代」，同时括注「westata 多一行标题
-`Linear regression`」。实测确认这是**真实差异**：Stata 的 `regress y k` 第一行就是
-`      Source |       SS           df       MS`, 没有标题；`Linear regression` 只是 `e(title)`,
-Stata 存而不印。稳健版（`regress, robust`）才有该标题行，且与 `Number of obs` 同行。
+报告 C04-01 把 OLS 归为 A 类「可直接替代」，括注「westata 多一行标题」。实测确认差异为真：
+Stata 的 `regress y k` 第一行就是 `Source | SS df MS`，`Linear regression` 只是 `e(title)`，
+**存而不印**；只有稳健版才把它打印在双列块的首行。
 
-**尝试与结果**：在 `_stata_summary` 中给 `lines.append(banner)` 加上
-"普通非稳健 OLS 不打印" 的条件（`model_name in ("regress","ols")` and `not vcetype` and
-`block in ("ols","")`），诊断打印确认三个条件**同时为真**、`_plain_ols=True`，但输出仍然
-带标题——说明 1824 行之后有某个分支**重建了 `lines` 并补回标题**，而该重建点未被定位。
+**第 81–82 轮未能定位，第 83 轮用「枚举所有 `lines` 赋值点」的办法一次找到：**
 
-**已耗时 12+ 次工具调用，代码已回滚，工作区干净。** 记为已知差异：
-- 影响：表头多一行（`Linear regression` + 一个空行）
-- 数值：完全一致
-- 性质：纯排版，非数值缺陷
+`_stata_summary`（1649–4070 行，仅 1 个返回点）里有 8 处 `lines` 赋值，其中：
 
-**第 82 轮按上一条线索插桩，排除了两处但仍未定位，结论如下（避免重复劳动）：**
+```
+2246: lines = [banner] if banner else []     <- 真正的原因
+```
 
-1. `_stata_summary` 跨度是 **1649–4070 行**（不只是头部），其中 `lines` 重建点共 12 处。
-2. 在唯一的 `lines.append(banner)`（1815 行）前插桩，普通 OLS 打印出
-   `robust=False inblock=False model='regress' block='ols' preN=0 append=NO`
-   —— **条件全部满足、append 被跳过，但输出仍带标题**。因此标题**不来自这一行**。
-3. 反向验证：把 `e(title)` 置空后首行变为空 → 标题**确实来自 `e(title)`**，但由**另一处**
-   插入。把 1815 行改为按 `model_name` 跳过时，普通 OLS **不变**、稳健版反而首行变空，
-   进一步证明两者走**不同路径**。
+该行在 **ANOVA 分支里重建了整个 `lines` 列表**，用 `[banner]` 把标题硬编码加回去，**覆盖了**
+1815 行 `lines.append(banner)` 处做的任何判断。这正是前两轮修补 1815 行毫无效果的原因。
 
-**下次的可操作方向**：不要去读 `_stata_summary` 的代码，而是对 `render_summary` 的返回值做
-**逐行来源标记**（给每个 `lines` 元素附加来源标签后 dump），否则读代码会持续得出错误假设。
+**教训**：在一个「会重建列表」的渲染函数里，只改某个 `append` 点无效——必须枚举所有重建点。
+前两轮读代码得出的假设都是错的，第三轮改为**机械地列出所有 `lines = ...`** 立刻命中。
 
-两轮共耗费约 20 次工具调用，代码均已回滚，工作区干净。
+��复后 `regress y k` 与 Stata 的输出 **13/13 行逐字符一致**；稳健版仍保留标题。
+一条断言 `regress` 必须有 banner 的旧测试被改正（它把 bug 钉死了）。
 
 ### C 类（部分实现，8 项）在第 72–79 轮全部关闭
 

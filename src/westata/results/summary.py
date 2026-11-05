@@ -2243,7 +2243,18 @@ def _stata_summary(result: Any) -> str:
         # banner and a blank line, since Stata prints no ``Model:``/
         # ``Covariance type:`` row before its table.
         # An empty banner means Stata prints none (``nl``); the list starts empty then.
-        lines = [banner] if banner else []
+        #
+        # A plain (non-robust) ``regress`` prints no banner EITHER, even though it stores
+        # ``e(title) = "Linear regression"``. Measured: ``regress y k`` opens directly at
+        # "      Source |       SS           df       MS", while ``regress y k, robust``
+        # heads its two-column block with the title. This branch REBUILDS ``lines``, so
+        # suppressing the banner at the earlier ``lines.append(banner)`` had no effect here
+        # -- which is why two rounds of patching that line changed nothing.
+        _banner_suppressed = (
+            str(getattr(result, "model_name", "") or "") in ("regress", "ols")
+            and not _vcetype_for_banner
+        )
+        lines = [banner] if (banner and not _banner_suppressed) else []
         # ``title2`` (areg's "Absorbed variable: ...") was appended to the earlier ``lines``
         # list, which this branch REPLACES -- the same trap the design block below hit. It
         # has to be re-attached here or the subtitle disappears exactly when the ANOVA

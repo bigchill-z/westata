@@ -3123,20 +3123,27 @@ def _stata_summary(result: Any) -> str:
     # ``arch`` names its parameters "mu", "omega", "alpha[1]", "beta[1]" -- the backend's
     # spelling. Stata nests them instead:
     #
-    #   y            |
-    #          _cons |   .0162927   ...
+    #   dinf         |
+    #          _cons |   .0005369   ...
     #   -------------+------------------------------
     #   ARCH         |
     #           arch |
-    #            L1. |   -.046348   ...
-    #              garch |
-    #            L1. |   .5624728   ...
-    #          _cons |   .4867155   ...
+    #            L1. |   .4201012   ...
+    #          _cons |   .0001802   ...
     #
     # Written here as "GROUP:SUB:bare" so the generic group machinery emits the levels;
     # a name with no sub-label is "GROUP:bare".
+    #
+    # The mean-equation group is headed with the DEPENDENT VARIABLE, not a literal "y":
+    # measured, ``arch dinf, arch(1)`` prints "dinf |", and the hardcoded "y" appeared for
+    # every series regardless of its name.
+    _arch_mean_group = str(
+        (getattr(result, "e", None) or {}).get("depvar")
+        or getattr(result, "response_name", None)
+        or "y"
+    )
     _ARCH_NAMES = {
-        "mu": "y:_cons",
+        "mu": f"{_arch_mean_group}:_cons",
         "omega": "ARCH:_cons",
         "alpha": "ARCH:arch:L1.",
         "beta": "ARCH:garch:L1.",
@@ -3158,7 +3165,12 @@ def _stata_summary(result: Any) -> str:
         # ORDER: Stata prints the ARCH group as arch.L1, garch.L1, then _cons -- the
         # variance parameters first, the constant last. Sorting by the rewritten name
         # would put "_cons" first, so the group is ordered explicitly.
-        _arch_order = {"ARCH:arch:": 0, "ARCH:garch": 1, "ARCH:_cons": 2, "y:_cons": -1}
+        _arch_order = {
+            "ARCH:arch:": 0,
+            "ARCH:garch": 1,
+            "ARCH:_cons": 2,
+            f"{_arch_mean_group}:_cons": -1,
+        }
 
         def _arch_rank(name: str) -> int:
             rewritten = _arch_rewrite(name)

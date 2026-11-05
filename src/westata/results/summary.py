@@ -3517,6 +3517,46 @@ def _stata_summary(result: Any) -> str:
                 f"{_stata_coef(upper[index], ci_hi_w)}"
             )
         else:
+            # ``arima``'s ``/sigma`` row prints the STANDARD DEVIATION, but the fitted
+            # parameter stored under that name is the VARIANCE, so it has to be square
+            # rooted before printing:
+            #
+            #   Stata:  /sigma |   .0164621   .0007197    22.87  ...
+            #   stored: sigma2 = .0002708   ->  sqrt = .016456  (agrees to 7 figures)
+            #
+            # The standard error follows the delta method for the square root,
+            # se(sigma) = se(sigma^2) / (2 * sigma) = 2.37e-05 / (2 * .016456) = .00072,
+            # which is Stata's .0007197. A plain square root without that scaling would
+            # report .0000237 -- three orders of magnitude too small.
+            #
+            # This is the mirror image of tobit's ``var(e.y)``, which stores the standard
+            # deviation and prints its square. The two commands disagree internally about
+            # which scale the stored parameter is on.
+            _arima_sigma = (
+                str(getattr(result, "model_name", "") or "") == "arima"
+                and str(bare).strip() == "/sigma"
+            )
+            if _arima_sigma:
+                variance = float(params[index])
+                if variance > 0.0:
+                    deviation = float(np.sqrt(variance))
+                    deviation_se = float(bse[index]) / (2.0 * deviation)
+                    statistic = deviation / deviation_se if deviation_se > 0.0 else float("nan")
+                    pvalue = (
+                        float(2.0 * stats.norm.sf(abs(statistic)))
+                        if np.isfinite(statistic)
+                        else float("nan")
+                    )
+                    lines.append(
+                        f"{bare:>{name_width}} |"
+                        f"{_stata_coef(deviation, coef_w)}"
+                        f"{_stata_coef(deviation_se, se_w)}"
+                        f"{_stata_stat(statistic, stat_w)}"
+                        f"{_stata_pvalue(pvalue, p_w)}"
+                        f"{_stata_coef(np.sqrt(lower[index]), ci_lo_w)}"
+                        f"{_stata_coef(np.sqrt(upper[index]), ci_hi_w)}"
+                    )
+                    continue
             lines.append(
                 f"{bare:>{name_width}} |"
                 f"{_stata_coef(params[index], coef_w)}"

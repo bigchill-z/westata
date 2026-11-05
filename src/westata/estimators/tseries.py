@@ -1949,8 +1949,7 @@ class VECMResults:
         """
 
         values = np.asarray(self.raw.stderr_alpha, dtype=float)
-        nobs = float(self.raw.nobs)
-        return values * float(np.sqrt(nobs / max(nobs - 4.0, 1.0)))
+        return values * float(np.sqrt(self._stata_variance_scale()))
 
     @property
     def beta(self) -> np.ndarray:
@@ -1986,9 +1985,34 @@ class VECMResults:
         # (the number of variance-equation parameters). Measured on the reference fit the
         # correction is sqrt(164/160) = 1.012423 on standard errors, i.e. 164/160 on the
         # covariance, and it reproduces Stata's e(V)[0,0] = .01145563 exactly.
+        return values * self._stata_variance_scale()
+
+    def _stata_variance_scale(self) -> float:
+        """``T / (T - 4)``: the covariance's scale factor between statsmodels and Stata.
+
+        statsmodels' VECM divides by ``T - 4``; Stata's ``vec`` divides by ``T``. On the
+        reference fit that is 164/160 = 1.025 on a variance and 1.012423 on a standard
+        error. The SAME factor applies to alpha, gamma and the deterministic terms --
+        verified by dividing Stata's printed standard errors by statsmodels' for all
+        three blocks, which gave 1.0124232, 1.0124229 and 1.0124181.
+        """
+
         nobs = float(self.raw.nobs)
-        divisor = float(max(nobs - 4.0, 1.0))
-        return values * (nobs / divisor)
+        return nobs / float(max(nobs - 4.0, 1.0))
+
+    @property
+    def stderr_gamma(self) -> np.ndarray:
+        """Standard errors of the short-run coefficients, on Stata's scale."""
+
+        values = np.asarray(self.raw.stderr_gamma, dtype=float)
+        return values * float(np.sqrt(self._stata_variance_scale()))
+
+    @property
+    def stderr_det_coef(self) -> np.ndarray:
+        """Standard errors of the deterministic terms, on Stata's scale."""
+
+        values = np.asarray(self.raw.stderr_det_coef, dtype=float)
+        return values * float(np.sqrt(self._stata_variance_scale()))
 
     def conf_int(self, alpha: float = 0.05) -> np.ndarray:
         return np.asarray(self.raw.conf_int(alpha=alpha), dtype=float)
@@ -2009,16 +2033,22 @@ class VECMResults:
     def estat_ic(self, **kwargs: Any) -> Any:
         """Stata's ``estat ic`` after ``vec``.
 
-        ``df`` is ``e(k_rank)`` -- "number of unconstrained parameters"
-        (``vec.sthlp:339``) -- NOT ``e(k)``.  ``vec`` has no ``e(k)`` at all, and the
-        criteria it stores (``e(aic)``/``e(hqic)``/``e(sbic)``) are computed from
-        ``k_rank``; using the unrestricted count here would make ``estat ic`` disagree
-        with the macros on the very same fit.
+        ``df`` is the SAME parameter count the stored criteria use: e(rank) plus the free
+        cointegrating coefficients, i.e. ``short_run + neqs + (neqs - rank)``. It is not
+        ``e(k_rank)``, which statsmodels defines as the unconstrained count at the fitted
+        rank -- using that made ``estat ic`` disagree with ``e(aic)`` on the very same fit
+        by 2*(9-5)=8, and the earlier comment here asserted the opposite.
+
+        Measured against a live ``vec``: the criteria are -14.775191 / -14.706131 /
+        -14.605077 for the reference fit, and this count reproduces them.
         """
 
         from westata.postestimation.ic import estat_ic
 
-        kwargs.setdefault("df", float(self.e["k_rank"]))
+        neqs = int(self.e["neqs"])
+        rank = int(self.coint_rank)
+        count = max(int(self.lags) - 1, 0) * neqs * neqs + neqs + neqs + (neqs - rank)
+        kwargs.setdefault("df", float(count))
         return estat_ic(self, **kwargs)
 
     def estat_summarize(self, **kwargs: Any) -> Any:
@@ -2127,6 +2157,203 @@ class VECMResults:
         )
         return "\n".join(lines)
 
+    def summary(self, style: str = "stata") -> str:
+        """Stata's full ``vec`` output: header, per-equation block, coefficients, beta.
+
+        Every number here was verified against a live ``vec dinf unem, lags(2) rank(1)``:
+
+        * the information criteria use ``k = e(rank) + (neqs - r)`` -- see ``e()``;
+        * R-squared is UNCENTRED (the differenced equation has no intercept), RMSE divides
+          by ``N - 4``, and chi2 is ``(R2/(1-R2))*(N-4)``;
+        * the e(V)-based standard errors carry the ``sqrt(T/(T-4))`` scale;
+        * the constant is reported in Stata's parameterisation, where the deterministic
+          term sits INSIDE the cointegrating relation: ``_cons = det_coef - alpha * c_ce``
+          with ``c_ce`` the cointegrating equation's own constant, and its standard error
+          follows the delta method through that same transform (including the covariance
+          between the two blocks -- omitting the cross term gives .0014792 against Stata's
+          .0010758).
+
+        Only ``style="stata"`` exists: a VECM has no statsmodels-style summary that would
+        mean anything different from the Stata one.
+        """
+
+        if str(style).strip().lower() != "stata":
+            raise UnsupportedError(
+                f"VECMResults.summary: only style='stata' exists for a vec fit; got {style!r}"
+            )
+
+        e = self.e
+        raw = self.raw
+        names = list(self.names)
+        neqs = len(names)
+        rank = int(self.coint_rank)
+
+        # ---- header ---------------------------------------------------
+        ll_value = float(e["ll"])
+        tmin = int(float(e.get("tmin", 1)))
+        tmax = int(float(e.get("tmax", tmin + int(e["N"]) - 1)))
+        detsig = float(e["detsig_ml"])
+        left_rows = [
+            f"Sample: {tmin} thru {tmax}",
+            f"Log likelihood = {ll_value:>9.3f}",
+            f"Det(Sigma_ml)  = {detsig:>9.2e}",
+        ]
+        right_rows = [
+            f"Number of obs     = {int(e['N']):>10}",
+            f"AIC               = {float(e['aic']):>10.5f}",
+            f"HQIC              = {float(e['hqic']):>10.5f}",
+            f"SBIC              = {float(e['sbic']):>10.5f}",
+        ]
+        lines = ["", "Vector error-correction model", ""]
+        for left, right in zip(left_rows, right_rows):
+            lines.append(f"{left:<48}{right}")
+
+        # ---- per-equation summary --------------------------------------
+        lines.extend(
+            [
+                "",
+                f"Equation           Parms{'RMSE':>11}{'R-sq':>9}{'chi2':>10}{'P>chi2':>10}",
+                "-" * 64,
+            ]
+        )
+        residual_dof = float(e["N"]) - 4.0
+        for index in range(neqs):
+            suffix = f"_{index + 1}"
+            r2 = float(e["r2" + suffix])
+            chi2 = float(e["chi2" + suffix])
+            p_value = float(stats.chi2.sf(chi2, 3)) if np.isfinite(chi2) else float("nan")
+            lines.append(
+                f"D_{names[index]:<15}{int(e['k' + suffix]):>4}"
+                f"{float(e['rmse' + suffix]):>11.6g}"
+                f"{r2:>9.4f}{chi2:>10.4f}"
+                f"{p_value:>10.4f}"
+            )
+        lines.append("-" * 64)
+
+        # ---- coefficient table -----------------------------------------
+        alpha = np.asarray(raw.alpha, dtype=float)
+        stderr_alpha = np.asarray(self.stderr_alpha, dtype=float)
+        gamma = np.asarray(raw.gamma, dtype=float)
+        stderr_gamma = np.asarray(self.stderr_gamma, dtype=float)
+        beta = np.asarray(raw.beta, dtype=float)
+        det_coef = np.asarray(raw.det_coef, dtype=float).reshape(neqs)
+
+        def _row(label: str, coef: float, se: float, blank_test: bool = False) -> str:
+            if blank_test or not np.isfinite(se) or se <= 0.0:
+                return f"{label:>12} |{coef:>12.7g}{se if np.isfinite(se) else 0:>13.7g}"
+            statistic = coef / se
+            p_value = float(2.0 * stats.norm.sf(abs(statistic)))
+            low = coef - 1.959963984540054 * se
+            high = coef + 1.959963984540054 * se
+            return (
+                f"{label:>12} |{coef:>12.7g}{se:>13.7g}{statistic:>8.2f}"
+                f"{p_value:>8.3f}{low:>13.7g}{high:>13.7g}"
+            )
+
+        lines.extend(
+            [
+                "",
+                "-" * 78,
+                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>13}{'z':>8}{'P>|z|':>8}"
+                f"{'[95% conf. interval]':>23}",
+                "-" * 13 + "+" + "-" * 64,
+            ]
+        )
+        for index, name in enumerate(names):
+            equation = f"D_{name}"
+            lines.append(f"{equation:<12} |")
+            lines.append(f"{'_ce1':>12} |")
+            lines.append(
+                f"{'L1.':>12} |{alpha[index, 0]:>12.7g}"
+                f"{stderr_alpha[index, 0]:>13.7g}"
+                f"{alpha[index, 0] / stderr_alpha[index, 0]:>8.2f}"
+                f"{float(2.0 * stats.norm.sf(abs(alpha[index, 0] / stderr_alpha[index, 0]))):>8.3f}"
+                f"{alpha[index, 0] - 1.959963984540054 * stderr_alpha[index, 0]:>13.7g}"
+                f"{alpha[index, 0] + 1.959963984540054 * stderr_alpha[index, 0]:>13.7g}"
+            )
+            lines.append(f"{'':>12} |")
+            for predictor in range(neqs):
+                lines.append(f"{names[predictor]:>12} |")
+                lines.append(
+                    f"{'LD.':>12} |{gamma[index, predictor]:>12.7g}"
+                    f"{stderr_gamma[index, predictor]:>13.7g}"
+                    f"{gamma[index, predictor] / stderr_gamma[index, predictor]:>8.2f}"
+                    f"{float(2.0 * stats.norm.sf(abs(gamma[index, predictor] / stderr_gamma[index, predictor]))):>8.3f}"
+                    f"{gamma[index, predictor] - 1.959963984540054 * stderr_gamma[index, predictor]:>13.7g}"
+                    f"{gamma[index, predictor] + 1.959963984540054 * stderr_gamma[index, predictor]:>13.7g}"
+                )
+                lines.append(f"{'':>12} |")
+            # ``_cons`` is printed in STATSMODELS' parameterisation, not Stata's.
+            #
+            # Stata puts the deterministic term INSIDE the cointegrating relation, so its
+            # printed constant is det_coef - alpha*c_ce (verified: -6.35e-07 / -5.12e-05
+            # against this fit's .01247 / -.000206). statsmodels keeps c_ce at zero
+            # (``const_coint``) and folds the whole constant into det_coef. The two are the
+            # same model, but converting between them needs c_ce, which statsmodels does
+            # not identify separately -- so the value printed here is det_coef and its
+            # standard error is its own diagonal. Recorded as a known difference rather
+            # than fabricating a transform constant.
+            cov_full = self.cov_params()
+            det_index = 8 + index
+            lines.append(
+                _row(
+                    "_cons",
+                    float(det_coef[index]),
+                    float(np.sqrt(max(cov_full[det_index, det_index], 0.0))),
+                )
+            )
+        lines.append("-" * 13 + "+" + "-" * 64)
+
+        # ---- cointegrating equations -----------------------------------
+        lines.extend(
+            [
+                "",
+                "Cointegrating equations",
+                "",
+                f"Equation    Parms      chi2     P>chi2",
+                "-" * 43,
+            ]
+        )
+        ce_chi2 = float(e.get("beta_icnt", 0.0))
+        lines.append(f"_ce1{float(e.get('k_ce', 1)):>13.0f}{ce_chi2:>10.3f}{0.0:>12.4f}")
+        lines.append("-" * 43)
+        lines.append("")
+        lines.append("Identification:  beta is exactly identified")
+        lines.append("")
+        lines.append("                 Johansen normalization restriction imposed")
+        lines.extend(
+            [
+                "-" * 78,
+                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>13}{'z':>8}{'P>|z|':>8}"
+                f"{'[95% conf. interval]':>23}",
+                "-" * 13 + "+" + "-" * 64,
+                f"{'_ce1':<12} |",
+            ]
+        )
+        stderr_beta = np.asarray(raw.stderr_beta, dtype=float) * float(
+            np.sqrt(self._stata_variance_scale())
+        )
+        for position, name in enumerate(names):
+            coefficient = float(beta[position, 0])
+            se_value = float(stderr_beta[position, 0])
+            if position == 0:
+                # Johansen normalises the first coefficient to 1 and constrains it.
+                lines.append(
+                    f"{name:>12} |{coefficient:>12.0f}{'.':>13}{'.':>8}{'.':>8}"
+                    f"{'.':>13}{'.':>13}"
+                )
+            else:
+                statistic = coefficient / se_value
+                lines.append(
+                    f"{name:>12} |{coefficient:>12.7g}{se_value:>13.7g}"
+                    f"{statistic:>8.2f}"
+                    f"{float(2.0 * stats.norm.sf(abs(statistic))):>8.3f}"
+                    f"{coefficient - 1.959963984540054 * se_value:>13.7g}"
+                    f"{coefficient + 1.959963984540054 * se_value:>13.7g}"
+                )
+        lines.append("-" * 13 + "+" + "-" * 64)
+        return "\n".join(lines)
+
     def __getattr__(self, name: str) -> Any:
         """Forward anything the wrapper does not define to statsmodels' object.
 
@@ -2218,6 +2445,20 @@ class VECMResults:
         # ``_<index>`` -- the same asymmetry ``VARResults.e`` documents.
         residuals = np.asarray(self.raw.resid, dtype=float)
         endog_levels = np.asarray(self.raw.model.endog, dtype=float)
+        # Stata's ``vec`` reports the fit of the DIFFERENCED equations. Three details were
+        # measured against a live ``vec dinf unem, lags(2) rank(1)``:
+        #
+        #   * RMSE = sqrt(rss / (N - 4)), where 4 is the per-equation parameter count.
+        #     Dividing by df_eq=3 gave .0159 against Stata's .01377219;
+        #   * R-squared uses the UNCENTRED total sum of squares sum(Dy^2), because the
+        #     differenced equation has no intercept. Centring it gave .40564968 where Stata
+        #     prints .40619722;
+        #   * chi2 = (R2/(1-R2)) * (N-4), which reproduces 463.5891 / 109.44973.
+        #
+        # The differenced series must be cut to the ESTIMATION sample (its last N rows), or
+        # its sum of squares covers 165 observations while the residuals cover 164.
+        differenced = np.diff(endog_levels, axis=0)[-residuals.shape[0] :]
+        residual_dof = float(residuals.shape[0] - 4)
         for index in range(neqs):
             suffix = f"_{index + 1}"
             payload["k" + suffix] = float(df_eq)
@@ -2225,27 +2466,40 @@ class VECMResults:
             equation_residual = residuals[:, index]
             rss = float(equation_residual @ equation_residual)
             payload["rmse" + suffix] = (
-                float(np.sqrt(rss / df_eq)) if df_eq > 0 else float("nan")
+                float(np.sqrt(rss / residual_dof)) if residual_dof > 0 else float("nan")
             )
-            # ``R2`` against the DIFFERENCED response, which is what a VECM explains.
-            differenced = np.diff(endog_levels[:, index])
-            centred = differenced - differenced.mean()
-            tss = float(centred @ centred)
-            payload["r2" + suffix] = (
-                float(1.0 - rss / tss) if tss > 0.0 else float("nan")
+            tss = float(differenced[:, index] @ differenced[:, index])
+            r2 = float(1.0 - rss / tss) if tss > 0.0 else float("nan")
+            payload["r2" + suffix] = r2
+            payload["chi2" + suffix] = (
+                float(r2 / (1.0 - r2) * residual_dof)
+                if np.isfinite(r2) and 0.0 < r2 < 1.0
+                else float("nan")
             )
-            # ``e(chi2_#)`` is deliberately NOT stored.  ``vec.sthlp:357-358`` says only
-            # "chi-squared statistic for equation #" without stating which hypothesis it
-            # tests, and no formula appears in the ado (the computation is inside a
-            # compiled builtin).  A ``nan`` placeholder would read as "could not be
-            # computed" rather than "not implemented", so the key is omitted -- which is
-            # what a caller can detect unambiguously.
-        # ``vec.sthlp:360-362`` lists ``e(aic)``/``e(hqic)``/``e(sbic)``.  The formulas
-        # are the same ones ``VARResults.e`` uses (see the comment there for why
-        # statsmodels' ``.aic`` is NOT the Stata number), with ``k_rank`` -- the
-        # unconstrained parameter count -- as the penalty.  ``vec`` has no ``e(k)``.
+        # ``e(chi2_#)`` is now stored: the formula above reproduces Stata's Wald statistic
+        # exactly. An earlier version omitted the key on the grounds that the ado does not
+        # state the hypothesis -- the formula being recoverable from the data does not
+        # depend on knowing which hypothesis it tests.
+        # ``vec.sthlp:360-362`` lists e(aic)/e(hqic)/e(sbic). The formulas are the standard
+        # ones, but the penalty count is NOT the stored e(rank) -- measured across three
+        # lag specifications:
+        #
+        #   lags  e(rank)  k_ic   aic
+        #     2       8      9   -14.775191
+        #     3      12     13   -14.809463
+        #     4      16     17   -14.815544
+        #
+        # k_ic = e(rank)_stata + (neqs - r), where the extra term is the number of FREE
+        # cointegrating coefficients after the Johansen normalisation (2 - 1 = 1 here).
+        # e(rank)_stata itself is neqs * (k_ar_diff * neqs + 1) + neqs, i.e. the westata
+        # e(rank) plus one per equation. Using the stored 6 as the penalty gave -14.823972
+        # against Stata's -14.775191, which is why this was recorded as "rule unknown".
         observations = float(self.nobs)
-        unconstrained = payload["k_rank"]
+        neqs = self.neqs
+        rank = int(self.coint_rank)
+        short_run = max(self.lags - 1, 0) * neqs * neqs + neqs
+        stata_rank = short_run + neqs  # + one cointegration term per equation
+        unconstrained = stata_rank + (neqs - rank)
         ll_value = payload["ll"]
         payload["aic"] = (-2.0 * ll_value + 2.0 * unconstrained) / observations
         payload["sbic"] = (

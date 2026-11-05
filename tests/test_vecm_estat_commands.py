@@ -79,22 +79,30 @@ def test_estat_ic_reports_the_criteria(vecm_fit) -> None:
         assert absent not in text, absent
 
 
-def test_the_parameter_count_is_e_k(vecm_fit) -> None:
-    """A VECM's penalty count is ``e(k_rank)``, NOT ``e(k)``.
+def _stata_parameter_count(fit) -> float:
+    """The count ``vec`` uses in its criteria: e(rank) + the free cointegrating terms."""
 
-    ``vec.sthlp:339`` calls ``e(k_rank)`` "number of unconstrained parameters"; ``vec``
-    stores no ``e(k)`` at all.  The first version of this method passed ``e(k)`` (the
-    unrestricted count), which made ``estat ic`` disagree with the ``e(aic)`` macro on
-    the SAME fit.
+    neqs = int(fit.e["neqs"])
+    rank = int(fit.coint_rank)
+    return float(max(int(fit.lags) - 1, 0) * neqs * neqs + neqs + neqs + (neqs - rank))
+
+
+def test_the_parameter_count_is_the_stata_count(vecm_fit) -> None:
+    """Neither ``e(k)`` nor ``e(k_rank)`` -- a third count, measured from Stata.
+
+    ``vec`` numbers its criteria with e(rank) plus one free cointegrating coefficient per
+    equation. Verified across three lag specifications: lags 2/3/4 give k = 9/13/17 and
+    AIC -14.775191 / -14.809463 / -14.815544. Both earlier attempts here (``e(k)`` then
+    ``e(k_rank)``) produced counts that disagree with the stored macros.
     """
 
     rendered = vecm_fit.estat_ic()
 
-    assert f"{float(vecm_fit.e['k_rank']):>8.0f}" in str(rendered)
+    assert f"{_stata_parameter_count(vecm_fit):>8.0f}" in str(rendered)
 
 
-def test_the_df_is_the_k_rank(vecm_fit) -> None:
-    assert vecm_fit.estat_ic().df == float(vecm_fit.e["k_rank"])
+def test_the_df_is_the_stata_parameter_count(vecm_fit) -> None:
+    assert vecm_fit.estat_ic().df == _stata_parameter_count(vecm_fit)
 
 
 def test_the_df_is_not_the_unrestricted_count(vecm_fit) -> None:

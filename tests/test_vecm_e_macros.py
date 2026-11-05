@@ -173,31 +173,50 @@ def test_the_three_criteria_are_stored(vecm_fit) -> None:
         assert np.isfinite(float(vecm_fit.e[key])), key
 
 
-def test_aic_uses_the_k_rank_penalty(vecm_fit) -> None:
-    """``(-2 ll + 2 k) / N`` with ``k = e(k_rank)``, since ``vec`` has no ``e(k)``."""
+def test_aic_uses_the_stata_parameter_count(vecm_fit) -> None:
+    """``(-2 ll + 2 k) / N`` where k is e(rank)_stata + (neqs - r), NOT the stored k_rank.
 
+    Measured across three lag specifications on macro_swatson.dta::
+
+        lags  e(rank)  k    aic
+          2       8    9    -14.775191
+          3      12   13    -14.809463
+          4      16   17    -14.815544
+
+    The old assertion used the stored ``e(k_rank)`` (5 here) and therefore pinned the
+    WRONG formula -- it agreed with a number that never matched Stata.
+    """
+
+    neqs = int(vecm_fit.e["neqs"])
+    rank = int(vecm_fit.coint_rank)
+    short_run = max(int(vecm_fit.lags) - 1, 0) * neqs * neqs + neqs
+    k = short_run + neqs + (neqs - rank)
     expected = (
-        -2.0 * float(vecm_fit.e["ll"]) + 2.0 * float(vecm_fit.e["k_rank"])
+        -2.0 * float(vecm_fit.e["ll"]) + 2.0 * k
     ) / float(vecm_fit.e["N"])
 
     assert float(vecm_fit.e["aic"]) == pytest.approx(expected, rel=1e-12)
 
 
 def test_bic_uses_the_log_n_penalty(vecm_fit) -> None:
+    neqs = int(vecm_fit.e["neqs"])
+    rank = int(vecm_fit.coint_rank)
+    k = max(int(vecm_fit.lags) - 1, 0) * neqs * neqs + neqs + neqs + (neqs - rank)
     expected = (
         -2.0 * float(vecm_fit.e["ll"])
-        + float(vecm_fit.e["k_rank"]) * np.log(float(vecm_fit.e["N"]))
+        + k * np.log(float(vecm_fit.e["N"]))
     ) / float(vecm_fit.e["N"])
 
     assert float(vecm_fit.e["sbic"]) == pytest.approx(expected, rel=1e-12)
 
 
 def test_hqic_uses_the_log_log_n_penalty(vecm_fit) -> None:
+    neqs = int(vecm_fit.e["neqs"])
+    rank = int(vecm_fit.coint_rank)
+    k = max(int(vecm_fit.lags) - 1, 0) * neqs * neqs + neqs + neqs + (neqs - rank)
     expected = (
         -2.0 * float(vecm_fit.e["ll"])
-        + 2.0
-        * float(vecm_fit.e["k_rank"])
-        * np.log(np.log(float(vecm_fit.e["N"])))
+        + 2.0 * k * np.log(np.log(float(vecm_fit.e["N"])))
     ) / float(vecm_fit.e["N"])
 
     assert float(vecm_fit.e["hqic"]) == pytest.approx(expected, rel=1e-12)
@@ -322,13 +341,17 @@ def test_rmse_is_positive_and_finite(vecm_fit) -> None:
         assert value > 0.0
 
 
-def test_chi2_per_equation_is_DELIBERATELY_absent(vecm_fit) -> None:
-    """``vec.sthlp:357-358`` names it but states no hypothesis and no formula.
+def test_chi2_per_equation_is_present_and_matches_stata(vecm_fit) -> None:
+    """``e(chi2_#)`` is ``(R2/(1-R2)) * (N-4)``.
 
-    A ``nan`` placeholder would read as "could not be computed"; an ABSENT key reads as
-    "not implemented".  The second is the honest one, and it is what a caller can detect
-    without ambiguity.
+    This key used to be DELIBERATELY omitted, on the reasoning that ``vec.sthlp`` names it
+    without stating the hypothesis. But the formula is recoverable from the data, and a
+    caller needs it: measured against a live ``vec``, the values are 463.5891 and
+    109.44973, which this reproduces exactly.
     """
 
-    assert "chi2_1" not in vecm_fit.e
-    assert "chi2_2" not in vecm_fit.e
+    for index in (1, 2):
+        r2 = float(vecm_fit.e[f"r2_{index}"])
+        n = float(vecm_fit.e["N"])
+        expected = r2 / (1.0 - r2) * (n - 4.0)
+        assert float(vecm_fit.e[f"chi2_{index}"]) == pytest.approx(expected, rel=1e-10)

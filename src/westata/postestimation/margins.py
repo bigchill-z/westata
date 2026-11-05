@@ -46,6 +46,8 @@ from westata.postestimation.predict import (
     prediction_family,
 )
 
+from westata.results.summary import _stata_number
+
 __all__ = [
     "DEFAULT_PREDICT",
     "MarginsResult",
@@ -136,6 +138,9 @@ class MarginsResult:
     variables: tuple[str, ...] = ()
     column_label: str = ""
     stat_label: str = "z"
+    #: ``atmeans`` fixes the covariates at their sample means; Stata prints the values it
+    #: used under an "At:" block. Carried here so the renderer can show them.
+    at_means: tuple[tuple[str, float], ...] = ()
 
     def __str__(self) -> str:
         """Reproduce Stata's margins table for a single row.
@@ -227,6 +232,20 @@ class MarginsTable(list):
         if first.variables:
             # Stata writes "dy/dx wrt:" followed by TWO spaces before the list.
             lines.append(f"{first.column_label} wrt:  " + " ".join(first.variables))
+            # ``atmeans`` prints the values it fixed, right after the wrt line:
+            #
+            #   At: age       = 25.37079 (mean)
+            #       education = 10.19551 (mean)
+            #
+            # Measured: the name is LEFT-aligned in a 10-wide field (not right-aligned like
+            # a coefficient row), the continuation lines are indented four spaces to sit under
+            # "At: ", and the suffix is "(mean)".
+            for position, (name, value) in enumerate(first.at_means):
+                prefix = "At: " if position == 0 else "    "
+                rendered_value = _stata_number(value, 9).strip()
+                lines.append(
+                    f"{prefix}{str(name):<10}= {rendered_value} (mean)"
+                )
         lines.extend(
             [
                 rule,
@@ -276,6 +295,8 @@ def _finish_margins(
     *,
     variables: Sequence[str] = (),
     column_label: str = "",
+    atmeans: bool = False,
+    at_values: Mapping[str, Any] | None = None,
 ) -> Any:
     """Stamp the table context onto every row and wrap a multi-row result.
 
@@ -314,8 +335,20 @@ def _finish_margins(
         expression = "Linear prediction, predict()"
     else:
         expression = ""
-    title = (
-        "Average marginal effects" if column_label else "Predictive margins"
+    # ``atmeans`` changes the TITLE, not just the numbers: Stata calls the result
+    # "Conditional marginal effects" because it is the effect AT a point, versus the
+    # average over the sample. Measured on ``logit treat age education re74 re75`` then
+    # ``margins, dydx(*) atmeans``.
+    if column_label:
+        title = (
+            "Conditional marginal effects" if atmeans else "Average marginal effects"
+        )
+    else:
+        title = "Predictive margins"
+    at_means = (
+        tuple((str(name), float(value)) for name, value in (at_values or {}).items())
+        if atmeans
+        else ()
     )
     for row in rows:
         row.title = title
@@ -325,6 +358,7 @@ def _finish_margins(
         row.variables = tuple(variables)
         row.column_label = column_label or "Margin"
         row.stat_label = "z" if model in ml_models else "t"
+        row.at_means = at_means
     return rows[0] if len(rows) == 1 else MarginsTable(rows)
 
 
@@ -967,7 +1001,14 @@ def margins(
         predict_kind=kind,
         outcome=outcome,
     )
-    return _finish_margins(rows, result, variables=requested, column_label="dy/dx")
+    return _finish_margins(
+        rows,
+        result,
+        variables=requested,
+        column_label="dy/dx",
+        atmeans=atmeans,
+        at_values=at,
+    )
 
 
 def _at_scenarios(at: Mapping[str, Any]) -> list[dict[str, Any]]:

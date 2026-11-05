@@ -97,3 +97,59 @@ def test_a_custom_cutoff_is_honoured() -> None:
     at_zero = ws.rdrobust(vote, margin, bandwidth=0.5, cutoff=0.0).tau
     shifted = ws.rdrobust(vote, margin, bandwidth=0.5, cutoff=0.3).tau
     assert abs(at_zero - shifted) > 1e-3
+
+
+# ---------------------------------------------------------------- real data, exact point
+def test_the_point_estimate_matches_stata_on_real_data() -> None:
+    """border.dta, ``rdrobust diff border, c(30) h(5) b(8)`` -> tau_cl 121.297562295.
+
+    This is the case used to document the variance gap, and it is worth pinning because the
+    point estimate is exact to nine digits on real data with mass points in the running
+    variable -- not just on the synthetic sample above.
+    """
+
+    import pandas as _pd
+
+    try:
+        frame = _pd.read_stata(
+            r"D:\myCodeProject\test_westata\data\border.dta", convert_categoricals=False
+        )
+    except FileNotFoundError:  # pragma: no cover - data lives outside the repo
+        import pytest as _pytest
+
+        _pytest.skip("border.dta is not available")
+
+    sample = frame[["diff", "border"]].dropna()
+    result = ws.rdrobust(
+        sample["diff"], sample["border"], cutoff=30.0, bandwidth=5.0, bias_bandwidth=8.0
+    )
+    import pytest as _pytest
+
+    # Stata prints nine significant figures; compare at that tolerance rather than exact
+    # float equality, which fails on the twelfth digit.
+    assert result.tau == _pytest.approx(121.297562295, abs=1e-8)
+
+
+def test_the_variance_stays_unavailable_rather_than_guessed() -> None:
+    """``rdrobust_vce`` lives only in a compiled Mata library; the SE must stay NaN."""
+
+    import numpy as _np
+
+    import pandas as _pd
+
+    try:
+        frame = _pd.read_stata(
+            r"D:\myCodeProject\test_westata\data\border.dta", convert_categoricals=False
+        )
+    except FileNotFoundError:  # pragma: no cover - data lives outside the repo
+        import pytest as _pytest
+
+        _pytest.skip("border.dta is not available")
+
+    sample = frame[["diff", "border"]].dropna()
+    result = ws.rdrobust(
+        sample["diff"], sample["border"], cutoff=30.0, bandwidth=5.0, bias_bandwidth=8.0
+    )
+    assert not result.variance_matches_stata
+    assert _np.isnan(result.se)
+    assert _np.isnan(result.z)

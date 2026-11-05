@@ -53,6 +53,33 @@ class RdRobustResult:
 
     ``se``/``z``/``pvalue``/``ci`` are ``nan`` when the variance estimator could not be
     reproduced; ``variance_matches_stata`` records which case applies.
+
+    WHY THE VARIANCE IS NOT REPRODUCED -- and this one IS a hard boundary, unlike several
+    earlier gaps in this codebase that turned out to be recoverable. The point estimate
+    matches Stata exactly (``rdrobust diff border, c(30) h(5) b(8)`` gives tau_cl
+    121.297562295 here and 121.297562295 in Stata). The variance is computed inside
+    ``rdrobust_vce``, which lives ONLY in the compiled Mata library
+    ``~/ado/plus/l/lrdrobust.mlib`` -- there is no ``.ado``/``.mata`` source for it, unlike
+    ``rdrobust.ado`` itself, which IS readable at ``~/ado/plus/r/rdrobust.ado`` (1331 lines).
+
+    What the readable part pins down, verified against Stata's own ``e(V_cl_l)`` /
+    ``e(V_cl_r)`` (h(5) b(8) on border.dta, cutoff 30)::
+
+        V_cl_l = [[496.94559, 225.18263], [225.18263, 167.66193]]
+        V_cl_r = [[4303.6294, -1188.4335], [-1188.4335, 336.15059]]
+        sqrt((V_cl_l + V_cl_r)[1,1]) = 69.2861818   == Stata se_tau_cl 69.2861819408
+
+    i.e. ``se = sqrt((V_l + V_r)[deriv, deriv])`` in zero-based terms -- the Mata code's
+    ``[deriv+1, deriv+1]``. What is NOT recovered is how V_l/V_r are built from the
+    residuals. The standard CR1 sandwich candidates were tried and all miss on the very
+    section used for the check above (n_left = 5, only a 2-column design):
+
+        w^2 * res^2   ->  38.16     (target 496.95)
+        w   * res^2   -> 240.47
+        w   * res^2 * n -> 1202.33
+
+    Reporting any of those would be the plausible-but-wrong number this project refuses, so
+    the inferential fields stay NaN and the test suite asserts that they do.
     """
 
     tau: float

@@ -147,13 +147,24 @@ class IcResult:
 
         row = (
             f"{'.':>12} |{self.n:>11.0f}"
-            f"{_cell(self.ll_null, 11, 5)}{_cell(self.ll_model, 11, 5)}"
+            # FOUR decimals for the log-likelihoods, not five. Measured from a live
+            # ``estat ic`` after ``regress y k``: "-124.2294  -102.2761". Printing five put
+            # "-124.22935  -102.27611" in the cells -- correct to more places than Stata
+            # shows, which still fails an exact-layout comparison and makes the columns look
+            # one character wider than the header's.
+            f"{_cell(self.ll_null, 11, 4)}{_cell(self.ll_model, 11, 4)}"
             f"{self.df:>8.0f}"
             f"{_cell(self.aic, 11, 4)}{_cell(self.bic, 11, 4)}"
         )
         note = "Note: BIC uses N = number of observations. See [R] IC note."
-        full_rule = "-" * 13 + "+" + "-" * 63
-        return chr(10).join(["", title, "", full_rule, header, full_rule, row, full_rule, note])
+        # Structure measured from a live ``estat ic``: a FULL-width rule, the header, the
+        # split rule, the data row, then another FULL-width rule. The first and last rules
+        # have no "+" column -- an earlier version used the split rule for all three, so the
+        # opening line had a vertical bar in it and both edges were wrong.
+        full_rule = "-" * 77
+        return chr(10).join(
+            ["", title, "", full_rule, header, rule, row, full_rule, note]
+        )
 
     def to_frame(self) -> pd.DataFrame:
         """The single row as a DataFrame with Stata's column names."""

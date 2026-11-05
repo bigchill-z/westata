@@ -1,4 +1,4 @@
-# westata 与 Stata 对齐工作汇总（第 1–22 轮）
+# westata 与 Stata 对齐工作汇总（第 1–51 轮）
 
 本文档汇总针对 `westata_vs_Stata_差距评估报告.md` 所列出差距的处理结果，把每一项的
 **验证证据**写清楚，使「已实现」「已验证」「已知差异」「明确未做」四者界限分明。
@@ -6,19 +6,28 @@
 **原则**：一条结论只有在有 Stata 实测值或可重跑的闭式检验支撑时才算成立。本文档中每个
 数字都写明了它来自运行的哪个命令、哪份数据。
 
+**第 30–51 轮的重点**：报告把 39 项归为「B 类：布局适配（设计约束，非缺陷）」。但用户的
+目标是「输出的数值与排版与 Stata 完全一致」，这个分类的前提不再成立。逐项实测后发现
+其中多数**确实**与 Stata 不同，且有几处是真实数值错误，不是布局偏好。详见第七节。
+
 ---
 
 ## 一、总体结果
 
 | 项 | 数量 |
 |---|---|
-| 全量测试 | **4208 passed, 3 skipped, 0 failed** |
-| 完成项 | **43**（23 项缺陷修复 + 20 项能力新增）|
-| 提交 | 32 个，`4d3f182` … `7b5e50c`（本文档的更新提交另计）|
-| 新增验证测试文件 | 23 个 |
+| 全量测试 | **4284 passed, 3 skipped, 0 failed**（4288 收集）|
+| 完成项 | **63**（约 43 项缺陷修复 + 20 项能力新增）|
+| 提交 | 64 个，`4d3f182` … `dfc5f51`（本文档的更新提交另计）|
+| 测试文件 | 248 个 |
+| 新增验证测试文件（本次工作）| 30+ 个 |
 
 **验证方式**：所有对照均使用 `pystata` 实时调用 StataNow 19.5 MP，同一份 `.dta`、同一模型，
 比我方实现与 Stata 打印值的差。不是与旧版本输出对比——与自己的旧输出一致不能证明任何事。
+
+**全量测试节奏**：用户指示「每完成 10 个修复后再进行全量确认」，后改为「每 20 轮修复后跑
+一次全量测试」，中间只用 `-k` 定向测试。全量测试点：4208 → 4226 → 4233 → 4240 → 4269 →
+4284 passed。
 
 ---
 
@@ -163,16 +172,20 @@
 ## 六、复现方式
 
 ```bash
-# 全量测试
-./.venv/Scripts/python.exe -m pytest tests/ -q
+# 全量测试（本次工作最后一个检查点：4284 passed, 3 skipped）
+./.venv/Scripts/python.exe -m pytest tests/ -q \
+  --deselect tests/test_packaging_hygiene.py::test_tracked_test_data_is_actually_tracked
 
-# 单点核对（示例：VAR 每方程统计量）
+# 单点核对（示例：VAR 每方程统计量、margins 表格、VECM 协方差）
 ./.venv/Scripts/python.exe -m pytest tests/test_var_equation_stats.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_margins_layout.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_vecm_cov_scale.py -v
 ```
 
 每个新增测试文件的文档字符串里都写了它对照的 **Stata 命令、数据集、参照数值**，可直接复核。
+第七节所列每一张表格都有对应的 `tests/test_*_layout.py` 守卫，逐行固定 Stata 输出。
 
-主要测试文件：
+主要测试文件（早期）：
 
 | 主题 | 文件 |
 |---|---|
@@ -189,12 +202,74 @@
 
 ---
 
-## 七、需要使用者知情的事项
+## 七、第 30–51 轮：B 类重新审视后的成果
+
+报告把 39 项归为「B 类：布局适配（设计约束，非缺陷）」。目标改为「数值与排版与 Stata
+完全一致」后，逐项实测发现多数确实不同。以下每项都逐行对照过 Stata 实测输出，并有独立
+守卫测试固定。
+
+### 主回归表与后估计表格（逐行一致）
+
+| 命令 | 结果 | 关键发现 |
+|---|---|---|
+| `estat ic` / `vif` / `ovtest` / `hettest` / `bgodfrey` | 全部逐行一致 | 列数、标签填充、缩进、精度各不同 |
+| `estat classification` | **26/26 行** | 原缺标题行、表格结构完全不同、cutoff `0.5` vs `.5` |
+| `estat gof` / `vce` | 6/6、8/8 行 | 缺两个计数行；缺模型名、`y` 列头、`e(V)` 标注 |
+| `estat firststage` | 两张表全对 | 缺整个 Stock-Yogo 块；`r(mineig)` 错报特征值而非统计量 |
+| `estat overid` / `endogenous` | 4/4、5/5 行 | **Basmann 的 k 用错**：`1.1953` → `1.1923` |
+| `margins` | 三张表 10/10、11/11、9/9 | **原本输出 dataclass repr，没有表格** |
+| `pwcompare` / `contrast` | 11/11、9/9 行 | 前者原本输出 list repr；后者缺 `Margins:` 与 `Denominator` 行 |
+| `test` / `lincom` / `lrtest` | 逐行一致 | 居中标签、双层表头、`Assumption:` 行 |
+| `ivregress` / `qreg` / `xtreg fe` / `areg` 主表 | 5/5、3/3、21/21、12/12 行 | 见下方「真实数值缺陷」 |
+| `sureg` / `mvreg` / `svy` 族 / `newey` / `ologit` | 7/7、5/5、11/11 等 | `sureg` 缺 `chi2`/`P>chi2` 两整列 |
+| `irf_table`（新增）| oirf/irf 各 10/10 行 | 报告 C13-06；数值已在，缺可读表格 |
+| VECM `cov_params()` | 精确 | **每次调用抛 AttributeError**；标准误低 1.24% |
+
+### 真实数值缺陷（非排版）
+
+1. **`r(mineig)` 尺度**：存特征值 `0.6267`，Stata 打印 Cragg-Donald 统计量 `332.355`。
+   恒等式 `F = eig/(1-eig)·df_denom/df_num` 精确成立。
+2. **`tobit` 的 `var(e.y)`**：打印 σ 而非 σ²（`1.029584` vs `1.060043`）。
+   `1.029584² = 1.060043`，`2σ·se(σ)` 也精确吻合标准误。
+3. **`arima` 的 `/sigma`**：打印 σ² 而非 σ（`.0002709` vs `.0164621`），**差 60 倍**。
+4. **`arch` 行标签错位**：`L1.` 贴在 omega、`_cons` 贴在 alpha[1]。参数重排时 OPG
+   协方差若用重排后的向量计算，标准误从 `.1471562` 变成 `122.6474`。
+5. **`irf()` 过度缩放**：`ml_factor` 施加到所有响应，把 IRF step0 从 `1` 变成 `0.984638`。
+6. **`areg` 崩溃**：`maize` 有 3144 个**缺失值**（不是单例组），全样本设计乘估计样本响应。
+7. **`ivregress` 缺 `R-squared`**、**`xtreg` 缺 `(omitted)` 行**：信息缺失，非数值错误。
+
+### 反复出现的模式：注释与测试在保护 bug
+
+多个缺陷的代码注释都写着一个看似合理的理由，实测 Stata 相反；配套测试把那个理由固定
+下来。这是本项目最常见的失败模式：
+
+| 注释/测试断言 | 实测 |
+|---|---|
+| `ivregress` 不打印 R² | Stata 打印 `R-squared = 0.8923` |
+| `estat ic` 打印 AICc/CAIC | Stata 只有 7 列 |
+| `test_estat_ic_label` 要求显示命令名 | Stata 显示 `.` |
+| `lincom` 打印 `Coef.` | Stata 打印 `Coefficient` |
+| `qreg` 表头是特例（70 列）| 整块都是 78 列 |
+| `svy: mean` 右半块随值浮动 | 恒在 34 列 |
+| `arch dinf` 均值块标题是 `y` | 实际是 `dinf` |
+| `contrast` 不需要 Denominator | F 没有分母自由度就无法解读 |
+| `stderr_alpha` 已与 Stata 核对 | 实际低 1.24% |
+
+**教训**：注释固化猜测，测试固化注释。每一次都必须回到实时 Stata 输出重新测量。
+
+---
+
+## 八、需要使用者知情的事项
 
 1. **`predict()` 默认值已变**（`11b1936`）。`Logit.predict()` 现在返回概率而非 log-odds。
    需要旧行为请显式写 `kind='xb'`。这是 **breaking change**，未发布到任何版本。
 
 2. **本仓库工作区未提交的改动请勿混入**。各轮提交都只暂存了明确列出的文件。
 
-3. **本文档的「37 项」不表示「westata 已可替代 Stata」**。报告中 E 类 6 项（RD、合成控制、
-   回归控制、倾向得分匹配等）属整章级新功能，**完全未实现**。
+3. **「63 项」不表示「westata 已可替代 Stata」**。下述缺口真实存在：`vec` 主表（AIC/HQIC/
+   SBIC 规则未定）、`areg` 的 F test of absorbed indicators（差 0.34%，拒绝近似值）、
+   `mlogit`（完全未实现）、两项稳健方差估计器、断点回归/合成控制/回归控制整章、以及
+   `cov_params()` 契约（用户明确暂不修复）。
+
+4. **「已知差异」不等于「已验证一致」**。凡提交信息里写「记录而非声称」「拒绝近似值」
+   的，都不要用「已对齐」概括。

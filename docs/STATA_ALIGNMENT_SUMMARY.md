@@ -16,9 +16,9 @@
 
 | 项 | 数量 |
 |---|---|
-| 全量测试 | **4323 passed, 3 skipped, 0 failed**（第 63 轮检查点）|
-| 完成项 | **66** |
-| 提交 | 78 个，`4d3f182` … `5ad82e3`（本文档的更新提交另计）|
+| 全量测试 | **4337 passed, 3 skipped, 0 failed**（第 66 轮检查点）|
+| 完成项 | **68**（含第 64–65 轮 `tebalance`、`rcm`）|
+| 提交 | 81 个，`4d3f182` … `95e2ded`（本文档的更新提交另计）|
 | 测试文件 | 250 个 |
 | 新增验证测试文件（本次工作）| 30+ 个 |
 
@@ -27,7 +27,7 @@
 
 **全量测试节奏**：用户指示「每完成 10 个修复后再进行全量确认」，后改为「每 20 轮修复后跑
 一次全量测试」，中间只用 `-k` 定向测试。全量测试点：4208 → 4226 → 4233 → 4240 → 4269 →
-4284 → 4323 passed。
+4284 → 4323 → 4337 passed。
 
 ### 报告分类 vs 实测状态（第 63 轮核对）
 
@@ -37,10 +37,15 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | 类别 | 报告 | 实测 |
 |---|---|---|
 | **D 真实缺陷（14）** | 全部待修 | **全部已修复**，测试覆盖：`margins` 147、`classification` 26、`predict_defaults` 24、`hdfe` 66、`psmatch` 7、`didregress` 19、`teffects` 92 项全部通过 |
-| **E 能力缺失（23）** | 全部缺失 | **19 项已实现**（`estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps` 等），**仅 4 项缺失** |
+| **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
-**E 类剩余的 4 项**：`tebalance`、`synth`/`synth2`、`rcm`、`xtserial`（已确认用户 ado 路径下不存在）。
+**E 类剩余的 2 项**：`synth`/`synth2`（结构已还原、算法参数在二进制 mlib 中）、`xtserial`（已确认用户 ado 路径下不存在）。
+
+第 64–65 轮新增两项，并各自记录了局限：
+
+- **`tebalance summarize`**：Raw 列 8/8 精确，Matched 列 7/8 精确；`age` 因 ties 权重分配不同而有残差，守卫测试对其用宽松容差以免静默通过。
+- **`rcm`**：给定 Stata 选中的预测变量时 ATT 与全部 12 期效应逐位一致（`-44.12853199` vs `-44.12853209`）；但**自动模型搜索无法复现**，且实测 Stata 选中的模型前期 RSS 比穷举最优差 13 倍（256.39 vs 20.73），说明其 `rcm()` Mata 搜索空间受限且为编译代码。已用测试显式断言「自动搜索不匹配 Stata」，防止日后误认等价。
 
 ---
 

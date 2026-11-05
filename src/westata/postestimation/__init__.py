@@ -68,6 +68,7 @@ from westata.postestimation.ovtest import OvTestResult, estat_ovtest
 from westata.postestimation.mtest import MTEST_METHODS, MTestResult, adjust_pvalues
 from westata.postestimation.overid import OverIdResult, estat_overid
 from westata.postestimation.summarize import SummarizeResult, estat_summarize
+from westata.postestimation.summary_stats import SummarizeTable, summarize
 from westata.postestimation.vce import VceMatrix, estat_vce
 from westata.postestimation.vif import VifResult, estat_vif
 
@@ -125,6 +126,8 @@ __all__ = [
     "veclmar",
     "SummarizeResult",
     "estat_summarize",
+    "summarize",
+    "SummarizeTable",
     "MTEST_METHODS",
     "MTestResult",
     "adjust_pvalues",

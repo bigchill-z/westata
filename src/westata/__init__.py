@@ -103,6 +103,7 @@ from westata.errors import (
     WestataError,
 )
 from westata.postestimation import (
+    summarize,
     vargranger,
     format_ereturn_list,
     rcm,
@@ -251,6 +252,7 @@ __all__ = [
     "rcm",
     "format_ereturn_list",
     "vargranger",
+    "summarize",
     "LRTestResult",
     "pwcompare",
     "contrast",

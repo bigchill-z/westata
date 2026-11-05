@@ -16,10 +16,28 @@ so ``k_ar_diff = lags - 1`` and ``det_order=0`` (a constant restricted to the co
 relation, which is Stata's default ``trend(constant)``).
 
 ``lags(1)`` is NOT implemented. It maps to ``k_ar_diff=0``, and statsmodels then reports
-173.8827 / 2.8945 against Stata's 172.50341 / 1.2744366 -- dropping leading rows to shift the
-sample lands at 172.4773 / 2.7275, which is close on the first statistic and wrong on the
-second. The lag-1 case evidently uses a different sample convention that four attempts did not
-pin down, so it raises instead of returning a number that is nearly right.
+173.8827 / 2.8945 against Stata's 172.50341 / 1.2744366.
+
+Re-measured across every sample start and both k_ar_diff settings, looking for any
+combination that reproduces Stata's pair::
+
+    kd=0 start=0  n=166  trace  173.8827   2.8945  eig .64523 .01739
+    kd=0 start=1  n=165  trace  173.8176   2.9529  eig .64720 .01784
+    kd=0 start=2  n=164  trace  172.4773   2.7275  eig .64704 .01659
+    kd=1 start=0  n=166  trace  183.0918   7.7811  eig .65664 .04634
+    kd=1 start=1  n=165  trace  181.8193   8.5344  eig .65462 .05101
+    Stata (N=165, Sample 4 thru 168)     172.5034   1.2744  eig .64575 .00769
+
+The first slot looks close only at start=2 (172.4773 vs 172.5034, 0.015% off), but the
+EIGENVALUES there are .64704 / .01659 against Stata's .64575 / .00769 -- the second is off by
+more than a factor of two, so the agreement in the trace statistic is a coincidence of two
+opposite errors rather than a nearly-right convention. Stata's own second eigenvalue being
+an order of magnitude smaller suggests the lag-1 case builds a genuinely different system,
+which five attempts have not reconstructed.
+
+Note also that Stata loses TWO observations at lags(1) (Sample 4 thru 168 from a series
+starting at 3, N=165), where k_ar_diff=0 loses only one. That extra step is not simply a
+shifted sample, which is what the earlier note assumed. Raising is still the honest outcome.
 
 Reference values (``vecrank dinf unem, lags(2)`` on macro_swatson.dta, N = 164)::
 
@@ -163,9 +181,12 @@ def vecrank(
     if lags == 1:
         raise UnsupportedError(
             "vecrank: lags(1) is not implemented. It maps to k_ar_diff=0, where the backend "
-            "reports 173.8827 / 2.8945 against Stata's 172.50341 / 1.2744366, and shifting "
-            "the sample start does not reconcile both statistics. lags(2) and above match "
-            "Stata exactly."
+            "reports 173.8827 / 2.8945 against Stata's 172.50341 / 1.2744366. Every sample "
+            "start and both k_ar_diff settings were measured; the closest trace agreement "
+            "(172.4773 at start=2) comes with eigenvalues .64704/.01659 against Stata's "
+            ".64575/.00769, so it is a coincidence of two opposing errors, not a nearly "
+            "right convention. Stata also loses TWO observations here, not one. lags(2) and "
+            "above match Stata exactly."
         )
     if str(trend).strip().lower() not in {"constant", "c"}:
         raise UnsupportedError(

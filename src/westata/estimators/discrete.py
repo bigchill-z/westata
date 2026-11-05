@@ -2163,3 +2163,137 @@ class OrderedProbit(_Ordered):
     _stata_command = "oprobit"
     _supports_freq_weights = True
     _distribution = "probit"
+
+
+class MultinomialLogit(_DiscreteBase):
+    """Multinomial logistic regression (Stata ``mlogit``).
+
+    The base outcome's coefficients are normalised to zero and Stata still PRINTS them, as a
+    row of zeros in ``e(b)``. That detail matters for matching ``e(b)`` exactly and is why the
+    parameter vector here has ``levels * predictors`` entries rather than
+    ``(levels - 1) * predictors``.
+
+    Reference from a live ``mlogit y land mci, base(1)`` on a 504-observation sample with three
+    outcome levels (see tests/test_mlogit.py for the exact fixture and every coefficient), with
+    ``e(ll) = -491.487956370835`` and the coefficient vector
+
+        1:land 1:mci 1:_cons | 2:land 2:mci 2:_cons | 3:land 3:mci 3:_cons
+           0     0      0    | .00001555 -1.3655805 1.1794885 | ...
+    """
+
+    _stata_command = "mlogit"
+    _supports_freq_weights = True
+    _is_multinomial = True
+
+    def __init__(
+        self,
+        endog: Any,
+        exog: Any,
+        *,
+        param_names: list[str] | None = None,
+        freq_weights: Any = None,
+    ) -> None:
+        response = np.asarray(endog, dtype=float).reshape(-1)
+        levels = np.unique(response)
+        if levels.size < 3:
+            raise ConsistencyError(
+                f"mlogit: the outcome needs at least three levels; found {levels.size}. "
+                "Use Logit for a binary outcome."
+            )
+        super().__init__(
+            endog, exog, param_names=param_names, freq_weights=freq_weights
+        )
+        self._levels = levels
+
+    def fit(self, cov_type: str | None = None, cov_kwds: Any = None, *, maxiter: int = 200, **kwargs: Any) -> Any:
+        from statsmodels.discrete.discrete_model import MNLogit as _MNLogit
+
+        requested = "nonrobust" if cov_type is None else str(cov_type).strip()
+        if requested.lower() != "nonrobust":
+            raise ValueError(
+                f"mlogit: only cov_type='nonrobust' is implemented; got {cov_type!r}"
+            )
+        design = np.asarray(self._X, dtype=float)
+        response = np.asarray(self._y, dtype=float).reshape(-1)
+        levels = np.unique(response)
+        codes = np.searchsorted(levels, response)
+        model = _MNLogit(codes, design)
+        result = model.fit(
+            method="newton", maxiter=maxiter, disp=False
+        )
+
+        # statsmodels estimates (levels - 1) rows; Stata stores `levels` rows with the base
+        # row fixed at zero. Rebuild the full vector in Stata's order.
+        base_params = np.asarray(result.params, dtype=float)  # (k, levels-1)
+        predictors = design.shape[1]
+        full = np.zeros((predictors, levels.size))
+        full[:, 1:] = base_params
+        params = full.T.reshape(-1)  # row-major over levels, as Stata stacks them
+
+        names: list[str] = []
+        base_names = (
+            list(self._param_names)
+            if getattr(self, "_param_names", None) is not None
+            else [f"x{index + 1}" for index in range(predictors)]
+        )
+        for level in levels:
+            for name in base_names:
+                names.append(f"{int(level)}:{name}")
+
+        # Covariance: statsmodels reports (levels-1)*k; block it the same way.
+        base_cov = np.asarray(result.cov_params(), dtype=float)
+        size = predictors * levels.size
+        covariance = np.zeros((size, size))
+        index_map: list[int] = []
+        for level_index in range(levels.size):
+            for predictor in range(predictors):
+                if level_index == 0:
+                    index_map.append(-1)
+                else:
+                    index_map.append(
+                        (level_index - 1) * predictors + predictor
+                    )
+        for row in range(size):
+            if index_map[row] < 0:
+                continue
+            for column in range(size):
+                if index_map[column] < 0:
+                    continue
+                covariance[row, column] = base_cov[index_map[row], index_map[column]]
+
+        llf = float(result.llf)
+        nobs = int(response.size)
+        return StataResults(
+            params=params,
+            param_names=names,
+            cov=covariance,
+            # MNLogit returns an (n, levels) probability matrix; the shared results object
+            # wants one fitted value per observation, so the expected level is used.
+            resid=np.asarray(
+                response - (result.predict() * levels).sum(axis=1), dtype=float
+            ),
+            fittedvalues=np.asarray(
+                (result.predict() * levels).sum(axis=1), dtype=float
+            ),
+            nobs=nobs,
+            df_resid=float(nobs - len(names)),
+            df_model=float(len(names)),
+            dist="z",
+            model_name=self._stata_command,
+            cov_type="nonrobust",
+            e={
+                "N": float(nobs),
+                "ll": llf,
+                "rank": float(len(names)),
+                "df_m": float(len(names)),
+                "df_r": float(nobs - len(names)),
+                "k": float(len(names)),
+                "k_eq": float(levels.size),
+                "k_dv": float(levels.size),
+                "title": "Multinomial logistic regression",
+                "converged": 1.0,
+                "chi2type": "LR",
+                "baseoutcome": float(levels[0]),
+                "width": 78.0,
+            },
+        )

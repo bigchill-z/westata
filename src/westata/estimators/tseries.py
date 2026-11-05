@@ -970,18 +970,28 @@ class VARResults:
 
         Rescaling by that factor reproduces Stata to every printed digit. ``ml_factor``
         already carried it for ``sigma_u``; the IRF was the one path that did not apply it.
+
+        ONLY the ORTHOGONALISED responses get that factor. The plain ``irfs`` are the
+        derivatives of the system with respect to a unit shock, and Stata's ``irf table
+        irf`` starts them at exactly 1 for the shocked equation:
+
+            step 0   Stata 1         statsmodels 1         (unchanged)
+            step 1   Stata -.470944  statsmodels -.470944
+            oirf 0   Stata .013603   statsmodels .013815  <- the factor applies here
+
+        An earlier version rescaled ``irfs`` too, turning its first value into 0.984638 --
+        a plausible-looking number that is simply wrong. ``ma_rep`` is the same object as
+        ``irfs`` in statsmodels, so it is left alone as well.
         """
 
         analysis = self._result.irf(periods)
         factor = float(np.sqrt(self.ml_factor))
-        for attribute in ("irfs", "orth_irfs", "ma_rep"):
-            values = getattr(analysis, attribute, None)
-            if values is None:
-                continue
+        values = getattr(analysis, "orth_irfs", None)
+        if values is not None:
             try:
-                setattr(analysis, attribute, np.asarray(values, dtype=float) * factor)
+                setattr(analysis, "orth_irfs", np.asarray(values, dtype=float) * factor)
             except (AttributeError, TypeError):
-                continue
+                pass
         return analysis
 
     def fevd(self, periods: int = 10) -> Any:
@@ -1000,6 +1010,108 @@ class VARResults:
             # Move the shock axis last so [period, response, shock] reads as expected.
             analysis.westata_decomp = np.transpose(decomposition, (1, 2, 0))
         return analysis
+
+    def irf_table(
+        self,
+        *,
+        statistic: str = "oirf",
+        impulse: str | int | None = None,
+        response: str | int | None = None,
+        periods: int = 10,
+        irfname: str = "var1",
+    ) -> Any:
+        """Stata's ``irf table``: responses in a readable two-column table.
+
+        Measured from a live ``irf table oirf, impulse(dinf) response(dinf)`` after
+        ``irf create v1, step(10)``::
+
+            Results from v1
+            ---------------------
+                     |      (1)
+                Step |      oirf
+            ---------+-----------
+                   0 |  .013603
+                   1 | -.005984
+                 ...
+            ---------------------
+            (1) irfname = v1, impulse = dinf, and response = dinf.
+
+        ``statistic`` is ``"oirf"`` (default, Stata's default) or ``"irf"``. The numbers come
+        from :meth:`irf`, which already puts OIRF on Stata's ML scale and leaves plain IRF at
+        its unit-shock scale; this method only formats them.
+
+        Impulse and response default to the first variable, which is what a one-column
+        ``irf table`` with a single impulse/response shows.
+        """
+
+        key = str(statistic).strip().lower()
+        if key not in {"oirf", "irf"}:
+            raise UnsupportedError(
+                f"irf_table: only 'oirf' and 'irf' are implemented; got {statistic!r}"
+            )
+        analysis = self.irf(periods=periods)
+        values = np.asarray(
+            getattr(analysis, "orth_irfs" if key == "oirf" else "irfs"),
+            dtype=float,
+        )
+        names = list(self.names)
+
+        def _index(value: str | int | None, what: str) -> int:
+            if value is None:
+                return 0
+            if isinstance(value, int):
+                if not 0 <= value < len(names):
+                    raise ValueError(f"irf_table: {what} index {value} out of range")
+                return value
+            if str(value) not in names:
+                raise ConsistencyError(
+                    f"irf_table: unknown {what} {value!r}; available {names}"
+                )
+            return names.index(str(value))
+
+        impulse_index = _index(impulse, "impulse")
+        response_index = _index(response, "response")
+        # ``irfs`` is laid out (step, RESPONSE, IMPULSE) -- checked against Stata:
+        # irfs[0,0,0] = 1 for a unit shock to dinf, and irfs[1,0,0] = -.470944.
+        series = values[:, response_index, impulse_index]
+
+        def _cell(value: float) -> str:
+            if not np.isfinite(value):
+                return "."
+            text = f"{value:.6f}"
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            return text.rstrip("0").rstrip(".") or "0"
+
+        # Geometry measured from Stata's own lines for BOTH statistics:
+        #   '         |      (1)'   19 chars, pipe at 9
+        #   '    Step |      oirf'  20 chars (the name line is one wider)
+        #   '       0 |  .013603'   19 chars
+        #   '       0 |         1'  20 chars -- irf's step-0 unit shock only
+        # Building each line from its measured width is more reliable than deriving the
+        # fields, because the widths differ between the header and the rows.
+        lines = [
+            f"Results from {irfname}",
+            "-" * 21,
+            f"{'':>9}|{'(1)':>9}",
+            f"{'Step':>8} |{key:>10}",
+            "-" * 9 + "+" + "-" * 11,
+        ]
+        for step in range(series.size):
+            cell = _cell(float(series[step]))
+            # Only an integer (irf step 0) gets the wider, ten-character value field.
+            width = 10 if cell.lstrip("-").isdigit() else 9
+            lines.append(f"{step:>8} |{cell:>{width}}")
+        lines.extend(
+            [
+                "-" * 21,
+                f"(1) irfname = {irfname}, impulse = {names[impulse_index]}, "
+                f"and response = {names[response_index]}.",
+            ]
+        )
+        return chr(10).join(lines)
 
     def fevd_table(self, periods: int = 10) -> Any:
         """Stata's ``irf table fevd``: one row per step, one column per (shock, response).

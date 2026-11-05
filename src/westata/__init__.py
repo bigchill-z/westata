@@ -101,6 +101,7 @@ from westata.errors import (
     WestataError,
 )
 from westata.postestimation import (
+    tebalance_summarize,
     HausmanResult,
     LincomResult,
     LRTestResult,
@@ -240,6 +241,7 @@ __all__ = [
     "rdrobust",
     "teffects_ra",
     "teffects_psmatch",
+    "tebalance_summarize",
     "LRTestResult",
     "pwcompare",
     "contrast",

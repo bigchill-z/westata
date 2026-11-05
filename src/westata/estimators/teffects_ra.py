@@ -44,13 +44,25 @@ function lands within 0.2% on the first seed, but 2% high on seed 11 and 2.5% lo
 A term that is right on one sample and wrong in both directions on others is a coincidence, not
 a derivation -- so it is not shipped.
 
-The right place to look is ``_teffects_ra_gmm.ado``, which is readable and shows the estimator
-is a GMM over BOTH the outcome equations and a treatment equation. A GMM form was built (last
-row) but its Jacobian normalisation is wrong by roughly a factor of 2.6, so it is further off
-than the simpler approximation.
+The right place to look is ``_teffects_ra_gmm.ado``, which IS readable -- but reading it in
+round 68 shows it only SETS UP the GMM system and calls Stata's ``gmm`` command. The file is
+177 lines with no occurrence of influence/variance/psi/robust/score, so it contains no variance
+code at all. The variance is produced inside the builtin ``gmm``: the same kind of boundary as
+``rdrobust_vce``, where the estimator is visible and the sandwich is not.
 
 ``se``/``z``/``p``/the interval therefore stay NaN, and a test pins them that way -- the same
 call made for ``rdrobust``.
+
+Round 68 re-measured the gap on nsw_dw.dta (8 covariates, ``teffects ra (re78 ...) (treat)``)
+so the limitation stays quantified rather than becoming folklore:
+
+    Stata e(b)[1,1]        = 1621.583081895851   this package: 1621.5830818958466
+    Stata sqrt(e(V)[1,1])  =   679.054055509282
+
+Every influence-function variant tried lands 2.9-3.4% LOW: the plain AIPW form gives 656.90
+(-3.26%), adding Var(beta) 657.66 (-3.16%), adding the E[X|T] estimation term 659.51 (-2.88%).
+Three independent refinements all move toward the target and stop short of it, which says a
+term is still missing rather than mis-scaled -- so none is shipped.
 """
 
 from __future__ import annotations

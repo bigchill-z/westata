@@ -2801,29 +2801,27 @@ def _stata_summary(result: Any) -> str:
         # than ``svy: regress`` (78, left 54), because their table is narrower.
         # Captured: "Number of strata =  8             Number of obs   =        576".
         if _is_svy_estimate(result):
-            # The block is 62 columns wide, but the SPLIT between its halves adapts to the
-            # value: measured, "Number of obs   =        576" puts the right half at 34
-            # while "Number of obs   = 100" puts it at 41. Both rows are still 62 wide.
-            # So the right half is built at its natural size and the left is padded to
-            # whatever remains, instead of a fixed 34/28 split.
+            # Measured from a live ``svy: mean x1 x2``: every line is 62 characters, the
+            # left "=" sits at 17 and the right half ALWAYS starts at column 34 with its
+            # "=" at 50 and a ten-wide value ending at 62:
+            #
+            #   'Number of strata =  20            Number of obs   =        400'
+            #   'Number of PSUs   = 200            Population size = 507.732852'
+            #   '                                  Design df       =        180'
+            #
+            # The previous version let the split float with the value's width, on the
+            # belief that "Number of obs = 100" pushed the right half to 41. Measured on
+            # three different value widths, the right half does not move: it is 34.
             def _row_narrow(left: str, label: str = "", value: str = "") -> str:
                 if not label:
                     return left.rstrip()
-                # Two of these rows pad the value differently, and both were measured:
-                #   "Number of obs   = 100"     value occupies its own width
-                #   "Design df       =  15"     value carries ONE extra leading space
-                # so the field is len(value) for the first and len(value) + 1 for the
-                # second. Applying one rule to both left one row a column short.
-                _padded = label in ("Design df",)
-                right = f"{label:<16}= {' ' + value if _padded else value}"
-                pad = max(4, 62 - len(right) - len(left))
-                return f"{left}{' ' * pad}{right}".rstrip()
+                return f"{left:<34}{label:<16}= {value:>10}".rstrip()
 
             narrow: list[str] = []
             if np.isfinite(n_strata):
                 narrow.append(
                     _row_narrow(
-                        f"Number of strata = {int(round(n_strata)):>2}",
+                        f"Number of strata = {int(round(n_strata)):>3}",
                         "Number of obs",
                         f"{nobs:,.0f}",
                     )
@@ -2840,7 +2838,7 @@ def _stata_summary(result: Any) -> str:
                     pop = f"{n_pop:,.6f}"
                 narrow.append(
                     _row_narrow(
-                        f"Number of PSUs   = {int(round(n_psu)):>2}",
+                        f"Number of PSUs   = {int(round(n_psu)):>3}",
                         "Population size",
                         pop,
                     )

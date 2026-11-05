@@ -638,15 +638,29 @@ class VARResults:
         """Parameter names in Stata's ``e(b)`` order (equation by equation).
 
         For a VAR(2) with two variables Stata stores
-        ``L.y1 L2.y1 L.y2 L2.y2 _cons`` per equation (variable first, then
+        ``L1.y1 L1.y2 L2.y1 L2.y2 _cons`` per equation (variable first, then
         lag), whereas statsmodels uses ``[eq] * (const, L1y1..L1yk, L2y1..)``.
+
+        The FIRST lag carries its digit too. An earlier version emitted ``L.y1`` for lag 1
+        and ``L2.y1`` for lag 2, so the printed table read::
+
+                     L. |   -.4709436   <- Stata prints L1.
+                    L2. |    -.401031
+
+        Measured from ``var dinf unem, lags(1/2)``: every lag row is ``L<k>.``, including
+        the first. ``L.`` is only correct for an ARMA term (``ar.L1``), which is a different
+        spelling produced elsewhere.
         """
 
         rows: list[str] = []
         for _ in self.names:
+            # Stata lists a VARIABLE's lags consecutively -- L1.y1 L2.y1, then L1.y2 L2.y2 --
+            # so the variable is the OUTER loop and the lag the inner one. The previous code
+            # had it the other way round, producing L1.y1 L2.y1 L1.y2 L2.y2, which is the
+            # statsmodels layout rather than Stata's.
             for name in self.names:
                 for lag in range(1, self.lags + 1):
-                    rows.append(f"L.{name}" if lag == 1 else f"L{lag}.{name}")
+                    rows.append(f"L{lag}.{name}")
             rows.extend(name for name, _ in self._deterministic_spec())
         return rows
 

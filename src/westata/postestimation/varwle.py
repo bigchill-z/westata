@@ -124,7 +124,11 @@ def varwle(result: Any) -> VarWleResult:
     def positions(equation_index: int, lag: int) -> list[int]:
         """Parameter positions of one lag within one equation's block."""
 
-        prefix = f"L{lag}." if lag > 1 else "L."
+        # Every lag carries its digit -- including the first. This matched the old
+        # ``stata_param_names``, which spelled lag 1 as "L." ; Stata prints "L1." and
+        # ``var dinf unem, lags(1/2)`` shows it plainly. Fixing the names without fixing
+        # this lookup would have silently matched NOTHING for lag 1.
+        prefix = f"L{lag}."
         offset = equation_index * per_equation
         block = names[offset : offset + per_equation]
         return [

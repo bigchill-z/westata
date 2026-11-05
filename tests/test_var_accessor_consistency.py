@@ -90,10 +90,16 @@ def test_the_constant_comes_last_in_each_equation(var_fit) -> None:
     # Five coefficients per equation: four lag terms then the constant.
     assert names[4] == "_cons"
     assert names[9] == "_cons"
-    assert names[0].startswith("L.")
+    assert names[0].startswith("L1.")
 
 
 def test_the_lag_naming_matches_stata(var_fit) -> None:
-    """``L.y1``, ``L2.y1``, ``L.y2``, ``L2.y2`` -- variable outer, lag inner."""
+    """``L1.y1``, ``L2.y1``, ``L1.y2``, ``L2.y2`` -- every lag carries its digit.
 
-    assert var_fit.stata_param_names[:4] == ["L.y1", "L2.y1", "L.y2", "L2.y2"]
+    The previous version of this test asserted ``L.y1`` for the FIRST lag and described that
+    as "matching Stata". It does not: ``var dinf unem, lags(1/2)`` prints ``L1.`` for the first
+    lag row, and the rendered table read ``L.`` where Stata reads ``L1.``. The ordering claim
+    in the old docstring (variable outer, lag inner) was right; only the digit was missing.
+    """
+
+    assert var_fit.stata_param_names[:4] == ["L1.y1", "L2.y1", "L1.y2", "L2.y2"]

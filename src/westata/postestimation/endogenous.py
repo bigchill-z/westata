@@ -138,8 +138,9 @@ class EndogenousResult:
 
             Tests of endogeneity
             H0: Variables are exogenous
-            Durbin (score) chi2(1)          =  192.536  (p = 0.0000)
-            Wu-Hausman F(1,396)             =  367.505  (p = 0.0000)
+
+            Durbin (score) chi2(1)          =  182.141  (p = 0.0000)
+            Wu-Hausman F(1,396)             =  331.077  (p = 0.0000)
 
         Two details: the null line capitalises "Variables", and "=" sits at column 32 (a
         32-wide label field plus a space). Both statistics print at six significant figures,
@@ -153,9 +154,12 @@ class EndogenousResult:
                 "",
                 "Tests of endogeneity",
                 "H0: Variables are exogenous",
-                f"{durbin_label:<31} = {_six_g(self.durbin):>8}"
+                # Stata leaves a BLANK line between the null hypothesis and the statistics.
+                "",
+                # Two-space indent, as Stata prints it: "  Durbin (score) chi2(1) ..."
+                f"  {durbin_label:<31} = {_six_g(self.durbin):>8}"
                 f"  (p = {self.durbin_pvalue:.4f})",
-                f"{wu_label:<31} = {_six_g(self.wu):>8}"
+                f"  {wu_label:<31} = {_six_g(self.wu):>8}"
                 f"  (p = {self.wu_pvalue:.4f})",
             ]
         )

@@ -3469,6 +3469,44 @@ def _stata_summary(result: Any) -> str:
                 if _scale_label
                 else f"{bare:>{name_width}} |"
             )
+            if _scale_label:
+                # ``var(e.<y>)`` is the VARIANCE, but the fitted parameter is its square
+                # root, so the stored value has to be squared before it is printed.
+                # Measured on ``tobit cens x1 x2, ll(0)``: the stored 1.029584 is Stata's
+                # 1.060043 variance exactly (1.029584**2 = 1.060043), and the variance's
+                # standard error is the delta-method transform 2*sigma*se(sigma)
+                # = 2 * 1.029584 * .0395174 = .081372 against Stata's .0813728.
+                #
+                # The interval is transformed on the LOG-VARIANCE scale, which is why it
+                # comes out asymmetric about the estimate (1.060043 sits below its own
+                # interval's midpoint) -- on the raw scale Stata's interval is not
+                # symmetric, so a plus/minus construction cannot be right.
+                sigma = float(params[index])
+                sigma_se = float(bse[index])
+                variance = sigma**2
+                variance_se = 2.0 * sigma * sigma_se
+                if variance > 0.0 and np.isfinite(variance_se) and variance_se > 0.0:
+                    shift = 1.96 * variance_se / variance
+                    lines.append(
+                        _name_cell
+                        + f"{_stata_coef(variance, coef_w)}"
+                        f"{_stata_coef(variance_se, se_w)}"
+                        f"{'':>{stat_w}}"
+                        f"{'':>{p_w}}"
+                        f"{_stata_coef(variance * float(np.exp(-shift)), ci_lo_w)}"
+                        f"{_stata_coef(variance * float(np.exp(shift)), ci_hi_w)}"
+                    )
+                else:
+                    lines.append(
+                        _name_cell
+                        + f"{_stata_coef(variance, coef_w)}"
+                        f"{_stata_coef(variance_se, se_w)}"
+                        f"{'':>{stat_w}}"
+                        f"{'':>{p_w}}"
+                        f"{_stata_coef(lower[index], ci_lo_w)}"
+                        f"{_stata_coef(upper[index], ci_hi_w)}"
+                    )
+                continue
             lines.append(
                 _name_cell
                 + f"{_stata_coef(params[index], coef_w)}"

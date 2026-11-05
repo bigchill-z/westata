@@ -102,8 +102,27 @@ def test_a_third_order_rank_has_no_further_statistic(table) -> None:
     assert np.isnan(table.rows[2].trace)
 
 
-def test_lags_one_is_refused_rather_than_approximated(data) -> None:
-    """The lag-1 convention was not pinned down, so it raises instead of guessing."""
+def test_lags_one_matches_stata(data) -> None:
+    """``lags(1)`` was refused for many rounds; it is now computed directly and matches.
 
-    with pytest.raises(Exception):
-        vecrank(data, lags=1)
+    Reference, a live ``vecrank dinf unem, lags(1) max`` on macro_swatson.dta::
+
+        rank  Params           LL  Eigenvalue   statistic
+           0       2    1075.5453                 172.5034
+           1       5    1161.1598     .64575        1.2744
+           2       6    1161.7970     .00769
+
+    The earlier note blamed a different search space. The real cause was that
+    statsmodels' ``k_ar_diff=0`` keeps one extra observation (N = 166 against Stata's 165),
+    because at one lag there are NO lagged differences to regress out -- only the constant.
+    Computing the reduced-rank regression directly reproduces all four numbers.
+    """
+
+    result = vecrank(data, lags=1)
+    table = str(result)
+
+    assert "172.5034" in table
+    assert "1.2744" in table
+    assert "1075.5453" in table
+    assert "1161.1598" in table
+    assert "1161.7970" in table

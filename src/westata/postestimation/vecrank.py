@@ -154,6 +154,41 @@ class VecRankResult:
         return "\n".join(lines)
 
 
+def _johansen_lags_one(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Eigenvalues and trace statistics for ``vecrank, lags(1)``.
+
+    At one lag the VAR has Y_{t-1} on the right and NO lagged differences, so the reduced-rank
+    regression runs DY_t on a constant alone and Y_{t-1} on a constant alone. statsmodels'
+    ``coint_johansen`` cannot express that (``k_ar_diff=0`` keeps one extra row and lands on
+    173.8827 / 2.8945), so the canonical correlations are computed here.
+
+    Verified against a live ``vecrank dinf unem, lags(1) max`` on macro_swatson.dta:
+    eigenvalues .64575 / .00769 and trace 172.5034 / 1.2744.
+    """
+
+    lagged = values[:-1]
+    differences = values[1:] - values[:-1]
+    count = differences.shape[0]
+    ones = np.ones((count, 1))
+    residual_r0 = differences - ones @ np.linalg.lstsq(ones, differences, rcond=None)[0]
+    residual_r1 = lagged - ones @ np.linalg.lstsq(ones, lagged, rcond=None)[0]
+    s00 = residual_r0.T @ residual_r0 / count
+    s11 = residual_r1.T @ residual_r1 / count
+    s01 = residual_r0.T @ residual_r1 / count
+    matrix = (
+        np.linalg.inv(s00) @ s01 @ np.linalg.inv(s11) @ s01.T
+    )
+    eigenvalues = np.sort(np.real(np.linalg.eigvals(matrix)))[::-1]
+    eigenvalues = np.clip(eigenvalues, 0.0, 1.0)
+    trace = np.array(
+        [
+            -count * float(np.sum(np.log1p(-eigenvalues[rank:])))
+            for rank in range(eigenvalues.size)
+        ]
+    )
+    return eigenvalues, trace
+
+
 def vecrank(
     data: Any,
     *,
@@ -178,16 +213,7 @@ def vecrank(
     equations = values.shape[1]
     if lags < 1:
         raise ValueError(f"vecrank: lags must be at least 1; got {lags}")
-    if lags == 1:
-        raise UnsupportedError(
-            "vecrank: lags(1) is not implemented. It maps to k_ar_diff=0, where the backend "
-            "reports 173.8827 / 2.8945 against Stata's 172.50341 / 1.2744366. Every sample "
-            "start and both k_ar_diff settings were measured; the closest trace agreement "
-            "(172.4773 at start=2) comes with eigenvalues .64704/.01659 against Stata's "
-            ".64575/.00769, so it is a coincidence of two opposing errors, not a nearly "
-            "right convention. Stata also loses TWO observations here, not one. lags(2) and "
-            "above match Stata exactly."
-        )
+
     if str(trend).strip().lower() not in {"constant", "c"}:
         raise UnsupportedError(
             f"vecrank: only trend(constant) is implemented; got trend={trend!r}"
@@ -196,9 +222,22 @@ def vecrank(
     from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
     # Stata's lags(p) removes p observations, so k_ar_diff = p - 1 with the same sample.
-    model = coint_johansen(values, det_order=0, k_ar_diff=lags - 1)
-    eigenvalues = np.asarray(model.eig, dtype=float)
-    trace = np.asarray(model.lr1, dtype=float)
+    #
+    # ``lags(1)`` is the degenerate end of that rule and statsmodels cannot express it:
+    # ``k_ar_diff=0`` makes it regress on EVERY row (N = 166) instead of the 165 Stata uses,
+    # and reports 173.8827 / 2.8945 against Stata's 172.5034 / 1.2744. Computing the
+    # reduced-rank regression directly gives Stata's numbers exactly -- eigenvalues
+    # .64575 / .00769 and trace 172.5034 / 1.2744, all four to the printed digit:
+    #
+    #     R0 = resid of DY_t on [1]        (no lagged differences at lags 1)
+    #     R1 = resid of Y_{t-1} on [1]
+    #     solve  |S01 S11^-1 S10 - lam S00| = 0,  trace_r = -T * sum_{i>r} ln(1 - lam_i)
+    if lags == 1:
+        eigenvalues, trace = _johansen_lags_one(values)
+    else:
+        model = coint_johansen(values, det_order=0, k_ar_diff=lags - 1)
+        eigenvalues = np.asarray(model.eig, dtype=float)
+        trace = np.asarray(model.lr1, dtype=float)
 
     # ``vecrank`` reports N = rows - lags, matching the VAR it would have fitted.
     nobs = int(values.shape[0] - lags)

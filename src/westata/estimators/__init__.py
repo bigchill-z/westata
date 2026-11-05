@@ -48,6 +48,7 @@ from westata.estimators.prais import PraisResult, prais, prais_winsten
 from westata.estimators.rdrobust import RdRobustResult, rdrobust
 from westata.estimators.teffects_ra import TefectsRaResult, teffects_ra
 from westata.estimators.psmatch import PsmatchResult, teffects_psmatch
+from westata.estimators.nnmatch import NnmatchResult, teffects_nnmatch
 from westata.estimators.panel_dynamic import XtAbond
 from westata.estimators.panel_nonlinear import (
     XtLogit,
@@ -158,6 +159,8 @@ __all__ = [
     "teffects_ra",
     "PsmatchResult",
     "teffects_psmatch",
+    "NnmatchResult",
+    "teffects_nnmatch",
     "check_time_spacing",
     "IV2SLS",
     "IVLIML",

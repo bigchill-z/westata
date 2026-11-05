@@ -40,6 +40,26 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### 未解决的一处排版差异：普通 OLS 多一行标题（第 81 轮，已停止排查）
+
+报告 C04-01 把 OLS 归为 A 类「可直接替代」，同时括注「westata 多一行标题
+`Linear regression`」。实测确认这是**真实差异**：Stata 的 `regress y k` 第一行就是
+`      Source |       SS           df       MS`, 没有标题；`Linear regression` 只是 `e(title)`,
+Stata 存而不印。稳健版（`regress, robust`）才有该标题行，且与 `Number of obs` 同行。
+
+**尝试与结果**：在 `_stata_summary` 中给 `lines.append(banner)` 加上
+"普通非稳健 OLS 不打印" 的条件（`model_name in ("regress","ols")` and `not vcetype` and
+`block in ("ols","")`），诊断打印确认三个条件**同时为真**、`_plain_ols=True`，但输出仍然
+带标题——说明 1824 行之后有某个分支**重建了 `lines` 并补回标题**，而该重建点未被定位。
+
+**已耗时 12+ 次工具调用，代码已回滚，工作区干净。** 记为已知差异：
+- 影响：表头多一行（`Linear regression` + 一个空行）
+- 数值：完全一致
+- 性质：纯排版，非数值缺陷
+
+**继续排查的前置条件**：需要先给 `_stata_summary` 的每一处 `lines = [...]` 重建点编号并
+逐一打印 `lines[0]`，才能定位是哪一处补回了标题。单靠读代码在这一轮没有找到。
+
 ### C 类（部分实现，8 项）在第 72–79 轮全部关闭
 
 | 项 | 内容 | 处理 |

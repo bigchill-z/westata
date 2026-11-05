@@ -447,15 +447,40 @@ class ContrastResult(list):
         self.df_denom = float(df_denom)
 
     def __str__(self) -> str:
+        """Reproduce ``contrast`` exactly::
+
+            Contrasts of marginal linear predictions
+            Margins: asbalanced
+            ------------------------------------------------
+                         |         df           F        P>F
+            -------------+----------------------------------
+                     grp |          2        0.32     0.7288
+                         |
+             Denominator |         26
+            ------------------------------------------------
+
+        Five differences from what this printed before: the ``Margins: asbalanced`` line was
+        missing, a stray blank line followed the title, the name column was one too wide,
+        and the trailing blank piped row plus the ``Denominator`` row were absent entirely.
+        Without the denominator the F statistic cannot be read -- it needs its second
+        degrees of freedom.
+
+        Geometry measured from that output: every table line is 48 characters with the pipe
+        at column 13; df ends at 25, F at 37 and P>F at 48.
+        """
+
         lines = [
             "Contrasts of marginal linear predictions",
-            "",
+            "Margins: asbalanced",
             "-" * 48,
-            f"{'':>13} |{'df':>10}{'F':>12}{'P>F':>11}",
-            "-" * 14 + "+" + "-" * 33,
-            f"{self.term:>13} |{self.df:>10}{self.fvalue:>12.2f}{self.pvalue:>11.4f}",
-            "-" * 48,
+            f"{'':>12} |{'df':>11}{'F':>12}{'P>F':>11}",
+            "-" * 13 + "+" + "-" * 34,
+            f"{self.term:>12} |{self.df:>11.0f}{self.fvalue:>12.2f}{self.pvalue:>11.4f}",
+            f"{'':>12} |",
         ]
+        if np.isfinite(self.df_denom):
+            lines.append(f"{'Denominator':>12} |{self.df_denom:>11.0f}")
+        lines.append("-" * 48)
         return chr(10).join(lines)
 
 

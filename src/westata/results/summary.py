@@ -2008,37 +2008,58 @@ def _stata_summary(result: Any) -> str:
     elif str(getattr(result, "model_name", "") or "") == "xtabond":
         lines = _xtabond_header_block(result, nobs)
     elif str(getattr(result, "model_name", "") or "") == "sureg":
-        # ``sureg`` opens with an EQUATION SUMMARY table and no fit statistics. Measured:
+        # ``sureg`` opens with an EQUATION SUMMARY table and no fit statistics. Measured
+        # from a live ``sureg (y1 x1) (y2 x2)``:
         #
-        #   Seemingly unrelated regression
-        #   --------------------------------------------------------------
-        #   Equation             Obs   Params         RMSE  "R-squared"
-        #   --------------------------------------------------------------
-        #   y                    100        1     .9808943      0.0157
-        #   ybin                 100        1     .4994156      0.0023
-        #   --------------------------------------------------------------
+        #   ------------------------------------------------------------------------------
+        #   Equation             Obs   Params         RMSE  "R-squared"      chi2   P>chi2
+        #   ------------------------------------------------------------------------------
+        #   y1                   300        1     .9515677      0.7915    1731.53   0.0000
+        #   y2                   300        1     .9551537      0.6891    1018.27   0.0000
+        #   ------------------------------------------------------------------------------
+        #
+        # Each line is 78 characters; the value fields END at 24, 33, 46, 58, 69 and 78.
+        # Two columns were missing entirely before -- ``chi2`` and ``P>chi2`` -- so the
+        # table reported a fit with no test of it, and RMSE printed six significant
+        # figures against Stata's seven decimals (.95157 against .9515677).
         _sureg_e = getattr(result, "e", None) or {}
         _sureg_title = str(_sureg_e.get("title") or "Seemingly unrelated regression")
         _sureg_names = list(_sureg_e.get("equations") or [])
-        _r2_header = '"R-squared"'
-        lines = [_sureg_title, "-" * 62,
-                 f"{'Equation':<18}{'Obs':>7}{'Params':>9}{'RMSE':>13}"
-                 f"{_r2_header:>13}",
-                 "-" * 62]
-        for _eq in _sureg_names:
+        _sureg_rule = "-" * 78
+        _r2_header = '"R-squared"'  # Stata prints the quotes literally in this table
+        # The header is one column wider in two fields than the data rows -- measured:
+        # header ends 24 / 33 / 46 / 59 / 69 / 78, rows end 24 / 33 / 46 / 58 / 69 / 78.
+        lines = [
+            _sureg_title,
+            _sureg_rule,
+            f"{'Equation':<18}{'Obs':>6}{'Params':>9}{'RMSE':>13}"
+            f"{_r2_header:>13}{'chi2':>10}{'P>chi2':>9}",
+            _sureg_rule,
+        ]
+        # ``e(chi2_1)``/``e(p_1)`` are keyed by the equation's POSITION, not its name.
+        for _position, _eq in enumerate(_sureg_names, start=1):
             _rmse_eq = _e_float(result, f"rmse_{_eq}")
             _r2_eq = _e_float(result, f"r2_{_eq}")
             _k_eq = _e_float(result, f"k_{_eq}")
+            _chi2_eq = _e_float(result, f"chi2_{_position}")
+            _p_eq = _e_float(result, f"p_{_position}")
             # ``e(N)`` is the TOTAL across equations; the table reports the per-equation
             # count, which for a balanced system is N / k_eq.
             _n_eq = int(nobs // max(int(_e_float(result, "k_eq")), 1))
+            # RMSE prints SEVEN DECIMALS with the leading zero dropped, not significant
+            # figures: .9515677 rather than .95157.
+            _rmse_text = f"{_rmse_eq:.7f}" if np.isfinite(_rmse_eq) else "."
+            if _rmse_text.startswith("0."):
+                _rmse_text = _rmse_text[1:]
             lines.append(
-                f"{str(_eq):<18}{_n_eq:>7}"
+                f"{str(_eq):<18}{_n_eq:>6}"
                 f"{(int(_k_eq) + 1) if np.isfinite(_k_eq) else 1:>9}"
-                f"{_stata_number(_rmse_eq, 7).strip():>13}"
-                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>13}"
+                f"{_rmse_text:>13}"
+                f"{_four(_r2_eq) if np.isfinite(_r2_eq) else '.':>12}"
+                f"{_chi2_eq:>11.2f}"
+                f"{_four(_p_eq) if np.isfinite(_p_eq) else '.':>9}"
             )
-        lines.append("-" * 62)
+        lines.append(_sureg_rule)
     elif str(getattr(result, "model_name", "") or "") == "areg":
         # ``areg`` prints a TWO-COLUMN header instead of the Source/SS table, like reghdfe
         # but with its own left column. Measured:

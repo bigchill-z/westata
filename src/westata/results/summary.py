@@ -3644,14 +3644,25 @@ def _stata_summary(result: Any) -> str:
                         if np.isfinite(statistic)
                         else float("nan")
                     )
+                    # The interval is built on the SIGMA scale and is SYMMETRIC there --
+                    # unlike tobit's, which lives on the log-variance scale with a t.
+                    # Measured on ``arima dinf, arima(1,0,0)``:
+                    #
+                    #   /sigma |  .0164621  .0007197  22.87  0.000   .0150515  .0178727
+                    #
+                    # Implied z: (lo - sigma)/se = -1.959983 and (hi - sigma)/se =
+                    # +1.959983, i.e. the normal's 1.96 to every printed digit. Taking the
+                    # SQUARE ROOT of a variance interval instead (the previous code)
+                    # produces an asymmetric pair that matches neither command's rule.
+                    half_width = 1.959963984540054 * deviation_se
                     lines.append(
                         f"{bare:>{name_width}} |"
                         f"{_stata_coef(deviation, coef_w)}"
                         f"{_stata_coef(deviation_se, se_w)}"
                         f"{_stata_stat(statistic, stat_w)}"
                         f"{_stata_pvalue(pvalue, p_w)}"
-                        f"{_stata_coef(np.sqrt(lower[index]), ci_lo_w)}"
-                        f"{_stata_coef(np.sqrt(upper[index]), ci_hi_w)}"
+                        f"{_stata_coef(deviation - half_width, ci_lo_w)}"
+                        f"{_stata_coef(deviation + half_width, ci_hi_w)}"
                     )
                     continue
             lines.append(

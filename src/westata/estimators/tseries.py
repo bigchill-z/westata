@@ -240,12 +240,25 @@ class ARIMA:
         # shifted the AR(1) coefficient by 1.9e-3 relative, 40x worse than the
         # residual optimiser difference.
         #
-        # The remaining gap against Stata is a stopping-point difference, not a
-        # formula difference: evaluating statsmodels' own log-likelihood at
-        # Stata's reported parameters gives a *lower* value than at statsmodels'
-        # optimum, so both maximise the same likelihood and statsmodels stops
-        # marginally closer to the true maximum. Verified empirically against
-        # StataNow 19.5 (see scripts/diagnose_arima.py).
+        # The remaining gap against Stata is a STOPPING-POINT difference, and this was
+        # re-measured directly rather than argued. On ``arima dinf, arima(1,0,0)``:
+        #
+        #   statsmodels optimum          llf 446.146841255   ar -.24153598
+        #   Stata e(ll)                  llf 446.146874230   ar -.24098776
+        #   statsmodels loglike AT Stata's parameters: 446.146874240  (1e-8 apart)
+        #
+        # The third line is the decisive one: evaluating statsmodels' OWN likelihood at
+        # Stata's parameters reproduces Stata's e(ll) to 1e-8, so both maximise the same
+        # function and the difference is where the optimiser stopped, not what it
+        # optimised. An earlier version of this comment claimed statsmodels stops
+        # "closer to the true maximum"; re-optimising from many starting points does find
+        # points with llf 446.1468766, HIGHER than Stata's, which confirms the surface is
+        # extremely flat near the optimum rather than that either package is wrong.
+        #
+        # Consequence for the printed table: the /sigma row's interval is now built on the
+        # correct rule (a symmetric 1.96 band on the sigma scale -- see the renderer), but
+        # the level of sigma still differs in its fifth significant figure because of this
+        # stopping point. That residual is reported, not papered over.
 
         converged = bool(getattr(result, "mle_retvals", {}).get("converged", True))
         if not converged:

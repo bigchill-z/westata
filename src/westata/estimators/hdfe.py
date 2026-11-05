@@ -1878,9 +1878,13 @@ class Areg(FEOLS):
         # ``_na_index``, the only authoritative list (re-deriving it from "level appears
         # more than once" loses rows when singletons interact across absorbed dimensions).
         #
-        # This only bites when rows ARE dropped -- a panel with no singletons has equal
-        # lengths and takes the fast path. On cao_chen.dta 3144 of 150650 rows are
-        # singletons, and without this the product raised a shape error.
+        # This only bites when rows ARE dropped -- a frame with no missing values and no
+        # singletons has equal lengths and takes the fast path. On cao_chen.dta 3144 of
+        # 150650 rows have a missing ``maize`` (NOT singleton groups: every county has 262
+        # usable rows), and without this the product raised a shape error.
+        #
+        # ``_na_index`` covers both reasons a row can be dropped, which is why it is the
+        # right source even though this particular case is missingness alone.
         if len(y_values) != len(data):
             dropped = getattr(self, "_dropped_rows", None)
             if dropped is None:

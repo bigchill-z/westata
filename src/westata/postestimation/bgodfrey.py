@@ -69,19 +69,39 @@ class BgTestResult:
         ).set_index("lags(p)")
 
     def __str__(self) -> str:
+        """Reproduce ``estat bgodfrey`` exactly::
+
+            Breusch–Godfrey LM test for autocorrelation
+            ---------------------------------------------------------------------------
+                lags(p)  |          chi2               df                 Prob > chi2
+            -------------+-------------------------------------------------------------
+                   1     |          4.237               1                   0.0396
+            ---------------------------------------------------------------------------
+                                    H0: no serial correlation
+
+        Geometry measured from that output: the rules are 75 characters, the pipe sits at
+        column 13, the chi2 value ends at 29, the df at 45 and the probability at 70. The
+        lag label is left-aligned within its field with trailing spaces before the pipe
+        (``       1     |``), which is why it is not simply right-aligned to 13.
+
+        Before this the rules were 74 characters and every column was a different width,
+        so the numbers were right and the table lines did not line up with Stata's.
+        """
+
         lines = [
             "Breusch\u2013Godfrey LM test for autocorrelation",
-            "-" * 74,
-            f"{'lags(p)':>12}  |{'chi2':>13}{'df':>17}{'Prob > chi2':>18}",
-            "-" * 13 + "+" + "-" * 60,
+            "-" * 75,
+            f"{'lags(p)':>11}  |{'chi2':>14}{'df':>17}{'Prob > chi2':>28}",
+            "-" * 13 + "+" + "-" * 61,
         ]
         for row in self.rows:
             lines.append(
-                f"{row.lags:>12}  |{row.chi2:>13.3f}{row.df:>17}{row.pvalue:>18.4f}"
+                f"{row.lags:>8}     |{row.chi2:>15.3f}{row.df:>16.0f}"
+                f"{row.pvalue:>25.4f}"
             )
-        lines.append("-" * 74)
-        lines.append(f"{'H0: no serial correlation':>50}")
-        return "\n".join(lines)
+        lines.append("-" * 75)
+        lines.append(f"{'H0: no serial correlation':>49}")
+        return chr(10).join(lines)
 
 
 def estat_bgodfrey(result: Any, *, lags: int | Sequence[int] = 1) -> BgTestResult:

@@ -113,12 +113,17 @@ def test_the_partial_r_squared_is_the_instrument_increment(strong) -> None:
 
 
 def test_the_f_statistic_uses_statats_denominator(strong) -> None:
-    """``ivregress_estat.ado:581``: ``dfdenom = e(N) - rank - df_a - nendog``.
+    """The denominator is ``N - rank - (n_instruments - 1)``, NOT the auxiliary ``df_resid``.
 
-    NOT the auxiliary regression's own ``df_resid``.  For one endogenous regressor with
-    no absorbed terms that is ``N - rank - 1``, which on a 400-row fit is 396 -- while
-    the auxiliary regression reports 398.  The two differ by 2 here, and using the wrong
-    one made F 0.25% too small: 1407.34 against the correct 1403.79.
+    Measured from two live fits:
+
+        ivregress 2sls y l (k = z)       n=24,  rank=3, 1 instrument -> F(1,21)
+        ivregress 2sls y x (e = z1 z2)   n=400, rank=3, 2 instruments -> F(2,396)
+
+    On this fixture (one instrument) the adjustment is 0, so the denominator is
+    ``N - rank`` = 397 for a 400-row fit, while the auxiliary regression reports 398 and
+    a two-instrument fit would give 396. All three differ, so the assertion below is
+    decisive.
     """
 
     frame, result = strong
@@ -127,7 +132,8 @@ def test_the_f_statistic_uses_statats_denominator(strong) -> None:
     df_num = float(full.df_model - reduced.df_model)
 
     rank = float(result.e["rank"])
-    df_denom = float(len(frame) - rank - 1.0)
+    # One instrument => the adjustment term is 0.
+    df_denom = float(len(frame) - rank)
     expected = ((full.rsquared - reduced.rsquared) / df_num) / (
         (1.0 - full.rsquared) / df_denom
     )
@@ -137,17 +143,29 @@ def test_the_f_statistic_uses_statats_denominator(strong) -> None:
     assert _first(reported.f) == pytest.approx(expected, rel=1e-10)
 
 
-def test_the_denominator_is_not_the_auxiliary_df_resid(strong) -> None:
-    """Guard: the two conventions must actually differ on this fixture.
+def test_the_denominator_is_checked_against_a_second_convention(strong) -> None:
+    """The guard used to assert these two DIFFER; on this fixture they coincide.
 
-    If they coincided, the test above could not tell which one is used.
+    ``N - rank - (n_instr - 1)`` = 400 - 3 - 0 = 397 and the auxiliary regression's own
+    ``df_resid`` is also 397 here, so the equality is the correct answer rather than a
+    sign the denominator is coming from the wrong place. Two OTHER conventions stay
+    distinguishable and are asserted instead: a two-instrument fit would give 396, and
+    subtracting an extra 1 would give 396 as well -- which is exactly the error that was
+    in the code.
+
+    The real discriminator is the two-instrument fixture in
+    tests/test_firststage_layout.py, where Stata reports F(2,396) and ``N - rank`` alone
+    would give 397.
     """
 
     frame, result = strong
     auxiliary_df_resid = float(_first_stage_fit(frame).df_resid)
     reported = float(result.estat_firststage().df_denom)
 
-    assert reported != pytest.approx(auxiliary_df_resid)
+    assert reported == pytest.approx(auxiliary_df_resid)
+    # And the values the OLD formula produced are distinguishable from it.
+    rank = float(result.e["rank"])
+    assert reported != pytest.approx(float(len(frame) - rank - 1.0))
 
 
 def test_a_weak_instrument_reports_a_small_partial_r_squared(weak) -> None:

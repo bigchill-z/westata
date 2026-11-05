@@ -1225,19 +1225,74 @@ class IV2SLS:
             out["kappa"] = float(kappa)
         return out
 
+    def _partial_first_stage_f(self) -> float:
+        """Stata's partial first-stage F for each endogenous regressor; smallest returned.
+
+        For endogenous regressor ``j``: regress it on the INCLUDED exogenous variables plus a
+        constant (the restricted model), then again with the excluded instruments added (the
+        full model). ``F = ((rss_r - rss_f) / n_excluded) / (rss_f / (n - k_full))``.
+
+        The denominator uses the FULL design's rank, which is what puts Stata at 21 rather
+        than 20 here.
+        """
+
+        y_endog = np.asarray(self._X_endog, dtype=float)
+        included = np.asarray(self._X_exog, dtype=float)
+        excluded = np.asarray(self._Z_instr, dtype=float)
+        if excluded.shape[1] == 0:
+            return float("nan")
+        ones = np.ones((y_endog.shape[0], 1))
+        design_r = np.column_stack([ones, included])
+        design_f = np.column_stack([ones, included, excluded])
+        n = design_r.shape[0]
+        k_full = design_f.shape[1]
+        n_excluded = excluded.shape[1]
+        df_denom = n - k_full
+        if df_denom <= 0:
+            return float("nan")
+        statistics: list[float] = []
+        for column in range(y_endog.shape[1]):
+            target = y_endog[:, column]
+            coefficients_r, *_ = np.linalg.lstsq(design_r, target, rcond=None)
+            rss_r = float(((target - design_r @ coefficients_r) ** 2).sum())
+            coefficients_f, *_ = np.linalg.lstsq(design_f, target, rcond=None)
+            rss_f = float(((target - design_f @ coefficients_f) ** 2).sum())
+            if rss_f <= 0.0:
+                continue
+            statistics.append((rss_r - rss_f) / n_excluded / (rss_f / df_denom))
+        return float(min(statistics)) if statistics else float("nan")
+
     def _first_stage_f(self, ref: Any, nobs: int) -> float:
-        """Smallest first-stage F over the endogenous regressors (NaN if none)."""
+        """Smallest partial first-stage F over the endogenous regressors.
+
+        Computed here rather than read from ``linearmodels``' ``f.stat``: that reports
+        ``F(1,20) = 17967.770`` where Stata prints ``F(1,21) = 18866.2`` on the same data --
+        one degree of freedom fewer, and a statistic 5% apart.
+
+        Stata's ``estat firststage`` reports the PARTIAL F: the excluded instruments are
+        tested jointly in a first-stage regression that already contains the included
+        exogenous regressors, with ``df_denom = n - k_full`` over the FULL first-stage
+        design. Measured on ``ivregress 2sls y l (k = z)`` (n = 24, full design
+        [const, z, l] so df = 21):
+
+            (rss_restricted - rss_full) / 1  /  (rss_full / 21) = 18866.1586
+
+        matching Stata's 18866.2.
+        """
 
         if self._X_endog.shape[1] == 0:
             return float("nan")
         try:
-            diagnostics = ref.first_stage.diagnostics
-            f_stat = np.asarray(diagnostics["f.stat"], dtype=float)
-        except (AttributeError, KeyError, TypeError, ValueError):
-            return float("nan")
-        if f_stat.size == 0:
-            return float("nan")
-        f_first = float(np.nanmin(f_stat))
+            f_first = float(self._partial_first_stage_f())
+        except (AttributeError, KeyError, TypeError, ValueError, np.linalg.LinAlgError):
+            # Fall back to the backend's number, which at least signals the right order of
+            # magnitude, rather than failing the whole fit.
+            try:
+                diagnostics = ref.first_stage.diagnostics
+                f_stat = np.asarray(diagnostics["f.stat"], dtype=float)
+                f_first = float(np.nanmin(f_stat)) if f_stat.size else float("nan")
+            except (AttributeError, KeyError, TypeError, ValueError):
+                return float("nan")
         if np.isfinite(f_first) and f_first < _WEAK_INSTRUMENT_F:
             warnings.warn(
                 "weak instruments: the smallest first-stage F statistic is "

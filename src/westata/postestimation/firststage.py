@@ -602,8 +602,23 @@ def estat_firststage(
         # ``N - rank - 1``.
         model_rank = float(getattr(result, "e", {}).get("rank", np.nan) or np.nan)
         absorbed = float(getattr(result, "e", {}).get("df_a", 0.0) or 0.0)
+        # The denominator depends on the number of EXCLUDED INSTRUMENTS, which two live
+        # fits pin down:
+        #
+        #   ivregress 2sls y l (k = z)        n=24,  e(rank)=3, 1 instrument -> F(1,21)
+        #   ivregress 2sls y x (e = z1 z2)    n=400, e(rank)=3, 2 instruments -> F(2,396)
+        #
+        # i.e. ``N - rank - (n_instr - 1)``: 24-3-0 = 21 and 400-3-1 = 396. Neither the ado
+        # line's ``- nendog`` (which gives 20 and 395) nor plain ``N - rank`` (397 for the
+        # second) fits both. With one instrument the two candidates coincide, which is why
+        # this went unnoticed: the earlier code matched single-instrument fits and was 1 low
+        # on the F for many-instrument ones.
+        # ``df_num`` is already the number of excluded instruments (set above from
+        # ``instruments.shape[1]``), so it carries exactly the count this needs.
+        n_excluded = int(df_num) if np.isfinite(df_num) else 1
+        instrument_adjustment = max(n_excluded - 1, 0)
         if np.isfinite(model_rank):
-            df_denom = float(nobs - model_rank - absorbed - 1.0)
+            df_denom = float(nobs - model_rank - absorbed - instrument_adjustment)
         else:  # pragma: no cover - defensive
             df_denom = float(nobs - design_aug.shape[1])
         if df_denom <= 0 or not np.isfinite(partial_r2) or partial_r2 >= 1.0:

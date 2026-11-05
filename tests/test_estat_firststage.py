@@ -98,20 +98,23 @@ def test_pvalue_is_upper_tail_f(auto_iv) -> None:
 
 
 def test_degrees_of_freedom(auto_iv) -> None:
-    """``ivregress_estat.ado:581``: ``dfdenom = e(N) - rank - df_a - nendog``.
+    """The denominator is ``N - rank - (n_instruments - 1)``.
 
-    This test used to assert ``N - 2`` -- the auxiliary regression's own ``df_resid``,
-    which counts the intercept and the instrument but not the endogenous regressor being
-    explained.  Stata's denominator also subtracts that regressor via ``rank`` and
-    ``nendog``, so with one instrument and one endogenous variable it is ``N - rank -
-    1``.
+    Two live fits pin the formula down, and neither simple candidate fits both:
+
+        ivregress 2sls y l (k = z)       n=24,  rank=3, 1 instrument -> F(1,21)
+        ivregress 2sls y x (e = z1 z2)   n=400, rank=3, 2 instruments -> F(2,396)
+
+    With one instrument the adjustment term is 0, so the denominator here is ``N - rank``.
+    The earlier assertion subtracted an extra 1, which matched TWO-instrument fits and was
+    one too small here.
     """
 
     frame, result = auto_iv
     fs = result.estat_firststage()
 
     assert fs.df_num[0] == 1.0  # one excluded instrument
-    assert fs.df_denom[0] == float(len(frame) - float(result.e["rank"]) - 1.0)
+    assert fs.df_denom[0] == float(len(frame) - float(result.e["rank"]))
 
 
 def test_a_weak_instrument_shows_a_small_partial_r2(auto_iv) -> None:

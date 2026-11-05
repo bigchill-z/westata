@@ -3066,9 +3066,15 @@ def _stata_summary(result: Any) -> str:
     # ``newey`` stores "Newey-West" and must still take this branch.
     _is_robust = bool(_vcetype) and _vcetype.strip().upper() != "OIM"
     se_header = "std. err." if _is_robust else "Std. err."
+    # ``logit ..., or`` renames the coefficient column. Measured: "Odds ratio" ends at
+    # column 25 where "Coefficient" ends at 26, both inside a 78-character row.
+    _odds_ratio = bool(getattr(result, "_odds_ratio", False))
+    # "Odds ratio" is one character shorter than "Coefficient" but the column boundary is
+    # fixed, so it is padded to the same width -- otherwise the whole row loses a space.
+    _coef_header = f"{'Odds ratio':<{coef_w}}" if _odds_ratio else "Coefficient"
     header = (
         f"{response_label:>{name_width}} | "
-        f"{'Coefficient':>{coef_w - 1}}"
+        f"{_coef_header:>{coef_w if _odds_ratio else coef_w - 1}}"
         f"{se_header:>{se_w}}"
         f"{stat_label:>{stat_w - 2}}"
         f"{p_label:>{p_w + 1}}"
@@ -3665,15 +3671,35 @@ def _stata_summary(result: Any) -> str:
                         f"{_stata_coef(deviation + half_width, ci_hi_w)}"
                     )
                     continue
-            lines.append(
-                f"{bare:>{name_width}} |"
-                f"{_stata_coef(params[index], coef_w)}"
-                f"{_stata_coef(bse[index], se_w)}"
-                f"{_stata_stat(stats_[index], stat_w)}"
-                f"{_stata_pvalue(pvalues[index], p_w)}"
-                f"{_stata_coef(lower[index], ci_lo_w)}"
-                f"{_stata_coef(upper[index], ci_hi_w)}"
-            )
+            if _odds_ratio:
+                # ``logit ..., or`` reports EXPONENTIATED coefficients. Stata re-labels the
+                # column "Odds ratio" and exponentiates the ESTIMATE, its standard error and
+                # both interval endpoints; z and P>|z| are unchanged because they come from
+                # the untransformed scale. Measured on ``logit treat age education re74 re75,
+                # or``: age 1.013706 (.0138091), education 1.084459 (.0595068).
+                #
+                # exp(b) and exp(b +/- z*se) are the same thing as exp(b) +/- ... only for
+                # small se, which is why the endpoints are exponentiated individually rather
+                # than rebuilt from the transformed centre.
+                lines.append(
+                    f"{bare:>{name_width}} |"
+                    f"{_stata_coef(float(np.exp(params[index])), coef_w)}"
+                    f"{_stata_coef(float(np.exp(params[index])) * float(bse[index]), se_w)}"
+                    f"{_stata_stat(stats_[index], stat_w)}"
+                    f"{_stata_pvalue(pvalues[index], p_w)}"
+                    f"{_stata_coef(float(np.exp(lower[index])), ci_lo_w)}"
+                    f"{_stata_coef(float(np.exp(upper[index])), ci_hi_w)}"
+                )
+            else:
+                lines.append(
+                    f"{bare:>{name_width}} |"
+                    f"{_stata_coef(params[index], coef_w)}"
+                    f"{_stata_coef(bse[index], se_w)}"
+                    f"{_stata_stat(stats_[index], stat_w)}"
+                    f"{_stata_pvalue(pvalues[index], p_w)}"
+                    f"{_stata_coef(lower[index], ci_lo_w)}"
+                    f"{_stata_coef(upper[index], ci_hi_w)}"
+                )
     # The random-effects ML commands continue the coefficient table with two derived rows
     # INSIDE the same table (not as a block below it), each preceded by a split rule:
     #
@@ -4012,6 +4038,11 @@ def _stata_summary(result: Any) -> str:
             # No "F test that all u_i=0" row (the RE estimator has none), but Stata still
             # closes the sigma/rho block with a full-width rule.
             lines.append(_border_rule)
+
+    # ``logit ..., or`` closes with a note explaining what the constant means on this scale.
+    # Measured: "Note: _cons estimates baseline odds."
+    if bool(getattr(result, "_odds_ratio", False)):
+        lines.append("Note: _cons estimates baseline odds.")
 
     # ``areg`` closes with its own absorbed-indicator test, and the wording is NOT xtreg's.
     # Measured from ``areg maize canal disaster, absorb(county)``:

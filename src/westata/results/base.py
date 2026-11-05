@@ -1275,15 +1275,27 @@ class StataResults:
             name="odds_ratio",
         )
 
-    def summary(self, style: str = "statsmodels") -> str:
+    def summary(self, style: str = "statsmodels", *, odds_ratio: bool = False) -> str:
         """Render a text summary.
 
         Parameters
         ----------
         style:
             ``"statsmodels"`` (default) or ``"stata"``.
+        odds_ratio:
+            Exponentiate the coefficients, their standard errors and both interval
+            endpoints, and relabel the column "Odds ratio" -- Stata's ``logit ..., or``.
+            z and P>|z| are unaffected, since they come from the untransformed scale.
         """
 
+        if odds_ratio:
+            # A shallow copy carries the flag without mutating the fit, so two summaries of
+            # the same result can differ. ``copy.copy`` keeps the shared arrays shared.
+            import copy as _copy
+
+            clone = _copy.copy(self)
+            clone._odds_ratio = True
+            return render_summary(clone, style)
         return render_summary(self, style)
 
     def __repr__(self) -> str:

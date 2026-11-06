@@ -2349,23 +2349,42 @@ class VECMResults:
         det_coef = np.asarray(raw.det_coef, dtype=float).reshape(neqs)
 
         def _row(label: str, coef: float, se: float, blank_test: bool = False) -> str:
+            """One coefficient row, ending at column 78 like Stata's.
+
+            Measured targets: value ends at 25, standard error at 36, z at 45, p at 53, and the
+            two interval bounds at 66 and 78. With a 14-character label field that means the six
+            value fields are 11 / 11 / 9 / 8 / 13 / 12 wide.
+
+            The numbers use _vec_number so the leading zero is dropped -- "%12.7g" printed
+            "0.107031" where Stata writes ".107031", and "6.284021e-07" where Stata writes a
+            short exponential form for a near-zero constant.
+            """
+
             if blank_test or not np.isfinite(se) or se <= 0.0:
-                return f"{label:>12} |{coef:>12.7g}{se if np.isfinite(se) else 0:>13.7g}"
+                return (
+                    f"{label:>12} |{_vec_number(coef, 7):>11}"
+                    f"{_vec_number(se if np.isfinite(se) else 0.0, 7):>11}"
+                )
             statistic = coef / se
             p_value = float(2.0 * stats.norm.sf(abs(statistic)))
             low = coef - 1.959963984540054 * se
             high = coef + 1.959963984540054 * se
             return (
-                f"{label:>12} |{coef:>12.7g}{se:>13.7g}{statistic:>8.2f}"
-                f"{p_value:>8.3f}{low:>13.7g}{high:>13.7g}"
+                f"{label:>12} |{_vec_number(coef, 7):>11}{_vec_number(se, 7):>11}"
+                f"{statistic:>9.2f}{p_value:>8.3f}"
+                f"{_vec_number(low, 7):>13}{_vec_number(high, 7):>12}"
             )
 
         lines.extend(
             [
                 "",
                 "-" * 78,
-                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>13}{'z':>8}{'P>|z|':>8}"
-                f"{'[95% conf. interval]':>23}",
+                # Ends measured from Stata: |14  Coefficient 26  Std. err. 37  z 44  P>|z| 53
+                #                              [95% conf. interval] 78
+                # Columns end at 14 / 26 / 37 / 44 / 53 / 78, so the field widths are
+                # 12, 11, 7, 9 and 25 -- measured, not guessed.
+                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>11}{'z':>7}{'P>|z|':>9}"
+                f"{'[95% conf. interval]':>25}",
                 "-" * 13 + "+" + "-" * 64,
             ]
         )
@@ -2374,23 +2393,23 @@ class VECMResults:
             lines.append(f"{equation:<12} |")
             lines.append(f"{'_ce1':>12} |")
             lines.append(
-                f"{'L1.':>12} |{alpha[index, 0]:>12.7g}"
-                f"{stderr_alpha[index, 0]:>13.7g}"
-                f"{alpha[index, 0] / stderr_alpha[index, 0]:>8.2f}"
+                f"{'L1.':>12} |{_vec_number(alpha[index, 0], 7):>11}"
+                f"{_vec_number(stderr_alpha[index, 0], 7):>11}"
+                f"{alpha[index, 0] / stderr_alpha[index, 0]:>9.2f}"
                 f"{float(2.0 * stats.norm.sf(abs(alpha[index, 0] / stderr_alpha[index, 0]))):>8.3f}"
-                f"{alpha[index, 0] - 1.959963984540054 * stderr_alpha[index, 0]:>13.7g}"
-                f"{alpha[index, 0] + 1.959963984540054 * stderr_alpha[index, 0]:>13.7g}"
+                f"{_vec_number(alpha[index, 0] - 1.959963984540054 * stderr_alpha[index, 0], 7):>13}"
+                f"{_vec_number(alpha[index, 0] + 1.959963984540054 * stderr_alpha[index, 0], 7):>12}"
             )
             lines.append(f"{'':>12} |")
             for predictor in range(neqs):
                 lines.append(f"{names[predictor]:>12} |")
                 lines.append(
-                    f"{'LD.':>12} |{gamma[index, predictor]:>12.7g}"
-                    f"{stderr_gamma[index, predictor]:>13.7g}"
-                    f"{gamma[index, predictor] / stderr_gamma[index, predictor]:>8.2f}"
+                    f"{'LD.':>12} |{_vec_number(gamma[index, predictor], 7):>11}"
+                    f"{_vec_number(stderr_gamma[index, predictor], 7):>11}"
+                    f"{gamma[index, predictor] / stderr_gamma[index, predictor]:>9.2f}"
                     f"{float(2.0 * stats.norm.sf(abs(gamma[index, predictor] / stderr_gamma[index, predictor]))):>8.3f}"
-                    f"{gamma[index, predictor] - 1.959963984540054 * stderr_gamma[index, predictor]:>13.7g}"
-                    f"{gamma[index, predictor] + 1.959963984540054 * stderr_gamma[index, predictor]:>13.7g}"
+                    f"{_vec_number(gamma[index, predictor] - 1.959963984540054 * stderr_gamma[index, predictor], 7):>13}"
+                    f"{_vec_number(gamma[index, predictor] + 1.959963984540054 * stderr_gamma[index, predictor], 7):>12}"
                 )
                 lines.append(f"{'':>12} |")
             # ``_cons`` is reported in STATS' parameterisation, where the deterministic term

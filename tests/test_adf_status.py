@@ -51,11 +51,16 @@ def levels():
     return np.asarray(frame["lrgnp"], dtype=float)
 
 
-def test_the_entry_point_is_unitroot_not_dfuller() -> None:
-    """The usability gap: a Stata user types `dfuller` and gets AttributeError."""
+def test_dfuller_is_now_available_as_an_alias() -> None:
+    """Round 132 closed the usability gap this test originally recorded.
+
+    It asserted `not hasattr(ws, "dfuller")` -- the state at the time -- because a Stata user
+    typing the command name got AttributeError. The alias now exists and delegates to unitroot.
+    """
 
     assert hasattr(ws, "unitroot")
-    assert not hasattr(ws, "dfuller")
+    assert hasattr(ws, "dfuller")
+    assert hasattr(ws, "pperron")
 
 
 def test_adf_with_trend_matches_stata(levels) -> None:

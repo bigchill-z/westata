@@ -3667,6 +3667,61 @@ def unitroot(
     raise ValueError(f"unitroot: unknown test {test!r}; use 'adf', 'pp' or 'kpss'")
 
 
+def dfuller(
+    endog: Any,
+    *,
+    trend: bool = False,
+    lags: int | None = None,
+    autolag: str | None = None,
+    regression: str | None = None,
+) -> UnitRootResult:
+    """Augmented Dickey-Fuller test, spelled the way Stata spells it.
+
+    A thin alias: ``dfuller(y, trend=True)`` is ``unitroot(y, test="adf", regression="ct")``.
+    It exists because ``unitroot`` is not the name a Stata user reaches for, and the option
+    mapping is not guessable:
+
+        no option     ->  regression="c"
+        , trend       ->  regression="ct"
+        , noconstant  ->  regression="n"
+
+    Measured against a live Stata on nelson_plosser.dta, where the numbers already matched:
+
+        dfuller lrgnp, trend    Z(t) -2.026     unitroot(..., regression="ct")  -2.0262
+        dfuller d.lrgnp         Z(t) -5.322     unitroot(..., regression="c")   -5.3216
+
+    ``lags=`` maps to ``maxlag``; Stata's default is zero lags, which is what ``None`` gives.
+    Passing ``regression=`` overrides ``trend``.
+    """
+
+    if regression is None:
+        regression = "ct" if trend else "c"
+    return unitroot(
+        endog, test="adf", regression=regression, maxlag=lags, autolag=autolag
+    )
+
+
+def pperron(
+    endog: Any,
+    *,
+    trend: bool = False,
+    lags: int | None = None,
+    autolag: str | None = None,
+    regression: str | None = None,
+) -> UnitRootResult:
+    """Phillips-Perron test, spelled the way Stata spells it.
+
+    ``pperron(y, trend=True)`` is ``unitroot(y, test="pp", regression="ct")``; the option mapping
+    is the same as :func:`dfuller`.
+    """
+
+    if regression is None:
+        regression = "ct" if trend else "c"
+    return unitroot(
+        endog, test="pp", regression=regression, maxlag=lags, autolag=autolag
+    )
+
+
 def _vec_chi2(value: float, digits: int = 7) -> str:
     """The per-equation chi2 column: SEVEN significant figures, no leading zero.
 

@@ -96,6 +96,8 @@ from westata.estimators.tseries import (
     VECM,
     UnitRootResult,
     unitroot,
+    dfuller,
+    pperron,
 )
 
 __all__ = [

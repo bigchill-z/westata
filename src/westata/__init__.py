@@ -94,6 +94,8 @@ from westata.estimators import (
     Tobit,
     UnitRootResult,
     unitroot,
+    dfuller,
+    pperron,
 )
 from westata.errors import (
     ConsistencyError,
@@ -292,6 +294,8 @@ __all__ = [
     "GARCH",
     "UnitRootResult",
     "unitroot",
+    "dfuller",
+    "pperron",
     "WaldTest",
     "LincomResult",
     "MarginsResult",

@@ -2290,8 +2290,19 @@ class VECMResults:
         tmin = int(float(e.get("tmin", 1)))
         tmax = int(float(e.get("tmax", tmin + int(e["N"]) - 1)))
         detsig = float(e["detsig_ml"])
+        # Stata's header is a THREE-row left block against a FOUR-row right block, with AIC on
+        # its own line and no counterpart on the left:
+        #
+        #   Sample: 3 thru 166                       Number of obs     =        164
+        #                                            AIC               =  -14.77519
+        #   Log likelihood =  1220.566               HQIC              =  -14.70613
+        #   Det(Sigma_ml)  =  1.18e-09               SBIC              =  -14.60508
+        #
+        # Pairing AIC with "Log likelihood" (the obvious reading of the left list) shifted every
+        # row below it. The block also starts FLUSH -- there is no leading blank line.
         left_rows = [
             f"Sample: {tmin} thru {tmax}",
+            "",
             f"Log likelihood = {ll_value:>9.3f}",
             f"Det(Sigma_ml)  = {detsig:>9.2e}",
         ]
@@ -2301,7 +2312,7 @@ class VECMResults:
             f"HQIC              = {float(e['hqic']):>10.5f}",
             f"SBIC              = {float(e['sbic']):>10.5f}",
         ]
-        lines = ["", "Vector error-correction model", ""]
+        lines = ["Vector error-correction model", ""]
         for left, right in zip(left_rows, right_rows):
             lines.append(f"{left:<48}{right}")
 
@@ -2309,7 +2320,7 @@ class VECMResults:
         lines.extend(
             [
                 "",
-                f"Equation           Parms{'RMSE':>11}{'R-sq':>9}{'chi2':>10}{'P>chi2':>10}",
+                f"Equation           Parms{'RMSE':>10}{'R-sq':>9}{'chi2':>10}{'P>chi2':>11}",
                 "-" * 64,
             ]
         )
@@ -2320,10 +2331,12 @@ class VECMResults:
             chi2 = float(e["chi2" + suffix])
             p_value = float(stats.chi2.sf(chi2, 3)) if np.isfinite(chi2) else float("nan")
             lines.append(
-                f"D_{names[index]:<15}{int(e['k' + suffix]):>4}"
-                f"{float(e['rmse' + suffix]):>11.6g}"
-                f"{r2:>9.4f}{chi2:>10.4f}"
-                f"{p_value:>10.4f}"
+                # Columns end at 23 / 35 / 44 / 55 / 64, measured from a live vec table:
+                #   'D_dinf                4     .013772   0.7434   463.5891   0.0000'
+                f"D_{names[index]:<14}{int(e['k' + suffix]):>7}"
+                f"{_vec_number(float(e['rmse' + suffix]), 6):>12}"
+                f"{r2:>9.4f}{chi2:>11.4f}"
+                f"{p_value:>9.4f}"
             )
         lines.append("-" * 64)
 
@@ -3458,6 +3471,30 @@ def unitroot(
         )
 
     raise ValueError(f"unitroot: unknown test {test!r}; use 'adf', 'pp' or 'kpss'")
+
+
+def _vec_number(value: float, digits: int = 6) -> str:
+    """A vec table number: ``digits`` DECIMAL PLACES, trailing zeros trimmed, no leading zero.
+
+    Stata prints an RMSE of .0137721869 as ".013772" and one of .0025600170 as ".00256".
+    "%11.6g" gave "0.0137722" -- wrong precision AND wrong on the leading zero -- and
+    "%11.6f" would give ".013772" for the first but ".00256" only after the trailing zeros go.
+    Both cases land right with fixed-point plus trimming:
+
+        .0137721869  ->  .013772
+        .0025600170  ->  .00256
+    """
+
+    if not np.isfinite(value):
+        return "."
+    text = f"{float(value):.{digits}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text or "0"
 
 
 def render_dfuller(result: Any, *, variable: str, regression: str = "c") -> str:

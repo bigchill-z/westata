@@ -2085,17 +2085,33 @@ class VECMResults:
         return values * self._stata_variance_scale()
 
     def _stata_variance_scale(self) -> float:
-        """``T / (T - 4)``: the covariance's scale factor between statsmodels and Stata.
+        """``T / (T - df_eq)``: the covariance's scale factor between statsmodels and Stata.
 
-        statsmodels' VECM divides by ``T - 4``; Stata's ``vec`` divides by ``T``. On the
-        reference fit that is 164/160 = 1.025 on a variance and 1.012423 on a standard
-        error. The SAME factor applies to alpha, gamma and the deterministic terms --
-        verified by dividing Stata's printed standard errors by statsmodels' for all
-        three blocks, which gave 1.0124232, 1.0124229 and 1.0124181.
+        statsmodels' VECM divides by ``T - df_eq``; Stata's ``vec`` divides by ``T``. The SAME
+        factor applies to alpha, gamma and the deterministic terms.
+
+        The subtrahend is ``df_eq``, NOT the literal 4 the code carried. On the rank-1 reference
+        fit df_eq IS 4, which is why the constant looked right there (164/160 = 1.025 on a
+        variance, 1.012423 on a standard error, matching Stata to the last digit). It stops being
+        4 as soon as the model is richer:
+
+            rank 2, three variables, 2 lags:  df_eq = 6, N = 218
+                N/(N-4) = 1.01869159   <- what this returned
+                N/(N-6) = 1.02830189   <- what Stata uses
+
+        a 0.47% error on every standard error in every block, which is exactly the third-digit
+        mismatch recorded against alpha and gamma in the alignment summary.
         """
 
         nobs = float(self.raw.nobs)
-        return nobs / float(max(nobs - 4.0, 1.0))
+        subtrahend = 4.0
+        try:
+            candidate = float(self.e.get("df_eq", 0.0) or 0.0)
+        except Exception:  # pragma: no cover - defensive
+            candidate = 0.0
+        if np.isfinite(candidate) and 0.0 < candidate < nobs:
+            subtrahend = candidate
+        return nobs / max(nobs - subtrahend, 1.0)
 
     @property
     def stderr_gamma(self) -> np.ndarray:

@@ -208,12 +208,21 @@ def _johansen_general(values: np.ndarray, lags: int) -> tuple[np.ndarray, np.nda
     )
     residual_r0 = response - common @ np.linalg.lstsq(common, response, rcond=None)[0]
     residual_r1 = level - common @ np.linalg.lstsq(common, level, rcond=None)[0]
-    s00 = residual_r0.T @ residual_r0 / count
-    s11 = residual_r1.T @ residual_r1 / count
-    s01 = residual_r0.T @ residual_r1 / count
-    eigenvalues = np.sort(
-        np.real(np.linalg.eigvals(np.linalg.solve(s00, s01 @ np.linalg.solve(s11, s01.T))))
-    )[::-1]
+    # Canonical correlations via QR + SVD rather than explicit covariance inverses.
+    #
+    # The covariance route is only safe while S11 is invertible. On a sample with a
+    # nearly dependent column it is not: inf/unem/dinf gives cond(S11) = 4.5e28 and
+    # rank(S11) = 2 for a 3x3 matrix, so np.linalg.solve returns arbitrary numbers -- that
+    # was the source of the 3.63428 eigenvalue (larger than 1) seen in round 13.
+    #
+    # Orthonormalising both residual blocks first makes the singular values of Q0'Q1 the
+    # canonical correlations directly, and a collinear direction contributes an EXACT zero
+    # instead of a numerically meaningless one. On the two-variable reference this gives
+    # .65664 / .04634, identical to the covariance route.
+    basis_r0, _ = np.linalg.qr(residual_r0, mode="reduced")
+    basis_r1, _ = np.linalg.qr(residual_r1, mode="reduced")
+    singular_values = np.linalg.svd(basis_r0.T @ basis_r1, compute_uv=False)
+    eigenvalues = np.sort(singular_values**2)[::-1]
     eigenvalues = np.clip(eigenvalues, 0.0, 1.0)
     trace = np.array(
         [

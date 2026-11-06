@@ -182,7 +182,24 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`, `RegressionAdjustment`, `IPW`, `AIPW` |
+| `teffects nnmatch ..., atet` / `caliper()` | `teffects_nnmatch(...)` — the function form adds `caliper` and `tie_tolerance` |
+| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
+| `tebalance summarize` | `tebalance_summarize(...)` |
 | `didregress` / `xtdidregress` | `Didregress`, `Xtdidregress` |
+| `rcm` | `rcm(...)` — pass `selected=` for a result that matches Stata |
+
+Both matching estimators use Stata's tie rule: every control at the k-th smallest
+distance counts as a match, not just the first. That rule is what the numbers hinge
+on — on the reference data 47 of 185 treated units have ties. The *standard errors*
+are not reproduced (the AI-robust and sandwich forms live in compiled code), so
+`se`/`z`/`p`/`ci` come back `NaN` rather than as a plausible guess.
+
+```python
+d = df.dropna(subset=["price", "mpg", "weight"]).copy()
+d["treat"] = (d["foreign"] > 0).astype(int)
+ws.teffects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
+ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
+```
 
 ### Time series
 
@@ -191,6 +208,17 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | `arima` | `ARIMA` |
 | `arch` / `garch` | `GARCH` (needs `arch`) |
 | unit-root tests | `unitroot(test=...)`, `XtUnitroot` |
+| `vecrank` | `vecrank(...)` — `lags(1)` included |
+| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`, `varlmar`, `varstable`, `varwle` |
+| `veclmar` / `vecstable` | `veclmar`, `vecstable` |
+| `vargranger` | `vargranger(fitted)` |
+| `prais` | `prais(frame, formula)` |
+
+```python
+values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
+ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
+ws.vecrank(values, lags=1)
+```
 
 ### Post-estimation
 
@@ -199,6 +227,8 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | `test` | `res.test(...)` |
 | `lincom` | `res.lincom(...)` |
 | `margins` | `res.margins(...)` |
+| `summarize` | `ws.summarize(frame, ["y", "x1"])` |
+| `ereturn list` | `format_ereturn_list(res)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
 

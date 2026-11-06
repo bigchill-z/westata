@@ -213,7 +213,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              3963 个测试，不需要 Stata 授权
+tests/              4402 个测试（4398 通过、3 跳过），不需要 Stata 授权
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```

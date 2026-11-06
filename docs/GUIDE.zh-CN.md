@@ -177,7 +177,23 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`、`RegressionAdjustment`、`IPW`、`AIPW` |
+| `teffects nnmatch ..., atet` / `caliper()` | `teffects_nnmatch(...)` —— 函数形式另带 `caliper` 与 `tie_tolerance` |
+| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
+| `tebalance summarize` | `tebalance_summarize(...)` |
 | `didregress` / `xtdidregress` | `Didregress`、`Xtdidregress` |
+| `rcm` | `rcm(...)` —— 需要与 Stata 一致的结果请传 `selected=` |
+
+两个匹配估计量都采用 Stata 的并列（tie）规则：第 k 小距离上的**所有**对照都算匹配，而不只取
+第一个。数值能否对上完全取决于这条规则——参考数据上 185 个处理组个体中有 47 个存在并列。
+**标准误未复现**（AI 稳健与 sandwich 形式在编译代码中），因此 `se`/`z`/`p`/`ci` 返回 `NaN`
+而不是一个看似合理的猜测值。
+
+```python
+d = df.dropna(subset=["price", "mpg", "weight"]).copy()
+d["treat"] = (d["foreign"] > 0).astype(int)
+ws.teffects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
+ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
+```
 
 ### 时间序列
 
@@ -186,6 +202,17 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | `arima` | `ARIMA` |
 | `arch` / `garch` | `GARCH`（需要 `arch`）|
 | 单位根检验 | `unitroot(test=...)`、`XtUnitroot` |
+| `vecrank` | `vecrank(...)` —— 含 `lags(1)` |
+| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`、`varlmar`、`varstable`、`varwle` |
+| `veclmar` / `vecstable` | `veclmar`、`vecstable` |
+| `vargranger` | `vargranger(fitted)` |
+| `prais` | `prais(frame, formula)` |
+
+```python
+values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
+ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
+ws.vecrank(values, lags=1)
+```
 
 ### 后估计
 
@@ -196,6 +223,8 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | `margins` | `res.margins(...)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
+| `summarize` | `ws.summarize(frame, ["y", "x1"])` |
+| `ereturn list` | `format_ereturn_list(res)` |
 
 ```python
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()

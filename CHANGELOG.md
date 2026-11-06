@@ -122,6 +122,74 @@ two factor-variable models, the `r(mtest)` family for two models, and the three
 refusals. All 90 match to `rel < 1e-9`. The tests read that file, so they can no
 longer pass by agreeing with the implementation's own reading of the ado.
 
+## [0.1.0] — 2026-11-06
+
+A minor bump rather than a patch: the public surface grew, and several outputs that
+0.0.6 printed were wrong and now differ from it.
+
+### Added — eight modules that did not exist
+
+| name | Stata command | note |
+|---|---|---|
+| `summarize` | `summarize` | the plain six-column table; `estat_summarize` is the estimation-sample variant and could not substitute |
+| `teffects_nnmatch` | `teffects nnmatch` | the whole estimator was missing, not just `caliper()` |
+| `teffects_psmatch` | `teffects psmatch` | all-controls-at-the-k-th-distance tie rule |
+| `tebalance_summarize` | `tebalance summarize` | 7 of 8 covariates exact; `age` differs and is documented |
+| `rcm` | `rcm` | exact when `selected=` is supplied; the forward search is not aligned |
+| `rdrobust` | `rdrobust` | point estimate exact; robust SE not reproducible (compiled `lrobust.mlib`) |
+| `MultinomialLogit` | `mlogit` | base-outcome block inserted, not dropped |
+| `vargranger` | `vargranger` | 10/10 rows character-exact |
+| `format_ereturn_list` | `ereturn list` | the four-block dump |
+
+`ws.summarize` also unblocks report cases C04-04, C05-08 and C09-04, which all ended
+with "you have to summarize yourself" -- none of them named the missing command.
+
+### Fixed — numerics
+
+- `estat firststage` reported the wrong denominator: `F(1,20) = 17967.770` against
+  Stata's `F(1,21) = 18866.2`, **5% off**. The denominator is
+  `N - rank - (n_instruments - 1)`; the old formula matched two-instrument fits and
+  was one too low on every single-instrument one.
+- `vecrank lags(1)` was refused for six rounds on the theory that Stata "searches a
+  different space". At one lag there are no lagged differences to regress out, so both
+  sides are residualised on a constant alone; computed directly it reproduces Stata's
+  eigenvalues `.64575/.00769` and trace `172.5034/1.2744` exactly.
+- `logit ..., or` (previously absent), and `margins` elasticities, which used
+  `mean(dy)*mean(f)` where Stata uses `mean(dy*f)` -- 0.2% low.
+- `VAR`/`varwle` lag labels printed `L.` for lag 1 where Stata prints `L1.`.
+
+### Fixed — layout, each measured against a live reference
+
+- plain `regress` printed a stray `Linear regression` banner; the ANSI/ANOVA branch
+  rebuilt the line list and re-inserted it, so suppressing it at the earlier append
+  point had no effect. `regress y k` now opens directly at `Source | SS df MS`.
+- `estat ic`: log-likelihoods printed five decimals where Stata prints four, and the
+  outer rules carried a `+` column that Stata does not print.
+- `estat overid`: Sargan used `%8.5f` and Basmann `%8.4f`, so the two rows disagreed
+  with each other and neither matched Stata's six decimals.
+- `estat endogenous`, `test`, `lincom`: indentation off by one or two columns.
+- `newey` prints `Newey–West` with an EN-DASH; an ASCII hyphen compares unequal while
+  looking identical in a diff.
+
+### Documentation
+
+`docs/API.md` and `docs/API.zh-CN.md` regenerated: 154 exports, **202/202 prose
+entries (100%)**, up from 174. 28 names had no prose -- the eight modules above plus
+20 VAR/VECM and postestimation functions that had been exported for many rounds
+without being documented.
+
+### Known limitation (not fixed, recorded)
+
+`cov_params()` still returns an `ndarray` rather than a DataFrame, by the user's
+explicit instruction.
+
+Not reproduced, each traced to a mechanism rather than left unexplained:
+`synth`/`synth2` (V is built by a function that lives only in `lsynth_mata_subr.mlib`
+and depends on the outcome paths as well as the predictors), `rdrobust` robust SE,
+`teffects ra` SE (the sandwich is inside the builtin `gmm`), `xtserial` (absent from
+both ado paths), and `rcm`'s automatic model search (a different regression setup, not
+a different search space).
+
 ## [0.0.6] — 2026-11-04
 
 ### Fixed — `xtlogit, re` reported `e(sigma_u)` 150x too large

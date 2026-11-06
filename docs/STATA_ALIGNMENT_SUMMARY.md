@@ -40,6 +40,28 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 63 轮）：`heckman` 的 `e(selambda)` 缺失——已定位，未修复
+
+第 63 轮延续「截断到 0」与「静默回退」的排查。在 `heckman` 上发现一处**真实缺口**，但本轮的修复尝试未能生效，**已回滚，不留半成品**。
+
+**缺口**：Stata 的 `heckman` 存 **`e(selambda)`**（无下划线），westata 的 `e()` 里**没有这个键**。从手册抄 `e(selambda)` 的调用方拿到 `None`。
+
+**伴随的可疑信号**：`e(lambda) = -0.1724` 而 `e(se_lambda) = 0.0`——**系数非零、标准误恰为 0**，正是「截断到 0」的特征。
+
+**已确认正确的一处**：`bse[lambda] = .09466297`，与 `sqrt(V[lambda,lambda])` 完全一致，**所以标准误本身算得对，只是 `e()` 里没暴露**。
+
+**三次尝试均未生效**（已全部回滚）：
+
+| 尝试 | 结果 |
+|---|---|
+| 用 delta-method 二次型 `grad_lambda' V grad_lambda` | 结果为负，`max(...,0)` 得 0.0 |
+| 改用 `covariance[k+m, k+m]` | 索引指向 `/athrho` 而非 lambda（lambda 是派生量，不在 theta 中）|
+| 按名字定位 `covariance[lambda位置]` | 仍得 0.0，且调试输出未触发——说明 `names` 与内部 `covariance` 的对应关系与预期不同 |
+
+**下次的起点**：先确认 `heckman` 走的是哪一个 `_heckman_ml` 分支（文件里有两处结构相同的代码，分别在 1790 与 2277 附近），再决定改哪一处；**不要假设调试输出未出现就是没执行**。
+
+**回滚理由**：保留一个恒为 0 的 `selambda` 键比没有这个键更糟——它会让调用方以为拿到了值。
+
 ### v2 报告（第 55–62 轮）：面板方差分解与 IV 后估计的输出
 
 **第 55–56 轮 · `xtreg, re` 的方差分解（真实缺陷，已修复）**

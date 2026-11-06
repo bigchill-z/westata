@@ -40,6 +40,21 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 34–35 轮）：§5.2「六个语义陷阱」全部核实
+
+§5.2 列出六项「会静默出错」的陷阱。逐项核实后：
+
+| 陷阱 | 报告说法 | 实测结果 |
+|---|---|---|
+| `dydx='*'` | `KeyError: column '*'` | **已修**（第 4 轮），逐字符一致 |
+| fweight + `predict` | 返回 2201 行而非 24 | **已修**（第 34 轮），`pr[1..3]` 精确 |
+| fweight + `atmeans` | 均值未加权、MEM 差 18% | **已修**（第 1 轮），五均值 + 两 MEM 精确 |
+| `treatment_period` | 传 `trperiod(150)` 会**错位** | **不成立**：越界时明确报错「need at least two pre-periods and one post-period; found 20 and 0」，不会静默错位 |
+| VAR 参数顺序 | 行序 `[const, L1.x, L1.y, L2.x, L2.y]` | **准确**，属**文档记录**而非缺陷；`params.index` 确实如此 |
+| `i.year` / `L.x` | 公式报 `NameError` | **设计选择**：Python 用 `C(year)` / `shift()`，目标本身不要求与 Stata 用法一致 |
+
+**结论：3 项已修复，1 项不成立，1 项是文档，1 项是设计选择。此节无剩余缺陷。**
+
 ### v2 报告（第 33 轮）：RD 带宽——重读 `ado` 找到三处此前遗漏的定义
 
 按第 32 轮的建议系统重读 `rdbwselect.ado:375-500`，找到**三处此前一直用错的定义**：

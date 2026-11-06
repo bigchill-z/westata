@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import sys
+import uuid
 import warnings
 from pathlib import Path
 
@@ -37,7 +39,22 @@ def capture(dataset: str, tsset: str, command: str) -> list[str]:
     frame = pd.read_stata(dataset).dropna().reset_index(drop=True)
     frame["__t"] = range(1, len(frame) + 1)
     # Stata writes the log into the PROCESS working directory, not the dataset directory.
-    log_path = Path("capture_stata_output.log")
+    #
+    # The name must be UNIQUE PER CALL. A fixed name failed once in the full suite while passing
+    # in isolation: two captures raced on the same file, one deleted it, and the other raised
+    # FileNotFoundError. The failure looked like a Stata problem and was a test-isolation one.
+    log_path = Path(f"capture_stata_output_{os.getpid()}_{uuid.uuid4().hex[:8]}.log")
+    try:
+        return _run_capture(frame, tsset, command, log_path)
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+def _run_capture(
+    frame: pd.DataFrame, tsset: str, command: str, log_path: Path
+) -> list[str]:
+    """The capture proper; the caller owns the log's lifetime."""
+
     with StataSession() as session:
         session.push(frame)
         with contextlib.redirect_stdout(io.StringIO()):
@@ -52,7 +69,6 @@ def capture(dataset: str, tsset: str, command: str) -> list[str]:
             session.run(steps[-1])
             session.run("log close cap")
     text = log_path.read_text(encoding="utf-8", errors="replace")
-    log_path.unlink(missing_ok=True)
     return text.splitlines()
 
 

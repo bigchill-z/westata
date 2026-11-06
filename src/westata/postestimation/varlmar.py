@@ -95,7 +95,8 @@ class LmarResult:
             lines.append(
                 f"  |{row.lag:>4}  |{row.chi2:>10.4f}{row.df:>6}{row.pvalue:>12.5f}   |"
             )
-        lines.append(rule)
+        # Stata CLOSES the box with a solid rule, not a repeat of the separator.
+        lines.append("  +" + "-" * 38 + "+")
         lines.append("   H0: no autocorrelation at lag order")
         return "\n".join(lines)
 

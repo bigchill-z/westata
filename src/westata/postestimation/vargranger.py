@@ -103,7 +103,7 @@ class VarGrangerResult:
 
         lines = [
             "   Granger causality Wald tests",
-            "  +" + "-" * 65 + "+",
+            "  +" + "-" * 66 + "+",
             _place("Equation", "Excluded", "chi2", "df", "Prob > chi2"),
             "  |" + "-" * 38 + "+" + "-" * 27 + "|",
         ]
@@ -121,7 +121,7 @@ class VarGrangerResult:
                 )
             )
             previous = row.equation
-        lines.append("  +" + "-" * 65 + "+")
+        lines.append("  +" + "-" * 66 + "+")
         return chr(10).join(lines)
 
 

@@ -101,7 +101,7 @@ def test_vargranger_matches_stata_character_for_character(fitted) -> None:
 
     expected = [
         "   Granger causality Wald tests",
-        "  +-----------------------------------------------------------------+",
+        "  +------------------------------------------------------------------+",
         "  |          Equation           Excluded |   chi2     df Prob > chi2 |",
         "  |--------------------------------------+---------------------------|",
         "  |              dinf               unem |  48.123     2    0.000    |",
@@ -109,7 +109,7 @@ def test_vargranger_matches_stata_character_for_character(fitted) -> None:
         "  |--------------------------------------+---------------------------|",
         "  |              unem               dinf |   9.009     2    0.011    |",
         "  |              unem                ALL |   9.009     2    0.011    |",
-        "  +-----------------------------------------------------------------+",
+        "  +------------------------------------------------------------------+",
     ]
     rendered = str(vargranger(fitted)).splitlines()
     assert rendered == expected

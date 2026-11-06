@@ -61,7 +61,9 @@ def test_the_box_rows_are_forty_two_characters(rank_two_lm) -> None:
     """The title and H0 lines are shorter by design; only box rows are 42 wide."""
 
     rows = [line for line in str(rank_two_lm).splitlines() if line.startswith("  |")]
-    assert len(rows) == 5
+    # Four rows start with "| ": header, separator, and two data rows. Stata closes
+    # the box with a solid "+" rule, which is not counted here.
+    assert len(rows) == 4
     for row in rows:
         assert len(row) == 42, (len(row), row)
 

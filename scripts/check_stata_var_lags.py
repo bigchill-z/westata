@@ -82,6 +82,49 @@ def main() -> int:
             broken = True
         print(f"  {command:28} stored {stored:>2}, expected {wanted:>2}  {status}")
 
+    # ---- other lag-using commands ------------------------------------------------
+    #
+    # `e(b)` size is NOT a valid test for commands that do not store coefficients. dfuller and
+    # pperron report "Number of lags = 2" and change Z(t) accordingly while leaving e(b) empty --
+    # an audit that judged them by e(b) size called them BROKEN, which was the audit's fault.
+    print()
+    print("other lag-using commands (checked by their own output, not e(b))")
+    print("-" * 62)
+    with StataSession() as session:
+        session.push(frame)
+        with contextlib.redirect_stdout(io.StringIO()):
+            session.run("tsset tt")
+        for command in ("dfuller va, lags(2)", "pperron va, lags(2)"):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                session.run(command)
+            text = buffer.getvalue()
+            stated = [
+                line.strip()
+                for line in text.splitlines()
+                if "lags" in line.lower() and ("=" in line or "Number" in line)
+            ]
+            honoured = any("=   2" in line or "= 2" in line for line in stated)
+            print(f"  {command:28} {stated[0] if stated else '--':>28}  {'OK' if honoured else 'CHECK'}")
+
+    # varsoc prints a table rather than storing a coefficient vector.
+    with StataSession() as session:
+        session.push(frame)
+        with contextlib.redirect_stdout(io.StringIO()):
+            session.run("tsset tt")
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            session.run("varsoc va vb, maxlag(4)")
+        # Rows look like: '  |   0 | -1269.08 ...  |', so the lag index sits between bars.
+        table_rows = [
+            line
+            for line in buffer.getvalue().splitlines()
+            if line.strip().startswith("|") and line.count("|") >= 2
+            and line.strip()[1:].strip().split("|")[0].strip().isdigit()
+        ]
+        print(f"  {'varsoc va vb, maxlag(4)':28} {len(table_rows):>26} rows  "
+              f"{'OK' if len(table_rows) == 5 else 'CHECK'}")
+
     print()
     if broken:
         print("WARNING: `var lags()` does NOT estimate the full lag structure here.")

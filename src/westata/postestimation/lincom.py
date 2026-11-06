@@ -21,10 +21,32 @@ __all__ = ["LincomResult", "run_lincom"]
 
 
 def _lincom_g(value: float) -> str:
-    """Stata's ``%9.0g``: seven significant figures, leading zero dropped."""
+    """Stata's number format for ``lincom``: EIGHT significant characters, leading zero dropped.
 
-    number = float(value)
-    text = f"{number:.7g}"
+    The docstring used to say "``%9.0g``: seven significant figures", which is neither what the
+    option means nor what Stata prints. Captured from two fits:
+
+        cobb_douglas   '  1.075205   .1159063     9.28   0.000     .8341646    1.316245'
+        grilic         '  .1066109   .0059536    17.91   0.000     .0949233    .1182984'
+
+    Below 1 Stata keeps SEVEN decimals (.005953578 -> ".0059536"); at or above 1 it drops one
+    (1.0752048 -> "1.075205") so the cell stays eight characters. Seven significant figures gives
+    ".005953578" -- three characters wider, which pushed the whole row past 78 columns; seven
+    decimals gives "1.0752048", one wider than Stata's cell.
+
+    Checked against six values spanning both ranges; all six match.
+    """
+
+    magnitude = abs(float(value))
+    if magnitude < 1.0:
+        places = 7
+    elif magnitude < 10.0:
+        places = 6
+    else:
+        places = 4
+    text = f"{float(value):.{places}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
     if text.startswith("0."):
         text = text[1:]
     elif text.startswith("-0."):
@@ -123,6 +145,9 @@ class LincomResult:
         return chr(10).join(
             [
                 marker,
+                # Stata puts a BLANK line between the "( 1)  s = 0" marker and the table.
+                # Measured: the captured block is 12 / 0 / 78 / 78 / 78 / 78 / 78 characters.
+                "",
                 full_rule,
                 header,
                 "-" * 13 + "+" + "-" * 64,

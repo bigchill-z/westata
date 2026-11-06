@@ -40,6 +40,25 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 2 轮）：vecrank 的「缺最后一阶」不成立，`trend(trend)` 未实现
+
+| 报告说法 | 实测 | 处置 |
+|---|---|---|
+| `vecrank` 临界值表「缺最后一阶」| **不成立**：`trend(constant)` 下 rank=2 的 Trace 与临界值在 **Stata 输出中本来就是空的**（该阶没有可检验的 rank）。westata 输出 `183.0918 / 7.7811`、LL、特征值、参数量与 Stata 逐位一致 | 无需修改 |
+| `trend(trend)` 未支持 | **准确**：目前 `UnsupportedError` | 未实现 |
+
+**`trend(trend)` 的真实障碍**：statsmodels 的 `det_order=1` 给出 `183.5984 / 7.6836`，与 Stata 的 `183.6114 / 7.6369` 差 0.007% / 0.6%，**结构接近但不等价**。statsmodels 的`detrend()` 对**整条序列**去趋势（`endog = detrend(endog, det_order)`），而 Stata 的 `trend(trend)` 把趋势放在协整关系内部。手工按后者构造得到 `51.39`，与 183.61 差 3.6 倍，说明样本/滞后差分的构造也不同。
+
+**下次的前置条件**：需要 `vecrank.ado` 或 Stata 手册中 `trend()` 的精确定义（哪一项进 Z0、哪一项进 Z1、滞后差分阶数、`N` 是否仍为 164）。盲调参已证明无效。
+
+### v2 报告（第 2 轮）：`teffects psmatch` 参照无法获取
+
+报告中 `teffects psmatch` 缺 `caliper` 与 `predict, ps` 属实，但**本轮无法取得参照**：
+
+同一数据集上 `teffects nnmatch (re78 age) (treat), atet` 正常，而 `teffects psmatch` 无论用 1 个、2 个、4 个协变量、无论加不加 `caliper()`，一律返回 `r(103) too many variables specified`。**这与协变量数量无关**，是本环境中该命令的特定失败。
+
+**下次的前置条件**：先用最小命令（`teffects psmatch (y x) (t)`）确认命令本身可用，再引入数据集；或在另一个数据集（如 `cattaneo2`）上取参照。
+
 ### v2 报告（第 1 轮）：三个 P0 已修，dfgls 未修
 
 新报告 `westata_vs_Stata_差距评估报告_v2.md` 质量明显高于 v1：给出了文件、行号、根因与修法，复现后确认**大部分准确**。

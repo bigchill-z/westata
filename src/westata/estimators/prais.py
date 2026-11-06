@@ -49,6 +49,22 @@ def _transform(values: np.ndarray, rho: float) -> np.ndarray:
     return out
 
 
+def _transform_corc(values: np.ndarray, rho: float) -> np.ndarray:
+    """Cochrane-Orcutt transform: ``y_t - rho*y_{t-1}`` with the first observation DROPPED.
+
+    ``prais, corc`` (prais.ado:6, ``syntax ... noDW CORC``) runs the same iteration as the
+    Prais-Winsten default with this one difference: the transformed first row is discarded
+    rather than scaled by ``sqrt(1 - rho^2)``.
+
+    Measured on ``prais y k l`` / ``prais y k l, corc`` over cobb_douglas:
+
+        prais : b = .15651652  .93948861  -7.5439159   rho = .12543124
+        corc  : b = .15687809  .92974899  -6.0923288   rho = .11463695
+    """
+
+    return values[1:] - rho * values[:-1]
+
+
 def prais_winsten(
     exog: np.ndarray,
     endog: np.ndarray,
@@ -56,6 +72,7 @@ def prais_winsten(
     maxiter: int = 100,
     tolerance: float = 1e-8,
     rho: float | None = None,
+    corc: bool = False,
 ) -> tuple[np.ndarray, float, int]:
     """Iterated Prais-Winsten estimate.
 
@@ -83,10 +100,11 @@ def prais_winsten(
                 f"prais: the estimated AR(1) coefficient {current_rho:.6f} is not inside "
                 "(-1, 1); the series is not stationary"
             )
+        transformer = _transform_corc if corc else _transform
         transformed_x = np.column_stack(
-            [_transform(x[:, j], current_rho) for j in range(x.shape[1])]
+            [transformer(x[:, j], current_rho) for j in range(x.shape[1])]
         )
-        transformed_y = _transform(y, current_rho)
+        transformed_y = transformer(y, current_rho)
         updated = ols(transformed_x, transformed_y)
         residual = y - x @ updated
         next_rho = _rho_from_residuals(residual)
@@ -256,11 +274,17 @@ def prais(
     *,
     maxiter: int = 100,
     tolerance: float = 1e-8,
+    corc: bool = False,
 ) -> PraisResult:
     """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.
 
     ``formula`` is a statsmodels/patsy style spec such as ``"y ~ x1 + x2"``. The data must
     already be in time order through ``frame``'s row order.
+
+    ``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops
+    the first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in
+    both the coefficients and the estimated rho, so it is a separate estimator, not a
+    cosmetic switch.
     """
 
     from westata.formula.factor import build_design
@@ -275,7 +299,7 @@ def prais(
     x = np.asarray(design, dtype=float)
 
     coefficients, rho, iterations = prais_winsten(
-        x, y, maxiter=maxiter, tolerance=tolerance
+        x, y, maxiter=maxiter, tolerance=tolerance, corc=corc
     )
 
     resid = y - x @ coefficients

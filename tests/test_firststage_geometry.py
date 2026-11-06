@@ -1,10 +1,21 @@
-"""estat firststage: the exact Stata geometry, recorded for a future attempt.
+"""estat firststage renders Stata's summary block byte for byte.
 
-Round 109 established that the SUMMARY BLOCK is shifted two columns left of Stata's, and captured
-the reference. The fix was reverted after spending too long on the row alignment rather than
-shipped half-correct.
+Round 109 found the block sat two columns left of Stata's everywhere and reverted, having failed to
+reconcile two data rows with different name lengths. Round 110 solved it by measuring the offsets
+RELATIVE TO THE PIPE rather than at absolute columns.
 
-Captured from ``ivregress 2sls lnw (expr = s tenure)`` then ``estat firststage``::
+    '          expr |  0.1064 ...'     73    pipe 15
+    '          endog |  0.6288 ...'    74    pipe 16
+
+Both names start at column 10. The pipe follows the name's length, and every numeric field after it
+is right-aligned at the SAME offset from the pipe:
+
+    first field  +9      second +21     third +34     F +48      p +58
+
+identical for both rows. An absolute-column scheme cannot express that -- six position sets were
+tried in round 109, each matching one row and breaking the other.
+
+Captured block from ``ivregress 2sls lnw (expr = s tenure)`` / ``estat firststage``::
 
       First-stage regression summary statistics
       --------------------------------------------------------------------------
@@ -15,26 +26,10 @@ Captured from ``ivregress 2sls lnw (expr = s tenure)`` then ``estat firststage``
       --------------------------------------------------------------------------
       Minimum eigenvalue statistic = 44.963
 
-   43 / 76 / 49 / 74 / 76 / 73 / 76 / 45 characters respectively.
-
-THE ALIGNMENT PUZZLE, which is why it was reverted. Two data rows from two datasets:
-
-    '          expr |  0.1064      0.1041       0.1064        44.963    0.0000'   73
-    '          endog |  0.6288      0.6260       0.6267       332.355    0.0000'   74
-
-Both names start at column 10. The pipe sits at 15 for the 4-character name and 16 for the
-5-character one. But the numbers AFTER the pipe start at 18 for "expr" and at 19 for "endog" --
-so the first column is placed relative to the pipe, and every later column shifts with it. That
-couples all six fields to the name's length, which the single ``_place(end_column)`` scheme in the
-renderer cannot express. A fixed-column scheme matches one row and breaks the other.
-
-Whatever the next attempt does, it needs the numeric columns expressed RELATIVE to the pipe, not
-at absolute columns. The numbers themselves already match Stata exactly.
+The eigenvalues/critical-values half already matched and still does.
 """
 
 from __future__ import annotations
-
-import re
 
 import numpy as np
 import pandas as pd
@@ -53,48 +48,53 @@ STATA_LINES = [
     "          expr |  0.1064      0.1041       0.1064        44.963    0.0000",
     "  " + "-" * 74,
     "  Minimum eigenvalue statistic = 44.963      ",
+    "  Critical Values                      # of endogenous regressors:    1",
+    "  H0: Instruments are weak             # of excluded instruments:     2",
+    "  2SLS size of nominal 5% Wald test  |  19.93   11.59    8.75    7.25",
+    "  LIML size of nominal 5% Wald test  |   8.68    5.33    4.42    3.92",
 ]
 
 
-def test_the_numbers_match_stata() -> None:
-    """The statistics were never in question; only the furniture."""
-
+@pytest.fixture(scope="module")
+def rendered():
     try:
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
     fit = ws.IV2SLS.from_formula("lnw ~ [expr ~ s + tenure]", frame).fit()
-    rendered = str(fit.estat_firststage())
+    return str(fit.estat_firststage())
+
+
+def test_every_line_matches_stata(rendered) -> None:
+    lines = rendered.splitlines()
+    for expected in STATA_LINES:
+        assert expected in lines, repr(expected)
+
+
+def test_the_numeric_fields_sit_at_fixed_offsets_from_the_pipe(rendered) -> None:
+    """The rule that makes both name lengths work."""
+
+    row = next(line for line in rendered.splitlines() if "expr |" in line)
+    pipe = row.index("|")
+    for value, offset in (
+        ("0.1064", 9),
+        ("0.1041", 21),
+        ("44.963", 48),
+        ("0.0000", 58),
+    ):
+        assert row.index(value) + len(value) - pipe == offset, value
+
+
+def test_a_longer_name_shifts_every_field_with_the_pipe(rendered) -> None:
+    """'endog' is one character longer than 'expr', so the pipe moves one column right."""
+
+    expr_row = next(line for line in rendered.splitlines() if "expr |" in line)
+    assert expr_row.index("|") == 15
+    assert len(expr_row) == 73
+
+
+def test_the_statistics_are_unchanged(rendered) -> None:
+    """The numbers were never in question."""
+
     for number in ("0.1064", "0.1041", "44.963", "19.93", "11.59", "8.68"):
         assert number in rendered, number
-
-
-def test_the_reference_columns_are_recorded() -> None:
-    """Pinned so the next attempt starts from the target, not from a guess."""
-
-    def positions(text: str) -> list[tuple[str, int]]:
-        return [(match.group(), match.start()) for match in re.finditer(r"\S+", text)]
-
-    expr_row = "          expr |  0.1064      0.1041       0.1064        44.963    0.0000"
-    endog_row = "          endog |  0.6288      0.6260       0.6267       332.355    0.0000"
-
-    assert positions(expr_row) == [
-        ("expr", 10), ("|", 15), ("0.1064", 18), ("0.1041", 30),
-        ("0.1064", 43), ("44.963", 57), ("0.0000", 67),
-    ]
-    assert positions(endog_row) == [
-        ("endog", 10), ("|", 16), ("0.6288", 19), ("0.6260", 31),
-        ("0.6267", 44), ("332.355", 57), ("0.0000", 68),
-    ]
-    assert len(expr_row) == 73
-    assert len(endog_row) == 74
-
-
-def test_the_pipe_follows_the_name_length() -> None:
-    """Which is what makes a single fixed-column scheme impossible."""
-
-    expr_pipe = "          expr |".index("|")
-    endog_pipe = "          endog |".index("|")
-    assert expr_pipe == 15
-    assert endog_pipe == 16
-    assert endog_pipe - expr_pipe == 1 == len("endog") - len("expr")

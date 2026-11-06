@@ -65,13 +65,16 @@ def first_stage():
 
 
 STATA_LINES = [
-    "First-stage regression summary statistics",
-    "--------------------------------------------------------------------------",
-    "             |            Adjusted      Partial",
-    "    Variable |   R-sq.       R-sq.        R-sq.      F(2,396)   Prob > F",
-    "-------------+------------------------------------------------------------",
-    "       endog |  0.6288      0.6260       0.6267       332.355    0.0000",
-    "--------------------------------------------------------------------------",
+    # Captured byte-exactly from `ivregress 2sls` / `estat firststage`. Every line of the summary
+    # block starts with TWO spaces that this fixture originally omitted, so it agreed with the
+    # renderer's missing indent rather than with Stata.
+    "  First-stage regression summary statistics",
+    "  " + "-" * 74,
+    "               |            Adjusted      Partial",
+    "      Variable |   R-sq.       R-sq.        R-sq.      F(2,396)   Prob > F",
+    "  " + "-" * 13 + "+" + "-" * 60,
+    "          endog |  0.6288      0.6260       0.6267       332.355    0.0000",
+    "  " + "-" * 74,
 ]
 
 

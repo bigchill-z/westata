@@ -264,7 +264,7 @@ class FirstStageResult:
         separator = "  " + "-" * 35 + "+" + "-" * 33
         lines = [
             "",
-            f"  Minimum eigenvalue statistic = {self.mineig:.3f}",
+            f"  Minimum eigenvalue statistic = {self.mineig:.3f}" + " " * 6,
             "",
             f"  Critical Values                      # of endogenous regressors: {n_endog:>4}",
             f"  H0: Instruments are weak             # of excluded instruments: {n_excluded:>5}",
@@ -332,8 +332,12 @@ class FirstStageResult:
         #
         # Stata's header rows are FIXED text apart from the F label, so they are written
         # out literally; only the data rows need placement.
-        rule = "-" * 74
-        header_top = "             |            Adjusted      Partial"
+        #
+        # EVERY line in this block starts with TWO spaces that the columns recorded above did not
+        # account for, which is why the block sat two columns left of Stata's. Captured lengths:
+        # title 43, rule 76, header_top 49, header_bottom 74, separator 76.
+        rule = "  " + "-" * 74
+        header_top = "  " + " " * 13 + "|" + " " * 12 + "Adjusted" + " " * 6 + "Partial"
         # Built by placing each field at its measured column: the pipe at 13, the three
         # "R-sq." headings starting at 17 / 30 / 43, the F label ending at 61 and
         # "Prob > F" ending at 72. Writing the padding out by hand kept drifting by one
@@ -344,7 +348,7 @@ class FirstStageResult:
                 text += " " * max(end_column - len(text) - len(value), 0) + value
             return text
 
-        header_bottom = _row(
+        header_bottom = "  " + _row(
             [
                 ("Variable", 12),
                 ("|", 14),
@@ -357,22 +361,43 @@ class FirstStageResult:
         )
         lines = [
             "",
-            "First-stage regression summary statistics",
+            "  First-stage regression summary statistics",
             rule,
             header_top,
             header_bottom,
             "-" * 13 + "+" + "-" * 60,
         ]
+        lines = [
+            "",
+            "  First-stage regression summary statistics",
+            rule,
+            header_top,
+            header_bottom,
+            "  " + "-" * 13 + "+" + "-" * 60,
+        ]
         for i, name in enumerate(self.endog):
-            row_pieces: list[str] = []
-            _place(row_pieces, name, 12)
-            _place(row_pieces, "|", 14)
-            _place(row_pieces, f"{self.r2[i]:.4f}", 22)
-            _place(row_pieces, f"{self.adj_r2[i]:.4f}", 34)
-            _place(row_pieces, f"{self.partial_r2[i]:.4f}", 47)
-            _place(row_pieces, f"{self.f[i]:.3f}", 61)
-            _place(row_pieces, f"{self.pvalue[i]:.4f}", 71)
-            lines.append("".join(row_pieces))
+            # The name is LEFT-aligned at column 10 and the pipe follows it, so the pipe lands at
+            # 15 for a 4-character name and 16 for a 5-character one. Every numeric field after
+            # the pipe is right-aligned at a fixed offset FROM THE PIPE -- measured, and identical
+            # for both reference rows:
+            #
+            #   '          expr |  0.1064 ...'   pipe 15, fields end at +9 +21 +34 +48 +58
+            #   '          endog |  0.6288 ...'  pipe 16, same offsets
+            #
+            # Absolute columns cannot express this: six position sets were tried, each matching
+            # one row and breaking the other.
+            prefix = " " * 10 + name + " "
+            row = prefix + "|"
+            for value, offset in (
+                (f"{self.r2[i]:.4f}", 9),
+                (f"{self.adj_r2[i]:.4f}", 21),
+                (f"{self.partial_r2[i]:.4f}", 34),
+                (f"{self.f[i]:.3f}", 48),
+                (f"{self.pvalue[i]:.4f}", 58),
+            ):
+                target = len(prefix) + max(14 - len(prefix), 0) + offset
+                row += " " * max(target - len(row) - len(value), 0) + value
+            lines.append(row)
         lines.append(rule)
         return chr(10).join(lines)
 

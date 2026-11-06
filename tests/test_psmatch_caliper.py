@@ -21,9 +21,9 @@ re75), atet`` on nsw_dw:
 0.1 is loose enough to exclude nothing on this sample, so it must reproduce the uncapped
 answer exactly -- a switch that quietly changed the number here would be wrong.
 
-KNOWN LIMIT, not touched this round: ``nneighbor(3)`` gives 2412.8207 here against Stata's
-2397.636. That is a tie-handling difference that predates this work (n=1 is exact, so the
-general path is right), and no caliper combination should be read as evidence about it.
+The ``nneighbor(3)`` gap recorded in round 7 is CLOSED in round 8 and pinned below: the
+1e-6 tie tolerance had merged two controls 6e-7 apart. See test_the_tolerance_does_not_merge_
+distinct_distances.
 """
 
 from __future__ import annotations
@@ -99,3 +99,47 @@ def test_a_tight_but_feasible_caliper_only_removes_matches(data) -> None:
     )
     assert tight.matches_min >= 1
     assert tight.matches_max <= 8  # the uncapped maximum measured on this sample
+
+
+STATA_BY_NNEIGHBOR = {1: 2639.8646, 2: 2491.8602, 3: 2397.636, 4: 2330.1077, 5: 2321.0271}
+
+
+@pytest.mark.parametrize("nneighbor", sorted(STATA_BY_NNEIGHBOR))
+def test_every_nneighbor_count_matches_stata(data, nneighbor: int) -> None:
+    """nn(1) through nn(5), live StataNow on nsw_dw."""
+
+    result = ws.teffects_psmatch(
+        data["re78"],
+        data["treat"],
+        data[COVARIATES].to_numpy(float),
+        nneighbor=nneighbor,
+    )
+    assert float(result.ate) == pytest.approx(
+        STATA_BY_NNEIGHBOR[nneighbor], abs=5e-4
+    )
+
+
+def test_the_tolerance_does_not_merge_distinct_distances(data) -> None:
+    """The round-7 gap: a 1e-6 tolerance merged two controls 6e-7 apart.
+
+    For treated unit 2 the third and fourth nearest controls sit at propensity-score
+    distances 0.0011575908 and 0.00115824. A 1e-6 tolerance counted both, reporting four
+    matches where Stata uses three, which moved nn(3) from 2397.636 to 2412.8207.
+    """
+
+    loose = ws.teffects_psmatch(
+        data["re78"],
+        data["treat"],
+        data[COVARIATES].to_numpy(float),
+        nneighbor=3,
+        tie_tolerance=1e-6,
+    )
+    tight = ws.teffects_psmatch(
+        data["re78"],
+        data["treat"],
+        data[COVARIATES].to_numpy(float),
+        nneighbor=3,
+    )
+    assert float(tight.ate) == pytest.approx(2397.636, abs=5e-4)
+    # And the loose tolerance is demonstrably a different, wrong answer.
+    assert abs(float(loose.ate) - 2397.636) > 10.0

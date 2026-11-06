@@ -166,7 +166,7 @@ def teffects_psmatch(
     covariates: Any,
     *,
     nneighbor: int = 1,
-    tie_tolerance: float = 1e-6,
+    tie_tolerance: float = 1e-9,
     outcome: str = "",
     caliper: float | None = None,
 ) -> PsmatchResult:
@@ -177,10 +177,21 @@ def teffects_psmatch(
     model does by default (verified: the logit coefficients agree to 1e-7).
 
     ``nneighbor`` is Stata's ``nn()``; ties at the k-th smallest distance are ALL included,
-    so the realised number of matches can exceed it. ``tie_tolerance`` is the absolute
-    propensity-score difference still considered a tie; 1e-8 through 1e-6 were measured to
-    give identical results on the reference sample, so the default is deliberately on the
-    generous side of the logit's own convergence precision.
+    so the realised number of matches can exceed it.
+
+    ``tie_tolerance`` is the absolute propensity-score difference still counted as a tie. It
+    must be TIGHT. The old 1e-6 default lumped two controls 0.0011575908 and 0.00115824
+    apart -- a difference of 6e-7 -- into one tie for treated unit 2, which reported four
+    matches where Stata uses three. Measured across nn(1) to nn(5) on nsw_dw::
+
+        tolerance   matches Stata
+        1e-6        4 of 5      (nn(3) gives 2412.8207 against 2397.636)
+        1e-9        5 of 5
+        1e-12       5 of 5
+        0           5 of 5
+
+    1e-9 separates distinct distances while still absorbing the logit's own numerical noise,
+    which is far below that scale.
 
     ``caliper`` is Stata's ``caliper(#)``: a control further than # in propensity-score
     distance is ineligible, and a treated unit with nothing inside the caliper is dropped

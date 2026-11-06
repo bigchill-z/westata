@@ -2340,18 +2340,28 @@ class VECMResults:
                 "-" * 64,
             ]
         )
-        residual_dof = float(e["N"]) - 4.0
+        # Residual degrees of freedom are N - df_eq, not N - 4. The literal 4 is df_eq for a
+        # rank-1 two-variable model and wrong for anything richer: at rank 2 over three
+        # variables df_eq is 6, and N-4 gave rmse .934955 against Stata's .939355.
+        residual_dof = float(e["N"]) - float(e.get("df_eq", 4.0) or 4.0)
         for index in range(neqs):
             suffix = f"_{index + 1}"
             r2 = float(e["r2" + suffix])
             chi2 = float(e["chi2" + suffix])
-            p_value = float(stats.chi2.sf(chi2, 3)) if np.isfinite(chi2) else float("nan")
+            # The Wald chi2 has df_eq degrees of freedom, not the literal 3 -- which is
+            # df_eq for rank 1 only. At rank 2 over three variables the p-value was computed
+            # against the wrong distribution (0.0483 where Stata prints 0.2461).
+            p_value = (
+                float(stats.chi2.sf(chi2, int(e.get("df_eq", 3) or 3)))
+                if np.isfinite(chi2)
+                else float("nan")
+            )
             lines.append(
                 # Columns end at 23 / 35 / 44 / 55 / 64, measured from a live vec table:
                 #   'D_dinf                4     .013772   0.7434   463.5891   0.0000'
                 f"D_{names[index]:<14}{int(e['k' + suffix]):>7}"
-                f"{_vec_number(float(e['rmse' + suffix]), 6):>12}"
-                f"{r2:>9.4f}{chi2:>11.4f}"
+                f"{_vec_rmse(float(e['rmse' + suffix]), 6):>12}"
+                f"{r2:>9.4f}{_vec_chi2(chi2, 7):>11}"
                 f"{p_value:>9.4f}"
             )
         lines.append("-" * 64)
@@ -2752,7 +2762,9 @@ class VECMResults:
         # The differenced series must be cut to the ESTIMATION sample (its last N rows), or
         # its sum of squares covers 165 observations while the residuals cover 164.
         differenced = np.diff(endog_levels, axis=0)[-residuals.shape[0] :]
-        residual_dof = float(residuals.shape[0] - 4)
+        # N - df_eq again: the literal 4 coincides with df_eq only for the rank-1 case the
+        # conformance data uses.
+        residual_dof = float(residuals.shape[0] - df_eq)
         for index in range(neqs):
             suffix = f"_{index + 1}"
             payload["k" + suffix] = float(df_eq)
@@ -3630,6 +3642,57 @@ def unitroot(
         )
 
     raise ValueError(f"unitroot: unknown test {test!r}; use 'adf', 'pp' or 'kpss'")
+
+
+def _vec_chi2(value: float, digits: int = 7) -> str:
+    """The per-equation chi2 column: SEVEN significant figures, no leading zero.
+
+    Measured from a live vec, and every value below distinguishes this from a fixed-decimal rule:
+
+        463.5890975 -> "463.5891"      seven sig figs = four decimals
+        109.449732  -> "109.4497"
+          7.8916758 -> "7.891676"      seven sig figs = six decimals
+          9.497462  -> "9.497462"
+          4.113776  -> "4.113776"
+
+    "%11.6g" gave 463.589 and 7.89168 -- wrong on both ends of the range.
+    """
+
+    if not np.isfinite(value):
+        return "."
+    text = f"{float(value):.{digits}g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
+def _vec_rmse(value: float, digits: int = 6) -> str:
+    """The RMSE column of vec's per-equation table.
+
+    Stata switches format by MAGNITUDE here, which is why one rule never fit:
+
+        .0137721869 -> ".013772"    (six DECIMALS)
+        1.370735    -> "1.37074"    (six SIGNIFICANT figures)
+        .0025600170 -> ".00256"     (six decimals, trailing zeros trimmed)
+
+    "%.6f" would print 1.370735; "%.6g" would print .0137722. Above one it uses significant
+    figures, below one fixed decimals.
+    """
+
+    if not np.isfinite(value):
+        return "."
+    number = float(value)
+    if abs(number) >= 1.0:
+        text = f"{number:.{digits}g}"
+    else:
+        text = f"{number:.{digits}f}".rstrip("0").rstrip(".")
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text or "0"
 
 
 def _vec_number(value: float, digits: int = 6) -> str:

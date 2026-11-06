@@ -40,6 +40,33 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 28 轮）：`rdrobust_bw()` 可在 Mata 中调用，但尚未跑通
+
+第 27 轮的计划是「让 Stata 直接输出 `C` 向量」。本轮确认了**可行路径与三项已核实的前提**。
+
+**已核实（Mata 逐条执行成功）**：
+
+| 量 | Mata 计算值 | 与我的 Python 实现对比 |
+|---|---|---|
+| `N` | 1297 | 一致 |
+| `x_sd` | 34.46853553 | 一致（34.468536）|
+| `x_iq`（来自 `summarize, detail` 的 `r(p75)-r(p25)`）| 34.643816 | — |
+| `max|X|`（全范围）| 2.90119666 | 需用于 `h_B=range` |
+
+**调用约定**（照 `rdbwselect.ado:545`）：
+
+```
+rdrobust_bw(Y_l, X_l, T_l, Z_l, C_l, fw_l, c=c, o=1, nu=0, o_B=2,
+            h_V=c_bw, h_B=..., scaleregul, vce_select, nnmatch,
+            kernel, dups_l, dupsid_l, covs_drop_coll, cr_method, vcache_l)
+```
+
+**当前障碍**：以上述参数调用返回 `r(3301) subscript invalid`。已排除的猜测：`C_l` 用空矩阵（ado 第 418 行是标量 `C_l=C_r=0`，已改）、`mm_quantile` 不存在（已改用 `summarize`）。剩余可能：`dups_l`/`dupsid_l` 需要在 `masspoints(adjust)` 下由 `panelsetup` 预计算，而我只用了零向量。
+
+**仍未提交代码**（探针已删除，工作区干净）。
+
+**下次的起点**：先复制 `rdbwselect.ado:400-440` 中 `masspoints` 分支的完整构造（`X_uniq_l`、`dups_l`、`dupsid_l` 的真实生成方式），再调用 `rdrobust_bw`——**不要再用零向量近似**。
+
 ### v2 报告（第 27 轮）：`rdrobust` 自动带宽——确定尺度与目标比值，仍未精确
 
 第 11–12 轮在**原始尺度**上工作，误差达 6 倍。本轮确定了正确的**标准化尺度**，把误差缩到 4.8%。

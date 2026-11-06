@@ -40,6 +40,25 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 11 轮）：`rdrobust` 自动带宽——取得完整算法，但未复现
+
+**重大发现**：`rdbwselect.ado`（1331 行）与 `rdrobust.ado` 在**用户 ado 路径**下**可读**。此前多轮把 `rdrobust` 归为「二进制边界」是不够准确的——**选择器的控制流与组合公式全部可读**，只有内层 `rdrobust_bw()`（8580 字节，19–21 个参数）在 `l/lrdrobust.mlib` 中。
+
+已从源码取得 RD（`mserd`，默认）的组合公式（`rdbwselect.ado:557`）：
+
+```
+h = ( (C_h_l[1] + C_h_r[1]) /
+      ( (C_h_r[2] - C_h_l[2])^2 + regul*(C_h_r[3] + C_h_l[3]) ) ) ^ C_h_l[4]
+```
+
+**关键细节**：分母里 `C[2]` 是**减号**——RD 估计量取两侧之差；`msesum` 变体才是加号。用错符号会得到一个「看起来合理」但属于另一个估计量的带宽。
+
+**三层嵌套结构**（此前未意识到）：`d_bw` → `b_bw` → `h_bw`，每一步的 `h_V` pilot 都取自上一步的结果。
+
+**当前进展**：`estimators/rdbandwidth.py` 已实现框架，`b` 得 29.9098 对 Stata 的28.0281（**差 6.7%**），`h` 仍差 6.6 倍。差距在于 `C_h_*` 需要以 `b_bw_d` 作 pilot 重新计算，而 `C` 分量本身由编译库返回。
+
+**结论**：**未对齐，模块未接入公开 API**（`rdrobust` 默认调用仍抛 `UnsupportedError`）。这比上一轮的「整块不可达」前进了一步——现在知道差在哪一层。
+
 ### v2 报告（第 10 轮）：`rdrobust` 自动带宽——现状核实与可行性评估
 
 报告 §7.3(2) 说 `rdrobust` 缺 MSE 最优带宽选择器，且「这是一个独立、可分离的工程任务：实现 IK/CCT 的 MSE-optimal 与 CER bands，就能一次点亮 7 条命令」。**核实后报告完全准确**：

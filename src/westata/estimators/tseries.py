@@ -2022,6 +2022,37 @@ class VECMResults:
         return np.asarray(self.raw.beta, dtype=float)
 
     @property
+    def beta_labelled(self) -> Any:
+        """The cointegrating vectors as a labelled DataFrame (rows = variables, cols = ec).
+
+        An ADDITION beside ``beta``, not a replacement. v2 report section 6 class 4 asked for
+        named output, but making ``beta`` itself a DataFrame breaks ``result.beta[0, 0]`` --
+        an existing test failed with KeyError the moment it was tried in round 19, which is
+        how the cost was measured rather than guessed.
+
+        So both forms exist: ``beta`` stays an ndarray for positional access, and this returns
+        the same numbers with ``raw.names`` on the rows and ``ec1..ecR`` on the columns. Falls
+        back to the bare array when the names were not recorded, rather than inventing labels.
+        """
+
+        return self._labelled(np.asarray(self.raw.beta, dtype=float), "ec")
+
+    @property
+    def alpha_labelled(self) -> Any:
+        """The adjustment speeds as a labelled DataFrame; see ``beta_labelled``."""
+
+        return self._labelled(np.asarray(self.raw.alpha, dtype=float), "ec")
+
+    def _labelled(self, values: np.ndarray, prefix: str) -> Any:
+        """Wrap a (variables x relations) array with both sets of names when available."""
+
+        names = [str(name) for name in (getattr(self.raw, "names", None) or [])]
+        if values.ndim != 2 or len(names) != values.shape[0]:
+            return values
+        relations = [f"{prefix}{index + 1}" for index in range(values.shape[1])]
+        return pd.DataFrame(values, index=names, columns=relations)
+
+    @property
     def gamma(self) -> np.ndarray:
         return np.asarray(self.raw.gamma, dtype=float)
 

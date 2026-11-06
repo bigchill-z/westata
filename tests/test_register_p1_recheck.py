@@ -50,3 +50,15 @@ def test_the_stale_psmatch_row_was_corrected() -> None:
 def test_the_recheck_warns_that_scores_are_not_a_work_order() -> None:
     text = REGISTER.read_text(encoding="utf-8")
     assert "不能当作工单" in text
+
+
+def test_the_extension_recheck_records_the_honest_gaps() -> None:
+    """X05 is NOT silently upgraded to 'fixed' -- its structural gaps are real."""
+
+    text = REGISTER.read_text(encoding="utf-8")
+    assert "3.6.2 扩展项 X01 / X05 实测复核" in text
+    section = text.split("3.6.2 扩展项 X01 / X05 实测复核", 1)[1].split("### 3.7", 1)[0]
+    assert "e(beta)" in section
+    assert "e(sample)" in section
+    assert "varstable" in section
+    assert "不刷分" in section

@@ -370,16 +370,11 @@ def test_output_layout_matches_stata(auto) -> None:
         "Prob > chi2 = 0.0440",
         "",
         "Cameron & Trivedi's decomposition of IM-test",
-        "",
-        "-" * 50,
         "              Source |       chi2     df         p",
-        "-" * 21 + "+" + "-" * 28,
         "  Heteroskedasticity |       9.79      4    0.0440",
         "            Skewness |       7.31      2    0.0259",
         "            Kurtosis |       1.71      1    0.1912",
-        "-" * 21 + "+" + "-" * 28,
         "               Total |      18.81      7    0.0088",
-        "-" * 50,
     ]
     rendered = [line.rstrip() for line in str(_fit(auto, "W1").estat_imtest(white=True)).splitlines()]
 

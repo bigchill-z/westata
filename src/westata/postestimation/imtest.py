@@ -157,17 +157,24 @@ class ImTestResult:
                     f"Prob > chi2 = {self.white_pvalue:.4f}",
                 ]
             )
+        # Captured byte-for-byte from a live `estat imtest` on grilic:
+        #
+        #   Cameron & Trivedi's decomposition of IM-test
+        #                 Source |       chi2     df         p
+        #     Heteroskedasticity |       9.77      9    0.3693
+        #               Skewness |      13.20      3    0.0042
+        #               Kurtosis |       3.88      1    0.0490
+        #                  Total |      26.85     13    0.0131
+        #
+        # FIVE lines, no full-width rules and no blank lines. The previous version opened with a
+        # 50-character rule, a blank line and a 21+"+"+28 separator, then closed with another full
+        # rule -- a layout its own comment attributed to StataNow 19.5, which the live output does
+        # not contain.
         lines.extend(
             [
                 "",
                 "Cameron & Trivedi's decomposition of IM-test",
-                "",
-                rule,
-                # Header column widths measured from the log: chi2 11 wide, df 7,
-                # p 10.  The p column had been printed wider, which shifted every
-                # p-value one space to the right of Stata's table.
                 f"{'Source':>20} |{'chi2':>11}{'df':>7}{'p':>10}",
-                "-" * 21 + "+" + "-" * 28,
             ]
         )
         rows = (
@@ -180,12 +187,10 @@ class ImTestResult:
                 f"{label:>20} |{statistic:>11.2f}{df:>7.0f}"
                 f"{self._pvalue(statistic, df):>10.4f}"
             )
-        lines.append("-" * 21 + "+" + "-" * 28)
         lines.append(
             f"{'Total':>20} |{self.total:>11.2f}{self.df_total:>7.0f}"
             f"{self._pvalue(self.total, self.df_total):>10.4f}"
         )
-        lines.append(rule)
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, float]:

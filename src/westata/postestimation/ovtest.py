@@ -113,7 +113,9 @@ class OvTestResult:
                 # "X = ". Seven characters made "F(3, 23) =    3.08" one column wider than
                 # Stata's "F(3, 23) =   3.08".
                 f"{label} = {self.statistic:>6.2f}",
-                f"Prob > F = {self.pvalue:>6.4f}",
+                # Stata indents this line by ONE space: " Prob > F = 0.2620". Captured from
+                # a live estat ovtest; the unindented form is 17 characters where Stata's is 18.
+                f" Prob > F = {self.pvalue:>6.4f}",
             ]
         )
 

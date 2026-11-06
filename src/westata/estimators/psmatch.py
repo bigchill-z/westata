@@ -65,6 +65,7 @@ class PsmatchResult:
     matches_min: int
     matches_max: int
     outcome: str
+    caliper: float = float("nan")
     treatment_model: str = "logit"
     se: float = float("nan")
     z: float = float("nan")
@@ -167,6 +168,7 @@ def teffects_psmatch(
     nneighbor: int = 1,
     tie_tolerance: float = 1e-6,
     outcome: str = "",
+    caliper: float | None = None,
 ) -> PsmatchResult:
     """ATET by propensity-score matching, as ``teffects psmatch ..., atet``.
 
@@ -179,6 +181,11 @@ def teffects_psmatch(
     propensity-score difference still considered a tie; 1e-8 through 1e-6 were measured to
     give identical results on the reference sample, so the default is deliberately on the
     generous side of the logit's own convergence precision.
+
+    ``caliper`` is Stata's ``caliper(#)``: a control further than # in propensity-score
+    distance is ineligible, and a treated unit with nothing inside the caliper is dropped
+    from the estimate (Stata reports those as "no matches"). ``None`` means no cap, which is
+    the default.
 
     The AI-robust standard error is NOT computed (see the module docstring), so the
     inferential fields stay NaN.
@@ -229,12 +236,28 @@ def teffects_psmatch(
     match_counts: list[int] = []
     for index in treated:
         distance = np.abs(score[index] - score[controls])
+        if caliper is not None:
+            # Beyond the caliper a control is ineligible, so it must not be chosen even as
+            # the nearest one. Marking it infinite rather than filtering keeps the index
+            # correspondence with ``controls``.
+            distance = np.where(distance <= caliper, distance, np.inf)
+            if not np.isfinite(distance).any():
+                continue
         order = np.argsort(distance)
         # The k-th smallest distance sets the threshold; every control at or below it
         # (within the tie tolerance) is a match. This is the rule Stata's m1..m8 encode.
-        kth = min(nneighbor, order.size)
+        finite = int(np.isfinite(distance).sum())
+        kth = min(nneighbor, finite)
         threshold = distance[order[kth - 1]]
+        if not np.isfinite(threshold):
+            continue
         selected = controls[distance <= threshold + tie_tolerance]
+        # ``distance`` was capped, so a selected control is inside the caliper by
+        # construction; the explicit mask guards the tie_tolerance widening above.
+        selected = selected[
+            np.abs(score[index] - score[selected]) <= (caliper if caliper is not None else np.inf)
+            + tie_tolerance
+        ]
         if selected.size == 0:  # pragma: no cover - threshold always selects at least one
             raise ConsistencyError(
                 f"teffects psmatch: no control matched treated observation {index}"
@@ -252,4 +275,5 @@ def teffects_psmatch(
         matches_min=int(min(match_counts)),
         matches_max=int(max(match_counts)),
         outcome=str(outcome or ""),
+        caliper=float("nan") if caliper is None else caliper,
     )

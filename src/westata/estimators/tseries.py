@@ -2552,42 +2552,52 @@ class VECMResults:
         lines.extend(
             [
                 "-" * 78,
-                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>13}{'z':>8}{'P>|z|':>8}"
-                f"{'[95% conf. interval]':>23}",
+                # Stata heads this table with "beta" and uses the same column geometry as the
+                # d() equation table: values end at 25 / 36 / 45 / 53 / 66 / 78.
+                f"{'beta':>12} |{'Coefficient':>12}{'Std. err.':>11}{'z':>7}{'P>|z|':>9}"
+                f"{'[95% conf. interval]':>25}",
                 "-" * 13 + "+" + "-" * 64,
-                f"{'_ce1':<12} |",
             ]
         )
         stderr_beta = np.asarray(raw.stderr_beta, dtype=float) * float(
             np.sqrt(self._stata_variance_scale())
         )
-        for position, name in enumerate(names):
-            coefficient = float(beta[position, 0])
-            se_value = float(stderr_beta[position, 0])
-            if position == 0:
-                # Johansen normalises the first coefficient to 1 and constrains it.
-                lines.append(
-                    f"{name:>12} |{coefficient:>12.0f}{'.':>13}{'.':>8}{'.':>8}"
-                    f"{'.':>13}{'.':>13}"
+
+        def _beta_row(label: str, coefficient: float, se_value: float, constrained: bool) -> str:
+            """One beta row: seven decimals, leading zero dropped, dots when constrained."""
+
+            if constrained or not np.isfinite(se_value) or se_value <= 0.0:
+                return (
+                    f"{label:>12} |{_vec_number(coefficient, 7):>11}{'.':>11}"
+                    f"{'.':>9}{'.':>8}{'.':>13}{'.':>12}"
                 )
-            elif not np.isfinite(se_value) or se_value <= 0.0:
-                # A zero standard error means the coefficient is constrained by the
-                # normalisation for this relation, so no test statistic exists. Printing a dot is
-                # what Stata does; dividing raised ZeroDivisionError and killed the whole summary
-                # on a rank-2 system.
-                lines.append(
-                    f"{name:>12} |{coefficient:>12.7g}{'.':>13}{'.':>8}{'.':>8}"
-                    f"{'.':>13}{'.':>13}"
+            statistic = coefficient / se_value
+            low = coefficient - 1.959963984540054 * se_value
+            high = coefficient + 1.959963984540054 * se_value
+            return (
+                f"{label:>12} |{_vec_number(coefficient, 7):>11}"
+                f"{_vec_number(se_value, 7):>11}{statistic:>9.2f}"
+                f"{float(2.0 * stats.norm.sf(abs(statistic))):>8.3f}"
+                f"{_vec_number(low, 7):>13}{_vec_number(high, 7):>12}"
+            )
+
+        # ONE BLOCK PER RELATION. The previous loop read only beta[:, 0], so a rank-2 system
+        # printed just the first cointegrating relation and silently dropped _ce2.
+        relations = beta.shape[1] if beta.ndim == 2 else 1
+        for relation in range(relations):
+            lines.append(f"{'_ce' + str(relation + 1):<12} |")
+            for position, name in enumerate(names):
+                coefficient = float(
+                    beta[position, relation] if beta.ndim == 2 else beta[position]
                 )
-            else:
-                statistic = coefficient / se_value
-                lines.append(
-                    f"{name:>12} |{coefficient:>12.7g}{se_value:>13.7g}"
-                    f"{statistic:>8.2f}"
-                    f"{float(2.0 * stats.norm.sf(abs(statistic))):>8.3f}"
-                    f"{coefficient - 1.959963984540054 * se_value:>13.7g}"
-                    f"{coefficient + 1.959963984540054 * se_value:>13.7g}"
+                se_value = float(
+                    stderr_beta[position, relation]
+                    if stderr_beta.ndim == 2 and stderr_beta.shape[1] == relations
+                    else stderr_beta[position]
                 )
+                lines.append(_beta_row(name, coefficient, se_value, position == 0))
+            if relation + 1 < relations:
+                lines.append("-" * 13 + "+" + "-" * 64)
         lines.append("-" * 13 + "+" + "-" * 64)
         return "\n".join(lines)
 

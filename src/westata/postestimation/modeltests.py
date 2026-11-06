@@ -441,8 +441,46 @@ def _comparable_names(
     it is a documented design choice, not a mismatch.
     """
 
-    consistent_names = list(consistent.param_names)
-    efficient_names = list(efficient.param_names)
+    # Stata prints the comparison rows in ITS OWN order, which is not patsy's. An IV model is
+    # the clearest case: param_names lists the endogenous regressor LAST, while hausman's table
+    # leads with it.
+    #
+    #   param_names  ['Intercept', 'expr', 'tenure', 'rns', 'smsa', 's']
+    #   stata_params ['s', 'expr', 'tenure', 'rns', 'smsa', '_cons']
+    #
+    # ``stata_params`` carries the right ORDER but also Stata's spelling of the constant
+    # ("_cons" where patsy says "Intercept"), so the names cannot simply be swapped in: doing
+    # that made ``consistent_names.index("_cons")`` raise "'_cons' is not in list" further down.
+    # The order is therefore taken from stata_params and mapped BACK to the param_names
+    # spelling, which keeps every downstream lookup working.
+    def _stata_order(names: list[str], result: Any) -> list[str]:
+        ordered = getattr(result, "stata_params", None)
+        if ordered is None or len(ordered.index) != len(names):
+            return names
+        by_lower = {str(name).lower(): name for name in names}
+        # The constant is spelled differently on the two lists ("_cons" against "Intercept"),
+        # so it is matched through _CONSTANT_NAMES rather than by name.
+        # _CONSTANT_NAMES mixes cases ("Intercept" is capitalised, "_cons" is not), so the
+        # comparison has to be case-insensitive on BOTH sides -- matching only the candidate to
+        # a lowercased set made every constant look absent and silently fell back to param order.
+        constants_lower = {name.lower() for name in _CONSTANT_NAMES}
+        constant_patsy = next(
+            (name for name in names if str(name).lower() in constants_lower), None
+        )
+        mapped: list[str] = []
+        for stata_name in ordered.index:
+            key = str(stata_name).lower()
+            if key in by_lower:
+                mapped.append(by_lower[key])
+            elif key in constants_lower and constant_patsy is not None:
+                if constant_patsy not in mapped:
+                    mapped.append(constant_patsy)
+            else:
+                return names
+        return mapped if sorted(mapped) == sorted(names) else names
+
+    consistent_names = _stata_order(list(consistent.param_names), consistent)
+    efficient_names = _stata_order(list(efficient.param_names), efficient)
     efficient_set = set(efficient_names)
     consistent_set = set(consistent_names)
 

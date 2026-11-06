@@ -40,6 +40,26 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 7 轮）：`teffects psmatch caliper()` 已实现，并纠正我自己的误判
+
+第 2 轮我把 `psmatch` 的参照记为**不可获取**（一律 `r(103)`，与协变量数量无关），并归因为环境问题。**这个判断是错的**，而错误信息里写得很清楚：
+
+```
+The outcome-model is misspecified. An outline of the syntax is
+teffects psmatch (outcome_variable) (treatment_variable varlist)
+```
+
+`psmatch` 的协变量在**处理方程**一侧，与 `nnmatch` 相反。我写的是 `(re78 age) (treat)`，正确的是 `(re78) (treat age)`。**信息摆了一整轮，我把它读成了环境的限制而不是命令的错误。**
+
+修好后 caliper 与 Stata 一致（`nsw_dw`）：
+
+| | ATET |
+|---|---|
+| 无 caliper | 2639.8646 |
+| `caliper(0.1)` | 2639.8646（该阈值未排除任何对照，故应完全相同）|
+
+**已知限制（本轮未动）**：`nneighbor(3)` 得 2412.8207，Stata 为 2397.636。这是 `n>1` 时的 tie 处理差异，早于本轮工作（`n=1` 是精确的），已记录而非让一个通过的 caliper 测试暗示匹配器已完全对齐。
+
 ### v2 报告（第 6 轮）：`esttab` 文本输出已实现
 
 报告 C20-01 说 `etable` 缺 `esttab` 的编号行、`mtitle` 行、统计量脚注。`model_names` 早已存在，缺的是**渲染出的表格本身**——`etable` 返回 DataFrame（对程序正确，对比较无用）。

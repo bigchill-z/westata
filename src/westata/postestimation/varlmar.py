@@ -69,18 +69,34 @@ class LmarResult:
         ).set_index("lag")
 
     def __str__(self) -> str:
+        """Stata's BOXED Lagrange-multiplier table.
+
+        Captured from a live ``veclmar`` after a rank-2, three-variable ``vec``::
+
+               Lagrange-multiplier test
+              | lag  |      chi2    df   Prob > chi2 |
+              |------+-------------------------------|
+              |   1  |    6.1793     9     0.72185   |
+              |   2  |    5.3813     9     0.79988   |
+               H0: no autocorrelation at lag order
+
+        Every line is 42 characters. The numbers were always right -- C14-07 scored 0.25 with
+        full numeric coverage -- but the table was rendered with dashes where Stata draws a box,
+        so a line-wise comparison had nothing to align.
+        """
+
+        rule = "  |------+-------------------------------|"
         lines = [
             "   Lagrange-multiplier test",
-            "",
-            f"{'lag':>4} |{'chi2':>10}{'df':>6}{'Prob > chi2':>14}",
-            "-" * 6 + "+" + "-" * 30,
+            "  | lag  |      chi2    df   Prob > chi2 |",
+            rule,
         ]
         for row in self.rows:
             lines.append(
-                f"{row.lag:>4} |{row.chi2:>10.4f}{row.df:>6}{row.pvalue:>14.5f}"
+                f"  |{row.lag:>4}  |{row.chi2:>10.4f}{row.df:>6}{row.pvalue:>12.5f}   |"
             )
-        lines.append("-" * 6 + "+" + "-" * 30)
-        lines.append("  H0: no autocorrelation at lag order")
+        lines.append(rule)
+        lines.append("   H0: no autocorrelation at lag order")
         return "\n".join(lines)
 
 

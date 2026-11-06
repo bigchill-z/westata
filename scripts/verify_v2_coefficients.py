@@ -85,7 +85,67 @@ CASES = [
 ]
 
 
+STATISTIC_CASES = [
+    (
+        "dwatson", "estat dwatson", "r(dw)",
+        lambda result: float(ws.estat_dwatson(result).d),
+    ),
+    (
+        "ovtest", "estat ovtest", "r(F)",
+        lambda result: float(result.estat_ovtest().statistic),
+    ),
+    (
+        "imtest", "estat imtest", "r(chi2_t)",
+        lambda result: float(result.estat_imtest().to_dict()["chi2_t"]),
+    ),
+    (
+        "vif (first)", "estat vif", "r(vif_1)",
+        lambda result: float(np.asarray(result.estat_vif().vif).ravel()[0]),
+    ),
+]
+
+
 def main() -> int:
+    status = _coefficients()
+    _statistics()
+    return status
+
+
+def _statistics() -> None:
+    """The 25-item family in the report script, reduced to the four that need no extra setup."""
+
+    frame = _dedupe(
+        pd.read_stata(f"{DATA}/grilic.dta", convert_categoricals=False).dropna()
+    ).assign(t=lambda data: np.arange(1, len(data) + 1))
+    result = ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    print()
+    print(f"{'statistic':16} {'stata':>20} {'westata':>20} {'rel err':>12}  verdict")
+    print("-" * 86)
+    with StataSession() as session:
+        session.push(frame)
+        with contextlib.redirect_stdout(io.StringIO()):
+            session.run("tsset t")
+        for label, command, key, builder in STATISTIC_CASES:
+            with contextlib.redirect_stdout(io.StringIO()):
+                session.run("quietly regress lnw s expr tenure")
+                session.run(command)
+            returns = session.raw.get_return()
+            if key not in returns:
+                print(f"{label:16} {'--':>20} {'--':>20} {'--':>12}  MISSING {key}")
+                continue
+            theirs = float(np.asarray(returns[key]).ravel()[0])
+            try:
+                ours = builder(result)
+            except Exception as error:  # noqa: BLE001
+                print(f"{label:16} {theirs:>20.10f} {'--':>20} {'--':>12}  WESTATA: {str(error)[:20]}")
+                continue
+            denominator = max(abs(theirs), 1e-12)
+            relative = abs(ours - theirs) / denominator
+            verdict = "exact" if relative < 1e-10 else ("close" if relative < 1e-5 else "DIFFERS")
+            print(f"{label:16} {theirs:>20.10f} {ours:>20.10f} {relative:>12.2e}  {verdict}")
+
+
+def _coefficients() -> int:
     print(f"{'model':44} {'params':>8} {'max rel err':>14}  verdict")
     print("-" * 88)
     for dataset, command, builder in CASES:

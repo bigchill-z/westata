@@ -195,30 +195,28 @@ class HausmanResult:
             return text
 
         def _coefficient(value: float) -> str:
-            """Six significant figures with the leading zero dropped.
+            """SEVEN DECIMAL PLACES, trailing zeros trimmed, leading zero dropped.
 
-            Eleven of thirteen coefficients on the reference fit reproduce exactly. Two do not,
-            and they are recorded rather than tuned further:
+            Sixteen coefficients from the reference fit pin this exactly:
 
-            * ``-.0000559`` -- Stata avoids scientific notation for a small value; this returns
-              ``-5.587e-05``. A fixed-point fallback gets the shape but lands on 3 significant
-              digits where Stata keeps 4.
-            * ``-.0840797`` vs this returning ``-.08408`` -- a rounding difference in the seventh
-              digit.
+                .1504642   .102643   .0478211   .0101206   -.0000559   -.0840797
+                .0502254   .0381189  .0121065   .0355587   .0356146    .0119159
 
-            Three candidate rules were measured (%.6g, %.7g, and a %9.0g width model); %.6g with
-            the leading zero stripped matched the most rows, so it is what ships.
+            which is "%.7f" with the padding removed -- NOT a significant-figures rule. Two
+            earlier attempts got this wrong in opposite directions: "%.6g" turned -.0840797 into
+            -.08408, and gave -.0000559 in scientific notation as -5.58788e-05. Significant-digit
+            formatting cannot produce both ".1504642" (seven places) and "-.0000559" (three
+            significant digits) from values a decade apart.
             """
 
-            number = float(value)
-            if number == 0.0:
-                return "0"
-            text = f"{number:.6g}"
+            text = f"{float(value):.7f}"
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
             if text.startswith("0."):
                 text = text[1:]
             elif text.startswith("-0."):
                 text = "-" + text[2:]
-            return text
+            return text or "0"
 
         consistent = np.asarray(self.consistent, dtype=float)
         efficient = np.asarray(self.efficient, dtype=float)
@@ -238,12 +236,25 @@ class HausmanResult:
         ]
         for index, name in enumerate(self.names):
             error = errors[index]
-            error_text = f"{float(error):.7f}" if np.isfinite(error) else "."
+            # The standard error uses the same rule as the coefficients -- seven decimals, no
+            # leading zero -- and "." when the difference has no estimable variance.
+            if np.isfinite(error):
+                error_text = f"{float(error):.7f}"
+                if error_text.startswith("0."):
+                    error_text = error_text[1:]
+                elif error_text.startswith("-0."):
+                    error_text = "-" + error_text[2:]
+            else:
+                error_text = "."
             lines.append(
-                f"{name:>12} |{_coefficient(consistent[index]):>13}"
+                # Column widths measured from the Stata block: the three coefficient columns
+                # end at 26, 39 and 55, and the standard error ends at 71. "%.7f" values are at
+                # most 10 characters wide, so 12/13/16/16 land exactly there -- the earlier
+                # 13/13/16/15 pushed the first three numbers one column right.
+                f"{name:>12} |{_coefficient(consistent[index]):>12}"
                 f"{_coefficient(efficient[index]):>13}"
                 f"{_coefficient(differences[index]):>16}"
-                f"{error_text:>15}"
+                f"{error_text:>16}"
             )
         lines.append("-" * 78)
         lines.append(

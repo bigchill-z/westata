@@ -7,19 +7,20 @@ lines, so a line-wise comparison had almost nothing to match.
 The table is now rendered: header, one row per compared coefficient with (b), (B), (b-B) and
 sqrt(diag(V_b-V_b)), the two command attribution lines, then the quadratic form and its value.
 
-Two KNOWN residuals are pinned here rather than papered over:
+FORMATTING is settled: seven DECIMAL PLACES with trailing zeros trimmed and the leading zero
+dropped. Sixteen coefficients pin it, and two earlier rules failed in opposite directions --
+"%.6g" turned -.0840797 into -.08408 and printed a small value as -5.58788e-05. No
+significant-figures rule can produce both ".1504642" (seven places) and "-.0000559" (three
+significant digits) from values a decade apart.
 
-  * the seventh significant digit rounds differently on some coefficients -- "-.0840797" comes
-    out "-.08408". Three candidate format rules (%.6g, %.7g, a %9.0g width model) were measured
-    against the thirteen reference coefficients; %.6g with the leading zero stripped matched the
-    most rows (11 of 13) and is what ships.
-  * a very small coefficient prints in scientific notation ("-5.58787e-05") where Stata writes
-    fixed-point ("-.0000559").
+ROW ORDER now follows Stata, which leads with an IV model's endogenous regressor. stata_params
+carries that order but spells the constant "_cons" while param_names says "Intercept", so each
+name is mapped back to the param_names spelling -- and _CONSTANT_NAMES mixes cases, so the
+comparison has to be case-insensitive on both sides.
 
-Row ORDER is also not yet Stata's: it prints the endogenous regressor first, while this follows
-param_names (statsmodels order). Redirecting the order to stata_params fixed the rows but broke
-the constant's name between the two orderings (_cons versus Intercept), so it was reverted rather
-than shipped half-done.
+ONE KNOWN RESIDUAL: the "smsa" row is one character shorter than Stata's, because Stata's column
+width adapts when the (B) value is nine characters ("-.1396666") rather than eight. Four of five
+coefficient rows are byte-identical; this one differs by a single space.
 """
 
 from __future__ import annotations
@@ -94,3 +95,35 @@ def test_a_summary_only_result_still_renders() -> None:
 
     simple = HausmanResult(statistic=3.5, df=2.0, pvalue=0.17)
     assert "chi2(2) = 3.50" in str(simple)
+
+STATA_ROWS = [
+    "           s |    .1504642      .102643        .0478211        .0101206",
+    "        expr |    .0502254     .0381189        .0121065        .0030987",
+    "      tenure |    .0355587     .0356146       -.0000559        .0021937",
+    "         rns |   -.0721638    -.0840797        .0119159        .0085301",
+]
+
+
+def test_four_of_five_coefficient_rows_are_byte_identical(outcome) -> None:
+    """The "smsa" row is the one known residual (a single space from a 9-character value)."""
+
+    rendered = str(outcome)
+    lines = rendered.splitlines()
+    for expected in STATA_ROWS:
+        assert expected in lines, repr(expected)
+
+
+def test_the_small_coefficient_uses_fixed_point(outcome) -> None:
+    """It used to print in scientific notation."""
+
+    rendered = str(outcome)
+    assert "-.0000559" in rendered
+    assert "e-05" not in rendered
+
+
+def test_the_row_order_leads_with_the_endogenous_regressor(outcome) -> None:
+    """Stata prints "s" first even though patsy puts it last."""
+
+    rows = [line for line in str(outcome).splitlines() if "|" in line and "Coefficients" not in line]
+    order = [row.split("|")[0].strip() for row in rows if row.split("|")[0].strip()]
+    assert order[:5] == ["s", "expr", "tenure", "rns", "smsa"]

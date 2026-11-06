@@ -40,6 +40,26 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 93–94 轮）：`estat` 族的排版与可达性，以及一次失败的审计
+
+**第 93 轮**用第 90 轮的捕获工具核对 `vif`/`ic`/`dwatson`，三处都不对：
+
+| 命令 | 缺陷 |
+|---|---|
+| `estat vif` | 表头缺末尾 2 空格（36 字符 vs Stata 的 38）；表格前多一空行 |
+| `estat ic` | 用 3 条 77 字符边框线包住一个**只有 4 行**的表。代码注释声称该结构「measured from a live estat ic」——实测**没有任何边框线**，测试也固化了同一错误 |
+| `estat dwatson` | `result.estat_dwatson()` 抛 `AttributeError`。**实现早已存在于 `postestimation/serial.py` 且逐字节正确**（49 字符、`1.704354`），只是从未接线 |
+
+**第 94 轮尝试审计「实现了但不可达」的函数，三次方法全部失败**：
+
+1. 判据「是否顶层导出或结果方法」→ 10 个误报（`build_contrast`、`resolve_names`、`test_as_stata` 等是被兄弟模块调用的内部辅助函数）；
+2. 判据「是否有文件包含该名字」→ 4 个误报（`is_constant_name`、`model_predict_types`、`ordered_probability`、`parse_hypotheses` 均在**同文件内**被调用）；
+3. 判据「是否有 AST Call 节点」→ 仍列出 124 项，绝大多数是**类方法**（`aic`、`t_test`、`wald_error` 等通过属性访问调用，自由函数的 Call 匹配抓不到）。
+
+结论：**静态分析在这个代码库里无法可靠区分「死代码」与「方法」**，审计脚本已删除，不保留一个会给出 124 项噪声的工具。第 93 轮的具体缺陷已修复并加守卫，而系统性的可达性检查需要完整的类方法解析，超出本轮范围。
+
+（本轮同时纠正一处自身疏忽：查询 `hasattr(ws, 'dwatson')` 少了 `estat_` 前缀，误以为顶层未导出；实际 `estat_dwatson` 已在顶层。这类查询错配在本任务中反复出现。）
+
 ### v2 报告（第 82 轮）：IRF 的障碍不在正交化，而在残差协方差
 
 第 81 轮推测「Stata 的 A0 是下三角、statsmodels 不是」。本轮验证后**推翻了这个推测**。

@@ -52,6 +52,59 @@ def _translate_base_terms(formula: str) -> str:
     return _BASE_TERM_RE.sub(_replace_base_term, formula)
 
 
+_RESERVED_NAMES = frozenset(
+    {
+        "inf", "nan", "None", "True", "False", "C", "I", "Q", "and", "or", "not", "in",
+        "is", "if", "else", "lambda", "sum", "min", "max", "abs", "len", "list", "dict",
+        "set", "all", "any", "float", "int", "str", "bool", "complex", "round", "pow",
+    }
+)
+
+
+class _EscapedFormula:
+    """Keeps the rename mapping so the result can be restored to the user's spelling."""
+
+    def __init__(self, formula: str, data: Any, aliases: dict[str, str]) -> None:
+        self.formula = formula
+        self.data = data
+        self._aliases = aliases
+
+    def restore(self, name: str) -> str:
+        for original, alias in self._aliases.items():
+            if alias in name:
+                name = name.replace(alias, original)
+        return name
+
+
+def _escape_reserved_names(formula: str, data: Any) -> Any:
+    """Rename columns that collide with names the formula evaluator resolves first.
+
+    Returns ``None`` when nothing needs escaping, so the common path is untouched.
+    """
+
+    import re
+
+    present = [column for column in data.columns if str(column) in _RESERVED_NAMES]
+    if not present:
+        return None
+
+    aliases: dict[str, str] = {}
+    renamed = data.copy()
+    used = {str(column) for column in data.columns}
+    for column in present:
+        alias = f"__ws_{column}__"
+        while alias in used:
+            alias = "_" + alias
+        used.add(alias)
+        aliases[str(column)] = alias
+        renamed = renamed.rename(columns={column: alias})
+
+    escaped = formula
+    for original, alias in aliases.items():
+        escaped = re.sub(rf"(?<![\w.]){re.escape(original)}(?![\w])", alias, escaped)
+    return _EscapedFormula(escaped, renamed, aliases)
+
+
 def build_design(
     formula: str,
     data: pd.DataFrame,
@@ -97,6 +150,20 @@ def build_design(
         )
 
     translated = _translate_base_terms(formula)
+
+    # A column named after a Python builtin cannot be used: patsy evaluates the formula in a
+    # namespace where "inf" resolves to FLOAT INFINITY before it ever looks at the data, so
+    # ``inf`` as a response raised "numbers besides '0' and '1' are only allowed with **".
+    # "inf" is the natural name for an inflation series -- macro_swatson.dta uses it -- so this
+    # is not a corner case.
+    #
+    # The columns are renamed to a collision-free alias for the duration of the parse and the
+    # names are mapped back afterwards, so the user's formula and the resulting column names both
+    # keep the spelling they wrote.
+    escapes = _escape_reserved_names(translated, data)
+    if escapes:
+        translated = escapes.formula
+        data = escapes.data
     try:
         _, exog = patsy.dmatrices(translated, data, return_type="dataframe")
     except patsy.PatsyError as exc:
@@ -111,4 +178,6 @@ def build_design(
     X = np.asarray(exog, dtype=float)
     column_names = list(exog.design_info.column_names)
     kept_index = exog.index
+    if escapes:
+        column_names = [escapes.restore(name) for name in column_names]
     return X, column_names, kept_index

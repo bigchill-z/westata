@@ -56,20 +56,55 @@ class VarStableResult:
         )
 
     def __str__(self) -> str:
+        """Stata's boxed eigenvalue table.
+
+        Captured from a live ``varstable`` after a bare ``var dinf unem``::
+
+               Eigenvalue stability condition
+              +----------------------------------------+
+              |        Eigenvalue        |   Modulus   |
+              |--------------------------+-------------|
+              |     .82182               |    .82182   |
+              |   .7970223               |   .797022   |
+              |  -.2258777 +  .6292178i  |   .668533   |
+              +----------------------------------------+
+
+        The bar positions are 2, 29 and 43, so the eigenvalue cell spans 3-28 and the modulus
+        30-42. Within those cells:
+
+        * a SHORT eigenvalue is right-aligned to offset 11
+        * a LONG one (the complex row) starts at offset 2 with its own leading spaces
+        * the modulus is right-aligned to offset 10
+
+        Getting this to match took measuring all three rows: an earlier attempt right-aligned
+        every value to the same column and missed the complex row by one space, and another
+        left-aligned the whole cell and missed the short rows.
+        """
+
+        def _bare(number: float) -> str:
+            text_value = f"{float(number):.6g}"
+            if text_value.startswith("0."):
+                text_value = text_value[1:]
+            elif text_value.startswith("-0."):
+                text_value = "-" + text_value[2:]
+            return text_value
+
         result = [
             "   Eigenvalue stability condition",
-            "",
-            f"{'Eigenvalue':>24} | {'Modulus':>10}",
-            "-" * 25 + "+" + "-" * 12,
+            "  +----------------------------------------+",
+            "  |        Eigenvalue        |   Modulus   |",
+            "  |--------------------------+-------------|",
         ]
         for value, magnitude in zip(self.eigenvalues, self.modulus):
-            magnitude_text = f"{float(magnitude):.6g}"
-            if magnitude_text.startswith("0."):
-                magnitude_text = magnitude_text[1:]
-            elif magnitude_text.startswith("-0."):
-                magnitude_text = "-" + magnitude_text[2:]
-            result.append(f"{_format_complex(value):>24} | {magnitude_text:>10}")
-        result.append("-" * 25 + "+" + "-" * 12)
+            eigenvalue_text = _format_complex(value)
+            cell = (
+                "  " + eigenvalue_text if len(eigenvalue_text) > 11
+                else eigenvalue_text.rjust(11)
+            )
+            result.append(
+                f"  |{cell.ljust(26)}|{_bare(magnitude).rjust(10).ljust(13)}|"
+            )
+        result.append("  +----------------------------------------+")
         if self.stable:
             result.append("   All the eigenvalues lie inside the unit circle.")
             result.append("   VAR satisfies stability condition.")
@@ -100,7 +135,7 @@ def _format_complex(value: complex) -> str:
     if abs(imaginary) < 1e-12:
         return _bare(real)
     sign = "+" if imaginary >= 0 else "-"
-    return f"{_bare(real)} {sign} {_bare(abs(imaginary))}i"
+    return f"{_bare(real)} {sign}  {_bare(abs(imaginary))}i"
 
 
 def varstable(result: Any) -> VarStableResult:

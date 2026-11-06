@@ -79,9 +79,13 @@ def test_varstable_is_internally_consistent(fitted) -> None:
     companion[k:, :k] = np.eye(k)
     expected = sorted(np.abs(np.linalg.eigvals(companion)), reverse=True)
 
+    # The table drops the leading zero, as Stata does, so compare against that spelling.
     rendered = str(ws.varstable(fitted))
     for value in expected:
-        assert f"{value:.6f}"[:8] in rendered or f"{value:.4f}" in rendered
+        text_value = f"{value:.6g}"
+        if text_value.startswith("0."):
+            text_value = text_value[1:]
+        assert text_value in rendered, text_value
 
 
 def test_all_moduli_are_inside_the_unit_circle(fitted) -> None:

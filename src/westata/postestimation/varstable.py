@@ -63,7 +63,12 @@ class VarStableResult:
             "-" * 25 + "+" + "-" * 12,
         ]
         for value, magnitude in zip(self.eigenvalues, self.modulus):
-            result.append(f"{_format_complex(value):>24} | {magnitude:>10.6g}")
+            magnitude_text = f"{float(magnitude):.6g}"
+            if magnitude_text.startswith("0."):
+                magnitude_text = magnitude_text[1:]
+            elif magnitude_text.startswith("-0."):
+                magnitude_text = "-" + magnitude_text[2:]
+            result.append(f"{_format_complex(value):>24} | {magnitude_text:>10}")
         result.append("-" * 25 + "+" + "-" * 12)
         if self.stable:
             result.append("   All the eigenvalues lie inside the unit circle.")
@@ -77,12 +82,25 @@ class VarStableResult:
 def _format_complex(value: complex) -> str:
     """Render an eigenvalue the way Stata does: real part, then ``± .xxxxi``."""
 
+    def _bare(number: float) -> str:
+        """Seven significant figures with the leading zero dropped: .82182, -.2258777.
+
+        Stata never prints the zero; "0.82182" appeared in every row before this.
+        """
+
+        text_value = f"{float(number):.7g}"
+        if text_value.startswith("0."):
+            text_value = text_value[1:]
+        elif text_value.startswith("-0."):
+            text_value = "-" + text_value[2:]
+        return text_value
+
     real = float(value.real)
     imaginary = float(value.imag)
     if abs(imaginary) < 1e-12:
-        return f"{real:.7g}"
+        return _bare(real)
     sign = "+" if imaginary >= 0 else "-"
-    return f"{real:.7g} {sign} {abs(imaginary):.7g}i"
+    return f"{_bare(real)} {sign} {_bare(abs(imaginary))}i"
 
 
 def varstable(result: Any) -> VarStableResult:

@@ -122,6 +122,62 @@ two factor-variable models, the `r(mtest)` family for two models, and the three
 refusals. All 90 match to `rel < 1e-9`. The tests read that file, so they can no
 longer pass by agreeing with the implementation's own reading of the ado.
 
+## [0.2.0] — 2026-11-06
+
+Aligns the package with the v2 gap report (`westata_vs_Stata_差距评估报告_v2.md`): its four P0
+findings and most of its P1s, each measured against a live StataNow run.
+
+### Fixed — four P0s
+
+- **Panel clustered standard errors.** The `(n, 1)` form was refused outright, which is the
+  form `linearmodels` itself accepts. `lin_1992` now matches Stata to every printed digit:
+  `ltlan .154461106203`, `ltwlab .060334025167`, `ltpow .058925780613`. The report described
+  this as "all paths broken"; 1-D arrays and `cov_type="robust"` already worked, and I initially
+  said they were 3.7x off because I compared by POSITION rather than by name.
+- **`estat ovtest, rhs`** counted each indicator as two test columns. `grilic` with two dummies
+  went from `F(11, 741) = 5.21` to Stata's `F(9, 743) = 2.03`.
+- **`margins, atmeans` under fweight** took the means before expanding the weights, so the
+  `At:` block showed `.3333` where Stata prints `.0495229` and the child MEM was 18% off.
+  All five means and both MEMs now match character for character.
+- **`dfgls`** still does not match, and is recorded rather than shipped: the report says it
+  omits the division by the standard error, but it already divides — the statistic has the
+  wrong SIGN (`+0.806` against `-1.284`), and a grid over the detrending parameters never got
+  closer than `-0.1188`. `dfgls` is builtin in this Stata, so its source cannot be read.
+
+### Fixed — P1s
+
+- **`teffects psmatch caliper()`**, and `nn(1)`–`nn(5)` exact. The `nn(3)` gap blamed on a
+  "tie-handling difference" was a tie tolerance too wide by one order of magnitude: `1e-6`
+  merged two controls 6e-7 apart, `1e-9` separates them.
+- **`prais ..., corc`**: Cochrane-Orcutt drops the first observation where Prais-Winsten scales
+  it, so both coefficients and rho differ; slopes now agree to 8 significant digits.
+- **`margins, dydx(*)`**: the wildcard form, which used to raise `KeyError: column '*'`.
+- **`ivregress ..., first`**: the first-stage regression table, `result.first_stage()`, 14/14
+  lines identical. `estat firststage` and it are different outputs and both are kept.
+- **`esttab` text output**: `ws.etable_as_stata(...)`, 12/12 lines identical, including stars
+  that hang past the aligned number and a constant printed LAST.
+- **`xtreg, mle`**: a different estimator from `xtreg, re`, not a variant — `sigma_u` differs by
+  60%. Log-likelihood agrees to 9 significant figures.
+- **`vecrank`**: the 5% critical-value table was indexed by nothing, so a three-variable system
+  printed `nan`; `lags(2)` statistics now reproduce Stata exactly after finding that lagged
+  differences belong in BOTH residualisations.
+
+### Added — statsmodels ecosystem surface
+
+`res.t_test`, `res.f_test`, `res.get_influence` and `res.model`, each verified against
+statsmodels itself (`t = 7.1974807336` both sides). Plus `beta_labelled`/`alpha_labelled` and
+`resid_series`/`fitted_series`: the report wanted those attributes to CHANGE TYPE, but an
+existing test failed with `KeyError: (0, 0)` the moment that was tried, so the labelled views are
+additional names instead. `cov_params()` still returns an ndarray, by explicit user instruction.
+
+### Known limitation (not fixed, recorded)
+
+`rdrobust` bandwidth selection: the algorithm is transcribed from `rdbwselect.ado` and two
+helpers are exact, but the selector lands 6x off and is NOT wired in. `rdrobust` still refuses
+to guess. Three-variable `vecrank` remains 15% high after QR+SVD removed an impossible >1
+eigenvalue. `synth`/`synth2` are absent: the function that builds V lives only in
+`lsynth_mata_subr.mlib`.
+
 ## [0.1.0] — 2026-11-06
 
 A minor bump rather than a patch: the public surface grew, and several outputs that

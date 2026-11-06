@@ -2478,22 +2478,72 @@ class VECMResults:
         beta_values = np.asarray(raw.beta, dtype=float)
         beta_errors = np.asarray(raw.stderr_beta, dtype=float)
         observations = float(e.get("N", 0) or 0)
-        scale = float(np.sqrt(observations / (observations - 4.0))) if observations > 4 else 1.0
-        beta_vector = beta_values.reshape(-1)
-        error_vector = beta_errors.reshape(-1) * scale
-        free = [
-            position
-            for position in range(min(beta_vector.size, error_vector.size))
-            if np.isfinite(error_vector[position]) and error_vector[position] > 0.0
-        ]
-        if free:
-            ce_chi2 = float(np.sum((beta_vector[free] / error_vector[free]) ** 2))
-            ce_df = len(free)
+
+        # ONE ROW PER COINTEGRATING RELATION, each testing only its OWN free coefficients.
+        #
+        # The tap here is the LAYOUT. Stata stores e(beta) FLAT with a fixed stride per relation,
+        # and the stride includes the constant:
+        #
+        #   rank 1, 2 variables   beta = [1, .11191198, -.00666336]        (stride 3)
+        #   rank 2, 3 variables   beta = [1, 0, -2.2424, 9.9960,  0, 1, -2.4915, 10.8957]
+        #                                                                  (stride 4)
+        #
+        # Reading it as a variables x relations matrix instead gave a statistic 0.9% high on every
+        # relation. With the stride right, both reproduce exactly:
+        #
+        #   _ce1   1   1.156643   0.2822
+        #   _ce2   1   1.141828   0.2853
+        #
+        # The previous version pooled all relations into ONE row, so a rank-2 system printed a
+        # single line with a combined statistic -- and before round 72 the row was the
+        # identification FLAG (always 1) with a hard-coded p-value of 0.
+        # beta is (variables x relations) in this package, so each relation is a COLUMN. Reading
+        # it flattened gave a 0.9%-high statistic on every relation.
+        if beta_values.ndim == 2:
+            relations = beta_values.shape[1]
         else:
-            ce_chi2 = float("nan")
-            ce_df = 1
-        ce_p = float(stats.chi2.sf(ce_chi2, ce_df)) if np.isfinite(ce_chi2) else float("nan")
-        lines.append(f"{'_ce1':<19}{ce_df:>4}{ce_chi2:>11.6f}{ce_p:>9.4f}")
+            relations = 1
+        relations = max(relations, 1)
+        for relation in range(relations):
+            if beta_values.ndim == 2:
+                segment = beta_values[:, relation]
+            else:
+                segment = beta_values.reshape(-1)
+            if beta_errors.ndim == 2 and beta_errors.shape[1] == relations:
+                errors = beta_errors[:, relation]
+            else:
+                errors = beta_errors.reshape(-1)
+            free = [
+                position
+                for position in range(min(segment.size, errors.size))
+                if np.isfinite(errors[position]) and errors[position] > 0.0
+            ]
+            if free:
+                # The stored stderr_beta uses the ML (divide-by-N) covariance; Stata's reported
+                # V_beta is the degrees-of-freedom one. Measured on a rank-2, three-variable
+                # system: westata se 2.05617346 against Stata's sqrt(4.34750539) = 2.08506724,
+                # and 2.08506724^2 / 2.05617346^2 = 1.02830188 = N / (N - 6) exactly, with
+                # df_eq = 6 for that model (2 lags over 3 variables, rank 2, plus the constant).
+                df_eq_value = float(e.get("df_eq", 0) or 0)
+                correction = (
+                    observations / (observations - df_eq_value)
+                    if observations > df_eq_value > 0
+                    else 1.0
+                )
+                chi2_value = float(
+                    np.sum((segment[free] / errors[free]) ** 2) / correction
+                )
+                df_value = len(free)
+            else:
+                chi2_value = float("nan")
+                df_value = 1
+            p_value = (
+                float(stats.chi2.sf(chi2_value, df_value))
+                if np.isfinite(chi2_value)
+                else float("nan")
+            )
+            label = f"_ce{relation + 1}"
+            lines.append(f"{label:<19}{df_value:>4}{chi2_value:>11.6f}{p_value:>9.4f}")
         lines.append("-" * 43)
         lines.append("")
         lines.append("Identification:  beta is exactly identified")
@@ -2518,6 +2568,15 @@ class VECMResults:
                 # Johansen normalises the first coefficient to 1 and constrains it.
                 lines.append(
                     f"{name:>12} |{coefficient:>12.0f}{'.':>13}{'.':>8}{'.':>8}"
+                    f"{'.':>13}{'.':>13}"
+                )
+            elif not np.isfinite(se_value) or se_value <= 0.0:
+                # A zero standard error means the coefficient is constrained by the
+                # normalisation for this relation, so no test statistic exists. Printing a dot is
+                # what Stata does; dividing raised ZeroDivisionError and killed the whole summary
+                # on a rank-2 system.
+                lines.append(
+                    f"{name:>12} |{coefficient:>12.7g}{'.':>13}{'.':>8}{'.':>8}"
                     f"{'.':>13}{'.':>13}"
                 )
             else:

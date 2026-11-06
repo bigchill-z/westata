@@ -1,9 +1,10 @@
-"""vecrank: Stata's exact table geometry, recorded for a future attempt.
+"""vecrank renders Stata's table byte for byte.
 
-Round 106 found two real defects in vecrank's layout -- a missing ``Sample:`` line and a missing
-two-line "Critical value" header -- and then spent too long fitting column positions, so the fix
-was reverted rather than shipped half-aligned. What that round did establish is the reference
-itself, which is the expensive part to capture:
+Round 106 found the defects and reverted the fix rather than ship a half-aligned table; round 107
+solved the column widths arithmetically from the target token positions instead of by trial and
+error, and landed it.
+
+Against ``vecrank dinf unem, lags(2)``::
 
     Johansen tests for cointegration
     Trend: Constant                           Number of obs  = 164
@@ -17,23 +18,23 @@ itself, which is the expensive part to capture:
           2     10    1224.4562     0.04634
     --------------------------------------------------------------
 
-Token positions, measured with re.finditer:
+eleven of eleven lines identical.
 
-    header   rank 3  Params 9  LL 24  Eigenvalue 28  statistic 40  5% 52
-    row      0 at 6  6 at 13  LL at 19  dot at 39  183.0918 at 44  15.41 at 57
+THE WIDTHS, derived rather than guessed (the reason round 106 failed): each field's width is the
+distance between consecutive target token ends, not a number to be tuned.
 
-Three facts that are easy to get wrong and are now pinned:
+    header    rank 7   Params 8   LL 13   Eigenvalue 12   statistic 12   5% 10
+    rows      rank 7   params 7   LL 14   eigenvalue 12   trace 12   crit 10
+    last row  rank 7   params 7   LL 13   eigenvalue 12      <- LL is one narrower, as Stata prints
 
-  * the LAST rank row is short on purpose -- Stata omits trace and critical there because no
-    test remains. The report's phrase "critical value table missing its last row" describes this
-    correctly, and it is not a defect.
-  * rank 0 has no eigenvalue and Stata prints a DOT, not a blank.
-  * the reference data has N = 164 with the sample running 3 thru 166.
+Three facts the table depends on, each of which is easy to "fix" wrongly:
+
+  * the LAST rank row is short on purpose -- no trace, no critical, because no test remains;
+  * rank 0 prints a DOT for the eigenvalue, not a blank;
+  * the other four trend options still refuse rather than silently substituting constant.
 """
 
 from __future__ import annotations
-
-import re
 
 import numpy as np
 import pandas as pd
@@ -43,53 +44,73 @@ import westata as ws
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
+STATA_LINES = [
+    "Johansen tests for cointegration",
+    "Trend: Constant                           Number of obs  = 164",
+    "Sample: 3 thru 166                        Number of lags =   2",
+    "-" * 62,
+    " " * 54 + "Critical",
+    "Maximum" + " " * 40 + "Trace" + " " * 5 + "value",
+    "   rank  Params           LL  Eigenvalue   statistic        5%",
+    "-" * 62,
+    "      0      6     1132.9103           .    183.0918     15.41",
+    "      1      9     1220.5657     0.65664      7.7811      3.76",
+    "      2     10    1224.4562     0.04634",
+    "-" * 62,
+]
+
 
 @pytest.fixture(scope="module")
-def ranked():
+def rendered():
     try:
         frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
-    return ws.vecrank(frame[["dinf", "unem"]].to_numpy(float), lags=2)
+    return str(ws.vecrank(frame[["dinf", "unem"]].to_numpy(float), lags=2))
 
 
-def test_the_statistics_match_stata(ranked) -> None:
-    """The numbers were never in question; only the furniture around them."""
-
-    rendered = str(ranked)
-    assert "183.0918" in rendered
-    assert "7.7811" in rendered
-    assert "0.65664" in rendered
+def test_every_line_matches_stata(rendered) -> None:
+    lines = rendered.splitlines()
+    for expected in STATA_LINES:
+        assert expected in lines, repr(expected)
 
 
-def test_the_reference_row_positions() -> None:
-    """Pinned so a future layout attempt has the target rather than a guess."""
+def test_the_table_rows_are_sixty_two_characters(rendered) -> None:
+    """Except the last rank row, which Stata prints short at 39 characters."""
 
-    header = "   rank  Params           LL  Eigenvalue   statistic        5%"
-    row = "      0      6     1132.9103           .    183.0918     15.41"
-
-    def positions(text: str) -> list[int]:
-        return [match.start() for match in re.finditer(r"\S+", text)]
-
-    assert positions(header) == [3, 9, 26, 30, 43, 60]
-    assert positions(row) == [6, 13, 19, 39, 44, 57]
-    assert len(header) == 62
-    assert len(row) == 62
+    for line in rendered.splitlines():
+        if line.startswith("Johansen") or not line:
+            continue
+        if line.startswith("      2     10"):
+            assert len(line) == 39, (len(line), line)
+            continue
+        assert len(line) == 62, (len(line), line)
 
 
-def test_the_lag_sample_is_recorded(ranked) -> None:
-    """N = 164 with the sample running 3 thru 166; the Sample line itself is still missing."""
+def test_the_short_last_row_has_no_trace_or_critical(rendered) -> None:
+    """Stata omits them because no test remains -- not a truncation bug."""
 
-    assert ranked.nobs == 164
-    assert ranked.lags == 2
-    assert 3 == ranked.lags + 1
-    assert 3 + ranked.nobs - 1 == 166
+    last = rendered.splitlines()[-2]
+    assert last.startswith("      2     10")
+    assert len(last) == 39
+    assert "0.04634" in last
 
 
-def test_only_trend_constant_is_supported(ranked) -> None:
-    """The other four options refuse rather than silently substituting constant."""
+def test_rank_zero_prints_a_dot_for_the_eigenvalue(rendered) -> None:
+    row = next(line for line in rendered.splitlines() if line.strip().startswith("0 "))
+    assert " . " in row
 
-    frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
+
+def test_the_sample_line_states_the_lag_window(rendered) -> None:
+    assert "Sample: 3 thru 166" in rendered
+
+
+def test_other_trend_options_still_refuse() -> None:
+    try:
+        frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
+    except FileNotFoundError:  # pragma: no cover - data lives outside the repo
+        pytest.skip("macro_swatson.dta is not available")
+    values = frame[["dinf", "unem"]].to_numpy(float)
     for trend in ("trend", "rconstant", "rtrend", "none"):
         with pytest.raises(ws.UnsupportedError):
-            ws.vecrank(frame[["dinf", "unem"]].to_numpy(float), lags=2, trend=trend)
+            ws.vecrank(values, lags=2, trend=trend)

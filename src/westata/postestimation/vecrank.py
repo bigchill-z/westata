@@ -148,24 +148,61 @@ class VecRankResult:
         ).set_index("rank")
 
     def __str__(self) -> str:
+        """Stata's vecrank table, captured byte-for-byte.
+
+        From ``vecrank dinf unem, lags(2)``::
+
+            Johansen tests for cointegration
+            Trend: Constant                           Number of obs  = 164
+            Sample: 3 thru 166                        Number of lags =   2
+            --------------------------------------------------------------
+                                                                  Critical
+            Maximum                                        Trace     value
+               rank  Params           LL  Eigenvalue   statistic        5%
+                  0      6     1132.9103           .    183.0918     15.41
+                  1      9     1220.5657     0.65664      7.7811      3.76
+                  2     10    1224.4562     0.04634
+            --------------------------------------------------------------
+
+        Three things here are easy to get wrong, and the widths were solved from the target token
+        positions rather than guessed:
+
+        * the ``Sample:`` line and the two-line "Critical / value" header were missing entirely;
+        * rank 0 has no eigenvalue and Stata prints a DOT, not a blank;
+        * the LAST rank row is short ON PURPOSE -- trace and critical are omitted because no test
+          remains. Its LL field is also one column narrower than the other rows', which is why the
+          last row is built with its own format rather than reusing the general one.
+        """
+
+        sample_start = self.lags + 1
+        sample_end = sample_start + self.nobs - 1
         lines = [
             "Johansen tests for cointegration",
-            "",
-            f"Trend: Constant                            Number of obs  = {self.nobs}",
-            f"                                           Number of lags = {self.lags:>3}",
+            f"Trend: Constant                           Number of obs  = {self.nobs}",
+            f"Sample: {sample_start} thru {sample_end}".ljust(42)
+            + f"Number of lags = {self.lags:>3}",
             "-" * 62,
-            f"{'rank':>5}{'Params':>8}{'LL':>13}{'Eigenvalue':>12}{'Trace':>11}{'5%':>8}",
+            " " * 54 + "Critical",
+            "Maximum" + " " * 40 + "Trace" + " " * 5 + "value",
+            f"{'rank':>7}{'Params':>8}{'LL':>13}{'Eigenvalue':>12}"
+            f"{'statistic':>12}{'5%':>10}",
             "-" * 62,
         ]
         for row in self.rows:
-            eigenvalue = (
-                "" if not np.isfinite(row.eigenvalue) else f"{row.eigenvalue:.5f}"
-            )
-            trace = "" if row.rank >= self.equations else f"{row.trace:.4f}"
-            critical = "" if row.rank >= self.equations else f"{row.trace_critical:>8.2f}"
+            if not np.isfinite(row.eigenvalue):
+                eigenvalue = "."
+            else:
+                eigenvalue = f"{row.eigenvalue:.5f}"
+            if row.rank >= self.equations:
+                # Short final row: no trace, no critical, and a 13-wide LL field.
+                lines.append(
+                    f"{row.rank:>7}{row.params:>7}{row.loglikelihood:>13.4f}"
+                    f"{eigenvalue:>12}"
+                )
+                continue
             lines.append(
-                f"{row.rank:>5}{row.params:>8}{row.loglikelihood:>13.4f}"
-                f"{eigenvalue:>12}{trace:>11}{critical}"
+                f"{row.rank:>7}{row.params:>7}{row.loglikelihood:>14.4f}"
+                f"{eigenvalue:>12}{row.trace:>12.4f}{row.trace_critical:>10.2f}"
             )
         lines.append("-" * 62)
         return "\n".join(lines)

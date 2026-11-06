@@ -11,7 +11,7 @@ logarithms of every remaining eigenvalue. Verified on macro_swatson.dta, k=2, la
     rank  Params        LL        Eigenvalue   Maximum   5%
        0      6     1132.9103        .        175.3107  14.07
        1      9     1220.5657   0.65664        7.7811   3.76
-       2     10    1224.4562   0.04634
+       2      10    1224.4562   0.04634
 
 Note the trace table's rank-0 statistic is 183.0918 and this one is 175.3107 -- summing the other
 eigenvalue's contribution is exactly the difference, which is a good check that neither was
@@ -37,7 +37,7 @@ STATA_MAX_TABLE = [
     "   rank  Params           LL                 Maximum        5%",
     "      0      6     1132.9103           .    175.3107     14.07",
     "      1      9     1220.5657     0.65664      7.7811      3.76",
-    "      2     10    1224.4562     0.04634",
+    "      2      10    1224.4562     0.04634",
 ]
 
 

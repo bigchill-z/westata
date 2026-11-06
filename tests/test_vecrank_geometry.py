@@ -15,7 +15,7 @@ Against ``vecrank dinf unem, lags(2)``::
        rank  Params           LL  Eigenvalue   statistic        5%
           0      6     1132.9103           .    183.0918     15.41
           1      9     1220.5657     0.65664      7.7811      3.76
-          2     10    1224.4562     0.04634
+          2      10    1224.4562     0.04634
     --------------------------------------------------------------
 
 eleven of eleven lines identical.
@@ -55,7 +55,7 @@ STATA_LINES = [
     "-" * 62,
     "      0      6     1132.9103           .    183.0918     15.41",
     "      1      9     1220.5657     0.65664      7.7811      3.76",
-    "      2     10    1224.4562     0.04634",
+    "      2      10    1224.4562     0.04634",
     "-" * 62,
 ]
 
@@ -76,13 +76,18 @@ def test_every_line_matches_stata(rendered) -> None:
 
 
 def test_the_table_rows_are_sixty_two_characters(rendered) -> None:
-    """Except the last rank row, which Stata prints short at 39 characters."""
+    """Except the last rank row, which Stata prints short at 40 characters.
+
+    Round 142 corrected this: an older hand-typed reference line had Params ending at column 14
+    and the row at 39 characters. A live `vecrank dinf unem, lags(2)` shows Params ending at 15
+    and the row at 40. The corrected table matches Stata byte for byte on all five trend cases.
+    """
 
     for line in rendered.splitlines():
         if line.startswith("Johansen") or not line:
             continue
-        if line.startswith("      2     10"):
-            assert len(line) == 39, (len(line), line)
+        if line.startswith("      2      10"):
+            assert len(line) == 40, (len(line), line)
             continue
         assert len(line) == 62, (len(line), line)
 
@@ -91,8 +96,8 @@ def test_the_short_last_row_has_no_trace_or_critical(rendered) -> None:
     """Stata omits them because no test remains -- not a truncation bug."""
 
     last = rendered.splitlines()[-2]
-    assert last.startswith("      2     10")
-    assert len(last) == 39
+    assert last.startswith("      2      10")
+    assert len(last) == 40
     assert "0.04634" in last
 
 
@@ -105,14 +110,17 @@ def test_the_sample_line_states_the_lag_window(rendered) -> None:
     assert "Sample: 3 thru 166" in rendered
 
 
-def test_trend_is_now_supported_and_the_rest_still_refuse() -> None:
-    """Round 136 implemented ``trend(trend)``; the restricted variants still refuse.
+def test_all_five_trend_specifications_are_supported() -> None:
+    """Round 136 added ``trend``; round 142 lifted the refusal on the other three.
 
-    ``trend`` was in this loop until round 136 because the deterministic block was hard-coded to a
-    column of ones. Adding a linear trend inside the cointegrating relation reproduces Stata's
-    eigenvalues, trace, likelihood, parameter counts AND critical values exactly, so it moved out
-    of the refusal list. ``rconstant``, ``rtrend`` and ``none`` each use a different tabulation and
-    still change which rank would be chosen, so they stay refused.
+    ``rconstant`` and ``rtrend`` are not just different residualising blocks: the restricted
+    deterministic term is appended to R1 as an extra pseudo-variable, and in the unrestricted
+    (full-rank) VAR it becomes another ordinary column. Once both of those are done, all five
+    specifications reproduce Stata's eigenvalues, trace, likelihood, parameter counts and
+    critical values.
+
+    Earlier versions of this guard asserted three of the five were refused -- correct at the
+    time, wrong now. The history is kept so the reversal is visible rather than silent.
     """
 
     try:
@@ -121,12 +129,20 @@ def test_trend_is_now_supported_and_the_rest_still_refuse() -> None:
         pytest.skip("macro_swatson.dta is not available")
     values = frame[["dinf", "unem"]].to_numpy(float)
 
-    # Supported now.
-    supported = ws.vecrank(values, lags=2, trend="trend")
-    assert supported.deterministic == "trend"
-    assert supported.rows[0].params == 8  # Stata: 8 / 11 / 12, against 6 / 9 / 10 for constant
+    # Measured parameter counts for k=2, lags=2, and the rank-0 trace for each case.
+    expected = {
+        "none": ([4, 7, 8], 169.1915),
+        "rconstant": ([4, 8, 10], 183.1679),
+        "constant": ([6, 9, 10], 183.0918),
+        "rtrend": ([6, 10, 12], 183.7733),
+        "trend": ([8, 11, 12], 183.6114),
+    }
+    for trend, (params, trace) in expected.items():
+        result = ws.vecrank(values, lags=2, trend=trend)
+        assert result.deterministic == trend
+        assert [row.params for row in result.rows] == params, trend
+        assert float(result.rows[0].trace) == pytest.approx(trace, abs=5e-4), trend
 
-    # Still refused, with a reason.
-    for trend in ("rconstant", "rtrend", "none"):
-        with pytest.raises(ws.UnsupportedError):
-            ws.vecrank(values, lags=2, trend=trend)
+    # An unknown spelling still refuses, rather than silently falling back to a default.
+    with pytest.raises(ws.UnsupportedError):
+        ws.vecrank(values, lags=2, trend="not_a_case")

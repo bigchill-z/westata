@@ -190,9 +190,11 @@ class VecRankResult:
 
         sample_start = self.lags + 1
         sample_end = sample_start + self.nobs - 1
-        # Stata names the deterministic specification on this line: "Trend: Constant",
-        # "Trend: Linear", "Trend: Restricted constant", "Trend: <none>".
-        trend_label = "Trend: Linear" if self.deterministic == "trend" else "Trend: Constant"
+        # Stata names the deterministic specification on this line. With all five labels measured,
+        # "Number" starts at column 42 for EVERY case -- a plain ljust(42). Round 137 inferred a
+        # centring formula and a special 41-column Linear case from two labels and one
+        # mistyped reference line; five labels settle it.
+        trend_label = _TREND_LABELS.get(self.deterministic, "Trend: Constant")
         lines = [
             "Johansen tests for cointegration",
             f"{trend_label:<42}Number of obs  = {self.nobs}",
@@ -220,20 +222,19 @@ class VecRankResult:
             #   eig/trace/crit  right-aligned to 40 / 52 / 62 minus that same shift
             #
             # The Params width is k + 5, not a constant: k=2 ends the field at 14 and k=3 at 15.
-            # Hard-coding 7 put every k=3 table one column out. And the LL is LEFT-aligned, which
-            # is what lets a short likelihood (the trend table drops a trailing zero: 1224.797
-            # against 1224.4562) start in the same column instead of right-aligning into it.
+            # Hard-coding 7 put every k=3 table one column out. The LL is RIGHT-ALIGNED to
+            # column 28 - shift; round 138 inferred "LEFT-aligned" from six rows whose likelihoods
+            # all happened to be nine characters wide, which hid the rule. With the five trend
+            # specifications the likelihoods are 8 or 9 characters (1217.468 vs 1224.4562) and
+            # both still END at 28, proving right alignment.
             #
             # Stata also STARTS the selected rank with "*" and prints "* selected rank" below the
             # rule. On a three-variable system: "     17.7528*    29.68".
-            # The SHIFT is the LARGER of two effects, which is what took several attempts:
-            #   * the Params FIELD is wider for more variables (k+5, so 7 at k=2 and 8 at k=3);
-            #   * a two- or three-digit VALUE also consumes a column.
-            # Taking only the first put every k=2 two-digit row (params=10) one column out;
-            # taking only the second put every k=3 row one column out. The max satisfies both,
-            # verified on all six reference rows.
-            params_width = 5 + self.equations
-            shift = max(params_width - 7, len(str(int(row.params))) - 1)
+            # The Params field is 7 columns plus one for each extra digit of the value. Stata
+            # right-aligns the value to column 14 for one digit and 15 for two; the following
+            # columns stay at their ABSOLUTE positions (28 / 40 / 52 / 62), so a wider Params
+            # value simply leaves one fewer space before the likelihood.
+            params_width = 7 + len(str(int(row.params))) - 1
             # EIGHT SIGNIFICANT FIGURES, not four decimals. "%.4f" happened to be right while
             # every likelihood was positive and four-digit (1132.9103) and wrong the moment a
             # three-variable system produced a negative one: Stata prints -628.85566, not
@@ -241,17 +242,17 @@ class VecRankResult:
             ll_text = _vecrank_significant(row.loglikelihood, 8)
 
             line = f"{row.rank:>7}{row.params:>{params_width}}"
-            line += " " * max(19 - shift - len(line), 0) + ll_text
-            # Only the LL start moves with the Params width. Every later field is at a FIXED end
-            # column -- measured: a k=3 row and a k=2 row of the same shape have identical
-            # eigenvalue/trace/critical positions (40 / 52 / 62), differing only in Params.
-            #
-            # The short final row has no trace or critical. Its eigenvalue ends one column in
-            # ONLY when the likelihood is nine characters wide: a k=2 short row (LL "1224.4562",
-            # 9 chars) puts eig at 39, while a k=3 short row (LL "-619.97925", 10 chars) puts it
-            # at 40, same as the full rows. The condition is the text width, not the row type.
-            extra = 1 if (row.rank >= self.equations and len(ll_text) == 9) else 0
-            line += " " * max(40 - extra - len(line) - len(eigenvalue), 0) + eigenvalue
+            # EVERY column has a FIXED end position: LL 28, eigenvalue 40, trace 52, critical 62.
+            # This is the rule that all five trend specifications and both k=2 and k=3 agree on.
+            # Round 138 inferred that the later columns moved with the Params width; that was an
+            # artefact of a left-aligned LL. With right alignment the Params field may widen by
+            # one column but the fields after it do not move at all.
+            line += " " * max(28 - len(line) - len(ll_text), 0) + ll_text
+            # Every later field is at a FIXED end column, minus the same shift: 40 (eigenvalue),
+            # 52 (trace), 62 (critical). Round 138's "extra" rule for short rows was an artefact of
+            # a left-aligned LL; with right alignment all five specifications put the short row's
+            # eigenvalue at 40 - shift.
+            line += " " * max(40 - len(line) - len(eigenvalue), 0) + eigenvalue
             if row.rank >= self.equations:
                 lines.append(line)
                 continue
@@ -294,13 +295,11 @@ class VecRankResult:
                 eigenvalue = (
                     "." if not np.isfinite(row.eigenvalue) else f"{row.eigenvalue:.5f}"
                 )
-                params_width = 5 + self.equations
-                shift = max(params_width - 7, len(str(int(row.params))) - 1)
+                params_width = 7 + len(str(int(row.params))) - 1
                 ll_text = _vecrank_significant(row.loglikelihood, 8)
                 line = f"{row.rank:>7}{row.params:>{params_width}}"
-                line += " " * max(19 - shift - len(line), 0) + ll_text
-                extra = 1 if (row.rank >= self.equations and len(ll_text) == 9) else 0
-                line += " " * max(40 - extra - len(line) - len(eigenvalue), 0) + eigenvalue
+                line += " " * max(28 - len(line) - len(ll_text), 0) + ll_text
+                line += " " * max(40 - len(line) - len(eigenvalue), 0) + eigenvalue
                 if row.rank < self.equations:
                     statistic_text = f"{row.maximum:.4f}"
                     line += " " * max(52 - len(line) - len(statistic_text), 0) + statistic_text
@@ -338,23 +337,72 @@ def _vecrank_significant(value: float, digits: int) -> str:
     return text
 
 
-def _deterministic_block(count: int, deterministic: str) -> np.ndarray:
-    """The deterministic columns the residualisations regress on.
+#: Johansen's five deterministic specifications. ``unrestricted`` is the number of deterministic
+#: columns regressed out of BOTH dY_t and Y_{t-1} (0, 1 for a constant, 2 for constant + trend).
+#: ``restricted`` is the term that belongs INSIDE the cointegrating relation and is appended to R1
+#: as an extra column before the canonical correlations -- NOT a different residualising block.
+#:
+#: Round 142 proved this by construction: two probes over all five cases, one with asymmetric
+#: residualising blocks (3 of 5 matched) and one with the augmented R1 (5 of 5 matched), against
+#: live `vecrank dinf unem, lags(2) trend(<case>)` on macro_swatson.dta.
+_DETERMINISTIC_CASES: dict[str, tuple[int, str | None]] = {
+    "none": (0, None),
+    "rconstant": (0, "constant"),
+    "constant": (1, None),
+    "rtrend": (1, "trend"),
+    "trend": (2, None),
+}
 
-    ``constant`` is a column of ones; ``trend`` adds a linear time trend inside the cointegrating
-    relation. Measured on macro_swatson.dta with ``vecrank dinf unem, lags(2)``:
+#: 5% trace critical values, per specification, in the same ascending "tail" order as the
+#: constant table. Measured from live runs at k=2 and k=3, which is enough for the three-variable
+#: guard; a larger system is refused rather than given invented thresholds.
+_TRACE_CRITICAL_TAILS: dict[str, tuple[float, ...]] = {
+    "none": (3.84, 12.53, 24.31),
+    "rconstant": (9.42, 19.96, 34.91),
+    "constant": (3.76, 15.41, 29.68),
+    "rtrend": (12.25, 25.32, 42.44),
+    "trend": (3.74, 18.17, 34.55),
+}
 
-        constant   eig .65664 / .04634   trace 183.0918 / 7.7811
-        trend      eig .65802 / .04550   trace 183.6114 / 7.6369
+#: The maximum-eigenvalue 5% critical tables use the SAME tail values but a different second
+#: entry for the restricted cases (9.24 vs 9.42, 12.52 vs 12.25). Measured from live
+#: `vecrank ..., max trend(<case>)` runs at k=2 and k=3. The k=3 entries here were measured,
+#: NOT extrapolated: an earlier draft of this line guessed 21.12/27.42/31.79 and was wrong on
+#: all three.
+_MAX_CRITICAL_TAILS: dict[str, tuple[float, ...]] = {
+    "none": (3.84, 11.44, 17.89),
+    "rconstant": (9.24, 15.67, 22.00),
+    "constant": (3.76, 14.07, 20.97),
+    "rtrend": (12.52, 18.96, 25.54),
+    "trend": (3.74, 16.87, 23.78),
+}
 
-    and adding the trend column reproduces the second row exactly -- so the whole difference between
-    the two specifications is this block, nothing else.
+#: Stata's "Trend:" label for each specification.
+_TREND_LABELS: dict[str, str] = {
+    "none": "Trend: <none>",
+    "rconstant": "Trend: Restricted constant",
+    "constant": "Trend: Constant",
+    "rtrend": "Trend: Restricted",
+    "trend": "Trend: Linear",
+}
+
+
+def _deterministic_block(count: int, deterministic: str) -> np.ndarray | None:
+    """The UNRESTRICTED deterministic columns regressed out of both residualisations.
+
+    ``None`` means no deterministic term at all (``trend(none)`` and ``trend(rconstant)``). For
+    ``rconstant``/``rtrend`` the restricted term is handled separately by ``_johansen_general``,
+    which appends it to R1 -- that asymmetry is what makes those two cases different, and why an
+    earlier attempt that only swapped the residualising block reproduced 3 of 5 cases, not 5.
     """
 
     steps = np.arange(1, count + 1, dtype=float).reshape(-1, 1)
-    if deterministic == "trend":
-        return np.column_stack([np.ones((count, 1)), steps])
-    return np.ones((count, 1))
+    unrestricted, _ = _DETERMINISTIC_CASES[deterministic]
+    if unrestricted == 0:
+        return None
+    if unrestricted == 1:
+        return np.ones((count, 1))
+    return np.column_stack([np.ones((count, 1)), steps])
 
 
 def _johansen_general(
@@ -390,9 +438,25 @@ def _johansen_general(
     level = values[rows]
     lag_blocks = [differences[rows - depth] for depth in range(1, lags)]
     det = _deterministic_block(count, deterministic)
-    common = np.column_stack([det] + lag_blocks) if lag_blocks else det
-    residual_r0 = response - common @ np.linalg.lstsq(common, response, rcond=None)[0]
-    residual_r1 = level - common @ np.linalg.lstsq(common, level, rcond=None)[0]
+    base_columns = ([det] if det is not None else []) + lag_blocks
+    common = np.column_stack(base_columns) if base_columns else None
+
+    def residualise(matrix: np.ndarray) -> np.ndarray:
+        if common is None:
+            return matrix
+        return matrix - common @ np.linalg.lstsq(common, matrix, rcond=None)[0]
+
+    residual_r0 = residualise(response)
+    residual_r1 = residualise(level)
+
+    # The RESTRICTED deterministic term belongs inside the cointegrating relation, so it is
+    # APPENDED to R1 as an extra pseudo-variable. This is the step that separates rconstant and
+    # rtrend from the symmetric cases. Verified on all five specifications.
+    _, restricted = _DETERMINISTIC_CASES[deterministic]
+    if restricted is not None:
+        steps = np.arange(1, count + 1, dtype=float).reshape(-1, 1)
+        term = np.ones((count, 1)) if restricted == "constant" else steps
+        residual_r1 = np.column_stack([residual_r1, residualise(term)])
     # Canonical correlations via QR + SVD rather than explicit covariance inverses.
     #
     # The covariance route is only safe while S11 is invertible. On a sample with a
@@ -409,6 +473,9 @@ def _johansen_general(
     singular_values = np.linalg.svd(basis_r0.T @ basis_r1, compute_uv=False)
     eigenvalues = np.sort(singular_values**2)[::-1]
     eigenvalues = np.clip(eigenvalues, 0.0, 1.0)
+    # An augmented R1 (restricted cases) has more columns than equations; only the first k
+    # canonical correlations are eigenvalues of the cointegrating system.
+    eigenvalues = eigenvalues[: values.shape[1]]
     trace = np.array(
         [
             -count * float(np.sum(np.log1p(-eigenvalues[rank:])))
@@ -436,16 +503,25 @@ def _johansen_lags_one(
     differences = values[1:] - values[:-1]
     count = differences.shape[0]
     det = _deterministic_block(count, deterministic)
-    residual_r0 = differences - det @ np.linalg.lstsq(det, differences, rcond=None)[0]
-    residual_r1 = lagged - det @ np.linalg.lstsq(det, lagged, rcond=None)[0]
-    s00 = residual_r0.T @ residual_r0 / count
-    s11 = residual_r1.T @ residual_r1 / count
-    s01 = residual_r0.T @ residual_r1 / count
-    matrix = (
-        np.linalg.inv(s00) @ s01 @ np.linalg.inv(s11) @ s01.T
-    )
-    eigenvalues = np.sort(np.real(np.linalg.eigvals(matrix)))[::-1]
-    eigenvalues = np.clip(eigenvalues, 0.0, 1.0)
+
+    def residualise(matrix: np.ndarray) -> np.ndarray:
+        if det is None:
+            return matrix
+        return matrix - det @ np.linalg.lstsq(det, matrix, rcond=None)[0]
+
+    residual_r0 = residualise(differences)
+    residual_r1 = residualise(lagged)
+    _, restricted = _DETERMINISTIC_CASES[deterministic]
+    if restricted is not None:
+        steps = np.arange(1, count + 1, dtype=float).reshape(-1, 1)
+        term = np.ones((count, 1)) if restricted == "constant" else steps
+        residual_r1 = np.column_stack([residual_r1, residualise(term)])
+    # QR + SVD, as in _johansen_general: an augmented R1 may have more columns than equations,
+    # and the covariance route needs an invertible S11 that it no longer has.
+    basis_r0, _ = np.linalg.qr(residual_r0, mode="reduced")
+    basis_r1, _ = np.linalg.qr(residual_r1, mode="reduced")
+    singular = np.linalg.svd(basis_r0.T @ basis_r1, compute_uv=False)
+    eigenvalues = np.clip(np.sort(singular**2)[::-1], 0.0, 1.0)[: values.shape[1]]
     trace = np.array(
         [
             -count * float(np.sum(np.log1p(-eigenvalues[rank:])))
@@ -485,24 +561,17 @@ def vecrank(
     if lags < 1:
         raise ValueError(f"vecrank: lags must be at least 1; got {lags}")
 
-    # ``trend(trend)`` puts a linear trend INSIDE the cointegrating relation, which is one extra
-    # column in the deterministic block. The eigenvalues and trace statistics then follow exactly
-    # (measured: .65802 / .04550 and 183.6114 / 7.6369 against Stata's identical figures), so only
-    # the deterministic block and the parameter counts differ between the two.
-    #
-    # ``rconstant``, ``rtrend`` and ``none`` are still refused: they change the critical values and
-    # the parameter count in ways this implementation does not yet reproduce, and a wrong critical
-    # value silently changes which rank is chosen.
+    # All five of Stata's trend() specifications are Johansen's five deterministic cases. The
+    # symmetric ones (none, constant, trend) only differ in how many columns are regressed out of
+    # both residualisations; the RESTRICTED ones (rconstant, rtrend) additionally put a term
+    # INSIDE the cointegrating relation by appending it to R1. Round 142 proved that construction
+    # against live Stata on all five cases, so the earlier refusal is lifted.
     normalized_trend = str(trend).strip().lower()
-    if normalized_trend in {"constant", "c"}:
-        deterministic = "constant"
-    elif normalized_trend == "trend":
-        deterministic = "trend"
-    else:
+    aliases = {"c": "constant", "rc": "rconstant", "rt": "rtrend", "n": "none"}
+    deterministic = aliases.get(normalized_trend, normalized_trend)
+    if deterministic not in _DETERMINISTIC_CASES:
         raise UnsupportedError(
-            "vecrank: trend(constant) and trend(trend) are implemented; "
-            f"got trend={trend!r}. The restricted variants (rconstant, rtrend) and none change "
-            "the critical values, which this implementation does not yet reproduce."
+            f"vecrank: unknown trend={trend!r}; use none, rconstant, constant, rtrend or trend"
         )
 
     from statsmodels.tsa.vector_ar.vecm import coint_johansen
@@ -537,25 +606,23 @@ def vecrank(
     # statistic IS that LR. Verified on the reference case: 1224.4562, 1220.5657, 1132.9103.
     full_ll = _unrestricted_loglikelihood(values, lags, deterministic)
 
-    if equations > len(_TRACE_CRITICAL_TAIL):
+    trace_table = _TRACE_CRITICAL_TAILS[deterministic]
+    max_table = _MAX_CRITICAL_TAILS[deterministic]
+    if equations > len(trace_table) or equations > len(max_table):
         raise UnsupportedError(
             f"vecrank: the 5% critical values are measured for up to "
-            f"{len(_TRACE_CRITICAL_TAIL)} variables; got {equations}. The larger-V tables "
-            "exist in Stata but have not been transcribed here, and inventing them would put "
-            "a made-up threshold beside a real statistic. Pass the values yourself or reduce "
-            "the system."
+            f"{min(len(trace_table), len(max_table))} variables; got {equations}. The larger-V "
+            "tables exist in Stata but have not been transcribed here, and inventing them would "
+            "put a made-up threshold beside a real statistic. Reduce the system."
         )
     # A k-variable system tests rank r against the (k - r)-th entry from the start of the
     # descending sequence, i.e. the last k entries of the tail read backwards.
     # rank 0 takes the LARGEST of the k values in play, then they descend: k=2 gives
     # rank0 = 15.41, rank1 = 3.76. The tail is stored ascending, so reverse the slice.
-    # The TREND case uses its own tabulation. Reusing the constant-case numbers would put a
-    # real statistic beside the wrong threshold, which changes which rank gets selected.
-    trace_table = (
-        _TRACE_CRITICAL_TAIL_TREND if deterministic == "trend" else _TRACE_CRITICAL_TAIL
-    )
+    # Each specification has its OWN tabulation; reusing the constant numbers would put a real
+    # statistic beside the wrong threshold and silently change which rank gets selected.
     critical_trace = tuple(reversed(trace_table[:equations]))
-    critical_max = tuple(reversed(_MAX_CRITICAL_TAIL[:equations]))
+    critical_max = tuple(reversed(max_table[:equations]))
     rows: list[VecRankRow] = []
     for rank in range(equations + 1):
         # Stata prints the eigenvalue on the row BELOW its trace statistic: rank 0's row
@@ -616,10 +683,20 @@ def _unrestricted_loglikelihood(
     observations = values.shape[0] - lags
     equations = values.shape[1]
     response = np.diff(values, axis=0)[lags - 1 :]
-    columns = [
-        _deterministic_block(observations, deterministic),
-        values[lags - 1 : len(values) - 1],
-    ]
+    # In the UNRESTRICTED (rank = k) VAR the restricted deterministic term is just another
+    # unrestricted column: it is a constant for rconstant and a trend for rtrend. So the number
+    # of deterministic columns here is unrestricted + n_restricted, NOT just unrestricted.
+    # Using only the unrestricted block gave full_ll 1217.468 for rconstant, which made rank 0's
+    # LL 1125.8841 against Stata's 1132.8723 -- a 7-unit error from a mis-specified full model.
+    unrestricted, restricted = _DETERMINISTIC_CASES[deterministic]
+    n_columns = unrestricted + (0 if restricted is None else 1)
+    steps = np.arange(1, observations + 1, dtype=float).reshape(-1, 1)
+    det_columns: list[np.ndarray] = []
+    if n_columns >= 1:
+        det_columns.append(np.ones((observations, 1)))
+    if n_columns >= 2:
+        det_columns.append(steps)
+    columns = det_columns + [values[lags - 1 : len(values) - 1]]
     differences = np.diff(values, axis=0)
     for depth in range(1, lags):
         low = lags - 1 - depth
@@ -643,27 +720,22 @@ def _parameter_counts(
     eigenvalues: np.ndarray,
     deterministic: str = "constant",
 ) -> list[int]:
-    """Stata's Params column: short-run parameters plus the cointegrating vectors.
+    """Stata's Params column for all five deterministic specifications.
 
-    For rank ``r``: ``lags * k**2`` short-run coefficients plus ``(k - r)``... the observed
-    values on the reference case are 6, 9, 10 for ranks 0, 1, 2 with k=2, lags=2 -- i.e.
-    ``k*(k*lags + 1) - r*(k - r)``.
+    Round 142 measured all five on macro_swatson (k=2, lags=2) and fitted ONE formula:
+
+        base    = k*(k*(lags-1)) + n_unrestricted*k
+        rank r  = base + r*(2k - r + n_restricted)
+
+    which gives 4/7/8 (none), 4/8/10 (rconstant), 6/9/10 (constant), 6/10/12 (rtrend) and
+    8/11/12 (trend). The restricted term adds ONE to the rank coefficient, not to the base --
+    that is the whole reason rconstant's second row is 8 where none's is 7.
     """
 
-    # Measured on the reference case (k=2, lags=2): 6, 9, 10. The k-equation VAR without a
-    # rank restriction has k*(k*lags + 1) = 10 free parameters, and restricting to rank r
-    # removes r*(k - r) of them, which gives 10 -> 9 -> 10 for r = 0, 1, 2.
-    # Measured on the reference case (k=2, lags=2): Params = 6, 9, 10 for ranks 0, 1, 2.
-    # The unrestricted part is the short-run block k*(k*(lags-1)) plus the k constants; each
-    # additional cointegrating vector contributes (2k - r) more parameters.
-    base = equations * (equations * (lags - 1)) + equations
-    # A trend inside the cointegrating relation costs one extra parameter PER EQUATION, on top of
-    # the constant each equation already carries. Measured on macro_swatson (k=2, lags=2):
-    #   constant  6 / 9 / 10        trend  8 / 11 / 12
-    # i.e. a uniform +2 = +k, not a change to the rank term.
-    if deterministic == "trend":
-        base += equations
+    unrestricted, restricted = _DETERMINISTIC_CASES[deterministic]
+    base = equations * (equations * (lags - 1)) + unrestricted * equations
+    n_restricted = 0 if restricted is None else 1
     counts: list[int] = []
     for rank in range(equations + 1):
-        counts.append(int(base + rank * (2 * equations - rank)))
+        counts.append(int(base + rank * (2 * equations - rank + n_restricted)))
     return counts

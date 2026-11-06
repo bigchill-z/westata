@@ -110,7 +110,7 @@ def test_lags_one_matches_stata(data) -> None:
         rank  Params           LL  Eigenvalue   statistic
            0       2    1075.5453                 172.5034
            1       5    1161.1598     .64575        1.2744
-           2       6    1161.7970     .00769
+           2       6     1161.797     .00769
 
     The earlier note blamed a different search space. The real cause was that
     statsmodels' ``k_ar_diff=0`` keeps one extra observation (N = 166 against Stata's 165),
@@ -125,4 +125,4 @@ def test_lags_one_matches_stata(data) -> None:
     assert "1.2744" in table
     assert "1075.5453" in table
     assert "1161.1598" in table
-    assert "1161.7970" in table
+    assert "1161.797" in table

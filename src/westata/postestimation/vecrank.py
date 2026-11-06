@@ -211,35 +211,90 @@ class VecRankResult:
             # adjusting a row and re-running is how three previous attempts each fixed one
             # line and broke another.
             #
-            #   rank  right-aligned to  7      params right-aligned to 14     (both fixed)
-            #   LL    LEFT-aligned from 19 - (params digits - 1)
-            #   eig, trace, crit  right-aligned to 40, 52, 62 minus that same shift
+            #   rank      right-aligned to 7
+            #   params    right-aligned to 7 + (k + 5)   -- the field widens with the system
+            #   LL        LEFT-aligned from 19 - (params digits - 1)
+            #   eig/trace/crit  right-aligned to 40 / 52 / 62 minus that same shift
             #
-            # The LL is left-aligned, which is what makes a SHORT likelihood text (the trend
-            # table drops a trailing zero: 1224.797 against 1224.4562) start in the same column
-            # rather than right-align into it. Treating every field as right-aligned is what
-            # produced a table that matched one row and broke the next.
-            shift = len(str(int(row.params))) - 1
-            ll_text = f"{row.loglikelihood:.4f}"
-            if self.deterministic == "trend" and "." in ll_text:
-                ll_text = ll_text.rstrip("0").rstrip(".")
+            # The Params width is k + 5, not a constant: k=2 ends the field at 14 and k=3 at 15.
+            # Hard-coding 7 put every k=3 table one column out. And the LL is LEFT-aligned, which
+            # is what lets a short likelihood (the trend table drops a trailing zero: 1224.797
+            # against 1224.4562) start in the same column instead of right-aligning into it.
+            #
+            # Stata also STARTS the selected rank with "*" and prints "* selected rank" below the
+            # rule. On a three-variable system: "     17.7528*    29.68".
+            # The SHIFT is the LARGER of two effects, which is what took several attempts:
+            #   * the Params FIELD is wider for more variables (k+5, so 7 at k=2 and 8 at k=3);
+            #   * a two- or three-digit VALUE also consumes a column.
+            # Taking only the first put every k=2 two-digit row (params=10) one column out;
+            # taking only the second put every k=3 row one column out. The max satisfies both,
+            # verified on all six reference rows.
+            params_width = 5 + self.equations
+            shift = max(params_width - 7, len(str(int(row.params))) - 1)
+            # EIGHT SIGNIFICANT FIGURES, not four decimals. "%.4f" happened to be right while
+            # every likelihood was positive and four-digit (1132.9103) and wrong the moment a
+            # three-variable system produced a negative one: Stata prints -628.85566, not
+            # -628.8557. Trailing zeros are then dropped, which is why 4500.724 shows seven.
+            ll_text = _vecrank_significant(row.loglikelihood, 8)
 
-            line = f"{row.rank:>7}{row.params:>7}"
+            line = f"{row.rank:>7}{row.params:>{params_width}}"
             line += " " * max(19 - shift - len(line), 0) + ll_text
-            # The short final row has no trace or critical; when its likelihood is also one
-            # character lighter, the eigenvalue moves in by one more.
-            extra = 1 if (row.rank >= self.equations and len(ll_text) < 9) else 0
-            line += " " * max(40 - shift - extra - len(line) - len(eigenvalue), 0) + eigenvalue
+            # Only the LL start moves with the Params width. Every later field is at a FIXED end
+            # column -- measured: a k=3 row and a k=2 row of the same shape have identical
+            # eigenvalue/trace/critical positions (40 / 52 / 62), differing only in Params.
+            #
+            # The short final row has no trace or critical. Its eigenvalue ends one column in
+            # ONLY when the likelihood is nine characters wide: a k=2 short row (LL "1224.4562",
+            # 9 chars) puts eig at 39, while a k=3 short row (LL "-619.97925", 10 chars) puts it
+            # at 40, same as the full rows. The condition is the text width, not the row type.
+            extra = 1 if (row.rank >= self.equations and len(ll_text) == 9) else 0
+            line += " " * max(40 - extra - len(line) - len(eigenvalue), 0) + eigenvalue
             if row.rank >= self.equations:
                 lines.append(line)
                 continue
             trace_text = f"{row.trace:.4f}"
-            line += " " * max(52 - shift - len(line) - len(trace_text), 0) + trace_text
+            # The star rides ON the trace field: it does not consume a column, so the field is
+            # padded using the WIDTH WITHOUT the star and the star is appended afterwards.
+            # Padding with it included pushed the critical value one column right (63 instead of
+            # Stata's 62) on exactly the row that carried the marker.
+            selected = row.rank == self.rank
+            line += " " * max(52 - len(line) - len(trace_text), 0) + trace_text
+            if selected:
+                line += "*"
             critical_text = f"{row.trace_critical:.2f}"
-            line += " " * max(62 - shift - len(line) - len(critical_text), 0) + critical_text
+            line += " " * max(62 - len(line) - len(critical_text), 0) + critical_text
             lines.append(line)
         lines.append("-" * 62)
+        if self.rank < self.equations:
+            lines.append("* selected rank")
         return "\n".join(lines)
+
+
+def _vecrank_significant(value: float, digits: int) -> str:
+    """Format ``value`` to ``digits`` significant figures, dropping trailing zeros.
+
+    Python's ``g`` presentation does NOT do this: it prints as many digits as the float carries
+    once they fit inside the requested precision, so ``f"{v:.9g}"`` on -628.855659 returns
+    "-628.855659" rather than a nine- or eight-digit form. Stata prints a fixed number of
+    significant figures, so the rounding has to be explicit.
+
+    Verified against live ``vecrank`` output, which uses EIGHT:
+
+        1132.9103   (8 sig figs, 4 decimals)
+        -628.85566  (8 sig figs, 5 decimals -- the failure "%.4f" produced as -628.8557)
+        4500.724    (8 sig figs, trailing zero dropped, so seven digits show)
+    """
+
+    from decimal import Decimal, ROUND_HALF_UP
+
+    number = Decimal(repr(float(value)))
+    if number == 0:
+        return "0"
+    quantum = Decimal(1).scaleb(number.adjusted() - (digits - 1))
+    text = format(number.quantize(quantum, rounding=ROUND_HALF_UP), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
 
 
 def _deterministic_block(count: int, deterministic: str) -> np.ndarray:

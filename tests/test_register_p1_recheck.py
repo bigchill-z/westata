@@ -62,3 +62,14 @@ def test_the_extension_recheck_records_the_honest_gaps() -> None:
     assert "e(sample)" in section
     assert "varstable" in section
     assert "不刷分" in section
+
+
+def test_the_three_terminal_states_are_recorded() -> None:
+    """Round 149's classification: do not re-run the dfgls-style rebuild on class A."""
+
+    text = REGISTER.read_text(encoding="utf-8")
+    assert "3.6.3 剩余缺口的三种终结状态" in text
+    section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
+    for item in ("二进制 Mata", "本环境无参照", "rddensity", "xtserial", "dfgls", "rcm", "rdrobust"):
+        assert item in section, item
+    assert "反编译" in section

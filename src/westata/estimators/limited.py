@@ -2008,6 +2008,17 @@ class Heckman:
             # Verified: the fixture prints rho .2849988, sigma 1.003876,
             # lambda .2861034, and the product is .2861035.
             "lambda": float(rho * sigma),
+            # Stata stores the standard error under "selambda" -- no underscore. Without it a
+            # caller porting e(selambda) from the manual reads None.
+            #
+            # Verified against ``heckman ..., twostep`` on grilic: Stata reports
+            #   e(lambda) -0.17237340   e(selambda) 0.09466295
+            # and ours is -0.17237339 / .09466297 -- the two agree to every printed digit.
+            #
+            # The index is k_beta (lambda is the LAST outcome-equation coefficient here) and the
+            # variance is a diagonal entry of the sandwich built above. Round 64's three failed
+            # attempts all patched _fit_ml, which plain heckman never reaches.
+            "selambda": float(np.sqrt(max(float(covariance[names.index("lambda"), names.index("lambda")]), 0.0))),
             "lam_coef": lam_coef,
             "estimator": "twostep",
             "vce": "twostep",

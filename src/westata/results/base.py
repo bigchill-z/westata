@@ -1254,6 +1254,47 @@ class StataResults:
             "pass exog=... explicitly"
         )
 
+    # ------------------------------------------------------------------
+    # statsmodels ecosystem surface (v2 report section 6)
+    # ------------------------------------------------------------------
+    @property
+    def model(self) -> Any:
+        """The fitted model, as statsmodels exposes it.
+
+        ``statsmodels.stats.anova.anova_lm`` reads ``res.model`` and re-fits from it, so its
+        absence made ``anova_lm(westata_result)`` raise AttributeError. The object returned
+        here carries ``endog``, ``exog``, ``exog_names`` and a ``fit()`` that returns this
+        same result -- enough for anova_lm's contract without pretending to BE a
+        statsmodels model.
+        """
+
+        from westata.results.ecosystem import ResultModel
+
+        return ResultModel(self)
+
+    def t_test(self, r_matrix: Any, cov_p: Any = None, use_t: bool | None = None) -> Any:
+        """statsmodels' ``t_test``: a single restriction reported as a t statistic."""
+
+        from westata.results.ecosystem import build_contrast
+
+        return build_contrast(self, r_matrix, use_t=True if use_t is None else use_t)
+
+    def f_test(
+        self, r_matrix: Any, cov_p: Any = None, invcov: Any = None
+    ) -> Any:
+        """statsmodels' ``f_test``: one or more restrictions reported jointly as F."""
+
+        from westata.results.ecosystem import build_contrast
+
+        return build_contrast(self, r_matrix, use_t=False)
+
+    def get_influence(self) -> Any:
+        """Influence measures, named as statsmodels' ``OLSInfluence`` names them."""
+
+        from westata.results.ecosystem import influence_measures
+
+        return influence_measures(self)
+
     def wald_test(self, R: Any, q: Any = None, scalar: bool = True) -> Any:
         """statsmodels-compatible joint Wald test.
 

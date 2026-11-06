@@ -40,6 +40,32 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 17 轮）：全量验证与状态汇总
+
+**4466 passed, 3 skipped, 0 failed**——第 1–16 轮的全部改动无回归。
+
+| 项目 | 类型 | 状态 |
+|---|---|---|
+| P0-1 面板聚类 SE | 缺陷 | ✅ `(n,1)` 形态修复，四种输入形式均精确 |
+| P0-2 `ovtest, rhs` 哑变量 | 缺陷 | ✅ `F(11,741)=5.21` → `F(9,743)=2.03` |
+| P0-3 `margins atmeans` fweight | 缺陷 | ✅ 五个均值与两个 MEM 逐字符一致 |
+| P0-4 `dfgls` tau | 缺陷 | ⛔ 需 `dfgls.ado`（内置命令，两路径均无）|
+| P1 `vecrank` 缺最后一阶 | 缺陷 | ✅ 经核实**非缺陷**（Stata 本身留空）|
+| P1 `vecrank trend(trend)` | 选项 | ⛔ 需 `vecrank.ado` 内部常数 |
+| P1 `psmatch caliper()` | 选项 | ✅ 并纠正了我自己的误判（语法用错，非环境问题）|
+| P1 `psmatch nn(k)` | 缺陷 | ✅ 容差 1e-6 → 1e-9，`nn(1)`–`nn(5)` 全部精确 |
+| P1 `prais, corc` | 选项 | ✅ 系数 8 位、`rho` 1e-6 内一致 |
+| P1 `margins dydx('*')` | 选项 | ✅ 逐字符一致 |
+| P1 第一阶段回归表 | 输出缺失 | ✅ `result.first_stage()`，14/14 行一致 |
+| P1 `esttab` / `mtitle` | 输出缺失 | ✅ `ws.etable_as_stata()`，12/12 行一致 |
+| P1 `xtreg, mle` | 命令缺失 | ✅ llf 精确到 9 位有效数字 |
+| §7.3 RD 带宽选择器 | 工程任务 | ⚠ 取得完整算法与两项精确辅助，**未接入**（差 6 倍，不发布）|
+| §7.3 AI-robust 方差 | 工程任务 | ⛔ 需 `lrdrobust.mlib` 中的 `rdrobust_vce` |
+| `vecrank` 3 变量统计量 | 缺陷 | ⚠ QR+SVD 改善了病态，**仍差 15%** |
+| `synth` / `synth2` | 整章 | ⛔ 6 类途径已穷尽 |
+
+**11 项修复，3 项需编译源码，2 项部分完成并如实标注。**
+
 ### v2 报告（第 14 轮）：`vecrank` 三变量统计量——尝试自建 Johansen，未成功
 
 第 13 轮修好临界值后，3 变量的**统计量**仍错（`trace nan / 41.6130 / 5.2920` vs Stata `35.2070 / 3.6149 / 0.0000`，最大特征值 `3.63428` > 1）。本轮尝试用 **QR + Cholesky 白化**绕开 statsmodels 的病态求逆。

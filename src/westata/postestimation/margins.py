@@ -1019,6 +1019,30 @@ def margins(
         )
         return _finish_margins(rows, result)
     requested = [dydx] if isinstance(dydx, str) else list(dydx)
+    # ``dydx(*)`` means EVERY covariate, which in Stata is every parameter except the
+    # constant: a live ``margins, dydx(*)`` after ``regress y k l`` reports
+    # "dy/dx wrt:  k l". Passing '*' straight to the resolver raised
+    # ``KeyError: column '*' not in [...]``, which does not tell the caller that the
+    # wildcard exists at all.
+    if "*" in requested:
+        # The constant is excluded by name: patsy spells it "Intercept", and an explicit
+        # "_cons" column appears in designs built without patsy.
+        everything = [
+            str(name)
+            for name in names
+            if str(name) not in ("Intercept", "_cons", "const")
+        ]
+        if len(requested) == 1:
+            requested = everything
+        else:
+            # A mixed list such as ['*', 'x1'] names x1 twice; Stata prints each
+            # covariate once, so the wildcard is expanded and duplicates collapse.
+            expanded: list[str] = []
+            for entry in requested:
+                for name in everything if entry == "*" else [entry]:
+                    if name not in expanded:
+                        expanded.append(name)
+            requested = expanded
     rows = _marginal_effects(
         result,
         exog,

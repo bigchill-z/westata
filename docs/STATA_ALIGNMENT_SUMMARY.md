@@ -40,6 +40,20 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 5 轮）：`ivregress ..., first` 第一阶段回归表已实现
+
+报告 C10-01 说缺第一阶段回归表——**准确**。此前只有 `estat firststage`（**诊断**：R²、偏 R²、工具变量 F），没有 `, first`（**方程**：系数、标准误、t、区间）。Stata 两者都有且不可互相替代，所以新增 `result.first_stage()` 与既有的 `result.estat_firststage()` 并列。
+
+`grilic` 上 `ivregress 2sls lnw s expr (tenure = rns smsa), first` 的 **14 行全部逐字符一致**（`F(4, 753) = 11.15`、`R-squared 0.0559`，五个系数行含 `_cons`）。
+
+三个踩过的坑：
+
+1. 数字格式必须复用 `results.summary` 中**已验证**的 `%9.0g` 实现。自写的 `.7g` 把 `.0006668274` 打了出来——**7 位有效数字**与 **7 位小数**不是一回事。
+2. 统计块与系数表的排版**不同**：每个标签从第 56 列开始、`=` 落在第 70 列，且 R-squared/Adj R-squared/Root MSE 用**4 位小数并保留前导零**（`0.0559`），与下方单元格的 `.0559` 风格相反。
+3. 常数项经 patsy 传进来叫 `Intercept`，Stata 打印 `_cons`。
+
+数据取自 `result.iv_structure`（`IV2SLS.fit` 早已为 `estat firststage` 挂上），因此两个输出**不可能对设计矩阵产生分歧**。
+
 ### v2 报告（第 4 轮）：`margins, dydx(*)` 已实现
 
 报告 P1 / C11-03 说缺通配形式——**准确**。`dydx=['*']` 原先抛 `KeyError: column '*' not in [...]`，该报错完全没有提示通配符是存在的。

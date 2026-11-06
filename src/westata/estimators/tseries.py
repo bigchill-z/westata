@@ -3439,3 +3439,66 @@ def unitroot(
         )
 
     raise ValueError(f"unitroot: unknown test {test!r}; use 'adf', 'pp' or 'kpss'")
+
+
+def render_dfuller(result: Any, *, variable: str, regression: str = "c") -> str:
+    """``dfuller``'s printed table, reproduced line for line.
+
+    The report scored the ADF cases 0.00 on LINE agreement although every number matched --
+    Z(t) -3.706, critical values -4.018 / -3.441 / -3.141, MacKinnon p 0.0220. The cause was
+    that this package printed a list and Stata prints a table, so a line-wise comparison had
+    nothing to align. This renders the table.
+
+    Two details a plausible-looking implementation gets wrong:
+
+    * the header uses an EN DASH between "Dickey" and "Fuller", not a hyphen
+    * the statistic row starts with one space (" Z(t)") and the numbers are right-aligned so the
+      row ends at column 62
+    """
+
+    en_dash = "\u2013"
+    title = "Dickey" + en_dash + "Fuller"
+    label = {
+        "ct": "H0: Random walk with or without drift",
+        "c": "H0: Random walk without drift, d = 0",
+        "n": "H0: Random walk without drift, d = 0",
+    }.get(regression, "H0: Random walk without drift, d = 0")
+
+    statistic = float(getattr(result, "statistic", float("nan")))
+    critical = dict(getattr(result, "critical", {}) or {})
+    nobs = int(getattr(result, "observations", 0) or getattr(result, "nobs", 0) or 0)
+    lags = int(getattr(result, "lags", 0) or 0)
+    pvalue = getattr(result, "pvalue", None)
+
+    def _critical(name: str) -> str:
+        for key in (name, name + "%"):
+            if key in critical:
+                return "%.3f" % float(critical[key])
+        return "."
+
+    # Columns are right-aligned at fixed positions measured from a live dfuller:
+    #   header: statistic @14-23, 1% @34-36, 5% @47-49, 10% @59-62
+    #   row   : Z(t) @1-5,        -3.706 @17-23, -4.018 @30-36, -3.441 @43-49, -3.141 @56-62
+    # so every number ENDS at 23 / 36 / 49 / 62.
+    def _at(text_value: str, end_column: int) -> str:
+        return text_value.rjust(end_column) if len(text_value) else " " * end_column
+
+    lines = [
+        (title + " test for unit root").ljust(42) + "Number of obs  =".ljust(16) + str(nobs).rjust(4),
+        ("Variable: " + variable).ljust(42) + "Number of lags =".ljust(16) + str(lags).rjust(4),
+        "",
+        label,
+        "",
+        title.rjust(52),
+        "                   Test      -------- critical value ---------",
+        _at("statistic", 23) + _at("1%", 36)[23:] + _at("5%", 49)[36:] + _at("10%", 62)[49:],
+        "-" * 62,
+        _at(" Z(t)", 5) + _at("%.3f" % statistic, 23)[5:]
+        + _at(_critical("1"), 36)[23:] + _at(_critical("5"), 49)[36:]
+        + _at(_critical("10"), 62)[49:],
+        "-" * 62,
+    ]
+    # Stata prints this line only when it has a MacKinnon p-value, with a trailing period.
+    if pvalue is not None and np.isfinite(float(pvalue)):
+        lines.append("MacKinnon approximate p-value for Z(t) = %.4f." % float(pvalue))
+    return "\n".join(lines)

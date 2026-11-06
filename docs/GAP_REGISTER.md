@@ -174,13 +174,31 @@
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `teffects psmatch` / `ipwra` | ⬜ | 倾向得分匹配 / 加权回归调整 |
+| `teffects psmatch` / `ipwra` | ⚠️ 点估计精确、推断为空 | ATET 2639.865 与 Stata 精确一致；`se`/`z`/`p`/CI 为 NaN 并带 `variance_matches_stata=False`。见 §3.6.1 |
 | `didregress` 多期交错 | ⬜ | 仅做标准 2×2 |
 | `stteffects` | ⬜ | 生存处理效应 |
 | `csdid`、`drdid` | ❌ | 用户包，不在 base |
 | `rdrobust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
 | `synth` / `synth2` | ❌ | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；受阻于 `.mlib` 中的嵌套优化器 |
 | `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `teffects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
+
+#### 3.6.1 报告 P1 清单实测复核（第 144–145 轮）
+
+报告 §7 / 第 620–628 行的 P1 清单是 **0.1.0 时的快照**，多项已被修复但未回写。逐项复核：
+
+| 报告条目 | 报告描述 | 当前实测 |
+|---|---|---|
+| C16-01/02/03 | `rdrobust` 无自动带宽、无 `covs` | **`covs()` 已支持且精确**；仅自动带宽仍明确拒绝（五种构造 10–15% 偏离，其中一种「吻合」已证伪为均值假象） |
+| C15-03 | `psmatch` 无 `caliper` | **`caliper=` 已支持** |
+| C15-01/02 | `psmatch`/`ra`/`nnmatch` 无方差 | 属实且**有意**：三者 `se`/`p`/CI 均为 NaN，`variance_matches_stata=False`。不猜测 AI-robust 方差 |
+| C14-05 | `vecrank` 只支持 `trend(constant)` | **五个 `trend()` 选项全部实现**，k=2/k=3、trace/max 表逐字节匹配 Stata（第 142–143 轮） |
+| C12-05 | `xtreg, mle` 缺失 | **`RandomEffectsMLE` 已实现**，三个方差分量与 Stata 一致（第 112 轮） |
+| C12-11 | `xtserial` 缺失 | **本环境仍无 ado、Stata 报 r(111)/r(199)，无参照可验证**，保持拒绝 |
+| C08-05 | `prais, corc` 缺失 | **`corc=` 已实现**，与 Stata 一样在 icecream.dta 上不收敛且 rho 差 0.005%（第 111 轮） |
+| C13-06 | `irf create` / `.irf` 体系缺失 | **OIRF/FEVD/irf_table 数值早已验证**；第 144 轮新增 `irf_create()` 写出 23 列 `.dta`，5 个数值列与 Stata 精确一致。**限制**：`pandas.to_stata` 无法写 `_dta[]` characteristics，故 Stata 的 `irf table` 仍读不了（r(498)），是数值导出而非 drop-in `.irf` set |
+| C18-01/02 | `synth`/`synth2` 整章缺失 | **仍缺**；但 `synth.ado` 931 行可读，受阻于二进制 `.mlib` 中的嵌套优化器 |
+
+**使用说明**：报告第 620–628 行的 P1 清单与附录评分表（多处 0.00）**不能当作工单**。第 127–135 轮审计发现 12 个 0.00 分项实际存在且数值正确，多为入口名不同（`dfuller`→已补别名）或接口形态差异。
 
 ### 3.7 复杂抽样
 

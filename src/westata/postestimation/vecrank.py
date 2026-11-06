@@ -69,6 +69,23 @@ _MAX_CRITICAL: dict[int, tuple[float, ...]] = {
     0: (14.07, 3.76),
 }
 
+#: The Osterwald-Lenum tables give ONE value per rank, and for the constant case the sequence is
+#: the same for every k -- what changes is where a system starts inside it. Measured from live
+#: ``vecrank ..., lags(2) max trend(constant)`` runs over macro_swatson:
+#:
+#:   k=2: rank0 = 15.41, rank1 = 3.76                  -> the last two entries
+#:   k=3: rank0 = 29.68, rank1 = 15.41, rank2 = 3.76   -> the last three
+#:
+#: So a k-variable system reads ``_TRACE_CRITICAL_TAIL[k - 1 - rank]``. Indexing the old
+#: two-entry dict by rank printed 15.41 on row 0 of a two-variable system (correct) and then ran
+#: off the end, which is why a three-variable system reported ``nan`` as its rank-0 value.
+#:
+#: ONLY the first three entries are measured here. Stata's own table continues upward for more
+#: variables, but inventing those numbers would be worse than reporting that they are unknown,
+#: so a system with more than three is REFUSED rather than given a made-up critical value.
+_TRACE_CRITICAL_TAIL: tuple[float, ...] = (3.76, 15.41, 29.68)
+_MAX_CRITICAL_TAIL: tuple[float, ...] = (3.76, 14.07, 20.97)
+
 
 @dataclass(frozen=True)
 class VecRankRow:
@@ -248,8 +265,20 @@ def vecrank(
     # statistic IS that LR. Verified on the reference case: 1224.4562, 1220.5657, 1132.9103.
     full_ll = _unrestricted_loglikelihood(values, lags)
 
-    critical_trace = _TRACE_CRITICAL[0]
-    critical_max = _MAX_CRITICAL[0]
+    if equations > len(_TRACE_CRITICAL_TAIL):
+        raise UnsupportedError(
+            f"vecrank: the 5% critical values are measured for up to "
+            f"{len(_TRACE_CRITICAL_TAIL)} variables; got {equations}. The larger-V tables "
+            "exist in Stata but have not been transcribed here, and inventing them would put "
+            "a made-up threshold beside a real statistic. Pass the values yourself or reduce "
+            "the system."
+        )
+    # A k-variable system tests rank r against the (k - r)-th entry from the start of the
+    # descending sequence, i.e. the last k entries of the tail read backwards.
+    # rank 0 takes the LARGEST of the k values in play, then they descend: k=2 gives
+    # rank0 = 15.41, rank1 = 3.76. The tail is stored ascending, so reverse the slice.
+    critical_trace = tuple(reversed(_TRACE_CRITICAL_TAIL[:equations]))
+    critical_max = tuple(reversed(_MAX_CRITICAL_TAIL[:equations]))
     rows: list[VecRankRow] = []
     for rank in range(equations + 1):
         # Stata prints the eigenvalue on the row BELOW its trace statistic: rank 0's row

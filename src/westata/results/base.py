@@ -850,6 +850,39 @@ class StataResults:
         return self._fittedvalues
 
     @property
+    def resid_series(self) -> pd.Series:
+        """The residuals with the ESTIMATION SAMPLE's index attached.
+
+        v2 report section 6 wants ``resid`` itself to be a Series, as statsmodels returns it.
+        Replacing the attribute would break positional access -- round 19 measured that cost on
+        ``beta`` with a KeyError from an existing test -- so the labelled form is a separate
+        name, exactly as ``beta_labelled`` is.
+
+        Falls back to a default RangeIndex when the fit did not retain the observation index,
+        which is honest: the numbers are still there, and the index says only "row i".
+        """
+
+        values = np.asarray(self._resid, dtype=float).reshape(-1)
+        index = self._observation_index(values.size)
+        return pd.Series(values, index=index, name="resid")
+
+    @property
+    def fitted_series(self) -> pd.Series:
+        """The fitted values with the estimation sample's index attached; see ``resid_series``."""
+
+        values = np.asarray(self._fittedvalues, dtype=float).reshape(-1)
+        index = self._observation_index(values.size)
+        return pd.Series(values, index=index, name="fittedvalues")
+
+    def _observation_index(self, size: int) -> Any:
+        """The row labels of the estimation sample, or ``range(size)`` when unavailable."""
+
+        data = getattr(self, "model_data", None)
+        if isinstance(data, pd.DataFrame) and len(data) == size:
+            return data.index
+        return pd.RangeIndex(size)
+
+    @property
     def cov(self) -> np.ndarray:
         return self._cov
 

@@ -512,13 +512,12 @@ Dataset: `panel` — 1600 observations on the Stata side.
 > Conditional Poisson: only slopes compare.
 
 
-    "",
-    "### Why some observation counts differ",
-    "",
-    "Some rows above show a different `N` on each side. None is a mistake, and each is one of three",
-    "things:",
-    "",
-    "| Command | Stata `e(N)` | westata `nobs` |
+### Why some observation counts differ
+
+Some rows above show a different `N` on each side. None is a mistake, and each is one of three
+things:
+
+| Command | Stata `e(N)` | westata `nobs` |
 |---|---|---|
 | `xtreg, be` | 1600 | 200 |
 | `tobit` | 74 | 69 |
@@ -526,21 +525,21 @@ Dataset: `panel` — 1600 observations on the Stata side.
 | `sureg vce(robust)` | 74 | 148 |
 | `heckman twostep` | 600 | 354 |
 | `xtlogit, fe` | 1600 | 1488 |
-| `xtpoisson, fe` | 1600 | 1592 |",
-    "",
-    "1. **What `e(N)` counts.** `sureg` is a system: Stata reports the *per-equation* sample size,",
-    "   westata the length of the stacked residual vector (equations x rows), which is what its result",
-    "   object validates `nobs` against. Two equations on 74 rows give 74 and 148.",
-    "2. **Missing values are dropped.** `tobit` on `rep78` loses the 5 observations where `rep78` is",
-    "   missing, so the estimation sample is 69, while Stata's `e(N)` still reports 74.",
-    "3. **Conditioning and collapsing.** `xtlogit, fe` and `xtpoisson, fe` condition out entities whose",
-    "   outcome never varies; `xtreg, be` collapses to one observation per entity. We report the rows that",
-    "   survived, Stata the rows that entered.",
-    "",
-    "In every case the coefficients and standard errors agree to the precision shown in the table above,",
-    "which is the check that matters. The counts are listed because a silent 148-versus-74 would read as",
-    "a defect.",
-    "",
+| `xtpoisson, fe` | 1600 | 1592 |
+
+1. **What `e(N)` counts.** `sureg` is a system: Stata reports the *per-equation* sample size,
+   westata the length of the stacked residual vector (equations x rows), which is what its result
+   object validates `nobs` against. Two equations on 74 rows give 74 and 148.
+2. **Missing values are dropped.** `tobit` on `rep78` loses the 5 observations where `rep78` is
+   missing, so the estimation sample is 69, while Stata's `e(N)` still reports 74.
+3. **Conditioning and collapsing.** `xtlogit, fe` and `xtpoisson, fe` condition out entities whose
+   outcome never varies; `xtreg, be` collapses to one observation per entity. We report the rows
+   that survived, Stata the rows that entered.
+
+In every case the coefficients and standard errors agree to the precision shown in the table
+above, which is the check that matters. The counts are listed because a silent 148-versus-74
+would read as a defect.
+
 ## Known deviations
 
 Three kinds of difference exist in the tables above, and they are not the same thing.

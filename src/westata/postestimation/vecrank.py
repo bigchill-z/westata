@@ -86,6 +86,14 @@ _MAX_CRITICAL: dict[int, tuple[float, ...]] = {
 _TRACE_CRITICAL_TAIL: tuple[float, ...] = (3.76, 15.41, 29.68)
 _MAX_CRITICAL_TAIL: tuple[float, ...] = (3.76, 14.07, 20.97)
 
+#: The same tables for trend(trend). The trend case uses a DIFFERENT Osterwald-Lenum
+#: tabulation, so reusing the constant-case numbers silently changes which rank gets chosen.
+#: Measured from live runs on macro_swatson, two and three variables:
+#:
+#:   k=2: rank0 = 18.17, rank1 = 3.74
+#:   k=3: rank0 = 34.55, rank1 = 18.17, rank2 = 3.74
+_TRACE_CRITICAL_TAIL_TREND: tuple[float, ...] = (3.74, 18.17, 34.55)
+
 
 @dataclass(frozen=True)
 class VecRankRow:
@@ -109,6 +117,9 @@ class VecRankResult:
     nobs: int
     lags: int
     equations: int
+    #: "constant" or "trend" -- decides the Trend: line and, more importantly, which
+    #: critical-value table the rows were built from.
+    deterministic: str = "constant"
 
     @property
     def rank(self) -> int:
@@ -176,9 +187,12 @@ class VecRankResult:
 
         sample_start = self.lags + 1
         sample_end = sample_start + self.nobs - 1
+        # Stata names the deterministic specification on this line: "Trend: Constant",
+        # "Trend: Linear", "Trend: Restricted constant", "Trend: <none>".
+        trend_label = "Trend: Linear" if self.deterministic == "trend" else "Trend: Constant"
         lines = [
             "Johansen tests for cointegration",
-            f"Trend: Constant                           Number of obs  = {self.nobs}",
+            f"{trend_label:<42}Number of obs  = {self.nobs}",
             f"Sample: {sample_start} thru {sample_end}".ljust(42)
             + f"Number of lags = {self.lags:>3}",
             "-" * 62,
@@ -208,7 +222,28 @@ class VecRankResult:
         return "\n".join(lines)
 
 
-def _johansen_general(values: np.ndarray, lags: int) -> tuple[np.ndarray, np.ndarray]:
+def _deterministic_block(count: int, deterministic: str) -> np.ndarray:
+    """The deterministic columns the residualisations regress on.
+
+    ``constant`` is a column of ones; ``trend`` adds a linear time trend inside the cointegrating
+    relation. Measured on macro_swatson.dta with ``vecrank dinf unem, lags(2)``:
+
+        constant   eig .65664 / .04634   trace 183.0918 / 7.7811
+        trend      eig .65802 / .04550   trace 183.6114 / 7.6369
+
+    and adding the trend column reproduces the second row exactly -- so the whole difference between
+    the two specifications is this block, nothing else.
+    """
+
+    steps = np.arange(1, count + 1, dtype=float).reshape(-1, 1)
+    if deterministic == "trend":
+        return np.column_stack([np.ones((count, 1)), steps])
+    return np.ones((count, 1))
+
+
+def _johansen_general(
+    values: np.ndarray, lags: int, deterministic: str = "constant"
+) -> tuple[np.ndarray, np.ndarray]:
     """Eigenvalues and trace statistics for a VAR of order ``lags`` (1 or 2).
 
     The construction that round 14 got wrong, and the one-line reason it was wrong: the
@@ -238,11 +273,8 @@ def _johansen_general(values: np.ndarray, lags: int) -> tuple[np.ndarray, np.nda
     response = differences[rows]
     level = values[rows]
     lag_blocks = [differences[rows - depth] for depth in range(1, lags)]
-    common = (
-        np.column_stack([np.ones((count, 1))] + lag_blocks)
-        if lag_blocks
-        else np.ones((count, 1))
-    )
+    det = _deterministic_block(count, deterministic)
+    common = np.column_stack([det] + lag_blocks) if lag_blocks else det
     residual_r0 = response - common @ np.linalg.lstsq(common, response, rcond=None)[0]
     residual_r1 = level - common @ np.linalg.lstsq(common, level, rcond=None)[0]
     # Canonical correlations via QR + SVD rather than explicit covariance inverses.
@@ -270,7 +302,9 @@ def _johansen_general(values: np.ndarray, lags: int) -> tuple[np.ndarray, np.nda
     return eigenvalues, trace
 
 
-def _johansen_lags_one(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _johansen_lags_one(
+    values: np.ndarray, deterministic: str = "constant"
+) -> tuple[np.ndarray, np.ndarray]:
     """Eigenvalues and trace statistics for ``vecrank, lags(1)``.
 
     At one lag the VAR has Y_{t-1} on the right and NO lagged differences, so the reduced-rank
@@ -285,9 +319,9 @@ def _johansen_lags_one(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     lagged = values[:-1]
     differences = values[1:] - values[:-1]
     count = differences.shape[0]
-    ones = np.ones((count, 1))
-    residual_r0 = differences - ones @ np.linalg.lstsq(ones, differences, rcond=None)[0]
-    residual_r1 = lagged - ones @ np.linalg.lstsq(ones, lagged, rcond=None)[0]
+    det = _deterministic_block(count, deterministic)
+    residual_r0 = differences - det @ np.linalg.lstsq(det, differences, rcond=None)[0]
+    residual_r1 = lagged - det @ np.linalg.lstsq(det, lagged, rcond=None)[0]
     s00 = residual_r0.T @ residual_r0 / count
     s11 = residual_r1.T @ residual_r1 / count
     s01 = residual_r0.T @ residual_r1 / count
@@ -330,9 +364,24 @@ def vecrank(
     if lags < 1:
         raise ValueError(f"vecrank: lags must be at least 1; got {lags}")
 
-    if str(trend).strip().lower() not in {"constant", "c"}:
+    # ``trend(trend)`` puts a linear trend INSIDE the cointegrating relation, which is one extra
+    # column in the deterministic block. The eigenvalues and trace statistics then follow exactly
+    # (measured: .65802 / .04550 and 183.6114 / 7.6369 against Stata's identical figures), so only
+    # the deterministic block and the parameter counts differ between the two.
+    #
+    # ``rconstant``, ``rtrend`` and ``none`` are still refused: they change the critical values and
+    # the parameter count in ways this implementation does not yet reproduce, and a wrong critical
+    # value silently changes which rank is chosen.
+    normalized_trend = str(trend).strip().lower()
+    if normalized_trend in {"constant", "c"}:
+        deterministic = "constant"
+    elif normalized_trend == "trend":
+        deterministic = "trend"
+    else:
         raise UnsupportedError(
-            f"vecrank: only trend(constant) is implemented; got trend={trend!r}"
+            "vecrank: trend(constant) and trend(trend) are implemented; "
+            f"got trend={trend!r}. The restricted variants (rconstant, rtrend) and none change "
+            "the critical values, which this implementation does not yet reproduce."
         )
 
     from statsmodels.tsa.vector_ar.vecm import coint_johansen
@@ -349,23 +398,23 @@ def vecrank(
     #     R1 = resid of Y_{t-1} on [1]
     #     solve  |S01 S11^-1 S10 - lam S00| = 0,  trace_r = -T * sum_{i>r} ln(1 - lam_i)
     if lags == 1:
-        eigenvalues, trace = _johansen_lags_one(values)
+        eigenvalues, trace = _johansen_lags_one(values, deterministic)
     else:
         # Computed here rather than delegated to statsmodels: both agree on a two-variable
         # system, but statsmodels loses numerical control when the series are nearly
         # dependent (inf/unem/dinf gives a largest eigenvalue of 3.6, which cannot be a
         # canonical correlation). The direct construction is exact for lags 1 and 2 on the
         # reference data; see _johansen_general.
-        eigenvalues, trace = _johansen_general(values, lags)
+        eigenvalues, trace = _johansen_general(values, lags, deterministic)
 
     # ``vecrank`` reports N = rows - lags, matching the VAR it would have fitted.
     nobs = int(values.shape[0] - lags)
-    parameters = _parameter_counts(equations, lags, nobs, eigenvalues)
+    parameters = _parameter_counts(equations, lags, nobs, eigenvalues, deterministic)
 
     # The unrestricted (rank = k) log-likelihood comes from the VAR on the same sample; each
     # rank restriction then lowers it by trace(r)/2, because LR = 2*dLL and the trace
     # statistic IS that LR. Verified on the reference case: 1224.4562, 1220.5657, 1132.9103.
-    full_ll = _unrestricted_loglikelihood(values, lags)
+    full_ll = _unrestricted_loglikelihood(values, lags, deterministic)
 
     if equations > len(_TRACE_CRITICAL_TAIL):
         raise UnsupportedError(
@@ -379,7 +428,12 @@ def vecrank(
     # descending sequence, i.e. the last k entries of the tail read backwards.
     # rank 0 takes the LARGEST of the k values in play, then they descend: k=2 gives
     # rank0 = 15.41, rank1 = 3.76. The tail is stored ascending, so reverse the slice.
-    critical_trace = tuple(reversed(_TRACE_CRITICAL_TAIL[:equations]))
+    # The TREND case uses its own tabulation. Reusing the constant-case numbers would put a
+    # real statistic beside the wrong threshold, which changes which rank gets selected.
+    trace_table = (
+        _TRACE_CRITICAL_TAIL_TREND if deterministic == "trend" else _TRACE_CRITICAL_TAIL
+    )
+    critical_trace = tuple(reversed(trace_table[:equations]))
     critical_max = tuple(reversed(_MAX_CRITICAL_TAIL[:equations]))
     rows: list[VecRankRow] = []
     for rank in range(equations + 1):
@@ -418,18 +472,32 @@ def vecrank(
             )
         )
     return VecRankResult(
-        rows=tuple(rows), nobs=nobs, lags=lags, equations=equations
+        rows=tuple(rows),
+        nobs=nobs,
+        lags=lags,
+        equations=equations,
+        deterministic=deterministic,
     )
 
 
 
-def _unrestricted_loglikelihood(values: np.ndarray, lags: int) -> float:
-    """Gaussian log-likelihood of the unrestricted VAR on the same sample ``vecrank`` uses."""
+def _unrestricted_loglikelihood(
+    values: np.ndarray, lags: int, deterministic: str = "constant"
+) -> float:
+    """Gaussian log-likelihood of the unrestricted VAR on the same sample ``vecrank`` uses.
+
+    The deterministic block must match the one used for the eigenvalues, or the likelihood is that
+    of a different model: with trend(constant) the reference case gives 1132.9103 / 1220.5657 /
+    1224.4562 and with trend(trend) 1132.9913 / 1220.9786 / 1224.797.
+    """
 
     observations = values.shape[0] - lags
     equations = values.shape[1]
     response = np.diff(values, axis=0)[lags - 1 :]
-    columns = [np.ones((observations, 1)), values[lags - 1 : len(values) - 1]]
+    columns = [
+        _deterministic_block(observations, deterministic),
+        values[lags - 1 : len(values) - 1],
+    ]
     differences = np.diff(values, axis=0)
     for depth in range(1, lags):
         low = lags - 1 - depth
@@ -446,7 +514,13 @@ def _unrestricted_loglikelihood(values: np.ndarray, lags: int) -> float:
     )
 
 
-def _parameter_counts(equations: int, lags: int, nobs: int, eigenvalues: np.ndarray) -> list[int]:
+def _parameter_counts(
+    equations: int,
+    lags: int,
+    nobs: int,
+    eigenvalues: np.ndarray,
+    deterministic: str = "constant",
+) -> list[int]:
     """Stata's Params column: short-run parameters plus the cointegrating vectors.
 
     For rank ``r``: ``lags * k**2`` short-run coefficients plus ``(k - r)``... the observed
@@ -461,6 +535,12 @@ def _parameter_counts(equations: int, lags: int, nobs: int, eigenvalues: np.ndar
     # The unrestricted part is the short-run block k*(k*(lags-1)) plus the k constants; each
     # additional cointegrating vector contributes (2k - r) more parameters.
     base = equations * (equations * (lags - 1)) + equations
+    # A trend inside the cointegrating relation costs one extra parameter PER EQUATION, on top of
+    # the constant each equation already carries. Measured on macro_swatson (k=2, lags=2):
+    #   constant  6 / 9 / 10        trend  8 / 11 / 12
+    # i.e. a uniform +2 = +k, not a change to the rank term.
+    if deterministic == "trend":
+        base += equations
     counts: list[int] = []
     for rank in range(equations + 1):
         counts.append(int(base + rank * (2 * equations - rank)))

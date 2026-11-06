@@ -105,12 +105,28 @@ def test_the_sample_line_states_the_lag_window(rendered) -> None:
     assert "Sample: 3 thru 166" in rendered
 
 
-def test_other_trend_options_still_refuse() -> None:
+def test_trend_is_now_supported_and_the_rest_still_refuse() -> None:
+    """Round 136 implemented ``trend(trend)``; the restricted variants still refuse.
+
+    ``trend`` was in this loop until round 136 because the deterministic block was hard-coded to a
+    column of ones. Adding a linear trend inside the cointegrating relation reproduces Stata's
+    eigenvalues, trace, likelihood, parameter counts AND critical values exactly, so it moved out
+    of the refusal list. ``rconstant``, ``rtrend`` and ``none`` each use a different tabulation and
+    still change which rank would be chosen, so they stay refused.
+    """
+
     try:
         frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
     values = frame[["dinf", "unem"]].to_numpy(float)
-    for trend in ("trend", "rconstant", "rtrend", "none"):
+
+    # Supported now.
+    supported = ws.vecrank(values, lags=2, trend="trend")
+    assert supported.deterministic == "trend"
+    assert supported.rows[0].params == 8  # Stata: 8 / 11 / 12, against 6 / 9 / 10 for constant
+
+    # Still refused, with a reason.
+    for trend in ("rconstant", "rtrend", "none"):
         with pytest.raises(ws.UnsupportedError):
             ws.vecrank(values, lags=2, trend=trend)

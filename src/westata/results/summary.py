@@ -1381,7 +1381,16 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         left_corr = f"corr(u_i, Xb) = {_four(corr)}"
     if np.isfinite(p_f):
         _p_label = "Prob > chi2" if _uses_wald else "Prob > F"
-        lines.append(row(left_corr, stat(_p_label, _four(p_f))))
+        # The prob row ON THE corr LINE is one character NARROWER than the other header
+        # rows -- 77 against 78 -- because Stata puts the value in 9 columns here rather
+        # than 10. Measured from a live ``xtreg ..., fe``:
+        #
+        #   '                                                F(3, 445)         =     658.69'  78
+        #   'corr(u_i, Xb) = -0.3538                         Prob > F          =    0.0000'  77
+        #
+        # Using the shared ``stat`` helper printed 78 and pushed the value one column right.
+        _padded_label = f"{_p_label:<18}"
+        lines.append(f"{left_corr:<48}{_padded_label}={_four(p_f):>10}".rstrip())
     elif left_corr:
         lines.append(row(left_corr))
     return lines

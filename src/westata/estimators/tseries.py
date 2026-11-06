@@ -1962,9 +1962,17 @@ def _vecm_cointegrating_constant(fitted: Any) -> float:
             coint_rank=int(getattr(model, "coint_rank", fitted.coint_rank)),
             deterministic="ci",
         ).fit()
-        return float(np.asarray(refit.const_coint, dtype=float).ravel()[0])
+        # ONE CONSTANT PER COINTEGRATING RELATION. Taking ravel()[0] returned a single float,
+        # so a rank-2 system applied the first relation's constant to both -- the same
+        # column-0 assumption that broke alpha, beta and the summary rows in rounds 73-75.
+        #
+        # Stata stores them in e(beta) with a stride of (neqs + 1) per relation:
+        #   rank 2, three variables -> [1, 0, -1.970651, 16.042122,
+        #                               0, 1, -4.429383, 16.736736]
+        constants = np.asarray(refit.const_coint, dtype=float).ravel()
+        return constants if constants.size else np.zeros(1)
     except Exception:  # pragma: no cover - the refit is best-effort
-        return 0.0
+        return np.zeros(1)
 
 
 @dataclass
@@ -2473,10 +2481,25 @@ class VECMResults:
             #
             # So the transform is applied and the residual is recorded rather than hidden:
             # these two constants are a numerical-precision difference, not a formula error.
-            c_ce = _vecm_cointegrating_constant(self)
-            constant = float(det_coef[index]) - float(alpha[index, 0]) * c_ce
+            c_ce_values = np.atleast_1d(_vecm_cointegrating_constant(self))
             cov_full = self.cov_params()
             det_index = 8 + index
+            # Stata's constant sits INSIDE the cointegrating relation, so the reported _cons is
+            # det_coef minus the adjustment applied to EVERY relation's own constant. Reading
+            # alpha[index, 0] and a single c_ce applied relation 1 to all of them.
+            relations_available = min(
+                int(c_ce_values.size),
+                alpha.shape[1] if alpha.ndim == 2 else 1,
+            )
+            c_ce = float(c_ce_values[0]) if relations_available >= 1 else 0.0
+            correction = 0.0
+            for relation in range(max(relations_available, 1)):
+                adjustment = float(
+                    alpha[index, relation] if alpha.ndim == 2 else alpha[index]
+                )
+                own_constant = float(c_ce_values[relation]) if relation < c_ce_values.size else 0.0
+                correction += adjustment * own_constant
+            constant = float(det_coef[index]) - correction
             statistic_variance = (
                 float(cov_full[det_index, det_index])
                 + c_ce**2 * float(cov_full[index, index])

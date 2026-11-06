@@ -817,6 +817,26 @@ def margins(
     names = list(param_names)
     factor_set = set(factor_vars or ())
 
+    # ``margins`` averages over the ESTIMATION SAMPLE, and under ``fweight`` Stata's sample
+    # is the EXPANDED one. The design matrix holds the collapsed rows (24 for the titanic
+    # logit), so averaging over it gave marginal effects 4-5% away from Stata's -- measured:
+    # ``dydx(child)`` .1809351 here against .1732315 in Stata, and every other covariate off
+    # by a similar amount (C11-03 in the 0.0.6 gap report).
+    #
+    # This expansion MUST run BEFORE ``atmeans`` computes the means, not after. When it ran
+    # afterwards the "At:" block reported the UNWEIGHTED means of the 24 collapsed rows --
+    # child .3333333 where Stata prints .0495229, female .5 against .2135393, class1 .25
+    # against .1476602 -- and the conditional MEM inherited that error (child .2628119
+    # against .2223422, 18% off). The AME was unaffected, which is why the bug survived: it
+    # only shows in the atmeans form.
+    _freq = getattr(result, "freq_weights", None)
+    if _freq is not None:
+        _freq = np.asarray(_freq, dtype=float).reshape(-1)
+        if _freq.size == exog.shape[0] and np.all(np.isfinite(_freq)):
+            _repeats = np.rint(_freq).astype(int)
+            if np.all(_repeats >= 0) and int(_repeats.sum()) > 0:
+                exog = np.repeat(exog, _repeats, axis=0)
+
     # ``atmeans`` fixes every covariate at its SAMPLE MEAN and reports a CONDITIONAL marginal
     # effect there, which is a different number from the average marginal effect -- measured
     # on grilic's logit: s is -.0135868 at the means against -.0135532 averaged. Stata prints
@@ -837,22 +857,6 @@ def margins(
                 continue
             means[base] = float(np.mean(exog[:, position]))
         at = means
-
-    # ``margins`` averages over the ESTIMATION SAMPLE, and under ``fweight`` Stata's sample
-    # is the EXPANDED one. The design matrix holds the collapsed rows (24 for the titanic
-    # logit), so averaging over it gave marginal effects 4-5% away from Stata's -- measured:
-    # ``dydx(child)`` .1809351 here against .1732315 in Stata, and every other covariate off
-    # by a similar amount (C11-03 in the 0.0.6 gap report).
-    #
-    # Expanding here rather than weighting each ``np.mean`` downstream keeps every form
-    # correct at once, including the elasticity forms whose factor depends on the covariates.
-    _freq = getattr(result, "freq_weights", None)
-    if _freq is not None:
-        _freq = np.asarray(_freq, dtype=float).reshape(-1)
-        if _freq.size == exog.shape[0] and np.all(np.isfinite(_freq)):
-            _repeats = np.rint(_freq).astype(int)
-            if np.all(_repeats >= 0) and int(_repeats.sum()) > 0:
-                exog = np.repeat(exog, _repeats, axis=0)
 
     # ``at()`` with a SEQUENCE of values produces one result per value (and one per
     # combination when several covariates carry sequences -- ``margins.sthlp:1000-1005``).

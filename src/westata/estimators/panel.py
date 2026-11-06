@@ -1977,9 +1977,18 @@ def _cluster_labels(
         return aligned.to_numpy()
 
     values = np.asarray(clusters)
+    # A single clustering variable is naturally given as a Series or an (n,) array, but
+    # users following linearmodels' own signature pass an (n, 1) frame or array. Accepting
+    # both costs one ravel and removes a whole class of "the numbers are right but the call
+    # fails" confusion. More than one column is a genuine MULTI-WAY request and is still
+    # refused, because Stata's vce(cluster a b) is a different estimator from a two-column
+    # label set here.
+    if values.ndim == 2 and values.shape[1] == 1:
+        values = values.ravel()
     if values.ndim != 1:
         raise ConsistencyError(
-            f"cluster labels must be one-dimensional; got {values.ndim} dimensions"
+            f"cluster labels must be one-dimensional (or a single-column table); "
+            f"got shape {values.shape}"
         )
 
     if values.size == len(kept_index):

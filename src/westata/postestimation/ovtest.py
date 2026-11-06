@@ -293,9 +293,15 @@ def estat_ovtest(
             continue
         values = matrix[:, j]
         if np.all(np.isin(values, (0.0, 1.0))):
-            # Indicator: contributes only itself.
-            columns.append(values)
-            omitted_labels.append(name)
+            # Indicators are SKIPPED entirely, not re-added. Stata's ``ovtest, rhs`` leaves
+            # indicator regressors out of the test set; adding them here produced a column
+            # perfectly collinear with the regressor already in the design, so every dummy
+            # counted as TWO extra test columns.
+            #
+            # Measured on grilic (n = 758):
+            #   lnw s expr tenure          -> F(9, 745) = 1.70 on both sides
+            #   lnw s expr tenure rns smsa -> Stata F(9, 743) = 2.03
+            #                                 was   F(11, 741) = 5.21
             continue
         scaled, constant = _rescale(values)
         if constant:

@@ -232,20 +232,22 @@ class MarginsTable(list):
         if first.variables:
             # Stata writes "dy/dx wrt:" followed by TWO spaces before the list.
             lines.append(f"{first.column_label} wrt:  " + " ".join(first.variables))
-            # ``atmeans`` prints the values it fixed, right after the wrt line:
-            #
-            #   At: age       = 25.37079 (mean)
-            #       education = 10.19551 (mean)
-            #
-            # Measured: the name is LEFT-aligned in a 10-wide field (not right-aligned like
-            # a coefficient row), the continuation lines are indented four spaces to sit under
-            # "At: ", and the suffix is "(mean)".
-            for position, (name, value) in enumerate(first.at_means):
-                prefix = "At: " if position == 0 else "    "
-                rendered_value = _stata_number(value, 9).strip()
-                lines.append(
-                    f"{prefix}{str(name):<10}= {rendered_value} (mean)"
-                )
+        # ``atmeans`` prints the values it fixed, whatever the form. This used to live INSIDE
+        # the ``if first.variables`` block, so `margins(atmeans=True)` -- which has no dydx and
+        # therefore no wrt line -- never printed them. The means were computed correctly and the
+        # table simply dropped them, which is why the statistic also stayed wrong: with no "At:"
+        # values the adjusted design was never built, and the margin was the unweighted one.
+        #
+        #   At: age       = 25.37079 (mean)
+        #       education = 10.19551 (mean)
+        #
+        # Measured: the name is LEFT-aligned in a 10-wide field (not right-aligned like a
+        # coefficient row), the continuation lines are indented four spaces to sit under
+        # "At: ", and the suffix is "(mean)".
+        for position, (name, value) in enumerate(first.at_means):
+            prefix = "At: " if position == 0 else "    "
+            rendered_value = _stata_number(value, 9).strip()
+            lines.append(f"{prefix}{str(name):<10}= {rendered_value} (mean)")
         lines.extend(
             [
                 rule,
@@ -849,13 +851,41 @@ def margins(
             )
         means: dict[str, float] = {}
         position_by_name = {str(name): index for index, name in enumerate(names)}
+        # Stata's atmeans uses WEIGHTED means when the fit carried weights. Measured on a
+        # titanic logit with [fweight=freq]:
+        #
+        #   covariate   unweighted   weighted     Stata's "At:" line
+        #   child       .3333333     .0495229     .0495229
+        #   female      .5000000     .2135393     .2135393
+        #   class1      .2500000     .1476602     .1476602
+        #
+        # and the difference is not cosmetic: the reported Margin came out .5532798 unweighted
+        # against Stata's .3027798. The data has only 24 rows carrying a frequency column, so an
+        # unweighted mean of it describes the cell layout rather than the population.
+        # The fit EXPANDS frequency weights into repeated rows, so ``exog`` has sum(weights) rows
+        # while ``result.freq_weights`` still has one entry per source row. Comparing the two
+        # lengths directly made this guard reject the weights and silently fall back to the
+        # unweighted mean -- the original defect, wearing a new coat. Expand first, then check.
+        weight_vector = getattr(result, "freq_weights", None)
+        if weight_vector is not None:
+            weight_vector = np.asarray(weight_vector, dtype=float).ravel()
+            if weight_vector.size != exog.shape[0]:
+                counts = np.rint(weight_vector).astype(int)
+                if counts.sum() == exog.shape[0] and np.all(counts >= 0):
+                    weight_vector = np.repeat(np.ones(counts.size), counts)
+                else:
+                    weight_vector = None
         for name, position in position_by_name.items():
             if str(name) == "Intercept":
                 continue
             base = str(name).split("[")[0]
             if base in means:
                 continue
-            means[base] = float(np.mean(exog[:, position]))
+            column = exog[:, position]
+            if weight_vector is None:
+                means[base] = float(np.mean(column))
+            else:
+                means[base] = float(np.average(column, weights=weight_vector))
         at = means
 
     # ``at()`` with a SEQUENCE of values produces one result per value (and one per
@@ -1017,7 +1047,12 @@ def margins(
             result, exog, names, over=over, level=level, predict_kind=kind,
             outcome=outcome,
         )
-        return _finish_margins(rows, result)
+        # ``atmeans`` was resolved into ``at`` further up, but this branch used to finish
+        # without passing it back, so ``at_means`` stayed empty and Stata's "At:" lines never
+        # printed. The means themselves were computed correctly all along.
+        return _finish_margins(
+            rows, result, atmeans=atmeans, at_values=at if atmeans else None
+        )
     requested = [dydx] if isinstance(dydx, str) else list(dydx)
     # ``dydx(s expr)`` -- Stata accepts a SPACE-SEPARATED varlist inside one pair of
     # parentheses, and a caller writing that is asking for two effects, not for a column named

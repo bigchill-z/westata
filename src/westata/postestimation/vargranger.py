@@ -126,7 +126,23 @@ class VarGrangerResult:
 
 
 def vargranger(fitted: Any) -> VarGrangerResult:
-    """Build the ``vargranger`` table for a fitted ``VARResults``."""
+    """Build the ``vargranger`` table for a fitted ``VARResults``.
+
+    Stata's ``vargranger`` refuses anything but a var/svar/ivsvar/xtvar estimate::
+
+        vargranger only works with estimates from var, svar, ivsvar,or xtvar
+
+    A VECM is not among them. Passing one must say so rather than surface an AttributeError from
+    the missing ``granger_causality``, which names neither the test nor the reason.
+    """
+
+    if not hasattr(fitted, "granger_causality"):
+        from westata.errors import UnsupportedError
+
+        raise UnsupportedError(
+            "vargranger only works with estimates from var, svar, ivsvar or xtvar, as Stata "
+            "reports for a VECM. Fit the equivalent level VAR to test Granger causality there."
+        )
 
     names = [str(name) for name in fitted.names]
     rows: list[_Row] = []

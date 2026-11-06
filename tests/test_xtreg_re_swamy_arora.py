@@ -54,7 +54,7 @@ def fitted():
 def test_sigma_u_is_within_a_hundredth_of_a_percent(fitted) -> None:
     """The Swamy-Arora correction, to 4 decimal places."""
 
-    assert float(fitted.e["sigma_u"]) == pytest.approx(STATA["sigma_u"], rel=1e-4)
+    assert float(fitted.e["sigma_u"]) == pytest.approx(STATA["sigma_u"], rel=1e-6)
 
 
 def test_sigma_u_is_no_longer_the_raw_spread(fitted) -> None:
@@ -70,16 +70,31 @@ def test_rho_and_theta_are_much_closer(fitted) -> None:
         assert now < improvement / 5.0, key
 
 
-def test_the_known_sigma_e_gap_is_still_open(fitted) -> None:
-    """Pins the remaining discrepancy so it cannot be mistaken for agreement.
+def test_sigma_e_now_matches_too(fitted) -> None:
+    """Formerly a pinned 0.43% gap; closed by dividing rss by N rather than df_r.
 
-    sigma_e stays 0.43% high. If a later change closes it, this test fails and should be
-    updated deliberately -- it exists so nobody reads "sigma_u matches" as "the decomposition
-    is finished".
+    Round 55 left sigma_e 0.43% high and a test asserting that gap existed. The cause was the
+    divisor: xtreg, re reports a MAXIMUM-LIKELIHOOD standard error (rss / N) while e(rmse) is the
+    degrees-of-freedom one (rss / df_r). Both were being reported from the same number.
+
+    This test replaces the one that pinned the gap -- it failing was the signal that the gap
+    closed, which is what a pin is for.
     """
 
     relative = abs(float(fitted.e["sigma_e"]) - STATA["sigma_e"]) / STATA["sigma_e"]
-    assert relative == pytest.approx(0.0043, abs=2e-4)
+    assert relative < 1e-4
+
+
+def test_sigma_e_and_rmse_are_different_numbers(fitted) -> None:
+    """They must not collapse back into one value."""
+
+    assert float(fitted.e["sigma_e"]) != pytest.approx(float(fitted.e["rmse"]), rel=1e-4)
+
+
+def test_rmse_is_exact(fitted) -> None:
+    """e(rmse) uses the residual degrees of freedom and was always right."""
+
+    assert float(fitted.e["rmse"]) == pytest.approx(0.12787616, abs=5e-9)
 
 
 def test_a_small_panel_does_not_collapse_to_zero() -> None:

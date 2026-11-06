@@ -1522,9 +1522,24 @@ class PanelOLS:
 
 
         # e(sigma_e) = sqrt(e(rss)/e(df_r)) where e(df_r) is the reference df.
+        # ``xtreg, re`` divides the residual sum of squares by N, not by the residual degrees of
+        # freedom -- this is a MAXIMUM-LIKELIHOOD standard error, whereas e(rmse) is the
+        # degrees-of-freedom one. Measured on lin_1992 (rss 7.7182918, N 476, df_r 472):
+        #
+        #     sqrt(rss/N)    = .12733774   <- Stata e(sigma_e) .12733392
+        #     sqrt(rss/df_r) = .12787616   <- Stata e(rmse)    .12787616  (exact)
+        #
+        # Both numbers were being reported with the rmse value, which made sigma_e 0.43% high
+        # and pushed rho and theta off with it. The within estimator keeps df_r: it has no
+        # likelihood form and its e(sigma_e) agrees with e(rmse) there.
+        _sigma_divisor = (
+            float(nobs)
+            if self._random_effects_decomposition and nobs and nobs > 0
+            else float(scalar_df) if scalar_df else 0.0
+        )
         sigma_e = (
-            float(np.sqrt(rss / scalar_df))
-            if self._stores_sigma and scalar_df and scalar_df > 0
+            float(np.sqrt(rss / _sigma_divisor))
+            if self._stores_sigma and _sigma_divisor > 0
             else float("nan")
         )
 

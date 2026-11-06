@@ -71,11 +71,15 @@ def test_r2_can_be_requested_through_stats(models) -> None:
     assert "N " in rendered
 
 
-def test_the_number_format_is_the_open_defect(models) -> None:
-    """esttab prints 0.0966 where this prints 0.097 -- three significant figures, not decimals.
+def test_the_number_format_is_still_the_open_defect(models) -> None:
+    """esttab prints 0.0966 where this prints 0.097 -- significant figures, not decimals.
 
-    Pinned as a KNOWN DIFFERENCE rather than asserted away: fixing the formatter also moves the
-    standard-error columns, which round 96 could not land without breaking two fixtures.
+    Round 97 worked the format rule out (four significant figures at or above 1, three below) and
+    confirmed it reproduces both grilic and cobb_douglas, but the standard-error columns move with
+    it, and the SE start rule differs between those two tables in a way the same patch could not
+    satisfy. The formatter was reverted rather than shipped with misaligned columns.
+
+    Pinned as a KNOWN difference, with the measurement, so the next attempt starts from it.
     """
 
     rendered = etable_as_stata(models, model_names=["m1", "m2"])

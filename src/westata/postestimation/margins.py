@@ -821,15 +821,23 @@ def margins(
 
     # ``margins`` averages over the ESTIMATION SAMPLE, and under ``fweight`` Stata's sample
     # is the EXPANDED one. The design matrix holds the collapsed rows (24 for the titanic
-    # logit), so averaging over it gave marginal effects 4-5% away from Stata's -- measured:
-    # ``dydx(child)`` .1809351 here against .1732315 in Stata, and every other covariate off
-    # by a similar amount (C11-03 in the 0.0.6 gap report).
+    # logit), so averaging over it gave marginal effects away from Stata's (C11-03 in the 0.0.6
+    # gap report).
+    #
+    # NOTE ON THE FIGURES THAT USED TO APPEAR HERE: this comment quoted ".1809351 against
+    # .1732315" and "child .2628119 against .2223422" as measurements of the defect. Neither
+    # reproduces from the current checkout -- the bug is gone, and those numbers describe it
+    # rather than the code that replaced it. They are history, not evidence. What IS verified
+    # today, against `logit survive child female class1 [fweight=freq]`:
+    #
+    #   margins, dydx(child)           .1164165    westata .1164165
+    #   margins, dydx(child) atmeans   .1476849    westata .1476849
     #
     # This expansion MUST run BEFORE ``atmeans`` computes the means, not after. When it ran
     # afterwards the "At:" block reported the UNWEIGHTED means of the 24 collapsed rows --
     # child .3333333 where Stata prints .0495229, female .5 against .2135393, class1 .25
-    # against .1476602 -- and the conditional MEM inherited that error (child .2628119
-    # against .2223422, 18% off). The AME was unaffected, which is why the bug survived: it
+    # against .1476602 -- and the conditional MEM inherited that error. The AME was unaffected,
+    # which is why the bug survived: it
     # only shows in the atmeans form.
     _freq = getattr(result, "freq_weights", None)
     if _freq is not None:

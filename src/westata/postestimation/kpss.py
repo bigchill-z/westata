@@ -72,6 +72,12 @@ class KpssResult:
     trend: bool
     nobs: int
     critical: dict[float, float]
+    #: The series name Stata prints in the title and H0 line. Empty means a bare array was passed,
+    #: in which case the generic wording is kept rather than inventing a variable name.
+    name: str = ""
+    #: Whether ``maxlag`` was supplied by the caller. Stata prints "Maxlag = 4 chosen by Schwert
+    #: criterion" only for the automatic choice; an explicit ``maxlag(4)`` prints just "Maxlag = 4".
+    maxlag_explicit: bool = False
 
     @property
     def statistic(self) -> float:
@@ -91,23 +97,51 @@ class KpssResult:
         ).set_index("lag")
 
     def __str__(self) -> str:
+        """Stata's ``kpss`` output, captured byte-for-byte.
+
+        Two details that were wrong before round 146, both measured from live runs on
+        macro_swatson.dta (``kpss inf`` and ``kpss inf, maxlag(4)``):
+
+        * the Maxlag line says "chosen by Schwert criterion" ONLY when the lag count was chosen
+          automatically; an explicit ``maxlag(4)`` prints just ``Maxlag = 4``;
+        * the statistics are THREE significant figures with no leading zero (``2.14``, ``1.16``,
+          ``.811``), not four decimals (``0.0146`` was three sig figs too, not four dp).
+
+        The critical values also sit on ONE compact line, not four indented ones.
+        """
+
         kind = "trend stationary" if self.trend else "level stationary"
+        subject = self.name or "series"
+        maxlag_line = f"Maxlag = {self.maxlag}"
+        if not self.maxlag_explicit:
+            maxlag_line += " chosen by Schwert criterion"
+        labels = ((0.10, "10%"), (0.05, "5% "), (0.025, "2.5%"), (0.01, "1% "))
+        critical_line = "  ".join(
+            f"{label}: {self.critical[level]:.3f}" for level, label in labels
+        )
+        # Stata's blank lines are a SINGLE SPACE, not an empty string -- captured as len 1.
+        blank = " "
         lines = [
-            f"KPSS test for {kind}",
-            "",
-            f"Maxlag = {self.maxlag} chosen by Schwert criterion",
+            blank,
+            f"KPSS test for {self.name}" if self.name else f"KPSS test for {kind}",
+            blank,
+            maxlag_line,
             "Autocovariances weighted by Bartlett kernel",
-            "",
-            f"Critical values for H0: series is {kind}",
+            blank,
+            f"Critical values for H0: {subject} is {kind}",
+            blank,
+            critical_line,
+            blank,
+            "Lag order    Test statistic",
         ]
-        labels = {0.10: "10%", 0.05: "5%", 0.025: "2.5%", 0.01: "1%"}
-        for level in sorted(self.critical, reverse=True):
-            label = labels.get(level, f"{level * 100:g}%")
-            lines.append(f"  {label}: {self.critical[level]:.3f}")
-        lines.append("")
-        lines.append(f"{'Lag order':>10}{'Test statistic':>18}")
         for row in self.rows:
-            lines.append(f"{row.lag:>10}{row.statistic:>18.4g}")
+            # Three significant figures, leading zero dropped: 2.14 -> "2.14", .811 -> ".811".
+            text = f"{row.statistic:.3g}"
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            lines.append(f"{row.lag:>5}{text:>15}")
         return "\n".join(lines)
 
 
@@ -134,11 +168,22 @@ def _long_run_variance(residual: np.ndarray, lags: int) -> float:
     return total
 
 
-def kpss(values: Any, *, trend: bool = True, maxlag: int | None = None) -> KpssResult:
+def kpss(
+    values: Any,
+    *,
+    trend: bool = True,
+    maxlag: int | None = None,
+    name: str = "",
+) -> KpssResult:
     """KPSS test for stationarity, as ``kpss varname``.
 
     ``trend=True`` is Stata's DEFAULT (``trend stationary``); pass ``trend=False`` for its
-    ``notrend`` option. ``maxlag=None`` uses KPSS's rule, ``int(4*(n/100)**0.25)``.
+    ``notrend`` option. ``maxlag=None`` uses KPSS's rule, ``int(4*(n/100)**0.25)``. Supplying
+    ``maxlag`` explicitly also changes the printed Maxlag line, because Stata only says "chosen by
+    Schwert criterion" for the automatic choice.
+
+    ``name`` is optional: Stata prints the variable name in the title and H0 line, but a bare
+    ndarray has no name, so the generic wording is kept when it is omitted.
     """
 
     series = np.asarray(values, dtype=float).reshape(-1)
@@ -146,6 +191,7 @@ def kpss(values: Any, *, trend: bool = True, maxlag: int | None = None) -> KpssR
     if series.size < 10:
         raise ValueError(f"kpss: at least 10 observations are required; got {series.size}")
     nobs = int(series.size)
+    maxlag_explicit = maxlag is not None
     if maxlag is None:
         # KPSS uses a coefficient of FOUR, not the twelve ADF and PP use:
         # int(4*(n/100)**0.25) = 4 for n = 167, where twelve gives 13. Using 12 printed
@@ -170,5 +216,10 @@ def kpss(values: Any, *, trend: bool = True, maxlag: int | None = None) -> KpssR
 
     critical = dict(_CRITICAL_TREND if trend else _CRITICAL_LEVEL)
     return KpssResult(
-        rows=tuple(rows), trend=bool(trend), nobs=nobs, critical=critical
+        rows=tuple(rows),
+        trend=bool(trend),
+        nobs=nobs,
+        critical=critical,
+        name=str(name),
+        maxlag_explicit=maxlag_explicit,
     )

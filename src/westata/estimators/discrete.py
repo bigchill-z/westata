@@ -496,6 +496,19 @@ class _DiscreteBase:
                     "Fitting unweighted and returning it under a weighted call would report numbers for "
                     "the wrong sample."
                 )
+            # ``freq_weights`` is a COLUMN NAME here, not an array. Passing the array is a
+            # natural mistake -- the array-based constructor takes one -- and without this check
+            # it surfaced as `TypeError: unhashable type: 'numpy.ndarray'` from a dict lookup
+            # three lines down, which names neither the argument nor the expected type. That
+            # error is how a fit came to be silently run on 24 unweighted rows in round 116
+            # while a formula that looked correct was reported.
+            if not isinstance(freq_weights, str):
+                raise ConsistencyError(
+                    f"{cls._stata_command}: freq_weights must be the NAME of a column, not a "
+                    f"{type(freq_weights).__name__}. The formula interface looks the column up in "
+                    "the data it was given; pass e.g. freq_weights='freq'. (The array-based "
+                    f"constructor '{cls.__name__}(...)' is the one that takes the values.)"
+                )
             if freq_weights not in data.columns:
                 raise ConsistencyError(
                     f"{cls._stata_command}: freq_weights names {freq_weights!r}, which is not a column"

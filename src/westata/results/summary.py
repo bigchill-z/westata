@@ -1931,12 +1931,31 @@ def _stata_summary(result: Any) -> str:
             _chi2df = _df_label(df_model)
         else:
             _chi2df = "."
+        # The sample STARTS where the estimation sample starts, not at 1: with d=1 an
+        # observation is lost to differencing, so ``arima ..., arima(1,1,0)`` on 144 periods
+        # prints "Sample: 2 thru 144" and N = 143. ``e(N)`` already holds 143, and ``e(tmin)``
+        # holds the first period used; the header was hard-coding both.
+        _sample_n = int(_e_float(result, "N")) if np.isfinite(_e_float(result, "N")) else nobs
+        # e(tmin) stays at the RAW series start, so the first period actually used has to be
+        # derived: one observation is lost per degree of differencing, and the raw length is
+        # e(N) plus that loss. Measured across orders: d=0 -> "1 thru 144", d=1 -> "2 thru
+        # 144", d=2 -> "3 thru 142" with N = 144-d in every case.
+        _raw = _e_float(result, "tmax")
+        _lost = int(round(_raw)) - _sample_n if np.isfinite(_raw) else 0
+        _first = int(round(_e_float(result, "tmin"))) + max(_lost, 0) if np.isfinite(
+            _e_float(result, "tmin")
+        ) else 1
+        _start_label = f"Sample: {_first} thru {_first + _sample_n - 1}"
         lines.append(
-            f"{'Sample: 1 thru ' + str(nobs):<48}"
-            f"{'Number of obs':<18}= {nobs:>10d}"
+            f"{_start_label:<48}"
+            f"{'Number of obs':<18}= {_sample_n:>10d}"
         )
+        # ``arima`` reports a real Wald chi2 (e(chi2) is stored); ``arch`` prints a dot
+        # because its e(df_m) is absent. Printing a dot for both lost arima's statistic.
+        _wald = _e_float(result, "chi2")
+        _wald_text = "%.2f" % _wald if np.isfinite(_wald) else "."
         lines.append(
-            f"{'':<48}{'Wald chi2(' + _chi2df + ')':<18}= {'.':>10}"
+            f"{'':<48}{'Wald chi2(' + _chi2df + ')':<18}= {_wald_text:>10}"
         )
         _ll = _e_float(result, "ll")
         # ``%.7g`` gives "-1039.235", which is what Stata prints; more digits is too many.

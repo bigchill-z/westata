@@ -171,6 +171,59 @@ class VecRankResult:
         return "\n".join(lines)
 
 
+def _johansen_general(values: np.ndarray, lags: int) -> tuple[np.ndarray, np.ndarray]:
+    """Eigenvalues and trace statistics for a VAR of order ``lags`` (1 or 2).
+
+    The construction that round 14 got wrong, and the one-line reason it was wrong: the
+    LAGGED DIFFERENCES must enter BOTH residualisations. Putting ``DY_{t-1}`` into the model
+    for ``DY_t`` alone (the natural reading of "short-run dynamics") leaves it in
+    ``Y_{t-1}``'s equation and inflates every statistic -- on the reference data that gave
+    trace 51.4854 / 7.5897 against Stata's 183.0918 / 7.7811.
+
+    With them in both, the two-level case reproduces Stata exactly::
+
+        lags(1):  eig .64575 / .00769      trace 172.5034 / 1.2744
+        lags(2):  eig .65664 / .04634      trace 183.0918 / 7.7811
+
+    ``N = T - lags`` rows, matching the VAR Stata would have fitted.
+    """
+
+    total = values.shape[0]
+    differences = values[1:] - values[:-1]
+    count = total - lags
+    if count <= values.shape[1] + lags:
+        raise ConsistencyError(
+            f"vecrank: {total} observations cannot support lags({lags}) with "
+            f"{values.shape[1]} variables"
+        )
+    start = differences.shape[0] - count
+    rows = np.arange(start, start + count)
+    response = differences[rows]
+    level = values[rows]
+    lag_blocks = [differences[rows - depth] for depth in range(1, lags)]
+    common = (
+        np.column_stack([np.ones((count, 1))] + lag_blocks)
+        if lag_blocks
+        else np.ones((count, 1))
+    )
+    residual_r0 = response - common @ np.linalg.lstsq(common, response, rcond=None)[0]
+    residual_r1 = level - common @ np.linalg.lstsq(common, level, rcond=None)[0]
+    s00 = residual_r0.T @ residual_r0 / count
+    s11 = residual_r1.T @ residual_r1 / count
+    s01 = residual_r0.T @ residual_r1 / count
+    eigenvalues = np.sort(
+        np.real(np.linalg.eigvals(np.linalg.solve(s00, s01 @ np.linalg.solve(s11, s01.T))))
+    )[::-1]
+    eigenvalues = np.clip(eigenvalues, 0.0, 1.0)
+    trace = np.array(
+        [
+            -count * float(np.sum(np.log1p(-eigenvalues[rank:])))
+            for rank in range(eigenvalues.size)
+        ]
+    )
+    return eigenvalues, trace
+
+
 def _johansen_lags_one(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Eigenvalues and trace statistics for ``vecrank, lags(1)``.
 
@@ -252,9 +305,12 @@ def vecrank(
     if lags == 1:
         eigenvalues, trace = _johansen_lags_one(values)
     else:
-        model = coint_johansen(values, det_order=0, k_ar_diff=lags - 1)
-        eigenvalues = np.asarray(model.eig, dtype=float)
-        trace = np.asarray(model.lr1, dtype=float)
+        # Computed here rather than delegated to statsmodels: both agree on a two-variable
+        # system, but statsmodels loses numerical control when the series are nearly
+        # dependent (inf/unem/dinf gives a largest eigenvalue of 3.6, which cannot be a
+        # canonical correlation). The direct construction is exact for lags 1 and 2 on the
+        # reference data; see _johansen_general.
+        eigenvalues, trace = _johansen_general(values, lags)
 
     # ``vecrank`` reports N = rows - lags, matching the VAR it would have fitted.
     nobs = int(values.shape[0] - lags)

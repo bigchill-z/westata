@@ -40,6 +40,23 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 20–21 轮）：命名输出用「追加」而非「替换」
+
+第 19 轮证实：把 `VECM.beta` 换成 DataFrame 会破坏 `result.beta[0, 0]`（已有测试报 `KeyError: (0, 0)`）。第 20 轮改用**追加新属性**，两种形式并存：
+
+| 原属性（不变）| 新增命名形式 |
+|---|---|
+| `beta` / `alpha`（ndarray）| `beta_labelled` / `alpha_labelled`（DataFrame）|
+| `resid` / `fittedvalues`（ndarray）| `resid_series` / `fitted_series`（Series）|
+
+每个新属性都与原属性做 `np.allclose` 守卫——**同一拟合的两个视图若不一致，比只有一个更糟**。
+
+**方法学收获**：报告说「应改为 X」时，未必只能「替换成 X」。「更符合约定」与「不破坏现有调用」并非二选一，追加属性同时满足两者。这与本任务中多次「假设即实测」的错误形成对照——**先测量代价（第 19 轮），再选设计（第 20 轮）**。
+
+**已知限制（如实记录）**：`resid_series` 的 index 是拟合器自己的行号（从 0 开始），调用方自定义的 DataFrame index 不会保留，因为拟合器内部已 `reset_index`。数值正确，已在测试模块中写明。
+
+**全量验证**：**4486 passed, 3 skipped, 0 failed**（第 21 轮）。
+
 ### v2 报告（第 18–19 轮）：statsmodels 生态接口
 
 **第 18 轮已修复（3 类，均对照 statsmodels 本身验证）**：

@@ -117,17 +117,18 @@ class OverIdResult:
         labelled without the "(score)" qualifier Stata prints.
         """
 
-        # BOTH statistics print SIX decimals with no leading zero, and the two rows must
-        # use the same format. Measured from a live ``estat overid`` after a two-instrument
-        # 2SLS fit::
+        # The statistic is printed with SIX SIGNIFICANT DIGITS, not six decimals, and with the
+        # leading zero dropped below 1. Four fits measured on one dataset settle it:
         #
-        #   Sargan (score) chi2(1) =  .779145  (p = 0.3774)
-        #   Basmann chi2(1)        =  .772859  (p = 0.3793)
+        #   14.5335   <- chi2(1) = 14.533466     six SIG FIGS = four decimals
+        #   11.818    <- chi2(1) = 11.8180       six sig figs = THREE decimals
+        #   .028687   <- chi2(1) = 0.028687      six sig figs, leading zero dropped
+        #   14.5004   <- chi2(2) = 14.5004
         #
-        # The earlier code used %8.5f for Sargan and %8.4f for Basmann, so the two rows
-        # disagreed in precision AND both carried a leading zero Stata never prints.
+        # The previous code used "%.6f", which prints 14.533466 and 0.028687 -- wrong on both
+        # counts, and its own comment recorded ".779145" as if the format were fixed-width.
         def _statistic(value: float) -> str:
-            text = f"{float(value):.6f}"
+            text = f"{float(value):.6g}"
             if text.startswith("0."):
                 text = text[1:]
             elif text.startswith("-0."):

@@ -71,17 +71,35 @@ def test_r2_can_be_requested_through_stats(models) -> None:
     assert "N " in rendered
 
 
-def test_the_number_format_is_still_the_open_defect(models) -> None:
-    """esttab prints 0.0966 where this prints 0.097 -- significant figures, not decimals.
+def test_the_number_format_uses_significant_figures(models) -> None:
+    """esttab prints 0.0966, not 0.097 -- significant figures, not decimals.
 
-    Round 97 worked the format rule out (four significant figures at or above 1, three below) and
-    confirmed it reproduces both grilic and cobb_douglas, but the standard-error columns move with
-    it, and the SE start rule differs between those two tables in a way the same patch could not
-    satisfy. The formatter was reverted rather than shipped with misaligned columns.
-
-    Pinned as a KNOWN difference, with the measurement, so the next attempt starts from it.
+    Rounds 96-97 left this open: the formatter could not change without moving the standard-error
+    columns. The reason was a false comment claiming SE cells are NOT right-aligned to the column
+    end. Capturing all six SE cells from two tables showed they all end at the column edge, so
+    aligning them like the coefficients (_cell) decouples the two and the format change lands.
     """
 
     rendered = etable_as_stata(models, model_names=["m1", "m2"])
-    assert "0.097" in rendered or "0.097*" in rendered
-    assert "0.0966" not in rendered
+    assert "0.0966" in rendered
+    assert "0.097" not in rendered
+
+
+def test_the_standard_errors_use_the_same_rule(models) -> None:
+    """9.011188 must print "(9.011)", not "(9.01)" -- four figures at or above 1."""
+
+    rendered = etable_as_stata(
+        models, model_names=["m1", "m2"], stats=[("N", "nobs"), ("R-sq", "r2")]
+    )
+    assert "(0.00604)" in rendered
+    assert "(0.00595)" in rendered
+
+
+def test_rows_are_padded_to_the_table_width(models) -> None:
+    """Stata pads every table row to 44 columns; the legend lines are not padded."""
+
+    lines = etable_as_stata(models, model_names=["m1", "m2"]).splitlines()
+    table_rows = [line for line in lines if "p<0.05" not in line and "parentheses" not in line]
+    assert table_rows
+    for row in table_rows:
+        assert len(row) == 44, (len(row), row)

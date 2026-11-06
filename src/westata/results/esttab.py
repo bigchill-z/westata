@@ -97,15 +97,18 @@ def render_esttab(
         )
 
     def _number(value: float) -> str:
-        """esttab drops one decimal place once the integer part needs two columns.
+        """esttab prints three significant figures, four once the value reaches 1.
 
-        Measured: 0.377 -> "0.377" (three decimals) beside 77.58 -> "77.58" (two), so the
-        cells stay the same width. A fixed precision would print "77.579" and push the
-        row one column right.
+        Measured from live ``esttab m1 m2, se r2 mtitle`` output:
+
+            0.0966245 -> "0.0966"      0.0352 -> "0.0352"      4.391 -> "4.391"
+            77.5787   -> "77.58"       9.011188 -> "9.011"     -4.855 -> "-4.855"
+
+        A fixed decimal count cannot produce both "0.107" and "4.391": three decimals gives
+        "0.107" but "4.391"; four gives "0.1066" but "4.3912".
         """
-        integer = len(f"{abs(value):.0f}")
-        places = max(digits - max(integer - 1, 0), 0)
-        return f"{value:.{places}f}"
+
+        return f"{value:.4g}" if abs(value) >= 1.0 else f"{value:.3g}"
 
     # The union of parameter names, first model first, so the row order is the reader's.
     order: list[str] = []
@@ -164,34 +167,37 @@ def render_esttab(
             continue
         lines.append("".join(cells))
         if se and any(_lookup(model, label) for model in models):
-            # The SE cells START at fixed columns (17 and 33, measured) and are NOT
-            # right-aligned to the coefficient columns' ends: "(9.011)" ends at 24 while
-            # "(0.0352)" ends at 25. Padding them to the column end pushed the wide ones one
-            # column right.
-            se_pieces: list[str] = [" " * 17]
+            # Each SE cell is RIGHT-ALIGNED to its column's end (25 and 41), like the coefficient
+            # above it. The old comment here claimed otherwise -- "the SE cells are NOT
+            # right-aligned, (9.011) ends at 24 while (0.0352) ends at 25" -- and that claim sent
+            # rounds 96 and 97 hunting a positional rule that does not exist. Capturing all six
+            # cells from two reference tables shows they all end at the column edge:
+            #
+            #   grilic        "(0.00604)" 16-25    "(0.00595)" 32-41
+            #   grilic        "(0.0821)"  17-25    "(0.0849)"  33-41
+            #   cobb_douglas  "(0.0352)"  17-25    "(0.0417)"  33-41
+            #   cobb_douglas  "(9.011)"   18-25    "(14.54)"   34-41
+            #   cobb_douglas  "(0.150)"   --       "(0.150)"   34-41
+            se_pieces: list[str] = [" " * _NAME_WIDTH]
             for position, model in enumerate(models):
-                if position:
-                    used = sum(len(piece) for piece in se_pieces)
-                    se_pieces.append(" " * max(33 - used, 0))
                 raw = _lookup(model, label)
                 if not raw:
+                    _cell("", widths[position], se_pieces)
                     continue
                 se_value = float(model.bse[raw])
-                coefficient_text = _number(float(model.params[raw]))
-                coefficient_places = (
-                    len(coefficient_text.split(".")[1]) if "." in coefficient_text else 0
-                )
-                extra_integer = max(len(f"{abs(se_value):.0f}") - 1, 0)
-                se_places = max(coefficient_places + 1 - extra_integer, 0)
-                se_text = f"{se_value:.{se_places}f}"
-                if "." in se_text:
+                # Three significant figures below 1, four at or above it -- the same rule the
+                # coefficients use. Measured: 9.011188 -> "(9.011)", 0.0060425 -> "(0.00604)".
+                # "%.3g" drops a trailing zero, so 0.150 would print "(0.15)"; Stata keeps it,
+                # hence the pad to a minimum of three significant digits.
+                se_text = f"{se_value:.4g}" if abs(se_value) >= 1.0 else f"{se_value:.3g}"
+                if abs(se_value) < 1.0 and "." in se_text:
                     head, _, tail = se_text.partition(".")
-                    trimmed = tail.rstrip("0")
-                    if len(trimmed) >= 2:
-                        se_text = f"{head}.{trimmed}"
-                se_pieces.append(f"({se_text})")
+                    while len(tail) < 3:
+                        tail += "0"
+                    se_text = f"{head}.{tail}"
+                _cell(f"({se_text})", widths[position], se_pieces)
             lines.append("".join(se_pieces))
-        lines.append("")
+        continue
 
     if lines[-1] == "":
         lines.pop()
@@ -214,7 +220,16 @@ def render_esttab(
         lines.append("Standard errors in parentheses")
     if stars:
         lines.append("* p<0.05, ** p<0.01, *** p<0.001")
-    return "\n".join(lines)
+    # esttab pads every TABLE row out to the full 44 columns; the two legend lines below the
+    # closing rule are not padded. Rows built from the last column end at 41, so without this they
+    # read three characters short in a line-wise comparison.
+    closing_rule = len(lines) - (1 if se else 0) - (1 if stars else 0) - 1
+    padded: list[str] = []
+    for position, line in enumerate(lines):
+        if position <= closing_rule and len(line) < _LINE_WIDTH:
+            line = line + " " * (_LINE_WIDTH - len(line))
+        padded.append(line)
+    return "\n".join(padded)
 
 
 def _with_one_more_place(value: float, digits: int) -> str:

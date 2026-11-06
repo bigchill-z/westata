@@ -45,16 +45,19 @@ import westata as ws
 DATA = r"D:\myCodeProject\test_westata\data\cobb_douglas.dta"
 
 STATA_LINES = [
-    "                      (1)             (2)",
-    "                       m1              m2",
+    # Table rows are padded to 44 columns, as Stata prints them; the two legend lines are not.
+    "                      (1)             (2)   ",
+    "                       m1              m2   ",
     "--------------------------------------------",
-    "k                   0.377***        0.159**",
-    "                 (0.0352)        (0.0417)",
+    "k                   0.377***        0.159** ",
+    "                 (0.0352)        (0.0417)   ",
     "l                                   0.917***",
-    "_cons               77.58***       -4.855",
-    "                 (9.011)         (14.54)",
-    "N                      24              24",
-    "R-sq                0.839           0.942",
+    "                                  (0.150)   ",
+    "_cons               77.58***       -4.855   ",
+    "                  (9.011)         (14.54)   ",
+    "N                      24              24   ",
+    "R-sq                0.839           0.942   ",
+    "--------------------------------------------",
     "Standard errors in parentheses",
     "* p<0.05, ** p<0.01, *** p<0.001",
 ]
@@ -77,7 +80,9 @@ def rendered():
 
 @pytest.mark.parametrize("line", STATA_LINES)
 def test_each_line_matches_stata(rendered, line: str) -> None:
-    assert line in [row.rstrip() for row in rendered.splitlines()], line
+    # Both sides are rstripped: the renderer pads table rows to 44 columns as Stata does, and this
+    # test compares CONTENT. Padding has its own guard (test_rows_are_padded_to_the_table_width).
+    assert line.rstrip() in [row.rstrip() for row in rendered.splitlines()], line
 
 
 def test_the_numbering_and_mtitle_rows_come_first(rendered) -> None:

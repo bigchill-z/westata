@@ -94,6 +94,8 @@ class RdRobustResult:
     order: int
     bias_order: int
     kernel: str
+    #: ``e(coef_covs)``: the joint covariate coefficient, or nan when no ``covs`` were given.
+    coef_covs: Any = None
     se: float = float("nan")
     z: float = float("nan")
     pvalue: float = float("nan")
@@ -140,6 +142,102 @@ def _triangular(distance: np.ndarray, bandwidth: float) -> np.ndarray:
     return np.maximum(0.0, 1.0 - np.abs(distance / bandwidth))
 
 
+def _covariate_adjusted(
+    response: np.ndarray,
+    distance: np.ndarray,
+    covariates: Any,
+    bandwidth: float,
+    order: int,
+) -> tuple[float, int, int, np.ndarray]:
+    """Covariate-adjusted RD, transcribed from ``rdrobust.ado:761-841``.
+
+    The mechanism is Frisch-Waugh partialling per side, then POOLING the two sides before one
+    joint solve -- which is why Stata reports a single ``e(coef_covs)`` rather than one per side:
+
+        D_side   = [response, covariates]        covariates appended AFTER the response (:761)
+        G_p      = R'W R                          R = polynomial basis, no covariates
+        beta_p   = G_p^-1 R'W D                   (p+1) x (1 + dZ)  (:771)
+        ZWZ      = pooled moment of the covariate after partialling R out
+        gamma_p  = ZWZ^-1 ZWY                     (:834)
+        s_Y      = (1, -gamma_p)
+        tau_cl   = s_Y' * beta_p[deriv+1, ]       (:841)
+
+    TWO DETAILS that took separate rounds to get right, both now verified on
+    ``rdrobust vote margin, h(17.75) b(28.03) covs(cov1)``:
+
+    * ``beta_p`` has ONE ROW PER POLYNOMIAL ORDER, not one row per outcome. For a linear fit
+      with one covariate it is 2x2: rows = intercept/slope, columns = response/covariate.
+    * ``s_Y' * beta_p[deriv+1, ]`` with ``deriv=0`` reads ROW 0, the intercept row. Reading row
+      1 (the slope) gave 0.4238 against Stata's 7.4906.
+
+    Reproduced exactly: tau 7.49061748, gamma -94.34797652, samples 360 / 323.
+    """
+
+    from westata.errors import ConsistencyError
+
+    z = np.asarray(covariates, dtype=float)
+    if z.ndim == 1:
+        z = z.reshape(-1, 1)
+    if z.shape[0] != response.size:
+        raise ConsistencyError(
+            f"rdrobust: {z.shape[0]} covariate rows against {response.size} observations"
+        )
+    if not np.all(np.isfinite(z)):
+        raise ConsistencyError("rdrobust: covariates contain missing values")
+
+    left = distance < 0.0
+    right = ~left
+    sides: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
+    for name, mask, sign in (
+        ("right", right, 1.0),
+        ("left", left, -1.0),
+    ):
+        # Restrict to this side FIRST. Using the full-length distance without masking made
+        # `inside` true everywhere, so both "sides" contained all 683 observations and the
+        # estimate collapsed to 0.
+        signed = sign * distance[mask]
+        weight = _triangular(signed, bandwidth)
+        inside = weight > 0.0
+        basis = np.column_stack(
+            [signed[inside] ** power for power in range(order + 1)]
+        )
+        design = np.column_stack([response[mask][inside], z[mask][inside]])
+        sides[name] = (basis, weight[inside], design, int(inside.sum()))
+
+    basis_r, w_r, d_r, used_right = sides["right"]
+    basis_l, w_l, d_l, used_left = sides["left"]
+
+    inverse_r = np.linalg.pinv(basis_r.T @ (basis_r * w_r[:, None]))
+    inverse_l = np.linalg.pinv(basis_l.T @ (basis_l * w_l[:, None]))
+    beta_r = inverse_r @ (basis_r.T @ (d_r * w_r[:, None]))
+    beta_l = inverse_l @ (basis_l.T @ (d_l * w_l[:, None]))
+    beta_p = beta_r - beta_l
+
+    def _partial(basis: np.ndarray, weight: np.ndarray, target: np.ndarray) -> np.ndarray:
+        coefficients = np.linalg.pinv(basis.T @ (basis * weight[:, None])) @ (
+            basis.T @ (weight * target)
+        )
+        return target - basis @ coefficients
+
+    numerator = 0.0
+    denominator = 0.0
+    for basis, weight, design in ((basis_r, w_r, d_r), (basis_l, w_l, d_l)):
+        for column in range(1, d_r.shape[1]):
+            z_tilde = _partial(basis, weight, design[:, column])
+            y_tilde = _partial(basis, weight, design[:, 0])
+            numerator += float(np.sum(weight * z_tilde * y_tilde))
+            denominator += float(np.sum(weight * z_tilde**2))
+    if denominator <= 0.0:
+        raise ConsistencyError(
+            "rdrobust: the covariates are collinear with the polynomial terms inside the "
+            "bandwidth, so no adjustment can be estimated"
+        )
+    gamma = np.array([numerator / denominator])
+    multiplier = np.concatenate(([1.0], -gamma))
+    tau = float(multiplier @ beta_p[0])
+    return tau, used_left, used_right, gamma
+
+
 def _local_polynomial(
     distance: np.ndarray,
     response: np.ndarray,
@@ -179,6 +277,7 @@ def rdrobust(
     order: int = 1,
     bias_order: int = 2,
     kernel: str = "triangular",
+    covs: Any = None,
 ) -> RdRobustResult:
     """Sharp RD estimate at ``cutoff``.
 
@@ -219,12 +318,20 @@ def rdrobust(
     right = distance >= 0.0
     left = ~right
 
-    mu_right, used_right = _local_polynomial(
-        distance[right], y[right], bandwidth, order
-    )
-    mu_left, used_left = _local_polynomial(
-        -distance[left], y[left], bandwidth, order
-    )
+    if covs is None:
+        mu_right, used_right = _local_polynomial(
+            distance[right], y[right], bandwidth, order
+        )
+        mu_left, used_left = _local_polynomial(
+            -distance[left], y[left], bandwidth, order
+        )
+        covariate_coefficients: Any = None
+    else:
+        tau_covs, used_left, used_right, covariate_coefficients = _covariate_adjusted(
+            y, distance, covs, bandwidth, order
+        )
+        mu_right = tau_covs
+        mu_left = 0.0
 
     return RdRobustResult(
         tau=float(mu_right - mu_left),
@@ -239,4 +346,5 @@ def rdrobust(
         order=int(order),
         bias_order=int(bias_order),
         kernel="Triangular",
+        coef_covs=covariate_coefficients,
     )

@@ -93,6 +93,7 @@
 | `marginsplot` | ❌ | 绘图，超出范围 |
 | `estat gof` | ✅ 已实现（`poisson` 专属） | `result.estat_gof()`；公式抄自 `poisgof.ado`，含易漏的 `Σ lngamma(1+y)` 项；**`nbreg` 刻意拒绝**（Stata 无此命令） |
 | `estat ic` | ✅ 已实现 | `result.estat_ic()`；四准则公式抄自 `estimates.ado:985-1002`；`df` 默认 `rank(V)`。**注意 `e(aic)` 与 `estat ic` 的 AIC 本就不同**（差 `N(1+log2π)`），见 §8.20.12 |
+| `estat dwatson` | ✅ 已实现（线性模型） | `result.estat_dwatson()`；`d = Σ(e_t−e_{t−1})² / Σe_t²`，输出 `Durbin–Watson d-statistic(  df,     N) =  d`（49 字符）。**矩阵实现早已存在于 `postestimation/serial.py` 且逐值正确，但从未挂到结果对象上**——第 93 轮才发现 `result.estat_dwatson()` 抛 `AttributeError`；本次仅补接线。grilic 实测 `Durbin–Watson d-statistic(  4,   758) =  1.704354` 逐字节一致 |
 | `estat vif` | ✅ 已实现（线性模型） | `result.estat_vif()`；公式抄自 `vif.ado`，支持 `uncentered`/`nosort`；无常数模型与非线性模型按 Stata 行为拒绝 |
 | `estat hettest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_hettest()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`。**无变量列表 = 拟合值**（`hettest.ado:110-115`），不是“全部回归元”——这曾是与 Stata 不一致的根因；`rhs=True` 才是全部 `e(b)` 回归元。`variables` 按**原始数据变量名**解析（`rep78` 是原始 1-5 列，df=1），否则按设计列名。估计权重被辅助回归复用（`fweight`/`iweight` 的 `e(N)=sum(w)`）。robust/cluster VCE、pweight 与 `noconstant` 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29；单回归元时按 `hettest.ado:126-128` 静默丢弃。90 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/hettest_auto.json`） |
 | `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_ovtest()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True` |

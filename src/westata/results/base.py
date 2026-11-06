@@ -666,6 +666,19 @@ class StataResults:
 
         return estat_ic(self, **kwargs)
 
+    def estat_dwatson(self, **kwargs: Any) -> Any:
+        """Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.
+
+        ``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some
+        time, but it was never reachable from a fitted result: the report's chapter 7-9 checks
+        call ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,
+        the wiring was missing.
+        """
+
+        from westata.postestimation.serial import estat_dwatson
+
+        return estat_dwatson(self, **kwargs)
+
     def estat_firststage(self, **kwargs: Any) -> Any:
         """Stata's ``estat firststage`` -- IV first-stage diagnostics.
 

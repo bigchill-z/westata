@@ -146,9 +146,11 @@ class VifResult:
         table against Stata's.
         """
 
-        header = f"{'Variable':>12} |       VIF       1/VIF"
+        # Captured byte-exactly from a live estat vif: NO leading blank line, and the header
+        # carries two trailing spaces so it is 36 characters like every other row.
+        header = f"{'Variable':>12} |       VIF       1/VIF  "
         rule = "-" * 13 + "+" + "-" * 22
-        lines = ["", header, rule]
+        lines = [header, rule]
         for name, value, tol in zip(self.names, self.vif, self.tolerance):
             lines.append(f"{name:>12} |{value:>10.2f}    {tol:>8.6f}")
         lines.append(rule)

@@ -33,13 +33,13 @@ import pytest
 import westata as ws
 
 DATA = r"D:\myCodeProject\test_westata\data\cobb_douglas.dta"
+# Captured byte-exactly from a live `estat ic`: FOUR lines, no rules at all. The earlier
+# expectation here included three 77-character rules; the live output does not contain them, so
+# this test and the renderer were both wrong in the same way.
 STATA_BLOCK = [
     "Akaike's information criterion and Bayesian information criterion",
-    "-" * 77,
     "       Model |          N   ll(null)  ll(model)      df        AIC        BIC",
-    "-------------+---------------------------------------------------------------",
     "           . |         24  -124.2294  -102.2761       2   208.5522   210.9083",
-    "-" * 77,
     "Note: BIC uses N = number of observations. See [R] IC note.",
 ]
 
@@ -68,14 +68,12 @@ def test_the_log_likelihoods_have_four_decimals(rendered) -> None:
     assert "-102.27611" not in rendered
 
 
-def test_the_edge_rules_are_full_width(rendered) -> None:
-    """Only the header separator carries a '+'; the outer rules do not."""
+def test_there_are_no_rule_lines(rendered) -> None:
+    """The live table has no rules. An earlier version emitted three of them."""
 
     rules = [line for line in rendered.splitlines() if set(line) == {"-"}]
-    assert rules, "no full-width rule found"
-    assert len(rules) == 2
-    # The split rule sits between the header and the data row.
-    assert "-------------+---" in rendered
+    assert rules == []
+    assert rendered.count("\n") == 3
 
 
 def test_the_model_cell_is_a_dot(rendered) -> None:

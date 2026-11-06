@@ -1,0 +1,102 @@
+"""Three layout/wiring fixes found by capture-and-compare in round 93.
+
+vif       The header carried no trailing spaces, so it was 36 characters where Stata's is 38,
+          and an extra leading blank line preceded the table.
+ic        Three 77-character rules and blank lines wrapped a table that Stata prints as FOUR
+          plain lines. A comment claimed the rules were "measured from a live estat ic"; they
+          were not, and the test encoded the same mistake.
+dwatson   result.estat_dwatson() raised AttributeError. The implementation in
+          postestimation/serial.py was already correct and already matched Stata byte for byte --
+          it was simply never wired to the result object.
+
+Captured references:
+
+    Variable |       VIF       1/VIF
+-------------+----------------------
+        expr |      1.12    0.893267
+...
+    Mean VIF |      1.06
+
+    Akaike's information criterion and Bayesian information criterion
+           Model |          N   ll(null)  ll(model)      df        AIC        BIC
+               . |        758  -433.4714  -287.9592       4   583.9184   602.4412
+    Note: BIC uses N = number of observations. See [R] IC note.
+
+    Durbin-Watson d-statistic(  4,   758) =  1.704354
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import westata as ws
+
+DATA = r"D:\myCodeProject\test_westata\data\grilic.dta"
+COLUMNS = ["lnw", "s", "expr", "tenure", "rns", "smsa"]
+
+
+@pytest.fixture(scope="module")
+def frame():
+    try:
+        return pd.read_stata(DATA).dropna(subset=COLUMNS)
+    except FileNotFoundError:  # pragma: no cover - data lives outside the repo
+        pytest.skip("grilic.dta is not available")
+
+
+@pytest.fixture(scope="module")
+def simple(frame):
+    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+
+
+@pytest.fixture(scope="module")
+def extended(frame):
+    return ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
+
+
+def test_dwatson_is_callable(simple) -> None:
+    """It raised AttributeError before this round."""
+
+    rendered = str(simple.estat_dwatson())
+    assert rendered == "Durbin–Watson d-statistic(  4,   758) =  1.704354"
+
+
+def test_dwatson_has_the_stata_width(simple) -> None:
+    assert len(str(simple.estat_dwatson())) == 49
+
+
+def test_ic_has_no_rules(simple) -> None:
+    lines = str(simple.estat_ic()).splitlines()
+    assert len(lines) == 4
+    assert not any(set(line) == {"-"} for line in lines)
+
+
+def test_ic_matches_stata(simple) -> None:
+    lines = str(simple.estat_ic()).splitlines()
+    assert lines[0] == (
+        "Akaike's information criterion and Bayesian information criterion"
+    )
+    assert lines[1] == (
+        "       Model |          N   ll(null)  ll(model)      df        AIC        BIC"
+    )
+    assert lines[3] == "Note: BIC uses N = number of observations. See [R] IC note."
+
+
+def test_vif_has_no_leading_blank_line(extended) -> None:
+    lines = str(extended.estat_vif()).splitlines()
+    assert lines[0].startswith("    Variable |")
+
+
+def test_vif_header_carries_the_trailing_spaces(extended) -> None:
+    """Stata's header is 38 characters; ours was 36."""
+
+    header = str(extended.estat_vif()).splitlines()[0]
+    assert len(header) == 38, repr(header)
+    assert header.endswith("  ")
+
+
+def test_vif_rows_match_stata(extended) -> None:
+    rendered = str(extended.estat_vif())
+    assert "        expr |      1.12    0.893267" in rendered
+    assert "    Mean VIF |      1.06" in rendered

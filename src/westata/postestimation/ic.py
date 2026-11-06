@@ -157,14 +157,17 @@ class IcResult:
             f"{_cell(self.aic, 11, 4)}{_cell(self.bic, 11, 4)}"
         )
         note = "Note: BIC uses N = number of observations. See [R] IC note."
-        # Structure measured from a live ``estat ic``: a FULL-width rule, the header, the
-        # split rule, the data row, then another FULL-width rule. The first and last rules
-        # have no "+" column -- an earlier version used the split rule for all three, so the
-        # opening line had a vertical bar in it and both edges were wrong.
-        full_rule = "-" * 77
-        return chr(10).join(
-            ["", title, "", full_rule, header, rule, row, full_rule, note]
-        )
+        # Captured byte-exactly from a live estat ic on grilic: FOUR lines, no rules.
+        #
+        #   Akaike's information criterion and Bayesian information criterion
+        #          Model |          N   ll(null)  ll(model)      df        AIC        BIC
+        #              . |        758  -433.4714  -287.9592       4   583.9184   602.4412
+        #   Note: BIC uses N = number of observations. See [R] IC note.
+        #
+        # The previous version wrapped this in three 77-character rules and blank lines,
+        # with a comment claiming that structure came from a live estat ic. The live output
+        # has no rules at all -- the comment and the test encoding it were both wrong.
+        return chr(10).join([title, header, row, note])
 
     def to_frame(self) -> pd.DataFrame:
         """The single row as a DataFrame with Stata's column names."""

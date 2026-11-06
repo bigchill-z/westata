@@ -1074,7 +1074,27 @@ class _DiscreteBase:
 
 
 class Logit(_DiscreteBase):
-    """Logistic regression (Stata ``logit``)."""
+    """Logistic regression (Stata ``logit``).
+
+    NO INTERCEPT IS ADDED. The design matrix passed to ``Logit(y, X, ...)`` is taken as COMPLETE,
+    exactly as statsmodels treats it. Stata's ``logit y x1 x2`` adds a constant for you, so the two
+    calls are not equivalent:
+
+        ws.Logit(y, X, param_names=["x1", "x2"])            # no constant -> different model
+        ws.Logit.from_formula("y ~ x1 + x2", frame)         # constant included, matches Stata
+
+    Getting this wrong does not raise: it returns a well-formed fit with plausible coefficients
+    that disagree with Stata, which reads as a numerical defect rather than a missing column.
+    Measured on grilic.dta with a median split of lnw:
+
+        array interface, no constant   coef [.002219, -.000498, .052896]
+        Stata `logit hi s expr tenure`  coef [.459083, .158881, .153049], _cons -6.691539
+
+    To keep the array interface and still match Stata, pass a column of ones yourself:
+
+        X = np.column_stack([np.ones(len(frame)), frame[["s", "expr", "tenure"]]])
+        ws.Logit(y, X, param_names=["_cons", "s", "expr", "tenure"])
+    """
 
     _stata_command = "logit"
     _supports_freq_weights = True
@@ -1086,7 +1106,11 @@ class Logit(_DiscreteBase):
 
 
 class Probit(_DiscreteBase):
-    """Probit regression (Stata ``probit``)."""
+    """Probit regression (Stata ``probit``).
+
+    NO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design
+    matrix as complete and what to pass instead.
+    """
 
     _stata_command = "probit"
     _supports_freq_weights = True
@@ -1098,7 +1122,11 @@ class Probit(_DiscreteBase):
 
 
 class Poisson(_DiscreteBase):
-    """Poisson regression (Stata ``poisson``)."""
+    """Poisson regression (Stata ``poisson``).
+
+    NO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design
+    matrix as complete and what to pass instead.
+    """
 
     _stata_command = "poisson"
     _supports_freq_weights = True

@@ -59,15 +59,21 @@ from westata.errors import ConsistencyError, UnsupportedError
 
 __all__ = ["VecRankResult", "VecRankRow", "vecrank"]
 
-#: 95% critical values for the trace statistic, by (deterministic order, rank).
-#: ``vecrank.sthlp`` tabulates the same numbers; only the constant case is wired up, because
-#: that is the only one whose statistics this module reproduces.
-_TRACE_CRITICAL: dict[int, tuple[float, ...]] = {
-    0: (15.41, 3.76),
-}
-_MAX_CRITICAL: dict[int, tuple[float, ...]] = {
-    0: (14.07, 3.76),
-}
+#: 95% critical values keyed by the RANK being tested, not by the number of variables.
+#: The Osterwald-Lenum tables give one value per rank, so the same tuple serves any k: a
+#: three-variable system at rank 0 is tested against 29.68, at rank 1 against 15.41, at rank 2
+#: against 3.76. The earlier comment described these as keyed by "deterministic order", which
+#: is why the table held only two entries and produced a nan in the third row.
+#:
+#: Measured from a live ``vecrank inf unem dinf, lags(2) max trend(constant)`` and the
+#: two-variable run beside it::
+#:
+#:     rank  trace 5%   max-eigen 5%
+#:        0     29.68          20.97
+#:        1     15.41          14.07
+#:        2      3.76           3.76
+_TRACE_CRITICAL_5: tuple[float, ...] = (29.68, 15.41, 3.76)
+_MAX_CRITICAL_5: tuple[float, ...] = (20.97, 14.07, 3.76)
 
 
 @dataclass(frozen=True)
@@ -248,8 +254,8 @@ def vecrank(
     # statistic IS that LR. Verified on the reference case: 1224.4562, 1220.5657, 1132.9103.
     full_ll = _unrestricted_loglikelihood(values, lags)
 
-    critical_trace = _TRACE_CRITICAL[0]
-    critical_max = _MAX_CRITICAL[0]
+    critical_trace = _TRACE_CRITICAL_5
+    critical_max = _MAX_CRITICAL_5
     rows: list[VecRankRow] = []
     for rank in range(equations + 1):
         # Stata prints the eigenvalue on the row BELOW its trace statistic: rank 0's row

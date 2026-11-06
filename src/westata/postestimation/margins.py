@@ -1019,6 +1019,15 @@ def margins(
         )
         return _finish_margins(rows, result)
     requested = [dydx] if isinstance(dydx, str) else list(dydx)
+    # ``dydx(s expr)`` -- Stata accepts a SPACE-SEPARATED varlist inside one pair of
+    # parentheses, and a caller writing that is asking for two effects, not for a column named
+    # "s expr". Without this split the resolver raised
+    # ``KeyError: column 's expr' not in [...]``, which reads like a typo in the data rather
+    # than an unsupported spelling.
+    split_request: list[str] = []
+    for entry in requested:
+        split_request.extend(str(entry).split())
+    requested = split_request
     # ``dydx(*)`` means EVERY covariate, which in Stata is every parameter except the
     # constant: a live ``margins, dydx(*)`` after ``regress y k l`` reports
     # "dy/dx wrt:  k l". Passing '*' straight to the resolver raised

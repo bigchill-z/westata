@@ -2584,7 +2584,14 @@ class VECMResults:
         for index in range(neqs):
             suffix = f"_{index + 1}"
             payload["k" + suffix] = float(df_eq)
-            payload["df_m" + str(index + 1)] = float(df_eq - 1)
+            # Stata's e(df_m#) for a vec fit EQUALS the per-equation parameter count, not one
+            # less: measured e(df_m1) = e(df_m2) = e(k_1) = e(k_2) = 4 on a rank(1) VAR(1)-in-
+            # differences model. Subtracting one gave 3.
+            #
+            # This differs from the VAR convention further up, where df_m# is the model df with
+            # the deterministic term removed -- a vec equation's deterministic term and its
+            # error-correction term are both free parameters here.
+            payload["df_m" + str(index + 1)] = float(df_eq)
             equation_residual = residuals[:, index]
             rss = float(equation_residual @ equation_residual)
             payload["rmse" + suffix] = (

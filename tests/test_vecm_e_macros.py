@@ -315,13 +315,21 @@ def test_k_per_equation_matches_df_eq(vecm_fit) -> None:
     assert float(vecm_fit.e["k_2"]) == expected
 
 
-def test_df_m_per_equation_excludes_the_constant(vecm_fit) -> None:
-    """``df_m`` is the MODEL df, so the deterministic term is removed."""
+def test_df_m_per_equation_equals_the_parameter_count(vecm_fit) -> None:
+    """For a vec fit, ``e(df_m#)`` EQUALS the per-equation parameter count.
+
+    This test used to assert ``df_m# == df_eq - 1``, on the VAR convention where the model df
+    removes the deterministic term. Measured against a live ``vec dinf unem, lags(2) rank(1)``:
+
+        e(k_1) = e(k_2) = e(df_m1) = e(df_m2) = e(df_m) = 4
+
+    -- the error-correction term and the constant are both free parameters, so nothing is
+    removed. The minus-one produced 3.
+    """
 
     for index in (1, 2):
-        assert float(vecm_fit.e[f"df_m{index}"]) == float(
-            vecm_fit.e["df_eq"]
-        ) - 1.0
+        assert float(vecm_fit.e[f"df_m{index}"]) == float(vecm_fit.e[f"k_{index}"])
+        assert float(vecm_fit.e[f"df_m{index}"]) == 4.0
 
 
 def test_the_r_squared_lies_in_the_unit_interval(vecm_fit) -> None:

@@ -207,17 +207,37 @@ class VecRankResult:
                 eigenvalue = "."
             else:
                 eigenvalue = f"{row.eigenvalue:.5f}"
+            # Layout measured from ALL SIX rows of both tables at once, not one at a time --
+            # adjusting a row and re-running is how three previous attempts each fixed one
+            # line and broke another.
+            #
+            #   rank  right-aligned to  7      params right-aligned to 14     (both fixed)
+            #   LL    LEFT-aligned from 19 - (params digits - 1)
+            #   eig, trace, crit  right-aligned to 40, 52, 62 minus that same shift
+            #
+            # The LL is left-aligned, which is what makes a SHORT likelihood text (the trend
+            # table drops a trailing zero: 1224.797 against 1224.4562) start in the same column
+            # rather than right-align into it. Treating every field as right-aligned is what
+            # produced a table that matched one row and broke the next.
+            shift = len(str(int(row.params))) - 1
+            ll_text = f"{row.loglikelihood:.4f}"
+            if self.deterministic == "trend" and "." in ll_text:
+                ll_text = ll_text.rstrip("0").rstrip(".")
+
+            line = f"{row.rank:>7}{row.params:>7}"
+            line += " " * max(19 - shift - len(line), 0) + ll_text
+            # The short final row has no trace or critical; when its likelihood is also one
+            # character lighter, the eigenvalue moves in by one more.
+            extra = 1 if (row.rank >= self.equations and len(ll_text) < 9) else 0
+            line += " " * max(40 - shift - extra - len(line) - len(eigenvalue), 0) + eigenvalue
             if row.rank >= self.equations:
-                # Short final row: no trace, no critical, and a 13-wide LL field.
-                lines.append(
-                    f"{row.rank:>7}{row.params:>7}{row.loglikelihood:>13.4f}"
-                    f"{eigenvalue:>12}"
-                )
+                lines.append(line)
                 continue
-            lines.append(
-                f"{row.rank:>7}{row.params:>7}{row.loglikelihood:>14.4f}"
-                f"{eigenvalue:>12}{row.trace:>12.4f}{row.trace_critical:>10.2f}"
-            )
+            trace_text = f"{row.trace:.4f}"
+            line += " " * max(52 - shift - len(line) - len(trace_text), 0) + trace_text
+            critical_text = f"{row.trace_critical:.2f}"
+            line += " " * max(62 - shift - len(line) - len(critical_text), 0) + critical_text
+            lines.append(line)
         lines.append("-" * 62)
         return "\n".join(lines)
 

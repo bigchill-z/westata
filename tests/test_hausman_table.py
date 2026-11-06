@@ -18,9 +18,11 @@ carries that order but spells the constant "_cons" while param_names says "Inter
 name is mapped back to the param_names spelling -- and _CONSTANT_NAMES mixes cases, so the
 comparison has to be case-insensitive on both sides.
 
-ONE KNOWN RESIDUAL: the "smsa" row is one character shorter than Stata's, because Stata's column
-width adapts when the (B) value is nine characters ("-.1396666") rather than eight. Four of five
-coefficient rows are byte-identical; this one differs by a single space.
+ALL FIVE coefficient rows are now byte-identical to a live Stata run. An earlier version of this
+module recorded a "one space short" residual on the "smsa" row and described Stata's (B) value as
+"-.1396666"; both were wrong. The real value is POSITIVE ".1396666" (eight characters), and the
+column widths 12/13/16/16 in modeltests.py already place it exactly. Verified again in round 141
+against `hausman iv ols` on grilic.dta: every one of the five rows is 71 characters and matches.
 """
 
 from __future__ import annotations
@@ -101,16 +103,20 @@ STATA_ROWS = [
     "        expr |    .0502254     .0381189        .0121065        .0030987",
     "      tenure |    .0355587     .0356146       -.0000559        .0021937",
     "         rns |   -.0721638    -.0840797        .0119159        .0085301",
+    # The fifth row, previously recorded as one space short. Stata's (B) is POSITIVE and eight
+    # characters wide, and 12/13/16/16 places it exactly.
+    "        smsa |    .1195348     .1396666       -.0201319        .0089985",
 ]
 
 
-def test_four_of_five_coefficient_rows_are_byte_identical(outcome) -> None:
-    """The "smsa" row is the one known residual (a single space from a 9-character value)."""
+def test_all_five_coefficient_rows_are_byte_identical(outcome) -> None:
+    """Round 141: no residual remains, so all five rows are pinned rather than four."""
 
     rendered = str(outcome)
     lines = rendered.splitlines()
     for expected in STATA_ROWS:
         assert expected in lines, repr(expected)
+        assert len(expected) == 71
 
 
 def test_the_small_coefficient_uses_fixed_point(outcome) -> None:

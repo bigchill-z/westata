@@ -40,6 +40,21 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 3 轮）：`prais ..., corc` 已实现
+
+报告 P1 / C08-05 说 `prais` 缺 `corc` 选项——**准确**。
+
+`corc` 不是外观开关：Cochrane-Orcutt 变换**丢弃**首观测，而 Prais-Winsten 把它乘以 `sqrt(1 - rho^2)`（`prais.ado:6` 的 `syntax ... noDW CORC`，`:255` 记录 `e(tranmeth)` 为 `corc` 或 `prais`）。这会同时改变全部系数**和** `rho` 本身。
+
+| | 系数（`k`, `l`）| `rho` |
+|---|---|---|
+| `prais` Stata | `.15651652`, `.93948861` | `.12543124` |
+| `prais` westata | `.15651651`, `.93948867` | `.12543150` |
+| `corc` Stata | `.15687809`, `.92974899` | `.11463695` |
+| `corc` westata | `.15687809`, `.92974901` | `.11463704` |
+
+斜率一致到 8 位有效数字，常数项与 `rho` 到约 `1e-6`（迭代容差，非结构差异）。默认 Prais-Winsten 路径未改动，并有独立测试复核其四个数值，防止将来重构共享循环时被静默改动。
+
 ### v2 报告（第 2 轮）：vecrank 的「缺最后一阶」不成立，`trend(trend)` 未实现
 
 | 报告说法 | 实测 | 处置 |

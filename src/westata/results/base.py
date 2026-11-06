@@ -679,6 +679,23 @@ class StataResults:
 
         return estat_firststage(self, **kwargs)
 
+    def first_stage(self) -> str:
+        """Stata's ``ivregress ..., first`` -- the first-stage regression table.
+
+        One block per endogenous regressor, headed "First-stage regressions": the F,
+        R-squared, adjusted R-squared and Root MSE of that equation, then its
+        coefficient table with the included exogenous variables and the excluded
+        instruments.
+
+        This is a different output from :meth:`estat_firststage`, which prints the
+        DIAGNOSTICS for the same equations. Stata offers both and they are not
+        substitutes, so both are here.
+        """
+
+        from westata.estimators.first_stage_table import render_first_stage
+
+        return render_first_stage(self)
+
     def estat_overid(self, **kwargs: Any) -> Any:
         """Stata's ``estat overid`` -- overidentification restrictions test.
 

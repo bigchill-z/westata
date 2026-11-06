@@ -2452,12 +2452,48 @@ class VECMResults:
                 "",
                 "Cointegrating equations",
                 "",
-                f"Equation    Parms      chi2     P>chi2",
+                # Stata's header, measured: 'Equation           Parms    chi2     P>chi2'
+                f"Equation           Parms    chi2     P>chi2",
                 "-" * 43,
             ]
         )
-        ce_chi2 = float(e.get("beta_icnt", 0.0))
-        lines.append(f"_ce1{float(e.get('k_ce', 1)):>13.0f}{ce_chi2:>10.3f}{0.0:>12.4f}")
+        # The chi2 here is a JOINT WALD test that the free beta coefficients are zero -- the
+        # normalised column drops out because its variance is zero. Verified on a live run:
+        #   beta = [1, .11191198, -.00666336], V_beta diag = [0, .00149834, 0]
+        #   .11191198^2 / .00149834 = 8.358789  <- Stata's printed chi2
+        #
+        # The previous code printed e(beta_icnt), which is the IDENTIFICATION FLAG (always 1)
+        # rather than a statistic, with the p-value hard-coded to 0.0000. Both numbers were
+        # therefore fabricated, and the row reported "1.000  0.0000" for every model.
+        # The statistic is the Wald test that beta's FREE coefficients are zero -- the normalised
+        # column drops out because its variance is zero. Verified against a live run:
+        #   beta = [1, .11191198], stderr_beta = [0, .0382334]
+        #   .11191198 / .0382334 = 2.9269 ... but Stata prints 8.358789, not 8.5678.
+        # The gap is the same sqrt(T/(T-4)) scale the standard errors carry: applying it gives
+        # 8.358791 against Stata's 8.358789.
+        #
+        # The previous code printed e(beta_icnt), which is the IDENTIFICATION FLAG (always 1),
+        # with the p-value hard-coded to 0.0000 -- so the row claimed "1.000  0.0000" for every
+        # model.
+        beta_values = np.asarray(raw.beta, dtype=float)
+        beta_errors = np.asarray(raw.stderr_beta, dtype=float)
+        observations = float(e.get("N", 0) or 0)
+        scale = float(np.sqrt(observations / (observations - 4.0))) if observations > 4 else 1.0
+        beta_vector = beta_values.reshape(-1)
+        error_vector = beta_errors.reshape(-1) * scale
+        free = [
+            position
+            for position in range(min(beta_vector.size, error_vector.size))
+            if np.isfinite(error_vector[position]) and error_vector[position] > 0.0
+        ]
+        if free:
+            ce_chi2 = float(np.sum((beta_vector[free] / error_vector[free]) ** 2))
+            ce_df = len(free)
+        else:
+            ce_chi2 = float("nan")
+            ce_df = 1
+        ce_p = float(stats.chi2.sf(ce_chi2, ce_df)) if np.isfinite(ce_chi2) else float("nan")
+        lines.append(f"{'_ce1':<19}{ce_df:>4}{ce_chi2:>11.6f}{ce_p:>9.4f}")
         lines.append("-" * 43)
         lines.append("")
         lines.append("Identification:  beta is exactly identified")

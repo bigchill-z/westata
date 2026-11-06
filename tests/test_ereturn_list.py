@@ -84,8 +84,9 @@ def test_scalar_values_match_stata(fitted) -> None:
 def test_the_scalar_spacing_and_width(fitted) -> None:
     rendered = ws.format_ereturn_list(fitted)
     line = next(row for row in rendered.splitlines() if "e(rank)" in row)
-    # '                   e(rank) =  3' -- 23-wide name, " =  " then the value.
-    assert line == f"{'e(rank)':>23} =  3"
+    # '               e(rank) =  3' -- 22-wide name, " =  " then the value. Captured
+    # from a live ereturn list: the name field is 22, not the 23 this test used to assert.
+    assert line == f"{'e(rank)':>22} =  3"
 
 
 def test_the_macro_separator_differs_from_the_scalar_one(fitted) -> None:
@@ -95,13 +96,13 @@ def test_the_macro_separator_differs_from_the_scalar_one(fitted) -> None:
     macro = next(
         row for row in rendered.splitlines() if 'e(title)' in row and ':' in row
     )
-    assert macro == f"{'e(title)':>23} : \"Linear regression\""
+    assert macro == f"{'e(title)':>22} : \"Linear regression\""
 
 
 def test_the_matrix_shapes_are_reported(fitted) -> None:
     rendered = ws.format_ereturn_list(fitted)
-    assert f"{'e(b)':>23} :  1 x 3" in rendered
-    assert f"{'e(V)':>23} :  3 x 3" in rendered
+    assert f"{'e(b)':>22} :  1 x 3" in rendered
+    assert f"{'e(V)':>22} :  3 x 3" in rendered
 
 
 def test_strings_are_filed_as_macros_and_numbers_as_scalars(fitted) -> None:

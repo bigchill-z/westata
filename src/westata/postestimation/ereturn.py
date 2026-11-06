@@ -55,7 +55,14 @@ __all__ = ["format_ereturn_list"]
 #: Stata prints the blocks in this order no matter how the estimates were stored.
 _BLOCK_ORDER = ("scalars", "macros", "matrices", "functions")
 
-_NAME_WIDTH = 23
+#: Width of the ``e(name)`` field. Captured from a live ``ereturn list`` after ``regress lnw s``:
+#:
+#:     '                  e(N) =  758'        29 characters
+#:     '                  e(F) =  255.7039662336325'   43
+#:
+#: Eighteen spaces, then "e(N)" (4), then " =  " (4), then the value. That is a 22-wide field for
+#: the name; the previous value of 23 put every scalar line one column past Stata's.
+_NAME_WIDTH = 22
 
 
 def _scalar_value(value: Any) -> str:

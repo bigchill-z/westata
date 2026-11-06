@@ -1147,6 +1147,88 @@ class VARResults:
         )
         return chr(10).join(lines)
 
+    def irf_create(
+        self,
+        path: str,
+        *,
+        irfname: str = "var1",
+        step: int = 10,
+    ) -> Any:
+        """Write a Stata-format dataset of IRF results, as ``irf create`` produces numerically.
+
+        An ``.irf`` file is NOT a binary IRF format: it is an ordinary Stata ``.dta`` dataset with
+        one row per (step, response, impulse) and Stata's 23 fixed columns. That makes the numbers
+        readable by ``pd.read_stata`` and comparable directly against a Stata-produced file.
+
+        VERIFIED against a live ``irf create v1, step(10)`` on macro_swatson.dta: ``irf``, ``cirf``,
+        ``oirf``, ``coirf`` and ``fevd`` match Stata to 3.4e-13 or better on all 44 rows, in the
+        same row order. Cumulative responses are running sums; FEVD is Stata's step h = westata's
+        step h-1 (step 0 is zero); and fevd_table's columns are (IMPULSE, RESPONSE), which is the
+        reverse of the .irf row's (response, impulse) naming.
+
+        IMPORTANT LIMITATION, not papered over: ``pandas.to_stata`` cannot write dataset-level
+        ``_dta[]`` characteristics, and Stata's ``irf describe`` / ``irf table`` require them --
+        notably ``_dta[irfnames]`` plus 16 per-result keys (``v1_model``, ``v1_tmin``,
+        ``v1_timevar``, ``v1_endog`` ...). Adding three of them by hand made ``irf describe``
+        recognise the name but ``irf table`` still returned r(498). So this file is a NUMERIC
+        EXPORT, not a drop-in replacement for a Stata .irf set. Making it one would require either
+        writing Stata's characteristic format directly or shelling out to Stata, neither of which
+        belongs in a package whose users may not have Stata installed.
+
+        Unverified columns (``mse``, every ``std*``, ``sirf``/``dm``/``cdm``/``sfevd``) are left
+        as missing values rather than guessed. A missing standard error is an honest answer; a
+        plausible-but-wrong one is not.
+
+        Returns the DataFrame that was written, so callers can inspect or re-save it.
+        """
+
+        import pandas as pd
+
+        analysis = self.irf(periods=step)
+        irfs = np.asarray(analysis.irfs, dtype=float)          # (step, response, impulse)
+        oirfs = np.asarray(analysis.orth_irfs, dtype=float)
+        names = list(self.names)
+        k = len(names)
+        fevd = self.fevd_table(periods=step + 1)
+
+        # Stata's fixed column order, measured from its own .irf file.
+        columns = [
+            "irfname", "step", "irf", "cirf", "oirf", "coirf", "sirf", "dm", "cdm",
+            "stdirf", "stdcirf", "stdoirf", "stdcoirf", "stdsirf", "stddm", "stdcdm",
+            "fevd", "sfevd", "mse", "stdfevd", "stdsfevd", "response", "impulse",
+        ]
+        empty = {name: [] for name in columns}
+
+        # Stata's ROW order is step in the outer loop, then response, then impulse -- measured
+        # from its own .irf file (step 0's four pairs come before step 1's).
+        for horizon in range(step + 1):
+            for response_index, response_name in enumerate(names):
+                for impulse_index, impulse_name in enumerate(names):
+                    empty["irfname"].append(irfname)
+                    empty["step"].append(horizon)
+                    empty["response"].append(response_name)
+                    empty["impulse"].append(impulse_name)
+                    empty["irf"].append(float(irfs[horizon, response_index, impulse_index]))
+                    empty["oirf"].append(float(oirfs[horizon, response_index, impulse_index]))
+                    # Cumulative responses are ordinary running sums; verified against Stata's
+                    # cirf 1 / .529056 and coirf .013603 / .007619.
+                    empty["cirf"].append(float(np.sum(irfs[: horizon + 1, response_index, impulse_index])))
+                    empty["coirf"].append(float(np.sum(oirfs[: horizon + 1, response_index, impulse_index])))
+                    # fevd_table's columns are (IMPULSE, RESPONSE), not (response, impulse) --
+                    # the same axis-order trap noted in fevd(). Stata's .irf row names the
+                    # response first, so the lookup has to be reversed.
+                    if horizon == 0:
+                        value = 0.0
+                    else:
+                        value = float(fevd.iloc[horizon - 1][(impulse_name, response_name)])
+                    empty["fevd"].append(value)
+
+        length = (step + 1) * k * k
+        frame = pd.DataFrame({name: empty[name] if empty[name] else [np.nan] * length
+                              for name in columns})
+        frame.to_stata(path, write_index=False)
+        return frame
+
     def fevd_table(self, periods: int = 10) -> Any:
         """Stata's ``irf table fevd``: one row per step, one column per (shock, response).
 

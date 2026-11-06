@@ -177,7 +177,10 @@
 | `teffects psmatch` / `ipwra` | ⬜ | 倾向得分匹配 / 加权回归调整 |
 | `didregress` 多期交错 | ⬜ | 仅做标准 2×2 |
 | `stteffects` | ⬜ | 生存处理效应 |
-| `csdid`、`drdid`、`rdrobust`、`synth`、`psmatch`、`pstest` | ❌ | 用户包，不在 base |
+| `csdid`、`drdid` | ❌ | 用户包，不在 base |
+| `rdrobust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
+| `synth` / `synth2` | ❌ | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；受阻于 `.mlib` 中的嵌套优化器 |
+| `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `teffects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
 
 ### 3.7 复杂抽样
 
@@ -202,8 +205,8 @@
 | `svar` | ⬜ | 结构 VAR |
 | `vecstable` / `vecnorm` | ⬜ | |
 | `newey` | ✅ 已实现 | `ws.newey(y ~ x, lag=#)`；`lag()` 必需，Bartlett 核；`Checkt` 三种间隔判定（`tflag==2` 即便 force 也拒绝）；`e()` 只有 7 个标量；`predict` 限 `xb/index/stdp/residuals`。见 §8.20.50 |
-| `prais` | ⬜ | |
-| `dfgls` / `ers` | ❌ | |
+| `prais` | ✅ 已实现（含 `corc`） | `ws.prais(frame, formula, corc=...)`；PW 与 CORC 都在。**在 icecream.dta 上 `corc` 与 Stata 一样不收敛**（Stata 自己报 `r(430)`），rho 差 0.005%。`ConvergenceError` 现在携带 `.rho`，与 Stata 先打印 rho 再报错的行为对齐。见第 111 轮 |
+| `dfgls` / `ers` | ⚠️ 已实现但统计量错 | `ws.dfgls(series)`；表结构、样本量（N=51）、`_b[iota]`、`alpha`、`maxlag` 全部与 Stata 精确一致，**但 tau 的符号与量级都错**（-1.284 对照 +0.806）。四轮排查已排除 NaN 对齐、`cbar`、`markout`、符号约定、`GetCritD/E`；剩余疑点在 `.mlib` 内部的不可见路径。见 `tests/test_dfgls_status.py` |
 | `sspace` / `ucm` / `mgarch` / `dsge` | ❌ | 见 §7 |
 
 ### 3.9 重抽样范围

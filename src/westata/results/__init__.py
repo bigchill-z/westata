@@ -12,3 +12,5 @@ from westata.results.base import StataResults
 from westata.results.stata_return import EReturn
 
 __all__ = ["StataResults", "EReturn"]
+
+from westata.results.esttab import etable_as_stata, render_esttab

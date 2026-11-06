@@ -162,6 +162,7 @@ from westata.postestimation import (
 )
 from westata.protocols import SSC
 from westata.report import etable, to_latex, to_markdown
+from westata.results.esttab import etable_as_stata, render_esttab
 
 # The version is read from the INSTALLED package metadata, which is what pip writes and what
 # `pip show` reports. It used to be a hardcoded string maintained alongside `pyproject.toml`, and the two
@@ -333,6 +334,8 @@ __all__ = [
     "estat_summarize",
     "margins",
     "etable",
+    "etable_as_stata",
+    "render_esttab",
     "to_latex",
     "to_markdown",
     "WEIGHT_TYPES",

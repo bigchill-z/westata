@@ -1753,6 +1753,108 @@ class RandomEffects(PanelOLS):
             )
 
 
+class RandomEffectsMLE(RandomEffects):
+    """Random-effects by MAXIMUM LIKELIHOOD (Stata ``xtreg, mle``).
+
+    ``xtreg, re`` is a GLS estimator that plugs in Swamy-Arora variance components;
+    ``xtreg, mle`` maximises the same random-effects likelihood over the coefficients AND the
+    two variance components at once. They are different estimators and give different numbers:
+
+        re   ltlan .565591486884  ltwlab .144184445858  sigma_u .133248446685
+        mle  ltlan .564328798388  ltwlab .140897433220  sigma_u .214109360143
+
+    ``sigma_u`` differs by 60%, so this cannot be emulated by adjusting the GLS output.
+
+    Fitted with statsmodels' ``MixedLM`` (ML, not REML -- Stata's ``xtreg, mle`` maximises the
+    full likelihood). Nelder-Mead is used rather than the default because it lands closer to
+    Stata's optimum on the reference fit: llf 332.8973943565 against 332.8973943543, with
+    ``ltlan`` agreeing to 1.6e-7 where the default was 9.8e-7 away.
+
+    Standard errors come from the inverse of the observed information, which is what Stata
+    reports; the reference values agree to about 1e-6.
+    """
+
+    _stata_command = "xtreg, mle"
+
+    def fit(  # type: ignore[override]
+        self,
+        entity_effects: bool = False,
+        time_effects: bool = False,
+        cov_type: str | None = None,
+        cov_kwds: Mapping[str, Any] | None = None,
+        ssc: SSC | None = None,
+    ) -> StataResults:
+        """Maximum-likelihood random effects (no robust VCE in Stata either)."""
+
+        from statsmodels.regression.mixed_linear_model import MixedLM
+
+        self._reject_effects(entity_effects, time_effects)
+        if cov_type not in (None, "", "nonrobust", "unadjusted"):
+            raise ConsistencyError(
+                "xtreg, mle: Stata's mle estimator does not accept a robust or clustered "
+                f"VCE; got cov_type={cov_type!r}"
+            )
+
+        y_series, x_frame = self._design()
+        y = np.asarray(y_series, dtype=float).reshape(-1)
+        # patsy puts Intercept first; keep that order and rename it _cons for Stata.
+        design_names = [
+            "_cons" if str(name) == "Intercept" else str(name) for name in x_frame.columns
+        ]
+        X = np.asarray(x_frame, dtype=float)
+        groups = np.asarray(x_frame.index.get_level_values(0), dtype=object)
+        _, groups = np.unique(groups, return_inverse=True)
+
+        fitted = MixedLM(y, X, groups=groups).fit(reml=False, method="nm")
+        params = np.asarray(fitted.fe_params, dtype=float)
+        # ``cov_params`` covers the fixed effects AND the random-effect variance, so its
+        # leading (k, k) block is the piece that belongs in e(V).
+        covariance = np.asarray(fitted.cov_params(), dtype=float)[
+            : params.size, : params.size
+        ]
+        names = design_names
+        sigma_u = float(np.sqrt(np.asarray(fitted.cov_re).ravel()[0]))
+        sigma_e = float(np.sqrt(float(fitted.scale)))
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+
+        nobs = int(len(y))
+        rank = int(X.shape[1])
+        df_resid = float(nobs - rank)
+        results = StataResults(
+            params=params,
+            param_names=names,
+            cov=covariance,
+            resid=y - X @ params,
+            fittedvalues=X @ params,
+            nobs=nobs,
+            df_resid=df_resid,
+            df_model=float(rank - 1),
+            dist="z",
+            model_name="random-effects MLE regression",
+            cov_type="unadjusted",
+            e={
+                "cmd": "xtreg",
+                "cmd2": "xtreg",
+                "title": "Random-effects ML regression",
+                "N": float(nobs),
+                "N_g": float(len(np.unique(groups))),
+                "df_m": float(rank - 1),
+                "df_r": df_resid,
+                "chi2type": "Wald",
+                "ll": float(fitted.llf),
+                "sigma_u": sigma_u,
+                "sigma_e": sigma_e,
+                "rho": sigma_u**2 / (sigma_u**2 + sigma_e**2),
+                "method": "mle",
+                "vcetype": "",
+                "depvar": self._formula.split("~", 1)[0].strip(),
+            },
+            level=95.0,
+        )
+        results._bse = pd.Series(standard_errors, index=names)
+        return results
+
+
 class BetweenOLS(RandomEffects):
     """Between estimator on entity means (Stata ``xtreg, be``).
 

@@ -82,6 +82,7 @@ from westata.estimators.systems import Eivreg, Manova, ManovaResult, Mvreg, Sure
 from westata.estimators.quantile import QuantileRegression, RobustRegression
 from westata.estimators.quantile_boot import Bsqreg, Sqreg
 from westata.estimators.panel import (
+    RandomEffectsMLE,
     BetweenOLS,
     FirstDifferenceOLS,
     PanelOLS,
@@ -169,6 +170,7 @@ __all__ = [
     "FEOLS",
     "PanelOLS",
     "RandomEffects",
+    "RandomEffectsMLE",
     "BetweenOLS",
     "FirstDifferenceOLS",
     "Logit",

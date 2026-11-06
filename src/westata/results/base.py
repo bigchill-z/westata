@@ -1185,6 +1185,15 @@ class StataResults:
                     _repeats = np.rint(_freq).astype(int)
                     if np.all(_repeats >= 0) and int(_repeats.sum()) > 0:
                         exog = np.repeat(_matrix, _repeats, axis=0)
+                        # The MODEL was fitted on the expanded sample, so the arithmetic needs
+                        # the expansion; the OUTPUT must come back on the caller's rows, which
+                        # is what Stata's ``predict`` does. Without collapsing, a 24-row
+                        # titanic fit returned 2201 values (v2 report, section 5.2).
+                        _starts = np.concatenate(([0], np.cumsum(_repeats)[:-1]))
+                        _values = np.asarray(predict(self, exog, kind, **kwargs))
+                        if _values.ndim == 1:
+                            return _values[_starts]
+                        return _values[_starts]
         else:
             exog = self._as_design_for_predict(exog)
         return predict(self, exog, kind, **kwargs)

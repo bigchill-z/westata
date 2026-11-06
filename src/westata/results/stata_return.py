@@ -33,6 +33,29 @@ class EReturn(dict[str, Any]):
         if kwargs:
             self.update(kwargs)
 
+    @staticmethod
+    def _bare(name: Any) -> Any:
+        """Strip Stata's ``e(...)`` wrapper from a key.
+
+        ``ereturn list`` prints names as ``e(N)``, ``e(r2)`` and so on, so a reader copying a
+        name out of that listing or out of the Stata manual writes ``results.e["e(N)"]``. The
+        stored key is the bare ``N``. Accepting both spellings costs one normalisation and stops
+        a KeyError that says nothing about the convention.
+        """
+
+        if isinstance(name, str) and name.startswith("e(") and name.endswith(")"):
+            return name[2:-1]
+        return name
+
+    def __getitem__(self, key: Any) -> Any:
+        return super().__getitem__(self._bare(key))
+
+    def __contains__(self, key: Any) -> bool:
+        return super().__contains__(self._bare(key))
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        return super().get(self._bare(key), default)
+
     def __getattr__(self, name: str) -> Any:
         """Return ``None`` for a scalar that was not recorded.
 

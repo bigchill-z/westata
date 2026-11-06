@@ -82,13 +82,24 @@ def panel():
 
 
 def test_endogenous_matches_stata(grilic) -> None:
-    """C10-05 does not match Stata yet; the framework is right and the numbers are close but
-    NOT equal, so this assert records the gap rather than claiming success."""
+    """C10-05. Round 134 asserted only the headings because I had compared the numbers by eye;
+    round 135 pinned them after confirming both sides see the same 758 rows.
+
+    Stata, on the identical frame:
+        Durbin (score) chi2(1) = 5.00343  (p = 0.0253)
+        Wu-Hausman F(1,755)    = 5.01674  (p = 0.0254)
+    """
 
     fit = ws.IV2SLS.from_formula("lnw ~ [expr ~ s + tenure + age]", grilic).fit()
+    assert int(fit.nobs) == 758
     rendered = str(fit.estat_endogenous())
     assert "Tests of endogeneity" in rendered
     assert "H0: Variables are exogenous" in rendered
+    assert f"{STATA_DURBIN:.5f}" in rendered
+    assert f"{STATA_WU_HAUSMAN:.5f}" in rendered
+    # The p-values travel with the statistics and are what a reader actually uses.
+    assert "0.0253" in rendered
+    assert "0.0254" in rendered
 
 
 def test_hausman_statistic_matches_stata(grilic) -> None:

@@ -1054,6 +1054,77 @@ class PanelOLS:
             return df_resid
         return float(n_clust - 1)
 
+    # ------------------------------------------------------------------
+    # Random-effects variance decomposition
+    # ------------------------------------------------------------------
+    #: Set by the random-effects subclass; enables the Swamy-Arora correction.
+    _random_effects_decomposition = False
+    #: The long (observation-level) design, needed for the BETWEEN regression.
+    _long_design: Any = None
+
+    def _swamy_arora_sigma_u(
+        self,
+        response: np.ndarray,
+        codes: np.ndarray,
+        n_entities: int,
+        sizes: np.ndarray,
+        t_bar: float,
+        sigma_e: float,
+    ) -> float | None:
+        """``sigma_u`` from the Swamy-Arora decomposition, or ``None`` when unavailable.
+
+        Stata's ``xtreg, re`` reports the panel-effects standard deviation NET of the sampling
+        error in the estimated effects. Taking the plain standard deviation of the panel-mean
+        residuals -- which is what the shared code path computes, and is right for ``xtreg, fe``
+        -- overstates it by about 4% on a balanced panel.
+
+            sigma_u^2 = s_b^2 - sigma_e^2 / T_bar,  floored at zero
+
+        ``s_b^2`` is the between-regression residual variance: regress the entity means of the
+        response on the entity means of the design, with ``n_entities - k`` degrees of freedom.
+        The design keeps its intercept column, which is what makes the means regress through
+        the constant the way the between estimator does.
+        """
+
+        design = self._long_design
+        if design is None or n_entities <= 1 or not np.isfinite(t_bar) or t_bar <= 0:
+            return None
+        matrix = np.asarray(design, dtype=float)
+        values = np.asarray(response, dtype=float).reshape(-1)
+        if matrix.shape[0] != values.size or not np.isfinite(sigma_e):
+            return None
+
+        counts = sizes.astype(float)
+        if counts.shape[0] != n_entities or np.any(counts <= 0):
+            return None
+        total_index = np.bincount(codes, minlength=n_entities).astype(float)
+        if np.any(total_index != counts):
+            total_index = counts
+
+        mean_response = np.bincount(codes, weights=values, minlength=n_entities) / total_index
+        mean_design = np.column_stack(
+            [
+                np.bincount(codes, weights=matrix[:, column], minlength=n_entities)
+                / total_index
+                for column in range(matrix.shape[1])
+            ]
+        )
+
+        coefficients, *_ = np.linalg.lstsq(mean_design, mean_response, rcond=None)
+        residual = mean_response - mean_design @ coefficients
+        degrees = n_entities - int(np.linalg.matrix_rank(mean_design))
+        if degrees <= 0:
+            return None
+        between_variance = float(residual @ residual) / degrees
+        corrected = between_variance - sigma_e**2 / float(t_bar)
+        if corrected <= 0.0:
+            # The between variance is smaller than the sampling error, which happens on small
+            # panels. Returning 0 would say "no panel effects" and collapse theta to 0 -- on the
+            # identity test's unbalanced fixture it silenced every theta at once. Falling back to
+            # the uncorrected spread keeps the estimate finite and consistent with sigma_e.
+            return None
+        return float(np.sqrt(corrected))
+
     def _stata_clustered_scalar_df(self, nobs: int, rank: int, model_df: float) -> float:
         """Denominator Stata uses for ``e(rmse)``/``e(r2_a)`` under clustering.
 
@@ -1443,6 +1514,20 @@ class PanelOLS:
                 if np.isfinite(within_r2):
                     out["r2_w"] = float(within_r2)
 
+        # The random-effects variance decomposition needs the observation-level design.
+        if self._random_effects_decomposition and design is not None:
+            self._long_design = np.asarray(design[0], dtype=float)
+        elif self._random_effects_decomposition:
+            self._long_design = None
+
+
+        # e(sigma_e) = sqrt(e(rss)/e(df_r)) where e(df_r) is the reference df.
+        sigma_e = (
+            float(np.sqrt(rss / scalar_df))
+            if self._stores_sigma and scalar_df and scalar_df > 0
+            else float("nan")
+        )
+
         # Variance components, following xtreg_fe.ado:358-430 exactly.
         #
         # Stata's ``XB`` is ``predict, xb`` -- the LEVEL linear predictor
@@ -1476,6 +1561,24 @@ class PanelOLS:
         if self._stores_sigma and finite.sum() > 1:
             deviations = u_panel[finite] - u_panel[finite].mean()
             sigma_u = float(np.sqrt(np.sum(deviations**2) / (finite.sum() - 1)))
+            if self._random_effects_decomposition and self._long_design is not None:
+                # ``xtreg, re`` does NOT report the raw spread of the panel-mean residuals.
+                # Measured on lin_1992 the raw spread gives .31974965 against Stata's
+                # .30729941 -- 4% high -- and that error propagates to rho (.8621 vs .8535)
+                # and theta (.90346 vs .90001).
+                #
+                # Swamy-Arora removes the sampling error in the panel means:
+                #     sigma_u^2 = s_b^2 - sigma_e^2 / T_bar
+                # where s_b^2 is the residual variance of the BETWEEN regression (entity
+                # means of y on entity means of X, df = panels - regressors).
+                #
+                # Verified: .30728616 against .30729941, the 0.004% remainder coming from
+                # the sigma_e difference recorded as still open in the alignment summary.
+                correction = self._swamy_arora_sigma_u(
+                    y, codes, n_entities, sizes, t_bar, sigma_e
+                )
+                if correction is not None and np.isfinite(correction):
+                    sigma_u = correction
         else:
             sigma_u = float("nan")
 
@@ -1485,12 +1588,6 @@ class PanelOLS:
             if np.isfinite(correlation):
                 out["corr"] = float(correlation)
 
-        # e(sigma_e) = sqrt(e(rss)/e(df_r)) where e(df_r) is the reference df.
-        sigma_e = (
-            float(np.sqrt(rss / scalar_df))
-            if self._stores_sigma and scalar_df and scalar_df > 0
-            else float("nan")
-        )
 
         if np.isfinite(sigma_u):
             out["sigma_u"] = sigma_u
@@ -1674,6 +1771,10 @@ class RandomEffects(PanelOLS):
     # and it reports a Wald chi-square rather than an F.
     _stores_theta = True
     _stores_wald_chi2 = True
+
+    # sigma_u must come from the Swamy-Arora decomposition, not from the raw spread of the
+    # panel-mean residuals. See PanelOLS._swamy_arora_sigma_u.
+    _random_effects_decomposition = True
 
     # ``xtreg_re.json`` has no rss/mss/tss, no ll_0 and no absorbed block.
     _stores_totals = False

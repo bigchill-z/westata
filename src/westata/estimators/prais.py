@@ -115,9 +115,21 @@ def prais_winsten(
         coefficients = updated
         current_rho = next_rho
     else:
-        raise ConvergenceError(
-            f"prais: rho did not converge in {maxiter} iterations"
+        # Stata prints the value it reached BEFORE reporting r(430):
+        #
+        #   rho |   .9724118
+        #   convergence not achieved
+        #   r(430);
+        #
+        # so the estimate travels on the exception rather than being discarded. Without it a
+        # caller cannot tell a rho of .97 that is still creeping from one that is oscillating
+        # wildly, and has to re-run with a raised tolerance to find out.
+        failure = ConvergenceError(
+            f"prais: rho did not converge in {maxiter} iterations; last value "
+            f"{current_rho:.7f}"
         )
+        failure.rho = current_rho  # type: ignore[attr-defined]
+        raise failure
 
     return coefficients, current_rho, iterations
 

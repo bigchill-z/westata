@@ -2388,19 +2388,38 @@ class VECMResults:
                 "-" * 13 + "+" + "-" * 64,
             ]
         )
+        # alpha is (equations x relations), so a rank-2 fit has a _ce1 AND a _ce2 block in every
+        # equation. Reading alpha[:, 0] showed only the first relation and silently skipped the
+        # rest -- the same defect the beta table had, one table up.
+        relations = alpha.shape[1] if alpha.ndim == 2 else 1
         for index, name in enumerate(names):
             equation = f"D_{name}"
             lines.append(f"{equation:<12} |")
-            lines.append(f"{'_ce1':>12} |")
-            lines.append(
-                f"{'L1.':>12} |{_vec_number(alpha[index, 0], 7):>11}"
-                f"{_vec_number(stderr_alpha[index, 0], 7):>11}"
-                f"{alpha[index, 0] / stderr_alpha[index, 0]:>9.2f}"
-                f"{float(2.0 * stats.norm.sf(abs(alpha[index, 0] / stderr_alpha[index, 0]))):>8.3f}"
-                f"{_vec_number(alpha[index, 0] - 1.959963984540054 * stderr_alpha[index, 0], 7):>13}"
-                f"{_vec_number(alpha[index, 0] + 1.959963984540054 * stderr_alpha[index, 0], 7):>12}"
-            )
-            lines.append(f"{'':>12} |")
+            for relation in range(relations):
+                adjustment = float(
+                    alpha[index, relation] if alpha.ndim == 2 else alpha[index]
+                )
+                adjustment_se = float(
+                    stderr_alpha[index, relation]
+                    if stderr_alpha.ndim == 2 and stderr_alpha.shape[1] == relations
+                    else stderr_alpha[index]
+                )
+                lines.append(f"{'_ce' + str(relation + 1):>12} |")
+                if not np.isfinite(adjustment_se) or adjustment_se <= 0.0:
+                    lines.append(
+                        f"{'L1.':>12} |{_vec_number(adjustment, 7):>11}"
+                        f"{'.':>11}{'.':>9}{'.':>8}{'.':>13}{'.':>12}"
+                    )
+                else:
+                    statistic = adjustment / adjustment_se
+                    lines.append(
+                        f"{'L1.':>12} |{_vec_number(adjustment, 7):>11}"
+                        f"{_vec_number(adjustment_se, 7):>11}{statistic:>9.2f}"
+                        f"{float(2.0 * stats.norm.sf(abs(statistic))):>8.3f}"
+                        f"{_vec_number(adjustment - 1.959963984540054 * adjustment_se, 7):>13}"
+                        f"{_vec_number(adjustment + 1.959963984540054 * adjustment_se, 7):>12}"
+                    )
+                lines.append(f"{'':>12} |")
             for predictor in range(neqs):
                 lines.append(f"{names[predictor]:>12} |")
                 lines.append(

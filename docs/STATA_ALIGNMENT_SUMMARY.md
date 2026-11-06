@@ -40,6 +40,25 @@ C 部分实现 8 / **D 真实缺陷 14** / **E 能力缺失 23**。**该分类�
 | **E 能力缺失（23）** | 全部缺失 | **21 项已实现**（含第 64–65 轮新增的 `tebalance`、`rcm`；另有 `estat dwatson`/`bgodfrey`、`wntestq`、`prais`、`xttest0`、`varwle`/`varlmar`/`varstable`/`varsoc`、`vecrank`/`veclmar`/`vecstable`、`rdrobust`、`predict,ps`），**仅 2 项缺失** |
 | B 布局适配（39） | 设计约束，非缺陷 | 用户要求「排版完全一致」后**前提不成立**，多数实为差异，已逐项对齐 |
 
+### v2 报告（第 18–19 轮）：statsmodels 生态接口
+
+**第 18 轮已修复（3 类，均对照 statsmodels 本身验证）**：
+
+| 接口 | 对照结果 |
+|---|---|
+| `res.t_test('x1=0')` | `7.1974807336` = statsmodels `7.1974807336` |
+| `res.f_test('x1=0, x2=0')` | `30.9297891742` = statsmodels `30.9297891742` |
+| `res.get_influence()` | 杠杆值与 Cook 距离逐位相同 |
+| `res.model` | 提供 `endog`/`exog`/`exog_names`/`fit()` |
+
+**刻意排除的三项**：`cov_params()`（用户要求）、`resid`/`fittedvalues`（兼容性决策）、`anova_lm`（需 statsmodels 内部 `model_spec`，非公开接口）。
+
+**第 19 轮：`VECM.beta`/`alpha` 加标签——已实施、已测试、已回滚。**
+
+改动本身可行：`raw.names` 提供变量名，返回带 `ec1..ecR` 列的 DataFrame，`np.asarray()` 仍可用。但**一条已有测试立即失败**：`KeyError: (0, 0)`——测试用**位置索引**访问，DataFrame 的下标语义与 ndarray 不同。这证明该改动会破坏下游调用。
+
+**回滚后 20 个测试全部通过。** 这属于**兼容性决策而非缺陷修复**：改为命名 DataFrame 更符合statsmodels 约定，但会让 `result.beta[0, 0]` 这类写法失效。**需用户裁决。**
+
 ### v2 报告（第 17 轮）：全量验证与状态汇总
 
 **4466 passed, 3 skipped, 0 failed**——第 1–16 轮的全部改动无回归。

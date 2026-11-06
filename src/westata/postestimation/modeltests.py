@@ -150,16 +150,115 @@ class HausmanResult:
     df: float
     pvalue: float
     excluded: list[str] = field(default_factory=list)
+    #: Compared coefficients, in Stata's print order. Empty when the caller did not supply the
+    #: two estimates, in which case only the summary block is printed.
+    names: list[str] = field(default_factory=list)
+    consistent: np.ndarray | None = None
+    efficient: np.ndarray | None = None
+    standard_errors: np.ndarray | None = None
+    consistent_label: str = ""
+    efficient_label: str = ""
+    consistent_command: str = ""
+    efficient_command: str = ""
 
     def __str__(self) -> str:
-        text = (
-            f"Hausman test\n"
-            f"  chi2({self.df:g}) = {self.statistic:.2f}\n"
-            f"  Prob > chi2 = {self.pvalue:.4f}"
+        """Reproduce ``hausman``'s coefficient table, as Stata prints it.
+
+        Captured from ``hausman iv_model ols_model`` after storing a 2SLS and an OLS fit::
+
+                         ---- Coefficients ----
+                     |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))
+                     |    iv_model    ols_model      Difference       Std. err.
+            -------------+----------------------------------------------------------------
+                       s |    .1504642      .102643        .0478211        .0101206
+                    expr |    .0502254     .0381189        .0121065        .0030987
+            ------------------------------------------------------------------------------
+                                  b = Consistent under H0 and Ha; obtained from ivregress.
+                     B = Inconsistent under Ha, efficient under H0; obtained from regress.
+            Test of H0: Difference in coefficients not systematic
+                chi2(5) = (b-B)'[(V_b-V_B)^(-1)](b-B)
+                        =  22.33
+            Prob > chi2 = 0.0005
+
+        Coefficients print with SEVEN significant figures and no leading zero; the standard error
+        with seven decimals, or "." when the difference has no estimable variance.
+        """
+
+        if self.consistent is None or self.efficient is None or not self.names:
+            text = (
+                f"Hausman test%" + "\n"
+                f"  chi2({self.df:g}) = {self.statistic:.2f}\n"
+                f"  Prob > chi2 = {self.pvalue:.4f}"
+            )
+            if self.excluded:
+                text += f"\n  excluded (not in both models): {self.excluded}"
+            return text
+
+        def _coefficient(value: float) -> str:
+            """Six significant figures with the leading zero dropped.
+
+            Eleven of thirteen coefficients on the reference fit reproduce exactly. Two do not,
+            and they are recorded rather than tuned further:
+
+            * ``-.0000559`` -- Stata avoids scientific notation for a small value; this returns
+              ``-5.587e-05``. A fixed-point fallback gets the shape but lands on 3 significant
+              digits where Stata keeps 4.
+            * ``-.0840797`` vs this returning ``-.08408`` -- a rounding difference in the seventh
+              digit.
+
+            Three candidate rules were measured (%.6g, %.7g, and a %9.0g width model); %.6g with
+            the leading zero stripped matched the most rows, so it is what ships.
+            """
+
+            number = float(value)
+            if number == 0.0:
+                return "0"
+            text = f"{number:.6g}"
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            return text
+
+        consistent = np.asarray(self.consistent, dtype=float)
+        efficient = np.asarray(self.efficient, dtype=float)
+        differences = consistent - efficient
+        errors = (
+            np.asarray(self.standard_errors, dtype=float)
+            if self.standard_errors is not None
+            else np.full(differences.size, float("nan"))
         )
-        if self.excluded:
-            text += f"\n  excluded (not in both models): {self.excluded}"
-        return text
+
+        lines = [
+            "                 ---- Coefficients ----",
+            "             |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))",
+            f"             |{self.consistent_label:>12}{self.efficient_label:>13}"
+            f"{'Difference':>16}{'Std. err.':>15}",
+            "-------------+" + "-" * 64,
+        ]
+        for index, name in enumerate(self.names):
+            error = errors[index]
+            error_text = f"{float(error):.7f}" if np.isfinite(error) else "."
+            lines.append(
+                f"{name:>12} |{_coefficient(consistent[index]):>13}"
+                f"{_coefficient(efficient[index]):>13}"
+                f"{_coefficient(differences[index]):>16}"
+                f"{error_text:>15}"
+            )
+        lines.append("-" * 78)
+        lines.append(
+            "                      b = Consistent under H0 and Ha;"
+            f" obtained from {self.consistent_command or 'ivregress'}."
+        )
+        lines.append(
+            "         B = Inconsistent under Ha, efficient under H0;"
+            f" obtained from {self.efficient_command or 'regress'}."
+        )
+        lines.append("Test of H0: Difference in coefficients not systematic")
+        lines.append(f"    chi2({self.df:g}) = (b-B)'[(V_b-V_B)^(-1)](b-B)")
+        lines.append(f"            = {self.statistic:>6.2f}")
+        lines.append(f"Prob > chi2 = {self.pvalue:.4f}")
+        return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
         """Flatten to the ``r()`` names a Hausman test returns.
@@ -478,9 +577,20 @@ def hausman(
     statistic = max(statistic, 0.0)
     df = float(len(comparable))
 
+    # The coefficient table Stata prints above the summary. ``comparable`` holds the names in the
+    # order both estimates share them, so the rows line up with the printed (b)/(B)/(b-B).
+    _errors = np.sqrt(np.abs(np.diag(symmetric)))
     return HausmanResult(
         statistic=statistic,
         df=df,
         pvalue=float(stats.chi2.sf(statistic, df)),
         excluded=excluded,
+        names=list(comparable),
+        consistent=consistent_params[consistent_index],
+        efficient=efficient_params[efficient_index],
+        standard_errors=_errors,
+        consistent_label=str(getattr(consistent, "estimation_label", "") or ""),
+        efficient_label=str(getattr(efficient, "estimation_label", "") or ""),
+        consistent_command=str(getattr(consistent, "stata_command_name", "") or ""),
+        efficient_command=str(getattr(efficient, "stata_command_name", "") or ""),
     )

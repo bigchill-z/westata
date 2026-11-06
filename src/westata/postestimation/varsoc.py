@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import math
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -111,16 +113,44 @@ class VarSocResult:
         best_sbic = min(row.sbic for row in self.rows)
         best_fpe = min(row.fpe for row in self.rows)
         best_ll = max(row.ll for row in self.rows)
-        best_lr = max(row.lr for row in self.rows if row.lr > 0)
+        # The LR star marks the ORDER SELECTED BY THE SEQUENCE TESTS -- the last lag whose test
+        # is significant -- not the largest LR statistic. Stata's ``varsoc`` output shows the
+        # star on lag 2 (LR 144.93, p 0.000) even though lag 1 has LR 519.63, because lag 3's
+        # test is insignificant (p 0.140). Marking the maximum put the star on lag 1.
+        best_lr = 0.0
+        for row in self.rows:
+            if row.lr > 0 and row.lr_pvalue < 0.05:
+                best_lr = row.lr
 
-        def mark(value: float, best: float, digits: int = 4) -> str:
+        # Stata prints every criterion with SIX significant digits and marks the optimum with
+        # "*" -- but it marks only LR, FPE, AIC, HQIC and SBIC, NEVER the log-likelihood. A live
+        # ``varsoc dinf unem, maxlag(4)`` shows the star on LR at lag 2 (144.93*) while LL at
+        # lag 4 (1219.45) carries none, and two decimals against six was a separate mismatch:
+        #
+        #   |   2 |  1213.86  144.93*   4  0.000 1.2e-09* -14.8625* -14.7851* -14.6719* |
+        def mark(value: float, best: float, digits: int = 6) -> str:
             text = f"{value:.{digits}g}".rjust(10)
+            return text + ("*" if value == best else " ")
+
+        def mark_fpe(value: float, best: float) -> str:
+            """Stata's FPE column keeps ONE mantissa digit and TRUNCATES rather than rounds.
+
+            Measured: the value 6.67195e-08 prints as "6.6e-08", so ``%.1e`` (which gives
+            6.7e-08) is wrong. Truncation is applied to the mantissa only.
+            """
+
+            if not math.isfinite(value) or value == 0.0:
+                text = f"{value:.1e}".rjust(10)
+            else:
+                exponent = int(math.floor(math.log10(abs(value))))
+                mantissa = math.trunc(abs(value) / 10.0**exponent * 10.0) / 10.0
+                text = f"{'-' if value < 0 else ''}{mantissa:.1f}e{exponent:+03d}".rjust(10)
             return text + ("*" if value == best else " ")
 
         for row in self.rows:
             lines.append(
                 f"{row.lag:>3} |"
-                + (f"{row.ll:>10.6g}" + ("*" if row.ll == best_ll else " "))
+                + f"{row.ll:>10.6g} "
                 + (
                     f"{row.lr:>9.5g}" + ("*" if row.lr == best_lr else " ")
                     if row.lr > 0
@@ -128,7 +158,7 @@ class VarSocResult:
                 )
                 + (f"{row.lr_df:>6}" if row.lr > 0 else " " * 6)
                 + (f"{row.lr_pvalue:>7.3f} " if row.lr > 0 else " " * 8)
-                + mark(row.fpe, best_fpe)
+                + mark_fpe(row.fpe, best_fpe)
                 + mark(row.aic, best_aic)
                 + mark(row.hqic, best_hqic)
                 + mark(row.sbic, best_sbic)

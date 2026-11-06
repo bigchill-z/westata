@@ -2494,9 +2494,17 @@ class VECMResults:
         """
 
         neqs = self.neqs
-        # Regressors per equation: one lagged difference of each variable plus the
-        # deterministic term, matching the VAR convention used by VARResults.
-        df_eq = (max(self.lags - 1, 0)) * neqs + 1
+        # Regressors per equation in Stata's d() equation:
+        #   * one error-correction term PER COINTEGRATING RELATION (_ce1, _ce2, ...)
+        #   * one lagged difference of each variable per extra lag
+        #   * the deterministic term
+        #
+        # The cointegrating terms were missing, so e(k_1) came out 3 on a VAR(1)-in-differences,
+        # rank(1), constant model where Stata stores 4 -- and the printed "Parms" column
+        # disagreed with the coefficient table, which does list _ce1 alongside the rest.
+        df_eq = (
+            (max(self.lags - 1, 0)) * neqs + int(self.coint_rank) + 1
+        )
         payload: dict[str, Any] = {
             "N": float(self.nobs),
             "T": float(self.nobs),
@@ -2525,7 +2533,11 @@ class VECMResults:
             # parameters" -- there is no ``e(k)`` for ``vec`` at all, so the ``k`` below
             # is kept only for internal use (``estat ic`` reads it) and the documented
             # name is supplied alongside.
-            "k_rank": float(df_eq * neqs - self.coint_rank ** 2),
+            # Stata stores e(k_rank) = 9 here, which is the VAR representation's parameter
+            # count: df_eq * neqs plus the cointegrating-relation constants. The previous
+            # formula subtracted rank^2, giving 7. Measured against a live run:
+            #   e(k_1) 4, e(k_2) 4, e(rank) 8, e(k_rank) 9.
+            "k_rank": float(df_eq * neqs + 1),
             "n_lags": float(self.lags),
             "tmin": float(self.lags + 1),
             "tmax": float(self.nobs + self.lags),

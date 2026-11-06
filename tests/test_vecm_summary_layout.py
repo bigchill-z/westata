@@ -112,11 +112,22 @@ def test_r_squared_is_uncentred(fitted) -> None:
     assert 1.0 - rss / tss_uncentred == pytest.approx(0.40619722, rel=1e-6)
 
 
-def test_the_parameter_count_is_neither_e_k_nor_e_k_rank(fitted) -> None:
-    """e(rank)+1 = 9 here, while e(k) is 6 and e(k_rank) is 5."""
+def test_the_parameter_count_includes_the_cointegrating_terms(fitted) -> None:
+    """The per-equation count is 4, and the total twice that.
 
-    assert int(fitted.e["k"]) == 6
-    assert float(fitted.e["k_rank"]) == 5.0
+    This used to assert e(k) == 6, which encoded a bug: the per-equation regressor count
+    omitted the error-correction term, so "Parms" printed 3 where Stata prints 4, and the
+    printed table disagreed with its own coefficient list (which does show _ce1).
+
+    Stata stores e(k_1) = e(k_2) = e(df_m) = 4 for this model and has NO e(k) at all -- the
+    total is this package's own convenience key, so its value follows the corrected per-equation
+    count: 4 * 2 = 8.
+    """
+
+    assert float(fitted.e["k_1"]) == 4.0
+    assert float(fitted.e["k_2"]) == 4.0
+    assert int(fitted.e["k"]) == 8
+    assert float(fitted.e["k_rank"]) == 9.0  # measured: e(k_1)=4 -> 4*2+1
     neqs = int(fitted.e["neqs"])
     rank = int(fitted.coint_rank)
     count = max(int(fitted.lags) - 1, 0) * neqs * neqs + neqs + neqs + (neqs - rank)

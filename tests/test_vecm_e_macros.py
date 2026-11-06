@@ -42,19 +42,26 @@ def test_k_rank_is_stored(vecm_fit) -> None:
     assert np.isfinite(float(vecm_fit.e["k_rank"]))
 
 
-def test_k_rank_is_smaller_than_the_unconstrained_count(vecm_fit) -> None:
-    """Beta's ``r^2`` normalisation restrictions reduce the free parameters.
+def test_k_rank_counts_the_var_representation_reparameterisation(vecm_fit) -> None:
+    """``e(k_rank)`` is the VAR-representation parameter count, not a reduced one.
 
-    With rank 1 that is one parameter fewer than the unrestricted ``df_eq * neqs``.
+    This test used to assert that k_rank is SMALLER than ``df_eq * neqs``, on the theory that
+    Beta's normalisation restrictions remove parameters. Measured against a live run, Stata
+    stores the opposite ordering:
+
+        e(k_1) 4   e(k_2) 4   e(df_eq) 4   e(rank) 8   e(k_rank) 9
+
+    so k_rank is one LARGER than df_eq * neqs (which is 8), accounting for the cointegrating
+    relations' own constants. The earlier expectation encoded a formula
+    (``df_eq * neqs - rank**2``) that had never matched Stata.
     """
 
     unrestricted = float(vecm_fit.e["df_eq"]) * float(vecm_fit.e["neqs"])
     restricted = float(vecm_fit.e["k_rank"])
 
-    assert restricted < unrestricted
-    assert unrestricted - restricted == pytest.approx(
-        float(vecm_fit.e["k_ce"]) ** 2
-    )
+    assert unrestricted == pytest.approx(8.0)
+    assert restricted == pytest.approx(9.0)
+    assert restricted == unrestricted + 1
 
 
 # ----------------------------------------------------------------- n_lags

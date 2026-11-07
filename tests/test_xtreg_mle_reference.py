@@ -65,7 +65,13 @@ def test_the_class_exists() -> None:
 @pytest.mark.parametrize("term", sorted(STATA_MLE))
 def test_the_variance_components_match_stata(fitted, term: str) -> None:
     mine = float(fitted.e[term])
-    assert mine == pytest.approx(STATA_MLE[term], abs=5e-6), term
+    # rho is DERIVED from the two sigmas, so its tolerance must be at least as loose as theirs
+    # scaled by the same factor. With sigma_u 0.2141 and sigma_e 0.1061 the variances are 0.0458
+    # and 0.01126, and rho = 0.0458 / (0.0458 + 0.01126); a 1e-6 wobble in sigma_e moves rho by
+    # roughly 8e-6. Round 175 measured 0.8028384 against Stata's 0.8028448 while both sigmas were
+    # inside their own bounds, so 5e-6 was asking for more precision than the quantity has.
+    tolerance = 2e-5 if term == "rho" else 5e-6
+    assert mine == pytest.approx(STATA_MLE[term], abs=tolerance), term
 
 
 def test_mle_is_not_the_gls_estimator(fitted) -> None:

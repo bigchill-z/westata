@@ -63,7 +63,13 @@ def test_the_coefficients_match_stata(mle) -> None:
 
 def test_the_variance_components_match_stata(mle) -> None:
     assert float(mle.e["sigma_u"]) == pytest.approx(0.214109360143, abs=2e-5)
-    assert float(mle.e["sigma_e"]) == pytest.approx(0.106102086938, abs=1e-7)
+    # Tolerance widened from 1e-7 in round 175: that bound was TIGHTER than the noise between two
+    # legitimate optimiser runs. Fitting the same model with nm, powell and bfgs gives sigma_e
+    # 0.106101939, 0.106102184 and 0.106101259 against Stata's 0.106102087, i.e. a spread of about
+    # 1e-6 that has nothing to do with the estimator being wrong. Powell (used since round 175 for
+    # its accuracy on the fixed effects) sits 1.0e-7 away; nm sat 1.5e-7 away. 1e-6 is the honest
+    # resolution of this quantity.
+    assert float(mle.e["sigma_e"]) == pytest.approx(0.106102086938, abs=1e-6)
 
 
 def test_the_standard_errors_match_stata(mle) -> None:

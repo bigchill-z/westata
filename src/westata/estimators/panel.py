@@ -1921,7 +1921,17 @@ class RandomEffectsMLE(RandomEffects):
         groups = np.asarray(x_frame.index.get_level_values(0), dtype=object)
         _, groups = np.unique(groups, return_inverse=True)
 
-        fitted = MixedLM(y, X, groups=groups).fit(reml=False, method="nm")
+        # POWELL, not the Nelder-Mead default. Both reach the same likelihood (1380.228 on
+        # munnell.dta), but NM stops about 1e-6 away on the slope: it gave lnk1 -.0559852 where
+        # Stata prints -.0559845. Powell lands on -.0559845, .2469788, .8251519, 2.684451 -- all
+        # four within 4e-7 of `xtreg ..., mle`, with identical standard errors. Measured in round
+        # 175 by fitting the same model with each of nm/bfgs/lbfgs/powell.
+        _mixed = MixedLM(y, X, groups=groups)
+        try:
+            _start = _mixed.fit(reml=False, method="nm").params
+            fitted = _mixed.fit(reml=False, method="powell", start_params=_start)
+        except Exception:  # pragma: no cover - a pathological start falls back to the old path
+            fitted = _mixed.fit(reml=False, method="powell")
         params = np.asarray(fitted.fe_params, dtype=float)
         # ``cov_params`` covers the fixed effects AND the random-effect variance, so its
         # leading (k, k) block is the piece that belongs in e(V).

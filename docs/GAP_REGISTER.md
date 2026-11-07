@@ -207,6 +207,8 @@
 | X01 `kpss` | 0.12 / 0.50 | **第 146 轮修复排版**：Maxlag 行区分自动/显式、`%.3g` 去前导零、临界值单行、空行为单空格。四种情形（`inf` 默认/显式 maxlag、`dinf`、`notrend`）与 Stata 逐字节一致。数值本就正确 |
 | X05 `format_ereturn_list` | 0.58 / 1.00 | **第 156 轮补齐结构缺口**：`matrices:` 现在有 `e(beta) : 1 x 3`（标准化系数 `.55469752/.18441586/.1487096`，与 `mat list e(beta)` 精确一致），`functions:` 现在有 `e(sample)`（Stata 只打印名字，无值）。四行逐字节匹配。**仍保留的差异**：macros 顺序不同，且 westata 额外提供 `e(sigma)`/`e(aic)`/`e(bic)`/`e(_aic_is_stata)` |
 | C13-04 `varstable` | 0.27 / 0.00 | **误判**：第 147 轮验证 11/11 行与 Stata 逐字节一致，含复特征值与两位结论行。见 `tests/test_varstable_stata.py` |
+| C13-08 季节哑变量回归 | 0.17 / 0.07 | **数值全对，差距在排版**：第 183 轮确认季节性拟合的每个系数与标准误都与 Stata 一致；`C(var)[T.level]` 的 22 字符存储名原样进标签列，把表撑到 87 宽（Stata 78）。改为分组头 + 水平行的两段结构后恢复 78。见 `tests/test_factor_group_rendering.py` |
+| C14-04 `varsoc` | 0.14 / 0.84 | **已解决**（第 178–180 轮）：LL/AIC/HQIC/BIC/FPE 五列全部精确。见下方 3.6.3 与 `tests/test_varsoc_fixed_window.py` |
 
 **X05 剩余差异是有意保留的**：`e(beta)`/`e(sample)` 已补齐，但**不会为了完全一致而删除额外标量**——`e(aic)`/`e(bic)` 等是 westata 额外提供的信息，删掉它们会降低包自身的可用性。macros 顺序同理（Stata 的宏集合也依赖具体估计命令）。
 

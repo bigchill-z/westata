@@ -2902,12 +2902,11 @@ def _stata_summary(result: Any) -> str:
                     ("", ""),
                 ]
             else:
-                # A CONDITIONAL fit's right column keeps the full ten rows but its left column is
-                # SHORTER by one: Stata puts "Log likelihood" beside "LR chi2", not beside
-                # "Prob > chi2". Measured in round 236 -- with equal lengths the ll landed one row
-                # low, on the Prob row.
+                # The left list pairs one-for-one with the right, so the "Prob > chi2" index is
+                # reachable; the LR row's left cell stays blank, which is what Stata prints.
                 _left_rows = [
                     f"Group variable: {_entity or '.'}",
+                    "",
                     "",
                     "",
                     "",
@@ -2935,28 +2934,18 @@ def _stata_summary(result: Any) -> str:
                 # The model test is "Prob > chi2" for re. The CONDITIONAL fit has no Prob row in
                 # this block -- its right column carries "LR chi2(#)" and Stata puts Log likelihood
                 # on THAT row -- so fall back to the chi2 label, and only then to appending.
-                # ``LR chi2(#)`` is what a CONDITIONAL fit puts in this block; a random-effects
-                # fit puts "Wald chi2(#)" above "Prob > chi2" and Stata aligns the log likelihood
-                # with the PROB row. So the LR label is tried first and Prob second -- the other
-                # order matched "Prob > chi2" on fe as well (it is present) and left ll one row
-                # low. Measured in round 236.
+                # "Prob > chi2" -- NOT "LR chi2". Measured in round 237 by reading the whole
+                # block side by side: Stata leaves the LR row's left cell EMPTY and puts
+                # Log likelihood on the row below, beside Prob > chi2. Round 236 tried LR first
+                # and put it one row high; this restores Prob, which is also what re needs.
                 _test_index = next(
                     (
                         position
                         for position, (label, _value) in enumerate(ml_right)
-                        if label.startswith("LR chi2")
+                        if label.startswith("Prob >")
                     ),
                     None,
                 )
-                if _test_index is None:
-                    _test_index = next(
-                        (
-                            position
-                            for position, (label, _value) in enumerate(ml_right)
-                            if label.startswith("Prob >")
-                        ),
-                        None,
-                    )
                 # The fe splice is shorter than re's, so an index valid for ml_right can be past
                 # the end of ml_left -- guard it rather than trust the arithmetic.
                 if (

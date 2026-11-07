@@ -36,6 +36,41 @@ def _as_float(value: Any) -> float:
         return float("nan")
 
 
+def _ereturn_number(value: float) -> str:
+    """Stata's scalar rendering inside ``ereturn list``.
+
+    Measured: ``e(N)`` prints as the integer ``758`` while ``e(F)`` prints fifteen significant
+    figures -- Stata uses its default display format, which shows integers plainly and floats to
+    full precision rather than rounding to a fixed number of decimals.
+    """
+
+    import math
+
+    if not math.isfinite(value):
+        return "."
+    if value == int(value):
+        return f"{int(value)}"
+    # Stata's display drops the leading zero and shows sixteen significant figures:
+    # ".2978896544132554" -- measured in round 249, where that reproduces every scalar whose
+    # stored value matches. e(F) comes out one digit shorter in Stata because its stored value
+    # differs from this package's in the 12th decimal (3.4e-12, a floating-point difference from
+    # the order of the mss/rss operations), NOT because of the format -- so the formatting is
+    # left exact for the values that do match rather than tuned to hide that one.
+    text = f"{value:.16g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
+def _ereturn_macro(value: object) -> str:
+    """A macro's text, quoted the way ``ereturn list`` prints it."""
+
+    text = str(value)
+    return '"' + text + '"'
+
+
 class StataResults:
     """Estimation results with a statsmodels-compatible API.
 
@@ -1427,6 +1462,94 @@ class StataResults:
         if odds_ratio:
             return self._odds_ratio_summary(style)
         return render_summary(self, style)
+
+    def ereturn_list(self) -> str:
+        """Stata's ``ereturn list`` -- the four sections of one estimation result.
+
+        Captured from a live ``quietly regress lnw s expr`` then ``ereturn list`` (round 249):
+
+            (blank)
+            scalars:
+                              e(N) =  758
+                           e(df_m) =  2
+                              e(F) =  160.164773596988
+            (blank)
+            macros:
+                        e(cmdline) : "regress lnw s expr"
+                          e(title) : "Linear regression"
+            (blank)
+            matrices:
+                              e(b) :  1 x 3
+                              e(V) :  3 x 3
+            (blank)
+            functions:
+                         e(sample)
+
+        The three column shapes differ: a scalar is ``<name> = <value>`` with the name
+        RIGHT-aligned to column 21; a macro is ``<name> : "<text>"`` with the name right-aligned
+        to 21 and the text in double quotes; a matrix is ``<name> :  <r> x <c>`` with TWO spaces
+        after the colon (Stata pads to align the dimensions); a function is just the name.
+        The whole block opens with a blank line, like every other Stata output block.
+        """
+
+        macros = dict(getattr(self, "e", None) or {})
+        lines: list[str] = [""]
+
+        scalars: list[tuple[str, float]] = []
+        others: dict[str, object] = {}
+        for key, value in macros.items():
+            if str(key).startswith("_"):
+                continue
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                scalars.append((str(key), float(value)))
+            else:
+                others[str(key)] = value
+        if scalars:
+            # STATA PRINTS SCALARS IN ITS OWN ORDER, not alphabetically and not in insertion
+            # order -- measured on `regress lnw s expr` in round 249:
+            #   N, sum_w, df_m, df_r, F, r2, rmse, mss, rss, r2_a, ll, ll_0, rank, ic, ...
+            # The leading run is the one Stata's own e() machinery defines; anything not in it
+            # keeps insertion order after the known names.
+            _order = [
+                "N", "sum_w", "df_m", "df_r", "F", "chi2", "r2", "r2_w", "r2_b", "r2_o",
+                "rmse", "mss", "rss", "r2_a", "ll", "ll_0", "rank",
+            ]
+            _rank = {name: position for position, name in enumerate(_order)}
+            scalars.sort(key=lambda item: _rank.get(item[0], len(_order)))
+            lines.append("scalars:")
+            for name, value in scalars:
+                # Name right-aligned to column 22, then " = " with TWO spaces before the value:
+                # '                  e(N) =  758'. Measured in round 249.
+                lines.append(f"{('e(' + name + ')'):>22} =  {_ereturn_number(value)}")
+            lines.append("")
+
+        if others:
+            lines.append("macros:")
+            for name, value in others.items():
+                lines.append(f"{('e(' + name + ')'):>22} : {_ereturn_macro(value)}")
+            lines.append("")
+
+        # The coefficient vector and covariance are stored on the result, not in e().
+        matrices: list[tuple[str, int, int]] = []
+        params = getattr(self, "params", None)
+        if params is not None:
+            matrices.append(("b", 1, int(params.size)))
+        covariance = getattr(self, "cov_params", None)
+        if callable(covariance):
+            try:
+                shape = covariance()
+                matrices.append(("V", int(shape.shape[0]), int(shape.shape[1])))
+            except Exception:  # pragma: no cover - a result without a covariance
+                pass
+        if matrices:
+            lines.append("matrices:")
+            for name, rows, columns in matrices:
+                lines.append(f"{('e(' + name + ')'):>22} :  {rows} x {columns}")
+            lines.append("")
+
+        lines.append("functions:")
+        lines.append(f"{'e(sample)':>22}")
+        return chr(10).join(lines)
 
     def _odds_ratio_summary(self, style: str) -> str:
         """The ``odds_ratio=True`` path, split out so ``first=`` can reuse it."""

@@ -772,6 +772,7 @@ class PanelOLS:
         X = pd.DataFrame(
             np.asarray(x_frame, dtype=float), index=kept, columns=list(x_frame.columns)
         )
+        X = _order_columns_as_formula(X, self._formula)
         return y, X
 
     def _drop_absorbed_columns(
@@ -2170,6 +2171,48 @@ def _period_grid(observed: pd.Index) -> pd.Index:
     return pd.Index(
         np.arange(int(observed.min()), int(observed.max()) + 1), name=observed.name
     )
+
+
+def _order_columns_as_formula(X: pd.DataFrame, formula: str) -> pd.DataFrame:
+    """Reorder design columns to follow the FORMULA, as Stata's tables do.
+
+    patsy emits every expanded factor column before the plain terms, so ``y ~ k1 + C(year)`` came
+    back as ``Intercept, C(year)[T.1971], ..., k1`` with ``k1`` last. Stata keeps the order the
+    formula was written in -- ``k1`` first, then the ``year`` block -- so the coefficient table
+    listed the year levels above a slope that the caller had written first (round 218).
+
+    The ordering is by the first occurrence of each term's SOURCE text in the formula, with the
+    intercept always first. Only columns that are already present are moved; nothing is created or
+    dropped, so the regression itself is untouched.
+    """
+
+    columns = list(X.columns)
+    if not columns:
+        return X
+    # Map each design column to the formula term it came from.
+    def source_term(column: str) -> str:
+        text = str(column)
+        if text in ("Intercept", "_cons", "const"):
+            return ""
+        # ``C(year)[T.1971]`` -> ``C(year)``; ``k1`` -> ``k1``
+        bracket = text.find("[")
+        return text[:bracket] if bracket >= 0 else text
+
+    def first_position(column: str) -> int:
+        term = source_term(column)
+        if not term:
+            return -1
+        position = formula.find(term)
+        return position if position >= 0 else len(formula)
+
+    order = sorted(
+        range(len(columns)),
+        key=lambda index: (first_position(columns[index]), index),
+    )
+    reordered = [columns[index] for index in order]
+    if reordered == columns:
+        return X
+    return X.loc[:, reordered]
 
 
 def _panel_frame(data: pd.DataFrame, *, entity: str, time: str, command: str) -> pd.DataFrame:

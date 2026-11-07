@@ -3834,6 +3834,23 @@ def _stata_summary(result: Any) -> str:
                     if _factor is not None
                     else f"{bare:>{name_width}} |"
                 )
+                # A BLANK PIPE LINE SEPARATES THE FACTOR BLOCK FROM ``_cons``. Stata closes the
+                # level rows with one before the constant when a factor group precedes it:
+                #
+                #        1986  |   12005.98   ...
+                #             |                     <- this line
+                #       _cons |   2352.891   ...
+                #
+                # Measured in round 218 on `xtreg y k1 i.year, fe`. Emitted once, immediately
+                # before the constant, and only when a factor block was printed and this is
+                # actually the constant row.
+                _is_constant_row = (
+                    _factor is None
+                    and str(bare).strip().lower() in _GROUP_CONSTANTS
+                )
+                if _is_constant_row and seen_groups and lines and "|" in lines[-1]:
+                    if lines[-1].split("|", 1)[0].strip():
+                        lines.append(f"{'':>{name_width}} |")
                 lines.append(
                     f"{_level_text}"
                     f"{_stata_coef(params[index], coef_w)}"

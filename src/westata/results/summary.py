@@ -3510,6 +3510,12 @@ def _stata_summary(result: Any) -> str:
             else:
                 group = _factor.group(1).strip()
                 bare = _factor.group(2).strip()
+        else:
+            # ``_factor`` MUST be bound on EVERY iteration: the level-row renderer below reads
+            # it, and it is assigned only inside the branch above. A command whose coefficient
+            # name starts with an equation prefix (heckman, etregress) skipped that branch and
+            # hit UnboundLocalError the first time a plain row reached the renderer.
+            _factor = None
         if _skip_sigma_row and str(bare).strip() in ("sigma", "/sigma"):
             continue
         if group and group not in seen_groups:

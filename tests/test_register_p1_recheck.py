@@ -80,6 +80,23 @@ def test_the_three_terminal_states_are_recorded() -> None:
     assert "反编译" in section
 
 
+def test_the_decompilation_question_is_settled() -> None:
+    """Round 159 answered "unless Mata can be decompiled" with evidence, not an assumption.
+
+    The point of recording it is to stop the next attempt: class A is not "look harder for the
+    source", it is "the source is not in the installation".
+    """
+
+    text = REGISTER.read_text(encoding="utf-8")
+    section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
+    assert "第 159 轮对「能否反编译 Mata」的最终核实" in section
+    # The three pieces of evidence, each of which rules out a different hope.
+    assert "44 个可读串" in section
+    assert "出现次数全部为 0" in section
+    assert "mata describe using" in section
+    assert "源码根本不存在于安装目录中" in section
+
+
 def test_dfgls_is_no_longer_filed_under_the_mata_core_class() -> None:
     """Round 151 proved the five-round dfgls failure was an inverted DEFAULT, not Mata.
 

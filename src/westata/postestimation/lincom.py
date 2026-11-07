@@ -144,6 +144,10 @@ class LincomResult:
 
         return chr(10).join(
             [
+                # A LEADING BLANK line: the raw capture starts with a newline, so the block opens
+                # with an empty line before the "( 1)  2*s - expr = 0" marker. Measured in round
+                # 195 -- the eighth block found by walking every renderer's prefix since 189.
+                "",
                 marker,
                 # Stata puts a BLANK line between the "( 1)  s = 0" marker and the table.
                 # Measured: the captured block is 12 / 0 / 78 / 78 / 78 / 78 / 78 characters.

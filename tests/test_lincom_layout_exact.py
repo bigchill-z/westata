@@ -62,8 +62,11 @@ def test_the_response_name_is_right_aligned(rendered) -> None:
 
 
 def test_the_constraint_marker_is_indented(rendered) -> None:
-    assert rendered.splitlines()[0].startswith(" ")
-    assert rendered.splitlines()[0].lstrip().startswith("( 1)")
+    # CORRECTED in round 195: the block now opens with a blank line (the raw Stata capture starts
+    # with a newline), so the marker is line 1 rather than line 0.
+    assert rendered.splitlines()[0] == ""
+    assert rendered.splitlines()[1].startswith(" ")
+    assert rendered.splitlines()[1].lstrip().startswith("( 1)")
 
 
 def test_the_value_and_interval_agree_with_the_fit() -> None:

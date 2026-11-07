@@ -48,8 +48,13 @@ def rendered():
 
 
 STATA_LINES = [
+    # CORRECTED in round 195: the block opens with a blank line and has one after each
+    # header line, matching the live capture.
+    "",
     "Contrasts of marginal linear predictions",
+    "",
     "Margins: asbalanced",
+    "",
     "-" * 48,
     "             |         df           F        P>F",
     "-" * 13 + "+" + "-" * 34,

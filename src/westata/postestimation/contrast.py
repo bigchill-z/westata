@@ -470,8 +470,14 @@ class ContrastResult(list):
         """
 
         lines = [
+            # A LEADING blank line and a blank after each header line: the capture starts with a
+            # newline, and 'Margins: asbalanced' is separated from the rule by a blank. Measured
+            # in round 195 -- the ninth block found by the prefix survey begun in 189.
+            "",
             "Contrasts of marginal linear predictions",
+            "",
             "Margins: asbalanced",
+            "",
             "-" * 48,
             f"{'':>12} |{'df':>11}{'F':>12}{'P>F':>11}",
             "-" * 13 + "+" + "-" * 34,

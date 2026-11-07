@@ -457,13 +457,24 @@ def prais(
     )
 
     resid = y - x @ coefficients
-    df_resid = y.size - x.shape[1]
+    # ``corc`` fits on N-1 rows (the transformed first observation is dropped), so its residual
+    # degrees of freedom are one lower. The Prais-Winsten variant keeps all N.
+    df_resid = (y.size - 1 if corc else y.size) - x.shape[1]
     # Stata reports R-squared, Adjusted R-squared and Root MSE on the TRANSFORMED scale,
     # because the estimated model is the one fitted to the rho-transformed data. Reporting
     # the original-scale sums of squares gave R2 0.521716 and RMSE 0.048053 against Stata's
     # 0.6234 and .03232.
-    transformed_x = np.column_stack([_transform(x[:, j], rho) for j in range(x.shape[1])])
-    transformed_y = _transform(y, rho)
+    # THE TRANSFORM MUST MATCH THE ESTIMATOR. `prais, corc` drops the transformed first
+    # observation instead of scaling it by sqrt(1-rho^2), so its residual variance -- and hence
+    # every standard error -- is computed on N-1 rows with a DIFFERENT first value. Using the
+    # Prais-Winsten transform here for both variants was the whole of the 4.7% error: on icecream
+    # with `consumption ~ temp + price + income, corc` the coefficients and rho already matched
+    # Stata exactly (.4009256) while se(price) printed .8491466 against Stata's .8108501.
+    _final_transform = _transform_corc if corc else _transform
+    transformed_x = np.column_stack(
+        [_final_transform(x[:, j], rho) for j in range(x.shape[1])]
+    )
+    transformed_y = _final_transform(y, rho)
     trans_resid = transformed_y - transformed_x @ coefficients
     rss = float(trans_resid @ trans_resid)
     tss = float(np.sum((transformed_y - transformed_y.mean()) ** 2))

@@ -192,8 +192,11 @@ def test_every_label_carries_its_own_value_under_a_factor_model(mixed_frame) -> 
     expected = {
         "_cons": stored["Intercept"],
         "x1": stored["x1"],
-        "C(grp)[T.b]": stored["C(grp)[T.b]"],
-        "C(grp)[T.c]": stored["C(grp)[T.c]"],
+        # A factor coefficient is DISPLAYED as a bare level under a ``grp`` group header, not as
+        # the stored ``C(grp)[T.b]`` spelling: Stata prints 'grp |' then 'b | ...'. Changed in
+        # round 183 when the factor rows became a two-line structure.
+        "b": stored["C(grp)[T.b]"],
+        "c": stored["C(grp)[T.c]"],
     }
     for label, value in expected.items():
         assert rows[label] == _stata_coef(value, 12).strip(), label

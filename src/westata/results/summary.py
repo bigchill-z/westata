@@ -18,6 +18,7 @@ concrete class, which keeps this module usable by future result subclasses.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import numpy as np
@@ -3029,6 +3030,27 @@ def _stata_summary(result: Any) -> str:
     # ``inflate#Intercept`` (18 characters) but prints it as ``_cons`` inside an
     # ``inflate`` block, so sizing on the stored spelling made the table 83 wide instead
     # of 78 and pushed every column right.
+    def _factor_display_pieces(name: str) -> tuple[str, str] | None:
+        """Split ``C(var)[T.level]`` into the two strings Stata prints for it.
+
+        Returns ``(term, level)`` or ``None`` when the name is not a factor coefficient. Stata
+        shows a factor as a group header over its levels rather than one long row:
+
+            foreign |
+          Foreign  |  -1.650029   1.075994
+
+        Measured on auto.dta in round 183.
+        """
+
+        text = str(name).strip()
+        match = re.match(r"^C\(([^)]+)\)\[(?:T\.)?(.+)\]$", text)
+        if match is not None:
+            return match.group(1).strip(), match.group(2).strip()
+        match = re.match(r"^([A-Za-z_][\w]*)\(([^)]+)\)\[(?:T\.)?(.+)\]$", text)
+        if match is not None:
+            return match.group(2).strip(), match.group(3).strip()
+        return None
+
     def _display_length(name: str) -> int:
         text = str(name)
         for marker in ("#", ":"):
@@ -3046,7 +3068,18 @@ def _stata_summary(result: Any) -> str:
     _ordinary_names = [
         name for name in names if not str(name).startswith("var(e.")
     ]
-    name_width = max([12, *(_display_length(name) for name in _ordinary_names)])
+    # A FACTOR name is DISPLAYED as a group header plus a level row, so it must not widen the
+    # table by its full ``C(var)[T.level]`` spelling: with the 22-character form the table grew to
+    # 87 columns where Stata's is 78. Only the two pieces are measured. Measured on auto.dta in
+    # round 183.
+    _measured_names: list[str] = []
+    for _name in _ordinary_names:
+        _pieces = _factor_display_pieces(str(_name))
+        if _pieces is None:
+            _measured_names.append(str(_name))
+        else:
+            _measured_names.extend(_pieces)
+    name_width = max([12, *(_display_length(name) for name in _measured_names)])
 
     # The survey ESTIMATE commands (``svy: mean``/``total``/``proportion``) print a
     # different table: no t/P columns, one estimate column, and a 62-wide frame rather
@@ -3440,6 +3473,24 @@ def _stata_summary(result: Any) -> str:
                 group = prefix[:-1]
                 bare = name[len(prefix):]
                 break
+        if not group:
+            # A FACTOR coefficient carries its term and level in the name itself --
+            # ``C(foreign)[T.Foreign]``. Stata prints that as a group header over the levels:
+            #
+            #     foreign |
+            #   Foreign  |  -1.650029   1.075994
+            #
+            # instead of one long row, which is also what kept the table 87 wide where Stata's
+            # is 78. Measured on auto.dta in round 183.
+            _factor = re.match(r"^C\(([^)]+)\)\[(?:T\.)?(.+)\]$", str(name).strip())
+            if _factor is None:
+                _factor = re.match(r"^([A-Za-z_][\w]*)\(([^)]+)\)\[(?:T\.)?(.+)\]$", str(name).strip())
+                if _factor is not None:
+                    group = _factor.group(2).strip()
+                    bare = _factor.group(3).strip()
+            else:
+                group = _factor.group(1).strip()
+                bare = _factor.group(2).strip()
         if _skip_sigma_row and str(bare).strip() in ("sigma", "/sigma"):
             continue
         if group and group not in seen_groups:
@@ -3456,12 +3507,28 @@ def _stata_summary(result: Any) -> str:
                 "sureg",
             )
             # arch's FIRST group ("y") follows the header rule, exactly like sqreg's.
-            if seen_groups or not (_is_sqreg_shape or _is_arch_shape):
+            #
+            # A FACTOR group is a third shape: Stata puts a blank pipe line, then the term
+            # RIGHT-ALIGNED in the name column, with NO rule between it and the coefficient above:
+            #
+            #                 |
+            #            foreign |
+            #          Foreign  |  -1.650029   1.075994
+            #
+            # Measured on auto.dta, round 183.
+            _is_factor_group = _factor_display_pieces(str(name)) is not None
+            if _is_factor_group:
+                lines.append(f"{'':>{name_width}} |")
+            elif seen_groups or not (_is_sqreg_shape or _is_arch_shape):
                 lines.append(
                     "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
                 )
             seen_groups.add(group)
-            lines.append(f"{group:<{name_width}} |")
+            lines.append(
+                f"{group:>{name_width}} |"
+                if _is_factor_group
+                else f"{group:<{name_width}} |"
+            )
         # ``arch`` nests one level further: "ARCH" then a sub-label ("arch"/"garch") then
         # the lag ("L1."). The sub-label row is emitted once per distinct sub-label.
         if _is_arch_shape and ":" in bare:

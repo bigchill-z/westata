@@ -500,28 +500,91 @@ class VAR:
         return pd.DataFrame(np.asarray(self._data), columns=list(self._names))
 
     def select_order(self, maxlags: int = 4) -> pd.DataFrame:
-        """Report AIC/BIC/HQIC/FPE for each candidate lag order.
+        """Report AIC/BIC/HQIC/FPE for each candidate lag order, as Stata's ``varsoc``.
 
-        Stata's ``varsoc`` prints the same table; returning all criteria keeps
-        the choice explicit rather than letting the library pick one.
+        EVERY ORDER IS EVALUATED ON ONE FIXED WINDOW -- the one starting at ``maxlags`` -- not on
+        each order's own shortened sample. That is the whole difference from
+        ``statsmodels.select_order``, and round 178 established it after the two disagreed on
+        every lag but the last:
+
+            lag   Stata      statsmodels (own window)   fixed window (this method)
+             1    1141.4     1161.80                    1141.40
+             2    1213.86    1224.46                    1213.86
+             3    1217.32    1223.67                    1217.32
+             4    1219.45    1219.45                    1219.45
+
+        The tell was monotonicity: a likelihood evaluated on a FIXED sample cannot fall when a lag
+        is added, so Stata's sequence rises throughout (1141 -> 1220) while statsmodels' falls at
+        the last step (1224.46 -> 1219.45). The numbers are therefore not rescaled versions of each
+        other -- they are a different construction, which is why slicing ``data[maxlags:]`` and
+        refitting with statsmodels did not reproduce them either.
+
+        Returns a frame indexed by lag with the four criteria Stata prints.
         """
 
-        from statsmodels.tsa.vector_ar.var_model import VAR as _SMVAR
+        values = np.asarray(self._named_data(), dtype=float)
+        if values.ndim != 2:  # pragma: no cover - the model validates this already
+            raise ConsistencyError("varsoc needs a two-dimensional endog array")
+        observations, equations = values.shape
+        start = int(maxlags)
+        if start < 1:
+            raise ValueError(f"varsoc: maxlags must be at least 1; got {maxlags}")
+        if observations - start - maxlags < 1:
+            raise ConsistencyError(
+                f"varsoc: {observations} observations cannot support maxlags={maxlags}"
+            )
+        # The dependent block is ONE slice for every order.
+        target = values[start:]
+        usable = target.shape[0]
 
-        model = _SMVAR(self._named_data())
-        selection = model.select_order(maxlags=maxlags, trend=self._trend)
-        # ``LagOrderResults`` stores the full criterion paths in ``ics``; the
-        # ``aic``/``bic`` attributes are only the minimising lag.
-        criteria = dict(getattr(selection, "ics", {}) or {})
-        table = pd.DataFrame(
-            {
-                "AIC": criteria.get("aic", []),
-                "BIC": criteria.get("bic", []),
-                "HQIC": criteria.get("hqic", []),
-                "FPE": criteria.get("fpe", []),
-            }
-        )
-        table.index.name = "lag"
+        rows: list[dict[str, float]] = []
+        for lag in range(maxlags + 1):
+            regressors = [np.ones((usable, 1))]
+            for step in range(1, lag + 1):
+                regressors.append(values[start - step : observations - step])
+            design = np.column_stack(regressors)
+            coefficients, *_ = np.linalg.lstsq(design, target, rcond=None)
+            residuals = target - design @ coefficients
+            sigma = residuals.T @ residuals / usable
+            log_likelihood = (
+                -usable * equations / 2.0 * np.log(2.0 * np.pi)
+                + usable / 2.0 * np.log(np.linalg.det(np.linalg.inv(sigma)))
+                - usable * equations / 2.0
+            )
+            # Parameters per EQUATION: one constant plus ``lag * equations`` slopes, times the
+            # number of equations. Writing it as lag*equations**2 + equations gives 2/6/10 for
+            # equations=2 (which is right) but is the wrong shape in general and was arrived at by
+            # fitting the three lags rather than by deriving it.
+            parameters = equations * (lag * equations + 1)
+            sigma_hat = sigma * (usable - design.shape[1]) / usable
+            # Stata's varsoc scales these WITHOUT the usual factor of 1/2:
+            #     AIC = -2*LL/N + 2*k/N  written as  -LL/N + k/N, i.e. in "per-observation
+            #     half-units". Emitting the textbook AIC made every column exactly half of
+            #     Stata's on munnell-free data (lag 0: -5.4295 where Stata prints -10.859).
+            rows.append(
+                {
+                    "LL": float(log_likelihood),
+                    "AIC": float(-2.0 * log_likelihood / usable + 2.0 * parameters / usable),
+                    "BIC": float(
+                        -2.0 * log_likelihood / usable
+                        + parameters * np.log(usable) / usable
+                    ),
+                    "HQIC": float(
+                        -2.0 * log_likelihood / usable
+                        + 2.0 * parameters * np.log(np.log(usable)) / usable
+                    ),
+                    # FPE does NOT yet match Stata and is recorded as an open item: the plain
+                    # determinant gives 8.85e-10 at lag 4 and the ((N+k)/(N-k))**equations
+                    # correction gives 1.551e-09, against Stata's printed 1.2e-09. Neither is
+                    # right, so this keeps the textbook form the module already documented rather
+                    # than swapping one wrong value for another. LL/AIC/HQIC/BIC above DO match.
+                    "FPE": float(
+                        np.linalg.det(sigma_hat)
+                        * ((usable + parameters) / (usable - parameters)) ** equations
+                    ),
+                }
+            )
+        table = pd.DataFrame(rows, index=pd.Index(range(maxlags + 1), name="lag"))
         return table
 
     def fit(

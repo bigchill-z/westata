@@ -196,6 +196,46 @@ class PraisResult:
     def pvalues(self) -> pd.Series:
         return pd.Series(self._pvalues, index=self._names, name="pvalues")
 
+    def conf_int(self, alpha: float = 0.05) -> pd.DataFrame:
+        """Confidence intervals, in the statsmodels shape.
+
+        ``PraisResult`` carried the bounds privately (``_conf_int``) but exposed no public method,
+        so a caller porting statsmodels code had ``result.conf_int()`` fail with AttributeError --
+        the deviation the v3 report records at section 4, item (4). The column names are
+        ``lower``/``upper`` for the same reason: every other result class in this package uses
+        those names, and Stata's 95% interval is what the private array already holds.
+        """
+
+        intervals = np.asarray(self._conf_int, dtype=float)
+        if float(alpha) != 0.05:
+            # Recompute rather than rescale: the stored bounds are the 95% ones, and a different
+            # level needs the t quantile, not a linear stretch of the interval.
+            from scipy import stats as _stats
+
+            critical = float(_stats.t.ppf(1.0 - float(alpha) / 2.0, self._df_resid))
+            centre = np.asarray(self._params, dtype=float)
+            spread = np.asarray(self._bse, dtype=float)
+            intervals = np.column_stack([centre - critical * spread, centre + critical * spread])
+        return pd.DataFrame(intervals, index=self._names, columns=["lower", "upper"])
+
+    def cov_params(self) -> pd.DataFrame:
+        """The coefficient covariance matrix, reconstructed from the reported standard errors.
+
+        Only the diagonal was stored, so the off-diagonals are NOT recoverable here. They are
+        reported as NaN rather than zero: a zero would claim the estimates are uncorrelated, which
+        is a different (and false) statement.
+        """
+
+        size = len(self._names)
+        matrix = np.full((size, size), np.nan, dtype=float)
+        np.fill_diagonal(matrix, np.asarray(self._bse, dtype=float) ** 2)
+        return pd.DataFrame(matrix, index=self._names, columns=self._names)
+
+    def summary(self, style: str = "stata") -> str:
+        """Render the table; ``style`` is accepted for protocol parity."""
+
+        return str(self)
+
     @property
     def rho(self) -> float:
         return self._rho

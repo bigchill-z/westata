@@ -436,7 +436,15 @@ def _panel_design_block(result: Any) -> list[str]:
     # so the gate is "an xt command that knows its group count" rather than a fixed list
     # of two names -- the earlier list let every xtlogit/xtprobit/xtpoisson output drop
     # the panel structure entirely.
-    is_xt_family = model_name.startswith("xt") and "N_g" in e_macros
+    # THE GATE USES e(cmd), NOT model_name. `RandomEffects` carries model_name "xtreg, re", but
+    # `RandomEffectsMLE` carries "random-effects MLE regression" while its e(cmd) is still the
+    # string "xtreg" -- so keying on model_name silently dropped the whole design block (Group
+    # variable / Time variable / Obs per group) from `xtreg, mle`, which is the v3 report's
+    # "output is missing the group count". e(cmd) is the macro Stata itself sets for the command.
+    _cmd_macro = str(e_macros.get("cmd") or "").strip().lower()
+    is_xt_family = (
+        (model_name.startswith("xt") or _cmd_macro.startswith("xt")) and "N_g" in e_macros
+    )
     if not (is_xt_family or model_name in ("xtpcse", "xtgls")):
         return []
 

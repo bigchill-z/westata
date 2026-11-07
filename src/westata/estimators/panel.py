@@ -1991,6 +1991,17 @@ class RandomEffectsMLE(RandomEffects):
         nobs = int(len(y))
         rank = int(X.shape[1])
         df_resid = float(nobs - rank)
+        # ``e(ll_0)``: the log likelihood of the CONSTANT-ONLY random-effects fit. Stata reports
+        # the model test as LR chi2 = 2*(ll - ll_0), and without this macro the header printed no
+        # LR chi2 row at all (v3 report, xtreg, mle). Fitted the same way -- Powell from an NM
+        # start -- so the two likelihoods come from the same optimiser.
+        try:
+            _null = MixedLM(y, np.ones((nobs, 1)), groups=groups)
+            _null_start = _null.fit(reml=False, method="nm").params
+            _null_fit = _null.fit(reml=False, method="powell", start_params=_null_start)
+            ll_null = float(_null_fit.llf)
+        except Exception:  # pragma: no cover - a pathological start
+            ll_null = float("nan")
         results = StataResults(
             params=params,
             param_names=names,
@@ -2011,8 +2022,12 @@ class RandomEffectsMLE(RandomEffects):
                 "N_g": float(len(np.unique(groups))),
                 "df_m": float(rank - 1),
                 "df_r": df_resid,
-                "chi2type": "Wald",
+                "chi2type": "LR",
                 "ll": float(fitted.llf),
+                "ll_0": ll_null,
+                "chi2": float(2.0 * (float(fitted.llf) - ll_null))
+                if np.isfinite(ll_null)
+                else float("nan"),
                 "sigma_u": sigma_u,
                 "sigma_e": sigma_e,
                 "rho": sigma_u**2 / (sigma_u**2 + sigma_e**2),

@@ -1799,7 +1799,16 @@ def predict(
     # Stata's own spellings for the influence diagnostics. `predict lev, lev` is how regress's
     # manual names the leverage variable; without this alias a user typing the Stata option gets
     # an UnsupportedError that reads like the diagnostic is missing (round 171).
-    normalized = {"lev": "leverage", "p": "pr"}.get(normalized.lower(), normalized)
+    normalized = {
+        "lev": "leverage",
+        "p": "pr",
+        # Stata's `predict r, resid` and `predict r, residuals` both name the residual type
+        # `resid`; `r` on its own is what the manual's examples use as the NEW VARIABLE name, but
+        # writeDTA-generated commands also accept it as a type. Accepting both costs nothing and
+        # removes an UnsupportedError for a spelling users actually type (round 187).
+        "resid": "residuals",
+        "r": "residuals",
+    }.get(normalized.lower(), normalized)
 
     # A model that owns its prediction semantics takes precedence, and it also
     # defines which types exist: ``zip``/``zinb``/``ztp`` depend on the inflation

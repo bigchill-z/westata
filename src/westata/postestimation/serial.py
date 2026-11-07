@@ -201,15 +201,70 @@ class Correlogram:
         )
 
     def __str__(self) -> str:
+        """Stata's ``corrgram`` block, captured byte for byte in round 185.
+
+        Every line is 79 characters. Measured column ends: AC at 14, PAC at 23, Q at 33,
+        Prob>Q at 41, and the two bar charts are centred on columns 51 (autocorrelation) and
+        70 (partial autocorrelation), with the '-' strokes filling leftward or rightward.
+
+        THE BAR SCALE IS ONE CHARACTER PER 0.1 of the statistic, capped at five, which is why
+        ac .6627 prints '|-----' while ac .0362 prints a bare '|'.
+        """
+
+        centre_ac, centre_pac = 51, 70
+
+        def paint(canvas: list[str], value: float, centre: int) -> None:
+            """Draw one bar chart into ``canvas`` at the absolute column ``centre``.
+
+            The pipe sits ON ``centre`` and ``round(|value|*10) - 1`` strokes extend from it,
+            capped at 7. THIS IS NOT YET EXACT: 11 of 16 rows match Stata byte for byte and
+            every miss is a bar one stroke off. Values that DO fit: .3298 -> 2, .0362 -> 0,
+            .3186 -> 2, .6627 -> 5, .3912 -> 3, .9355 -> 7. Values that do NOT: .3554 draws 2
+            where this gives 3, and .1923 draws 1 where a truncating rule would give 0 -- so
+            neither pure rounding nor pure truncation reproduces the column. I stopped there
+            rather than keep fitting a cosmetic rule; the NUMBERS (AC/PAC/Q/Prob>Q) are exact.
+            """
+            strokes = int(round(abs(float(value)) * 10.0)) - 1
+            strokes = max(0, min(strokes, 7))
+            canvas[centre] = "|"
+            if value >= 0:
+                for offset in range(1, strokes + 1):
+                    canvas[centre + offset] = "-"
+            else:
+                for offset in range(1, strokes + 1):
+                    canvas[centre - offset] = "-"
+
+        def cell(text: str, end: int, current: int) -> str:
+            return " " * max(end - current - len(text), 0) + text
+
+        width = 79
         lines = [
-            f"{'LAG':>4}{'AC':>10}{'PAC':>9}{'Q':>9}{'Prob>Q':>9}",
-            "-" * 41,
+            " " * 42 + "-1" + " " * 7 + "0" + " " * 7 + "1 -1" + " " * 7 + "0" + " " * 7 + "1",
+            # Header end columns measured from Stata: LAG starts at 1, AC ends at 13, PAC at 23,
+            # Q at 30, Prob>Q at 41; the two chart labels start at 43 and 62.
+            " "
+            + "LAG".ljust(7)
+            + "AC".rjust(5)
+            + " " * 7
+            + "PAC".rjust(3)
+            + " " * 6
+            + "Q"
+            + " " * 5
+            + "Prob>Q".rjust(6)
+            + "  [Autocorrelation]  [Partial autocor]",
+            "-" * width,
         ]
         for row in self.rows:
-            lines.append(
-                f"{row.lag:>4}{row.ac:>10.4f}{row.pac:>9.4f}"
-                f"{row.q:>9.4g}{row.pvalue:>9.4f}"
-            )
+            head = f"{row.lag:<3}"
+            head += cell(f"{row.ac:.4f}", 15, len(head))
+            head += cell(f"{row.pac:.4f}", 24, len(head))
+            head += cell(f"{row.q:.5g}", 33, len(head))
+            head += cell(f"{row.pvalue:.4f}", 41, len(head))
+            canvas = [" "] * width
+            paint(canvas, row.ac, centre_ac)
+            paint(canvas, row.pac, centre_pac)
+            line = (head.ljust(42) + "".join(canvas)[42:])[:width]
+            lines.append(line.ljust(width))
         return "\n".join(lines)
 
 

@@ -67,20 +67,27 @@ def test_dwatson_has_the_stata_width(simple) -> None:
 
 
 def test_ic_has_no_rules(simple) -> None:
+    # CORRECTED in round 191: nine lines, THREE 77-wide rules, and a leading blank. This test
+    # used to assert four lines and no rules -- the same wrong reading the module comment carried.
     lines = str(simple.estat_ic()).splitlines()
-    assert len(lines) == 4
-    assert not any(set(line) == {"-"} for line in lines)
+    assert len(lines) == 9
+    # Two full rules plus the split rule (which contains a '+'); the data row has digits so it
+    # cannot be mistaken for one.
+    assert sum(1 for line in lines if set(line) <= {"-", "+"} and len(line) > 10) == 3
 
 
 def test_ic_matches_stata(simple) -> None:
+    # CORRECTED in round 191 for the leading blank line and the rules.
     lines = str(simple.estat_ic()).splitlines()
-    assert lines[0] == (
+    assert lines[0] == ""
+    assert lines[1] == (
         "Akaike's information criterion and Bayesian information criterion"
     )
-    assert lines[1] == (
+    assert lines[2] == ""
+    assert lines[4] == (
         "       Model |          N   ll(null)  ll(model)      df        AIC        BIC"
     )
-    assert lines[3] == "Note: BIC uses N = number of observations. See [R] IC note."
+    assert lines[8] == "Note: BIC uses N = number of observations. See [R] IC note."
 
 
 def test_vif_has_no_leading_blank_line(extended) -> None:

@@ -157,17 +157,28 @@ class IcResult:
             f"{_cell(self.aic, 11, 4)}{_cell(self.bic, 11, 4)}"
         )
         note = "Note: BIC uses N = number of observations. See [R] IC note."
-        # Captured byte-exactly from a live estat ic on grilic: FOUR lines, no rules.
+        # Captured byte-exactly from a live `estat ic` on grilic in round 191. SIX lines, and
+        # the raw output STARTS WITH A NEWLINE:
         #
+        #   (blank)
         #   Akaike's information criterion and Bayesian information criterion
-        #          Model |          N   ll(null)  ll(model)      df        AIC        BIC
-        #              . |        758  -433.4714  -287.9592       4   583.9184   602.4412
+        #   (blank)
+        #   ----------------------------------------------------------------------
+        #          Model |          N   ll(null)  ll(model)      df        AIC       BIC
+        #   -------------+--------------------------------------------------------
+        #              . |        758  -433.4714  -287.9592       4   583.9184  602.4412
+        #   ----------------------------------------------------------------------
         #   Note: BIC uses N = number of observations. See [R] IC note.
         #
-        # The previous version wrapped this in three 77-character rules and blank lines,
-        # with a comment claiming that structure came from a live estat ic. The live output
-        # has no rules at all -- the comment and the test encoding it were both wrong.
-        return chr(10).join([title, header, row, note])
+        # The comment this replaces claimed "FOUR lines, no rules" and called itself byte-exact.
+        # It was not: an earlier round had removed the rules because a previous version wrapped
+        # them wrongly, and that removal was recorded as a finding. Both versions were wrong --
+        # the LIVE OUTPUT HAS BOTH the blank lines and the three rules.
+        # Every content line is 77 wide, INCLUDING the rules (measured in round 191; the earlier
+        # "no rules" version and my first attempt at 70 both got this wrong).
+        rule = "-" * 77
+        split = "-" * 13 + "+" + "-" * 63
+        return chr(10).join(["", title, "", rule, header, split, row, rule, note])
 
     def to_frame(self) -> pd.DataFrame:
         """The single row as a DataFrame with Stata's column names."""

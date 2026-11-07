@@ -69,11 +69,20 @@ def test_the_log_likelihoods_have_four_decimals(rendered) -> None:
 
 
 def test_there_are_no_rule_lines(rendered) -> None:
-    """The live table has no rules. An earlier version emitted three of them."""
+    """CORRECTED in round 191: the live table HAS rules -- three of them, all 77 wide.
 
-    rules = [line for line in rendered.splitlines() if set(line) == {"-"}]
-    assert rules == []
-    assert rendered.count("\n") == 3
+    This test used to assert `rules == []` with the docstring "The live table has no rules. An
+    earlier version emitted three of them." Both were wrong: a previous round removed the rules
+    because an OLDER version wrapped them incorrectly, and recorded the removal as a finding. The
+    capture shows a blank line, the title, a blank line, then the three rules. The whole block is
+    nine lines including the leading blank.
+    """
+
+    # Two full rules plus the split rule, which carries a '+'.
+    rules = [line for line in rendered.splitlines() if set(line) <= {"-", "+"} and len(line) > 10]
+    assert len(rules) == 3
+    assert all(len(line) == 77 for line in rules)
+    assert rendered.count("\n") == 8
 
 
 def test_the_model_cell_is_a_dot(rendered) -> None:

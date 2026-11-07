@@ -3386,7 +3386,13 @@ def _stata_summary(result: Any) -> str:
         # Group headers are LEFT aligned in a 12-wide field then a space and the pipe;
         # the comparison row is right-aligned in 11. Both put the pipe at column 13.
         lines.append(f"{'ATET':<12} |")
-        lines.append(f"{'treated':>12} |")
+        # The variable named here is the TREATMENT variable's own name, not a fixed label:
+        # `didregress (y) (t)` prints "           t |", and a differently named treatment prints
+        # that name instead (measured in round 162 against a fit whose treatment column is `t`).
+        _treatment_name = str(
+            getattr(result, "did_treatment_name", "") or (names[0] if names else "treated")
+        )
+        lines.append(f"{_treatment_name:>12} |")
         lines.append(
             f"{'(1 vs 0)':>11}  |"
             f"{_stata_coef(params[0], coef_w)}"
@@ -3950,19 +3956,36 @@ def _stata_summary(result: Any) -> str:
             lines.append(f"{_text:<{row_width - len(_tail) - 1}}{_tail}")
 
     if _is_didregress(result):
-        # ``didregress`` closes with a note naming what the ATET was adjusted for. The WORD
-        # for the first adjustment depends on the command, measured in both:
-        #   didregress      "... covariates, group effects, and time effects."
-        #   xtdidregress    "... covariates, panel effects, and time effects."
+        # ``didregress`` closes with a note naming what the ATET was adjusted for. TWO things
+        # vary, both measured (round 162):
+        #   * the first effect word depends on the command --
+        #         didregress      "... group effects and time effects."
+        #         xtdidregress    "... panel effects and time effects."
+        #   * "covariates," appears ONLY when covariates were supplied:
+        #         didregress (y) (t)        -> "... adjusted for group effects and time effects."
+        #         didregress (y x1) (t)     -> "... adjusted for covariates, group effects, and
+        #                                       time effects."
+        # The previous version always printed "covariates", which made every no-covariate call
+        # one line short of Stata.
         _did_word = (
             "panel"
             if str(getattr(result, "model_name", "") or "") == "xtdidregress"
             else "group"
         )
-        lines.append(
-            f"Note: ATET estimate adjusted for covariates, {_did_word} effects, "
-            "and time effects."
-        )
+        # The result does not carry the covariate LIST, but ``df_m`` counts the model's slopes:
+        # the ATET term alone gives 1, and each covariate adds one. Measured on the same panel
+        # (df_m 1 without covariates, 2 with one).
+        _df_m = float(getattr(result, "e", {}).get("df_m", 1) or 1)
+        _has_covariates = _df_m > 1.0
+        if _has_covariates:
+            lines.append(
+                f"Note: ATET estimate adjusted for covariates, {_did_word} effects, "
+                "and time effects."
+            )
+        else:
+            lines.append(
+                f"Note: ATET estimate adjusted for {_did_word} effects and time effects."
+            )
 
     if str(getattr(result, "model_name", "") or "").startswith(
         ("ivregress", "xtivreg")

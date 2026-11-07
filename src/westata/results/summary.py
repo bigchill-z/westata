@@ -4371,7 +4371,19 @@ def _stata_summary(result: Any) -> str:
                     _alpha_se = _ln_se * float(np.exp(_ln_b))
                     _alpha_lo = float(np.exp(_ln_b - 1.959963984540054 * _ln_se))
                     _alpha_hi = float(np.exp(_ln_b + 1.959963984540054 * _ln_se))
-            if np.isfinite(_alpha_se):
+            # A DISPERSION AT THE BOUNDARY HAS NO USABLE STANDARD ERROR, and Stata prints "."
+            # rather than a number. Measured on `nbreg mpg weight fgn`: e(alpha) = 1.034e-09,
+            # _se[/lnalpha] = 0, and the table shows "." in all four of the SE/P/CI columns for
+            # both /lnalpha and alpha.
+            #
+            # The delta-method value computed above is not trustworthy there either: at alpha -> 0
+            # the observed information is rank-deficient (this fit's covariance has a ZERO row,
+            # leaving se(weight) = 0 and a smallest eigenvalue of 7e-11), so the reported interval
+            # spans orders of magnitude that no data supports. Suppressing it is the honest
+            # rendering, and 1e-5 is where alpha stops being distinguishable from the boundary
+            # given the sample sizes these models are fitted on.
+            _dispersion_at_boundary = np.isfinite(_alpha_se) and float(np.exp(_ln_b)) < 1e-5
+            if np.isfinite(_alpha_se) and not _dispersion_at_boundary:
                 lines.append(
                     f"{_row_name:>{name_width}} |"
                     f"{_stata_coef(_value, coef_w)}"
@@ -4380,6 +4392,20 @@ def _stata_summary(result: Any) -> str:
                     f"{'':>{p_w}}"
                     f"{_stata_coef(_alpha_lo, ci_lo_w)}"
                     f"{_stata_coef(_alpha_hi, ci_hi_w)}"
+                )
+                continue
+            if _dispersion_at_boundary:
+                # Stata leaves these cells blank rather than printing the placeholder
+                # bounds: measured on `nbreg mpg weight fgn`, the alpha row reads
+                #     alpha |   1.03e-09          .                             .
+                lines.append(
+                    f"{_row_name:>{name_width}} |"
+                    f"{_stata_coef(_value, coef_w)}"
+                    f"{'.':>{se_w}}"
+                    f"{'':>{stat_w}}"
+                    f"{'':>{p_w}}"
+                    f"{'':>{ci_lo_w}}"
+                    f"{'':>{ci_hi_w}}"
                 )
                 continue
             lines.append(

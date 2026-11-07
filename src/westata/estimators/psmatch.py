@@ -36,9 +36,18 @@ Verified from Stata's own exported propensity scores AND from westata's Logit pr
 giving the same two ATETs. The logit coefficients themselves agree with Stata to 1e-7, so
 none of this is a model discrepancy.
 
-NOT reproduced: the Abadie-Imbens AI-robust standard error requires a local-linear variance
-estimator, not a closed form. The point estimate is exact, so ``se``/``z``/``p``/the interval
-are NaN rather than a plausible guess -- the same call made for rdrobust and teffects_ra.
+NOT reproduced: the Abadie-Imbens AI-robust standard error. It is NOT "an estimator with no closed
+form" -- Abadie and Imbens (2006, 2011, 2012) give an explicit one, and
+``teffects_psmatch.sthlp:210-233`` points at the formula and notes that ``vce(robust)`` uses TWO
+matches by default. ``teffects psmatch`` has no ``vce(iid)`` fallback either (round 157 confirmed
+Stata rejects it with r(198)), so there is exactly one route.
+
+Implementing it is real but substantial work: the matching sets, the covariate distance matrix, a
+local-linear estimate of sigma^2, and a four-term variance decomposition, all against the published
+formula. The point estimate is exact now, so ``se``/``z``/``p``/the interval stay NaN rather than
+carrying a plausible guess -- the same call made for rdrobust's bandwidth selector and
+teffects_ra. A previous version of this paragraph said "not a closed form", which understated the
+problem: the formula is known, it is the implementation that is not written.
 """
 
 from __future__ import annotations

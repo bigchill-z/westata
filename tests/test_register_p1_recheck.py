@@ -53,7 +53,7 @@ def test_the_recheck_warns_that_scores_are_not_a_work_order() -> None:
 
 
 def test_the_extension_recheck_records_the_honest_gaps() -> None:
-    """X05 is NOT silently upgraded to 'fixed' -- its structural gaps are real."""
+    """X05's structural gaps were REAL and are now fixed; the deliberate differences remain."""
 
     text = REGISTER.read_text(encoding="utf-8")
     assert "3.6.2 扩展项 X01 / X05 实测复核" in text
@@ -61,7 +61,12 @@ def test_the_extension_recheck_records_the_honest_gaps() -> None:
     assert "e(beta)" in section
     assert "e(sample)" in section
     assert "varstable" in section
-    assert "不刷分" in section
+    # Round 156 closed the two structural gaps; the entry must say so rather than still
+    # describing them as missing.
+    assert "第 156 轮补齐结构缺口" in section
+    assert "缺 `e(beta)`" not in section
+    # The remaining differences are deliberate and must stay described as such.
+    assert "有意保留" in section
 
 
 def test_the_three_terminal_states_are_recorded() -> None:

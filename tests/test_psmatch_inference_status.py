@@ -10,11 +10,16 @@ live Stata on nsw_dw.dta:
 and the package returns ate = 2639.864554546459 with se/z/p/ci all NaN and
 `variance_matches_stata = False`.
 
-That is the correct shape for this situation. The Abadie-Imbens AI-robust variance needs a
-local-linear estimator rather than a closed form, and inventing one would produce a standard error
-that looks authoritative while being wrong -- exactly the failure mode this task has spent many
-rounds removing elsewhere. The flag exists so a caller can tell "not computed" from "computed as
-zero".
+That is the correct shape for this situation, though the REASON needed correcting in round 157. An
+earlier version of this docstring said the Abadie-Imbens variance "needs a local-linear estimator
+rather than a closed form". That understates it: Abadie and Imbens (2006, 2011, 2012) give an
+explicit estimator, and `teffects_psmatch.sthlp:210-233` points at the formula (noting that
+`vce(robust)` uses TWO matches by default). What is missing is the IMPLEMENTATION -- the matching
+sets, the covariate distance matrix, a local-linear sigma^2, and a four-term decomposition -- not
+the formula. `teffects psmatch` also has no `vce(iid)` fallback (Stata rejects it with r(198)), so
+there is one route, not two. A guessed standard error would still look authoritative while being
+wrong, which is why the fields stay NaN. The flag exists so a caller can tell "not computed" from
+"computed as zero".
 
 WHAT IS PINNED HERE:
   * the point estimate, to the printed precision;
@@ -75,3 +80,23 @@ def test_the_flag_reports_that_the_variance_does_not_match(fitted) -> None:
 
     assert fitted.variance_matches_stata is False
     assert not np.isclose(float(fitted.se), STATA_ATET_SE, equal_nan=False)
+
+
+def test_the_module_says_what_is_actually_missing() -> None:
+    """Not "no closed form" -- the formula is published; the implementation is not written.
+
+    Round 157 found the earlier wording understated the problem in a way that made the gap look
+    unclosable. Abadie-Imbens (2006, 2011, 2012) give an explicit estimator, and Stata's own help
+    points at it (teffects_psmatch.sthlp:210-233, which also notes vce(robust) defaults to TWO
+    matches). teffects psmatch has no vce(iid) fallback either.
+    """
+
+    import inspect
+
+    import westata.estimators.psmatch as module
+
+    doc = inspect.getdoc(module) or ""
+    assert "Abadie" in doc
+    assert "explicit one" in doc or "explicit estimator" in doc
+    assert "not written" in doc or "IMPLEMENTATION" in doc
+    assert "r(198)" in doc  # the vce(iid) route is closed, recorded so it is not re-tried

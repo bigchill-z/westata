@@ -2895,13 +2895,19 @@ def _stata_summary(result: Any) -> str:
                     # A label ending in ':' is a HEADING with no value at all -- Stata prints
                     # "Obs per group:" and nothing after it, not "Obs per group: = .".
                     if label.endswith(":"):
-                        right = f"{'   '}{label}"
+                        right = f"{label}"
                     elif not label and not value:
                         right = ""
+                    elif label in ("min", "avg", "max"):
+                        # The per-group extremes RIGHT-align their 3-letter label into the same
+                        # field, so "=" still lands in column 70. The field is one narrower here
+                        # (16) because these rows carry a space before the "=", not a bare one.
+                        right = f"{label:>16} = {value:>6}"
                     else:
-                        # Three leading spaces, then the label in 14, "= ", value in 6:
-                        # '   Number of obs    =    600' (28 wide).
-                        right = f"{'   '}{label:<14}= {value:>6}"
+                        # The left column is padded to _left_width (53 here) and the right column
+                        # runs to the "=" in column 70 -- a 17-wide label field. Measured on five
+                        # rows of a live xtlogit, re.
+                        right = f"{label:<17}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:

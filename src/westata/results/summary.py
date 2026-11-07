@@ -2653,7 +2653,24 @@ def _stata_summary(result: Any) -> str:
         # Pseudo R2, while ``ztp`` (zero-TRUNCATED, not zero-inflated) does print one. So
         # the deciding fact is the presence of the inflation counts, not of r2_p.
         _is_zero_inflated = np.isfinite(_e_float(result, "n_nonzero"))
-        _pairs_with_pseudo = np.isfinite(pseudo_r2) and not _is_zero_inflated
+        # A RANDOM-EFFECTS xt fit stores e(r2_p) but does NOT print "Pseudo R2". Measured in
+        # round 230 on a live `xtlogit y x1, re`: the right column is
+        # Number of obs / Number of groups / Obs per group / min / avg / max / Integration pts. /
+        # Wald chi2 / Prob > chi2 -- and then the table starts. Adding the row shifted the whole
+        # coefficient table down by one.
+        _xt_re_no_pseudo = (
+            str(getattr(result, "model_name", "") or "").startswith("xt")
+            and (
+                (getattr(result, "e", None) or {}).get("sigma_u") is not None
+                or str((getattr(result, "e", None) or {}).get("title") or "").endswith(
+                    "regression"
+                )
+            )
+            and "Random-effects" in str((getattr(result, "e", None) or {}).get("title") or "")
+        )
+        _pairs_with_pseudo = (
+            np.isfinite(pseudo_r2) and not _is_zero_inflated and not _xt_re_no_pseudo
+        )
         if _pairs_with_pseudo:
             ml_right.append(("Pseudo R2", _fixed(pseudo_r2, 4)))
         # ``nbreg`` labels its parameterisation opposite "Prob > chi2", which is the third

@@ -207,7 +207,7 @@ Measured relative agreement with StataNow 19.5:
 | `tobit` | 8.5e-8 | 6.4e-7 |
 | `margins, dydx` | 1.6e-7 | 5.2e-6 |
 | `ologit` / `oprobit` | ~2e-5 | — |
-| `nbreg` | 1.7e-5 | 9.1e-7 |
+| `nbreg` | 6.0e-9 | 1.6e-6 |
 | `arima` | 4.8e-5 | 8.2e-5 |
 | `predict` (OLS xb) | 1.6e-15 | — |
 | `predict` (logit pr) | 3.1e-11 | — |

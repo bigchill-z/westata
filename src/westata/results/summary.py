@@ -2796,6 +2796,75 @@ def _stata_summary(result: Any) -> str:
             _left_width = 48
         else:
             _left_width = 56
+        # A RANDOM-EFFECTS xt FIT PAIRS THE PANEL STRUCTURE WITH THE FIT STATISTICS, ROW BY ROW.
+        # This is why the block order resisted three rounds: `panel_lines` is a list of finished
+        # strings, and appending it cannot put "Group variable" beside "Number of groups" because
+        # that row has to exist in ml_left AND ml_right at the same index. Measured in round 226:
+        #
+        #   'Random-effects logistic regression     Number of obs    =    600'
+        #   'Group variable: sid                    Number of groups =     30'
+        #   ''
+        #   'Random effects u_i ~ Gaussian          Obs per group:'
+        #   '                                                min =     20'
+        #
+        # So the rows are spliced INTO ml_left/ml_right just after "Number of obs", and
+        # panel_lines is then suppressed for this shape (its own right column is unused).
+        _re_macros = getattr(result, "e", None) or {}
+        _is_random_effects = (
+            _re_macros.get("sigma_u") is not None
+            or "re" in str(_re_macros.get("title") or "")
+            or str(getattr(result, "model_name", "") or "").endswith(", re")
+        )
+        # The splice happens wherever ml_left currently stands -- the "== 1" guard I first wrote
+        # was wrong, because by this point ml_left already carries the banner, the dispersion
+        # label and the log likelihood.
+        _splice_panel = block == "ml" and _is_random_effects and bool(panel_lines)
+        if _splice_panel:
+            _entity = str(
+                _re_macros.get("ivar") or _re_macros.get("panelvar") or ""
+            ).strip()
+            _per_group = _re_macros.get("_obs_per_group") or {}
+            _gmin = _per_group.get("min", _e_float(result, "g_min"))
+            _gavg = _per_group.get("avg", _e_float(result, "g_avg"))
+            _gmax = _per_group.get("max", _e_float(result, "g_max"))
+            _n_groups = _e_float(result, "N_g")
+            _pts = _e_float(result, "intpoints")
+            if not np.isfinite(_pts):
+                _pts = 7.0
+            _left_rows = [
+                f"Group variable: {_entity or '.'}",
+                "",
+                "Random effects u_i ~ Gaussian",
+                "",
+                "",
+                "",
+                "",
+                "Integration method: "
+                + str(_re_macros.get("intmethod") or "mvaghermite").strip(),
+                "",
+                "",
+            ]
+            _right_rows: list[tuple[str, str]] = [
+                (
+                    "Number of groups",
+                    f"{_n_groups:,.0f}" if np.isfinite(_n_groups) else ".",
+                ),
+                ("", ""),
+                ("Obs per group:", ""),
+                ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
+                ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
+                ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
+                ("", ""),
+                ("Integration pts.", f"{int(round(_pts))}"),
+                ("", ""),
+            ]
+            ml_left[1:1] = _left_rows
+            ml_right[1:1] = _right_rows
+            # ``Log likelihood`` must end up on the row that already carries the model test, so
+            # it is removed here and re-appended after the splice.
+            if ml_left and ml_left[-1].startswith("Log likelihood"):
+                ml_left.pop()
+
         for index, line in enumerate(ml_left):
             right = ""
             if index < len(ml_right):
@@ -2818,7 +2887,13 @@ def _stata_summary(result: Any) -> str:
                 elif _is_truncreg:
                     right = f"{label:<18}= {value:>4}"
                 else:
-                    right = f"{label:<14}= {value:>6}"
+                    # The right column is 28 wide: "   " + label + padding + "= " + value.
+                    # A label ending in ':' is a HEADING with no value at all -- Stata prints
+                    # "Obs per group:" and nothing after it, not "Obs per group: = .".
+                    if label.endswith(":"):
+                        right = f"{label}"
+                    else:
+                        right = f"{label:<14}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:

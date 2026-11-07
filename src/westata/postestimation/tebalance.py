@@ -53,7 +53,7 @@ import numpy as np
 __all__ = ["BalanceRow", "BalanceSummary", "tebalance_summarize"]
 
 
-def _no_leading_zero(value: float, decimals: int) -> str:
+def _no_leading_zero(value: float, decimals: int, *, truncate: bool = False) -> str:
     """Format with fixed decimals but strip the leading zero, as Stata prints these cells.
 
     Measured from ``tebalance summarize``: ".1072771", "-.1745611", "1.027755" -- the sign is
@@ -63,7 +63,40 @@ def _no_leading_zero(value: float, decimals: int) -> str:
 
     if not np.isfinite(value):
         return "."
-    text = f"{float(value):.{decimals}f}"
+    # SEVEN SIGNIFICANT FIGURES, not fixed decimals, and the rounding must be EXPLICIT: Python's
+    # "g" presentation keeps as many digits as the float carries once they fit inside the request,
+    # so f"{v:.7g}" returned "-.003080708" (9 digits) where Stata prints "-.0030807". Stata also
+    # shows ".1072771" (7 decimals) beside "1.027755" (6 decimals) in the same column, which no
+    # fixed-decimal rule can produce.
+    from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP, localcontext
+
+    number = Decimal(repr(float(value)))
+    if number == 0:
+        return "0"
+    # This is Stata's field: the whole rendered cell is at most ``decimals`` CHARACTERS, counting
+    # a leading minus and the decimal point. Measured on `tebalance summarize`:
+    #     .1072771   (8 chars, 7 digits)      -.0030807  (9 chars, 7 digits after the point)
+    #     -.1745611  (9 chars)                .0476934   (8 chars)
+    # Note -.0030807 keeps SEVEN digits after the point, not five: the leading zero is dropped, so
+    # the digit count is driven by the characters available, which is why counting "significant
+    # figures" gave the wrong answer for small negative values.
+    adjusted = number.adjusted()
+    # The minus sign does NOT eat into the digit budget: '-.1745611' is ten characters while
+    # '.1072771' is eight, and both carry seven digits after the point.
+    budget = decimals
+    if adjusted >= 0:
+        places = max(budget - (adjusted + 1) - 1, 0)
+    else:
+        places = max(budget - 2, 0)
+    quantum = Decimal(1).scaleb(-places)
+    with localcontext() as context:
+        context.prec = 40
+        rounded = number.quantize(
+            quantum, rounding=ROUND_DOWN if truncate else ROUND_HALF_UP
+        )
+    text = format(rounded, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
     if text.startswith("0."):
         return text[1:]
     if text.startswith("-0."):
@@ -97,26 +130,41 @@ class BalanceSummary:
     """Covariates whose MATCHED columns reproduce Stata to the printed digits."""
 
     def __str__(self) -> str:
+        """Stata's ``tebalance summarize`` output, captured byte for byte.
+
+        Columns measured from a live run after ``teffects psmatch ..., atet`` on nsw_dw.dta:
+        the name field is 15 wide with the pipe at index 16, then the four statistics END at
+        28, 40, 54 and 65 -- so every line is 65 characters. An earlier version used 16/11/12/12/12
+        and printed 66-character rows with each statistic one column off.
+        """
+
+        def _field(
+            value: float, places: int, end: int, current: int, *, truncate: bool = False
+        ) -> str:
+            text = _no_leading_zero(value, places, truncate=truncate)
+            return " " * max(end - current - len(text), 0) + text
+
         lines = [
             "Covariate balance summary",
-            f"{'':>25}{'Raw':>10}{'Matched':>11}",
+            f"{'':>25}{'Raw':>10}{'Matched':>8}",
             "-" * 41,
             f"Number of obs = {self.nobs_raw:>12}{self.nobs_matched:>11}",
             f"Treated obs   = {self.treated_raw:>12}{self.treated_matched:>11}",
             f"Control obs   = {self.control_raw:>12}{self.control_matched:>11}",
             "-" * 41,
+            "",
             "-" * 65,
             f"{'':<16}|{'Standardized differences':>26}{'Variance ratio':>18}",
             f"{'':<16}|{'Raw':>9}{'Matched':>13}{'Raw':>11}{'Matched':>11}",
             "-" * 16 + "+" + "-" * 48,
         ]
         for row in self.rows:
-            lines.append(
-                f"{row.name:>16} |{_no_leading_zero(row.raw_std_diff, 7):>11}"
-                f"{_no_leading_zero(row.matched_std_diff, 7):>12}"
-                f"{_no_leading_zero(row.raw_variance_ratio, 6):>12}"
-                f"{_no_leading_zero(row.matched_variance_ratio, 6):>12}"
-            )
+            line = f"{row.name:>15} |"
+            line += _field(row.raw_std_diff, 9, 28, len(line))
+            line += _field(row.matched_std_diff, 9, 40, len(line))
+            line += _field(row.raw_variance_ratio, 9, 54, len(line), truncate=True)
+            line += _field(row.matched_variance_ratio, 9, 65, len(line), truncate=True)
+            lines.append(line)
         lines.append("-" * 65)
         return "\n".join(lines)
 

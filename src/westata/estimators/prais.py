@@ -140,6 +140,7 @@ class PraisResult:
     __slots__ = (
         "_params",
         "_names",
+        "_depvar",
         "_bse",
         "_tvalues",
         "_pvalues",
@@ -222,58 +223,134 @@ class PraisResult:
         return self._iterations
 
     def __str__(self) -> str:
+        """Stata's ``prais`` table, captured byte for byte in round 168.
+
+        Column offsets, all measured from a live run on icecream.dta (78-wide rows):
+
+            Source block: label ends at 12, pipe at 13, SS ends at 26, df at 36, MS at 48;
+                          the right-hand statistics start at 51.
+            Coefficient block: the dependent-variable label at 1, pipe at 13, then
+                          Coefficient 15-25, Std. err. 28-36, t 43-44, P>|t| 48-52,
+                          CI 56-78.
+            '       rho |   .8002264'  is the ONLY row after the coefficient rule, and the
+                          closing rule follows it.
+
+        THE CONSTANT IS PRINTED AS ``_cons``, not "Intercept". Several earlier details were wrong
+        together: a leading zero on every number, a 13-wide label column instead of 12, and the
+        p-value column colliding with the lower interval bound.
+        """
+
         width = 78
-        lines = ["Prais\u2013Winsten AR(1) regression with iterated estimates", ""]
-        lines.append(
-            f"{'':>13}{'SS':>13}{'df':>9}{'MS':>13}"
-            f"{'Number of obs':>19}   ={self._nobs:>9}"
-        )
-        lines.append("-" * 14 + "+" + "-" * 35 + "   " + "-" * 15 + "-" * 9)
-        f_stat = f"F({self._df_model:>2}, {self._df_resid:>3})"
-        lines.append(
-            f"{'Model':>12} |{self._mss:>13.7g}{self._df_model:>9}"
-            f"{self._mss / max(self._df_model, 1):>13.7g}"
-            f"{f_stat:>19}   ={self._fvalue:>9.2f}"
-        )
-        lines.append(
-            f"{'Residual':>12} |{self._rss:>13.7g}{self._df_resid:>9}"
-            f"{self._rss / max(self._df_resid, 1):>13.7g}"
-            f"{'Prob > F':>19}   ={self._p_f:>9.4f}"
-        )
-        lines.append("-" * 14 + "+" + "-" * 35 + "   " + "-" * 23)
-        lines.append(
-            f"{'Total':>12} |{self._tss:>13.7g}{self._nobs - 1:>9}"
-            f"{self._tss / max(self._nobs - 1, 1):>13.7g}"
-            f"{'R-squared':>19}   ={self._r2:>9.4f}"
-        )
-        lines.append(
-            f"{'':>13}{'':>13}{'':>9}{'':>13}"
-            f"{'Adj R-squared':>19}   ={self._r2_adj:>9.4f}"
-        )
-        lines.append(
-            f"{'':>13}{'':>13}{'':>9}{'':>13}"
-            f"{'Root MSE':>19}   ={self._rmse:>9.5f}"
-        )
-        lines.append("")
-        lines.append("-" * width)
-        lines.append(
-            f"{'consumption':>13} |{'Coefficient':>11}{'Std. err.':>11}"
-            f"{'t':>7}{'P>|t|':>8}{'[95% conf. interval]':>22}"
-        )
-        lines.append("-" * 14 + "+" + "-" * 62)
+
+        def num(value: float, places: int, digits: int = 7) -> str:
+            """Stata's cell: SEVEN significant figures, leading zero dropped."""
+            from decimal import Decimal, ROUND_HALF_UP, localcontext
+
+            if not np.isfinite(value):
+                return "."
+            number = Decimal(repr(float(value)))
+            if number == 0:
+                return "0"
+            exponent = number.adjusted()
+            quantum = Decimal(1).scaleb(exponent - (digits - 1))
+            with localcontext() as context:
+                context.prec = 40
+                rounded = number.quantize(quantum, rounding=ROUND_HALF_UP)
+            text = format(rounded, "f")
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+            if text.startswith("0."):
+                return text[1:]
+            if text.startswith("-0."):
+                return "-" + text[2:]
+            return text
+
+        def cell(text: str, end: int, current: int) -> str:
+            """Right-align ``text`` so it ENDS at absolute column ``end``."""
+            return " " * max(end - current - len(text), 0) + text
+
+        def stats_row(label: str, value: str) -> str:
+            """Right block: label at 51, '=' at 67, value ending at 78."""
+            line = " " * 51 + label
+            line += " " * max(67 - len(line), 1) + "="
+            return line + " " * max(78 - len(line) - len(value), 0) + value
+
+        def source_row(label: str, ss: str, df: str, ms: str) -> str:
+            line = f"{label:>12} |"
+            line += cell(ss, 26, len(line))
+            line += cell(df, 36, len(line))
+            line += cell(ms, 48, len(line))
+            return line
+
+        rule = f"{'-' * 13}+{'-' * 34}"
+
+        def joined(left: str, label: str, value: str) -> str:
+            """Left block padded to column 48, then the right-hand statistics block."""
+            return left + " " * max(48 - len(left), 0) + stats_row(label, value)[48:]
+
+        lines = [
+            "",
+            "",
+            "Prais\u2013Winsten AR(1) regression with iterated estimates",
+            "",
+            # The header row's SS/MS end three columns EARLIER than the data rows' do (23/36/45
+            # against 26/36/48): Stata centres the short labels over wider numeric fields.
+            joined(
+                f"{'Source':>12} |" + cell("SS", 23, 14) + cell("df", 36, 23) + cell("MS", 45, 36),
+                "Number of obs",
+                str(self._nobs),
+            ),
+            joined(rule, f"F({self._df_model}, {self._df_resid})", f"{self._fvalue:.2f}"),
+            joined(
+                source_row(
+                    "Model",
+                    num(self._mss, 7),
+                    str(self._df_model),
+                    num(self._mss / max(self._df_model, 1), 7),
+                ),
+                "Prob > F",
+                f"{self._p_f:.4f}",
+            ),
+            joined(
+                source_row(
+                    "Residual",
+                    num(self._rss, 7),
+                    str(self._df_resid),
+                    num(self._rss / max(self._df_resid, 1), 7),
+                ),
+                "R-squared",
+                f"{self._r2:.4f}",
+            ),
+            joined(rule, "Adj R-squared", f"{self._r2_adj:.4f}"),
+            joined(
+                source_row(
+                    "Total",
+                    num(self._tss, 7),
+                    str(self._nobs - 1),
+                    num(self._tss / max(self._nobs - 1, 1), 7),
+                ),
+                "Root MSE",
+                num(self._rmse, 3),
+            ),
+            "",
+            "-" * width,
+            f"{self._depvar:>12} |{'Coefficient':>11}{'Std. err.':>11}"
+            f"{'t':>9}{'P>|t|':>6}{'[95% conf. interval]':>22}",
+            "-" * 13 + "+" + "-" * 64,
+        ]
         for index, name in enumerate(self._names):
             low, high = self._conf_int[index]
+            # The constant is "_cons" in Stata, whatever the formula called it.
+            label = "_cons" if str(name).lower() in {"intercept", "const", "constant"} else str(name)
             lines.append(
-                f"{name:>13} |{self._params[index]:>11.7g}{self._bse[index]:>11.7g}"
-                f"{self._tvalues[index]:>7.2f}{self._pvalues[index]:>8.3f}"
-                f"{low:>11.7g}{high:>11.7g}"
+                f"{label:>12} |{num(self._params[index], 7):>11}{num(self._bse[index], 6):>11}"
+                f"{self._tvalues[index]:>8.2f}{self._pvalues[index]:>7.3f}"
+                f"{num(low, 7):>12}{num(high, 7):>12}"
             )
-        lines.append("-" * 14 + "+" + "-" * 62)
-        lines.append(f"{'rho':>13} |{self._rho:>11.7g}")
+        lines.append("-" * 13 + "+" + "-" * 64)
+        lines.append(f"{'rho':>12} |{num(self._rho, 7):>11}")
         lines.append("-" * width)
-        lines.append(
-            f"Durbin\u2013Watson statistic (original)    = {self._dw_original:.6f}"
-        )
+        lines.append(f"Durbin\u2013Watson statistic (original)    = {self._dw_original:.6f}")
         lines.append(
             f"Durbin\u2013Watson statistic (transformed) = {self._dw_transformed:.6f}"
         )
@@ -365,6 +442,7 @@ def prais(
     return PraisResult(
         params=coefficients,
         names=list(names),
+        depvar=str(lhs),
         bse=bse,
         tvalues=tvalues,
         pvalues=pvalues,

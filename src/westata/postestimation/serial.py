@@ -216,23 +216,31 @@ class Correlogram:
         def paint(canvas: list[str], value: float, centre: int) -> None:
             """Draw one bar chart into ``canvas`` at the absolute column ``centre``.
 
-            The pipe sits ON ``centre`` and ``round(|value|*10) - 1`` strokes extend from it,
-            capped at 7. THIS IS NOT YET EXACT: 11 of 16 rows match Stata byte for byte and
-            every miss is a bar one stroke off. Values that DO fit: .3298 -> 2, .0362 -> 0,
-            .3186 -> 2, .6627 -> 5, .3912 -> 3, .9355 -> 7. Values that do NOT: .3554 draws 2
-            where this gives 3, and .1923 draws 1 where a truncating rule would give 0 -- so
-            neither pure rounding nor pure truncation reproduces the column. I stopped there
-            rather than keep fitting a cosmetic rule; the NUMBERS (AC/PAC/Q/Prob>Q) are exact.
+            Transcribed from ``corrgram.ado``'s ``MkString`` (round 186) rather than fitted:
+
+                if corr >= 0:  vb = 9;                  ve = int(8*corr) + 9
+                else:          ve = 9;                  vb = int(8*corr) + 9
+
+            and then every position from ``vb`` to ``ve`` is stroked, with the pipe at position 9.
+            So the scale is EIGHT characters per unit of correlation, and the boundary is a
+            TRUNCATION of ``8*corr``, not a rounding of ``10*corr``.
+
+            Round 185 spent a whole round on this and concluded "neither pure rounding nor pure
+            truncation reproduces the column" -- both guesses were of the wrong FORM (10 per
+            unit, rounded) and the reference value I was checking against (-.0934 -> 1 stroke) was
+            mis-transcribed; Stata draws zero strokes there. Reading the ado answered it in one
+            step, which is the third time that has been the difference (varsoc's FPE, round 180;
+            this, round 186).
             """
-            strokes = int(round(abs(float(value)) * 10.0)) - 1
-            strokes = max(0, min(strokes, 7))
+            if not np.isfinite(value):
+                return
+            scaled = int(8.0 * float(value))
+            start = 9 if value >= 0 else 9 + scaled
+            finish = 9 + scaled if value >= 0 else 9
             canvas[centre] = "|"
-            if value >= 0:
-                for offset in range(1, strokes + 1):
-                    canvas[centre + offset] = "-"
-            else:
-                for offset in range(1, strokes + 1):
-                    canvas[centre - offset] = "-"
+            for position in range(min(start, finish), max(start, finish) + 1):
+                if position != 9:
+                    canvas[centre + position - 9] = "-"
 
         def cell(text: str, end: int, current: int) -> str:
             return " " * max(end - current - len(text), 0) + text

@@ -209,6 +209,7 @@
 | C13-04 `varstable` | 0.27 / 0.00 | **误判**：第 147 轮验证 11/11 行与 Stata 逐字节一致，含复特征值与两位结论行。见 `tests/test_varstable_stata.py` |
 | C13-08 季节哑变量回归 | 0.17 / 0.07 | **数值全对，差距在排版**：第 183 轮确认季节性拟合的每个系数与标准误都与 Stata 一致；`C(var)[T.level]` 的 22 字符存储名原样进标签列，把表撑到 87 宽（Stata 78）。改为分组头 + 水平行的两段结构后恢复 78。见 `tests/test_factor_group_rendering.py` |
 | C14-04 `varsoc` | 0.14 / 0.84 | **已解决**（第 178–180 轮）：LL/AIC/HQIC/BIC/FPE 五列全部精确。见下方 3.6.3 与 `tests/test_varsoc_fixed_window.py` |
+| C08-07 `corrgram` | 0.00 / 0.91 | **已解决**（第 185–186 轮）：16/16 行逐字节一致。缺口是两条条形图列根本没画；第 185 轮靠试凑只做到 11/16，**第 186 轮读 `corrgram.ado` 的 `MkString` 一步解决**：`ve = int(8*corr) + 9`（**8 字符/单位、截断**），且我第 185 轮抄错了一个参照值（`-.0934` Stata 画 0 笔，不是 1 笔）。见 `tests/test_corrgram_layout.py` |
 
 **X05 剩余差异是有意保留的**：`e(beta)`/`e(sample)` 已补齐，但**不会为了完全一致而删除额外标量**——`e(aic)`/`e(bic)` 等是 westata 额外提供的信息，删掉它们会降低包自身的可用性。macros 顺序同理（Stata 的宏集合也依赖具体估计命令）。
 

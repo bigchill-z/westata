@@ -259,6 +259,12 @@ def _canonical_cov_type(cov_type: str | None) -> str:
     if cov_type is None:
         return "nonrobust"
     key = str(cov_type).strip().upper()
+    # ``robust`` IS STATA'S OPTION NAME, and for ivregress it means HC0 -- that is what
+    # `ivregress 2sls ..., vce(robust)` computes (HC0, not HC1). Accepting the word keeps a
+    # caller from having to remember which numeric spelling each command family wants, which is
+    # the deviation the v3 report records at section 4, item (5).
+    if key == "ROBUST":
+        return "HC0"
     canonical = {t.upper(): t for t in _IV_COV_TYPES}.get(key)
     if canonical is None:
         if key in ("HC2", "HC3"):

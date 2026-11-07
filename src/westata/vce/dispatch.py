@@ -40,6 +40,12 @@ _ALIASES = {
     # ``newey``/``vce(hac ...)`` spellings.
     "NEWEY": "HAC",
     "NEWEYWEST": "HAC",
+    # ``robust`` IS THE STATA OPTION NAME, and for `regress, robust` it means HC1. Accepting the
+    # word here keeps a caller from having to remember which numeric spelling each command family
+    # wants -- the deviation the v3 report records at section 4, item (5). Note that the IV family
+    # maps the same word to HC0 instead (Stata's `ivregress ..., vce(robust)` is HC0), and that
+    # override lives in `estimators/iv.py` because the mapping genuinely differs per command.
+    "ROBUST": "HC1",
 }
 
 

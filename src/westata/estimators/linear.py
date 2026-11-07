@@ -478,7 +478,12 @@ class OLS:
         if cov_type is None:
             effective_cov_type = "HC1" if (spec is not None and spec.implies_robust) else "nonrobust"
         else:
-            effective_cov_type = cov_type
+            # Store the CANONICAL spelling, not the caller's alias: `cov_type="robust"` means HC1
+            # for `regress`, and the result should say so rather than echo a word that other
+            # command families map differently. The dispatch module owns the alias table.
+            from westata.vce.dispatch import _normalize_cov_type as _canonical
+
+            effective_cov_type = _canonical(str(cov_type))
             if (
                 spec is not None
                 and spec.implies_robust

@@ -83,7 +83,7 @@ def test_supported_cov_types_tuple():
     )
 
 
-@pytest.mark.parametrize("bad", ["bogus", "twoway", "robust", ""])
+@pytest.mark.parametrize("bad", ["bogus", "twoway", ""])
 def test_unknown_cov_type_raises_value_error(bad):
     X, resid, _ = _toy()
     with pytest.raises(ValueError) as excinfo:
@@ -177,3 +177,21 @@ def test_package_reexports():
 
     assert package_compute_cov is compute_cov
     assert vce.SSC is ProtocolSSC
+
+
+def test_robust_is_an_alias_for_hc1() -> None:
+    """Stata's ``regress, robust`` is HC1, so the word is accepted rather than rejected.
+
+    The IV family maps the same word to HC0 -- Stata's ``ivregress ..., vce(robust)`` is HC0 --
+    and that override lives in ``estimators/iv.py`` because the mapping genuinely differs by
+    command. Before this, a caller had to remember which numeric spelling each family wanted,
+    which is the deviation the v3 report records at section 4, item (5).
+    """
+
+    from westata.vce.dispatch import _normalize_cov_type
+
+    assert _normalize_cov_type("robust") == "HC1"
+    assert _normalize_cov_type("ROBUST") == "HC1"
+
+
+

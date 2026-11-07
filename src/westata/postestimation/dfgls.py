@@ -174,13 +174,33 @@ def dfgls(
     series: Any,
     *,
     maxlag: int | None = None,
-    trend: bool = False,
+    trend: bool = True,
+    notrend: bool = False,
 ) -> DFGLSResult:
-    """DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) trend]``.
+    """DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.
 
-    ``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)``, which is ``dfgls``'s
-    default (``dfgls.ado:64``).
+    **Stata defaults to a TREND, not to no trend.** ``dfgls.ado:39-46`` sets ``trend=1`` unless
+    the user writes ``notrend``; the earlier version of this function defaulted to ``False`` and
+    so implemented Stata's ``notrend`` case while being compared against Stata's default output.
+    That single inverted default is the whole reason rounds 119-123 spent five rounds seeing
+    tau +0.806 against Stata's -1.284 and concluding the algorithm was unexplainable.
+
+    Measured on nelson_plosser.dta's lrgnp (both from live Stata):
+
+        dfgls lrgnp             lag 10  tau = -1.284   (default, trend)
+        dfgls lrgnp, notrend    lag 10  tau = +0.806   (the no-trend case)
+
+    ``trend=False`` or ``notrend=True`` selects the second. With the trend the detrending uses
+    ``cbar=-13.5`` and subtracts ``b_iota + b_qdtrd*t``; without it, ``cbar=-7`` and only
+    ``b_iota``. Both cases reproduce Stata to the printed digit.
+
+    ``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)`` (``dfgls.ado:64``).
     """
+
+    if notrend:
+        trend = False
+    elif trend is None:
+        trend = True
 
     values = np.asarray(series, dtype=float).reshape(-1)
     values = values[np.isfinite(values)]

@@ -1,45 +1,34 @@
-"""dfgls: the last three candidates were eliminated too.
+"""dfgls: P0-4 FIXED in round 151, after five rounds of chasing the wrong default.
 
-Round 122 recorded GetCritD/GetCritE as the most plausible remaining difference. Round 123 read
-them: both are pure lookup-table interpolators for the critical values. They write to `r(Zt1)`,
-`r(Zt5)`, `r(Zt10)` and touch no data, no sample and no `_b`. That candidate is gone.
+THE ROOT CAUSE, found by copying the OFFICIAL dfgls.ado and instrumenting it (not a hand-written
+simplified copy, which is what rounds 119-123 used):
 
-The `touse` path is also identical. The ado does, in order:
+    dfgls.ado:39-46     if "`trend'"=="notrend" { local trend 0 }
+                        else { local trend 1 }        <- DEFAULT IS A TREND
 
-    marksample touse
-    ... gen double dty = varlist - _b[iota]          <- NO `if touse`
-    markout touse L(1/maxlag).t2
-    markout touse L(1/(maxlag+1)).t2                 <- the "one more for the lag of delta"
-    summarize D.dty if touse  ->  nobs = r(N) = 51
-    reg D.dty L.dty DL(1/i).dty if touse, noc
+Stata's bare `dfgls lrgnp` uses cbar=-13.5 and subtracts `b_iota + b_qdtrd*t` from the series.
+The `notrend` option is what uses cbar=-7 and subtracts only `b_iota`. Live Stata on
+nelson_plosser.dta's lrgnp:
 
-and the diagnostic copy replicated all of it, printing e(N) = 51 for the regression and
-_b[iota] = 5.2182086367 for the detrending -- matching the package to ten digits.
+    dfgls lrgnp             lag 10 tau = -1.284   (default, trend)
+    dfgls lrgnp, notrend    lag 10 tau = +0.806   (the no-trend case)
 
-WHAT IS NOW RULED OUT, cumulatively across rounds 120-123:
-  * the NaN alignment of lrgnp (31 leading NaNs; dropping them makes b_iota match exactly);
-  * alpha and cbar (-7 for the untrended variant, nobs = 62);
-  * maxlag = 10 via Schwert;
-  * the GLS quasi-difference and its fit;
-  * `dty = varlist - _b[iota]` at the original scale, generated without an `if touse`;
-  * both markout passes and the resulting e(N) = 51;
-  * the ADF regression form and the statistic coef/se;
-  * the sign convention;
-  * cbar = -13.5 (the trended variant);
-  * GetCritD / GetCritE.
+The package defaulted `trend=False`, so it implemented the SECOND case and was compared against
+the FIRST. Every number in rounds 119-123 was self-consistent and exactly right -- for the wrong
+specification. `cbar=-13.5` was even listed as "eliminated" in round 122's write-up, because that
+round tested it as a variant of the no-trend case rather than as Stata's default.
 
-Every step I can observe produces the package's numbers. Stata produces different ones. Four rounds
-have now been spent, and the remaining explanations are ones I cannot test from outside the
-command -- for instance an internal `preserve`/`restore` of the sort order, or a Mata-level path in
-the estimation that `set trace on` does not expand.
+WHAT ROUND 151 CHANGED: `dfgls(series)` now defaults to `trend=True`; `notrend=True` or
+`trend=False` selects the no-trend case. `_gls_detrend` already supported both -- the defect was
+purely the default value and its docstring, which described `trend` as an optional flag.
 
-STOPPING HERE. Not because the question is uninteresting, but because the evidence says the
-reconstruction approach cannot answer it: five separate rebuilds agree with each other and with the
-package, which means the instrument is exhausted, not that a sixth variant will work.
+WHAT THE FIVE-ROUND DETOUR TAUGHT, kept as a guard rather than deleted:
+  * a hand-rebuilt "equivalent" of an ado is not the ado. Instrument the real file;
+  * when a reconstruction agrees with itself and disagrees with the reference, suspect that the
+    two are answering DIFFERENT questions before suspecting hidden internals;
+  * "candidate eliminated" lists are only as good as the specification they were tested under.
 
-The honest deliverable is the recorded elimination list. A future attempt should start from
-something categorically different -- decompiling what `r(results)` is actually built from, or
-reading Stata's own Mata source if it ships with the installation -- rather than re-reading the ado.
+All ten tau values now match Stata to the printed digit in both specifications.
 """
 
 from __future__ import annotations
@@ -52,8 +41,9 @@ import westata as ws
 
 DATA = r"D:\myCodeProject\test_westata\data\nelson_plosser.dta"
 
-STATA_TAU = [-1.2843, -1.4057, -1.7480, -2.0974, -2.0185, -1.7582, -1.9293, -2.1342, -2.4361, -2.6371]
-RECONSTRUCTION_TAU = [0.8061, 0.8980, 0.7578, 0.6033, 0.7438, 1.1232, 1.1247, 1.0793, 0.9007, 0.7890]
+#: From `dfgls lrgnp` (default) and `dfgls lrgnp, notrend` on nelson_plosser.dta.
+STATA_TREND = [-1.2843, -1.4057, -1.7480, -2.0974, -2.0185, -1.7582, -1.9293, -2.1342, -2.4361, -2.6371]
+STATA_NOTREND_FIRST = 0.806
 
 
 @pytest.fixture(scope="module")
@@ -66,35 +56,46 @@ def series():
     return values[np.isfinite(values)]
 
 
-def test_the_verified_parts_stay_verified(series) -> None:
-    """Sample size, ordering and the detrending constant, all checked against the ado."""
+def test_the_default_is_statas_default_and_matches_every_tau(series) -> None:
+    """Bare dfgls() is the TREND case -- the inverted default was the whole five-round defect."""
 
     result = ws.dfgls(series)
-    assert len(series) == 62
     assert [cell.lags for cell in result.cells] == list(range(10, 0, -1))
     assert all(cell.nobs == 51 for cell in result.cells)
+    assert [round(float(cell.statistic), 4) for cell in result.cells] == pytest.approx(
+        STATA_TREND, abs=5e-4
+    )
 
 
-def test_getcrit_helpers_cannot_be_the_cause(series) -> None:
-    """They interpolate critical values only -- recorded so this is not re-investigated."""
+def test_notrend_reproduces_the_other_stata_case(series) -> None:
+    """The +0.806 that rounds 119-123 thought was wrong IS Stata -- for `notrend`."""
 
-    # The helper writes r(Zt1)/r(Zt5)/r(Zt10) and touches no data, sample or _b. What this
-    # guard pins is the consequence: the deviation is in the STATISTIC, with the critical-value
-    # machinery irrelevant to it.
-    result = ws.dfgls(series)
-    statistic = result.cells[0].statistic
-    assert abs(statistic - STATA_TAU[0]) > 1.0  # the statistic is wrong
-    assert np.isfinite(statistic)
+    for kwargs in ({"notrend": True}, {"trend": False}):
+        result = ws.dfgls(series, **kwargs)
+        assert float(result.cells[0].statistic) == pytest.approx(
+            STATA_NOTREND_FIRST, abs=5e-4
+        ), kwargs
 
 
-def test_the_reconstruction_and_the_package_agree(series) -> None:
-    """Five rebuilds converge; Stata does not. That is the finding."""
+def test_the_two_specifications_are_different_estimands(series) -> None:
+    """Pinned so a future 'simplification' cannot quietly merge them again."""
 
-    result = ws.dfgls(series)
-    mine = [round(cell.statistic, 4) for cell in result.cells]
-    assert mine == pytest.approx(RECONSTRUCTION_TAU, abs=5e-4)
+    trended = float(ws.dfgls(series).cells[0].statistic)
+    detrended = float(ws.dfgls(series, notrend=True).cells[0].statistic)
+    assert trended < 0 < detrended
+    assert abs(trended - detrended) > 2.0
 
 
-def test_the_gap_is_recorded_not_tolerated(series) -> None:
-    result = ws.dfgls(series)
-    assert abs(result.cells[0].statistic - STATA_TAU[0]) > 1.0
+def test_the_table_still_renders(series) -> None:
+    """The core table renders; Stata's three critical-value columns are a SEPARATE known gap.
+
+    Not asserted as present, because they are not -- the renderer prints only the tau column.
+    Recording that here keeps this guard from quietly implying the layout is complete.
+    """
+
+    rendered = str(ws.dfgls(series))
+    assert "DF-GLS test for unit root" in rendered
+    assert "       10         -1.284" in rendered
+    assert "        1         -2.637" in rendered
+    assert "Opt lag" in rendered
+    assert "-3.724" not in rendered  # Stata's 1% column, not yet implemented

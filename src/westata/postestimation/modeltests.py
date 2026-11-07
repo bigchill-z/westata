@@ -230,8 +230,14 @@ class HausmanResult:
         lines = [
             "                 ---- Coefficients ----",
             "             |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))",
-            f"             |{self.consistent_label:>12}{self.efficient_label:>13}"
-            f"{'Difference':>16}{'Std. err.':>15}",
+            # Header built from measured END columns, not padding arithmetic: the store names end
+            # at 23 and 36, "Difference" at 55, "Std. err." at 71 -- widths 11/13/19/16 with the
+            # 13-character label block in front of them.
+            "             |"
+            + " " * (23 - 14 - len(self.consistent_label)) + self.consistent_label
+            + " " * (36 - 23 - len(self.efficient_label)) + self.efficient_label
+            + " " * (55 - 36 - len("Difference")) + "Difference"
+            + " " * (71 - 55 - len("Std. err.")) + "Std. err.",
             "-------------+" + "-" * 64,
         ]
         for index, name in enumerate(self.names):
@@ -239,7 +245,12 @@ class HausmanResult:
             # The standard error uses the same rule as the coefficients -- seven decimals, no
             # leading zero -- and "." when the difference has no estimable variance.
             if np.isfinite(error):
-                error_text = f"{float(error):.7f}"
+                # Stata prints ".014854" here, not ".0148540": the standard-error column drops a
+                # trailing zero once the value fits. Emitting a fixed seven decimals left the cell
+                # one character wider than every other row in the same column.
+                error_text = f"{float(error):.7f}".rstrip("0")
+                if error_text.endswith("."):
+                    error_text += "0"
                 if error_text.startswith("0."):
                     error_text = error_text[1:]
                 elif error_text.startswith("-0."):
@@ -257,14 +268,18 @@ class HausmanResult:
                 f"{error_text:>16}"
             )
         lines.append("-" * 78)
+        # Indents measured from Stata: 26 spaces before "b =", 11 before "B =", and a BLANK line
+        # between the pair and the test paragraph. The previous version used 22 and 9 and omitted
+        # the blank, so both label lines sat one step left of Stata's.
         lines.append(
-            "                      b = Consistent under H0 and Ha;"
+            " " * 26 + "b = Consistent under H0 and Ha;"
             f" obtained from {self.consistent_command or 'ivregress'}."
         )
         lines.append(
-            "         B = Inconsistent under Ha, efficient under H0;"
+            " " * 11 + "B = Inconsistent under Ha, efficient under H0;"
             f" obtained from {self.efficient_command or 'regress'}."
         )
+        lines.append("")
         lines.append("Test of H0: Difference in coefficients not systematic")
         lines.append(f"    chi2({self.df:g}) = (b-B)'[(V_b-V_B)^(-1)](b-B)")
         lines.append(f"            = {self.statistic:>6.2f}")
@@ -435,6 +450,48 @@ def lrtest(unrestricted: Any, restricted: Any) -> LRTestResult:
         restricted_name=str(getattr(restricted, "model_name", "") or ""),
         unrestricted_name=str(getattr(unrestricted, "model_name", "") or ""),
     )
+
+
+def _command_name(result: Any) -> str:
+    """The Stata command that produced ``result``, for the Hausman footnote.
+
+    Stata closes the table with which command each side came from:
+
+        b = Consistent under H0 and Ha; obtained from xtreg.
+        B = Inconsistent under Ha, efficient under H0; obtained from xtreg.
+
+    Results expose that as ``stata_command_name``; when they do not, ``model_name`` holds it with
+    the options appended ('xtreg, fe'), so the part before the comma is the command. The previous
+    code fell back to the empty string, and the renderer then printed 'ivregress' and 'regress'
+    for ANY model -- measured on a panel fit in round 174, where every label was wrong (and two of
+    them named commands that were never run).
+    """
+
+    explicit = str(getattr(result, "stata_command_name", "") or "").strip()
+    if explicit:
+        return explicit
+    model = str(getattr(result, "model_name", "") or "").strip()
+    return model.split(",", 1)[0].strip()
+
+
+def _side_label(result: Any) -> str:
+    """The header label for one side of the Hausman table -- Stata's estimate store name.
+
+    Stata heads the columns with whatever the two models were stored as:
+
+        |       fe           re         Difference       Std. err.
+
+    Results carry ``estimation_label`` for that; failing that, the option part of ``model_name``
+    ('xtreg, fe' -> 'fe') is what a reader expects and what Stata shows for an unrenamed store.
+    The previous code produced an empty label, which left the column header reading
+    '|                               Difference' with no names over the two coefficient columns.
+    """
+
+    explicit = str(getattr(result, "estimation_label", "") or "").strip()
+    if explicit:
+        return explicit
+    model = str(getattr(result, "model_name", "") or "").strip()
+    return model.split(",", 1)[1].strip() if "," in model else ""
 
 
 def _comparable_names(
@@ -638,8 +695,8 @@ def hausman(
         consistent=consistent_params[consistent_index],
         efficient=efficient_params[efficient_index],
         standard_errors=_errors,
-        consistent_label=str(getattr(consistent, "estimation_label", "") or ""),
-        efficient_label=str(getattr(efficient, "estimation_label", "") or ""),
-        consistent_command=str(getattr(consistent, "stata_command_name", "") or ""),
-        efficient_command=str(getattr(efficient, "stata_command_name", "") or ""),
+        consistent_label=_side_label(consistent),
+        efficient_label=_side_label(efficient),
+        consistent_command=_command_name(consistent),
+        efficient_command=_command_name(efficient),
     )

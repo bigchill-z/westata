@@ -748,7 +748,12 @@ class _LogitPropensity:
         treated: np.ndarray,
         *,
         command: str,
-        maxiter: int = 100,
+        # 500, NOT 100. On nsw_dw.dta with the eight standard covariates the Newton iteration
+        # needs more than 100 steps to reach tol=1e-12; `from_formula` therefore raised
+        # "treatment (logit) model did not converge in 100 iterations" while the SAME design
+        # converged through the package's own Logit at maxiter=500 (v3 report, IPW.from_formula).
+        # The design was never wrong -- only the iteration budget.
+        maxiter: int = 500,
         tol: float = 1e-12,
     ) -> None:
         self._x = x
@@ -758,7 +763,17 @@ class _LogitPropensity:
         # propensity scores were systematically wrong (max difference 0.087 against the correct
         # ones) and the Hajek ATE came out 1589.9166 where Stata reports 1641.315, a 3.1% error
         # that the module's docstring never caught because it was checked on other data.
-        self._design = np.column_stack([np.ones(x.shape[0]), x])
+        # THE DESIGN ALREADY MAY CARRY A CONSTANT. `_prepare` builds its design through patsy,
+        # which emits an Intercept column, so prepending another gave this fit a DUPLICATE
+        # constant on two identical columns -- singular Hessian, no accepted step, and the
+        # reported "treatment (logit) model did not converge in 100 iterations" (v3 report,
+        # IPW.from_formula). The same eight covariates converge in four Newton steps when the
+        # design has one constant, which is what `_has_intercept` now guarantees.
+        self._design = (
+            np.asarray(x, dtype=float)
+            if _has_intercept(np.asarray(x, dtype=float))
+            else np.column_stack([np.ones(x.shape[0]), x])
+        )
         self._treated = treated
         self._command = command
         self._beta = self._fit(maxiter, tol)

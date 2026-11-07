@@ -73,7 +73,11 @@ STATA_LINES = [
     "               |            Adjusted      Partial",
     "      Variable |   R-sq.       R-sq.        R-sq.      F(2,396)   Prob > F",
     "  " + "-" * 13 + "+" + "-" * 60,
-    "          endog |  0.6288      0.6260       0.6267       332.355    0.0000",
+    # Captured from a live `ivregress 2sls y x (endog = z1 z2)` in round 188. The hand-typed
+    # version this replaces carried ONE MORE leading space (pipe at 16); Stata puts the pipe at
+    # 15 for both 'endog' and 's', which is why the row looked mismatched after the alignment
+    # fix rather than before it.
+    "         endog |  0.6288      0.6260       0.6267       332.355    0.0000",
     "  " + "-" * 74,
 ]
 

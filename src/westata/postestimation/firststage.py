@@ -264,13 +264,32 @@ class FirstStageResult:
         separator = "  " + "-" * 35 + "+" + "-" * 33
         lines = [
             "",
-            f"  Minimum eigenvalue statistic = {self.mineig:.3f}" + " " * 6,
+            # The line is padded to a FIXED total width of 45, not to a fixed number of trailing
+            # spaces: '190.149' needs five and '44.963' needs six to reach the same 45. Hard-coding
+            # either count broke the other case -- the two reference fits in the suite disagree by
+            # exactly one space, which is how this was found (round 188).
+            f"  Minimum eigenvalue statistic = {self.mineig:.3f}".ljust(45),
             "",
             f"  Critical Values                      # of endogenous regressors: {n_endog:>4}",
             f"  H0: Instruments are weak             # of excluded instruments: {n_excluded:>5}",
             rule,
             "                                     |    5%     10%     20%     30%",
-            "  2SLS relative bias                 |         (not available)",
+            # The RELATIVE BIAS row comes from matrix[0]. When every cell is ``nan`` Stata prints
+            # a single "(not available)" instead of four dots -- which is what this package did
+            # unconditionally, hiding the real critical values (13.91 9.08 6.46 5.39 on
+            # grilic.dta). Round 188: render the numbers when they exist, and keep the phrase
+            # only for the genuinely-absent case.
+            "  2SLS relative bias                 |"
+            + (
+                "         (not available)"
+                if not np.isfinite(np.asarray(matrix[0], dtype=float)).any()
+                else "".join(
+                    f"{value:>{7 if position == 0 else 8}.2f}"
+                    if np.isfinite(value)
+                    else ".".rjust(7 if position == 0 else 8)
+                    for position, value in enumerate(matrix[0])
+                )
+            ),
             separator,
             "                                     |   10%     15%     20%     25%",
         ]
@@ -386,7 +405,11 @@ class FirstStageResult:
             #
             # Absolute columns cannot express this: six position sets were tried, each matching
             # one row and breaking the other.
-            prefix = " " * 10 + name + " "
+            # The name is RIGHT-aligned so the pipe always lands at column 15, which is what
+            # Stata does: '             s |' and '          endog |' both put it there. A fixed
+            # ten-space prefix left the pipe at 12 for a one-character name, which is why the
+            # short-name rows sat one column left. Measured in round 188.
+            prefix = "  " + name.rjust(12) + " "
             row = prefix + "|"
             for value, offset in (
                 (f"{self.r2[i]:.4f}", 9),

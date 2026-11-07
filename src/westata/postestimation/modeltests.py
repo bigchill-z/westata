@@ -228,6 +228,10 @@ class HausmanResult:
         )
 
         lines = [
+            # A LEADING BLANK LINE: the raw capture begins with newline-then-spaces, so Stata's
+            # block opens with an empty line. Round 189 found the same omission in
+            # `estat endogenous`; checking the RAW prefix here too is what surfaced it.
+            "",
             "                 ---- Coefficients ----",
             "             |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))",
             # Header built from measured END columns, not padding arithmetic: the store names end
@@ -271,16 +275,23 @@ class HausmanResult:
         # Indents measured from Stata: 26 spaces before "b =", 11 before "B =", and a BLANK line
         # between the pair and the test paragraph. The previous version used 22 and 9 and omitted
         # the blank, so both label lines sat one step left of Stata's.
+        # Both footnote lines are RIGHT-ALIGNED to a fixed width of 78, not indented by a fixed
+        # amount: 'obtained from ivregress.' starts at 22 while 'obtained from xtreg.' starts at
+        # 26, and both end at 78. Writing the indent literally matched one model and put the other
+        # one step out (round 190).
         lines.append(
-            " " * 26 + "b = Consistent under H0 and Ha;"
-            f" obtained from {self.consistent_command or 'ivregress'}."
+            ("b = Consistent under H0 and Ha;"
+             f" obtained from {self.consistent_command or 'ivregress'}.").rjust(78)
         )
         lines.append(
-            " " * 11 + "B = Inconsistent under Ha, efficient under H0;"
-            f" obtained from {self.efficient_command or 'regress'}."
+            ("B = Inconsistent under Ha, efficient under H0;"
+             f" obtained from {self.efficient_command or 'regress'}.").rjust(78)
         )
         lines.append("")
         lines.append("Test of H0: Difference in coefficients not systematic")
+        # Another blank line between the null hypothesis and the chi2 formula, measured from the
+        # same capture (round 190).
+        lines.append("")
         lines.append(f"    chi2({self.df:g}) = (b-B)'[(V_b-V_B)^(-1)](b-B)")
         lines.append(f"            = {self.statistic:>6.2f}")
         lines.append(f"Prob > chi2 = {self.pvalue:.4f}")
@@ -471,7 +482,9 @@ def _command_name(result: Any) -> str:
     if explicit:
         return explicit
     model = str(getattr(result, "model_name", "") or "").strip()
-    return model.split(",", 1)[0].strip()
+    # 'ivregress 2sls' -> 'ivregress': Stata's footnote names the COMMAND, not the estimator.
+    # 'xtreg, fe' -> 'xtreg': the option part is not part of the command either.
+    return model.split(",")[0].split()[0] if model.split() else ""
 
 
 def _side_label(result: Any) -> str:
@@ -491,7 +504,17 @@ def _side_label(result: Any) -> str:
     if explicit:
         return explicit
     model = str(getattr(result, "model_name", "") or "").strip()
-    return model.split(",", 1)[1].strip() if "," in model else ""
+    if not model:
+        return ""
+    if "," in model:
+        # 'xtreg, fe' -> 'fe': Stata heads the column with the estimate store name, and for an
+        # unrenamed panel fit that is the option step.
+        return model.split(",", 1)[1].strip()
+    # An IV fit's model_name is 'ivregress 2sls' with no comma. Stata shows the STORE name the
+    # user chose ('iv'); we cannot know that. The ESTIMATOR word ('2sls') is short, honest, and
+    # fits the 12-character field -- 'ivregress 2sls' overflowed it and pushed 'Difference' out
+    # of its column (round 190).
+    return model.split()[-1] if model.split() else model
 
 
 def _comparable_names(

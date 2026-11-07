@@ -3761,15 +3761,52 @@ class UnitRootResult:
         return payload
 
     def __str__(self) -> str:
-        critical = "  ".join(
-            f"{key}: {value:.3f}" for key, value in self.critical.items()
+        """Stata's ``dfuller`` table.
+
+        Captured from a live `dfuller y` (n = 200, drift):
+
+            Dickey-Fuller test for unit root          Number of obs  = 199
+            Variable: y                               Number of lags =   0
+
+            H0: Random walk without drift, d = 0
+
+                                                   Dickey-Fuller
+                               Test      -------- critical value ---------
+                          statistic           1%           5%          10%
+            --------------------------------------------------------------
+             Z(t)            -2.175       -3.477       -2.883       -2.573
+            --------------------------------------------------------------
+            MacKinnon approximate p-value for Z(t) = 0.2153.
+
+        Every line is 62 characters and the rules are 62 wide -- the same width as the
+        header and the data row, unlike the irf tables where the rule is one short.
+        """
+
+        banner = "Dickey-Fuller test for unit root"
+        rule = "-" * 62
+        levels = sorted(self.critical, key=lambda key: float(str(key).rstrip("%")))
+        critical_cells = "".join(
+            f"{self.critical[level]:>13.3f}" for level in levels
         )
-        return (
-            f"{self.test}\n"
-            f"  statistic = {self.statistic:.6g}   p-value = {self.pvalue:.4f}\n"
-            f"  lags = {self.lags}   obs = {self.observations}\n"
-            f"  critical: {critical}\n"
-            f"  H0: {self.null}"
+        return chr(10).join(
+            [
+                # Stata's banner for `dfuller` is "Dickey-Fuller test for unit root"; the
+                # class stores the fuller name "Augmented Dickey-Fuller", so the banner comes
+                # from a literal rather than from `self.test`.
+                f"{banner:<42}Number of obs  = {self.observations}",
+                f"{'Variable: ' + str(getattr(self, 'variable', 'y')):<41}"
+                f"Number of lags = {self.lags:>3}",
+                "",
+                f"H0: {self.null}",
+                "",
+                f"{'Dickey-Fuller':>52}",
+                f"{'Test':>23}      -------- critical value ---------",
+                f"{'statistic':>23}" + "".join(f"{level:>13}" for level in levels),
+                rule,
+                f" {'Z(t)':<14}{self.statistic:>8.3f}" + critical_cells,
+                rule,
+                f"MacKinnon approximate p-value for Z(t) = {self.pvalue:.4f}.",
+            ]
         )
 
 

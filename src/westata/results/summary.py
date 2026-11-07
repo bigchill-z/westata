@@ -2790,10 +2790,24 @@ def _stata_summary(result: Any) -> str:
         # 52/18/6 geometry ("Interval regression            Number of obs     =    100").
         # tobit's right column starts at 52 with a 17-wide label and a 5-wide value
         # ("Right-censored =      0"); truncreg uses 48 / 18 / 4; the rest 56 / 14 / 6.
+        # Computed BEFORE _left_width, which depends on it. Round 228 moved this up after an
+        # UnboundLocalError: the width branch read the flag two dozen lines before it was set.
+        _re_macros = getattr(result, "e", None) or {}
+        _is_random_effects = (
+            _re_macros.get("sigma_u") is not None
+            or "re" in str(_re_macros.get("title") or "")
+            or str(getattr(result, "model_name", "") or "").endswith(", re")
+        )
+        _splice_panel = block == "ml" and _is_random_effects and bool(panel_lines)
         if _is_tobit or _is_intreg:
             _left_width = 52
         elif _is_truncreg:
             _left_width = 48
+        elif _splice_panel:
+            # The random-effects xt header starts its right column at 53, not 56. Measured in
+            # round 228: "Random-effects logistic regression" runs to 53 and
+            # "Number of obs    =    600" (14-wide label) fills to 78.
+            _left_width = 53
         else:
             _left_width = 56
         # A RANDOM-EFFECTS xt FIT PAIRS THE PANEL STRUCTURE WITH THE FIT STATISTICS, ROW BY ROW.
@@ -2809,16 +2823,6 @@ def _stata_summary(result: Any) -> str:
         #
         # So the rows are spliced INTO ml_left/ml_right just after "Number of obs", and
         # panel_lines is then suppressed for this shape (its own right column is unused).
-        _re_macros = getattr(result, "e", None) or {}
-        _is_random_effects = (
-            _re_macros.get("sigma_u") is not None
-            or "re" in str(_re_macros.get("title") or "")
-            or str(getattr(result, "model_name", "") or "").endswith(", re")
-        )
-        # The splice happens wherever ml_left currently stands -- the "== 1" guard I first wrote
-        # was wrong, because by this point ml_left already carries the banner, the dispersion
-        # label and the log likelihood.
-        _splice_panel = block == "ml" and _is_random_effects and bool(panel_lines)
         if _splice_panel:
             _entity = str(
                 _re_macros.get("ivar") or _re_macros.get("panelvar") or ""
@@ -2891,13 +2895,13 @@ def _stata_summary(result: Any) -> str:
                     # A label ending in ':' is a HEADING with no value at all -- Stata prints
                     # "Obs per group:" and nothing after it, not "Obs per group: = .".
                     if label.endswith(":"):
-                        right = f"{label}"
+                        right = f"{'   '}{label}"
                     elif not label and not value:
-                        # An empty pair is a SEPARATOR row, not "= ." -- the padding below would
-                        # otherwise print a lone '=' in the right column.
                         right = ""
                     else:
-                        right = f"{label:<14}= {value:>6}"
+                        # Three leading spaces, then the label in 14, "= ", value in 6:
+                        # '   Number of obs    =    600' (28 wide).
+                        right = f"{'   '}{label:<14}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:
@@ -2915,7 +2919,13 @@ def _stata_summary(result: Any) -> str:
         # undone here -- found in round 199 by tracing executed line numbers rather than reading.
         #
         # The deferred panel block goes AFTER the ML banner block (see where it is computed).
-        if _defer_panel_block:
+        #
+        # EXCEPT when the rows were SPLICED into ml_left/ml_right pair-wise (round 226): then
+        # they are already in ``lines`` and extending again duplicates every one of them, which
+        # is what made the block 38 lines against Stata's 26. ``_splice_panel`` is set further
+        # up in this same function; round 227 tried to gate this on a freshly recomputed
+        # random-effects test instead of reusing that flag, and the banner got displaced.
+        if _defer_panel_block and not _splice_panel:
             lines.append("")
             lines.extend(panel_lines)
     elif block == "quantile":

@@ -776,6 +776,15 @@ class _DiscreteBase:
         chi2type, statistic, df_m = _model_test(
             params, cov, names, llf, ll_null, canonical != "nonrobust"
         )
+        # STATA REPORTS e(df_m) NET OF THE AUXILIARY PARAMETERS. Measured on
+        # `nbreg mpg weight fgn` with TWO slopes: e(df_m) = 1, not 2, while e(chi2) =
+        # 69.876594 keeps the likelihood-ratio value. `nbreg.sthlp` documents df_m as the
+        # model degrees of freedom and `e(k_aux)` separately, and the printed header says
+        # "LR chi2(1)". Deducting k_aux reproduces it; without this the header read
+        # "LR chi2(2)" beside a statistic whose p-value assumed one.
+        _aux = int(getattr(self, "_aux_count", 0) or 0)
+        if _aux:
+            df_m = max(int(df_m) - _aux, 1)
         scalars: dict[str, Any] = {
             "N": nobs,
             "df_m": df_m,

@@ -249,6 +249,38 @@ def _parse_hypothesis(
     return rows, rhs, ""
 
 
+def _split_parenthesised(spec: str) -> list[str]:
+    """Split ``"(a = 0) (b = 0)"`` into its top-level parenthesised groups.
+
+    Stata wraps each restriction in parentheses when the hypothesis is written in that style, and
+    the wrapper is NOT part of the expression -- ``test (s = 0) (expr = 0)`` prints the same two
+    constraints and the same F as ``test (s=0) (expr=0)`` and as ``test s expr``. Text outside the
+    groups is kept as its own fragment, so ``"x1 (a = 0)"`` still parses both parts.
+    """
+
+    groups: list[str] = []
+    depth = 0
+    start = 0
+    for index, character in enumerate(spec):
+        if character == "(":
+            if depth == 0:
+                # Flush whatever preceded this group (usually whitespace, sometimes a bare term).
+                leading = spec[start:index].strip()
+                if leading:
+                    groups.append(leading)
+                start = index + 1
+            depth += 1
+        elif character == ")":
+            depth = max(depth - 1, 0)
+            if depth == 0:
+                groups.append(spec[start:index].strip())
+                start = index + 1
+    trailing = spec[start:].strip()
+    if trailing:
+        groups.append(trailing)
+    return [group for group in groups if group]
+
+
 def test_as_stata(
     result: Any,
     *specs: Any,
@@ -275,9 +307,18 @@ def test_as_stata(
     # string as one hypothesis made the parser read ``0,x2`` as a coefficient name and
     # fail with a KeyError.  Splitting here means both spellings work:
     # ``test("x1 = 0, x2 = 0")`` and ``test("x1 = 0", "x2 = 0")``.
+    #
+    # Stata ALSO accepts each restriction wrapped in parentheses, which is required when a
+    # constraint itself contains a comma: ``test (x1 = 0) (x2 = 0)``.  Without this branch the
+    # whole string reached the parser as one spec and ``(x1`` was read as a coefficient name,
+    # raising ``KeyError: coefficient '(s' not found`` -- measured on grilic.dta in round 160.
     expanded: list[Any] = []
     for spec in specs:
-        if isinstance(spec, str) and "," in spec:
+        if isinstance(spec, str) and "(" in spec:
+            expanded.extend(
+                part.strip() for part in _split_parenthesised(spec) if part.strip()
+            )
+        elif isinstance(spec, str) and "," in spec:
             expanded.extend(part for part in spec.split(",") if part.strip())
         else:
             expanded.append(spec)

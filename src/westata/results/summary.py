@@ -760,7 +760,13 @@ def _panel_design_block(result: Any) -> list[str]:
             e_macros.get("title") or ""
         ) or str(getattr(result, "model_name", "") or "").endswith(", re")
         lines = [
-            f"{'Group variable:':<18}{entity or '.':<35}"
+            # ONE space after the colon, not the padded field the PCSE block uses. Measured in
+            # round 224 on `xtlogit y x1, re`:
+            #
+            #   'Group variable: sid                               Number of obs ...'
+            #
+            # The ':<18' field this used to use printed 'Group variable:   sid', three spaces.
+            f"{'Group variable: ' + (entity or '.'):<50}"
             f"{'Number of groups':<17}= {_number('N_g'):>7}",
         ]
         if _is_random_effects:

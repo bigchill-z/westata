@@ -4456,7 +4456,26 @@ def _stata_summary(result: Any) -> str:
         and not _has_sigma_pair
         and not _has_athrho
     )
-    if _closes_with_border or _is_plain_regression:
+    # LIKELIHOOD FITS CLOSE THEIR TABLE TOO. Measured on `logit rns s expr`: Stata's last line is
+    # a full-width rule under `_cons`, and this package stopped at `_cons` -- which is why every
+    # ML case scored 0.11-0.31 on the report's line-match metric. `tobit`, which reports the scale
+    # as `var(e.mpg)`, keeps that row inside the table and still closes with the same rule.
+    #
+    # The xt likelihood family is excluded: its tail is the sigma/rho decomposition (handled by
+    # _closes_with_border above) or the `LR test of rho=0` line, and adding a rule there pushed
+    # `xtlogit, re` past its measured line count.
+    _model_label = str(getattr(result, "model_name", "") or "")
+    _is_likelihood_table = (
+        not _model_label.startswith("xt")
+        and not _has_re_variance
+        and not _has_alpha
+        and not _has_sigma_pair
+        and not _has_athrho
+        and _e_float(result, "ll") == _e_float(result, "ll")  # finite likelihood
+        and str((getattr(result, "e", None) or {}).get("chi2type") or "").lower()
+        in ("lr", "wald", "chi2")
+    )
+    if _closes_with_border or _is_plain_regression or _is_likelihood_table:
         lines.append(_border_rule)
 
     # ``reghdfe`` prints an "Absorbed degrees of freedom" table BELOW the closed

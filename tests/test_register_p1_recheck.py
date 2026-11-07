@@ -65,7 +65,7 @@ def test_the_extension_recheck_records_the_honest_gaps() -> None:
 
 
 def test_the_three_terminal_states_are_recorded() -> None:
-    """Round 149's classification: do not re-run the dfgls-style rebuild on class A."""
+    """Round 149's classification, corrected in round 152 after dfgls proved it wrong."""
 
     text = REGISTER.read_text(encoding="utf-8")
     assert "3.6.3 剩余缺口的三种终结状态" in text
@@ -73,3 +73,28 @@ def test_the_three_terminal_states_are_recorded() -> None:
     for item in ("二进制 Mata", "本环境无参照", "rddensity", "xtserial", "dfgls", "rcm", "rdrobust"):
         assert item in section, item
     assert "反编译" in section
+
+
+def test_dfgls_is_no_longer_filed_under_the_mata_core_class() -> None:
+    """Round 151 proved the five-round dfgls failure was an inverted DEFAULT, not Mata.
+
+    The correction matters: filing "my reconstruction disagrees with Stata" under the
+    binary-core class turns a checkable mistake into an unfalsifiable excuse.
+    """
+
+    text = REGISTER.read_text(encoding="utf-8")
+    section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
+    class_a = [line for line in section.splitlines() if line.startswith("| **A.")]
+    assert class_a, "class A row missing"
+    assert "dfgls" not in class_a[0], "dfgls must not be listed as a binary-Mata item"
+    assert "默认选项写反" in section
+    assert "不要把" in section and "直接归入 A 类" in section
+
+
+def test_the_summary_retracts_the_builtin_command_claim() -> None:
+    """'dfgls is builtin, so no source exists' was false and steered five rounds wrong."""
+
+    summary = (REGISTER.parent / "STATA_ALIGNMENT_SUMMARY.md").read_text(encoding="utf-8")
+    assert "以上两段已被第 151 轮证伪" in summary
+    assert "ado/base/d/dfgls.ado" in summary
+    assert "从未被单独验证过的" in summary

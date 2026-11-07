@@ -216,13 +216,13 @@
 
 | 类别 | 项 | 证据 | 处理 |
 |---|---|---|---|
-| **A. 可读 ado + 二进制 Mata 核心** | `synth`/`synth2`、`rcm` 自动选择、`dfgls` 统计量 | `synth.ado` 931 行、`rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中；`dfgls.ado` 逐行重建 5 次都与 Stata 不符（第 120–123 轮） | **已到边界**。除非反编译 Mata 或找到随 Stata 发布的 Mata 源码，否则不再重建 |
+| **A. 可读 ado + 二进制 Mata 核心** | `synth`/`synth2`、`rcm` 自动选择 | `synth.ado` 931 行、`rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中 | **已到边界**。除非反编译 Mata 或找到随 Stata 发布的 Mata 源码，否则不再重建 |
 | **B. 本环境无参照** | `xtserial`、`rddensity` | 无 ado、Stata 报 r(111)/r(199)，无法取得任何参照输出 | **不可验证，保持拒绝**，不写猜测实现 |
-| **C. 有明确算法但规模大 / 有意不做** | `rdrobust` 自动带宽、`teffects` AI-robust 方差、`e(beta)`/`e(sample)` | 五种带宽构造 10–15% 偏离（一种「吻合」证伪为均值假象）；方差需局部线性估计量 | **已记录原因**，等有明确需求或可验证算法再做 |
+| **C. 有明确算法但规模大 / 有意不做** | `rdrobust` 自动带宽、`teffects` AI-robust 方差、`e(beta)`/`e(sample)`、`dfgls` 临界值列 | 五种带宽构造 10–15% 偏离（一种「吻合」证伪为均值假象）；方差需局部线性估计量；`dfgls` 的 1%/5%/10% 列需抄 `GetCritE/D` 六点表 | **已记录原因**，等有明确需求或可验证算法再做 |
 
 对 A 类的补充实测（第 149 轮）：`rcm.ado` 的 1126 行里，模型选择的 Mata 调用全部指向编译函数（`rcm_levelsofsel` 等），**ado 层没有可抄的选择逻辑**。`rcm` 给定 `selected=` 时全部精确（ATT 1e-7 内），只有自动 forward 选择与 Stata 不一致——第 149 轮穷举证实 Stata 选的是 RSS 更差的模型，说明其搜索空间受限，而该空间不可读。
 
-**推论**：A 类不是「再读一遍 ado 就能解决」的问题，这正是第 120–123 轮 `dfgls` 五轮无进展的原因。下一次遇到同类，先确认 `.mlib` 是否可反编译，而不是重跑重建法。
+**推论（第 152 轮修正）**：A 类不是「再读一遍 ado 就能解决」的问题。但**不要把「重建失败」直接归入 A 类**——第 151 轮证明 `dfgls` 曾被错误地放在这里，五轮失败的真正原因却是**默认选项写反**（Stata 默认 `trend`，包默认 `notrend`），与 Mata 毫无关系。判断 A 类的正确依据是**确认执行的确实是 `.mlib` 里的编译函数**，而不是「重建结果对不上」。
 
 ### 3.7 复杂抽样
 
@@ -248,7 +248,7 @@
 | `vecstable` / `vecnorm` | ⬜ | |
 | `newey` | ✅ 已实现 | `ws.newey(y ~ x, lag=#)`；`lag()` 必需，Bartlett 核；`Checkt` 三种间隔判定（`tflag==2` 即便 force 也拒绝）；`e()` 只有 7 个标量；`predict` 限 `xb/index/stdp/residuals`。见 §8.20.50 |
 | `prais` | ✅ 已实现（含 `corc`） | `ws.prais(frame, formula, corc=...)`；PW 与 CORC 都在。**在 icecream.dta 上 `corc` 与 Stata 一样不收敛**（Stata 自己报 `r(430)`），rho 差 0.005%。`ConvergenceError` 现在携带 `.rho`，与 Stata 先打印 rho 再报错的行为对齐。见第 111 轮 |
-| `dfgls` / `ers` | ⚠️ 已实现但统计量错 | `ws.dfgls(series)`；表结构、样本量（N=51）、`_b[iota]`、`alpha`、`maxlag` 全部与 Stata 精确一致，**但 tau 的符号与量级都错**（-1.284 对照 +0.806）。四轮排查已排除 NaN 对齐、`cbar`、`markout`、符号约定、`GetCritD/E`；剩余疑点在 `.mlib` 内部的不可见路径。见 `tests/test_dfgls_status.py` |
+| `dfgls` / `ers` | ✅ 统计量已修（第 151 轮） | `ws.dfgls(series)` 默认即 Stata 默认（**有趋势**，`cbar=-13.5`）；`notrend=True` 对应 `dfgls, notrend`。十个 tau 全部与 Stata 逐位一致（-1.2843…-2.6371；notrend 为 +0.8061）。**根因是默认选项写反**——包默认 `trend=False` 实现的是 Stata 的 `notrend`，却与 Stata 的默认输出对比，五轮排查因此全部走偏。**剩余缺口**：表的 1%/5%/10% 临界值列未实现（`GetCritE/D` 六点表未抄录），归入 C 类 |
 | `sspace` / `ucm` / `mgarch` / `dsge` | ❌ | 见 §7 |
 
 ### 3.9 重抽样范围

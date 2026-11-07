@@ -115,3 +115,54 @@ def test_the_documentation_states_the_mapping() -> None:
         assert "HC1" in text and "HC0" in text
         # The regress/HC1 and ivregress/HC0 pairing is the fact being documented.
         assert "regress" in text and "ivregress" in text
+
+
+def test_panel_robust_equals_clustering_on_the_entity() -> None:
+    """A THIRD pattern: for `xtreg ..., fe`, Stata's vce(robust) and vce(cluster id) coincide.
+
+    Measured on a 40x10 balanced panel:
+
+        xtreg y x1, fe                      0.05440432377516
+        xtreg y x1, fe vce(robust)          0.05229223550829
+        xtreg y x1, fe vce(cluster sid)     0.05229223550829
+
+    The fixed effects are differenced out, so the robust VCE is clustered by construction.
+    Reading a panel result's cov_type="robust" as "HC1" would be wrong: here it names the same
+    estimator as clustering, not a separate small-sample correction.
+    """
+
+    rng = np.random.default_rng(3)
+    n_g, n_t = 40, 10
+    sid = np.repeat(np.arange(n_g), n_t)
+    frame = pd.DataFrame(
+        {
+            "y": rng.normal(size=n_g * n_t),
+            "x1": rng.normal(size=n_g * n_t),
+            "sid": sid,
+            "t": np.tile(np.arange(n_t), n_g),
+        }
+    )
+
+    classical = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit()
+    robust = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
+        cov_type="robust"
+    )
+    clustered = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
+        cov_type="cluster", cov_kwds={"groups": frame["sid"]}
+    )
+
+    assert float(classical.bse["x1"]) == pytest.approx(0.05440432377516, abs=1e-12)
+    assert float(robust.bse["x1"]) == pytest.approx(0.05229223550829, abs=1e-12)
+    # The whole point: robust and cluster are the SAME number for an fe fit.
+    assert float(robust.bse["x1"]) == pytest.approx(
+        float(clustered.bse["x1"]), abs=1e-12
+    )
+
+
+def test_the_docs_carry_the_panel_note() -> None:
+    import io as _io
+
+    for path in ("docs/API.md", "docs/API.zh-CN.md"):
+        text = _io.open(path, encoding="utf-8").read()
+        assert "vce(cluster" in text
+        assert "0.05229223550829" in text

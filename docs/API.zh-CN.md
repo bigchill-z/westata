@@ -37,6 +37,24 @@ _westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
 | `ivregress ..., vce(robust) small` | `cov_type="HC1"` | 加 `small` 后 Stata 才乘该因子 |
 | `sureg ..., cov_type="robust"` | 字面量 `"robust"` | 其 sandwich 来自 `_reg3robust`，是独立实现，不是 HC1 |
 
+### 面板估计量：`vce(robust)` 与 `vce(cluster id)` 是同一个数
+
+第三种情形，也是最容易让人诧异的：对 `xtreg ..., fe`，
+Stata 的 `vce(robust)` 与 `vce(cluster id)` 产生**完全相同**的标准误——
+因为固定效应已经被组内去均值，稳健 VCE 天然就是按组聚类的。
+40×10 平衡面板实测：
+
+```
+xtreg y x1, fe                      0.05440432377516
+xtreg y x1, fe vce(robust)          0.05229223550829
+xtreg y x1, fe vce(cluster sid)     0.05229223550829   <- 与 robust 完全相同
+```
+
+`PanelOLS` 三者全部命中，并且对 `robust` 与 `HC1` 都报 `cov_type="robust"`——
+因为在这个族里它们**确实是同一个估计量**，HC0/HC1 并不指向另一种修正。
+不要把面板结果上的 `cov_type="robust"` 读作「HC1」，
+而应读作「面板稳健 VCE，对 `fe` 而言等于按个体聚类」。
+
 ### 实测数据
 
 `grilic.dta` 上 `s` 的标准误：

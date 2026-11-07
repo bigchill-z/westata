@@ -37,6 +37,24 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 | `ivregress ..., vce(robust) small` | `cov_type="HC1"` | the factor Stata applies with `small` |
 | `sureg ..., cov_type="robust"` | the literal label `"robust"` | its sandwich comes from `_reg3robust`, a separate implementation, not HC1 |
 
+### Panel estimators: `vce(robust)` and `vce(cluster id)` coincide
+
+A third pattern, and the one most likely to surprise: for `xtreg ..., fe` Stata's `vce(robust)` and
+`vce(cluster id)` produce the SAME standard error, because the fixed effects have already been
+differenced out and the robust VCE is therefore clustered by construction. Measured on a 40x10
+balanced panel:
+
+```
+xtreg y x1, fe                      0.05440432377516
+xtreg y x1, fe vce(robust)          0.05229223550829
+xtreg y x1, fe vce(cluster sid)     0.05229223550829   <- identical to robust
+```
+
+`PanelOLS` matches all three, and reports `cov_type="robust"` for both `robust` and `HC1` because
+they ARE the same estimator here -- HC0/HC1 do not name a separate correction in this family. Do not
+read `cov_type="robust"` on a panel result as "HC1"; read it as "the panel-robust VCE, which for
+`fe` equals clustering on the entity".
+
 ### The measurement behind the table
 
 On `grilic.dta`, standard error of `s`:

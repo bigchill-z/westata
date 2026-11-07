@@ -51,19 +51,28 @@ def test_the_table_is_reachable_from_the_result(fitted) -> None:
 
     table = fitted.fevd_table(periods=3)
     assert isinstance(table, pd.DataFrame)
-    # periods=3 gives steps 0..2 (three rows).
-    assert len(table) == 3
+    # Stata's `irf create ..., step(3)` produces steps 0..3 -- FOUR rows, because step 0 is the
+    # all-zero horizon where no forecast error has accumulated yet. This used to be three, from
+    # the era when fevd_table omitted that row and every value sat one step early.
+    assert len(table) == 4
 
 
 def test_the_decomposition_matches_stata(fitted) -> None:
     table = fitted.fevd_table(periods=3)
-    # Stata's blocks, indexed from step 0: step 0 of every off-diagonal pair is 0.
+    # Re-captured from `irf table fevd, noci` on macro_swatson (n = 166, lags 1/2). The
+    # previous series started at Stata's step 1 while being indexed from 0 -- the same
+    # off-by-one that made fevd_table skip the zero row:
+    #
+    #   step 0 |    0           0           0           0
+    #   step 1 |    1     .005822           0     .994178
+    #   step 2 |  .878729     .002094     .121271     .997906
+    #   step 3 |  .876761     .001063     .123239     .998937
     pairs = {
-        ("dinf", "unem"): [0.005822, 0.002094, 0.001063],
-        ("unem", "dinf"): [0.0, 0.121271, 0.123239],
+        ("dinf", "unem"): [0.0, 0.005822, 0.002094, 0.001063],
+        ("unem", "dinf"): [0.0, 0.0, 0.121271, 0.123239],
     }
     for (impulse, response), expected in pairs.items():
-        column = table[(impulse, response)].to_numpy(float)[:3]
+        column = table[(impulse, response)].to_numpy(float)[:4]
         assert np.allclose(column, expected, atol=5e-7), (impulse, response, column)
 
 
@@ -74,7 +83,10 @@ def test_each_response_column_sums_to_one(fitted) -> None:
     names = ["dinf", "unem"]
     for response in names:
         total = sum(table[(impulse, response)].to_numpy(float) for impulse in names)
-        assert np.allclose(total, 1.0, atol=1e-9), response
+        # Step 0 sums to zero BY CONSTRUCTION: Stata reports no decomposition at
+        # horizon zero, so the property starts at step 1.
+        assert total[0] == 0.0
+        assert np.allclose(total[1:], 1.0, atol=1e-9), response
 
 
 def test_the_irf_analysis_fevd_table_is_not_the_entry_point(fitted) -> None:

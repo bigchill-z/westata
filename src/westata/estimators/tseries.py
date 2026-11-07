@@ -1434,10 +1434,11 @@ class VARResults:
                     # fevd_table's columns are (IMPULSE, RESPONSE), not (response, impulse) --
                     # the same axis-order trap noted in fevd(). Stata's .irf row names the
                     # response first, so the lookup has to be reversed.
-                    if horizon == 0:
-                        value = 0.0
-                    else:
-                        value = float(fevd.iloc[horizon - 1][(impulse_name, response_name)])
+                    # NO OFFSET NOW: fevd_table returns one row per horizon INCLUDING
+                    # step 0 (the all-zero row Stata prints), so `horizon` indexes it
+                    # directly. The old `horizon - 1` predates that zero row and shifted
+                    # every fevd value one step early -- the same defect the table had.
+                    value = float(fevd.iloc[horizon][(impulse_name, response_name)])
                     empty["fevd"].append(value)
 
         length = (step + 1) * k * k
@@ -1485,6 +1486,28 @@ class VARResults:
             for response in range(responses)
         ]
         frame = frame.loc[:, ordered]
+        # STATA PREPENDS A ZERO ROW AT STEP 0. Measured on `irf table fevd` for the same
+        # bivariate VAR(2):
+        #
+        #   step 0 |    0        0        0        0
+        #   step 1 |    1   .005441      0   .994559
+        #   step 2 |  .997243 .005846 .002757 .994154
+        #
+        # while statsmodels' decomp starts at what Stata calls step 1: its period 0 is
+        # [1, .005441, 0, .994559]. The forecast-error variance is not decomposed at horizon
+        # zero -- there is no error yet -- so Stata reports zeros there and shifts everything
+        # down one row. Without this the whole table sat one step early and every number
+        # appeared against the wrong Step label.
+        frame = _pd.concat(
+            [
+                _pd.DataFrame(
+                    np.zeros((1, len(ordered)), dtype=float),
+                    columns=frame.columns,
+                ),
+                frame,
+            ],
+            ignore_index=True,
+        )
         frame.index.name = "step"
         return frame
 

@@ -5255,12 +5255,14 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().predict(kind='pr')[:6]
 
 **Stata:** `(no Stata equivalent -- renders the estimation table Stata prints)`
 
-Render a text summary of the fit. `style='statsmodels'` (the default) prints the statsmodels-style table, while `style='stata'` prints the layout Stata prints for the same command -- for `regress` the ANOVA and fit block with the coefficient table, for a discrete-choice model the LR chi-square header and z statistics. It RETURNS a string rather than printing, so it displays in a notebook and can also be written to a file unchanged.
+Render a text summary of the fit. `style='stata'` (the default) prints the table exactly as
+Stata does; pass `style='statsmodels'` for the statsmodels-style table with its `coef` and
+`AIC:` labels.
 
 **Signature**
 
 ```python
-ws.summary(self, style: 'str' = 'statsmodels', *, odds_ratio: 'bool' = False) -> 'str'
+ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False)  ->  str
 ```
 
 **Example**

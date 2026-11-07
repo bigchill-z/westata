@@ -80,7 +80,7 @@ def frame():
 
 # ------------------------------------------------------------- the OLS block
 def test_regress_uses_the_ols_block(frame) -> None:
-    rendered = str(ws.OLS.from_formula("y ~ x", frame).fit().summary())
+    rendered = str(ws.OLS.from_formula("y ~ x", frame).fit().summary(style="statsmodels"))
 
     for label in OLS_LABELS:
         assert _has_standalone_label(rendered, label), label
@@ -100,7 +100,7 @@ def test_regress_uses_the_ols_block(frame) -> None:
     ids=["logit", "probit", "poisson", "tobit"],
 )
 def test_the_ml_families_use_the_ml_block(frame, builder) -> None:
-    rendered = str(builder(frame).summary())
+    rendered = str(builder(frame).summary(style="statsmodels"))
 
     for label in ML_LABELS:
         assert label in rendered, label
@@ -118,8 +118,10 @@ def test_tobit_is_the_case_that_rules_out_keying_on_dist(frame) -> None:
     fitted = ws.Tobit.from_formula("yc ~ x", frame, lower=0).fit()
 
     assert fitted.dist == "t"
-    assert "LR chi2:" in str(fitted.summary())
-    assert "F-statistic:" not in str(fitted.summary())
+    # Explicit style: "LR chi2:" and "F-statistic:" are statsmodels spellings; summary() now
+    # defaults to Stata's layout, where the same test reads "LR chi2(" and "F(".
+    assert "LR chi2:" in str(fitted.summary(style="statsmodels"))
+    assert "F-statistic:" not in str(fitted.summary(style="statsmodels"))
 
 
 def test_no_dots_are_printed_for_statistics_the_command_does_not_have(frame) -> None:
@@ -146,7 +148,7 @@ def test_no_dots_are_printed_for_statistics_the_command_does_not_have(frame) -> 
     ids=["regress", "logit", "poisson"],
 )
 def test_every_table_keeps_the_essentials(frame, builder) -> None:
-    rendered = str(builder(frame).summary())
+    rendered = str(builder(frame).summary(style="statsmodels"))
 
     assert "No. Observations:" in rendered
     assert "Log-Likelihood:" in rendered

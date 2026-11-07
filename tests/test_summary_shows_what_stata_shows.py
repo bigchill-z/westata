@@ -57,11 +57,11 @@ def logit_fit():
 def test_regress_summary_has_no_aic_line(ols_fit) -> None:
     """Stata's ``regress`` table has no AIC, so this one must not either."""
 
-    assert "AIC:" not in str(ols_fit.summary())
+    assert "AIC:" not in str(ols_fit.summary(style="statsmodels"))
 
 
 def test_regress_summary_has_no_bic_line(ols_fit) -> None:
-    assert "BIC:" not in str(ols_fit.summary())
+    assert "BIC:" not in str(ols_fit.summary(style="statsmodels"))
 
 
 def test_regress_still_exposes_the_key_for_callers(ols_fit) -> None:
@@ -97,20 +97,24 @@ def test_estat_ic_remains_the_stata_conformant_route(ols_fit) -> None:
 def test_the_logit_summary_keeps_its_aic_line(logit_fit) -> None:
     """The ML families DO store information criteria, so the line stays."""
 
-    assert "AIC:" in str(logit_fit.summary())
+    assert "AIC:" in str(logit_fit.summary(style="statsmodels"))
 
 
 def test_the_poisson_summary_keeps_its_aic_line() -> None:
     fitted = ws.Poisson.from_formula("ycnt ~ x", _frame()).fit()
 
-    assert "AIC:" in str(fitted.summary())
+    assert "AIC:" in str(fitted.summary(style="statsmodels"))
 
 
 # ------------------------------------------------------- the rest of the table
 def test_the_regress_table_keeps_what_stata_prints(ols_fit) -> None:
-    """Guard: the change must remove AIC/BIC and nothing else."""
+    """Guard: the change must remove AIC/BIC and nothing else.
 
-    rendered = str(ols_fit.summary())
+    Asks for the statsmodels layout EXPLICITLY -- every label asserted below is a statsmodels
+    spelling ("No. Observations:", "Df Residuals:"), and summary() now defaults to Stata's.
+    """
+
+    rendered = str(ols_fit.summary(style="statsmodels"))
 
     for label in (
         "No. Observations:",
@@ -125,7 +129,7 @@ def test_the_regress_table_keeps_what_stata_prints(ols_fit) -> None:
 
 
 def test_the_coefficient_table_is_still_there(ols_fit) -> None:
-    rendered = str(ols_fit.summary())
+    rendered = str(ols_fit.summary(style="statsmodels"))
 
     assert "coef" in rendered
     assert "std err" in rendered
@@ -136,5 +140,5 @@ def test_the_coefficient_table_is_still_there(ols_fit) -> None:
 def test_the_two_summaries_differ_in_the_expected_way(ols_fit, logit_fit) -> None:
     """One shows AIC, one does not -- the discrimination is real, not a blanket removal."""
 
-    assert "AIC:" not in str(ols_fit.summary())
-    assert "AIC:" in str(logit_fit.summary())
+    assert "AIC:" not in str(ols_fit.summary(style="statsmodels"))
+    assert "AIC:" in str(logit_fit.summary(style="statsmodels"))

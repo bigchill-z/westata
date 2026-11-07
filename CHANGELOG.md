@@ -9,6 +9,25 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+### Changed — `summary()` now defaults to Stata's layout
+
+`result.summary()` and `render_summary(result)` defaulted to `style="statsmodels"`, so a plain
+`regress` fit printed a statsmodels table while a `var` or `sureg` fit printed Stata's -- three of
+the five `summary` methods in the package already defaulted to `"stata"`, and only the shared
+`StataResults` path and the module-level renderer lagged behind.
+
+Both now default to `"stata"`. **This is a behaviour change for callers who relied on the default**:
+the statsmodels table is still available, but it must be asked for by name.
+
+```python
+r.summary()                      # Stata's table (was: statsmodels')
+r.summary(style="statsmodels")   # the previous default
+```
+
+Tests that assert statsmodels-only spellings (`coef`, `AIC:`, `No. Observations:`,
+`R-squared:`, `std err`) now pass `style="statsmodels"` explicitly, so each one names the surface
+it is checking instead of depending on whichever default is in force.
+
 ### Fixed — output blocks that were one blank line, rule or row away from Stata
 
 A systematic check of every renderer's RAW prefix (`str(out)[0]`) plus a line-by-line comparison

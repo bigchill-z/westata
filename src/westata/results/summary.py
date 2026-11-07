@@ -49,7 +49,7 @@ def _ci_label(level: float | None) -> str:
     return f"[{rendered}% conf. interval]"
 
 
-def render_summary(result: Any, style: str = "statsmodels") -> str:
+def render_summary(result: Any, style: str = "stata") -> str:
     """Render ``result`` in the requested style.
 
     Parameters
@@ -58,7 +58,8 @@ def render_summary(result: Any, style: str = "statsmodels") -> str:
         A results object exposing the statsmodels-compatible surface used by
         :class:`westata.results.StataResults`.
     style:
-        ``"statsmodels"`` (default) or ``"stata"``.  Case is ignored.
+        ``"stata"`` (default) or ``"statsmodels"``.  Case is ignored. Stata's layout is the default
+        because reproducing it is this package's purpose; ask for the other one explicitly.
     """
 
     normalized = _normalize_style(style)

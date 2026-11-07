@@ -140,7 +140,8 @@ def test_the_rendered_table_uses_the_results_own_level(frame) -> None:
 
 
 def test_the_statsmodels_style_is_unaffected(frame) -> None:
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().summary()
+    # Explicit style: "std err" is the statsmodels spelling; Stata's is "Std. err.".
+    rendered = ws.OLS.from_formula("y ~ x", frame).fit().summary(style="statsmodels")
 
     assert "std err" in rendered
     assert "Coefficient" not in rendered

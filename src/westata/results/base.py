@@ -1441,7 +1441,7 @@ class StataResults:
 
     def summary(
         self,
-        style: str = "statsmodels",
+        style: str = "stata",
         *,
         odds_ratio: bool = False,
         first: bool = False,
@@ -1451,7 +1451,8 @@ class StataResults:
         Parameters
         ----------
         style:
-            ``"statsmodels"`` (default) or ``"stata"``.
+            ``"stata"`` (default) or ``"statsmodels"``. The default is Stata's layout because this
+            package exists to reproduce it; pass ``style="statsmodels"`` for the statsmodels table.
         odds_ratio:
             Exponentiate the coefficients, their standard errors and both interval
             endpoints, and relabel the column "Odds ratio" -- Stata's ``logit ..., or``.

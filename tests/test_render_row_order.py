@@ -138,7 +138,9 @@ def test_the_statsmodels_style_keeps_patsy_names(frame) -> None:
     changing it would break callers that expect patsy's names.
     """
 
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary()
+    # Explicit style: this test is about the statsmodels surface, and summary() now defaults to
+    # Stata's layout.
+    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="statsmodels")
 
     assert "Intercept" in rendered
     assert "_cons" not in rendered

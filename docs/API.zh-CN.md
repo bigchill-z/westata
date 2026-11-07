@@ -5253,12 +5253,12 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().predict(kind='pr')[:6]
 
 **Stata 指令:** `(no Stata equivalent -- renders the estimation table Stata prints)`
 
-把拟合结果渲染成文本摘要。`style='statsmodels'`（默认）打印 statsmodels 风格的表格，`style='stata'` 打印同一命令下 Stata 的版式——`regress` 为方差分析与拟合区块加系数表，离散选择模型为 LR 卡方表头与 z 统计量。它**返回**字符串而不是直接打印，因此在 notebook 中会显示，也可以原样写入文件。
+渲染拟合结果的文本摘要。`style='stata'`（默认）按 Stata 的表格原样输出；需要 statsmodels 风格（`coef`、`AIC:` 等标签）时显式传入 `style='statsmodels'`。
 
 **签名**
 
 ```python
-ws.summary(self, style: 'str' = 'statsmodels', *, odds_ratio: 'bool' = False) -> 'str'
+ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False)  ->  str
 ```
 
 **示例**

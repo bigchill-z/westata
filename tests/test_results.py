@@ -151,7 +151,8 @@ def test_summary_stata_uses_z_labels_for_z_distribution() -> None:
 
 def test_summary_statsmodels_includes_coefficients() -> None:
     res = make_results()
-    text = res.summary()
+    # Explicit style: "coef" is a statsmodels column name; summary() now defaults to Stata's.
+    text = res.summary(style="statsmodels")
     assert isinstance(text, str)
     for name in PARAM_NAMES:
         assert name in text

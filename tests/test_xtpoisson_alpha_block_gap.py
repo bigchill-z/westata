@@ -80,12 +80,12 @@ def test_the_three_known_differences(fitted) -> None:
         i for i, line in enumerate(lines) if line.strip().startswith("/lnalpha |")
     )
 
-    # (1) the rule is AFTER /lnalpha here, BEFORE it in Stata
-    assert lines[lnalpha_index - 1].startswith("          x1 |") or "|" in lines[lnalpha_index - 1]
+    # (1) FIXED in round 244: the split rule now sits ABOVE /lnalpha, as Stata has it.
+    assert lines[lnalpha_index - 1].startswith("-------------+")
 
-    # (2) z and P are printed here; Stata leaves them empty
+    # (2) FIXED in round 244: /lnalpha prints no z or P.
     lnalpha_line = lines[lnalpha_index]
-    assert "-1.38" in lnalpha_line
+    assert "-1.38" not in lnalpha_line
 
     # (3) FIXED in round 243: alpha now carries its delta-method standard error and interval.
     #     The guard that used to assert a placeholder "." here failed as designed, which is how

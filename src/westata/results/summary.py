@@ -4147,15 +4147,34 @@ def _stata_summary(result: Any) -> str:
                 if _is_constant_row and seen_groups and lines and "|" in lines[-1]:
                     if lines[-1].split("|", 1)[0].strip():
                         lines.append(f"{'':>{name_width}} |")
-                lines.append(
-                    f"{_level_text}"
-                    f"{_stata_coef(params[index], coef_w)}"
-                    f"{_stata_coef(bse[index], se_w)}"
-                    f"{_stata_stat(stats_[index], stat_w)}"
-                    f"{_stata_pvalue(pvalues[index], p_w)}"
-                    f"{_stata_coef(lower[index], ci_lo_w)}"
-                    f"{_stata_coef(upper[index], ci_hi_w)}"
-                )
+                # /lnalpha PRINTS NO TEST STATISTIC. Stata leaves its z and P columns empty and
+                # shows only the coefficient, its standard error and the interval -- measured in
+                # round 244 against `xtpoisson n x1, re`. This package printed -1.38 and 0.168.
+                _hide_stat_p = str(bare).strip() in ("/lnalpha", "lnalpha")
+                if _hide_stat_p:
+                    # A SPLIT RULE OPENS the auxiliary block, ABOVE /lnalpha. Stata puts it
+                    # there, not between /lnalpha and alpha -- measured in round 244.
+                    if not (lines and lines[-1].startswith("---") and "+" in lines[-1]):
+                        lines.append(_split_rule)
+                    lines.append(
+                        f"{_level_text}"
+                        f"{_stata_coef(params[index], coef_w)}"
+                        f"{_stata_coef(bse[index], se_w)}"
+                        f"{'':>{stat_w}}"
+                        f"{'':>{p_w}}"
+                        f"{_stata_coef(lower[index], ci_lo_w)}"
+                        f"{_stata_coef(upper[index], ci_hi_w)}"
+                    )
+                else:
+                    lines.append(
+                        f"{_level_text}"
+                        f"{_stata_coef(params[index], coef_w)}"
+                        f"{_stata_coef(bse[index], se_w)}"
+                        f"{_stata_stat(stats_[index], stat_w)}"
+                        f"{_stata_pvalue(pvalues[index], p_w)}"
+                        f"{_stata_coef(lower[index], ci_lo_w)}"
+                        f"{_stata_coef(upper[index], ci_hi_w)}"
+                    )
     # The random-effects ML commands continue the coefficient table with two derived rows
     # INSIDE the same table (not as a block below it), each preceded by a split rule:
     #
@@ -4249,7 +4268,8 @@ def _stata_summary(result: Any) -> str:
             )
 
     if _has_re_variance or _has_alpha or _has_sigma_pair:
-        # A split rule separates the coefficient block from the derived rows, measured.
+        # A split rule separates /lnalpha from the derived alpha row -- Stata prints ONE there
+        # and one ABOVE /lnalpha, which the row renderer already emitted (round 244).
         lines.append(_split_rule)
         # Three shapes, each measured: the random-effects logit/probit add sigma_u + rho,
         # the truncated negative binomial adds alpha, and xttobit adds ONLY rho (its
@@ -4435,9 +4455,10 @@ def _stata_summary(result: Any) -> str:
         if np.isfinite(_ll_v) and np.isfinite(_ll0_v):
             _lr = 2.0 * (_ll_v - _ll0_v)
             _p_lr = 0.5 * float(stats.chi2.sf(_lr, 1))
-            # A rule separates the derived alpha row from the test, and the closing rule
-            # already follows it -- measured, Stata prints both.
-            lines.insert(len(lines) - 1, _split_rule)
+            # NO RULE between the alpha row and the LR test line: the closing border already
+            # follows alpha, and Stata prints nothing between them. The comment this replaces
+            # claimed "Stata prints both"; a live `xtpoisson n x1, re` shows alpha, then the
+            # full border, then the LR test -- measured in round 244.
             _text = f"LR test of alpha=0: chibar2(01) = {_lr:.2f}"
             _tail = f"Prob >= chibar2 = {_p_lr:.3f}"
             lines.append(f"{_text:<{row_width - len(_tail) - 1}}{_tail}")

@@ -855,6 +855,33 @@ class _DiscreteBase:
             # implement ``offset()``, so Stata's empty-string-for-none convention applies.
             "offset": getattr(result, "_westata_offset_name", ""),
         }
+        # ``LR test of alpha=0`` COMPARES AGAINST THE POISSON FIT, not against the constant-only
+        # model. Measured on `nbreg mpg weight fgn`: Stata prints "chibar2(01) = 0.00", and
+        # 2*(ll_nb - ll_poisson) = 2*(-196.130285 + 196.129885) = -0.0008, which Stata clamps to
+        # zero. Using e(ll_0) -- the constant-only model that belongs to the header's MODEL test --
+        # produced 69.88 and put a model test where the dispersion test belongs.
+        #
+        # The Poisson likelihood is the negative binomial's alpha -> 0 limit, so it is evaluated
+        # from the SAME coefficients with the dispersion dropped. `result.model` carries the
+        # backend model, which is where endog/exog live; the scalar block only receives `result`.
+        if int(getattr(self, "_aux_count", 0) or 0):
+            try:
+                from scipy import special as _special
+
+                _backend = getattr(result, "model", None)
+                _endog = np.asarray(_backend.endog, dtype=float).reshape(-1)
+                _exog = np.asarray(_backend.exog, dtype=float)
+                _beta = np.asarray(params, dtype=float)[: _exog.shape[1]]
+                _mu = np.exp(np.clip(_exog @ _beta, -700.0, 700.0))
+                scalars["ll_poisson_only"] = float(
+                    np.sum(
+                        _endog * np.log(np.maximum(_mu, 1e-300))
+                        - _mu
+                        - _special.gammaln(_endog + 1.0)
+                    )
+                )
+            except Exception:  # pragma: no cover - a backend without a plain Poisson form
+                pass
         # The ``ereturn local`` block each command writes verbatim.  Values are
         # transcribed from the ado rather than invented:
         #   logit.ado:253-267    title / marginsnotok / marginsok / predict / estat_cmd

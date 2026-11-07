@@ -4549,9 +4549,17 @@ def _stata_summary(result: Any) -> str:
         # ``xtpoisson ycount x1, re``: 2*(ll - ll_0) = 3.7927 against Stata's
         # "chibar2(01) = 3.79", and 0.5*chi2.sf(3.79, 1) = 0.0257 against its "0.026".
         _ll_v = _e_float(result, "ll")
-        _ll0_v = _e_float(result, "ll_0")
+        # NBREG COMPARES AGAINST THE POISSON FIT. Measured on `nbreg mpg weight fgn`: Stata
+        # prints "chibar2(01) = 0.00", and 2*(ll_nb - ll_poisson) = 2*(-196.130285 +
+        # 196.129885) = -0.0008, which Stata clamps to zero. `xtpoisson`/`tnbreg` carry no
+        # e(ll_poisson_only) and keep e(ll_0), the comparison their help files describe.
+        _ll0_v = _e_float(result, "ll_poisson_only")
+        if not np.isfinite(_ll0_v):
+            _ll0_v = _e_float(result, "ll_0")
         if np.isfinite(_ll_v) and np.isfinite(_ll0_v):
-            _lr = 2.0 * (_ll_v - _ll0_v)
+            # A negative statistic means the restricted fit did better; Stata clamps rather
+            # than printing a negative chi-square (``nbreg.ado:378-384``).
+            _lr = max(2.0 * (_ll_v - _ll0_v), 0.0)
             _p_lr = 0.5 * float(stats.chi2.sf(_lr, 1))
             # NO RULE between the alpha row and the LR test line: the closing border already
             # follows alpha, and Stata prints nothing between them. The comment this replaces

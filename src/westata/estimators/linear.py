@@ -562,7 +562,26 @@ class OLS:
             # vce(cluster province)`` reports "F(6, 27) = ." and "Prob > F = .".
             fvalue = float("nan")
         elif tested:
-            fvalue = _wald_f(np.asarray(beta, dtype=float), cov, tested)
+            # THE CLASSICAL F, AS A RATIO OF THE MEAN SQUARES. `(mss/df_m)/(rss/df_r)` equals
+            # b'V^-1 b / df_m algebraically for a non-robust covariance, but not bit for bit, and
+            # Stata's e(F) IS the ratio: recomputing it in Stata from e(mss)/e(rss) reproduces
+            # e(F) to all sixteen digits (round 253). Measured on two fits -- a plain regressor and
+            # a factor model -- the two forms agree to 3e-15 and 6e-14 relative, so the choice
+            # only decides the last digit or two, which is exactly what was differing.
+            #
+            # A robust or clustered covariance keeps the Wald form: there the ratio is not what
+            # Stata reports.
+            _cov_label = str(effective_cov_type or "nonrobust").lower()
+            if (
+                _cov_label in ("nonrobust", "ols", "unadjusted")
+                and np.isfinite(mss)
+                and np.isfinite(rss)
+                and df_resid > 0
+                and df_model > 0
+            ):
+                fvalue = float((mss / float(df_model)) / (rss / float(df_resid)))
+            else:
+                fvalue = _wald_f(np.asarray(beta, dtype=float), cov, tested)
         else:
             fvalue = float("nan")
         # ``e(aic)``/``e(bic)`` are westata additions, not Stata values: Stata's

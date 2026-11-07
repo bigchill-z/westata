@@ -4642,6 +4642,31 @@ x2          -0.512087
 Name: params, dtype: float64
 ```
 
+### `ereturn_list`
+
+**Stata:** `ereturn list`
+
+Print the result's stored macros the way Stata's `ereturn list` does: four blocks (scalars, macros,
+matrices, functions), a leading blank line, names right-aligned into 22 columns.
+
+Matches a live `regress` run **34 of 34 lines**. Filtering, ordering and the geometry are described
+on [`format_ereturn_list`](#format_ereturn_list), which delegates here.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+print(r.ereturn_list())
+```
+
+```text
+scalars:
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  2
+               ...
+```
+
 ### `bse`
 
 **Stata:** `regress -- the `Std. err.` column`
@@ -6416,7 +6441,22 @@ None
 
 **Stata:** `ereturn list`
 
-The four-block dump Stata's `ereturn list` prints: scalars, macros, matrices, functions -- in that fixed order, each followed by a blank line. Scalars and macros use DIFFERENT separators (` =  ` with two spaces versus a single space and a colon), and the split between the two blocks is by TYPE: strings become macros, numbers become scalars, so a macro added later cannot be misfiled. Scalar values print up to 16 significant digits with no leading zero and no trailing zeros.
+The four-block dump Stata's `ereturn list` prints: scalars, macros, matrices, functions -- in that
+fixed order, each preceded by a blank line, and the whole block opens with one. Scalars and macros
+use DIFFERENT separators (` =  ` with two spaces versus a single space and a colon), and the split
+between the two blocks is by TYPE: strings become macros, numbers become scalars.
+
+The block starts with a **blank line** and the names are right-aligned into 22 columns; a scalar
+value drops its leading zero. `scalars` prints only the keys the command actually PUBLISHES --
+`regress` reports thirteen, while `e(aic)`, `e(bic)` and `e(sigma)` are stored but not printed. A
+command whose published set has not been measured against a live run keeps every scalar, because
+dropping rows on a guess is worse than printing extras.
+
+`e(cmdline)` is deliberately absent: it records the command **as the user typed it**, including
+options, and this package has no such record -- inventing one would be a fabricated value.
+
+This function delegates to `result.ereturn_list()` when the result provides it, so the two can no
+longer disagree.
 
 **Signature**
 
@@ -6433,40 +6473,40 @@ ws.format_ereturn_list(ws.OLS.from_formula('y ~ x1', base).fit())
 **Output**
 
 ```text
+
 scalars:
-                   e(N) =  200
-                e(df_m) =  1
-                e(df_r) =  198
-               e(sum_w) =  200
-                  e(r2) =  .3566186969885982
-                e(r2_a) =  .3533692964683386
-                e(rmse) =  1.163859236421547
-               e(sigma) =  1.163859236421547
-                   e(F) =  109.7490736414688
-                  e(ll) =  -313.1309552730224
-                 e(rss) =  268.2045277963416
-                 e(mss) =  148.6626185459396
-                e(rank) =  2
-                 e(aic) =  62.68649726417567
-                 e(bic) =  69.28313199727174
-       e(_aic_is_stata) =  0
-                e(ll_0) =  -357.2327276994888
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  1
+               e(df_r) =  198
+                  e(F) =  651.4420949517942
+                 e(r2) =  .7669058301010659
+               e(rmse) =  1.028277863327364
+                e(mss) =  688.8057935688862
+                e(rss) =  209.3563621133996
+               e(r2_a) =  .7657285868187481
+                 e(ll) =  -288.3597581706589
+               e(ll_0) =  -433.9910326118382
+               e(rank) =  2
 
 macros:
-           e(marginsok) : "XB default"
-                 e(vce) : "ols"
-             e(vcetype) : ""
-           e(estat_cmd) : "regress_estat"
-               e(title) : "Linear regression"
-              e(depvar) : "y"
-                 e(cmd) : "regress"
-          e(properties) : "b V"
+              e(title) : "Linear regression"
+          e(marginsok) : "XB default"
+                e(vce) : "ols"
+             e(depvar) : "y"
+                e(cmd) : "regress"
+         e(properties) : "b V"
+            e(predict) : "regres_p"
+              e(model) : "ols"
+          e(estat_cmd) : "regress_estat"
 
 matrices:
-                   e(b) :  1 x 2
-                   e(V) :  2 x 2
+                  e(b) :  1 x 2
+                  e(V) :  2 x 2
+               e(beta) :  1 x 1
 
 functions:
+             e(sample)
 ```
 
 ### `kpss`

@@ -159,7 +159,23 @@ def format_ereturn_list(result: Any) -> str:
     ``result`` must expose ``e`` (a mapping). Matrices are discovered through
     ``cov_params()`` (reported as ``e(V)``) and the parameter vector (``e(b)``); a result that
     supplies neither simply gets no matrices block entries.
+
+    DELEGATES TO THE RESULT'S OWN RENDERER when it has one. Round 255 found this free function
+    and ``StataResults.ereturn_list`` had drifted apart: 38 lines against 34, no leading blank
+    line, a different scalar order, an extra e(sigma) row, and an e(F) that predated the
+    mean-square fix. A live ``ereturn list`` STARTS with a newline and prints 35 lines, which is
+    what the method produces -- so the method is authoritative and this wrapper follows it. The
+    older body is kept below only for results that are not StataResults (a duck-typed object with
+    just ``e`` and ``params``).
     """
+
+    renderer = getattr(result, "ereturn_list", None)
+    if callable(renderer):
+        return renderer()
+    return _legacy_ereturn_list(result)
+
+
+def _legacy_ereturn_list(result: Any) -> str:
 
     e_macros = dict(getattr(result, "e", None) or {})
     # Stata distinguishes scalars from macros by TYPE: strings go under "macros", numbers

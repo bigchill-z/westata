@@ -180,9 +180,9 @@ try:  # pragma: no cover - the fallback is exercised only from an uninstalled tr
     try:
         __version__ = _distribution_version("westata")
     except PackageNotFoundError:
-        __version__ = "0.2.0"
+        __version__ = "0.3.0"
 except Exception:  # pragma: no cover - very old interpreters
-    __version__ = "0.2.0"
+    __version__ = "0.3.0"
 
 
 def ssc(**kwargs: object) -> SSC:

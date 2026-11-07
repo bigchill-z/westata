@@ -4642,6 +4642,29 @@ x2          -0.512087
 Name: params, dtype: float64
 ```
 
+### `ereturn_list`
+
+**Stata 指令:** `ereturn list`
+
+按 Stata `ereturn list` 的样式打印结果中存储的宏：四个区块（scalars、macros、matrices、functions），以空行开头，名称右对齐到 22 列。
+
+与实时 `regress` 对照，**34 行全部一致**。过滤、排序与几何细节见 [`format_ereturn_list`](#format_ereturn_list)，本方法即其委托目标。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+print(r.ereturn_list())
+```
+
+```text
+scalars:
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  2
+               ...
+```
+
 ### `bse`
 
 **Stata 指令:** `regress -- the `Std. err.` column`
@@ -6416,7 +6439,13 @@ None
 
 **Stata 指令:** `ereturn list`
 
-Stata `ereturn list` 的四个块：scalars、macros、matrices、functions——顺序固定，每块后跟一个空行。标量与宏用**不同的分隔符**（` =  ` 两个空格 对 一个空格加冒号），两块按**类型**划分：字符串进 macros、数字进 scalars，因此以后新增的宏不会被错误归档。标量值打印至多 16 位有效数字，无前导零、无尾随零。
+Stata `ereturn list` 的四个区块：scalars、macros、matrices、functions，顺序固定，每块前有一个空行，整段以空行开头。标量与宏使用不同的分隔（` =  ` 两个空格 对 单个空格加冒号），两块以**类型**划分：字符串归入 macros，数值归入 scalars。
+
+名称右对齐到 22 列；标量值去掉前导零。`scalars` 只打印命令**实际发布**的键 —— `regress` 报告十三个，而 `e(aic)`、`e(bic)`、`e(sigma)` 虽被存储却不打印。未与实时 Stata 对照测量过的命令保留全部标量，因为凭猜测删行比多打印更糟。
+
+`e(cmdline)` 刻意缺失：它记录的是用户实际输入的命令（含选项），本包没有该记录，编造出来就是伪造值。
+
+结果对象带 `ereturn_list()` 时，本函数委托给它，两者不会再出现分歧。
 
 **签名**
 
@@ -6433,40 +6462,40 @@ ws.format_ereturn_list(ws.OLS.from_formula('y ~ x1', base).fit())
 **输出**
 
 ```text
+
 scalars:
-                   e(N) =  200
-                e(df_m) =  1
-                e(df_r) =  198
-               e(sum_w) =  200
-                  e(r2) =  .3566186969885982
-                e(r2_a) =  .3533692964683386
-                e(rmse) =  1.163859236421547
-               e(sigma) =  1.163859236421547
-                   e(F) =  109.7490736414688
-                  e(ll) =  -313.1309552730224
-                 e(rss) =  268.2045277963416
-                 e(mss) =  148.6626185459396
-                e(rank) =  2
-                 e(aic) =  62.68649726417567
-                 e(bic) =  69.28313199727174
-       e(_aic_is_stata) =  0
-                e(ll_0) =  -357.2327276994888
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  1
+               e(df_r) =  198
+                  e(F) =  651.4420949517942
+                 e(r2) =  .7669058301010659
+               e(rmse) =  1.028277863327364
+                e(mss) =  688.8057935688862
+                e(rss) =  209.3563621133996
+               e(r2_a) =  .7657285868187481
+                 e(ll) =  -288.3597581706589
+               e(ll_0) =  -433.9910326118382
+               e(rank) =  2
 
 macros:
-           e(marginsok) : "XB default"
-                 e(vce) : "ols"
-             e(vcetype) : ""
-           e(estat_cmd) : "regress_estat"
-               e(title) : "Linear regression"
-              e(depvar) : "y"
-                 e(cmd) : "regress"
-          e(properties) : "b V"
+              e(title) : "Linear regression"
+          e(marginsok) : "XB default"
+                e(vce) : "ols"
+             e(depvar) : "y"
+                e(cmd) : "regress"
+         e(properties) : "b V"
+            e(predict) : "regres_p"
+              e(model) : "ols"
+          e(estat_cmd) : "regress_estat"
 
 matrices:
-                   e(b) :  1 x 2
-                   e(V) :  2 x 2
+                  e(b) :  1 x 2
+                  e(V) :  2 x 2
+               e(beta) :  1 x 1
 
 functions:
+             e(sample)
 ```
 
 ### `kpss`

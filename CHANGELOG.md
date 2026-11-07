@@ -9,6 +9,108 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+### Fixed — output blocks that were one blank line, rule or row away from Stata
+
+A systematic check of every renderer's RAW prefix (`str(out)[0]`) plus a line-by-line comparison
+against live Stata found twelve blocks that were missing structure. In each case the **numbers were
+already right**, which is why the shape had gone unexamined.
+
+| Block | Was | Now |
+|---|---|---|
+| `estat ic` | no rules at all | three 77-wide rules; 9 lines |
+| `estat endogenous` | no leading blank | exact |
+| `estat bgodfrey` | no leading blank; whole table off by one row | exact |
+| `estat dwatson` | no leading blank; six decimals, not six figures | exact |
+| `estat vif` | no leading blank | exact |
+| `estat imtest` | no blank after the title, no rules | 12 lines, exact |
+| `estat summarize` | no blank after the header, no closing rule | 11 lines, exact |
+| `margins` | 10 lines where Stata prints 14 | exact |
+| `lincom` | no leading blank | exact |
+| `contrast` | 9 lines where Stata prints 12 | exact |
+| `test()` | no leading blank | exact |
+| ML summaries (`logit`, `probit`) | no leading blank | exact |
+
+The last one had a cause worth recording: the ML branch **explicitly deleted** every leading blank
+line, on a comment claiming "Stata's header starts with the banner line and has no leading blank".
+A live `logit rns s expr tenure, nolog` starts with a newline. Two earlier attempts to *add* the
+blank upstream were silently undone by that strip; it was found by tracing executed line numbers
+rather than by reading the source.
+
+### Fixed — `teffects`: four estimation errors, all from a missing constant or a discarded tie
+
+These were not layout problems. Each made the reported effect wrong.
+
+| Command | Reported | Stata | Cause |
+|---|---|---|---|
+| `teffects ipw` ATE | 1589.9166 | **1641.315** | treatment logit fitted without an intercept (3.1% error) |
+| `teffects aipw` ATE | 1616.9959 | **1619.053** | outcome regression fitted without an intercept |
+| `teffects ra` ATE | 1679.0065 | **1621.583** | per-arm regression fitted without an intercept (3.5%) |
+| `teffects nnmatch` ATE | 2039.4582 | **1906.126** | only the k-th nearest neighbour kept; Stata keeps every TIED neighbour (7%) |
+
+The nnmatch cause was found by exporting Stata's own match set with
+`teffects nnmatch ..., generate(q_)`: it writes **eight** variables on the reference data (`q_2`
+populated for 90 rows, `q_3` for 42, …), so ties are real. Averaging each unit's matched set
+equally, ties included, reproduces both estimands to the printed digit — ATE 1906.1262, ATET
+2453.0763, and nn(1) through nn(5) all match.
+
+The intercept omissions had one shared subtlety: `from_formula` builds the design through patsy,
+which already emits an `Intercept` column, while a caller passing arrays does not. Adding a second
+constant made the cross-product singular and broke 21 tests; `_has_intercept` now decides.
+
+### Added — `ereturn list`
+
+`result.ereturn_list()` renders Stata's four-block dump (scalars, macros, matrices, functions) and
+matches a live run **34 of 34 lines**. `format_ereturn_list(result)` now delegates to it — the two
+had drifted apart (38 lines against 34, no leading blank, a different scalar order, an extra
+`e(sigma)` row), and the method is the one that was measured.
+
+Only an ordinary `regress` has a measured published-scalar set; other commands keep every scalar
+rather than having rows dropped on a guess. `e(cmdline)` stays absent on purpose: it records the
+command **as the user typed it**, and inventing one would be a fabricated value.
+
+### Fixed — `e(F)` is the mean-square ratio, which is what Stata stores
+
+`e(F)` was computed through the Wald form, which is algebraically identical for a non-robust
+covariance but not bit for bit. Stata's own `e(F)` **is** `(e(mss)/e(df_m)) / (e(rss)/e(df_r))` —
+recomputing it inside Stata from those macros reproduces it to all sixteen digits — so a classical
+fit now uses the ratio and robust or clustered fits keep the Wald form.
+
+An earlier attempt at this was reverted after it appeared to break factor models; the apparent
+break was a measurement error (a hand-picked column subset), and the two forms were then confirmed
+to agree to 3e-15 on a plain regressor and 6e-14 on a factor model.
+
+### Fixed — `xtnbreg`, `xtpoisson`, `xtlogit` and the factor syntax
+
+* `xtlogit y x1 i.year` could not be written at all: `_panel_frame` moves the time column into the
+  index, so a formula naming it failed with `NameError`. The index levels are now exposed to patsy
+  when -- and only when -- the formula mentions one, which is what keeps listwise deletion intact.
+* Factor level labels were right-aligned; the indent is `name_width - 1 - len(text)`, measured from
+  two live captures (`Foreign` and `1971`) that disagree with any single fixed-width rule.
+* Random-effects rows no longer leak into the conditional variant. The test was a substring match
+  on `"re"`, which also matches the word "reg**re**ssion".
+* A count model's random effect is **Gamma**, not Gaussian, and it is closed form, so there is no
+  "Integration method" row; a conditional fit prints neither distribution nor integration rows.
+* `xtnbreg, re` is **not implemented**. It accepts only `method='fe'`, with a clear
+  `UnsupportedError`. Stata's random-effects variant needs a Beta negative-binomial mixture; the
+  specification is read from `xtnbreg.sthlp:172-180` and a verified group-level likelihood
+  prototype is in `tests/test_xtnbreg_beta_likelihood_prototype.py`, but the estimator around it
+  (joint optimisation of `(b, r, s)`, observed-information covariance, the Beta table) is not done.
+
+### Fixed — `predict` aliases, `summary(first=)` and factor names
+
+`predict lev`/`p`/`resid`/`r` are accepted as Stata's spellings of `leverage`/`pr`/`residuals`;
+`summary(first=True)` renders the first-stage block for `ivregress ..., first`; `C(var)[T.level]`
+column names are parsed rather than splitting on `(`.
+
+### Known limitation (not fixed, recorded)
+
+* `synth` / `synth2`: the core is Mata bytecode with no readable source in the installation.
+* `xtserial`: no `.ado` file exists; Stata itself raises `r(111)`.
+* `rdrobust` automatic bandwidth selection, `teffects` AI-robust variance, `arimasoc`: unimplemented.
+* Numeric differences characterised and deliberately not chased: the last digit of a `logit ..., or`
+  odds ratio and of an `ologit` cut point, where both implementation's likelihoods agree to fifteen
+  digits and only the optimiser's stopping point differs.
+
 ### Fixed — `estat imtest, white` reported one degree of freedom too many
 
 `result.estat_imtest(white=True)` disagreed with Stata's `estat imtest, white`.

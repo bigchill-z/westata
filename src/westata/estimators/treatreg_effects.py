@@ -1334,13 +1334,33 @@ class NearestNeighbourMatching:
 
     def _neighbours(
         self, distances: np.ndarray, source: np.ndarray, target: np.ndarray
-    ) -> np.ndarray:
-        """Indices of the ``nneighbor`` nearest ``source`` rows per target row."""
+    ) -> list[np.ndarray]:
+        """The matched ``source`` rows per target row, INCLUDING every tie.
+
+        Ties are real in this data and Stata keeps them all. Measured in round 207 by exporting
+        Stata's own match set with `teffects nnmatch ..., generate(q_)`: it writes EIGHT variables,
+        with q_2 populated for 90 rows, q_3 for 42, q_4 for 19 and so on. Taking only the k-th
+        nearest -- which this used to do -- therefore dropped real neighbours, and averaging the
+        surviving set equally reproduces Stata exactly:
+
+            equal-weight tie averaging   Stata
+            ATE    1906.1262             1906.126
+            ATET   2453.0763             2453.076
+
+        Returns a list of arrays rather than a rectangular matrix, because the matched sets have
+        different sizes once ties are kept.
+        """
 
         k = min(self._nneighbor, source.size)
         block = distances[np.ix_(target, source)]
-        order = np.argsort(block, axis=1, kind="stable")[:, :k]
-        return source[order]
+        matched: list[np.ndarray] = []
+        for row in range(block.shape[0]):
+            ordered = np.sort(block[row])
+            threshold = ordered[k - 1]
+            # A tie tolerance: distances that agree to floating-point noise are the same neighbour.
+            chosen = np.flatnonzero(block[row] <= threshold + 1e-12)
+            matched.append(source[chosen])
+        return matched
 
     @staticmethod
     def _same_arm_sigma(
@@ -1399,8 +1419,10 @@ class NearestNeighbourMatching:
         neighbours0 = self._neighbours(distances, control_index, treated_index)
         neighbours1 = self._neighbours(distances, treated_index, control_index)
 
-        imputed0 = y[neighbours0].mean(axis=1)  # counterfactual y0 for the treated
-        imputed1 = y[neighbours1].mean(axis=1)  # counterfactual y1 for the controls
+        # The matched sets are ragged once ties are kept, so the counterfactual is the mean over
+        # each unit's own set and the reuse weights are 1/|set| per member.
+        imputed0 = np.array([y[row].mean() for row in neighbours0])  # counterfactual y0, treated
+        imputed1 = np.array([y[row].mean() for row in neighbours1])  # counterfactual y1, controls
 
         effect_treated = y[treated_index] - imputed0
         effect_control = imputed1 - y[control_index]
@@ -1417,12 +1439,14 @@ class NearestNeighbourMatching:
             mean0 = float((y[control_index].sum() + imputed0.sum()) / n)
             mean1 = float((y[treated_index].sum() + imputed1.sum()) / n)
 
-        # How often each observation is reused as a match; fractional when
-        # nneighbor > 1, because each of the k matches carries weight 1/k.
+        # How often each observation is reused as a match; fractional when a set has several
+        # members, because each carries weight 1/|set|.
         reuse0 = np.zeros(n, dtype=float)   # a CONTROL reused by the treated
         reuse1 = np.zeros(n, dtype=float)   # a TREATED unit reused by the controls
-        np.add.at(reuse0, neighbours0.ravel(), 1.0 / neighbours0.shape[1])
-        np.add.at(reuse1, neighbours1.ravel(), 1.0 / neighbours1.shape[1])
+        for row in neighbours0:
+            np.add.at(reuse0, row, 1.0 / row.size)
+        for row in neighbours1:
+            np.add.at(reuse1, row, 1.0 / row.size)
 
         sigma2 = np.empty(n, dtype=float)
         sigma2[treated_index] = self._same_arm_sigma(distances, treated_index, y)

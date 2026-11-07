@@ -4260,6 +4260,30 @@ def _stata_summary(result: Any) -> str:
             )
         lines.append("-" * 53 + "+")
 
+    # A RANDOM-EFFECTS fit closes with the SAME kind of boundary test, but about rho rather than
+    # alpha. Measured on a live `xtlogit y x1, re`:
+    #
+    #   'LR test of rho=0: chibar2(01) = 98.28                  Prob >= chibar2 = 0.000'
+    #
+    # 2*(ll - ll_0) = 2*(-348.7264 + 397.8659) = 98.28, and the p-value is HALF the chi2(1) tail
+    # for the same boundary reason as the alpha test.
+    _is_re_rho_shape = (
+        not _has_alpha
+        and np.isfinite(_e_float(result, "rho"))
+        and str(getattr(result, "model_name", "") or "").startswith("xt")
+    )
+    if _is_re_rho_shape:
+        _ll_v = _e_float(result, "ll")
+        _ll0_v = _e_float(result, "ll_0")
+        if np.isfinite(_ll_v) and np.isfinite(_ll0_v):
+            _lr = 2.0 * (_ll_v - _ll0_v)
+            _p_lr = 0.5 * float(stats.chi2.sf(_lr, 1))
+            _text = f"LR test of rho=0: chibar2(01) = {_lr:.2f}"
+            _tail = f"Prob >= chibar2 = {_p_lr:.3f}"
+            # "Prob >=" starts at column 55 and the row is 78 wide, like the rest of the block --
+            # measured, the first version (row_width - len - 1) was one column short.
+            lines.append(f"{_text:<{row_width - len(_tail)}}{_tail}")
+
     if _has_alpha:
         # ``xtpoisson, re`` and ``tnbreg`` close with a likelihood-ratio test of the
         # dispersion parameter. The statistic is chi-BAR-squared -- a 50:50 mixture of

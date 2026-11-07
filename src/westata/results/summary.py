@@ -4211,14 +4211,22 @@ def _stata_summary(result: Any) -> str:
                     # there, not between /lnalpha and alpha -- measured in round 244.
                     if not (lines and lines[-1].startswith("---") and "+" in lines[-1]):
                         lines.append(_split_rule)
+                    # AT THE BOUNDARY THE SE AND THE INTERVAL GO TOO. Measured on
+                    # `nbreg mpg weight fgn`, whose optimum sits at alpha -> 0:
+                    #   /lnalpha |  -20.69024          .                             .
+                    # The z/P columns are blank for every dispersion row; here the SE
+                    # and interval are blank as well because the observed information
+                    # is rank-deficient. The interior case keeps both -- `nbreg y x1`
+                    # at alpha = .5285893 prints -.6375435 .1323071 -.8968606 -.3782264.
+                    _dispersion_boundary = float(np.exp(float(params[index]))) < 1e-5
                     lines.append(
                         f"{_level_text}"
                         f"{_stata_coef(params[index], coef_w)}"
-                        f"{_stata_coef(bse[index], se_w)}"
+                        f"{('.' if _dispersion_boundary else _stata_coef(bse[index], se_w)).rjust(se_w)}"
                         f"{'':>{stat_w}}"
                         f"{'':>{p_w}}"
-                        f"{_stata_coef(lower[index], ci_lo_w)}"
-                        f"{_stata_coef(upper[index], ci_hi_w)}"
+                        f"{('' if _dispersion_boundary else _stata_coef(lower[index], ci_lo_w)).rjust(ci_lo_w)}"
+                        f"{('' if _dispersion_boundary else _stata_coef(upper[index], ci_hi_w)).rjust(ci_hi_w)}"
                     )
                 else:
                     lines.append(

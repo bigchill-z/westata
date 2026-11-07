@@ -106,3 +106,16 @@ def test_an_interior_dispersion_keeps_its_standard_error() -> None:
     )
     # A number in the SE cell, not the boundary placeholder.
     assert row.split("|")[1].split()[1] != "."
+
+
+def test_the_lnalpha_row_also_drops_its_standard_error(nbreg) -> None:
+    """The dispersion row follows the same rule as the derived alpha row."""
+
+    row = next(
+        line
+        for line in str(nbreg.summary(style="stata")).splitlines()
+        if line.strip().startswith("/lnalpha |")
+    )
+    assert "12.69" not in row
+    assert "-38.69" not in row
+    assert " . " in row or row.rstrip().endswith(".")

@@ -684,16 +684,46 @@ class PanelOLS:
         """Build ``y``/``X`` with patsy and apply listwise deletion."""
 
         import patsy
+        import re as _re
 
+        # THE ENTITY AND TIME COLUMNS MUST BE VISIBLE TO THE FORMULA. `_panel_frame` moves them
+        # into a MultiIndex, so `C(year)` / `i.year` -- Stata's most common panel specification --
+        # failed with "name 'year' is not defined" even though the column was right there in the
+        # caller's data. Round 216.
+        #
+        # Only done when the formula actually NAMES one of those columns: resetting the index
+        # unconditionally changes the frame patsy sees and broke three listwise-deletion tests.
+        index_names = [
+            name for name in getattr(self._data.index, "names", []) if name is not None
+        ]
+        design_data = self._data
+        mentioned = [
+            name
+            for name in index_names
+            if _re.search(rf"\b{_re.escape(str(name))}\b", self._formula)
+        ]
+        if mentioned:
+            design_data = self._data.reset_index()
         try:
             y_frame, x_frame = patsy.dmatrices(
-                self._formula, self._data, return_type="dataframe"
+                self._formula, design_data, return_type="dataframe"
             )
         except patsy.PatsyError as exc:
             raise ConsistencyError(
                 f"{self._stata_command}: cannot build the design matrix for "
                 f"{self._formula!r}: {exc}"
             ) from exc
+
+        if mentioned:
+            # patsy worked on the reset frame, so the returned index is the caller's row label
+            # rather than the entity/time MultiIndex every downstream step expects. Restore it --
+            # keeping only the rows patsy kept -- before anyone reads ``x_frame.index``.
+            original = self._data.index
+            positions = x_frame.index.to_numpy()
+            if len(positions) and np.issubdtype(positions.dtype, np.integer):
+                restored = original.take(positions)
+                x_frame = x_frame.set_axis(restored, axis=0, copy=False)
+                y_frame = y_frame.set_axis(restored, axis=0, copy=False)
 
         kept = x_frame.index
         # A MISSING WEIGHT drops the row, exactly like a missing regressor: Stata's

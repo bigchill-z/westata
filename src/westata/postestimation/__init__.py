@@ -22,7 +22,7 @@ from westata.postestimation.nonlinear import nlcom, testnl
 from westata.postestimation.margins import MarginsResult, MarginsTable, margins
 from westata.postestimation.predict import SUPPORTED_TYPES, predict, supported_types
 from westata.postestimation.vargranger import VarGrangerResult, vargranger
-from westata.postestimation.ereturn import format_ereturn_list
+from westata.postestimation.ereturn import format_ereturn_list, standardized_coefficients
 from westata.postestimation.rcm import RcmResult, rcm
 from westata.postestimation.tebalance import (
     BalanceRow,

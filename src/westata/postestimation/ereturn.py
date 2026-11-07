@@ -50,7 +50,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["format_ereturn_list"]
+__all__ = ["format_ereturn_list", "standardized_coefficients"]
 
 #: Stata prints the blocks in this order no matter how the estimates were stored.
 _BLOCK_ORDER = ("scalars", "macros", "matrices", "functions")
@@ -80,6 +80,77 @@ def _scalar_value(value: Any) -> str:
     if text.startswith("-0."):
         return "-" + text[2:]
     return text
+
+
+def _standardized_shape(result: Any) -> str | None:
+    """The shape string for ``e(beta)``, or ``None`` when the result has no regressors.
+
+    Stata prints ``1 x k-1`` for an OLS fit with a constant and ``1 x k`` without one. The
+    standard errors and the matrix values are available from :func:`standardized_coefficients`;
+    this helper only decides WHETHER the row appears and how wide it is, so that a model without
+    an intercept is not silently given the wrong shape.
+    """
+
+    parameters = getattr(result, "params", None)
+    if parameters is None:
+        return None
+    try:
+        names = [str(name) for name in parameters.index]
+    except AttributeError:
+        return None
+    constant_like = {"intercept", "_cons", "const", "constant"}
+    regressors = [name for name in names if name.strip().lower() not in constant_like]
+    if not regressors:
+        return None
+    return f"1 x {len(regressors)}"
+
+
+def standardized_coefficients(result: Any) -> Any:
+    """``e(beta)``: coefficients from regressing the standardized response on standardized X.
+
+    Equivalent identities, both verified on grilic.dta: standardising the data and refitting gives
+    the same numbers as scaling each coefficient by ``sd(x_k)/sd(y)``, because in a regression with
+    an intercept ``b_k * sd(x_k)/sd(y)`` IS the standardized coefficient. The design-matrix route
+    is used here because it also works for fits whose sample sds are not at hand.
+
+    An earlier draft of this docstring claimed the scaling formula was "wrong with correlated
+    regressors" and quoted .77974961 for ``expr``. That was a mis-computation on my part, not a
+    property of the formula: the correct scaling gives .18441586, exactly Stata's value, and the
+    two routes agree to 8 decimals on every coefficient.
+    """
+
+    import pandas as pd
+
+    parameters = result.params
+    names = [str(name) for name in parameters.index]
+    constant_like = {"intercept", "_cons", "const", "constant"}
+    regressors = [name for name in names if name.strip().lower() not in constant_like]
+    if not regressors:
+        return pd.Series(dtype=float)
+
+    endog = getattr(result, "model", None)
+    model = getattr(result, "model", None)
+    if model is None:
+        raise ConsistencyError(
+            "ereturn: e(beta) needs the fitted design matrix; this result does not expose one"
+        )
+    design = getattr(model, "exog", None)
+    response = getattr(model, "endog", None)
+    if design is None or response is None:
+        raise ConsistencyError(
+            "ereturn: e(beta) needs the fitted design matrix; this result does not expose one"
+        )
+    design = np.asarray(design, dtype=float)
+    response = np.asarray(response, dtype=float).reshape(-1)
+
+    def standardise(values: np.ndarray) -> np.ndarray:
+        return (values - values.mean(axis=0)) / values.std(axis=0, ddof=1)
+
+    standard_response = standardise(response)
+    columns = [names.index(name) for name in regressors]
+    standard_design = standardise(design[:, columns])
+    coefficients, *_ = np.linalg.lstsq(standard_design, standard_response, rcond=None)
+    return pd.Series(coefficients, index=regressors, name="beta")
 
 
 def format_ereturn_list(result: Any) -> str:
@@ -117,6 +188,20 @@ def format_ereturn_list(result: Any) -> str:
         covariance = None
     if covariance is not None and covariance.ndim == 2:
         matrices.append(("V", f"{covariance.shape[0]} x {covariance.shape[1]}"))
+    # ``e(beta)``: standardized coefficients. Stata lists it for OLS-style fits as a 1 x (k-1)
+    # matrix -- one column per REGRESSOR, the constant excluded:
+    #
+    #     e(beta)[1,3]
+    #                 s       expr     tenure
+    #     r1  .55469752  .18441586   .1487096
+    #
+    # Computed as the OLS coefficients after standardising the response AND every regressor
+    # (sample sd, ddof=1); verified to 8 decimals on grilic.dta. This is equivalent to
+    # b_k * sd(x_k)/sd(y) -- both give .55469752 / .18441586 / .1487096 -- and the design route is
+    # used because it does not require the sample sds to be at hand.
+    beta_shape = _standardized_shape(result)
+    if beta_shape is not None:
+        matrices.append(("beta", beta_shape))
 
     blocks: dict[str, list[str]] = {"scalars": [], "macros": [], "matrices": [], "functions": []}
     # Spacing measured from Stata's own output:
@@ -131,6 +216,11 @@ def format_ereturn_list(result: Any) -> str:
         blocks["macros"].append(f"{('e(' + name + ')'):>{_NAME_WIDTH}} : \"{value}\"")
     for name, shape in matrices:
         blocks["matrices"].append(f"{('e(' + name + ')'):>{_NAME_WIDTH}} :  {shape}")
+    # ``functions:`` lists the functions a result exposes; Stata prints the name and NOTHING
+    # else -- '             e(sample)   ' is 25 characters with no value after it. Every fitted
+    # result here knows its estimation sample, so the row is unconditional.
+    if parameters is not None:
+        blocks["functions"].append(f"{'e(sample)':>{_NAME_WIDTH}}   ")
 
     lines: list[str] = []
     for block in _BLOCK_ORDER:

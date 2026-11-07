@@ -31,7 +31,11 @@ AUTO = "tests/data/auto.dta"
 
 #: From `regress mpg weight i.fx` on auto.dta (fx = encode(foreign)).
 STATA_WIDTH = 78
-STATA_COEF_ROW = "     Foreign |  -1.650029   1.075994    -1.53   0.130      -3.7955    .4954422"
+# CORRECTED in round 217: the level label is INDENTED by (name_width - 1 - len(text)) and then
+# padded two spaces before the pipe, not right-aligned. Re-captured from `regress mpg weight i.fxc`
+# on auto.dta, which prints '    Foreign  |  ...' -- four leading spaces and two before the pipe.
+# The old string right-aligned it (five leading, none trailing), which the live run never showed.
+STATA_COEF_ROW = "    Foreign  |  -1.650029   1.075994    -1.53   0.130      -3.7955    .4954422"
 STATA_BLANK_PIPE = " " * 13 + "|"
 
 

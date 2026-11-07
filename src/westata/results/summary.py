@@ -3817,8 +3817,25 @@ def _stata_summary(result: Any) -> str:
                     f"{_stata_coef(float(np.exp(upper[index])), ci_hi_w)}"
                 )
             else:
+                # A FACTOR LEVEL'S INDENT IS name_width-DRIVEN, not a fixed 7. Two measured
+                # examples fix the rule -- the level text is the LAST name_width-2 columns before
+                # the pipe, i.e. it starts at (name_width - 2 - len(text)) and is padded to the
+                # pipe:
+                #
+                #     '    Foreign  |'   name_width 12, len 7  -> 4 leading spaces
+                #     '       1971  |'   name_width 12, len 4  -> 7 leading spaces
+                #
+                # so leading = name_width - 1 - len(text), then the text, then two spaces and the
+                # pipe: 4+7=11, 4+7+2 = 13. Both measured examples satisfy it; my first attempt
+                # right-aligned the text (correct only when it happens to fill the field) and my
+                # second used a hard-coded 7 (right for 1971, wrong for Foreign).
+                _level_text = (
+                    f"{' ' * max(0, name_width - 1 - len(bare))}{bare}  |"
+                    if _factor is not None
+                    else f"{bare:>{name_width}} |"
+                )
                 lines.append(
-                    f"{bare:>{name_width}} |"
+                    f"{_level_text}"
                     f"{_stata_coef(params[index], coef_w)}"
                     f"{_stata_coef(bse[index], se_w)}"
                     f"{_stata_stat(stats_[index], stat_w)}"

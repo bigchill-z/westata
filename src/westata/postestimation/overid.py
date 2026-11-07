@@ -143,7 +143,14 @@ class OverIdResult:
         # Stata indents the heading by TWO spaces -- '  Tests of overidentifying restrictions:'
         # -- while the statistic rows below keep the same two-space indent. Measured in round 171;
         # omitting it made every line-by-line comparison fail on this row alone.
-        lines = ["", "  Tests of overidentifying restrictions:", sargan_row]
+        # A BLANK line also separates the heading from the first statistic, measured on a live
+        # `ivregress 2sls lnw expr tenure (s = rns mrt)` then `estat overid`:
+        #
+        #   (blank)
+        #     Tests of overidentifying restrictions:
+        #   (blank)
+        #     Sargan (score) chi2(1) =  2.13271  (p = 0.1442)
+        lines = ["", "  Tests of overidentifying restrictions:", "", sargan_row]
         if self.basmann is not None:
             basmann_row = (
                 f"  {'Basmann chi2(' + f'{self.df:g}' + ')':<22}"

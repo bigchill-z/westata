@@ -264,11 +264,19 @@ class FirstStageResult:
         separator = "  " + "-" * 35 + "+" + "-" * 33
         lines = [
             "",
+            # TWO blanks before the eigenvalue line, not one: measured on a live
+            # `estat firststage`, the rule sits at index 7, a blank at 8, ANOTHER blank at 9,
+            # then "Minimum eigenvalue statistic" at 10.
+            "",
             # The line is padded to a FIXED total width of 45, not to a fixed number of trailing
             # spaces: '190.149' needs five and '44.963' needs six to reach the same 45. Hard-coding
             # either count broke the other case -- the two reference fits in the suite disagree by
             # exactly one space, which is how this was found (round 188).
-            f"  Minimum eigenvalue statistic = {self.mineig:.3f}".ljust(45),
+            # SIX SIGNIFICANT FIGURES, not a fixed three decimals. Stata prints r(mineig) with its
+            # default %g style, so 332.355 stays three decimals while 20.0861 needs four. A
+            # hardcoded ``:.3f`` truncated the second case to "20.086" -- measured on a live
+            # `estat firststage` where r(mineig) = 20.0861029023 and Stata prints 20.0861.
+            f"  Minimum eigenvalue statistic = {self.mineig:.6g}".ljust(45),
             "",
             f"  Critical Values                      # of endogenous regressors: {n_endog:>4}",
             f"  H0: Instruments are weak             # of excluded instruments: {n_excluded:>5}",
@@ -415,13 +423,19 @@ class FirstStageResult:
                 (f"{self.r2[i]:.4f}", 9),
                 (f"{self.adj_r2[i]:.4f}", 21),
                 (f"{self.partial_r2[i]:.4f}", 34),
-                (f"{self.f[i]:.3f}", 48),
+                # The F column is VARIABLE width too: Stata prints 20.0861 here and 332.355
+                # elsewhere, so a fixed .3f truncated this one. Same %g rule as the eigenvalue.
+                (f"{self.f[i]:.6g}", 48),
                 (f"{self.pvalue[i]:.4f}", 58),
             ):
                 target = len(prefix) + max(14 - len(prefix), 0) + offset
                 row += " " * max(target - len(row) - len(value), 0) + value
             lines.append(row)
         lines.append(rule)
+        # A BLANK line closes the summary table before the Stock-Yogo block begins.
+        # Stata prints it: the rule, then a blank, then "Minimum eigenvalue statistic".
+        # Measured on a live `estat firststage` in round 9 of the v3 work.
+        lines.append("")
         return chr(10).join(lines)
 
     def _render_shea_table(self) -> str:
@@ -454,7 +468,7 @@ class FirstStageResult:
             )
             lines.append(
                 f"  {name:<14}|{self.shea[i]:>10.4f}{adjusted_text}"
-                f"{self.partial_r2[i]:>10.4f}{self.f[i]:>10.4}"
+                f"{self.partial_r2[i]:>10.4f}{self.f[i]:>10.4g}"
                 f"{self.pvalue[i]:>10.4f}"
             )
         lines.append("-" * 14 + "+" + "-" * 54)

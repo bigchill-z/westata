@@ -87,7 +87,11 @@ def _margin_number(value: float, end_column: int, used: int) -> str:
         text = "."
     else:
         number = float(value)
-        text = f"{number:.7f}"
+        # SEVEN decimals when the integer part is zero, SIX when it is not -- the same rule
+        # verified for tebalance (round 164) and prais (round 170). A flat seven decimals printed
+        # 1.0759941 where Stata prints 1.075994, because the integer digit eats one place.
+        decimals = 7 if abs(number) < 1.0 else 6
+        text = f"{number:.{decimals}f}"
         if "." in text:
             text = text.rstrip("0").rstrip(".")
         if text.startswith("0."):
@@ -220,13 +224,34 @@ class MarginsTable(list):
         rule = "-" * _MARGIN_WIDTH
 
         lines: list[str] = []
+        # A LEADING BLANK LINE, plus one after "Model VCE:" -- measured live in round 194:
+        #
+        #   (blank)
+        #   Average marginal effects ...
+        #   Model VCE: OLS
+        #   (blank)
+        #   Expression: Linear prediction, predict()
+        #   dy/dx wrt:  weight fx
+        #   (blank)
+        #   ----------------------------------------------------------------------
+        #
+        # The header carried neither blank line, which is why the block printed 10 lines where
+        # Stata prints 14.
+        lines.append("")
         if first.title:
             # "…effects" padded to column 59, then the sample size in three columns.
-            lines.append(
-                f"{first.title:<59}Number of obs = {first.nobs:>3.0f}"
-            )
+            # The line is 78 wide with "Number of obs = N" RIGHT-ALIGNED at the end, not started
+            # at a fixed column: '= 74' is two characters shorter than '= 758' and the title
+            # block absorbs the difference. Two fits pin it (round 194) -- regress puts 'Number'
+            # at column 60 and logit at 59, both ending at 78.
+            tail = f"Number of obs = {first.nobs:.0f}"
+            lines.append(f"{first.title:<{78 - len(tail)}}{tail}")
         if first.vce_label:
             lines.append(f"Model VCE: {first.vce_label}")
+        else:
+            # OLS results carry no vce_label, but Stata still names the VCE on this line.
+            lines.append("Model VCE: OLS")
+        lines.append("")
         if first.expression:
             lines.append(f"Expression: {first.expression}")
         if first.variables:
@@ -250,6 +275,8 @@ class MarginsTable(list):
             lines.append(f"{prefix}{str(name):<10}= {rendered_value} (mean)")
         lines.extend(
             [
+                # Blank line before the table, from the same capture as the header blanks.
+                "",
                 rule,
                 f"{'':<13}|{'Delta-method':>24}",
                 self._header(first),

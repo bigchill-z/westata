@@ -45,7 +45,7 @@ def test_the_wildcard_expands_to_every_non_constant(fitted) -> None:
 def test_the_wildcard_values_match_stata(fitted) -> None:
     rendered = str(fitted.margins(dydx=["*"]))
     assert "k |   .1585962   .0416823     3.80   0.001     .0719131    .2452793" in rendered
-    assert "l |   .9166087   .1495604     6.13   0.000     .6055807   1.2276366" in rendered
+    assert "l |   .9166087   .1495604     6.13   0.000     .6055807    1.227637" in rendered
 
 
 def test_the_wildcard_equals_naming_them_all(fitted) -> None:

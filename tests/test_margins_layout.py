@@ -63,11 +63,16 @@ def fitted():
 
 
 def test_single_marginal_effect_matches_stata(fitted) -> None:
+    # CORRECTED in round 194 from a live margins, dydx(s): the block opens with a BLANK line,
+    # carries one after "Model VCE:", and another before the table rule.
     expected = [
+        "",
         "Average marginal effects                                   Number of obs = 758",
         "Model VCE: OIM",
+        "",
         "Expression: Pr(rns), predict()",
         "dy/dx wrt:  s",
+        "",
         RULE,
         "             |            Delta-method",
         "             |      dy/dx   std. err.      z    P>|z|     [95% conf. interval]",
@@ -80,19 +85,24 @@ def test_single_marginal_effect_matches_stata(fitted) -> None:
 
 def test_two_marginal_effects_render_one_table(fitted) -> None:
     rendered = str(ws.margins(fitted, dydx=["s", "expr"])).splitlines()
-    assert rendered[3] == "dy/dx wrt:  s expr"
+    # Three header blank lines were added in round 194, shifting this row by three.
+    assert rendered[5] == "dy/dx wrt:  s expr"
     assert (
         "        expr |  -.0002224   .0079914    -0.03   0.978    -.0158853    .0154405"
         in rendered
     )
-    assert len(rendered) == 11
+    assert len(rendered) == 14
 
 
 def test_predictive_margins_matches_stata(fitted) -> None:
+    # CORRECTED in round 194 for the three header blank lines.
     expected = [
+        "",
         "Predictive margins                                         Number of obs = 758",
         "Model VCE: OIM",
+        "",
         "Expression: Pr(rns), predict()",
+        "",
         RULE,
         "             |            Delta-method",
         "             |     Margin   std. err.      z    P>|z|     [95% conf. interval]",

@@ -984,6 +984,22 @@ class StataResults:
             # per-command English strings with no derivable source, so they are
             # left absent rather than guessed.
             self._e["properties"] = "b V"
+        # ``e(predict)`` and ``e(model)`` are FIXED per command -- they name the prediction
+        # routine Stata ships and the estimator family it belongs to, not anything the user
+        # typed. Both are recoverable for the commands this package implements; anything not in
+        # the map is left absent rather than guessed, which is why the map is explicit.
+        _predict_routines = {
+            "regress": ("regres_p", "ols"),
+            "logit": ("logit_p", "logistic"),
+            "probit": ("probit_p", "probit"),
+            "poisson": ("pois_p", "poisson"),
+            "nbreg": ("nbreg_p", "negbin"),
+        }
+        _model_name_for_macros = str(getattr(self, "_model_name", "") or "")
+        if _model_name_for_macros in _predict_routines:
+            routine, family = _predict_routines[_model_name_for_macros]
+            self._e.setdefault("predict", routine)
+            self._e.setdefault("model", family)
         return self._e
 
     def _e_scalar(self, key: str) -> float:
@@ -1524,10 +1540,24 @@ class StataResults:
             lines.append("")
 
         if others:
+            # AN EMPTY MACRO IS NOT PRINTED. e(vcetype) is "" on an ordinary OLS fit and Stata's
+            # ereturn list omits it entirely -- measured in round 250.
+            others = {name: value for name, value in others.items() if str(value) != ""}
+            # STATA PRINTS MACROS IN ITS OWN ORDER, not alphabetically:
+            #   cmdline, title, marginsok, vce, depvar, cmd, properties, predict, model, estat_cmd
+            _macro_order = [
+                "cmdline", "title", "marginsok", "vce", "depvar", "cmd",
+                "properties", "predict", "model", "estat_cmd",
+            ]
+            _macro_rank = {name: position for position, name in enumerate(_macro_order)}
+            ordered_macros = sorted(
+                others.items(), key=lambda item: _macro_rank.get(item[0], len(_macro_order))
+            )
             lines.append("macros:")
-            for name, value in others.items():
+            for name, value in ordered_macros:
                 lines.append(f"{('e(' + name + ')'):>22} : {_ereturn_macro(value)}")
-            lines.append("")
+            # NO trailing blank here: "matrices:" emits its own separator below, and adding one
+            # in both places produced two consecutive blanks (round 250).
 
         # The coefficient vector and covariance are stored on the result, not in e().
         matrices: list[tuple[str, int, int]] = []
@@ -1541,7 +1571,22 @@ class StataResults:
                 matrices.append(("V", int(shape.shape[0]), int(shape.shape[1])))
             except Exception:  # pragma: no cover - a result without a covariance
                 pass
+        # ``e(beta)`` is the STANDARDISED coefficient vector WITHOUT the constant: 1 x (k-1) on a
+        # model with an intercept. Measured in round 250 on `regress lnw s expr` (k=3, beta 1x2).
+        # Omitted when there is no intercept, since then there is nothing to standardise against.
+        try:
+            names = [str(name) for name in getattr(params, "index", ())]
+            has_constant = any(
+                name.lower() in ("_cons", "intercept", "const") for name in names
+            )
+            if params is not None and has_constant and int(params.size) > 1:
+                matrices.append(("beta", 1, int(params.size) - 1))
+        except Exception:  # pragma: no cover - a result without coefficient names
+            pass
         if matrices:
+            # A BLANK line separates the macro block from "matrices:" -- the section headings do
+            # not abut the previous section's last row.
+            lines.append("")
             lines.append("matrices:")
             for name, rows, columns in matrices:
                 lines.append(f"{('e(' + name + ')'):>22} :  {rows} x {columns}")

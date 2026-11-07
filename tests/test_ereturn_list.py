@@ -117,6 +117,38 @@ def test_the_leading_scalars_match_stata_exactly(fitted) -> None:
         assert line.split("=")[-1].strip() == value, name
 
 
+def test_the_macros_section_matches_stata(fitted) -> None:
+    """Round 250: the ten macros, in Stata's order, with no empty ones.
+
+    e(cmdline) is deliberately absent -- it records the command AS TYPED and this package has no
+    such record; inventing one would be a fabricated value (see the _e docstring).
+    """
+
+    lines = fitted.ereturn_list().splitlines()
+    start = lines.index("macros:")
+    end = lines.index("matrices:")
+    block = [line for line in lines[start + 1 : end] if line.strip()]
+    names = [line.split(":")[0].strip() for line in block]
+    assert names == [
+        "e(title)", "e(marginsok)", "e(vce)", "e(depvar)", "e(cmd)",
+        "e(properties)", "e(predict)", "e(model)", "e(estat_cmd)",
+    ]
+
+
+def test_an_empty_macro_is_not_printed(fitted) -> None:
+    """e(vcetype) is "" on an ordinary OLS fit and Stata omits it."""
+
+    assert "e(vcetype)" not in fitted.ereturn_list()
+
+
+def test_the_recoverable_macros_are_present(fitted) -> None:
+    """e(predict) and e(model) are fixed per command, so they can be recovered safely."""
+
+    rendered = fitted.ereturn_list()
+    assert 'e(predict) : "regres_p"' in rendered
+    assert 'e(model) : "ols"' in rendered
+
+
 def test_a_matrix_row_shows_its_shape(fitted) -> None:
     lines = fitted.ereturn_list().splitlines()
     b_line = next(line for line in lines if line.strip().startswith("e(b) :"))

@@ -86,9 +86,9 @@ def test_the_module_says_what_is_actually_missing() -> None:
     """Not "no closed form" -- the formula is published; the implementation is not written.
 
     Round 157 found the earlier wording understated the problem in a way that made the gap look
-    unclosable. Abadie-Imbens (2006, 2011, 2012) give an explicit estimator, and Stata's own help
-    points at it (teffects_psmatch.sthlp:210-233, which also notes vce(robust) defaults to TWO
-    matches). teffects psmatch has no vce(iid) fallback either.
+    unclosable. Round 158 then corrected a SECOND claim: an earlier note said vce(iid) was
+    rejected outright, but `atet vce(iid)` does run (SE 811.5662) -- it is simply not simpler,
+    because it carries the same propensity-score correction.
     """
 
     import inspect
@@ -99,4 +99,7 @@ def test_the_module_says_what_is_actually_missing() -> None:
     assert "Abadie" in doc
     assert "explicit one" in doc or "explicit estimator" in doc
     assert "not written" in doc or "IMPLEMENTATION" in doc
-    assert "r(198)" in doc  # the vce(iid) route is closed, recorded so it is not re-tried
+    # The iid route exists but is NOT a shortcut; both facts must be recorded.
+    assert "811.5662" in doc
+    assert "1.2948" in doc or "1.6766" in doc
+    assert "no" in doc and "simple iid version first" in doc

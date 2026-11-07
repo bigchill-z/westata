@@ -39,8 +39,20 @@ none of this is a model discrepancy.
 NOT reproduced: the Abadie-Imbens AI-robust standard error. It is NOT "an estimator with no closed
 form" -- Abadie and Imbens (2006, 2011, 2012) give an explicit one, and
 ``teffects_psmatch.sthlp:210-233`` points at the formula and notes that ``vce(robust)`` uses TWO
-matches by default. ``teffects psmatch`` has no ``vce(iid)`` fallback either (round 157 confirmed
-Stata rejects it with r(198)), so there is exactly one route.
+matches by default.
+
+THERE IS NO CHEAPER FALLBACK (round 158 checked this, correcting an earlier claim that ``vce(iid)``
+was rejected outright). ``atet`` WITH ``vce(iid)`` does run, and reports SE 811.5662 against the
+robust 714.7758 -- but it is not simpler:
+
+  * ``vce(iid)`` does not accept ``nn()`` (nn(2) and nn(3) both fail with r(198));
+  * treating its variance as "sample variance of the per-treated effects / n_t" gives 626.7777,
+    which is 1.2948 times too small (variance ratio 1.6766);
+  * that ratio is neither n/n_t (2.405) nor (n-1)/(n_t-1) (2.413), so the iid variance ALSO
+    carries a first-order inference-function correction for the estimated propensity score.
+
+Both routes therefore need the same complete Abadie-Imbens influence function. There is no
+"do the simple iid version first" step.
 
 Implementing it is real but substantial work: the matching sets, the covariate distance matrix, a
 local-linear estimate of sigma^2, and a four-term variance decomposition, all against the published

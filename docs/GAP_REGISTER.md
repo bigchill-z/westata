@@ -222,7 +222,15 @@
 
 **`e(beta)` / `e(sample)` 已于第 156 轮移出本表**，`ereturn list` 的四行矩阵与函数块现与 Stata 逐字节一致。
 
-第 157 轮对 `teffects` AI-robust 方差的核实：它**不是「没有闭式解」**，而是 Abadie-Imbens (2006, 2011, 2012) 的显式估计量（`teffects_psmatch.sthlp:210-233` 指明公式在 `[CAUSAL] teffects nnmatch` 的 Methods and formulas 中，并注明 `vce(robust)` 默认用 **2 个匹配**）。`teffects psmatch` 没有 `vce(iid)` 这条更简单的退路（实测报 r(198)），所以只有这一条路。实现在 `psmatch.py` 中是可行但独立的较大工作：需要匹配集合、协变量距离矩阵、`sigma²` 的局部线性估计与四项方差分解，且必须以上述文献公式为准，不能凑数。
+第 157 轮对 `teffects` AI-robust 方差的核实：它**不是「没有闭式解」**，而是 Abadie-Imbens (2006, 2011, 2012) 的显式估计量（`teffects_psmatch.sthlp:210-233` 指明公式在 `[CAUSAL] teffects nnmatch` 的 Methods and formulas 中，并注明 `vce(robust)` 默认用 **2 个匹配**）。实现在 `psmatch.py` 中是可行但独立的较大工作。
+
+**第 158 轮补充（修正上一版「没有 vce(iid) 退路」的说法）**：`atet` 配 `vce(iid)` **是可用**的，实测 SE = 811.5662（AI-robust 为 714.7758）。但它并不更简单：
+
+- `vce(iid)` **不接受 `nn()`**（`nn(2)`、`nn(3)` 均报 r(198)），只能用 nneighbor(1)；
+- 若把方差当作「各处理单元匹配效应的样本方差 / n_t」，得到 626.7777，与 811.5662 差 1.2948 倍（方差比 1.6766）；
+- 该比值既不是 `n/n_t`（2.405）也不是 `(n-1)/(n_t-1)`（2.413），说明**iid 方差同样含倾向得分估计的一阶影响函数修正项**。
+
+**结论**：两条路径共用同一个难点——完整的 Abadie-Imbens 影响函数。不存在「先做简单的 iid 版」这条捷径。这也是为什么本项留在 C 类而不是被拆成两步。
 
 **`dfgls` 已于第 154 轮完全移出本表**：1%/5%/10% 临界值列与三行页脚全部实现，`dfgls lrgnp` 与 `dfgls lrgnp, notrend` 两种情形各 20/20 行逐字节匹配 Stata。唯一残留是 no-trend 的 `GetCritM` 响应面在最大 lag 处 5% 列偏高约 0.013（`p/N=0.196` 位于拟合区域边缘，无整数 lag 可精确复现），已在 `_crit_m` 中就地注明。
 

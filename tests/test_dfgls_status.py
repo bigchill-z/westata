@@ -86,16 +86,48 @@ def test_the_two_specifications_are_different_estimands(series) -> None:
     assert abs(trended - detrended) > 2.0
 
 
-def test_the_table_still_renders(series) -> None:
-    """The core table renders; Stata's three critical-value columns are a SEPARATE known gap.
+def test_the_full_table_matches_stata_line_for_line(series) -> None:
+    """Round 154 completed the table: three critical-value columns plus the SIC/MAIC footers.
 
-    Not asserted as present, because they are not -- the renderer prints only the tau column.
-    Recording that here keeps this guard from quietly implying the layout is complete.
+    All 20 non-blank lines of `dfgls lrgnp` now match a live Stata capture exactly, and all 20 of
+    `dfgls lrgnp, notrend` too. This replaces the earlier guard, which asserted that the critical
+    columns were ABSENT -- true then, wrong now.
     """
 
-    rendered = str(ws.dfgls(series))
-    assert "DF-GLS test for unit root" in rendered
-    assert "       10         -1.284" in rendered
-    assert "        1         -2.637" in rendered
-    assert "Opt lag" in rendered
-    assert "-3.724" not in rendered  # Stata's 1% column, not yet implemented
+    rendered = str(ws.dfgls(series, name="lrgnp"))
+    lines = [line for line in rendered.splitlines() if line.strip()]
+    assert len(lines) == 20
+    # Every line between the two rules is 62 characters, header included.
+    first_rule = lines.index("-" * 62)
+    last_rule = len(lines) - 1 - lines[::-1].index("-" * 62)
+    assert all(len(line) == 62 for line in lines[first_rule : last_rule + 1])
+    assert "     10          -1.284       -3.724       -2.721       -2.440" in lines
+    assert "      1          -2.637       -3.724       -3.160       -2.860" in lines
+    assert lines[-1] == "Min MAIC = -5.376693 at lag 1 with RMSE = .0573553"
+
+
+def test_the_critical_columns_use_two_different_sample_sizes(series) -> None:
+    """1% is interpolated on the ORIGINAL length (constant down the table); 5%/10% move.
+
+    Getting this wrong is subtle: using one N for both columns reproduces neither.
+    """
+
+    result = ws.dfgls(series)
+    ones = {round(cell.critical_1, 3) for cell in result.cells}
+    assert ones == {-3.724}, "the 1% column must be constant"
+    fives = [round(cell.critical_5, 3) for cell in result.cells]
+    assert len(set(fives)) == len(fives), "the 5% column must vary with the lag"
+    assert fives[0] == pytest.approx(-2.721, abs=5e-4)
+    assert fives[-1] == pytest.approx(-3.160, abs=5e-4)
+
+
+def test_the_footer_selects_on_the_sequential_t_rule_not_the_smallest_rmse(series) -> None:
+    """Opt lag is the first lag (down from maxlag) with a highest-lag p-value below 0.10.
+
+    The old property returned the minimum-RMSE lag, which is 10 here, while Stata prints 1.
+    """
+
+    result = ws.dfgls(series)
+    assert result.best_lag == 1
+    smallest_rmse = min(result.cells, key=lambda cell: cell.rmse).lags
+    assert smallest_rmse != result.best_lag

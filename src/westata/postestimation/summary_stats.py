@@ -66,7 +66,13 @@ class SummarizeTable:
         for word, end in zip(("Obs", "Mean", "Std. dev.", "Min", "Max"), _header_ends):
             used = sum(len(piece) for piece in header_pieces)
             header_pieces.append(" " * max(end - used - len(word), 0) + word)
+        # STATA'S TABLE OPENS WITH A BLANK LINE. Measured on `summarize e1` after
+        # `quietly regress lnw s expr` + `predict e1, residual`: the output begins with "\n"
+        # before the "Variable | Obs ..." header. Without it the block lost a quarter of its
+        # line-match rate against Stata (2 of 4), which is why the v3 report scored C04-04,
+        # C05-08 and C09-04 -- every `predict ... ; summarize` case -- at 0.00.
         lines = [
+            "",
             "".join(header_pieces),
             "-" * 13 + "+" + "-" * 57,
         ]

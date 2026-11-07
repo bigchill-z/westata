@@ -52,7 +52,13 @@ def test_every_line_matches_stata(frame) -> None:
 
 
 def test_every_row_is_71_characters(frame) -> None:
-    for line in str(ws.summarize(frame, ["k", "l"])).splitlines():
+    rendered = str(ws.summarize(frame, ["k", "l"]))
+    # The block OPENS with a blank line, which Stata also prints -- measured on
+    # `summarize e1` in round 8 of the v3 work. It is 0 characters, so the width rule applies
+    # only to the rows that carry content.
+    for line in rendered.splitlines():
+        if not line.strip():
+            continue
         assert len(line) == 71, line
 
 

@@ -150,7 +150,10 @@ class VifResult:
         # carries two trailing spaces so it is 36 characters like every other row.
         header = f"{'Variable':>12} |       VIF       1/VIF  "
         rule = "-" * 13 + "+" + "-" * 22
-        lines = [header, rule]
+        # A LEADING BLANK LINE: Stata's raw capture starts '\n    V' (newline then the indented
+        # header), so the block opens with an empty line. Measured in round 193 by walking every
+        # estat renderer's prefix -- the same survey that found estat ic, bgodfrey and dwatson.
+        lines = ["", header, rule]
         for name, value, tol in zip(self.names, self.vif, self.tolerance):
             lines.append(f"{name:>12} |{value:>10.2f}    {tol:>8.6f}")
         lines.append(rule)

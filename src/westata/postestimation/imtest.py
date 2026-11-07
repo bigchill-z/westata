@@ -157,24 +157,34 @@ class ImTestResult:
                     f"Prob > chi2 = {self.white_pvalue:.4f}",
                 ]
             )
-        # Captured byte-for-byte from a live `estat imtest` on grilic:
+        # Captured byte-for-byte from a live `estat imtest` on grilic in round 193. TWELVE lines,
+        # with a blank line after the title, THREE 50-character rules, and a 21+'+'+28 separator:
         #
+        #   (blank)
         #   Cameron & Trivedi's decomposition of IM-test
+        #   (blank)
+        #   --------------------------------------------------
         #                 Source |       chi2     df         p
-        #     Heteroskedasticity |       9.77      9    0.3693
-        #               Skewness |      13.20      3    0.0042
-        #               Kurtosis |       3.88      1    0.0490
-        #                  Total |      26.85     13    0.0131
+        #   ---------------------+----------------------------
+        #     Heteroskedasticity |      21.54     18    0.2532
+        #               Skewness |      14.67      5    0.0119
+        #               Kurtosis |       3.68      1    0.0551
+        #   ---------------------+----------------------------
+        #                  Total |      39.88     24    0.0220
+        #   --------------------------------------------------
         #
-        # FIVE lines, no full-width rules and no blank lines. The previous version opened with a
-        # 50-character rule, a blank line and a 21+"+"+28 separator, then closed with another full
-        # rule -- a layout its own comment attributed to StataNow 19.5, which the live output does
-        # not contain.
+        # The comment this replaces claimed "FIVE lines, no full-width rules and no blank lines"
+        # and blamed a previous version for adding them. The rules and blank lines ARE in the live
+        # output; that earlier version had the right structure and was removed for the wrong
+        # reason. Same pattern as estat ic in round 191.
         lines.extend(
             [
                 "",
                 "Cameron & Trivedi's decomposition of IM-test",
+                "",
+                "-" * 50,
                 f"{'Source':>20} |{'chi2':>11}{'df':>7}{'p':>10}",
+                "-" * 21 + "+" + "-" * 28,
             ]
         )
         rows = (
@@ -182,15 +192,19 @@ class ImTestResult:
             ("Skewness", self.skewness, self.df_skewness),
             ("Kurtosis", self.kurtosis, self.df_kurtosis),
         )
+        split_rule = "-" * 21 + "+" + "-" * 28
         for label, statistic, df in rows:
             lines.append(
                 f"{label:>20} |{statistic:>11.2f}{df:>7.0f}"
                 f"{self._pvalue(statistic, df):>10.4f}"
             )
+        # A separator before the Total row and a full rule after it, both from the capture.
+        lines.append(split_rule)
         lines.append(
             f"{'Total':>20} |{self.total:>11.2f}{self.df_total:>7.0f}"
             f"{self._pvalue(self.total, self.df_total):>10.4f}"
         )
+        lines.append("-" * 50)
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, float]:

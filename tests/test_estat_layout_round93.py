@@ -95,14 +95,17 @@ def test_ic_matches_stata(simple) -> None:
 
 
 def test_vif_has_no_leading_blank_line(extended) -> None:
+    # CORRECTED in round 193: the block opens with a BLANK line (Stata starts chr(10)), so
+    # the header is line 1, not line 0.
     lines = str(extended.estat_vif()).splitlines()
-    assert lines[0].startswith("    Variable |")
+    assert lines[0] == ""
+    assert lines[1].startswith("    Variable |")
 
 
 def test_vif_header_carries_the_trailing_spaces(extended) -> None:
     """Stata's header is 38 characters; ours was 36."""
 
-    header = str(extended.estat_vif()).splitlines()[0]
+    header = str(extended.estat_vif()).splitlines()[1]
     assert len(header) == 38, repr(header)
     assert header.endswith("  ")
 

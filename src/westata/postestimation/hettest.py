@@ -130,7 +130,10 @@ class HetTestResult:
         label = "F" if self.method == "fstat" else "chi2"
         lines = [
             "",
-            "Breusch\u2013Pagan/Cook\u2013Weisberg test for heteroskedasticity",
+            # Stata's title line carries a TRAILING SPACE -- captured as
+            # 'Breusch-Pagan/Cook-Weisberg test for heteroskedasticity ' (54 chars). Omitting it
+            # made every `estat hettest` line-by-line comparison fail on this one row.
+            "Breusch\u2013Pagan/Cook\u2013Weisberg test for heteroskedasticity ",
             "Assumption: "
             + ("Normal error terms" if self.method == "normal" else "i.i.d. error terms"),
         ]

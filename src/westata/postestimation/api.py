@@ -249,6 +249,35 @@ def _parse_hypothesis(
     return rows, rhs, ""
 
 
+def _is_factor_reference(spec: str) -> bool:
+    """True when ``spec`` names a FACTOR COEFFICIENT rather than one or more hypotheses.
+
+    A coefficient from a categorical term is spelled ``C(var)[T.level]`` (or ``C(var)[2]``), so the
+    parentheses belong to the name. Telling these apart matters because the two forms are otherwise
+    indistinguishable: both contain '(' and ')'.
+    """
+
+    stripped = spec.strip()
+    if not stripped.startswith("C("):
+        return False
+    # A real hypothesis never has a '[' straight after the closing paren of C(...).
+    close = stripped.find(")")
+    return close != -1 and stripped[close + 1 :].lstrip().startswith("[")
+
+
+def _is_parenthesised_hypothesis(spec: str) -> bool:
+    """True when ``spec`` uses Stata's '(a = 0) (b = 0)' grouping.
+
+    Requires the string to START with '(' after whitespace, which excludes expressions that merely
+    contain parentheses somewhere -- ``C(foreign)[T.Foreign]`` starts with a name, not a group.
+    The earlier attempt also checked that each split fragment appeared verbatim inside
+    parentheses; that broke on the padded spelling ``( s = 0 )``, where the fragment is ' s = 0 '.
+    """
+
+    stripped = spec.strip()
+    return stripped.startswith("(") and stripped.rstrip().endswith(")")
+
+
 def _split_parenthesised(spec: str) -> list[str]:
     """Split ``"(a = 0) (b = 0)"`` into its top-level parenthesised groups.
 
@@ -314,7 +343,14 @@ def test_as_stata(
     # raising ``KeyError: coefficient '(s' not found`` -- measured on grilic.dta in round 160.
     expanded: list[Any] = []
     for spec in specs:
-        if isinstance(spec, str) and "(" in spec:
+        if isinstance(spec, str) and _is_factor_reference(spec):
+            # ``C(foreign)[T.Foreign]`` CONTAINS parentheses that are part of a COEFFICIENT NAME,
+            # not Stata's grouping syntax. Round 160 added the parenthesised-hypothesis branch and
+            # this case slipped through it: the splitter returned ['C', 'foreign', '[T.Foreign]'],
+            # and `test` then failed with "coefficient 'C' not found" for a name that was present.
+            # The README regression guard caught it in round 182.
+            expanded.append(spec)
+        elif isinstance(spec, str) and _is_parenthesised_hypothesis(spec):
             expanded.extend(
                 part.strip() for part in _split_parenthesised(spec) if part.strip()
             )

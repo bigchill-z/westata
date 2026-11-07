@@ -55,25 +55,70 @@ class XtTest0Result:
     nobs: int
     entities: int
     periods: int
+    #: Names for Stata's equation line. Stata prints the model's own dependent variable and the
+    #: panel's id/time names; the defaults keep older callers working.
+    depvar: str = ""
+    entity_name: str = ""
+    time_name: str = ""
 
     def __str__(self) -> str:
+        """Stata's ``xttest0`` block, with column offsets measured in round 176.
+
+        The pipe sits at column 25; the variance column ends at 37 and the SD column at 52. The
+        equation line names the DEPENDENT VARIABLE and the panel's own id/time names
+        ('lny[sid,t] = Xb + u[sid] + e[sid,t]'), not placeholders 'y[id,t]' -- the row label in
+        the table is the dependent variable too.
+        """
+
+        def cell(text: str, end: int, current: int) -> str:
+            return " " * max(end - current - len(text), 0) + text
+
+        depvar = str(self.depvar or "y")
+        entity = str(self.entity_name or "id")
+        time = str(self.time_name or "t")
         lines = [
             "Breusch and Pagan Lagrangian multiplier test for random effects",
             "",
-            "        y[id,t] = Xb + u[id] + e[id,t]",
+            f"        {depvar}[{entity},t] = Xb + u[{entity}] + e[{entity},t]",
             "",
             "        Estimated results:",
-            "                         |       Var     SD = sqrt(Var)",
-            "                ---------+-----------------------------",
-            f"{'y':>24} |{self.var_y:>12.7g}{np.sqrt(self.var_y):>14.7g}",
-            f"{'e':>24} |{self.var_e:>12.7g}{np.sqrt(self.var_e):>14.7g}",
-            f"{'u':>24} |{self.var_u:>12.7g}{np.sqrt(self.var_u):>14.7g}",
-            "",
-            "        Test: Var(u) = 0",
-            f"{'chibar2(01) =':>34}{self.chibar2:>8.2f}",
-            f"{'Prob > chibar2 =':>34}{self.pvalue:>9.4f}",
+            " " * 25 + "|       Var     SD = sqrt(Var)",
+            " " * 16 + "---------+-----------------------------",
         ]
+        for label, variance in (
+            (depvar, self.var_y),
+            ("e", self.var_e),
+            ("u", self.var_u),
+        ):
+            line = cell(label, 24, 0) + " |"
+            line += cell(self._variance(variance), 37, len(line))
+            line += cell(
+                self._variance(np.sqrt(variance) if variance == variance else variance),
+                52,
+                len(line),
+            )
+            lines.append(line)
+        lines.extend(
+            [
+                "",
+                "        Test: Var(u) = 0",
+                cell("chibar2(01)", 40, 0) + cell("=", 42, 40) + cell(f"{self.chibar2:>7.2f}", 51, 42),
+                cell("Prob > chibar2", 40, 0) + cell("=", 42, 40) + cell(f"{self.pvalue:>6.4f}", 51, 42),
+            ]
+        )
         return "\n".join(lines)
+
+    @staticmethod
+    def _variance(value: float) -> str:
+        """Seven significant figures with the leading zero dropped, as Stata prints these cells."""
+        if value != value:
+            return "."
+        text = f"{float(value):.7g}"
+        if text.startswith("0."):
+            return text[1:]
+        if text.startswith("-0."):
+            return "-" + text[2:]
+        return text
 
 
 
@@ -94,6 +139,24 @@ def _pooled_residuals(result: Any, fallback: np.ndarray) -> np.ndarray:
         return fallback
     coefficients, *_ = np.linalg.lstsq(matrix, response, rcond=None)
     return response - matrix @ coefficients
+
+
+def _depvar_name(result: Any) -> str:
+    """The dependent variable's name, for Stata's equation line and the first table row.
+
+    Results carry it as ``response_name`` or, failing that, in ``e(depvar)``. Stata prints the real
+    name -- 'lny[sid,t] = Xb + u[sid] + e[sid,t]' and a 'lny' row -- where an earlier version of
+    this module hard-coded the placeholders 'y[id,t]' and 'y'.
+    """
+
+    name = str(getattr(result, "response_name", "") or "").strip()
+    if name:
+        return name
+    stored = getattr(result, "e", None) or {}
+    try:
+        return str(stored["depvar"]).strip()
+    except (KeyError, TypeError):
+        return "y"
 
 
 def xttest0(
@@ -167,13 +230,38 @@ def xttest0(
 
     var_e = None
     var_u = None
+    # The VARIANCE BLOCK wants a residual decomposition, and the two rows come from different
+    # pieces of one. Round 176 measured both routes on munnell.dta:
+    #     within residual variance / (N - n)  =  0.00151239   -> Stata's "e" row .0015071
+    #     e(sigma_u)^2                        =  0.0067015    -> Stata's "u" row .0067015
+    # e(sigma_e)^2 is 2.5% too high for the "e" row (0.00154534), but e(sigma_u)^2 lands on the "u"
+    # row almost exactly, so the two rows are taken from the two sources that actually reproduce
+    # them rather than from one formula applied twice.
     stored = getattr(result, "e", None) or {}
-    # ``xtreg, re`` stores e(sigma_u)/e(sigma_e) as VARIANCES, not standard deviations.
     try:
-        var_u = float(stored["sigma_u"])
-        var_e = float(stored["sigma_e"])
+        # Group the residuals EXPLICITLY rather than reusing ``codes``/``group_sums``: those are
+        # built for the bincount arithmetic of the statistic, and mixing them with ``resid``
+        # produced 0.00671176 -- the total variance rather than the within one.
+        _frame = np.bincount(codes)
+        _means = np.bincount(codes, weights=resid) / np.maximum(_frame, 1)
+        within = resid - _means[codes]
+        var_e = float(within @ within) / max(nobs - entity_count, 1)
+    except (NameError, TypeError, ValueError):  # pragma: no cover - defensive
+        var_e = None
+    try:
+        var_u = float(stored["sigma_u"]) ** 2
     except (KeyError, TypeError, ValueError):
-        var_u = var_e = None
+        var_u = None
+    if var_u is None and var_e is not None:
+        # Without a stored sigma_u, back it out of the residual decomposition.
+        grand = float(resid.mean())
+        between = float(group_sums @ group_sums) / entity_count - periods * grand**2
+        var_u = max(between / periods - var_e / periods, 0.0)
+    if var_e is None and var_u is not None:
+        try:
+            var_e = float(stored["sigma_e"]) ** 2
+        except (KeyError, TypeError, ValueError):
+            var_e = None
     if var_u is None or var_e is None or not np.isfinite(var_u):
         # Fall back to the moment estimators so the block still prints something coherent,
         # but the STATISTIC above never depends on these.
@@ -205,4 +293,7 @@ def xttest0(
         nobs=nobs,
         entities=entity_count,
         periods=periods,
+        depvar=_depvar_name(result),
+        entity_name=str(getattr(result, "entity_name", "") or ""),
+        time_name=str(getattr(result, "time_name", "") or ""),
     )

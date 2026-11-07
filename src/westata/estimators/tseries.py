@@ -1214,13 +1214,79 @@ class VARResults:
                 )
             return names.index(str(value))
 
-        impulse_index = _index(impulse, "impulse")
-        response_index = _index(response, "response")
-        # ``irfs`` is laid out (step, RESPONSE, IMPULSE) -- checked against Stata:
-        # irfs[0,0,0] = 1 for a unit shock to dinf, and irfs[1,0,0] = -.470944.
-        series = values[:, response_index, impulse_index]
+        # TWO SHAPES, chosen by whether the caller narrowed the table.
+        #
+        # Explicit impulse/response (or one of them): Stata's single-column form, exactly as
+        # before -- one column, one footnote line naming the pair.
+        #
+        # Neither given: Stata's DEFAULT, which prints one column per (impulse, response)
+        # pair. A k-variable VAR therefore shows k*k columns, which is the C13-06 case: a
+        # bivariate system gives four. The previous code took the first pair silently, so the
+        # table looked truncated when it was only defaulted.
+        narrow = impulse is not None or response is not None
 
-        def _cell(value: float) -> str:
+        if narrow:
+            impulse_index = _index(impulse, "impulse")
+            response_index = _index(response, "response")
+            # ``irfs`` is laid out (step, RESPONSE, IMPULSE) -- checked against Stata:
+            # irfs[0,0,0] = 1 for a unit shock to dinf, and irfs[1,0,0] = -.470944.
+            series = values[:, response_index, impulse_index]
+
+            def _cell(value: float) -> str:
+                if not np.isfinite(value):
+                    return "."
+                text = f"{value:.6f}"
+                if text.startswith("0."):
+                    text = text[1:]
+                elif text.startswith("-0."):
+                    text = "-" + text[2:]
+                return text.rstrip("0").rstrip(".") or "0"
+
+            # Geometry measured from Stata's own lines:
+            #   '         |      (1)'   19 chars, pipe at 9
+            #   '    Step |      oirf'  20 chars (the name line is one wider)
+            #   '       0 |  .013603'   19 chars
+            lines = [
+                f"Results from {irfname}",
+                "-" * 21,
+                f"{'':>9}|{'(1)':>9}",
+                f"{'Step':>8} |{key:>10}",
+                "-" * 9 + "+" + "-" * 11,
+            ]
+            for step in range(series.size):
+                cell = _cell(float(series[step]))
+                width = 10 if cell.lstrip("-").isdigit() else 9
+                lines.append(f"{step:>8} |{cell:>{width}}")
+            lines.extend(
+                [
+                    "-" * 21,
+                    f"(1) irfname = {irfname}, impulse = {names[impulse_index]}, "
+                    f"and response = {names[response_index]}.",
+                ]
+            )
+            return chr(10).join(lines)
+
+        # ---- the wide form: one column per (impulse, response) pair ----
+        # IMPULSE IS THE OUTER LOOP, and the array is indexed [step, RESPONSE, IMPULSE]. Measured
+        # on the same bivariate VAR(2) that produced Stata's
+        #
+        #   step 0 |  .994097     .071477           0     .966327
+        #
+        # where orth_irfs[0] is
+        #
+        #   [[.994097, 0       ],   response=y1, impulse=y1 then y2
+        #    [.071477, .966327]]   response=y2, impulse=y1 then y2
+        #
+        # Stata's four columns therefore read (i=y1,r=y1) (i=y1,r=y2) (i=y2,r=y1) (i=y2,r=y2):
+        # .994097 / .071477 / 0 / .966327. Neither the array's memory order nor a
+        # response-outer loop reproduces that, so the column index is derived explicitly.
+        pairs = [
+            (impulse_position, response_position)
+            for impulse_position in range(len(names))
+            for response_position in range(len(names))
+        ]
+
+        def _wide_cell(value: float) -> str:
             if not np.isfinite(value):
                 return "."
             text = f"{value:.6f}"
@@ -1230,33 +1296,43 @@ class VARResults:
                 text = "-" + text[2:]
             return text.rstrip("0").rstrip(".") or "0"
 
-        # Geometry measured from Stata's own lines for BOTH statistics:
-        #   '         |      (1)'   19 chars, pipe at 9
-        #   '    Step |      oirf'  20 chars (the name line is one wider)
-        #   '       0 |  .013603'   19 chars
-        #   '       0 |         1'  20 chars -- irf's step-0 unit shock only
-        # Building each line from its measured width is more reliable than deriving the
-        # fields, because the widths differ between the header and the rows.
-        lines = [
-            f"Results from {irfname}",
-            "-" * 21,
-            f"{'':>9}|{'(1)':>9}",
-            f"{'Step':>8} |{key:>10}",
-            "-" * 9 + "+" + "-" * 11,
-        ]
-        for step in range(series.size):
-            cell = _cell(float(series[step]))
-            # Only an integer (irf step 0) gets the wider, ten-character value field.
-            width = 10 if cell.lstrip("-").isdigit() else 9
-            lines.append(f"{step:>8} |{cell:>{width}}")
-        lines.extend(
-            [
-                "-" * 21,
-                f"(1) irfname = {irfname}, impulse = {names[impulse_index]}, "
-                f"and response = {names[response_index]}.",
-            ]
+        # Column geometry measured from a live `irf table oirf` on a bivariate VAR(2):
+        #
+        #   ------------------------------------------------------
+        #            |      (1)         (2)         (3)         (4)
+        #       Step |     oirf        oirf        oirf        oirf
+        #   ---------+--------------------------------------------
+        #          0 |  .994097     .071477           0     .966327
+        #
+        # so every column is 12 wide and the step column is 8 plus a space.
+        # Stata puts TWO spaces after the pipe and then a 10-wide value, which is what makes
+        # the total row 55 characters for four columns. Measured, character by character:
+        #   '       0 |  .994097     .071477           0     .966327'
+        label_cells = "".join(
+            f"{'(' + str(position + 1) + ')':>10}" for position in range(len(pairs))
         )
-        return chr(10).join(lines)
+        word_cells = "".join(f"{'oirf':>10}" for _ in pairs)
+        inner_width = 2 + 10 * len(pairs)
+        wide_lines = [
+            f"Results from {irfname}",
+            "-" * (9 + inner_width),
+            f"{'':>9}|{label_cells}",
+            f"{'Step':>8} |{word_cells}",
+            "-" * 9 + "+" + "-" * inner_width,
+        ]
+        for step in range(values.shape[0]):
+            cells = "".join(
+                f"{_wide_cell(float(values[step, response_position, impulse_position])):>12}"
+                for impulse_position, response_position in pairs
+            )
+            wide_lines.append(f"{step:>8} |{cells}")
+        wide_lines.append("-" * (9 + inner_width))
+        wide_lines.append(
+            f"({irfname}, {key}; impulse = response order = "
+            + ", ".join(f"{names[i]}->{names[r]}" for i, r in pairs)
+            + ")"
+        )
+        return chr(10).join(wide_lines)
 
     def irf_create(
         self,

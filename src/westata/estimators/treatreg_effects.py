@@ -527,6 +527,23 @@ def _m_estimator_influence(
     return solved.T
 
 
+def _has_intercept(x: np.ndarray) -> bool:
+    """True when one column of ``x`` is a constant, i.e. the design already carries an intercept.
+
+    ``from_formula`` builds the design through patsy, which emits an ``Intercept`` column of ones;
+    a caller passing arrays directly does not. The treatment and outcome regressions need a
+    constant either way, so this decides whether to add one or to use the design as given.
+    """
+
+    if x.ndim != 2 or x.shape[1] == 0:
+        return False
+    for column in range(x.shape[1]):
+        values = x[:, column]
+        if np.ptp(values) == 0.0 and float(values[0]) != 0.0:
+            return True
+    return False
+
+
 def _linear_fit(x: np.ndarray, y: np.ndarray, command: str) -> np.ndarray:
     beta, *_ = np.linalg.lstsq(x, y, rcond=None)
     if not np.all(np.isfinite(beta)):
@@ -634,17 +651,29 @@ class RegressionAdjustment:
     def _arm_fit(
         self, arm: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Return ``(beta, fitted, residual, coefficient_influence)`` for one arm."""
+        """Return ``(beta, fitted, residual, coefficient_influence)`` for one arm.
+
+        THE ARM REGRESSION CARRIES AN INTERCEPT. ``teffects ra`` fits a separate outcome model per
+        arm, and Stata's includes a constant -- on nsw_dw this package reported 1679.0065 where
+        Stata reports 1621.583, a 3.5% error, purely because the constant was missing. Rounds 201
+        and 202 fixed the same omission in the treatment logit and in AIPW's outcome model; this is
+        the third and last instance in the file.
+        """
 
         x, y, n = self._x, self._y, self._y.size
-        beta = _linear_fit(x[arm], y[arm], self._command)
-        fitted = x @ beta
+        # The design may ALREADY carry a constant: `from_formula` puts patsy's Intercept in the
+        # first column, while a caller passing arrays directly does not. Adding a second intercept
+        # to a formula-built design makes the cross-product singular -- which is exactly what broke
+        # 21 tests on the first attempt at this fix.
+        design = x if _has_intercept(x) else np.column_stack([np.ones(n), x])
+        beta = _linear_fit(design[arm], y[arm], self._command)
+        fitted = design @ beta
         residual = y - fitted
         # u_i = (X_t'X_t / n)^{-1} x_i t_i e_i, one row per observation.
-        cross = (x[arm].T @ x[arm]) / n
+        cross = (design[arm].T @ design[arm]) / n
         try:
             influence = np.linalg.solve(
-                cross, (x * (arm * residual)[:, None]).T
+                cross, (design * (arm * residual)[:, None]).T
             ).T
         except np.linalg.LinAlgError as exc:
             raise ConsistencyError(
@@ -658,6 +687,10 @@ class RegressionAdjustment:
 
         x, treated = self._x, self._treated
         arm = _require_two_arms(treated, self._command)
+        # The arm fits carry a constant, so every mean of the design below must too -- chosen by
+        # the SAME rule they use, or the widths disagree (3 vs 4 columns) and the influence
+        # product fails.
+        design = x if _has_intercept(x) else np.column_stack([np.ones(x.shape[0]), x])
 
         beta1, fitted1, _, u1 = self._arm_fit(arm)
         beta0, fitted0, _, u0 = self._arm_fit(~arm)
@@ -666,14 +699,14 @@ class RegressionAdjustment:
 
         if self._estimand == "ate":
             estimate = float(difference.mean())
-            xbar = x.mean(axis=0)
+            xbar = design.mean(axis=0)
             influence = (difference - estimate) + (u1 - u0) @ xbar
             mean0, mean1 = float(fitted0.mean()), float(fitted1.mean())
             influence0 = (fitted0 - mean0) + u0 @ xbar
             influence1 = (fitted1 - mean1) + u1 @ xbar
         else:
             share = float(arm.mean())
-            xbar = x[arm].mean(axis=0)
+            xbar = design[arm].mean(axis=0)
             estimate = float(difference[arm].mean())
             influence = treated * (difference - estimate) / share + (u1 - u0) @ xbar
             mean0 = float(xbar @ beta0)
@@ -1058,7 +1091,8 @@ class AIPW(IPW):
         # THE OUTCOME MODEL CARRIES AN INTERCEPT TOO. Round 201 fixed the missing constant in the
         # TREATMENT model and left this one: with the intercept restored by hand the AIPW estimate
         # is 1619.0528 against Stata's 1619.053, where the un-augmented fits gave 1616.9959.
-        _design = np.column_stack([np.ones(x.shape[0]), x])
+        # Same rule as the arm fits: only add a constant when the design does not already have one.
+        _design = x if _has_intercept(x) else np.column_stack([np.ones(x.shape[0]), x])
         beta1 = _linear_fit(_design[arm], y[arm], self._command)
         beta0 = _linear_fit(_design[~arm], y[~arm], self._command)
         beta = model.beta

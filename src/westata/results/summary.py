@@ -795,14 +795,19 @@ def _panel_design_block(result: Any) -> list[str]:
         #
         # `xtlogit ..., fe` prints neither this row nor the blank lines around it.
         if _is_random_effects:
-            _integration_pts = _e_float(result, "n_quad")
+            # The count lives in e(intpoints) -- NOT e(n_quad), which I guessed last round and
+            # which silently fell through to a default of 7 when the real number was 12.
+            _integration_pts = _e_float(result, "intpoints")
             if not np.isfinite(_integration_pts):
-                _integration_pts = 7.0  # Stata's default for the adaptive Gauss-Hermite rule
+                _integration_pts = 7.0
             _method = str(e_macros.get("intmethod") or "mvaghermite").strip()
+            # Column positions measured: the left text runs to 53 and "Integration pts." starts
+            # THERE (not at 50 like the other right-column labels), with "=" at 71. The row is
+            # 79 wide, one longer than the rest of the block.
             lines.append("")
             lines.append(
                 f"{'Integration method: ' + _method:<53}"
-                f"{'Integration pts.':<18}= {int(round(_integration_pts)):>10}"
+                f"{'Integration pts.':<18}= {int(round(_integration_pts)):>6}"
             )
             lines.append("")
         if np.isfinite(_chi2):

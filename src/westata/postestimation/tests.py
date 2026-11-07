@@ -78,7 +78,10 @@ class WaldTest:
         # wrapping it in another ``( n)`` printed "( 1) ( 1) x1 = 0".  It was simply
         # never rendered, so the table showed a statistic with no statement of what was
         # being tested.
-        lines: list[str] = []
+        # A LEADING BLANK LINE: the raw capture of `test s` starts with a newline, so the block
+        # opens with an empty line before the constraint. Measured in round 196 -- lincom got the
+        # same fix in round 195, and `test` is the sibling renderer.
+        lines: list[str] = [""]
         text = str(self.constraint or "").strip()
         if text:
             # Stata indents the restriction by ONE space and leaves TWO after the ``( 1)``

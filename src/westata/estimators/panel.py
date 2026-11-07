@@ -501,7 +501,7 @@ class PanelOLS:
 
         if subset is not None:
             data = data.loc[subset]
-        return cls(
+        built = cls(
             formula,
             data,
             entity=entity,
@@ -509,6 +509,12 @@ class PanelOLS:
             weights=weights,
             weight_type=weight_type,
         )
+        # The panel identifiers, so the summary can print "Group variable: sid" instead of a
+        # bare "." -- the renderer reads them through e(ivar)/e(tvar), which `fit` fills from
+        # these two attributes (v3 report: `xtreg, mle` showed "Group variable: .").
+        built._entity_name = str(entity)
+        built._time_name = "" if time is None else str(time)
+        return built
 
     # ------------------------------------------------------------------ fit
     def fit(
@@ -2002,6 +2008,26 @@ class RandomEffectsMLE(RandomEffects):
             ll_null = float(_null_fit.llf)
         except Exception:  # pragma: no cover - a pathological start
             ll_null = float("nan")
+        # The model test's p-value: chi2 with df_m degrees of freedom, the ordinary upper tail
+        # (unlike the boundary tests for alpha/rho/sigma_u, which halve it).
+        try:
+            from scipy import stats as _stats
+
+            _chi2_model = 2.0 * (float(fitted.llf) - ll_null)
+            _chi2_model_sf = float(_stats.chi2.sf(max(_chi2_model, 0.0), max(rank - 1, 1)))
+        except Exception:  # pragma: no cover
+            _chi2_model_sf = float("nan")
+        # ``e(ll_pooled)``: the log likelihood of the POOLED (ordinary least squares) fit. The
+        # random-effects test `LR test of sigma_u=0` compares THIS fit against it, not against the
+        # constant-only model -- on the reference panel 2*(-528.931579 - -591.455135) = 125.05,
+        # which is Stata's chibar2(01), while the constant-only comparison is the header's 1.5225.
+        try:
+            _pooled_beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+            _pooled_resid = y - X @ _pooled_beta
+            _pooled_sigma2 = float(_pooled_resid @ _pooled_resid) / nobs
+            ll_pooled = float(-0.5 * nobs * (np.log(2.0 * np.pi * _pooled_sigma2) + 1.0))
+        except Exception:  # pragma: no cover - a singular pooled design
+            ll_pooled = float("nan")
         results = StataResults(
             params=params,
             param_names=names,
@@ -2025,7 +2051,13 @@ class RandomEffectsMLE(RandomEffects):
                 "chi2type": "LR",
                 "ll": float(fitted.llf),
                 "ll_0": ll_null,
+                "ll_pooled": ll_pooled,
                 "chi2": float(2.0 * (float(fitted.llf) - ll_null))
+                if np.isfinite(ll_null)
+                else float("nan"),
+                # `p`: the model test's p-value. Stata pairs it with Log likelihood on one line,
+                # and without it the header printed the likelihood alone (v3 report).
+                "p": float(_chi2_model_sf)
                 if np.isfinite(ll_null)
                 else float("nan"),
                 "sigma_u": sigma_u,
@@ -2034,6 +2066,11 @@ class RandomEffectsMLE(RandomEffects):
                 "method": "mle",
                 "vcetype": "",
                 "depvar": self._formula.split("~", 1)[0].strip(),
+                # `xtreg, mle` prints "Group variable: sid" and "Time variable: t", read from
+                # e(ivar)/e(tvar). Without them the design block rendered a bare "." -- the
+                # renderer looks these up in e(), not on the object (v3 report).
+                "ivar": str(getattr(self, "_entity_name", "") or ""),
+                "tvar": str(getattr(self, "_time_name", "") or ""),
             },
             level=95.0,
         )

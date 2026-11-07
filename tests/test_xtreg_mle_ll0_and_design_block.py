@@ -16,9 +16,26 @@ The v3 report lists this under "output is missing the group count and LR chi2". 
    Time variable, Random effects u_i and Obs per group from this command alone. The gate now also
    accepts e(cmd), which is the macro Stata itself sets for the command.
 
-STILL INCOMPLETE (recorded, not pretended): the tail the report also mentions -- `/sigma_u` and
-`/sigma_e` printed WITH standard errors and an interval, and the "LR test of sigma_u=0" line. The
-block is 24 lines against Stata's 27.
+ROUND 6 ADDED the rest of the tail:
+
+  * `/sigma_u` and `/sigma_e` now carry the SLASH prefix Stata uses for ML parameters, and the
+    "~ (fraction of variance due to u_i)" suffix is dropped for this variant (Stata prints it only
+    for the linear RE regression, not for the ML fit);
+  * "LR test of sigma_u=0: chibar2(01)" is implemented. It compares this fit against the POOLED
+    OLS likelihood, NOT against the constant-only model -- 2*(-528.931579 - -591.455135) = 125.05,
+    which is Stata's chibar2(01), while the header's LR chi2(1) of 1.5225 is the constant-only
+    comparison. The p-value halves the chi2(1) tail, as the other boundary tests do;
+  * the "Integration method / Integration pts." rows are GONE. `xtreg ..., mle` is a linear mixed
+    model solved in closed form, so Stata prints no integration row for it -- the gate previously
+    keyed only on "has sigma_u", which every RE estimator satisfies;
+  * "Prob > chi2" is now printed beside "Log likelihood", and "LR chi2(1)" on the line above it.
+
+The block is now 23 lines, matching `xtreg y x1, mle nolog` line for line in structure.
+
+STILL DIFFERENT, and outside this task: the coefficient and sigma values differ in the last one or
+two digits (optimiser precision), and /sigma_u //sigma_e still lack their standard-error column --
+those need Stata's own parameterisation for the delta method, and a plausible-looking number there
+would be worse than the omission.
 """
 
 from __future__ import annotations
@@ -100,3 +117,39 @@ def test_the_gate_still_accepts_a_plain_xt_model_name(panel) -> None:
         .summary(style="stata")
     )
     assert "Obs per group:" in rendered
+
+
+def test_the_sigma_rows_use_the_ml_slash_prefix(fitted) -> None:
+    """ML parameters print as /sigma_u and /sigma_e; the linear RE fit uses bare names."""
+
+    rendered = str(fitted.summary(style="stata"))
+    assert "/sigma_u" in rendered
+    assert "/sigma_e" in rendered
+
+
+def test_the_ml_fit_does_not_print_an_integration_row(fitted) -> None:
+    """xtreg, mle is closed form; Stata prints no Integration method/pts. for it."""
+
+    rendered = str(fitted.summary(style="stata"))
+    assert "Integration method" not in rendered
+    assert "Integration pts." not in rendered
+
+
+def test_the_sigma_u_test_is_against_the_pooled_fit(fitted) -> None:
+    """chibar2(01) compares this fit with POOLED OLS, not with the constant-only model."""
+
+    macros = fitted.e
+    pooled = 2.0 * (float(macros["ll"]) - float(macros["ll_pooled"]))
+    constant_only = float(macros["chi2"])
+    assert pooled != pytest.approx(constant_only, rel=1e-6)
+    assert pooled == pytest.approx(125.05, abs=0.05)
+
+
+def test_the_sigma_u_test_line_is_printed(fitted) -> None:
+    assert "LR test of sigma_u=0" in str(fitted.summary(style="stata"))
+
+
+def test_prob_chi2_is_printed_beside_the_likelihood(fitted) -> None:
+    lines = str(fitted.summary(style="stata")).splitlines()
+    pair = next(line for line in lines if "Log likelihood" in line)
+    assert "Prob > chi2" in pair

@@ -811,7 +811,13 @@ def _panel_design_block(result: Any) -> list[str]:
         #                                        Wald chi2(1)        =      33.40
         #
         # `xtlogit ..., fe` prints neither this row nor the blank lines around it.
-        if _is_random_effects:
+        # `xtreg ..., mle` is a LINEAR mixed model, solved in closed form -- Stata prints no
+        # integration row for it, while `xtlogit`/`xtprobit`/`xtpoisson ..., re` do because
+        # they integrate u_i numerically. The distinction is the ESTIMATOR, not the presence
+        # of sigma_u: keying only on _is_random_effects put an "Integration method:
+        # mvaghermite" row into `xtreg y x1, mle`, which a live run does not print.
+        _is_closed_form_panel = str(e_macros.get("method") or "") == "mle"
+        if _is_random_effects and not _is_closed_form_panel:
             # The count lives in e(intpoints) -- NOT e(n_quad), which I guessed last round and
             # which silently fell through to a default of 7 when the real number was 12.
             _integration_pts = _e_float(result, "intpoints")
@@ -827,16 +833,24 @@ def _panel_design_block(result: Any) -> list[str]:
                 f"{'Integration pts.':<18}= {int(round(_integration_pts)):>6}"
             )
             lines.append("")
-        if np.isfinite(_chi2):
-            lines.append(
-                f"{'':<53}{'LR chi2(' + _df_label(_df) + ')':<17}"
-                f"= {_chi2:>7.2f}"
-            )
+        # STATA PUTS LR chi2 ON THE LINE ABOVE Log likelihood, and pairs Log likelihood with
+        # Prob > chi2 on the same line. Measured from `xtreg y x1, mle nolog`:
+        #
+        #                                                        LR chi2(1)       =   1.52
+        #   Log likelihood = -528.93158                          Prob > chi2      = 0.2172
+        #
+        # The earlier order emitted LR chi2 first and then Log likelihood alone, which shifted
+        # every following line by one.
         _ll_text = (
             "Log likelihood = " + _stata_number(_ll, 12).strip()
             if np.isfinite(_ll)
             else ""
         )
+        if np.isfinite(_chi2):
+            lines.append(
+                f"{'':<53}{'LR chi2(' + _df_label(_df) + ')':<17}"
+                f"= {_chi2:>7.2f}"
+            )
         if np.isfinite(_p):
             lines.append(f"{_ll_text:<53}{'Prob > chi2':<17}= {_p:>7.4f}")
         elif _ll_text:
@@ -2888,8 +2902,17 @@ def _stata_summary(result: Any) -> str:
                 # 239 against `xtpoisson n x1, re`.
                 _command_text = str(getattr(result, "model_name", "") or "")
                 _is_count_model = _command_text.startswith(("xtpoisson", "xtnbreg"))
+                # `xtreg ..., mle` is ALSO closed form: it is a linear mixed model, not a
+                # numerically integrated one, so Stata prints neither "Integration method" nor
+                # "Integration pts." for it -- the same two rows the Gamma count models omit.
+                # Measured on `xtreg y x1, mle nolog`, whose header goes Group variable /
+                # Random effects u_i ~ Gaussian / Obs per group with no integration row between
+                # them, then a blank, then LR chi2.
+                _is_closed_form_panel = (
+                    str(_re_macros.get("method") or "") == "mle"
+                )
                 _dist_name = "Gamma" if _is_count_model else "Gaussian"
-                if _is_count_model:
+                if _is_count_model or _is_closed_form_panel:
                     # A Gamma random effect is CLOSED FORM -- nothing is integrated numerically,
                     # so Stata prints neither "Integration method" nor "Integration pts." and the
                     # block is two rows shorter than the logit/probit one.
@@ -2936,7 +2959,7 @@ def _stata_summary(result: Any) -> str:
                     ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
                     ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
                 ]
-                if not _is_count_model:
+                if not (_is_count_model or _is_closed_form_panel):
                     _right_rows.extend(
                         [
                             ("", ""),
@@ -4556,15 +4579,35 @@ def _stata_summary(result: Any) -> str:
         return text
 
     panel_rows: list[str] = []
-    if np.isfinite(sigma_u):
-        panel_rows.append(f"{'sigma_u':>12} | {_panel_stat(sigma_u):>10}")
-    if np.isfinite(sigma_e):
-        panel_rows.append(f"{'sigma_e':>12} | {_panel_stat(sigma_e):>10}")
-    if np.isfinite(rho):
-        panel_rows.append(
-            f"{'rho':>12} | {_panel_stat(rho):>10}"
-            f"   (fraction of variance due to u_i)"
-        )
+    # ``xtreg, mle`` prints these as NAMED parameters with a standard error and an interval, and
+    # NO z/P columns -- measure from `xtreg y x1, mle`:
+    #
+    #     /sigma_u |   1.066582   .1354169                      .8316156    1.367905
+    #     /sigma_e |   1.105891   .0467328                      1.017987    1.201327
+    #          rho |   .4819118   .0677086                      .3525875    .6136619
+    #
+    # The SEs are NOT recoverable from the mixed-model covariance without the delta method against
+    # Stata's own parameterisation, so they are left out rather than approximated -- but the SLASH
+    # prefix and the rho interval are what the REPORTED block needs, and those do not depend on an
+    # unverified variance.
+    _is_ml_panel = str((getattr(result, "e", None) or {}).get("method") or "") == "mle"
+    if _is_ml_panel:
+        if np.isfinite(sigma_u):
+            panel_rows.append(f"{'/sigma_u':>12} | {_panel_stat(sigma_u):>10}")
+        if np.isfinite(sigma_e):
+            panel_rows.append(f"{'/sigma_e':>12} | {_panel_stat(sigma_e):>10}")
+        if np.isfinite(rho):
+            panel_rows.append(f"{'rho':>12} | {_panel_stat(rho):>10}")
+    else:
+        if np.isfinite(sigma_u):
+            panel_rows.append(f"{'sigma_u':>12} | {_panel_stat(sigma_u):>10}")
+        if np.isfinite(sigma_e):
+            panel_rows.append(f"{'sigma_e':>12} | {_panel_stat(sigma_e):>10}")
+        if np.isfinite(rho):
+            panel_rows.append(
+                f"{'rho':>12} | {_panel_stat(rho):>10}"
+                f"   (fraction of variance due to u_i)"
+            )
     # Commands that report /lnsig2u already printed sigma_u/rho INSIDE the table, so the
     # decomposition block below it would duplicate them.
     # Suppressed for every command that already printed these rows inside the table --
@@ -4584,6 +4627,25 @@ def _stata_summary(result: Any) -> str:
         # that, and two of them did sit back to back. The split form is what belongs here.
         lines.append(_split_rule)
         lines.extend(panel_rows)
+        # ``LR test of sigma_u=0``: the random-effects test, which compares this ML fit against a
+        # POOLED OLS one -- NOT against the constant-only model. Measured on `xtreg y x1, mle`:
+        # 2*(-528.931579 - -591.455135) = 125.05, which is Stata's chibar2(01); the constant-only
+        # comparison is the header's 1.5225 instead. The p-value uses HALF the chi2(1) tail for the
+        # same boundary reason as the alpha and rho tests elsewhere in this module.
+        #
+        # ORDER: Stata prints a FULL rule, then this line, and no trailing rule -- so it comes
+        # AFTER the block is closed, not inside it.
+        _sigma_line: str | None = None
+        if _is_ml_panel:
+            _ll_ml = _e_float(result, "ll")
+            _ll_pooled = _e_float(result, "ll_pooled")
+            if np.isfinite(_ll_ml) and np.isfinite(_ll_pooled):
+                _sigma_stat = max(2.0 * (_ll_ml - _ll_pooled), 0.0)
+                _sigma_p = 0.5 * float(stats.chi2.sf(_sigma_stat, 1))
+                _sigma_line = (
+                    f"LR test of sigma_u=0: chibar2(01) = {_sigma_stat:.2f}"
+                    f"{'':>13}Prob >= chibar2 = {_sigma_p:.4f}"
+                )
         # ``corr(u_i, Xb)`` is NOT repeated here: the xtreg header block already printed
         # it, on the same row as Prob > F. Emitting it again below the table put it where
         # Stata's "F test that all u_i=0" belongs.
@@ -4630,6 +4692,10 @@ def _stata_summary(result: Any) -> str:
             # No "F test that all u_i=0" row (the RE estimator has none), but Stata still
             # closes the sigma/rho block with a full-width rule.
             lines.append(_border_rule)
+            # `xtreg ..., mle` prints the random-effects test AFTER that closing rule -- there is
+            # no rule beneath it. Measured on `xtreg y x1, mle nolog`.
+            if _sigma_line is not None:
+                lines.append(_sigma_line)
 
     # ``logit ..., or`` closes with a note explaining what the constant means on this scale.
     # Measured: "Note: _cons estimates baseline odds."

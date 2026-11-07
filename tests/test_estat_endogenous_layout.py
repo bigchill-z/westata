@@ -56,21 +56,34 @@ def test_every_line_matches_stata(rendered) -> None:
         assert expected in lines, repr(expected)
 
 
-def test_there_is_no_leading_blank_line(rendered) -> None:
-    assert rendered.splitlines()[0] == "  Tests of endogeneity"
+def test_there_is_a_leading_blank_line(rendered) -> None:
+    """CORRECTED in round 189 from a live capture.
 
-
-def test_no_blank_line_before_the_statistics(rendered) -> None:
-    """Stata runs the null line straight into the statistics."""
+    The output begins with '\\n  ', so line 0 IS blank and the title is line 1. This test used to
+    assert the opposite, and the module docstring agreed with it -- the two were written together
+    from the same wrong reading, which is why neither caught the other.
+    """
 
     lines = rendered.splitlines()
-    assert lines[1] == "  H0: Variables are exogenous"
-    assert lines[2].startswith("  Durbin")
+    assert lines[0] == ""
+    assert lines[1] == "  Tests of endogeneity"
+
+
+def test_a_blank_line_separates_the_null_hypothesis_from_the_statistics(rendered) -> None:
+    """CORRECTED in round 189: 'H0' at index 2, blank at 3, 'Durbin' at 4."""
+
+    lines = rendered.splitlines()
+    assert lines[2] == "  H0: Variables are exogenous"
+    assert lines[3] == ""
+    assert lines[4].startswith("  Durbin")
 
 
 def test_the_header_lines_share_the_statistics_indent(rendered) -> None:
+    """CORRECTED in round 189: blank lines do not start with two spaces, so the check applies to
+    the NON-BLANK ones only."""
+
     lines = rendered.splitlines()
-    assert all(line.startswith("  ") for line in lines)
+    assert all(line.startswith("  ") for line in lines if line)
     assert not any(line.startswith("   ") for line in lines)
 
 

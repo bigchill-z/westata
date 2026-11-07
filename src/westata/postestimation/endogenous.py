@@ -134,22 +134,21 @@ class EndogenousResult:
         )
 
     def __str__(self) -> str:
-        """Reproduce ``estat endogenous`` exactly, with no leading blank line::
+        """Reproduce ``estat endogenous`` exactly::
 
+            <blank>
               Tests of endogeneity
               H0: Variables are exogenous
-              Durbin (score) chi2(1)          =  24.9812  (p = 0.0000)
-              Wu-Hausman F(1,751)             =   25.594  (p = 0.0000)
+              Durbin (score) chi2(1)          =  28.8042  (p = 0.0000)
+              Wu-Hausman F(1,755)             =  29.8235  (p = 0.0000)
 
-        Captured from a live run on grilic. Three layout details had been wrong together:
+        Captured from a live run on grilic. Layout details:
 
-        * NO leading blank line -- the block starts at the first line
+        * a LEADING BLANK LINE -- the captured output begins with '\\n  ', so the block starts
+          with an empty line. The previous version's docstring asserted the opposite ("no leading
+          blank line") and the code obeyed it, which is why the block sat one line above Stata's.
         * both header lines carry a TWO-SPACE indent
         * there is NO blank line between the null hypothesis and the statistics
-
-        The previous version emitted a leading blank line, undented both header lines, and put a
-        blank line before the statistics -- which is why C10-05 scored 0.00 on line agreement
-        while its numbers (24.9812 / 25.594) were already exact.
 
         Other details confirmed: the null line capitalises "Variables", the label field is 31
         wide so "=" sits at column 32, and both statistics print at six significant figures.
@@ -159,8 +158,10 @@ class EndogenousResult:
         wu_label = f"Wu-Hausman F({self.wu_df:g},{self.wu_df_denom:g})"
         return chr(10).join(
             [
+                "",
                 "  Tests of endogeneity",
                 "  H0: Variables are exogenous",
+                "",
                 f"  {durbin_label:<31} = {_six_g(self.durbin):>8}"
                 f"  (p = {self.durbin_pvalue:.4f})",
                 f"  {wu_label:<31} = {_six_g(self.wu):>8}"

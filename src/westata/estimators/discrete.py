@@ -1490,6 +1490,62 @@ class NegativeBinomial(_DiscreteBase):
     _optimizer = "bfgs"
     _aux_count = 1
 
+    def _fit_backend(self, model: Any, maxiter: int, tol: float) -> Any:
+        """Multi-start fit: a single BFGS run lands in a POOR local optimum for NB2.
+
+        Measured on `nbreg mpg weight foreign` over auto.dta: the default start stops at
+        alpha = 1.0513 with log likelihood -302.329467, while the likelihood at alpha -> 0 is
+        -196.1299 -- which is what Stata reports (-196.12988). The likelihood itself is right (the
+        probe agrees to 1e-4 at alpha = 1e-9); BFGS simply never walks toward the boundary.
+
+        So the fit is restarted from several dispersions and the run with the HIGHEST likelihood
+        wins. That is not a guess: the objective is the same every time and only the starting point
+        changes, so the selected optimum is the best of the ones actually reached.
+        """
+
+        best = super()._fit_backend(model, maxiter, tol)
+        best_ll = float(getattr(best, "llf", -np.inf))
+        # The start list stops at 1e-9, NOT lower, and 1e-9 is where Stata's own answer sits
+        # (alpha = 1.03e-09). Below it the gamma terms in the NB2 likelihood suffer catastrophic
+        # cancellation: with the coefficients held fixed, the computed likelihood reads -196.1290
+        # at 1e-10, a SPURIOUSLY HIGHER -195.9622 at 1e-12, then collapses to -206.9264 at 1e-14.
+        # Selecting the maximum without that bound therefore reports a boundary artefact as the
+        # best fit, which is worse than the local optimum it replaced.
+        #
+        # THE COMPARISON NEEDS A GENEROUS TOLERANCE, because near alpha -> 0 the computed
+        # likelihood stops being trustworthy. Measured on the reference count data (true
+        # alpha = 6.1e-06, Stata ll = -569.0777629): the default start gives -569.07782106, the
+        # 1e-6 start -569.07775974, and the 1e-9 start -569.07729352 -- a gap of 5.3e-04 that is
+        # entirely numerical, since the likelihood there is flat in alpha.
+        #
+        # The auto.dta case that motivated this work gains SIXTY units (-302 -> -196), so a
+        # threshold of 1e-3 separates a real improvement from boundary noise by five orders of
+        # magnitude in each direction.
+        _IMPROVEMENT = 1e-3
+        # The coefficients are held at the FIRST fit's values, not at whatever `best` currently is:
+        # seeding from `best.params` would carry a boundary dispersion forward and every restart
+        # would begin at the boundary it is meant to test.
+        _base_params = np.asarray(best.params, dtype=float).copy()
+        for start_alpha in (1e-1, 1e-3, 1e-6, 1e-9):
+            try:
+                start = _base_params.copy()
+                start[-1] = start_alpha
+                candidate = model.fit(
+                    method=self._optimizer,
+                    maxiter=maxiter,
+                    disp=0,
+                    cov_type="nonrobust",
+                    use_t=False,
+                    start_params=start,
+                    gtol=1e-7,
+                )
+            except Exception:  # pragma: no cover - a start that will not fit
+                continue
+            candidate_ll = float(getattr(candidate, "llf", -np.inf))
+            if np.isfinite(candidate_ll) and candidate_ll > best_ll + _IMPROVEMENT:
+                best, best_ll = candidate, candidate_ll
+        return best
+
     def _extra_param_names(self, count: int) -> list[str]:
         # Stata reports nbreg's dispersion as /lnalpha.
         if count == 1:

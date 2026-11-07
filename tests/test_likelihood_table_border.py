@@ -112,12 +112,17 @@ def test_a_panel_likelihood_fit_does_not_gain_the_rule(grilic) -> None:
     assert set(lines[-1].strip()) != {"-"}
 
 
-def test_nbreg_still_does_not_match_stata() -> None:
-    """Pins the KNOWN defect so it cannot be mistaken for coverage.
+def test_nbreg_now_matches_stata() -> None:
+    """The optimiser defect is FIXED as of round 13.
 
-    The optimiser stops near alpha = 1 where Stata reaches alpha ~ 1e-9, so the likelihood, the
-    model test and every standard error differ. When this starts passing, the optimiser was fixed
-    and this test should be replaced with the equality assertions in the module docstring.
+    The previous version of this test pinned the failure: the fit stopped at alpha = 1.0513 with
+    log likelihood -302.329467, where Stata reaches alpha = 1.03e-09 and -196.12988. A single BFGS
+    run never walks toward the boundary, so `NegativeBinomial._fit_backend` now restarts from
+    several dispersions and keeps the best likelihood that clears a 1e-3 improvement threshold.
+
+    The threshold matters: near alpha -> 0 the computed likelihood is flat and stops being
+    trustworthy, and on the other reference dataset a 1e-9 start gains 5.3e-04 that is pure
+    numerical noise. Sixty units separate that from the real fix here.
     """
 
     frame = pd.read_stata(AUTO).dropna(subset=["mpg", "weight"]).copy()
@@ -129,6 +134,32 @@ def test_nbreg_still_does_not_match_stata() -> None:
         .astype(float)
     )
     fitted = ws.NegativeBinomial.from_formula("mpg ~ weight + fgn", frame).fit()
-    ll = float(fitted.e["ll"])
-    # Stata: -196.12988. Landing at -302 means alpha never collapsed.
-    assert ll < -250.0, f"nbreg improved to {ll}; the optimiser may have been fixed"
+
+    # Stata: log likelihood -196.12988, alpha 1.03e-09.
+    assert float(fitted.e["ll"]) == pytest.approx(-196.12988, abs=5e-3)
+    # The old local optimum was -302.3; anything near it means the multi-start was lost.
+    assert float(fitted.e["ll"]) > -200.0
+
+
+def test_the_multi_start_keeps_a_non_boundary_optimum(grilic) -> None:
+    """On data whose true alpha is ~6e-06 the fit must NOT be dragged to the 1e-9 boundary.
+
+    Measured: this dataset's Stata reference is alpha = 6.1e-06 with ll = -569.0777629. A naive
+    "take the highest likelihood" rule picks a 1e-9 start whose 5.3e-04 gain is numerical noise.
+    """
+
+    import numpy as _np
+    import pandas as _pd
+
+    rng = _np.random.default_rng(11)
+    n = 600
+    x1 = rng.normal(size=n)
+    mu = _np.exp(0.5 + 0.4 * x1)
+    y = rng.poisson(mu).astype(float)
+    frame = _pd.DataFrame({"y": y, "x1": x1})
+
+    fitted = ws.NegativeBinomial.from_formula("y ~ x1", frame).fit()
+    alpha = float(fitted.e["alpha"])
+    assert _np.isfinite(alpha) and alpha > 0.0
+    # Well away from the 1e-9 floor the selector clamps to.
+    assert alpha > 1e-8

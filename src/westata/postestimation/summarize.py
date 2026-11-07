@@ -288,6 +288,9 @@ class SummarizeResult:
                 # 11, giving a 69-character line. A 23-wide field pushed the label eight
                 # columns right of where Stata prints it.
                 f"{title:<43}{'Number of obs =':>15}{self.n_obs:>11,.0f}",
+                # A BLANK line between the header and the rule -- measured in round 197. The
+                # values were always right; the block was two lines short.
+                "",
                 "  " + "-" * 67,
             ]
         # Column widths measured from Stata's log: the name right-aligned in 14 (pipe
@@ -343,6 +346,9 @@ class SummarizeResult:
                     f"   max = {self.clusters['max']:.0f}",
                 ]
             )
+        # Stata CLOSES the table with a full rule; without it the block ended on the last data
+        # row, one line short (round 197).
+        lines.append("  " + "-" * 67)
         return "\n".join(lines)
 
     def to_frame(self) -> pd.DataFrame:

@@ -5295,12 +5295,17 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 
 **Stata:** `(no Stata spelling -- Stata expresses the same restriction as 'test x1 = 0')`
 
-statsmodels-compatible joint Wald test: `R b = q`, with `R` one row per restriction and one COLUMN PER PARAMETER, and `q` defaulting to zeros. `scalar=True` returns an F test with `df_denom = df_resid` and `scalar=False` a chi2 test, which is statsmodels' own behaviour; the returned object is the same `WaldTest` that `test` returns, exposing `statistic`, `df` (the numerator degrees of freedom), `df_denom`, `pvalue` and `distribution`. Use `test` for Stata's constraint syntax -- this is the matrix interface, so a shape mismatch raises `ValueError` instead of guessing which parameters were meant.
+statsmodels-compatible joint Wald test: `R b = q`, with `R` one row per restriction.
 
-**Signature**
-
+**`R` may also be a constraint string**, as statsmodels allows: `r.wald_test("x1 = 0")`. The
+parsing is delegated to `r.test()`, which already speaks Stata's constraint syntax, so a string
+returns the same `statistic` / `pvalue` / `df_denom` shape a matrix does. Combinations such as
+`"x1 + x2 = 0"` work because the constraint parser handles them. A matrix argument keeps the
+strict shape check -- `R` must have one column per parameter, and a wrong-shaped matrix still
+raises.
 ```python
-ws.wald_test(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'
+r.wald_test('x1 = 0')                                    # constraint string
+r.wald_test(np.array([[0.0, 1.0, 0.0]]), scalar=False)   # restriction matrix
 ```
 
 **Example**

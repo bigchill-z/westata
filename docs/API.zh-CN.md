@@ -5289,14 +5289,17 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 
 ### `wald_test`
 
-**Stata 指令:** `(no Stata spelling -- Stata expresses the same restriction as 'test x1 = 0')`
+与 statsmodels 兼容的联合 Wald 检验：`R b = q`，`R` 的每一行对应一条约束。
 
-与 statsmodels 兼容的联合 Wald 检验：`R b = q`，`R` 每行一个约束、**每列对应一个参数**，`q` 默认为零。`scalar=True` 返回 F 检验且 `df_denom = df_resid`，`scalar=False` 返回 chi2 检验，这正是 statsmodels 自身的行为；返回对象与 `test` 返回的是同一个 `WaldTest`，暴露 `statistic`、`df`（分子自由度）、`df_denom`、`pvalue` 与 `distribution`。需要 Stata 的约束语法时请用 `test`——这里是矩阵接口，形状不匹配会抛出 `ValueError`，而不是猜你想检验哪些参数。
-
+**`R` 也可以是约束字符串**，与 statsmodels 一致：`r.wald_test("x1 = 0")`。解析工作委托给
+`r.test()`，它本来就支持 Stata 的约束语法，因此字符串返回的 `statistic` / `pvalue` /
+`df_denom` 与矩阵形式相同。`"x1 + x2 = 0"` 这类组合也可用，约束解析器会处理。
+矩阵参数仍保留严格的形状检查——`R` 必须每个参数一列，形状不对依旧报错。
 **签名**
 
 ```python
-ws.wald_test(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'
+r.wald_test('x1 = 0')                                    # 约束字符串
+r.wald_test(np.array([[0.0, 1.0, 0.0]]), scalar=False)   # 约束矩阵
 ```
 
 **示例**

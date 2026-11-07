@@ -9,6 +9,88 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ## [Unreleased]
 
+### Fixed — v3 report audit: twelve real defects, eleven claims that did not reproduce
+
+The `westata_vs_Stata_替代评估报告_v3.md` audit produced both kinds of result, and the second kind
+took as much work to establish as the first.
+
+REAL DEFECTS FOUND AND FIXED:
+
+* **`prais, corc` standard errors were up to 4.7% wrong.** The final residual variance was computed
+  from the Prais-Winsten transform for BOTH variants, but `corc` drops the transformed first
+  observation instead of scaling it by sqrt(1-rho^2) -- which changes the first row of the design
+  AND the row count. Coefficients and rho had always matched; every z, p and interval was wrong.
+* **`IPW.from_formula` could not run at all.** `_LogitPropensity` prepended a constant
+  unconditionally while `_prepare` already emitted one through patsy, so the logit had a duplicate
+  column, a singular Hessian, and raised "did not converge in 100 iterations". Raising maxiter
+  changed only the number in the message.
+* **`nbreg` stopped in a local optimum.** A single BFGS run landed at alpha = 1.05 with log
+  likelihood -302 where Stata reaches alpha = 1.03e-09 and -196. The likelihood was never wrong --
+  fixed alpha = 1e-09 gives -196.129752 -- so the fit now restarts from several dispersions and
+  keeps the best. Two constraints came out of measurement: the start list stops at 1e-9 (below it
+  the gamma terms cancel catastrophically and 1e-12 reports a SPURIOUSLY HIGHER likelihood), and
+  the improvement threshold is 1e-3 (a genuine interior optimum was otherwise displaced by a
+  boundary artefact).
+* **`nbreg`'s `e(df_m)` did not net out `k_aux`**, so the header read "LR chi2(2)" beside a
+  statistic whose p-value used one degree of freedom.
+* **`nbreg`'s `LR test of alpha=0` compared against the constant-only model** instead of the
+  Poisson fit, printing 69.88 where Stata prints 0.00 -- a model test wearing the dispersion test's
+  label.
+* **A boundary dispersion reported a standard error.** At alpha -> 0 the observed information is
+  rank-deficient; Stata prints "." for the SE and leaves the interval blank.
+* **`fevd_table` omitted Stata's all-zero step-0 row**, shifting every value against the wrong Step
+  label. Two call sites and five test references had encoded the same off-by-one.
+* **`irf_table` defaulted to a single column** instead of one per (impulse, response) pair, and
+  once widened its column order was the array's, not Stata's.
+* **`summarize` was missing its leading blank line**, which cost a quarter of the line-match ratio
+  on every `predict ...; summarize ...` case.
+* **A plain `regress` did not close its coefficient table**, so every ordinary regression ended one
+  line short of Stata's.
+* **`Didregress.n_used` read 0 until `fit`**, even though listwise deletion depends only on which
+  cells are missing.
+
+CLAIMS THAT DID NOT REPRODUCE, each verified against a live Stata:
+
+* "`PanelOLS.fit(cov_type=...)` fails entirely on linearmodels 7.x" -- on 7.1 all three of
+  `robust`/`HC1`/`cluster` succeed and produce different standard errors, so the variance is
+  genuinely computed;
+* "the integer factor `C(m)` is not expanded" -- it expands to 12 parameters with F = 1.4245
+  against Stata's 1.42 and R-squared 0.1061 against 0.1061;
+* "`estat endogenous` scores 0.00" -- 6 of 6 lines match;
+* "`predict lev` / `predict p` / `margins, dydx(*)` score 0.00" -- all match exactly;
+* "weighted `logit, or` is missing its closing rule" -- the rule is present and every digit matches;
+* "`from_formula`'s first parameter should be a formula string" -- `Sureg` takes a LIST of equations
+  and the `teffects` family mirrors Stata's `(y) (t) (x)` two-formula syntax; a single formula
+  cannot express either, so this is structure rather than a defect.
+
+### Added — `wald_test` accepts a constraint string
+
+`result.wald_test("s = 0")` raised `ValueError: could not convert string to float` where statsmodels
+accepts a formula-like expression. The parsing already existed on `result.test()`, which speaks
+Stata's constraint syntax and returns the same `statistic`/`pvalue`/`df_denom` shape, so the string
+form now delegates to it. A matrix argument is unchanged, including the shape check.
+
+### Added — `cov_type="robust"`, mapped per command family
+
+The report's section 4 item (5): the same word meant three different things and `cov_type="robust"`
+was rejected outright. The mapping is genuinely per-family, so it lives in two places --
+`regress` maps ROBUST to HC1, `ivregress` maps it to HC0 (which is what
+`ivregress ..., vce(robust)` computes). The result stores the CANONICAL name, because echoing an
+alias would reproduce the confusion the report describes.
+
+### Added — `PraisResult` implements `conf_int` / `cov_params` / `summary`
+
+It carried its bounds privately (`_conf_int`) and exposed nothing, so `result.conf_int()` raised
+AttributeError while every `StataResults` answered it. `cov_params()` reports the off-diagonals as
+NaN rather than zero: only the diagonal was ever stored, and a zero would assert the estimates are
+uncorrelated.
+
+### Fixed — `IRF` and `FEVD` tables match Stata character for character
+
+`irf_table` now prints one column per (impulse, response) pair, in Stata's order (impulse outer,
+NOT the array's `[step, response, impulse]` layout), with header geometry measured so all eight
+lines are byte-identical. `fevd_table` prepends Stata's all-zero step-0 row.
+
 ### Changed — `summary()` now defaults to Stata's layout
 
 `result.summary()` and `render_summary(result)` defaulted to `style="statsmodels"`, so a plain

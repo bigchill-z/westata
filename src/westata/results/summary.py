@@ -779,6 +779,26 @@ def _panel_design_block(result: Any) -> list[str]:
         _ll = _e_float(result, "ll")
         _p = _e_float(result, "p")
         _df = _e_float(result, "df_m")
+        # A RANDOM-EFFECTS fit reports HOW it integrated u_i out, on its own row, between the
+        # per-group block and the model test. Measured in round 223:
+        #
+        #   (blank)
+        #   Integration method: mvaghermite            Integration pts.  =          7
+        #   (blank)
+        #                                        Wald chi2(1)        =      33.40
+        #
+        # `xtlogit ..., fe` prints neither this row nor the blank lines around it.
+        if _is_random_effects:
+            _integration_pts = _e_float(result, "n_quad")
+            if not np.isfinite(_integration_pts):
+                _integration_pts = 7.0  # Stata's default for the adaptive Gauss-Hermite rule
+            _method = str(e_macros.get("intmethod") or "mvaghermite").strip()
+            lines.append("")
+            lines.append(
+                f"{'Integration method: ' + _method:<53}"
+                f"{'Integration pts.':<18}= {int(round(_integration_pts)):>10}"
+            )
+            lines.append("")
         if np.isfinite(_chi2):
             lines.append(
                 f"{'':<53}{'LR chi2(' + _df_label(_df) + ')':<17}"

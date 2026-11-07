@@ -1710,9 +1710,16 @@ class XtPoisson(_PanelBase):
                 "xtpoisson: the dependent variable must be non-negative counts; "
                 f"{int(np.sum(y < 0.0))} observation(s) are negative"
             )
-        return cls(
+        built = cls(
             y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
+        # The NAMES, set the same way the logit/probit variants do. Without them the header
+        # printed "Group variable: ." and the coefficient header lost its dependent-variable
+        # label -- measured in round 239 against a live `xtpoisson n x1, re`.
+        built._entity_name = str(entity)
+        built._time_name = "" if time is None else str(time)
+        built._depvar_name = formula.split("~", 1)[0].strip()
+        return built
 
     def fit(
         self,
@@ -1976,9 +1983,16 @@ class XtNbreg(_PanelBase):
                 "xtnbreg: fixed-effects negative binomial requires integer counts; "
                 "the data contain non-integer values"
             )
-        return cls(
+        built = cls(
             y, X, groups, param_names=_stata_names(list(names)), method=normalized, model_data=model_data
         )
+        # The NAMES, set the same way the logit/probit variants do. Without them the header
+        # printed "Group variable: ." and the coefficient header lost its dependent-variable
+        # label -- measured in round 239 against a live `xtpoisson n x1, re`.
+        built._entity_name = str(entity)
+        built._time_name = "" if time is None else str(time)
+        built._depvar_name = formula.split("~", 1)[0].strip()
+        return built
 
     def fit(
         self,

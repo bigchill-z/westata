@@ -2874,19 +2874,42 @@ def _stata_summary(result: Any) -> str:
             # "Group variable" and the per-group extremes; it has no distribution line for u_i
             # and integrates nothing out, so no "Integration method" row. Measured in round 235.
             if _is_random_effects:
-                _left_rows = [
-                    f"Group variable: {_entity or '.'}",
-                    "",
-                    "Random effects u_i ~ Gaussian",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "Integration method: "
-                    + str(_re_macros.get("intmethod") or "mvaghermite").strip(),
-                    "",
-                    "",
-                ]
+                # The DISTRIBUTION of u_i is model-specific, not always Gaussian: a count model's
+                # random effect is Gamma (Stata: "Random effects u_i ~ Gamma"). Measured in round
+                # 239 against `xtpoisson n x1, re`.
+                _command_text = str(getattr(result, "model_name", "") or "")
+                _is_count_model = _command_text.startswith(("xtpoisson", "xtnbreg"))
+                _dist_name = "Gamma" if _is_count_model else "Gaussian"
+                if _is_count_model:
+                    # A Gamma random effect is CLOSED FORM -- nothing is integrated numerically,
+                    # so Stata prints neither "Integration method" nor "Integration pts." and the
+                    # block is two rows shorter than the logit/probit one.
+                    _left_rows = [
+                        f"Group variable: {_entity or '.'}",
+                        "",
+                        f"Random effects u_i ~ {_dist_name}",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                    ]
+                else:
+                    _left_rows = [
+                        f"Group variable: {_entity or '.'}",
+                        "",
+                        f"Random effects u_i ~ {_dist_name}",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "Integration method: "
+                        + str(_re_macros.get("intmethod") or "mvaghermite").strip(),
+                        "",
+                        "",
+                    ]
                 _right_rows: list[tuple[str, str]] = [
                     (
                         "Number of groups",
@@ -2897,10 +2920,15 @@ def _stata_summary(result: Any) -> str:
                     ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
                     ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
                     ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
-                    ("", ""),
-                    ("Integration pts.", f"{int(round(_pts))}"),
-                    ("", ""),
                 ]
+                if not _is_count_model:
+                    _right_rows.extend(
+                        [
+                            ("", ""),
+                            ("Integration pts.", f"{int(round(_pts))}"),
+                            ("", ""),
+                        ]
+                    )
             else:
                 # ROW MAP measured in round 238 by printing both lists at the assembly loop:
                 #

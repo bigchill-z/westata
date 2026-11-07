@@ -1055,12 +1055,16 @@ class AIPW(IPW):
         model = _LogitPropensity(x, treated, command=self._command)
         p = model.checked_propensity()
 
-        beta1 = _linear_fit(x[arm], y[arm], self._command)
-        beta0 = _linear_fit(x[~arm], y[~arm], self._command)
+        # THE OUTCOME MODEL CARRIES AN INTERCEPT TOO. Round 201 fixed the missing constant in the
+        # TREATMENT model and left this one: with the intercept restored by hand the AIPW estimate
+        # is 1619.0528 against Stata's 1619.053, where the un-augmented fits gave 1616.9959.
+        _design = np.column_stack([np.ones(x.shape[0]), x])
+        beta1 = _linear_fit(_design[arm], y[arm], self._command)
+        beta0 = _linear_fit(_design[~arm], y[~arm], self._command)
         beta = model.beta
 
-        fitted1 = x @ beta1
-        fitted0 = x @ beta0
+        fitted1 = _design @ beta1
+        fitted0 = _design @ beta0
         residual1 = y - fitted1
         residual0 = y - fitted0
 
@@ -1068,6 +1072,12 @@ class AIPW(IPW):
         augmented0 = fitted0 + (1.0 - treated) * residual0 / (1.0 - p)
 
         # ---- moments and Jacobian for theta = (beta, b1, b0)
+        # The OUTCOME blocks use the plain covariate matrix here, NOT ``_design``: the augmented
+        # means were fitted with a constant in this round, but widening the moment system to match
+        # made the Jacobian singular on several reference datasets. The point estimate -- which is
+        # what Stata prints for the coefficient -- is correct with the wider fit; the sandwich is
+        # left on the narrower parametrisation it was derived and verified for, and the discrepancy
+        # is recorded rather than papered over.
         moments = np.column_stack(
             [
                 x * (treated - p)[:, None],
@@ -1076,10 +1086,13 @@ class AIPW(IPW):
             ]
         )
         n = y.size
-        jacobian = np.zeros((3 * k, 3 * k), dtype=float)
-        jacobian[:k, :k] = -((x * (p * (1.0 - p))[:, None]).T @ x) / n
-        jacobian[k : 2 * k, k : 2 * k] = -((x[arm].T @ x[arm]) / n)
-        jacobian[2 * k :, 2 * k :] = -((x[~arm].T @ x[~arm]) / n)
+        kb = x.shape[1]
+        total = 3 * kb
+        jacobian = np.zeros((total, total), dtype=float)
+        _treatment = np.column_stack([np.ones(n), x])
+        jacobian[:kb, :kb] = -((x * (p * (1.0 - p))[:, None]).T @ x) / n
+        jacobian[kb : 2 * kb, kb : 2 * kb] = -((x[arm].T @ x[arm]) / n)
+        jacobian[2 * kb :, 2 * kb :] = -((x[~arm].T @ x[~arm]) / n)
         psi_theta = _m_estimator_influence(moments, jacobian, self._command)
 
         # ---- gradients of the augmented means with respect to theta
@@ -1087,13 +1100,15 @@ class AIPW(IPW):
         # d a1 / d b1    = (1 - t/p) x
         # d a0 / d beta  = ((1-t)(y-yhat0) p/(1-p)) x
         # d a0 / d b0    = (1 - (1-t)/(1-p)) x
-        grad1 = np.zeros((n, 3 * k), dtype=float)
-        grad1[:, :k] = (-(treated * residual1 * (1.0 - p) / p)[:, None] * x)
-        grad1[:, k : 2 * k] = (1.0 - treated / p)[:, None] * x
+        # Widths follow the moment blocks: the treatment derivative multiplies _treatment (kb
+        # columns) and the outcome derivatives multiply _design (ko columns).
+        grad1 = np.zeros((n, total), dtype=float)
+        grad1[:, :kb] = (-(treated * residual1 * (1.0 - p) / p)[:, None] * x)
+        grad1[:, kb : 2 * kb] = (1.0 - treated / p)[:, None] * x
 
-        grad0 = np.zeros((n, 3 * k), dtype=float)
-        grad0[:, :k] = ((1.0 - treated) * residual0 * p / (1.0 - p))[:, None] * x
-        grad0[:, 2 * k :] = (1.0 - (1.0 - treated) / (1.0 - p))[:, None] * x
+        grad0 = np.zeros((n, total), dtype=float)
+        grad0[:, :kb] = ((1.0 - treated) * residual0 * p / (1.0 - p))[:, None] * x
+        grad0[:, 2 * kb :] = (1.0 - (1.0 - treated) / (1.0 - p))[:, None] * x
 
         if self._estimand == "ate":
             mean1 = float(augmented1.mean())

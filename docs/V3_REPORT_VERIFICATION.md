@@ -123,6 +123,47 @@ olog 后，两边都是 **19 行且逐行相同（1.0000）**。
 
 > **比对 Stata 输出时必须先排除迭代日志**，否则会把日志行数误算成结构差异，进而去修一个不存在的缺陷。
 
+## 十、第 21–24 轮：statsmodels 协议与剩余条目
+
+### 已修复
+
+| 报告项 | 问题 | 修复 |
+|---|---|---|
+| §4 (1) | `wald_test("s = 0")` 抛 `ValueError: could not convert string to float` | 字符串形式委托给已存在的 `test()` 约束解析器 |
+| §4 (5) | `cov_type="robust"` 不被接受，且同一词在三个命令族含义不同 | `regress` 家族 → HC1，`ivregress` → **HC0**，分两处映射；结果存**规范名**而非回显别名 |
+| §4 (4) | `PraisResult` 有私有 `_conf_int` 却无公开 `conf_int()`，抛 `AttributeError` | 补 `conf_int` / `cov_params` / `summary`；非对角用 **NaN 而非 0** |
+
+### 核实后不成立
+
+**§4 (2)「7 个 `from_formula` 首参不是公式字符串」—— 对 `Sureg` 是合理设计。**
+
+`Sureg.from_formula(['lnw ~ s + expr', 'iq ~ s + expr'], d)` 接受**公式列表**，
+因为多方程系统本来就需要多个公式，单个 `formula` 无法表达。其余 6 个（`IPW`/`AIPW`/
+`RegressionAdjustment`/`NearestNeighbourMatching`/`Didregress`/`Xtdidregress`）是
+`(outcome, treatment, data, ...)` 形态，对应 Stata 的 `teffects (y) (t) (x)` 双公式语法——
+单公式同样无法表达。
+
+**结论**：这不是 API 缺陷，而是这三类命令的固有结构。改动会破坏语义。
+
+### 核实后确认为功能缺失（非报告描述的形态）
+
+**C13-06 `irf table oirf` 的 4 列**：报告称「只给 1 列」。
+
+实测 `ws.VAR` **没有 `irf` 方法**（只有 `fit` 与 `select_order`），所以不是「输出列数不足」，
+而是**整个 IRF 表面不存在**。这是能力缺口，与 §7.3 列出的未实现项同级。
+
+### `xtreg, mle` 的 2.6e-6「收敛差」
+
+实测 `xtreg y k1 i.year, mle`（munnell.dta）：
+
+| 量 | westata | Stata | 差 |
+|---|---|---|---|
+| `k1` | `2.4012813` | `2.4012813` | **完全一致** |
+| `_cons` | `-1209.2341856` | `-1209.2335` | `7e-4`（相对 **6e-7**）|
+
+主系数全位一致，`_cons` 的相对差在浮点量级。属于优化器停止点差异，与 `logit, or`、
+`ologit` cut 点同类。
+
 ## 六、最终验证
 
 ```

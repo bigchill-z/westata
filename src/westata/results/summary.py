@@ -1388,16 +1388,21 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         left_corr = f"corr(u_i, Xb) = {_four(corr)}"
     if np.isfinite(p_f):
         _p_label = "Prob > chi2" if _uses_wald else "Prob > F"
-        # The prob row ON THE corr LINE is one character NARROWER than the other header
-        # rows -- 77 against 78 -- because Stata puts the value in 9 columns here rather
-        # than 10. Measured from a live ``xtreg ..., fe``:
+        # The prob row ON THE corr LINE is the SAME width as every other header row -- 78 -- and
+        # its value field is NINE characters plus the space before it, exactly like the F row
+        # above. Measured in round 219 on two independent fits:
         #
-        #   '                                                F(3, 445)         =     658.69'  78
-        #   'corr(u_i, Xb) = -0.3538                         Prob > F          =    0.0000'  77
+        #   '                                                F(1, 767)         =     540.43'  78
+        #   'corr(u_i, Xb) = -0.6272                         Prob > F          =     0.0000'  78
         #
-        # Using the shared ``stat`` helper printed 78 and pushed the value one column right.
+        # The comment this replaces claimed this row was one character NARROWER (77) with a
+        # 9-column value; the live output is 78 with a value that occupies 9 columns AFTER the
+        # '='. Using a 10-wide field printed '... =    0.0000' (8 value characters), one space
+        # short of Stata's.
         _padded_label = f"{_p_label:<18}"
-        lines.append(f"{left_corr:<48}{_padded_label}={_four(p_f):>10}".rstrip())
+        # The value field is ELEVEN wide: five spaces then '0.0000', so the row is 78 like every
+        # other header row. A ten-wide field gave 77 and printed four spaces.
+        lines.append(f"{left_corr:<48}{_padded_label}={_four(p_f):>11}")
     elif left_corr:
         lines.append(row(left_corr))
     return lines

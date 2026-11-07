@@ -87,8 +87,10 @@ def test_the_three_known_differences(fitted) -> None:
     lnalpha_line = lines[lnalpha_index]
     assert "-1.38" in lnalpha_line
 
-    # (3) alpha prints a hard-coded 0 and "." for its interval here; Stata has a real standard
-    #     error (.1855815) and interval. The '0' and '.' come from the generic derived-row layout.
+    # (3) FIXED in round 243: alpha now carries its delta-method standard error and interval.
+    #     The guard that used to assert a placeholder "." here failed as designed, which is how
+    #     the fix was noticed to be complete.
     alpha_line = next(line for line in lines if line.strip().startswith("alpha |"))
     assert ".6901348" in alpha_line
-    assert alpha_line.rstrip().endswith(".")      # placeholder interval bound
+    assert ".185547" in alpha_line      # se(alpha) = se(lnalpha) * alpha, no leading zero
+    assert ".4074583" in alpha_line and "1.16892" in alpha_line   # the interval bounds

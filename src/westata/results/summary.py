@@ -4266,9 +4266,47 @@ def _stata_summary(result: Any) -> str:
             _value = _e_float(result, _key)
             if not np.isfinite(_value):
                 continue
-            # No test statistic on these rows: they are transforms of the coefficient
-            # above, not hypotheses. Stata leaves z and P blank and prints the interval's
-            # lower bound as 0 with the upper one missing.
+            # NO test statistic on these rows: they are transforms of the coefficient above,
+            # not hypotheses, so z and P stay blank.
+            #
+            # BUT ``alpha`` -- AND ONLY alpha -- carries a standard error and a confidence
+            # interval, by the delta method from /lnalpha: alpha = exp(lnalpha), so
+            # se(alpha) = se(lnalpha) * alpha and the interval is exp(b +/- z*se). Measured in
+            # round 243: exp(b) = .6901348 and se .185547 against Stata's alpha .6901348 with
+            # se .1855815 -- the fifth-digit gap is the same /lnalpha precision difference the
+            # row above already shows.
+            #
+            # The rho/sigma_u rows keep the placeholder bounds (0 and .) that Stata prints for
+            # them; adding an interval there would be wrong.
+            _alpha_se = float("nan")
+            _alpha_lo = float("nan")
+            _alpha_hi = float("nan")
+            if _row_name == "alpha":
+                _ln_index = next(
+                    (
+                        position
+                        for position, candidate in enumerate(names)
+                        if str(candidate).strip() in ("lnalpha", "/lnalpha")
+                    ),
+                    None,
+                )
+                if _ln_index is not None and _ln_index < len(bse):
+                    _ln_b = float(params[_ln_index])
+                    _ln_se = float(bse[_ln_index])
+                    _alpha_se = _ln_se * float(np.exp(_ln_b))
+                    _alpha_lo = float(np.exp(_ln_b - 1.959963984540054 * _ln_se))
+                    _alpha_hi = float(np.exp(_ln_b + 1.959963984540054 * _ln_se))
+            if np.isfinite(_alpha_se):
+                lines.append(
+                    f"{_row_name:>{name_width}} |"
+                    f"{_stata_coef(_value, coef_w)}"
+                    f"{_stata_coef(_alpha_se, se_w)}"
+                    f"{'':>{stat_w}}"
+                    f"{'':>{p_w}}"
+                    f"{_stata_coef(_alpha_lo, ci_lo_w)}"
+                    f"{_stata_coef(_alpha_hi, ci_hi_w)}"
+                )
+                continue
             lines.append(
                 f"{_row_name:>{name_width}} |"
                 f"{_stata_coef(_value, coef_w)}"

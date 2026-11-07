@@ -439,6 +439,49 @@ def _make_arima_forecast(fitted_state: Any, estimator: Any):
     return forecast
 
 
+def _fpe(values: np.ndarray, lag: int, equations: int, start: int) -> float:
+    """Stata's final prediction error for one lag order.
+
+    Transcribed from ``var.ado:296`` (round 180):
+
+        fpe = ((T + eqparm) / (T - eqparm))**K * detsig_ml
+
+    with ``eqparm`` = ``e(df_eq)``, "the number of parameters in the equation with most parameters
+    ... includes the constant" -- so ``lag * K + 1``, NOT the table's total parameter count.
+
+    THE SAMPLE IS THE SUBTLE PART, and it took three rounds to get right:
+
+      * lag 0 uses the COMMON window (``start`` rows dropped), because with no lags there is
+        nothing to start the series later for and Stata evaluates that row on the same block as
+        the criteria: 6.592e-08, which rounds to the printed 6.6e-08. Using all 166 rows gave
+        6.446e-08 instead.
+
+      * lag >= 1 uses THAT ORDER'S OWN sample, dropping only its own lags. Rounds 178-179 forced
+        the common window on every row and then, finding the numbers too high, "solved" for the
+        correction's parameter count -- which came out non-integral (13.6, 14.4, 17.1). That
+        non-integer was the symptom of the wrong T, not of a wrong formula.
+    """
+
+    drop = start if lag == 0 else lag
+    usable = values.shape[0] - drop
+    if usable <= 0:  # pragma: no cover - select_order validates the length
+        return float("nan")
+    target = values[drop:]
+    regressors = [np.ones((usable, 1))]
+    for step in range(1, lag + 1):
+        regressors.append(values[drop - step : values.shape[0] - step])
+    design = np.column_stack(regressors)
+    coefficients, *_ = np.linalg.lstsq(design, target, rcond=None)
+    residuals = target - design @ coefficients
+    # detsig_ml is the ML determinant: divide by T, not by T - k.
+    sigma = residuals.T @ residuals / usable
+    per_equation = lag * equations + 1
+    return float(
+        ((usable + per_equation) / (usable - per_equation)) ** equations
+        * np.linalg.det(sigma)
+    )
+
+
 class VAR:
     """Vector autoregression (Stata ``var``).
 
@@ -573,17 +616,20 @@ class VAR:
                         -2.0 * log_likelihood / usable
                         + 2.0 * parameters * np.log(np.log(usable)) / usable
                     ),
-                    # FPE: CLOSEST KNOWN FORM, still not exact. Round 179 read the full-precision
-                    # e(fpe) (lag 2 = 1.267577621885e-09, lag 4 = 1.239910471165e-09) and backed
-                    # out the multiplier Stata applies to det(sigma): 1.1919, 1.2051 and 1.2491 at
-                    # lags 2, 3 and 4. Solving (N/(N-k))**equations = multiplier gives a
-                    # NON-INTEGER k (13.6, 14.4, 17.1), so Stata's correction is not of that shape
-                    # at all. This route -- det(sigma) * (N/(N-parameters))**equations -- is the
-                    # closest tried, within 0.6% to 4.7%, and is kept with the gap stated rather
-                    # than tuned further. LL/AIC/HQIC/BIC above are exact.
-                    "FPE": float(
-                        np.linalg.det(sigma) * (usable / (usable - parameters)) ** equations
-                    ),
+                    # FPE uses a DIFFERENT SAMPLE from the criteria above it. Read from Stata's
+                    # own source in round 180 -- `var.ado:296`:
+                    #     fpe = ((T + eqparm)/(T - eqparm))**K * detsig_ml
+                    # where eqparm is e(df_eq), "the number of parameters in the equation with
+                    # most parameters ... includes the constant", i.e. lag*K + 1 -- not the total
+                    # parameter count -- and T is THAT ORDER'S OWN sample size (e(N)), not the
+                    # common window the likelihood uses.
+                    #
+                    # Rounds 178-179 failed by assuming one sample for the whole table and by
+                    # solving for a non-integer k, which was a symptom of the wrong T: with each
+                    # order's own sample the four lags come out 2.823167e-09, 1.267578e-09,
+                    # 1.227644e-09 and 1.239910e-09 against Stata's 2.823e-09, 1.267577621885e-09,
+                    # 1.228e-09 and 1.239910471165e-09.
+                    "FPE": float(_fpe(values, lag, equations, start)),
                 }
             )
         table = pd.DataFrame(rows, index=pd.Index(range(maxlags + 1), name="lag"))

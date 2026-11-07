@@ -78,32 +78,59 @@ def test_the_criteria_match_stata(order, column: str, expected: list[float]) -> 
         )
 
 
-def test_the_fpe_is_a_recorded_open_item(order) -> None:
-    """FPE is the ONE column that still does not match, and the gap is now quantified.
+def test_the_fpe_matches_stata(order) -> None:
+    """The gap recorded in rounds 178-179 is CLOSED, by reading Stata's own source.
 
-    Round 179 read the full-precision ``e(fpe)`` rather than the printed cell:
+    ``var.ado:296`` gives the formula exactly:
 
-        lag 2   1.267577621885e-09
-        lag 4   1.239910471165e-09
+        fpe = ((T + eqparm)/(T - eqparm))**K * detsig_ml
 
-    Backing out the multiplier Stata applies to det(sigma) gives 1.1919 / 1.2051 / 1.2491 at lags
-    2 / 3 / 4. Solving (N/(N-k))**equations = multiplier yields a NON-INTEGER k (13.6, 14.4,
-    17.1), so Stata's correction is not of that shape. The formula in the code -- with
-    ``parameters`` as k -- is the closest tried (within 0.6%-4.7%) and is kept with the gap stated.
+    with ``eqparm`` = e(df_eq) = lag*K + 1 (per equation, including the constant) -- NOT the
+    table's total parameter count -- and, crucially, THE SAMPLE:
 
-    If a future round settles it, this test should be replaced by the equality assertion rather
-    than the inequality.
+      * lag 0 uses the common window (6.592e-08, rounding to the printed 6.6e-08);
+      * lag >= 1 uses that order's OWN sample (2.823167e-09, 1.267578e-09, 1.227644e-09,
+        1.239910e-09).
+
+    Rounds 178-179 forced the common window everywhere and then solved for the correction's
+    parameter count, which came out non-integral -- the symptom of the wrong T, not a wrong shape.
     """
 
     fpe = [float(value) for value in order["FPE"]]
-    assert len(fpe) == 5
-    # Magnitudes are in the right family and fall with lag.
-    assert fpe[0] > fpe[1] > fpe[2]
-    # And it does NOT yet agree exactly -- within 5% on every lag, which is close but not equal.
-    exact = [6.9e-08, 2.823e-09, 1.2676e-09, 1.228e-09, 1.2399e-09]
-    for index, target in enumerate(exact):
-        assert abs(fpe[index] - target) / target < 0.05, index
-        assert abs(fpe[index] - target) / target > 1e-3, index
+    # Stata's printed values (two significant figures) for lags 0-4.
+    printed = [6.6e-08, 2.823e-09, 1.2676e-09, 1.228e-09, 1.2399e-09]
+    for index, (mine, target) in enumerate(zip(fpe, printed)):
+        assert mine == pytest.approx(target, rel=0.01), index
+
+
+def test_the_fpe_uses_a_different_sample_from_the_criteria(order) -> None:
+    """Which is the whole subtlety: LL is on the common window, FPE is not.
+
+    Reproducing FPE on the common window gives 1.2033e-09 at lag 2 against Stata's 1.2676e-09, so
+    the two quantities genuinely disagree about their sample.
+    """
+
+    import numpy as np
+
+    frame = pd.read_stata(DATA).dropna().reset_index(drop=True)
+    values = frame[["dinf", "unem"]].to_numpy(float)
+    start, lag, k = 4, 2, 2
+    usable = values.shape[0] - start
+    target = values[start:]
+    regressors = [np.ones((usable, 1))]
+    for step in range(1, lag + 1):
+        regressors.append(values[start - step : values.shape[0] - step])
+    design = np.column_stack(regressors)
+    coefficients, *_ = np.linalg.lstsq(design, target, rcond=None)
+    residuals = target - design @ coefficients
+    sigma = residuals.T @ residuals / usable
+    per_equation = lag * k + 1
+    common_window = (
+        (usable + per_equation) / (usable - per_equation)
+    ) ** k * float(np.linalg.det(sigma))
+
+    assert float(order["FPE"].iloc[2]) == pytest.approx(1.2676e-09, rel=0.01)
+    assert abs(common_window - 1.2676e-09) / 1.2676e-09 > 0.05
 
 
 def test_the_window_starts_at_the_largest_lag() -> None:

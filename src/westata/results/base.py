@@ -1513,10 +1513,29 @@ class StataResults:
 
         scalars: list[tuple[str, float]] = []
         others: dict[str, object] = {}
+        # WHICH SCALARS A COMMAND PUBLISHES IS ITS OWN DECISION, and Stata's choice is narrower
+        # than this package's e(): `regress` reports thirteen scalars while the result stores
+        # e(aic), e(bic) and e(sigma) as well (round 251). Printing everything made the block
+        # three lines longer than Stata's.
+        #
+        # The map holds commands whose published set has been MEASURED against a live run. A
+        # command not in it keeps every scalar -- inventing a filter for an unmeasured command
+        # would drop rows on a guess, which is worse than printing three extra.
+        _published_scalars = {
+            "regress": (
+                "N", "sum_w", "df_m", "df_r", "F", "r2", "rmse",
+                "mss", "rss", "r2_a", "ll", "ll_0", "rank",
+            ),
+        }
+        _published = _published_scalars.get(
+            str(getattr(self, "_model_name", "") or ""), None
+        )
         for key, value in macros.items():
             if str(key).startswith("_"):
                 continue
             if isinstance(value, (int, float)) and not isinstance(value, bool):
+                if _published is not None and str(key) not in _published:
+                    continue
                 scalars.append((str(key), float(value)))
             else:
                 others[str(key)] = value
@@ -1593,7 +1612,9 @@ class StataResults:
             lines.append("")
 
         lines.append("functions:")
-        lines.append(f"{'e(sample)':>22}")
+        # Stata pads this row to 24 characters -- 'e(sample)' plus three trailing spaces, measured
+        # in round 251. An rstripped row is one of the few places the block differs.
+        lines.append(f"{'e(sample)':>22}   ")
         return chr(10).join(lines)
 
     def _odds_ratio_summary(self, style: str) -> str:

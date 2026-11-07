@@ -149,6 +149,37 @@ def test_the_recoverable_macros_are_present(fitted) -> None:
     assert 'e(model) : "ols"' in rendered
 
 
+def test_only_the_published_scalars_appear(fitted) -> None:
+    """`regress` publishes thirteen; e(aic)/e(bic)/e(sigma) are stored but NOT printed.
+
+    Round 251: printing everything made the block three lines longer than Stata's.
+    """
+
+    lines = fitted.ereturn_list().splitlines()
+    start = lines.index("scalars:")
+    end = lines.index("macros:")
+    names = [line.split("=")[0].strip() for line in lines[start + 1 : end] if line.strip()]
+    assert names == [
+        "e(N)", "e(sum_w)", "e(df_m)", "e(df_r)", "e(F)", "e(r2)", "e(rmse)",
+        "e(mss)", "e(rss)", "e(r2_a)", "e(ll)", "e(ll_0)", "e(rank)",
+    ]
+    for hidden in ("e(aic)", "e(bic)", "e(sigma)"):
+        assert hidden not in names
+
+
+def test_the_sample_function_row_keeps_its_trailing_spaces(fitted) -> None:
+    """Stata pads it to 24 characters; an rstripped row differs from the live output."""
+
+    lines = fitted.ereturn_list().splitlines()
+    assert lines[-1] == f"{'e(sample)':>22}   "
+
+
+def test_the_block_is_thirty_four_lines_without_cmdline(fitted) -> None:
+    """Thirty-five with e(cmdline), which is deliberately not synthesised."""
+
+    assert len(fitted.ereturn_list().splitlines()) == 34
+
+
 def test_a_matrix_row_shows_its_shape(fitted) -> None:
     lines = fitted.ereturn_list().splitlines()
     b_line = next(line for line in lines if line.strip().startswith("e(b) :"))

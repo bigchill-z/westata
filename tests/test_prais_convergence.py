@@ -89,3 +89,40 @@ def test_corc_uses_the_cochrane_orcutt_transform() -> None:
     frame = pd.read_stata(DATA)
     corc = ws.prais(frame, FORMULA, corc=True)
     assert float(corc.rho) != pytest.approx(STATA_RHO, abs=1e-3)
+
+
+#: The whole table from a live Stata capture, pinned verbatim in round 170 -- 19 of 19 non-blank
+#: lines. TWO formatting rules had to be separated to get here: the coefficient cells use SEVEN
+#: DECIMALS when the integer part is zero and SIX otherwise (the rule tebalance also uses), while
+#: the Source block's SS/MS cells fill a TEN-character field with as many significant figures as
+#: fit. One rule for both produced -.0008022363 where Stata prints -.0008022.
+_LINE = "-" * 78
+_STEP = "-" * 13 + "+" + "-" * 64
+STATA_TABLE = [
+    "Prais\u2013Winsten AR(1) regression with iterated estimates",
+    "      Source |       SS           df       MS      Number of obs   =        30",
+    "-------------+----------------------------------   F(3, 26)        =     14.35",
+    "       Model |   .04494596         3  .014981987   Prob > F        =    0.0000",
+    "    Residual |  .027154354        26  .001044398   R-squared       =    0.6234",
+    "-------------+----------------------------------   Adj R-squared   =    0.5799",
+    "       Total |  .072100315        29  .002486218   Root MSE        =    .03232",
+    _LINE,
+    " consumption | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]",
+    _STEP,
+    "       _cons |   .5870049   .2952699     1.99   0.057    -.0199311    1.193941",
+    "       price |  -1.048854    .759751    -1.38   0.179    -2.610545    .5128361",
+    "      income |  -.0008022   .0020458    -0.39   0.698    -.0050074    .0034029",
+    "        temp |   .0029541   .0007109     4.16   0.000     .0014929    .0044152",
+    _STEP,
+    "         rho |   .8002264",
+    _LINE,
+    "Durbin\u2013Watson statistic (original)    = 1.021169",
+    "Durbin\u2013Watson statistic (transformed) = 1.846795",
+]
+
+
+def test_the_whole_table_matches_stata(fitted) -> None:
+    """19 of 19 non-blank lines, after the two formatting rules were separated."""
+
+    rendered = [line for line in str(fitted).splitlines() if line.strip()]
+    assert rendered == STATA_TABLE

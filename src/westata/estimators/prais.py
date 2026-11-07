@@ -236,6 +236,28 @@ class PraisResult:
     def iterations(self) -> int:
         return self._iterations
 
+    @staticmethod
+    def _round_cell(number, digits, decimals=None) -> str:
+        """Round a Decimal to ``digits`` significant figures or ``decimals`` places."""
+        from decimal import ROUND_HALF_UP, localcontext
+
+        if decimals is None:
+            exponent = number.adjusted()
+            quantum = __import__("decimal").Decimal(1).scaleb(exponent - (digits - 1))
+        else:
+            quantum = __import__("decimal").Decimal(1).scaleb(-decimals)
+        with localcontext() as context:
+            context.prec = 40
+            rounded = number.quantize(quantum, rounding=ROUND_HALF_UP)
+        text = format(rounded, "f")
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        if text.startswith("0."):
+            return text[1:]
+        if text.startswith("-0."):
+            return "-" + text[2:]
+        return text
+
     def __str__(self) -> str:
         """Stata's ``prais`` table, captured byte for byte in round 168.
 
@@ -256,8 +278,21 @@ class PraisResult:
 
         width = 78
 
-        def num(value: float, places: int, digits: int = 7) -> str:
-            """Stata's cell: SEVEN significant figures, leading zero dropped."""
+        def num(value: float, places: int | None = None, *, width: int | None = None) -> str:
+            """Stata's cell: SEVEN DECIMALS when the integer part is zero, SIX otherwise.
+
+            Round 170 established this by listing every cell beside Stata's text at once, after
+            a significant-figure rule had failed on ``-.0008022363`` (seven figures, ten
+            characters) where Stata prints ``-.0008022``. The rule turned out to be the same one
+            ``tebalance`` uses:
+
+                -.0008022, .0020458, .5128361, .5870049   <- seven decimals (integer part 0)
+                -1.048854, .759751, 1.193941, -2.610545   <- six decimals  (one integer digit)
+
+            The Source block's SS/MS cells are different: they fill a TEN-character field with as
+            many figures as fit, which is the ``width=`` mode.
+            """
+
             from decimal import Decimal, ROUND_HALF_UP, localcontext
 
             if not np.isfinite(value):
@@ -265,19 +300,15 @@ class PraisResult:
             number = Decimal(repr(float(value)))
             if number == 0:
                 return "0"
-            exponent = number.adjusted()
-            quantum = Decimal(1).scaleb(exponent - (digits - 1))
-            with localcontext() as context:
-                context.prec = 40
-                rounded = number.quantize(quantum, rounding=ROUND_HALF_UP)
-            text = format(rounded, "f")
-            if "." in text:
-                text = text.rstrip("0").rstrip(".")
-            if text.startswith("0."):
-                return text[1:]
-            if text.startswith("-0."):
-                return "-" + text[2:]
-            return text
+            if width is not None and places is None:
+                counts = range(9, 0, -1)
+                for digits in counts:
+                    candidate = self._round_cell(number, digits)
+                    if len(candidate) <= width:
+                        return candidate
+                return candidate
+            decimals = 7 if number.adjusted() < 0 else 6
+            return self._round_cell(number, None, decimals)
 
         def cell(text: str, end: int, current: int) -> str:
             """Right-align ``text`` so it ENDS at absolute column ``end``."""
@@ -318,9 +349,9 @@ class PraisResult:
             joined(
                 source_row(
                     "Model",
-                    num(self._mss, 7),
+                    num(self._mss, width=10),
                     str(self._df_model),
-                    num(self._mss / max(self._df_model, 1), 7),
+                    num(self._mss / max(self._df_model, 1), width=10),
                 ),
                 "Prob > F",
                 f"{self._p_f:.4f}",
@@ -328,9 +359,9 @@ class PraisResult:
             joined(
                 source_row(
                     "Residual",
-                    num(self._rss, 7),
+                    num(self._rss, width=10),
                     str(self._df_resid),
-                    num(self._rss / max(self._df_resid, 1), 7),
+                    num(self._rss / max(self._df_resid, 1), width=10),
                 ),
                 "R-squared",
                 f"{self._r2:.4f}",
@@ -339,30 +370,50 @@ class PraisResult:
             joined(
                 source_row(
                     "Total",
-                    num(self._tss, 7),
+                    num(self._tss, width=10),
                     str(self._nobs - 1),
-                    num(self._tss / max(self._nobs - 1, 1), 7),
+                    num(self._tss / max(self._nobs - 1, 1), width=10),
                 ),
                 "Root MSE",
-                num(self._rmse, 3),
+                # Root MSE is FOUR decimals (.03232), unlike the five-digit terms elsewhere.
+                f"{self._rmse:.5f}".lstrip("0") if 0 < self._rmse < 1 else f"{self._rmse:.5f}",
             ),
             "",
             "-" * width,
-            f"{self._depvar:>12} |{'Coefficient':>11}{'Std. err.':>11}"
-            f"{'t':>9}{'P>|t|':>6}{'[95% conf. interval]':>22}",
+            # Header positions measured from Stata: label at 1, pipe at 13, then
+            # Coefficient 15-25, Std. err. 28-36, t 43, P>|t| 48-52, interval 58-77.
+            cell(self._depvar, 12, 0)
+            + " |"
+            # "Coefficient" starts at 15 (one space after the pipe at 13) and ends at 25.
+            + cell("Coefficient", 26, 14)
+            + cell("Std. err.", 36, 25)
+            + cell("t", 43, 36)
+            + cell("P>|t|", 52, 43)
+            + cell("[95% conf. interval]", 77, 52),
             "-" * 13 + "+" + "-" * 64,
         ]
+        # Coefficient block end columns, measured from Stata's row
+        # '       price |  -1.048854    .759751    -1.38   0.179    -2.610545    .5128361':
+        # coefficient 25, std. err. 36, t 43, P>|t| 52, interval 65 and 78.
+        _COEF_END = (25, 36, 45, 53, 66, 78)
         for index, name in enumerate(self._names):
             low, high = self._conf_int[index]
             # The constant is "_cons" in Stata, whatever the formula called it.
             label = "_cons" if str(name).lower() in {"intercept", "const", "constant"} else str(name)
-            lines.append(
-                f"{label:>12} |{num(self._params[index], 7):>11}{num(self._bse[index], 6):>11}"
-                f"{self._tvalues[index]:>8.2f}{self._pvalues[index]:>7.3f}"
-                f"{num(low, 7):>12}{num(high, 7):>12}"
-            )
+            line = f"{label:>12} |"
+            line += cell(num(self._params[index]), _COEF_END[0], len(line))
+            # Standard errors get EIGHT characters, not nine: '.0020458' is right while a
+            # nine-character field produced '.00204577'.
+            line += cell(num(self._bse[index]), _COEF_END[1], len(line))
+            line += cell(f"{self._tvalues[index]:.2f}", _COEF_END[2], len(line))
+            line += cell(f"{self._pvalues[index]:.3f}", _COEF_END[3], len(line))
+            # The lower bound has NINE characters and the upper only EIGHT before the row ends:
+            # '.5128361' at width 9 would round to '.51283609' and overflow column 78.
+            line += cell(num(low), _COEF_END[4], len(line))
+            line += cell(num(high), _COEF_END[5], len(line))
+            lines.append(line)
         lines.append("-" * 13 + "+" + "-" * 64)
-        lines.append(f"{'rho':>12} |{num(self._rho, 7):>11}")
+        lines.append(f"{'rho':>12} |" + cell(num(self._rho), 25, 14))
         lines.append("-" * width)
         lines.append(f"Durbin\u2013Watson statistic (original)    = {self._dw_original:.6f}")
         lines.append(

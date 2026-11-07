@@ -785,6 +785,10 @@ class _PanelBase:
         e: dict[str, Any] = {
             "N": nobs,
             "N_g": groups_fitted,
+            # ``e(depvar)``: the outcome name Stata prints in the name column of the coefficient
+            # header ("y | Coefficient ..."). PanelOLS stores it; this family never did, so the
+            # header printed a bare "| Coefficient" (round 232).
+            "depvar": getattr(self, "_depvar_name", ""),
             # Stata's "Obs per group: min / avg / max". Nothing stored these until round 227, so
             # the renderer printed "." for all three. Counted over the ESTIMATION sample, which is
             # what Stata reports (a conditional fit drops constant-outcome groups, and e(N) drops
@@ -928,6 +932,9 @@ class XtLogit(_PanelBase):
         # design block could not otherwise print "Group variable: <name>".
         built._entity_name = str(entity)
         built._time_name = "" if time is None else str(time)
+        # The outcome NAME, for the coefficient header (`y | Coefficient ...`).
+        # `_build` returns the values only, so the name is taken from the formula.
+        built._depvar_name = formula.split("~", 1)[0].strip()
         return built
 
     def fit(
@@ -1354,6 +1361,9 @@ class XtProbit(_PanelBase):
         # design block could not otherwise print "Group variable: <name>".
         built._entity_name = str(entity)
         built._time_name = "" if time is None else str(time)
+        # The outcome NAME, for the coefficient header (`y | Coefficient ...`).
+        # `_build` returns the values only, so the name is taken from the formula.
+        built._depvar_name = formula.split("~", 1)[0].strip()
         return built
 
     def fit(

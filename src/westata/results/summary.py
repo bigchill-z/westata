@@ -2881,10 +2881,26 @@ def _stata_summary(result: Any) -> str:
             ]
             ml_left[1:1] = _left_rows
             ml_right[1:1] = _right_rows
-            # ``Log likelihood`` must end up on the row that already carries the model test, so
-            # it is removed here and re-appended after the splice.
+            # ``Log likelihood`` shares its row with the model test -- "Prob > chi2" or
+            # "Wald chi2(#)" -- so it is placed at whichever index that test occupies, NOT
+            # appended at the end. The pop that used to live here removed it and nothing put it
+            # back, which left the left column blank on that row (round 231).
             if ml_left and ml_left[-1].startswith("Log likelihood"):
-                ml_left.pop()
+                _ll_text = ml_left.pop()
+                # The test row is "Prob > chi2" (NOT "Wald chi2", which sits one row above it);
+                # matching the first label containing "chi2" put Log likelihood one row high.
+                _test_index = next(
+                    (
+                        position
+                        for position, (label, _value) in enumerate(ml_right)
+                        if label.startswith("Prob >")
+                    ),
+                    None,
+                )
+                if _test_index is not None and ml_left[_test_index] == "":
+                    ml_left[_test_index] = _ll_text
+                else:
+                    ml_left.append(_ll_text)
 
         for index, line in enumerate(ml_left):
             right = ""

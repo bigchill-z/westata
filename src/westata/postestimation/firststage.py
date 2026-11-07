@@ -386,14 +386,10 @@ class FirstStageResult:
                 ("Prob > F", 72),
             ]
         )
-        lines = [
-            "",
-            "  First-stage regression summary statistics",
-            rule,
-            header_top,
-            header_bottom,
-            "-" * 13 + "+" + "-" * 60,
-        ]
+        # A DUPLICATED ASSIGNMENT USED TO SIT HERE. The block was immediately overwritten
+        # by the one below, so it changed nothing while looking authoritative -- and the
+        # two differed by one leading space in the rule, which is exactly the kind of
+        # difference a reader would assume was load-bearing. Removed in round 10.
         lines = [
             "",
             "  First-stage regression summary statistics",

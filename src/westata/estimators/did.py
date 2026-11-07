@@ -565,9 +565,26 @@ class Didregress:
         self._check_numeric([depvar, *self._covariates, treatment_name])
 
         #: Observations dropped by listwise deletion in the last :meth:`fit`.
+        #: Observations dropped by listwise deletion in the last :meth:`fit`
         self._n_dropped_missing = 0
         #: Rows in the estimation sample of the last :meth:`fit`.
         self._n_used = 0
+        # THE SAMPLE COUNTS ARE KNOWABLE BEFORE `fit`. Listwise deletion depends only on
+        # which cells are missing, so a caller asking "how much data will this use?" got a
+        # misleading 0 / 0 until `fit` had run -- measured: `from_formula(...).n_used`
+        # returned 0 for a frame with 2000 complete rows. Computing them here makes the
+        # property honest at construction; `_estimation_sample` still refreshes them during
+        # `fit`, and the two agree because both read the same `_columns`.
+        #
+        # No validation runs here on purpose: `_validate_sample` raises on an unusable
+        # design, and that belongs at `fit` time rather than in the constructor.
+        try:
+            _used = self._data[self._columns]
+            _missing = _used.isna().any(axis=1)
+            self._n_dropped_missing = int(_missing.sum())
+            self._n_used = int((~_missing).sum())
+        except Exception:  # pragma: no cover - a frame without the declared columns
+            pass
 
     # ----------------------------------------------------------- construction
     @classmethod

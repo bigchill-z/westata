@@ -620,9 +620,25 @@ def test_construction_does_not_estimate(panel):
     model = Didregress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     )
-    assert model.n_used == 0
+    # THE SAMPLE SIZE IS KNOWABLE WITHOUT FITTING. Listwise deletion depends only on which
+    # cells are missing, so n_used is filled at construction; it used to read 0 until `fit`,
+    # which made "how much data will this use?" unanswerable. What construction must NOT do
+    # is ESTIMATE, and the absence of a coef table is what proves that.
+    assert model.n_used == panel.shape[0]
+    assert not hasattr(model, "params")
     assert "Didregress" in repr(model)
     assert "group(unit)" in repr(model)
+
+
+def test_the_construction_counts_match_the_fitted_ones(panel):
+    """Construction and fit must agree: both read the same `_columns`."""
+
+    model = Didregress.from_formula(
+        "y x1", "treated", panel, group="unit", time="period"
+    )
+    before = (model.n_used, model.n_dropped_missing)
+    model.fit()
+    assert (model.n_used, model.n_dropped_missing) == before
 
 
 def test_model_data_is_the_estimation_sample(panel, pooled):

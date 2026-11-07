@@ -2902,10 +2902,17 @@ def _stata_summary(result: Any) -> str:
                     ("", ""),
                 ]
             else:
-                # The left list pairs one-for-one with the right, so the "Prob > chi2" index is
-                # reachable; the LR row's left cell stays blank, which is what Stata prints.
+                # ROW MAP measured in round 238 by printing both lists at the assembly loop:
+                #
+                #   idx 8  ''            ''            <- blank
+                #   idx 9  ''            LR chi2(1)
+                #   idx 10 'Log likelihood'  Prob > chi2
+                #
+                # so there are TWO blanks between "max" and the LR row, and the left column is
+                # one entry longer than the right before the log likelihood is placed.
                 _left_rows = [
                     f"Group variable: {_entity or '.'}",
+                    "",
                     "",
                     "",
                     "",
@@ -2922,6 +2929,7 @@ def _stata_summary(result: Any) -> str:
                     ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
                     ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
                     ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
+                    ("", ""),
                 ]
             ml_left[1:1] = _left_rows
             ml_right[1:1] = _right_rows

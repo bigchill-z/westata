@@ -62,13 +62,14 @@ def test_regress_names_its_estat_program(regress_fit) -> None:
 
 
 def test_regress_does_NOT_record_a_predict_program(regress_fit) -> None:
-    """No ``regress_p.ado`` exists, so the value is unknown and the key stays absent.
+    """CORRECTED in round 252: ``regres_p.ado`` DOES exist, and the value is not a guess.
 
-    This test exists to stop a well-meaning "complete the pair" change: filling it with
-    ``"regress_p"`` would look symmetrical and be a guess.
+    The file lives at ``ado/base/r/regres_p.ado`` -- one 's' in "regres" -- so the original
+    search for "regress_p" found nothing and the key was left absent. A live
+    ``quietly regress y x`` then ``display e(predict)`` prints ``regres_p``.
     """
 
-    assert "predict" not in regress_fit.e
+    assert regress_fit.e["predict"] == "regres_p"
 
 
 def test_the_regress_estat_program_really_exists() -> None:

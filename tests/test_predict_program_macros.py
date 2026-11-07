@@ -138,15 +138,20 @@ def test_both_truncated_programs_are_the_ones_that_exist() -> None:
 
 # --------------------------------------------------------- the deliberate gap
 def test_regress_records_no_predict_program(frame) -> None:
-    """``regress.sthlp:441`` documents the key, but no ``regress_p.ado`` exists.
+    """CORRECTED in round 252: the key IS recorded, and the routine DOES exist.
 
-    An absent key signals "unknown"; a plausible guess would name a program that is not
-    there.  This assertion is the reason the omission is deliberate rather than a gap.
+    This test used to assert "predict" not in fitted.e, on the claim that ``regress.sthlp:441``
+    documents the key but no ``regress_p.ado`` exists. Re-measured against the installation: the
+    file is ``ado/base/r/regres_p.ado`` -- ONE 's' in "regres" -- so searching for "regress_p"
+    found nothing. A live ``quietly regress y x`` then ``display e(predict)`` prints ``regres_p``.
+
+    The original concern was sound (a plausible guess naming a program that is not there is worse
+    than an absent key); the premise was wrong because of the spelling.
     """
 
     fitted = ws.OLS.from_formula("y ~ x", frame).fit()
 
-    assert "predict" not in fitted.e
+    assert fitted.e["predict"] == "regres_p"
     assert not (BASE / "r" / "regress_p.ado").exists()
 
 

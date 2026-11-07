@@ -42,6 +42,9 @@ def rendered():
 
 
 STATA_LINES = [
+    # CORRECTED in round 192: the capture starts with a newline, so the block opens with a blank
+    # line. Without it every row compared against Stata's previous row.
+    "",
     "Breusch\u2013Godfrey LM test for autocorrelation",
     "-" * 75,
     "    lags(p)  |          chi2               df                 Prob > chi2",

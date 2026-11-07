@@ -85,9 +85,25 @@ class DurbinWatsonResult:
     nobs: int
 
     def __str__(self) -> str:
+        """Stata's single-line form, with a LEADING blank line.
+
+        Two details measured in round 192:
+
+        * the raw capture begins with a newline, so the block is two lines -- blank, then the
+          statistic. Emitting one line put it where Stata's blank line should be;
+        * the value is SIX DECIMALS with a trailing zero dropped, not six significant figures.
+          Three fits settle it: 1.021169 (icecream), 1.704354 (grilic/3 regressors) and 1.75295
+          (grilic/5 regressors) -- the last lost its trailing zero from 1.752950. '%.6g' gave
+          1.70435 for the middle one, which is six FIGURES rather than six decimals.
+        """
+
+        value = f"{self.d:.6f}".rstrip("0")
+        if value.endswith("."):
+            value += "0"
         return (
+            "\n"
             f"Durbin\u2013Watson d-statistic({self.df:>3.0f}, {self.nobs:>5d})"
-            f" = {self.d:>9.6f}"
+            f" = {value:>9}"
         )
 
 

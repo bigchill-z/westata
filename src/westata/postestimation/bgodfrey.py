@@ -69,8 +69,9 @@ class BgTestResult:
         ).set_index("lags(p)")
 
     def __str__(self) -> str:
-        """Reproduce ``estat bgodfrey`` exactly::
+        """Reproduce ``estat bgodfrey`` exactly, INCLUDING the leading blank line::
 
+            (blank)
             Breusch–Godfrey LM test for autocorrelation
             ---------------------------------------------------------------------------
                 lags(p)  |          chi2               df                 Prob > chi2
@@ -78,6 +79,11 @@ class BgTestResult:
                    1     |          4.237               1                   0.0396
             ---------------------------------------------------------------------------
                                     H0: no serial correlation
+
+        The raw capture begins with a newline, so the block opens with an empty line -- measured in
+        round 192 while walking every renderer's prefix. Omitting it shifted the whole block one
+        line up against Stata's, which is why a line-by-line comparison failed on EVERY row even
+        though all the geometry below was already right.
 
         Geometry measured from that output: the rules are 75 characters, the pipe sits at
         column 13, the chi2 value ends at 29, the df at 45 and the probability at 70. The
@@ -89,6 +95,7 @@ class BgTestResult:
         """
 
         lines = [
+            "",
             "Breusch\u2013Godfrey LM test for autocorrelation",
             "-" * 75,
             f"{'lags(p)':>11}  |{'chi2':>14}{'df':>17}{'Prob > chi2':>28}",

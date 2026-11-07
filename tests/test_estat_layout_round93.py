@@ -58,12 +58,16 @@ def extended(frame):
 def test_dwatson_is_callable(simple) -> None:
     """It raised AttributeError before this round."""
 
+    # CORRECTED in round 192: the block opens with a NEWLINE (the raw capture starts with one),
+    # so it is two lines -- blank then the statistic -- and the value carries six decimals with a
+    # trailing zero dropped.
     rendered = str(simple.estat_dwatson())
-    assert rendered == "Durbin–Watson d-statistic(  4,   758) =  1.704354"
+    assert rendered == "\nDurbin\u2013Watson d-statistic(  4,   758) =  1.704354"
 
 
 def test_dwatson_has_the_stata_width(simple) -> None:
-    assert len(str(simple.estat_dwatson())) == 49
+    # 50 = 49 characters of statistic plus the leading newline (round 192).
+    assert len(str(simple.estat_dwatson())) == 50
 
 
 def test_ic_has_no_rules(simple) -> None:

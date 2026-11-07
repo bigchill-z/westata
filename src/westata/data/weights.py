@@ -57,6 +57,12 @@ class WeightSpec:
     effective_n: float
     implies_robust: bool
     n_obs: int
+    #: Rows removed because their weight was negative. Stata does this for aweight/pweight and
+    #: keeps no placeholder, so the caller must drop the SAME rows from the design matrix.
+    dropped: int = 0
+    #: Boolean mask over the ORIGINAL rows, True where the observation survives. ``None`` when no
+    #: row was dropped.
+    kept: np.ndarray | None = None
 
 
 def normalize_weights(weights: Any, weight_type: str) -> WeightSpec:
@@ -93,8 +99,28 @@ def normalize_weights(weights: Any, weight_type: str) -> WeightSpec:
         raise WeightError("weights array is empty")
     if np.isnan(w).any():
         raise WeightError("weights contain missing values")
+    # NEGATIVE WEIGHTS ARE LEGAL FOR aweight AND pweight. Stata drops an observation whose weight
+    # is negative rather than refusing the command, and `[aw=1/lntc]` on nerlove.dta is exactly
+    # that case: lntc spans -2.501 to 4.9375, so 21 of 145 observations get a negative weight and
+    # Stata reports e(N) = 124. `fweight` is different -- it needs NONINTEGER counts to be positive
+    # integers and raises r(401) ("may not use noninteger frequency weights"), which this branch
+    # still enforces.
+    #
+    # The array KEEPS ITS ORIGINAL LENGTH here, with negative entries zeroed, because the caller
+    # has already built a design matrix with that many rows and checks the two for alignment. The
+    # `kept` mask is what the estimator uses to drop the rows.
+    dropped = 0
+    kept: np.ndarray | None = None
     if (w < 0).any():
-        raise WeightError("weights must be non-negative")
+        if kind not in ("aweight", "pweight"):
+            raise WeightError("weights must be non-negative")
+        kept = w >= 0.0
+        dropped = int((~kept).sum())
+        if not kept.any():
+            raise WeightError(
+                "every weight is negative, so no observation is left to fit"
+            )
+        w = np.where(kept, w, 0.0)
     if not np.isfinite(w).all():
         raise WeightError("weights must be finite")
 
@@ -111,6 +137,8 @@ def normalize_weights(weights: Any, weight_type: str) -> WeightSpec:
             effective_n=total,
             implies_robust=False,
             n_obs=n_obs,
+            dropped=dropped,
+            kept=kept,
         )
 
     if kind == "iweight":
@@ -120,15 +148,26 @@ def normalize_weights(weights: Any, weight_type: str) -> WeightSpec:
             effective_n=total,
             implies_robust=False,
             n_obs=n_obs,
+            dropped=dropped,
+            kept=kept,
         )
 
-    # aweight and pweight are both normalized so that the weights sum to N;
-    # they differ only in how the variance is computed.
-    normalized = w * (n_obs / total)
+    # aweight and pweight are both normalized so that the weights sum to N; they differ only in
+    # how the variance is computed.
+    #
+    # THE SURVIVING COUNT IS WHAT THE DEGREES OF FREEDOM USE. Stata reports e(N) = 124 for
+    # `[aw=1/lntc]`, and its F statistic is F(4, 119) -- 124 minus the five parameters. Counting
+    # all 145 rows gave F(4, 140), which changes the p-value. `surviving` therefore excludes the
+    # rows whose weight was negative, while `n_obs` still records how many rows the caller
+    # supplied so the alignment check keeps working.
+    surviving = int(kept.sum()) if kept is not None else int(n_obs)
+    normalized = w * (surviving / total)
     return WeightSpec(
         weights=normalized,
         weight_type=kind,
-        effective_n=float(n_obs),
+        effective_n=float(surviving),
         implies_robust=(kind == "pweight"),
         n_obs=n_obs,
+        dropped=dropped,
+        kept=kept,
     )

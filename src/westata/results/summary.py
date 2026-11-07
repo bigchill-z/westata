@@ -1616,6 +1616,23 @@ def _anova_block(
         if _ss_width == 11
         else "      Source |      SS            df       MS"
     )
+    # ``aweight`` AND ``pweight`` PREPEND A WEIGHT-SUM LINE. Measured on a live
+    # `reg lntc lnq lnpl lnpk lnpf [aw=1/lntc]`:
+    #
+    #   (sum of wgt is 100.3892784641447)
+    #   (blank)
+    #         Source |       SS           df       MS
+    #
+    # It appears only for those two weight types -- `fweight` and `iweight` print nothing extra --
+    # and it is the sum of the SURVIVING weights, not of the raw vector.
+    _weight_rows: list[str] = []
+    _weight_spec = getattr(result, "weight_spec", None)
+    _weight_type = str(getattr(_weight_spec, "weight_type", "") or "").lower()
+    if _weight_type in ("aweight", "pweight"):
+        _sum_w = _e_float(result, "sum_w")
+        if np.isfinite(_sum_w):
+            _weight_rows = [f"(sum of wgt is {_sum_w:.13g})", ""]
+
     left = [
         _anova_header,
         "-------------+----------------------------------",
@@ -1670,6 +1687,12 @@ def _anova_block(
     ]
     if _right_offset:
         rendered.insert(0, left[0])
+    # The weight-sum line precedes everything, including any `Fitting ... model:` lines. Its own
+    # blank separator is part of `_weight_rows`, so `lines` must NOT contribute another one -- it
+    # already starts with a blank that the weight branch has to consume.
+    if _weight_rows:
+        _tail = lines[1:] if lines and lines[0] == "" else lines
+        return _weight_rows + _tail + rendered
     return lines + rendered
     """Return which goodness-of-fit block Stata prints for this estimator."""
 
@@ -4414,7 +4437,26 @@ def _stata_summary(result: Any) -> str:
     # Measured in round 220. Emitting the border here as well produced a full rule immediately
     # followed by the split rule.
     _closes_with_border = _has_re_variance or _has_alpha or _has_sigma_pair or _has_athrho
-    if _closes_with_border:
+    # A PLAIN `regress` ALSO CLOSES ITS TABLE. Measured on `reg lntc lnq lnpl`:
+    #
+    #        lnpl |   .9211325   .2880704     3.20   0.002     .3
+    #       _cons |  -3.537623   .2276478   -15.54   0.000     -3
+    #   ------------------------------------------------------------   <- full border
+    #
+    # The RE/decomposition estimators were the only ones covered, so every ordinary regression
+    # table ended one line short of Stata's -- which cost a line on EVERY case the report scored.
+    #
+    # NOT for a panel fit: `xtreg, fe` puts a SPLIT rule there and the full border only after rho,
+    # so treating it as a plain table added a border where Stata has none and pushed the block to
+    # 43 lines. The distinction is the panel structure, not the block kind.
+    _is_plain_regression = (
+        str(getattr(result, "model_name", "") or "") == "regress"
+        and not _has_re_variance
+        and not _has_alpha
+        and not _has_sigma_pair
+        and not _has_athrho
+    )
+    if _closes_with_border or _is_plain_regression:
         lines.append(_border_rule)
 
     # ``reghdfe`` prints an "Absorbed degrees of freedom" table BELOW the closed

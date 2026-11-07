@@ -327,7 +327,14 @@ class OLS:
                     f"have {self._X.shape[0]} rows"
                 )
             self._weight_spec = spec
-            self._raw_weight_sum = float(np.asarray(weights, dtype=float).sum())
+            # ``e(sum_w)`` counts only the SURVIVING weights. Stata prints
+            # "(sum of wgt is 100.3892784641447)" for `[aw=1/lntc]` on nerlove.dta; summing the raw
+            # vector including the 21 negatives gives -183.19, which is a different number and was
+            # being reported.
+            _raw = np.asarray(weights, dtype=float)
+            if spec.kept is not None and spec.kept.shape[0] == _raw.shape[0]:
+                _raw = _raw[spec.kept]
+            self._raw_weight_sum = float(_raw.sum())
         elif weight_type is not None:
             raise WeightError("weight_type was supplied without weights")
 
@@ -431,6 +438,13 @@ class OLS:
         """
 
         X, y = self._X, self._y
+        # A NEGATIVE WEIGHT REMOVES ITS OBSERVATION, as Stata does for aweight/pweight -- and the
+        # rows must go BEFORE the design is used, so the weight vector and the matrix stay
+        # aligned. `[aw=1/lntc]` on nerlove.dta is the motivating case: lntc spans -2.501 to
+        # 4.9375, so 21 of 145 observations carry a negative weight and Stata reports e(N) = 124.
+        _weight_kept = getattr(self._weight_spec, "kept", None)
+        if _weight_kept is not None and _weight_kept.shape[0] == X.shape[0]:
+            X, y = X[_weight_kept], y[_weight_kept]
         n, k = X.shape
         if n == 0:
             raise ConsistencyError(
@@ -454,7 +468,11 @@ class OLS:
             w = np.ones(n, dtype=float)
             effective_n = float(n)
         else:
-            w = spec.weights
+            w = np.asarray(spec.weights, dtype=float)
+            # The rows were already dropped above, so take the matching entries out of the weight
+            # vector -- it still has its ORIGINAL length with negative entries zeroed.
+            if _weight_kept is not None and _weight_kept.shape[0] == w.shape[0] and w.shape[0] != n:
+                w = w[_weight_kept]
             effective_n = float(spec.effective_n)
 
         if cov_type is None:

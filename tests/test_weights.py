@@ -58,7 +58,10 @@ def test_unknown_weight_type_raises(bad):
 @pytest.mark.parametrize(
     "w, message",
     [
-        ([1.0, -1.0], "non-negative"),
+        # Negative weights are legal for aweight/pweight -- Stata DROPS those observations rather
+        # than refusing the command, measured on `reg lntc lnq [aw=1/lntc]` over nerlove.dta where
+        # 21 of 145 weights come out negative and e(N) is 124. fweight is the type that refuses,
+        # so the non-negative case is exercised there instead (see the next test).
         ([0.0, 0.0], "sum to zero"),
         ([1.0, np.nan], "missing"),
         ([1.0, np.inf], "finite"),
@@ -67,6 +70,26 @@ def test_unknown_weight_type_raises(bad):
 def test_invalid_weights_raise(w, message):
     with pytest.raises(WeightError, match=message):
         normalize_weights(w, "aweight")
+
+
+def test_a_negative_aweight_is_dropped_not_refused():
+    """The surviving count is what drives the degrees of freedom."""
+
+    spec = normalize_weights([1.0, -1.0, 2.0], "aweight")
+    assert spec.dropped == 1
+    assert spec.effective_n == 2.0
+    assert spec.kept is not None and spec.kept.tolist() == [True, False, True]
+    # The array keeps its length so the design stays aligned; the negative entry becomes zero.
+    assert spec.weights.shape[0] == 3
+    assert spec.weights[1] == 0.0
+
+
+@pytest.mark.parametrize("bad_type", ["fweight", "iweight"])
+def test_fweight_and_iweight_still_refuse_negative(bad_type):
+    """Stata raises r(401) for a noninteger frequency weight; the other types have no such rule."""
+
+    with pytest.raises(WeightError, match="non-negative"):
+        normalize_weights([1.0, -1.0], bad_type)
 
 
 def test_empty_weights_raise():

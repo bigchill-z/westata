@@ -79,21 +79,31 @@ def test_the_criteria_match_stata(order, column: str, expected: list[float]) -> 
 
 
 def test_the_fpe_is_a_recorded_open_item(order) -> None:
-    """FPE is the ONE column that still does not match, and both candidate formulas miss.
+    """FPE is the ONE column that still does not match, and the gap is now quantified.
 
-    Stata prints 1.2e-09 for lags 2-4 (two significant figures). The plain determinant of the
-    unbiased residual covariance gives 8.85e-10 at lag 4; the ((N+k)/(N-k))**equations correction
-    gives 1.551e-09. Neither rounds to 1.2e-09, so this is a real definitional difference and not a
-    rounding story -- pinned as such instead of being tuned to fit.
+    Round 179 read the full-precision ``e(fpe)`` rather than the printed cell:
+
+        lag 2   1.267577621885e-09
+        lag 4   1.239910471165e-09
+
+    Backing out the multiplier Stata applies to det(sigma) gives 1.1919 / 1.2051 / 1.2491 at lags
+    2 / 3 / 4. Solving (N/(N-k))**equations = multiplier yields a NON-INTEGER k (13.6, 14.4,
+    17.1), so Stata's correction is not of that shape. The formula in the code -- with
+    ``parameters`` as k -- is the closest tried (within 0.6%-4.7%) and is kept with the gap stated.
+
+    If a future round settles it, this test should be replaced by the equality assertion rather
+    than the inequality.
     """
 
     fpe = [float(value) for value in order["FPE"]]
     assert len(fpe) == 5
-    # The magnitudes are at least in the right family (Stata: 6.6e-08 down to 1.2e-09).
+    # Magnitudes are in the right family and fall with lag.
     assert fpe[0] > fpe[1] > fpe[2]
-    assert 1e-10 < fpe[4] < 1e-08
-    # And it does NOT yet agree at Stata's two-figure precision, which is the honest statement.
-    assert abs(fpe[4] - 1.2e-09) / 1.2e-09 > 0.10
+    # And it does NOT yet agree exactly -- within 5% on every lag, which is close but not equal.
+    exact = [6.9e-08, 2.823e-09, 1.2676e-09, 1.228e-09, 1.2399e-09]
+    for index, target in enumerate(exact):
+        assert abs(fpe[index] - target) / target < 0.05, index
+        assert abs(fpe[index] - target) / target > 1e-3, index
 
 
 def test_the_window_starts_at_the_largest_lag() -> None:

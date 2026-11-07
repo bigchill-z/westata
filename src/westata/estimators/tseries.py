@@ -573,14 +573,16 @@ class VAR:
                         -2.0 * log_likelihood / usable
                         + 2.0 * parameters * np.log(np.log(usable)) / usable
                     ),
-                    # FPE does NOT yet match Stata and is recorded as an open item: the plain
-                    # determinant gives 8.85e-10 at lag 4 and the ((N+k)/(N-k))**equations
-                    # correction gives 1.551e-09, against Stata's printed 1.2e-09. Neither is
-                    # right, so this keeps the textbook form the module already documented rather
-                    # than swapping one wrong value for another. LL/AIC/HQIC/BIC above DO match.
+                    # FPE: CLOSEST KNOWN FORM, still not exact. Round 179 read the full-precision
+                    # e(fpe) (lag 2 = 1.267577621885e-09, lag 4 = 1.239910471165e-09) and backed
+                    # out the multiplier Stata applies to det(sigma): 1.1919, 1.2051 and 1.2491 at
+                    # lags 2, 3 and 4. Solving (N/(N-k))**equations = multiplier gives a
+                    # NON-INTEGER k (13.6, 14.4, 17.1), so Stata's correction is not of that shape
+                    # at all. This route -- det(sigma) * (N/(N-parameters))**equations -- is the
+                    # closest tried, within 0.6% to 4.7%, and is kept with the gap stated rather
+                    # than tuned further. LL/AIC/HQIC/BIC above are exact.
                     "FPE": float(
-                        np.linalg.det(sigma_hat)
-                        * ((usable + parameters) / (usable - parameters)) ** equations
+                        np.linalg.det(sigma) * (usable / (usable - parameters)) ** equations
                     ),
                 }
             )

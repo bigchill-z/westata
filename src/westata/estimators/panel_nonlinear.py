@@ -148,6 +148,25 @@ def _codes(values: Any) -> np.ndarray:
     return np.asarray(codes, dtype=int)
 
 
+def _per_group_stats(groups: Any) -> dict[str, float]:
+    """``g_min`` / ``g_avg`` / ``g_max`` -- Stata's "Obs per group: min / avg / max".
+
+    Counted from the group codes of the estimation sample. Empty input yields ``nan`` for all
+    three, which the renderer already handles.
+    """
+
+    codes = np.asarray(groups)
+    if codes.size == 0:
+        return {"g_min": float("nan"), "g_avg": float("nan"), "g_max": float("nan")}
+    _, counts = np.unique(codes, return_counts=True)
+    sizes = counts.astype(float)
+    return {
+        "g_min": float(sizes.min()),
+        "g_avg": float(sizes.mean()),
+        "g_max": float(sizes.max()),
+    }
+
+
 def _group_slices(codes: np.ndarray) -> list[np.ndarray]:
     """Row positions of every group, sorted within the group."""
 
@@ -766,6 +785,12 @@ class _PanelBase:
         e: dict[str, Any] = {
             "N": nobs,
             "N_g": groups_fitted,
+            # Stata's "Obs per group: min / avg / max". Nothing stored these until round 227, so
+            # the renderer printed "." for all three. Counted over the ESTIMATION sample, which is
+            # what Stata reports (a conditional fit drops constant-outcome groups, and e(N) drops
+            # with them).
+            **(_per_group_stats(self._groups[rows] if rows is not None and np.size(rows)
+                                else self._groups)),
             # ``e(title)``: the banner Stata prints, measured per command+method. These are
             # NOT derivable from the class name -- "xtlogit, fe" prints "Conditional
             # fixed-effects logistic regression" while "xtlogit, re" prints

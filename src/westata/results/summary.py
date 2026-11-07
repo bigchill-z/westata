@@ -2892,12 +2892,20 @@ def _stata_summary(result: Any) -> str:
                     # "Obs per group:" and nothing after it, not "Obs per group: = .".
                     if label.endswith(":"):
                         right = f"{label}"
+                    elif not label and not value:
+                        # An empty pair is a SEPARATOR row, not "= ." -- the padding below would
+                        # otherwise print a lone '=' in the right column.
+                        right = ""
                     else:
                         right = f"{label:<14}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:
-                lines.append(f"{line:<{_left_width}}{right}".rstrip())
+                # A row with NOTHING on either side is a blank line, not a run of spaces. The
+                # f-string pads `line` to _left_width before rstrip can reach the concatenation,
+                # which is why blank separator rows came out as 52 spaces.
+                _composed = f"{line:<{_left_width}}{right}".rstrip()
+                lines.append(_composed)
         # tobit/truncreg replace the banner row, which leaves the standalone blank
         # A LEADING BLANK **IS** PRINTED for the ML family. This used to strip every blank line at
         # the top, on the comment's claim that "Stata's header starts with the banner line and has

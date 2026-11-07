@@ -1230,6 +1230,16 @@ class PanelOLS:
         n_entities = int(
             self._data.index.get_level_values(self._entity).nunique()
         )
+        # PER-GROUP COUNTS, which Stata reports as "Obs per group: min / avg / max" and which
+        # this package printed as "." through round 226 because nothing stored them. Derived from
+        # the estimation sample's index, so they describe the rows actually used.
+        _entity_codes = self._data.index.get_level_values(self._entity)
+        _group_sizes = np.asarray(
+            pd.Series(_entity_codes).value_counts().to_numpy(), dtype=float
+        )
+        g_min = float(_group_sizes.min()) if _group_sizes.size else float("nan")
+        g_max = float(_group_sizes.max()) if _group_sizes.size else float("nan")
+        g_avg = float(_group_sizes.mean()) if _group_sizes.size else float("nan")
         rmse = float(np.sqrt(rss / scalar_df)) if scalar_df > 0 else float("nan")
         e: dict[str, Any] = {
             "N": nobs,
@@ -1244,6 +1254,10 @@ class PanelOLS:
             "rank": rank,
             "n_entities": n_entities,
             "N_g": n_entities,
+            # Stata's "Obs per group: min / avg / max" -- absent until round 227.
+            "g_min": g_min,
+            "g_avg": g_avg,
+            "g_max": g_max,
             # ``e(title)`` and ``e(group)``: what Stata prints as the banner and as the
             # variable it grouped on. Measured from ``xtreg y x1, fe``:
             #

@@ -1287,6 +1287,12 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     # mean group size, printed with one decimal as Stata does ("6.0" beside "6").
     per_group = e.get("_obs_per_group") or {}
     lines = [
+        # A LEADING BLANK LINE: Stata's `xtreg ..., fe` capture starts with a newline, so the block
+        # opens with an empty line before the banner. Measured in round 215 on munnell --
+        # `xtreg y k1 i.year, fe` gives chr(10)+'Fixed-effects (within) regression'. Without it the
+        # whole header compared one row off, the same defect the prefix survey found ten times in
+        # rounds 189-196.
+        "",
         row(
             banner,
             stat("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else "."),

@@ -1775,7 +1775,11 @@ def _stata_summary(result: Any) -> str:
     block = _header_block_kind(result)
     chi2_type = str(getattr(result, "e", {}).get("chi2type") or "").strip()
 
-    lines: list[str] = []
+    # A LEADING BLANK LINE, exactly as Stata prints it. No splitlines() comparison can see this
+    # (an empty first element looks like any other empty line), which is why it survived until
+    # round 198 -- measured by checking the RAW prefix: 'regress' gives '\n      S' and
+    # 'logit ..., nolog' gives '\nLogisti'. Both same block, both need the blank.
+    lines: list[str] = [""]
     model_name = getattr(result, "model_name", "") or "westata results"
     cov_type = getattr(result, "cov_type", "nonrobust")
     # Stata's banner is the command's own ``e(title)`` -- "Linear regression",

@@ -91,6 +91,19 @@ def test_dfgls_is_no_longer_filed_under_the_mata_core_class() -> None:
     assert "不要把" in section and "直接归入 A 类" in section
 
 
+def test_dfgls_left_the_class_c_list_after_round_154() -> None:
+    """The critical-value columns were the last dfgls gap; they are now implemented."""
+
+    text = REGISTER.read_text(encoding="utf-8")
+    section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
+    class_c = [line for line in section.splitlines() if line.startswith("| **C.")]
+    assert class_c, "class C row missing"
+    assert "dfgls" not in class_c[0], "dfgls critical columns are implemented now"
+    assert "已于第 154 轮完全移出本表" in section
+    # And the register's own row must not still advertise the columns as missing.
+    assert "1%/5%/10% 临界值列未实现" not in text
+
+
 def test_the_summary_retracts_the_builtin_command_claim() -> None:
     """'dfgls is builtin, so no source exists' was false and steered five rounds wrong."""
 

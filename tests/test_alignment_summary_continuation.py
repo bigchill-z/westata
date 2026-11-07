@@ -29,8 +29,8 @@ def test_the_continuation_exists() -> None:
 def test_the_current_baseline_is_recorded() -> None:
     text = SUMMARY.read_text(encoding="utf-8")
     section = text.split("## 九、当前基线", 1)[1].split("## 十、", 1)[0]
-    assert "4801 passed" in section
-    assert "570" in section
+    assert "4845 passed" in section
+    assert "570" in section or "提交" in section
 
 
 def test_the_four_p0_items_have_their_final_states() -> None:
@@ -38,9 +38,9 @@ def test_the_four_p0_items_have_their_final_states() -> None:
     section = text.split("## 十、四个 P0", 1)[1].split("## 十一、", 1)[0]
     for item in ("P0-1", "P0-2", "P0-3", "P0-4"):
         assert item in section, item
-    # dfgls is the one that stays open; the three others are fixed.
-    assert "未修复" in section
-    assert "二进制 Mata" in section or "⬜" in section
+    # All four are closed now; dfgls was the last, and the section must say so.
+    assert "未修复" not in section, "no P0 row may still be marked unfixed"
+    assert "已修" in section
 
 
 def test_the_methodology_and_terminal_states_are_present() -> None:

@@ -52,15 +52,20 @@ def fitted():
     return ws.Logit.from_formula("y ~ x1 + x2", _frame()).fit()
 
 
+#: From a live `quietly logit y x1 x2` on this module's own synthetic panel, then `estat vce`
+#: (round 165 capture). NOTE the widths: 49/50 for a THREE-column matrix, against 61/62 for the
+#: four-column one -- the row width scales with the column count, which a fixed 62 got wrong.
 VCE_LINES = [
+    "",
     "Covariance matrix of coefficients of logit model",
-    "             | y",
-    "        e(V) |         x1          x2       _cons",
+    "",
+    "             | y" + " " * 33,
+    "        e(V) |         x1          x2       _cons ",
     "-------------+-----------------------------------",
-    "y            |",
-    "          x1 |   .0168814",
-    "          x2 | -.00338524   .01251233",
-    "       _cons |  .00121321  -.00025332   .01065644",
+    "y            |" + " " * 35,
+    "          x1 |   .0168814" + " " * 25,
+    "          x2 | -.00338524   .01251233" + " " * 13,
+    "       _cons |  .00121321  -.00025332   .01065644 ",
 ]
 
 GOF_LINES = [
@@ -79,7 +84,7 @@ def test_estat_vce_matches_stata_line_for_line(fitted) -> None:
 
 
 def test_estat_vce_names_the_model_and_the_equation(fitted) -> None:
-    """Three pieces were missing entirely: the model name, the column header and e(V)."""
+    """The model name, the response header and e(V) are all present."""
 
     rendered = str(ws.estat_vce(fitted))
     assert "of logit model" in rendered
@@ -100,12 +105,19 @@ def test_estat_gof_reports_both_counts(fitted) -> None:
     assert "Number of covariate patterns =    500" in rendered
 
 
-def test_vce_rows_stop_at_the_diagonal(fitted) -> None:
-    """Stata pads nothing past the diagonal; trailing blanks would break the widths."""
+def test_vce_row_width_scales_with_the_column_count(fitted) -> None:
+    """Round 165: Stata DOES pad past the diagonal, and the width follows the column count.
+
+    13 + 12 * n_columns + 1 -- fifty for this three-regressor fit, sixty-two for a four-regressor
+    one. The previous version of this test asserted the opposite (that no line carries trailing
+    blank padding at all), which is what made a hard-coded 62 look right.
+    """
 
     rendered = str(ws.estat_vce(fitted)).splitlines()
-    for line in rendered:
-        assert line == line.rstrip(), line
+    expected = 13 + 12 * 3 + 1
+    numeric = [line for line in rendered if "|" in line and "." in line]
+    assert numeric
+    assert all(len(line) == expected for line in numeric), [(len(l), l) for l in numeric]
 
 
 def test_the_cell_formatter_is_width_driven() -> None:

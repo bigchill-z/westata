@@ -58,17 +58,26 @@ def _display_name(name: str) -> str:
 
 
 def _format_entry(value: float, width: int) -> str:
-    """Stata's ``%10.0g`` cell: no leading zero, at most ten characters.
+    """Stata's ``%9.0g`` cell: no leading zero, at most NINE characters of number.
 
-    The WIDTH decides the precision, not a fixed significant-digit count -- the same rule
-    that governs every other Stata column. On the reference covariance matrix:
+    Derived in round 165 by putting each raw covariance beside Stata's printed text for the whole
+    matrix at once, after four attempts at a ``%.Ng`` loop had failed. Two branches decide the
+    rendering:
 
-        .0168814     prints at 7 significant figures (8 characters)
-        .01251233    at 8 (because it still fits in 10)
-        -.00338524   at 6 (10 characters at 7, so Stata falls back)
+        decimal exponent >= -5  ->  FIXED POINT, as many decimals as fit in nine characters
+        decimal exponent <= -6  ->  SCIENTIFIC, as many mantissa digits as fit in nine
 
-    A single significant-digit rule produced ``-.003385236`` where Stata prints
-    ``-.00338524``.
+    which is exactly the threshold the reference matrix straddles:
+
+        3.5445e-05   (exp -5)  ->  .00003545      fixed, 8 signif figs
+        9.1409e-06   (exp -6)  ->  9.141e-06      scientific
+        -1.158e-05   (exp -5)  ->  -.00001158     fixed
+        -3.106e-07   (exp -7)  ->  -3.106e-07     scientific
+        .00720832    (exp -3)  ->  .00720832      fixed
+
+    ``%.Ng`` cannot produce this: it switches to scientific at e-05, so ``.00003545`` came out as
+    ``3.5445e-05``. The leading zero is dropped in the fixed branch and the exponent is written
+    without a leading zero either (``e-06``, not ``e-007``).
     """
 
     if value is None or not np.isfinite(value):
@@ -76,17 +85,45 @@ def _format_entry(value: float, width: int) -> str:
     number = float(value)
     if number == 0.0:
         return "0".rjust(width)
-    for digits in range(7, 0, -1):
-        text = f"{number:.{digits}g}"
-        if text.startswith("0."):
-            text = text[1:]
-        elif text.startswith("-0."):
-            text = "-" + text[2:]
-        if text.endswith(".0"):
-            text = text[:-2]
-        if len(text) <= 10 - (0 if digits <= 6 else 1):
-            return text.rjust(width)
-    return f"{number:.1g}".rjust(width)
+
+    from decimal import Decimal, ROUND_HALF_UP
+
+    magnitude = abs(Decimal(repr(number)))
+    exponent = magnitude.adjusted()
+    budget = 9
+    text = ""
+    if exponent >= -5:
+        # Fixed point: take the most decimals that still fit.
+        for places in range(15, -1, -1):
+            candidate = format(
+                magnitude.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP), "f"
+            )
+            if "." in candidate:
+                candidate = candidate.rstrip("0").rstrip(".")
+            if candidate.startswith("0."):
+                candidate = candidate[1:]
+            if len(candidate) <= budget:
+                text = candidate
+                break
+    else:
+        # Scientific: most mantissa digits that still fit beside the exponent.
+        for digits in range(9, 0, -1):
+            mantissa = (magnitude.scaleb(-exponent)).quantize(
+                Decimal(1).scaleb(-(digits - 1)), rounding=ROUND_HALF_UP
+            )
+            body = format(mantissa, "f")
+            if "." in body:
+                body = body.rstrip("0").rstrip(".")
+            sign = "-" if exponent < 0 else "+"
+            candidate = f"{body}e{sign}{abs(exponent):02d}"
+            if len(candidate) <= budget:
+                text = candidate
+                break
+    if not text:  # pragma: no cover - only reachable for absurd magnitudes
+        text = f"{number:.1g}"
+    if number < 0:
+        text = "-" + text
+    return text.rjust(width)
 
 
 class VceMatrix:
@@ -191,36 +228,54 @@ class VceMatrix:
             )
         )
         lead = 12  # "        e(V) " puts the pipe at column 13
-        lines = [title]
-        if self.response_label:
-            lines.append(f"{'':>{lead}} | {self.response_label}")
-        # Stata's column fields are 11 wide, set by its %10.0g cells, not by the longest
-        # label -- deriving the width from the labels widened the whole matrix.
-        # Stata's column fields are 11 wide and right-aligned; the header row's fields
-        # are one wider than the value rows because of how Stata pads the label block.
+        # Stata's eleven-line-free block is exactly this, measured in round 165:
+        #   ''                                       blank
+        #   'Covariance matrix of coefficients ...'  title
+        #   ''                                       blank
+        #   '        e(V) |          s  ...'         62 wide
+        #   '-------------+---------------...'       61 wide (ONE shorter than the rows)
+        #   '           s |  .00003545    ...'       62 wide, blank after the diagonal
+        # Note there is NO "<response> |" row: the dependent variable appears only in the column
+        # heading. An earlier version printed one and shifted every line down by one.
+        # The row width scales with the number of columns: 13 (label block) + 12 per cell + 1
+        # trailing space. Measured on two matrices: three regressors -> 50, four -> 62. A fixed 62
+        # made every narrower table over-padded.
+        padding = 12
+        row_width = lead + 1 + padding * len(labels) + 1
+        lines = ["", title, ""]
+        # The response-variable lines exist ONLY for the discrete models. Measured in round 165:
+        #   regress -> 9 lines, no "| lnw" header line and no "lnw |" row
+        #   logit   -> 11 lines, BOTH present ("             | hi" then "hi           |")
+        # Treating them as universal is what made the OLS table one line too long.
+        discrete = model in {"logit", "probit", "cloglog", "logistic"}
+        if discrete and self.response_label:
+            # 61 wide, matching the separator rather than the 62-wide numeric rows.
+            lines.append(f"{'':>{lead}} | {self.response_label}".ljust(row_width - 1))
         # Each cell is TWELVE characters: the value right-aligned in 11 then one space.
         # Splitting Stata's own rows into 12-character slices reproduces them exactly:
         #   '  .00121321 ' | ' -.00025332 ' | '  .01065644'
-        padding = 12
         lines.append(
-            f"{'e(V)':>{lead}} |" + " ".join(f"{label:>11}" for label in labels)
+            (f"{'e(V)':>{lead}} |" + " ".join(f"{label:>11}" for label in labels)).ljust(
+                row_width
+            )
         )
-        # The separator is the SAME width as the header line: 13 dashes, "+", then the
-        # rest. A one-shorter version was within a character of right and therefore easy
-        # to miss.
-        lines.append("-" * (lead + 1) + "+" + "-" * (len(lines[-1]) - lead - 2))
-        if self.response_label:
-            lines.append(f"{self.response_label:<{lead}} |")
+        # The separator is 61 characters -- ONE SHORTER than the 62-wide rows, which is what
+        # Stata prints.
+        lines.append("-" * (lead + 1) + "+" + "-" * (row_width - lead - 3))
+        if discrete and self.response_label:
+            # The discrete models repeat the response as a row label above the coefficients.
+            # This line is 61 wide, like the separator -- not the 62 of the numeric rows.
+            lines.append(f"{self.response_label:<{lead}} |".ljust(row_width - 1))
         for row, label in enumerate(labels):
-            # Stata prints the lower triangle; the upper triangle is blank.
-            # Stata stops each row AT the diagonal -- it does not pad the trailing
-            # columns with blanks. Padding them made every line end with spaces and the
-            # row widths disagree with Stata's.
+            # Every row is padded to 62 characters, blank after the diagonal -- measured from
+            # Stata, which prints '       _cons | -.00049044  ...  .00720832 ' with the trailing
+            # space that makes the width 62.
             cells = " ".join(
                 _format_entry(matrix[row, col], 11)
                 for col in range(row + 1)
             )
-            lines.append(f"{label:>{lead}} |{cells}")
+            lines.append((f"{label:>{lead}} |" + cells).ljust(row_width))
+        # No trailing blank line: Stata's block ends on the last coefficient row.
         return chr(10).join(lines)
 
 

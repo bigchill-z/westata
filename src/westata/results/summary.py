@@ -2825,7 +2825,15 @@ def _stata_summary(result: Any) -> str:
             or _re_title.startswith("Random-effects")
             or str(getattr(result, "model_name", "") or "").endswith(", re")
         )
-        _splice_panel = block == "ml" and _is_random_effects and bool(panel_lines)
+        # BOTH xt likelihood shapes splice their panel rows in -- only the ROWS THEMSELVES differ
+        # between fe and re. Round 234 gated the splice on the random-effects test, which sent fe
+        # back to the old "append the whole block afterwards" path and misaligned its header.
+        _is_xt_likelihood = str(_re_title).endswith("regression") and str(
+            getattr(result, "model_name", "") or ""
+        ).startswith("xt")
+        _splice_panel = block == "ml" and (
+            _is_random_effects or _is_xt_likelihood
+        ) and bool(panel_lines)
         if _is_tobit or _is_intreg:
             _left_width = 52
         elif _is_truncreg:
@@ -2862,33 +2870,54 @@ def _stata_summary(result: Any) -> str:
             _pts = _e_float(result, "intpoints")
             if not np.isfinite(_pts):
                 _pts = 7.0
-            _left_rows = [
-                f"Group variable: {_entity or '.'}",
-                "",
-                "Random effects u_i ~ Gaussian",
-                "",
-                "",
-                "",
-                "",
-                "Integration method: "
-                + str(_re_macros.get("intmethod") or "mvaghermite").strip(),
-                "",
-                "",
-            ]
-            _right_rows: list[tuple[str, str]] = [
-                (
-                    "Number of groups",
-                    f"{_n_groups:,.0f}" if np.isfinite(_n_groups) else ".",
-                ),
-                ("", ""),
-                ("Obs per group:", ""),
-                ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
-                ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
-                ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
-                ("", ""),
-                ("Integration pts.", f"{int(round(_pts))}"),
-                ("", ""),
-            ]
+            # fe and re share this block but NOT these rows. A CONDITIONAL fit prints only
+            # "Group variable" and the per-group extremes; it has no distribution line for u_i
+            # and integrates nothing out, so no "Integration method" row. Measured in round 235.
+            if _is_random_effects:
+                _left_rows = [
+                    f"Group variable: {_entity or '.'}",
+                    "",
+                    "Random effects u_i ~ Gaussian",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "Integration method: "
+                    + str(_re_macros.get("intmethod") or "mvaghermite").strip(),
+                    "",
+                    "",
+                ]
+                _right_rows: list[tuple[str, str]] = [
+                    (
+                        "Number of groups",
+                        f"{_n_groups:,.0f}" if np.isfinite(_n_groups) else ".",
+                    ),
+                    ("", ""),
+                    ("Obs per group:", ""),
+                    ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
+                    ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
+                    ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
+                    ("", ""),
+                    ("Integration pts.", f"{int(round(_pts))}"),
+                    ("", ""),
+                ]
+            else:
+                _left_rows = [
+                    f"Group variable: {_entity or '.'}",
+                    "",
+                    "",
+                ]
+                _right_rows = [
+                    (
+                        "Number of groups",
+                        f"{_n_groups:,.0f}" if np.isfinite(_n_groups) else ".",
+                    ),
+                    ("", ""),
+                    ("Obs per group:", ""),
+                    ("min", f"{_gmin:.0f}" if np.isfinite(_gmin) else "."),
+                    ("avg", f"{_gavg:.1f}" if np.isfinite(_gavg) else "."),
+                    ("max", f"{_gmax:.0f}" if np.isfinite(_gmax) else "."),
+                ]
             ml_left[1:1] = _left_rows
             ml_right[1:1] = _right_rows
             # ``Log likelihood`` shares its row with the model test -- "Prob > chi2" or
@@ -2897,9 +2926,10 @@ def _stata_summary(result: Any) -> str:
             # back, which left the left column blank on that row (round 231).
             if ml_left and ml_left[-1].startswith("Log likelihood"):
                 _ll_text = ml_left.pop()
-                # The test row is "Prob > chi2" (NOT "Wald chi2", which sits one row above it);
-                # matching the first label containing "chi2" put Log likelihood one row high.
-                _test_index = next(
+                # The model test is "Prob > chi2" for re. The CONDITIONAL fit has no Prob row in
+                # this block -- its right column carries "LR chi2(#)" and Stata puts Log likelihood
+                # on THAT row -- so fall back to the chi2 label, and only then to appending.
+                _prob_index = next(
                     (
                         position
                         for position, (label, _value) in enumerate(ml_right)
@@ -2907,7 +2937,23 @@ def _stata_summary(result: Any) -> str:
                     ),
                     None,
                 )
-                if _test_index is not None and ml_left[_test_index] == "":
+                if _prob_index is None:
+                    _prob_index = next(
+                        (
+                            position
+                            for position, (label, _value) in enumerate(ml_right)
+                            if "chi2" in label
+                        ),
+                        None,
+                    )
+                _test_index = _prob_index
+                # The fe splice is shorter than re's, so an index valid for ml_right can be past
+                # the end of ml_left -- guard it rather than trust the arithmetic.
+                if (
+                    _test_index is not None
+                    and _test_index < len(ml_left)
+                    and ml_left[_test_index] == ""
+                ):
                     ml_left[_test_index] = _ll_text
                 else:
                     ml_left.append(_ll_text)

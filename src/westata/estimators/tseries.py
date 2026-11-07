@@ -1308,25 +1308,55 @@ class VARResults:
         # Stata puts TWO spaces after the pipe and then a 10-wide value, which is what makes
         # the total row 55 characters for four columns. Measured, character by character:
         #   '       0 |  .994097     .071477           0     .966327'
+        # GEOMETRY, measured character by character on a bivariate VAR(2):
+        #
+        #   '         |      (1)         (2)         (3)         (4)'   55 chars
+        #   '    Step |     oirf        oirf        oirf        oirf'   55 chars
+        #   '---------+--------------------------------------------'   54 chars
+        #   '       0 |  .994097     .071477           0     .966327'   55 chars
+        #
+        # The '#', '#' and value cells all END at columns 19, 31, 43 and 55 -- twelve apart --
+        # with the pipe at column 9. So the body is 12-wide cells and the row needs no trailing
+        # spaces; the rule is one character short of the data because Stata does not pad it.
+        # GEOMETRY, measured character by character on a bivariate VAR(2):
+        #
+        #   '         |      (1)         (2)         (3)         (4)'   55 chars
+        #   '    Step |     oirf        oirf        oirf        oirf'   55 chars
+        #   '---------+--------------------------------------------'   54 chars
+        #   '       0 |  .994097     .071477           0     .966327'   55 chars
+        #
+        # The '#', '#' and value cells all END at columns 19, 31, 43 and 55. With the pipe at
+        # column 9 and the body starting at 10, the FIRST cell is 9 wide and every later one is
+        # 12 -- which is also why the four values sit at 19/31/43/55 rather than at a uniform
+        # 12-step from the pipe.
+        def _cells(fill: str) -> str:
+            return "".join(
+                f"{fill:>{9 if position == 0 else 12}}"
+                for position in range(len(pairs))
+            )
+
         label_cells = "".join(
-            f"{'(' + str(position + 1) + ')':>10}" for position in range(len(pairs))
+            f"{('(' + str(position + 1) + ')'):>{9 if position == 0 else 12}}"
+            for position in range(len(pairs))
         )
-        word_cells = "".join(f"{'oirf':>10}" for _ in pairs)
-        inner_width = 2 + 10 * len(pairs)
+        word_cells = "".join(
+            f"{key:>{9 if position == 0 else 12}}" for position in range(len(pairs))
+        )
+        inner_width = 9 + 12 * (len(pairs) - 1)
         wide_lines = [
             f"Results from {irfname}",
-            "-" * (9 + inner_width),
+            "-" * (9 + inner_width - 1),
             f"{'':>9}|{label_cells}",
             f"{'Step':>8} |{word_cells}",
-            "-" * 9 + "+" + "-" * inner_width,
+            "-" * 9 + "+" + "-" * (inner_width - 1),
         ]
         for step in range(values.shape[0]):
             cells = "".join(
-                f"{_wide_cell(float(values[step, response_position, impulse_position])):>12}"
-                for impulse_position, response_position in pairs
+                f"{_wide_cell(float(values[step, response_position, impulse_position])):>{9 if position == 0 else 12}}"
+                for position, (impulse_position, response_position) in enumerate(pairs)
             )
             wide_lines.append(f"{step:>8} |{cells}")
-        wide_lines.append("-" * (9 + inner_width))
+        wide_lines.append("-" * (9 + inner_width - 1))
         wide_lines.append(
             f"({irfname}, {key}; impulse = response order = "
             + ", ".join(f"{names[i]}->{names[r]}" for i, r in pairs)

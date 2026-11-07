@@ -102,3 +102,35 @@ def test_the_footnote_names_every_pair(fitted) -> None:
     text = fitted.irf_table(periods=1)
     for pair in ("y1->y1", "y1->y2", "y2->y1", "y2->y2"):
         assert pair in text, pair
+
+
+#: Captured verbatim from a live `irf table oirf, noci` on the same bivariate VAR(2).
+STATA_WIDE = [
+    "         |      (1)         (2)         (3)         (4)",
+    "    Step |     oirf        oirf        oirf        oirf",
+    "---------+--------------------------------------------",
+    "       0 |  .994097     .071477           0     .966327",
+    "       1 | -.050136     .019827    -.052333     .044106",
+    "       2 |  .034698    -.067455     .024114    -.049783",
+    "       3 |  .000935     -.00033     .001006    -.000838",
+    "       4 | -.000601      .00133    -.000473     .001055",
+]
+
+
+def test_the_table_matches_stata_character_for_character(fitted) -> None:
+    """Header, rules and all five data rows, byte for byte.
+
+    The row lengths are 55/55/54/55 and the four value cells END at columns 19/31/43/55, so the
+    first cell is 9 wide and every later one 12 -- not a uniform 12 from the pipe. A width
+    assertion alone would have accepted three different wrong layouts.
+    """
+
+    block = fitted.irf_table(periods=4).splitlines()[2:10]
+    assert len(block) == len(STATA_WIDE)
+    for index, (theirs, ours) in enumerate(zip(STATA_WIDE, block)):
+        assert theirs == ours, f"line {index}: {theirs!r} != {ours!r}"
+
+
+def test_the_row_lengths_are_what_stata_prints(fitted) -> None:
+    block = fitted.irf_table(periods=4).splitlines()[2:10]
+    assert [len(line) for line in block] == [55, 55, 54, 55, 55, 55, 55, 55]

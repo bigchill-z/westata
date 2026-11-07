@@ -4019,8 +4019,22 @@ def _stata_summary(result: Any) -> str:
             f"{_stata_coef(_sig_hi, ci_hi_w)}"
         )
 
-    # The closing rule matches the OPENING one.
-    lines.append(_border_rule)
+    # The closing rule matches the OPENING one -- EXCEPT for the plain panel decomposition, where
+    # Stata does not close the coefficient table at all before sigma_u/sigma_e. There it prints
+    # only the split rule, and the full border comes AFTER rho:
+    #
+    #       _cons |   2352.891   3610.712     0.65   0.515
+    #   -------------+------------------------------------   <- split rule
+    #       sigma_u |   15272.67
+    #       sigma_e |  9567.7549
+    #           rho |  .71815593   (fraction ...
+    #   --------------------------------------------------   <- full border
+    #
+    # Measured in round 220. Emitting the border here as well produced a full rule immediately
+    # followed by the split rule.
+    _closes_with_border = _has_re_variance or _has_alpha or _has_sigma_pair or _has_athrho
+    if _closes_with_border:
+        lines.append(_border_rule)
 
     # ``reghdfe`` prints an "Absorbed degrees of freedom" table BELOW the closed
     # coefficient table, measured:
@@ -4170,9 +4184,17 @@ def _stata_summary(result: Any) -> str:
     if panel_rows and not (
         _has_re_variance or _has_alpha or _has_sigma_pair or _has_athrho
     ):
-        # Do NOT add a rule here: the ftest branch below emits its own full-width rule
-        # before the "F test that all u_i=0" line, and adding one too produced two
-        # consecutive rules where Stata has one.
+        # A SPLIT RULE separates the coefficient table from the decomposition rows, and Stata
+        # prints it in the +-- form, not as a full border:
+        #
+        #       _cons |   2352.891   3610.712     0.65   0.515
+        #   -------------+------------------------------------   <- _split_rule
+        #       sigma_u |   15272.67
+        #
+        # Measured in round 220 on `xtreg y k1 i.year, fe`. The comment this replaces said "do NOT
+        # add a rule here", which was true only of a FULL-WIDTH one: the ftest branch below emits
+        # that, and two of them did sit back to back. The split form is what belongs here.
+        lines.append(_split_rule)
         lines.extend(panel_rows)
         # ``corr(u_i, Xb)`` is NOT repeated here: the xtreg header block already printed
         # it, on the same row as Prob > F. Emitting it again below the table put it where

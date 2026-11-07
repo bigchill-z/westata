@@ -756,9 +756,17 @@ def _panel_design_block(result: Any) -> list[str]:
         #                                                        min =         20
         #
         # `xtlogit ..., fe` prints NO such row -- confirmed against a live run of both variants.
-        _is_random_effects = bool(e_macros.get("sigma_u") is not None) or "re" in str(
-            e_macros.get("title") or ""
-        ) or str(getattr(result, "model_name", "") or "").endswith(", re")
+        #
+        # THE TITLE TEST MUST BE A PREFIX, NOT A SUBSTRING. "re" in title matches the word
+        # "regression" -- so `xtlogit, fe` ("Conditional fixed-effects logistic regression") was
+        # classified as random-effects and printed the Gaussian and Integration rows it must not
+        # have. Found in round 234 by comparing the fe VARIANT, which the re work never re-checked.
+        _title_text = str(e_macros.get("title") or "").strip()
+        _is_random_effects = (
+            e_macros.get("sigma_u") is not None
+            or _title_text.startswith("Random-effects")
+            or str(getattr(result, "model_name", "") or "").endswith(", re")
+        )
         lines = [
             # ONE space after the colon, not the padded field the PCSE block uses. Measured in
             # round 224 on `xtlogit y x1, re`:
@@ -2810,9 +2818,11 @@ def _stata_summary(result: Any) -> str:
         # Computed BEFORE _left_width, which depends on it. Round 228 moved this up after an
         # UnboundLocalError: the width branch read the flag two dozen lines before it was set.
         _re_macros = getattr(result, "e", None) or {}
+        # Same prefix rule as above: a substring test on "re" matches "regression".
+        _re_title = str(_re_macros.get("title") or "").strip()
         _is_random_effects = (
             _re_macros.get("sigma_u") is not None
-            or "re" in str(_re_macros.get("title") or "")
+            or _re_title.startswith("Random-effects")
             or str(getattr(result, "model_name", "") or "").endswith(", re")
         )
         _splice_panel = block == "ml" and _is_random_effects and bool(panel_lines)

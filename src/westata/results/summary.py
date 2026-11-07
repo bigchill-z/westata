@@ -4027,7 +4027,11 @@ def _stata_summary(result: Any) -> str:
                 # width: measured, "var(e.food~p)|" has no space before the pipe while the
                 # banner's "  food_exp |" puts it one column further right. Deriving it from
                 # name_width made the row wider than 78 whenever a name overflowed that.
-                f"{bare:>12}|"
+                # The field is 13 wide, not 12: Stata prints '   var(e.mpg)|' with the pipe at
+                # index 13, this package printed '  var(e.mpg)|' at index 12. The row is 78
+                # characters either way, which is why the off-by-one survived every width
+                # assertion -- only a character-for-character comparison exposes it.
+                f"{bare:>13}|"
                 if _scale_label
                 else f"{bare:>{name_width}} |"
             )

@@ -1775,11 +1775,11 @@ def _stata_summary(result: Any) -> str:
     block = _header_block_kind(result)
     chi2_type = str(getattr(result, "e", {}).get("chi2type") or "").strip()
 
-    # A LEADING BLANK LINE, exactly as Stata prints it. No splitlines() comparison can see this
-    # (an empty first element looks like any other empty line), which is why it survived until
-    # round 198 -- measured by checking the RAW prefix: 'regress' gives '\n      S' and
-    # 'logit ..., nolog' gives '\nLogisti'. Both same block, both need the blank.
-    lines: list[str] = [""]
+    # NOTE: the leading blank line is NOT added here. The ML branch appends its own separator at
+    # the point where the banner goes, and round 199 found that adding one here as well produced
+    # TWO blank lines for logit/probit. The strip that removed it entirely was the real defect --
+    # see the comment where that strip used to be.
+    lines: list[str] = []
     model_name = getattr(result, "model_name", "") or "westata results"
     cov_type = getattr(result, "cov_type", "nonrobust")
     # Stata's banner is the command's own ``e(title)`` -- "Linear regression",
@@ -2287,6 +2287,11 @@ def _stata_summary(result: Any) -> str:
             str(getattr(result, "model_name", "") or "") in ("regress", "ols")
             and not _vcetype_for_banner
         )
+        # THE LEADING BLANK IS PART OF THE REBUILD. This branch REPLACES ``lines`` -- which is why
+        # the initialiser at the top of the function could carry the blank line and have no effect
+        # The leading blank comes from the separator appended earlier in this function; adding
+        # one here as well produced TWO blank lines for regress (round 199). The ML family gets
+        # its blank from that same separator now that the strip below no longer removes it.
         lines = [banner] if (banner and not _banner_suppressed) else []
         # ``title2`` (areg's "Absorbed variable: ...") was appended to the earlier ``lines``
         # list, which this branch REPLACES -- the same trap the design block below hit. It
@@ -2756,14 +2761,13 @@ def _stata_summary(result: Any) -> str:
             else:
                 lines.append(f"{line:<{_left_width}}{right}".rstrip())
         # tobit/truncreg replace the banner row, which leaves the standalone blank
-        # separator that preceded it stranded at the top of the block. Stata's header
-        # starts with the banner line and has no leading blank.
-        # The banner is now rendered ONLY by the ml block (``ml_left[0]``), which leaves the
-        # blank separator that used to follow the standalone banner stranded at the top.
-        # Trimming it is what makes the first line the banner again.
-        if _is_tobit or _is_truncreg or block == "ml":
-            while lines and not lines[0].strip():
-                lines.pop(0)
+        # A LEADING BLANK **IS** PRINTED for the ML family. This used to strip every blank line at
+        # the top, on the comment's claim that "Stata's header starts with the banner line and has
+        # no leading blank". A live `logit rns s expr tenure, nolog` starts with chr(10)+'Logisti',
+        # so the claim was wrong and the strip is what made logit/probit the only estimators
+        # without the blank. Rounds 198 and 199 both tried to ADD the blank upstream and both were
+        # undone here -- found in round 199 by tracing executed line numbers rather than reading.
+        #
         # The deferred panel block goes AFTER the ML banner block (see where it is computed).
         if _defer_panel_block:
             lines.append("")

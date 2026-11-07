@@ -61,7 +61,10 @@ def _banner(rendered: str) -> str:
     the run of spaces that separates the two columns yields the banner either way.
     """
 
-    first = rendered.splitlines()[0]
+    # Skip the LEADING blank line the renderer now emits (round 199 restored it; the raw Stata
+    # capture starts with a newline for every estimator checked).
+    lines = rendered.splitlines()
+    first = next(line for line in lines if line.strip()) if lines else ""
     return re.split(r"\s{2,}", first.strip())[0].strip()
 
 

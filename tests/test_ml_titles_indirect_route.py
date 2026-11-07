@@ -79,7 +79,10 @@ def test_the_stata_banner_uses_that_title(frame, command: str) -> None:
     """The renderer reads the macro, so the banner follows automatically."""
 
     fitted = BUILDERS[command](frame)
-    first_line = render_summary(fitted, style="stata").splitlines()[0].strip()
+    # Skip the leading blank line restored in round 199.
+    first_line = next(
+        line for line in render_summary(fitted, style="stata").splitlines() if line.strip()
+    ).strip()
     # The ML header is a TWO-COLUMN block: the banner shares its first line with
     # "Number of obs" (measured against Stata). Split on the run of spaces between the
     # two columns rather than assuming the banner owns the whole line.
@@ -92,7 +95,11 @@ def test_poisson_is_no_longer_the_generic_banner(frame) -> None:
     """The specific regression: poisson used to print the neutral fallback."""
 
     banner = (
-        render_summary(BUILDERS["poisson"](frame), style="stata").splitlines()[0].strip()
+        next(
+        line
+        for line in render_summary(BUILDERS["poisson"](frame), style="stata").splitlines()
+        if line.strip()
+    ).strip()
     )
 
     assert banner != "Stata-style regression results"

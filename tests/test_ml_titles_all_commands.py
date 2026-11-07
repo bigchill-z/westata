@@ -88,7 +88,9 @@ def test_the_title_matches_the_ado(frame, command: str) -> None:
 @pytest.mark.parametrize("command", sorted(BUILDERS))
 def test_the_stata_banner_uses_that_title(frame, command: str) -> None:
     fitted = BUILDERS[command](frame)
-    first_line = render_summary(fitted, style="stata").splitlines()[0].strip()
+    first_line = next(
+        line for line in render_summary(fitted, style="stata").splitlines() if line.strip()
+    ).strip()
     # The ML header is a two-column block, so the banner shares its first line with
     # "Number of obs" (measured against Stata). Split on the run of spaces between the
     # columns instead of assuming the banner owns the whole line.

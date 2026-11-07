@@ -707,7 +707,7 @@ class _LogitPropensity:
     the variance together is what makes the derivation auditable.
     """
 
-    __slots__ = ("_x", "_treated", "_beta", "_propensity", "_command")
+    __slots__ = ("_x", "_design", "_treated", "_beta", "_propensity", "_command")
 
     def __init__(
         self,
@@ -719,10 +719,17 @@ class _LogitPropensity:
         tol: float = 1e-12,
     ) -> None:
         self._x = x
+        # THE TREATMENT MODEL HAS AN INTERCEPT. Stata's `teffects ipw` fits the logit WITH a
+        # constant -- a live `logit treat age ... re75` reports `_cons = 1.177674`, which equals
+        # the intercept from this package's own Logit on the same design. Without it the
+        # propensity scores were systematically wrong (max difference 0.087 against the correct
+        # ones) and the Hajek ATE came out 1589.9166 where Stata reports 1641.315, a 3.1% error
+        # that the module's docstring never caught because it was checked on other data.
+        self._design = np.column_stack([np.ones(x.shape[0]), x])
         self._treated = treated
         self._command = command
         self._beta = self._fit(maxiter, tol)
-        self._propensity = expit(x @ self._beta)
+        self._propensity = expit(self._design @ self._beta)
 
     @staticmethod
     def _loglik(x: np.ndarray, t: np.ndarray, beta: np.ndarray) -> float:
@@ -730,7 +737,7 @@ class _LogitPropensity:
         return float(np.sum(t * eta - np.logaddexp(0.0, eta)))
 
     def _fit(self, maxiter: int, tol: float) -> np.ndarray:
-        x, t = self._x, self._treated
+        x, t = self._design, self._treated
         beta = np.zeros(x.shape[1], dtype=float)
         current = self._loglik(x, t, beta)
         for _ in range(maxiter):
@@ -806,7 +813,7 @@ class _LogitPropensity:
     def influence(self) -> np.ndarray:
         """``(X'WX / n)^{-1} x_i (t_i - p_i)``: the influence of ``beta``."""
 
-        x, p, n = self._x, self._propensity, self._x.shape[0]
+        x, p, n = self._design, self._propensity, self._design.shape[0]
         information = ((x * (p * (1.0 - p))[:, None]).T @ x) / n
         try:
             return np.linalg.solve(

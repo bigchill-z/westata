@@ -3,10 +3,26 @@
 STATUS: PARTIAL, NOT WIRED UP. ``rdrobust`` still raises ``UnsupportedError`` when
 ``bandwidth`` is omitted. Nothing in the public API imports this module.
 
-Why keep a partial file rather than delete it: the transcription below pins down six facts that
-were each an error in an earlier attempt, and re-deriving them is expensive. The ``C`` vector
-that the last step needs is produced by ``rdrobust_bw()`` inside ``l/lrdrobust.mlib``, and that
-is where this stops.
+Why keep a partial file rather than delete it: the transcription below pins down facts that
+were each an error in an earlier attempt, and re-deriving them is expensive. The one piece the
+last step needs is produced by ``rdrobust_bw()`` inside ``l/lrdrobust.mlib``, and that is
+where this stops.
+
+WHAT ROUND 2 OF THE v3 WORK ADDED: the three COMBINATION rules, read off the ado rather than
+guessed. ``combine_mserd`` / ``combine_msesum`` / ``combine_msetwo`` implement
+
+    rdbwselect.ado:537   d_bw_d = ((C_l[1]+C_r[1]) / (C_r[2]-C_l[2])^2) ^ C[4]
+    rdbwselect.ado:527   d_bw_s = ((C_l[1]+C_r[1]) / (C_r[2]+C_l[2])^2) ^ C[4]
+    rdbwselect.ado:499   b_bw_l = ((C_l[1]) / (C_l[2]^2 + regul*C_l[3])) ^ C[4]
+
+MSERD and MSESUM differ ONLY in that sign, which is the trap the note below already warned
+about. The bias and estimate steps add ``scaleregul`` on top of ``C[2]^2``.
+
+WHY THE REMAINING PIECE IS NOT A GUESSING GAME: ``mata which`` confirms ``rdrobust_bw()``
+lives in ``l/lrdrobust.mlib``; that file is 321 KB of which 1.9% is printable, with the
+function name appearing as an isolated string and binary either side. It is compiled bytecode
+on the same footing as ``synth``'s Mata core, which GAP_REGISTER already classes as
+'information unavailable, boundary reached'.
 
 WHAT IS ESTABLISHED (read from ``rdbwselect.ado`` or measured against a live run):
 
@@ -53,6 +69,9 @@ __all__ = [
     "C_C_TRIANGULAR",
     "C_C_UNIFORM",
     "pilot_bandwidth",
+    "combine_mserd",
+    "combine_msesum",
+    "combine_msetwo",
     "prepare_sample",
     "rd_exponent",
 ]
@@ -113,3 +132,69 @@ def derivative_scale(order: int) -> float:
     """The factorial that converts a polynomial coefficient into a derivative."""
 
     return float(math.factorial(order))
+
+
+def combine_mserd(c_left: np.ndarray, c_right: np.ndarray) -> float:
+    """``d_bw_d`` / ``b_bw_d`` / ``h_bw_d``: the default, difference form.
+
+    ``rdbwselect.ado:537`` computes
+
+        d_bw_d = ((C_d_l[1] + C_d_r[1])  /  (C_d_r[2] - C_d_l[2])^2) ^ C_d_l[4]
+
+    and later adds the regularisation term for the bias and estimate bandwidths:
+
+        b_bw_d = ((C_b_l[1] + C_b_r[1]) / ((C_b_r[2] - C_b_l[2])^2
+                                          + scaleregul*(C_b_r[3] + C_b_l[3]))) ^ C_b_l[4]
+
+    THE MINUS IS LOAD-BEARING. The MSESUM variant adds the two ``C[2]`` entries instead; using the
+    wrong sign yields a plausible bandwidth belonging to a different estimator (the module docstring
+    records that mistake from an earlier attempt).
+
+    ``C[1..3]`` come from ``rdrobust_bw()`` in the Mata library, which is non-readable bytecode --
+    so this function is the COMBINATION step only and expects those vectors as input.
+    """
+
+    numerator = float(c_left[0] + c_right[0])
+    denominator = float(c_right[1] - c_left[1]) ** 2
+    regularisation = float(c_left[2] + c_right[2])
+    exponent = float(c_left[3])
+    if denominator <= 0.0:
+        return float("nan")
+    with_regularisation = denominator + regularisation
+    if with_regularisation <= 0.0:
+        return float("nan")
+    return numerator / with_regularisation if exponent == 1.0 else (
+        max(numerator / with_regularisation, 0.0) ** exponent
+    )
+
+
+def combine_msesum(c_left: np.ndarray, c_right: np.ndarray) -> float:
+    """``*_bw_s``: the SUM form, where the two ``C[2]`` entries are added."""
+
+    numerator = float(c_left[0] + c_right[0])
+    denominator = float(c_right[1] + c_left[1]) ** 2
+    regularisation = float(c_left[2] + c_right[2])
+    exponent = float(c_left[3])
+    if denominator <= 0.0:
+        return float("nan")
+    with_regularisation = denominator + regularisation
+    if with_regularisation <= 0.0:
+        return float("nan")
+    return max(numerator / with_regularisation, 0.0) ** exponent
+
+
+def combine_msetwo(c_left: np.ndarray, c_right: np.ndarray) -> tuple[float, float]:
+    """``*_bw_l`` and ``*_bw_r``: the TWO form computes each SIDE separately.
+
+    ``rdbwselect.ado:499`` uses ``C[2]^2 + scaleregul*C[3]`` per side, with no cross-side term.
+    """
+
+    def one_side(c: np.ndarray) -> float:
+        numerator = float(c[0])
+        denominator = float(c[1]) ** 2 + float(c[2])
+        exponent = float(c[3])
+        if denominator <= 0.0:
+            return float("nan")
+        return max(numerator / denominator, 0.0) ** exponent
+
+    return one_side(c_left), one_side(c_right)

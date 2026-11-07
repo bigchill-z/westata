@@ -10,6 +10,7 @@ _westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
 
 ## 目录
 
+- **稳健标准误** — [Stata `robust` 与 `HC0`/`HC1` 的对应关系](#稳健标准误stata-robust-与-hc0hc1-的对应关系)
 - **线性模型与工具变量** — [`OLS`](#ols), [`FEOLS`](#feols), [`PanelOLS`](#panelols), [`RandomEffects`](#randomeffects), [`BetweenOLS`](#betweenols), [`FirstDifferenceOLS`](#firstdifferenceols), [`IV2SLS`](#iv2sls), [`IVLIML`](#ivliml), [`IVGMM`](#ivgmm), [`XtIvreg`](#xtivreg), [`XtGls`](#xtgls), [`XtPcse`](#xtpcse), [`XtAbond`](#xtabond), [`Eivreg`](#eivreg), [`Sureg`](#sureg), [`Mvreg`](#mvreg), [`RobustRegression`](#robustregression), [`QuantileRegression`](#quantileregression), [`Bsqreg`](#bsqreg), [`Sqreg`](#sqreg), [`NeweyWestResult`](#neweywestresult), [`Nl`](#nl)
 - **离散选择、计数与受限因变量** — [`Logit`](#logit), [`Probit`](#probit), [`OrderedLogit`](#orderedlogit), [`OrderedProbit`](#orderedprobit), [`Poisson`](#poisson), [`NegativeBinomial`](#negativebinomial), [`NegativeBinomialNB1`](#negativebinomialnb1), [`ZeroInflatedPoisson`](#zeroinflatedpoisson), [`ZeroInflatedNegativeBinomial`](#zeroinflatednegativebinomial), [`TruncatedPoisson`](#truncatedpoisson), [`TruncatedNegativeBinomial`](#truncatednegativebinomial), [`Tobit`](#tobit), [`Truncreg`](#truncreg), [`Intreg`](#intreg), [`Heckman`](#heckman), [`Etregress`](#etregress), [`Frontier`](#frontier), [`XtLogit`](#xtlogit), [`XtProbit`](#xtprobit), [`XtPoisson`](#xtpoisson), [`XtNbreg`](#xtnbreg), [`XtTobit`](#xttobit)
 - **时间序列、多元与面板单位根** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
@@ -19,6 +20,60 @@ _westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
 - **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`SummarizeResult`](#summarizeresult), [`dfgls`](#dfgls), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`level`](#level), [`odds_ratios`](#odds_ratios), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+
+## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
+
+> **把稳健标准误与 Stata 对比之前，先读这一节。**
+> 同一个 Stata 选项名，在不同命令里对应**不同的小样本因子**；
+> 弄混会得到看起来合理、但在第三位就错了的标准误。
+
+### 对应表
+
+| Stata | 对应 westata | 原因 |
+|---|---|---|
+| `regress ..., vce(robust)` | **`cov_type="HC1"`** | Stata 的 `regress` 乘了 `n/(n-k)` |
+| `regress ..., vce(robust) small` | Stata 不接受 | `small` 是 ivregress 专属选项 |
+| `ivregress ..., vce(robust)` | **`cov_type="HC0"`** | Stata 的 `ivregress` 默认**不**乘 `n/(n-k)` |
+| `ivregress ..., vce(robust) small` | `cov_type="HC1"` | 加 `small` 后 Stata 才乘该因子 |
+| `sureg ..., cov_type="robust"` | 字面量 `"robust"` | 其 sandwich 来自 `_reg3robust`，是独立实现，不是 HC1 |
+
+### 实测数据
+
+`grilic.dta` 上 `s` 的标准误：
+
+```
+reg lnw s expr, vce(robust)                     0.00638056877997
+    westata .fit(cov_type="HC1")               0.00638056877997   <- 命中
+    westata .fit(cov_type="HC0")               0.00636792980662   <- 不命中
+
+ivregress 2sls lnw expr (s = rns mrt), vce(robust)   0.04061066342746
+    westata .fit(cov_type="HC0")                     0.04061066342742   <- 命中
+    westata .fit(cov_type="HC1")                     0.04069126687443   <- 不命中
+```
+
+**注意两个命令族对同一个拼写取了相反的形态**：
+`regress` 是 HC1，`ivregress` 是 HC0。
+
+### 直接写 `cov_type="robust"`
+
+也可以直接用 Stata 的写法，包内按命令族解析，省去记表：
+
+```python
+ws.OLS.from_formula("lnw ~ s + expr", df).fit(cov_type="robust").cov_type      # 'HC1'
+ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", df).fit(
+    cov_type="robust"
+).cov_type                                                                    # 'HC0'
+```
+
+结果对象存的是**规范名**，不是你输入的别名——
+回显 `"robust"` 只会重新制造这一节要消除的混淆。
+
+### 被拒绝的选项及原因
+
+`cov_type="HC2"`/`"HC3"` 对 IV 估计量会报错：Stata 的 `ivregress`
+没有杠杆校正的稳健 VCE，把 HC0 的数字贴成 HC2 标签是**伪造**
+而非近似。`e(df_r)` 存 `N` 是同类原因——Stata 在未给 `small`
+时留空，而 statsmodels 的接口无法表示「存的缺失值」。
 
 ## 线性模型与工具变量
 

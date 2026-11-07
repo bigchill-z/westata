@@ -10,6 +10,7 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 
 ## Contents
 
+- **Robust standard errors** — [Stata `robust` vs `HC0`/`HC1`](#robust-standard-errors-stata-robust-versus-hc0hc1)
 - **Linear models and IV** — [`OLS`](#ols), [`FEOLS`](#feols), [`PanelOLS`](#panelols), [`RandomEffects`](#randomeffects), [`BetweenOLS`](#betweenols), [`FirstDifferenceOLS`](#firstdifferenceols), [`IV2SLS`](#iv2sls), [`IVLIML`](#ivliml), [`IVGMM`](#ivgmm), [`XtIvreg`](#xtivreg), [`XtGls`](#xtgls), [`XtPcse`](#xtpcse), [`XtAbond`](#xtabond), [`Eivreg`](#eivreg), [`Sureg`](#sureg), [`Mvreg`](#mvreg), [`RobustRegression`](#robustregression), [`QuantileRegression`](#quantileregression), [`Bsqreg`](#bsqreg), [`Sqreg`](#sqreg), [`NeweyWestResult`](#neweywestresult), [`Nl`](#nl)
 - **Discrete choice, counts and limited responses** — [`Logit`](#logit), [`Probit`](#probit), [`OrderedLogit`](#orderedlogit), [`OrderedProbit`](#orderedprobit), [`Poisson`](#poisson), [`NegativeBinomial`](#negativebinomial), [`NegativeBinomialNB1`](#negativebinomialnb1), [`ZeroInflatedPoisson`](#zeroinflatedpoisson), [`ZeroInflatedNegativeBinomial`](#zeroinflatednegativebinomial), [`TruncatedPoisson`](#truncatedpoisson), [`TruncatedNegativeBinomial`](#truncatednegativebinomial), [`Tobit`](#tobit), [`Truncreg`](#truncreg), [`Intreg`](#intreg), [`Heckman`](#heckman), [`Etregress`](#etregress), [`Frontier`](#frontier), [`XtLogit`](#xtlogit), [`XtProbit`](#xtprobit), [`XtPoisson`](#xtpoisson), [`XtNbreg`](#xtnbreg), [`XtTobit`](#xttobit)
 - **Time series, multivariate and panel roots** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
@@ -19,6 +20,61 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 - **Working with a fitted result** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **Errors and support types** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
 - **Other names** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`SummarizeResult`](#summarizeresult), [`dfgls`](#dfgls), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`level`](#level), [`odds_ratios`](#odds_ratios), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+
+## Robust standard errors: Stata's `robust` versus `HC0`/`HC1`
+
+> **Read this before comparing a robust standard error against Stata.** The same Stata option
+> name maps to a DIFFERENT small-sample factor depending on the command, and mixing them up
+> produces standard errors that look plausible and are wrong in the third digit.
+
+### The mapping
+
+| Stata | corresponds to | why |
+|---|---|---|
+| `regress ..., vce(robust)` | **`cov_type="HC1"`** | Stata's `regress` multiplies by `n/(n-k)` |
+| `regress ..., vce(robust) small` | not accepted by Stata | `small` is ivregress-only |
+| `ivregress ..., vce(robust)` | **`cov_type="HC0"`** | Stata's `ivregress` does NOT apply the `n/(n-k)` factor unless `small` is given |
+| `ivregress ..., vce(robust) small` | `cov_type="HC1"` | the factor Stata applies with `small` |
+| `sureg ..., cov_type="robust"` | the literal label `"robust"` | its sandwich comes from `_reg3robust`, a separate implementation, not HC1 |
+
+### The measurement behind the table
+
+On `grilic.dta`, standard error of `s`:
+
+```
+reg lnw s expr, vce(robust)                     0.00638056877997
+    westata .fit(cov_type="HC1")               0.00638056877997   <- matches
+    westata .fit(cov_type="HC0")               0.00636792980662   <- does not
+
+ivregress 2sls lnw expr (s = rns mrt), vce(robust)   0.04061066342746
+    westata .fit(cov_type="HC0")                     0.04061066342742   <- matches
+    westata .fit(cov_type="HC1")                     0.04069126687443   <- does not
+```
+
+Note the two families pick OPPOSITE flavours for the same spelling. `regress` is HC1; `ivregress`
+is HC0.
+
+### Writing `cov_type="robust"` instead of a number
+
+Both flavours are also reachable by the Stata spelling, resolved per command family so the caller
+does not have to remember the table:
+
+```python
+ws.OLS.from_formula("lnw ~ s + expr", df).fit(cov_type="robust").cov_type      # 'HC1'
+ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", df).fit(
+    cov_type="robust"
+).cov_type                                                                    # 'HC0'
+```
+
+The result stores the CANONICAL name, not the alias you typed -- echoing `"robust"` back would
+reproduce exactly the confusion this section exists to prevent.
+
+### What is refused, and why
+
+`cov_type="HC2"` and `"HC3"` raise for IV estimators: Stata's `ivregress` has no leverage-corrected
+robust VCE, so reporting an HC0 number under an HC2 label would be a fabrication rather than an
+approximation. `e(df_r)` stores `N` for the same class of reason -- Stata leaves it missing unless
+`small` is given, and a stored missing cannot be represented in the statsmodels surface.
 
 ## Linear models and IV
 

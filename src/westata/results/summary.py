@@ -2884,13 +2884,14 @@ def _stata_summary(result: Any) -> str:
                     # A Gamma random effect is CLOSED FORM -- nothing is integrated numerically,
                     # so Stata prints neither "Integration method" nor "Integration pts." and the
                     # block is two rows shorter than the logit/probit one.
+                    # The left list here must not be longer than the right: ml_right for a count
+                    # model carries Number of obs / Number of groups / Obs per group / min / avg
+                    # / max / Wald chi2 / Prob > chi2 -- nine rows -- and extra blanks on the left
+                    # pushed the whole block down. Measured in round 240 by printing both lists.
                     _left_rows = [
                         f"Group variable: {_entity or '.'}",
                         "",
                         f"Random effects u_i ~ {_dist_name}",
-                        "",
-                        "",
-                        "",
                         "",
                         "",
                         "",

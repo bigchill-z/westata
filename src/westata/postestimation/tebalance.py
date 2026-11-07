@@ -53,47 +53,40 @@ import numpy as np
 __all__ = ["BalanceRow", "BalanceSummary", "tebalance_summarize"]
 
 
-def _no_leading_zero(value: float, decimals: int, *, truncate: bool = False) -> str:
-    """Format with fixed decimals but strip the leading zero, as Stata prints these cells.
+def _no_leading_zero(value: float, *args: Any, **kwargs: Any) -> str:
+    """Stata's cell format for ``tebalance summarize``: SEVEN DECIMALS when the integer part is
+    zero, SIX when it is a single digit -- the leading zero is simply dropped.
 
-    Measured from ``tebalance summarize``: ".1072771", "-.1745611", "1.027755" -- the sign is
-    kept and the zero before the point is dropped, matching the %9.0g convention used
-    elsewhere in this package.
+    The rule was derived from the raw floats and Stata's printed text rather than guessed, which
+    is what four earlier attempts had been doing. All 32 cells of the reference table satisfy it:
+
+        .1072771  (0.10727712146...)    1.027755  (1.0277552846...)
+        -.0030807 (-0.003080708...)     1.081843  (1.0818427881...)
+        .9250286  (0.9250286484...)     1.180212  (1.1802124505...)
+
+    Every printed value carries SEVEN digits in total, sign excluded -- the decimal point does not
+    count against them. Rounding is half-up for BOTH columns; an earlier note claimed the variance
+    ratio was truncated, which held for twelve cells and failed on four (0.7380952889 -> .7380953,
+    not .7380952).
+
+    Earlier attempts are recorded because each looked reasonable and was wrong: significant
+    figures, a fixed decimal count, a character budget that let the minus sign eat a digit, and
+    per-column rounding. The distinguishing evidence was writing the raw float beside the printed
+    text for every cell at once, instead of adjusting a formatter and re-running.
     """
 
     if not np.isfinite(value):
         return "."
-    # SEVEN SIGNIFICANT FIGURES, not fixed decimals, and the rounding must be EXPLICIT: Python's
-    # "g" presentation keeps as many digits as the float carries once they fit inside the request,
-    # so f"{v:.7g}" returned "-.003080708" (9 digits) where Stata prints "-.0030807". Stata also
-    # shows ".1072771" (7 decimals) beside "1.027755" (6 decimals) in the same column, which no
-    # fixed-decimal rule can produce.
-    from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP, localcontext
+    from decimal import Decimal, ROUND_HALF_UP, localcontext
 
     number = Decimal(repr(float(value)))
     if number == 0:
         return "0"
-    # This is Stata's field: the whole rendered cell is at most ``decimals`` CHARACTERS, counting
-    # a leading minus and the decimal point. Measured on `tebalance summarize`:
-    #     .1072771   (8 chars, 7 digits)      -.0030807  (9 chars, 7 digits after the point)
-    #     -.1745611  (9 chars)                .0476934   (8 chars)
-    # Note -.0030807 keeps SEVEN digits after the point, not five: the leading zero is dropped, so
-    # the digit count is driven by the characters available, which is why counting "significant
-    # figures" gave the wrong answer for small negative values.
-    adjusted = number.adjusted()
-    # The minus sign does NOT eat into the digit budget: '-.1745611' is ten characters while
-    # '.1072771' is eight, and both carry seven digits after the point.
-    budget = decimals
-    if adjusted >= 0:
-        places = max(budget - (adjusted + 1) - 1, 0)
-    else:
-        places = max(budget - 2, 0)
+    places = 6 if number.adjusted() >= 0 else 7
     quantum = Decimal(1).scaleb(-places)
     with localcontext() as context:
         context.prec = 40
-        rounded = number.quantize(
-            quantum, rounding=ROUND_DOWN if truncate else ROUND_HALF_UP
-        )
+        rounded = number.quantize(quantum, rounding=ROUND_HALF_UP)
     text = format(rounded, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
@@ -138,32 +131,53 @@ class BalanceSummary:
         and printed 66-character rows with each statistic one column off.
         """
 
-        def _field(
-            value: float, places: int, end: int, current: int, *, truncate: bool = False
-        ) -> str:
-            text = _no_leading_zero(value, places, truncate=truncate)
+        def _field(value: float, end: int, current: int) -> str:
+            """Right-align the formatted cell to column ``end``.
+
+            The width is no longer a parameter: the formatter decides the decimals, and only the
+            padding position varies.
+            """
+            text = _no_leading_zero(value)
             return " " * max(end - current - len(text), 0) + text
 
         lines = [
             "Covariate balance summary",
-            f"{'':>25}{'Raw':>10}{'Matched':>8}",
+            "",
+            # Column ends measured from Stata: "Raw" ends at 28, "Matched" at 41, and the three
+            # observation counts end at 28 / 41 as well.
+            f"{'Raw':>28}{'Matched':>13}",
             "-" * 41,
-            f"Number of obs = {self.nobs_raw:>12}{self.nobs_matched:>11}",
-            f"Treated obs   = {self.treated_raw:>12}{self.treated_matched:>11}",
-            f"Control obs   = {self.control_raw:>12}{self.control_matched:>11}",
+            # The three counts END at columns 28 and 41, the same two positions as "Raw"/"Matched".
+            f"{'Number of obs =':<20}{self.nobs_raw:>8}{self.nobs_matched:>13}",
+            f"{'Treated obs   =':<20}{self.treated_raw:>8}{self.treated_matched:>13}",
+            f"{'Control obs   =':<20}{self.control_raw:>8}{self.control_matched:>13}",
             "-" * 41,
             "",
             "-" * 65,
-            f"{'':<16}|{'Standardized differences':>26}{'Variance ratio':>18}",
-            f"{'':<16}|{'Raw':>9}{'Matched':>13}{'Raw':>11}{'Matched':>11}",
+            # Header positions measured from Stata: the pipe sits at 16, then
+            #   "Standardized differences" starts at 17 and "Variance ratio" at 51;
+            #   "Raw" at 25, "Matched" at 33, second "Raw" at 51, second "Matched" at 58.
+            f"{'':>16}|{'Standardized differences':<34}{'Variance ratio'}",
+            # Built from measured offsets rather than field widths: their interaction was the
+            # source of three failed attempts at this single line.
+            " " * 16
+            + "|"
+            + " " * 8
+            + "Raw"
+            + " " * 5
+            + "Matched"
+            + " " * 11
+            + "Raw"
+            + " " * 4
+            + "Matched",
             "-" * 16 + "+" + "-" * 48,
         ]
         for row in self.rows:
             line = f"{row.name:>15} |"
-            line += _field(row.raw_std_diff, 9, 28, len(line))
-            line += _field(row.matched_std_diff, 9, 40, len(line))
-            line += _field(row.raw_variance_ratio, 9, 54, len(line), truncate=True)
-            line += _field(row.matched_variance_ratio, 9, 65, len(line), truncate=True)
+            line += _field(row.raw_std_diff, 28, len(line))
+            line += _field(row.matched_std_diff, 40, len(line))
+            line += _field(row.raw_variance_ratio, 54, len(line))
+            line += _field(row.matched_variance_ratio, 65, len(line))
             lines.append(line)
         lines.append("-" * 65)
         return "\n".join(lines)

@@ -109,9 +109,8 @@ def test_the_matched_column_matches_stata(summary) -> None:
 
 
 def test_every_data_row_is_sixty_five_characters(summary) -> None:
-    """The width Stata uses; the interior spacing is the recorded gap."""
+    """The width Stata uses, and every row matches it byte for byte (round 164)."""
 
-    # Eight covariates; the header rows also contain " |" and are excluded by requiring a name.
     names = {row.name for row in summary.rows}
     lines = [
         line
@@ -120,6 +119,28 @@ def test_every_data_row_is_sixty_five_characters(summary) -> None:
     ]
     assert len(lines) == 8
     assert all(len(line) == 65 for line in lines)
+
+
+#: Full data rows from a live `tebalance summarize`, pinned verbatim in round 164.
+STATA_ROWS = [
+    "            age |   .1072771   -.0030807      1.027755   1.081843",
+    "      education |   .1412198    .1041542      1.551284   1.213356",
+    "          black |   .0438866   -.0769979      .9250286   1.170807",
+    "       hispanic |  -.1745611    .0476934      .5828804   1.208333",
+    "        married |   .0936407    .0278399      1.180212   1.046651",
+    "       nodegree |  -.3039864   -.1223973      1.499755   1.140232",
+    "           re74 |  -.0021599   -.0172992      .7380953   .7524242",
+    "           re75 |   .0838632   -.1507322      1.076344   .5813152",
+]
+
+
+def test_every_data_row_matches_stata_byte_for_byte(summary) -> None:
+    """The layout gap recorded in round 163 was closed: seven decimals, or six past a 1-digit
+    integer part, rounding half-up in BOTH columns, leading zero dropped."""
+
+    mine = str(summary).splitlines()
+    for expected in STATA_ROWS:
+        assert expected in mine, repr(expected)
 
 
 def test_omitting_the_weights_leaves_the_columns_identical(summary) -> None:

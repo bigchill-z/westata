@@ -1404,11 +1404,24 @@ class StataResults:
     def wald_test(self, R: Any, q: Any = None, scalar: bool = True) -> Any:
         """statsmodels-compatible joint Wald test.
 
-        Mirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object
-        with ``statistic``, ``df_denom``, ``df_num`` and ``pvalue``.  When
-        ``scalar`` is False a chi2 test is returned instead of the F test, which
-        matches statsmodels' documented behaviour.
+        Mirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object with
+        ``statistic``, ``df_denom``, ``df_num`` and ``pvalue``. When ``scalar`` is False a
+        chi2 test is returned instead of the F test, matching statsmodels' behaviour.
+
+        R MAY BE A CONSTRAINT STRING, as statsmodels allows: ``wald_test("s = 0")``.
+        statsmodels accepts a formula-like expression and so does this method -- the parsing
+        is delegated to :meth:`test`, which already speaks Stata's constraint syntax. Only the
+        return SHAPE differs: ``test`` reports Stata's F statistic with ``df``/``df_denom``,
+        which is what a caller of ``wald_test`` is asking for anyway.
         """
+
+        # A string (or a list holding one) is a CONSTRAINT, not a matrix. Feeding it to
+        # np.asarray(..., dtype=float) raised 'could not convert string to float' -- the
+        # deviation the v3 report records at section 4.
+        if isinstance(R, str):
+            return self.test(R)
+        if isinstance(R, (list, tuple)) and R and all(isinstance(item, str) for item in R):
+            return self.test(*R)
 
         from westata.postestimation.api import statsmodels_wald_test
 

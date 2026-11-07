@@ -4426,8 +4426,13 @@ def _stata_summary(result: Any) -> str:
     #
     # 2*(ll - ll_0) = 2*(-348.7264 + 397.8659) = 98.28, and the p-value is HALF the chi2(1) tail
     # for the same boundary reason as the alpha test.
+    # A LINEAR xtreg fit ALSO stores e(rho) but prints NO such test -- its decomposition block
+    # (sigma_u/sigma_e/rho) and the "F test that all u_i=0" are the whole tail. Restricting this
+    # to the NON-LINEAR family is what keeps xtreg, fe at its measured 42 lines; without the
+    # exclusion the test was inserted after _cons and pushed the block to 43 (round 245).
     _is_re_rho_shape = (
-        not _has_alpha
+        block == "ml"
+        and not _has_alpha
         and np.isfinite(_e_float(result, "rho"))
         and str(getattr(result, "model_name", "") or "").startswith("xt")
     )

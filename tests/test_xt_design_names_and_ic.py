@@ -10,7 +10,7 @@ because the name is not recoverable from the result: ``model_data`` carries the 
 group labels, not the column name. The estimator now records ``e(ivar)``/``e(tvar)`` from
 the frame the caller passed, and the block prints::
 
-    Group variable:   firm          Number of groups    =        100
+    Group variable: firm            Number of groups    =        100
 
 **``e(ic)`` was still the old penalty-term formula here.** Round 238 corrected
 ``discrete.py`` after the ``poisson_sim`` fixture (``ic = 1.0`` with two parameters)
@@ -75,7 +75,11 @@ def test_the_rendered_block_prints_the_name(fitted) -> None:
 
     assert "Group variable:" in rendered
     assert "Group variable:   ." not in rendered
-    assert "Group variable:   firm" in rendered
+    assert "Group variable: firm" in rendered
+    # CORRECTED in round 245: ONE space after the colon. Re-measured on this fixture with a live
+    # `xtlogit y x1, fe` -- 'Group variable: firm' -- after round 224 fixed the padding and this
+    # assertion was left holding the old three-space form.
+    assert "Group variable:   firm" not in rendered
 
 
 def test_the_name_comes_from_the_argument_not_from_model_data(fitted) -> None:

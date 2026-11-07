@@ -746,14 +746,35 @@ def _panel_design_block(result: Any) -> list[str]:
         #
         # Left column 53, right column 25 (label 18, " =", value 7). The old version used
         # 18/14 splits, which is why the earlier output was 64/69 wide instead of 78.
+        # A RANDOM-EFFECTS fit names the distribution of u_i on its own row, in the LEFT column,
+        # opposite the "Obs per group:" heading, and pushes the per-group block one row down:
+        #
+        #   Group variable: sid                      Number of obs     =        600
+        #                                            Number of groups  =         30
+        #   (blank)
+        #   Random effects u_i ~ Gaussian            Obs per group:
+        #                                                        min =         20
+        #
+        # `xtlogit ..., fe` prints NO such row -- confirmed against a live run of both variants.
+        _is_random_effects = bool(e_macros.get("sigma_u") is not None) or "re" in str(
+            e_macros.get("title") or ""
+        ) or str(getattr(result, "model_name", "") or "").endswith(", re")
         lines = [
             f"{'Group variable:':<18}{entity or '.':<35}"
             f"{'Number of groups':<17}= {_number('N_g'):>7}",
-            f"{'':<53}{'Obs per group:':>25}",
-            f"{'':<53}{'min':>18} = {_number('g_min'):>7}",
-            f"{'':<53}{'avg':>18} = {_number('g_avg'):>7}",
-            f"{'':<53}{'max':>18} = {_number('g_max'):>7}",
         ]
+        if _is_random_effects:
+            lines.append("")
+            lines.append(f"{'Random effects u_i ~ Gaussian':<53}{'Obs per group:':>25}")
+        else:
+            lines.append(f"{'':<53}{'Obs per group:':>25}")
+        lines.extend(
+            [
+                f"{'':<53}{'min':>18} = {_number('g_min'):>7}",
+                f"{'':<53}{'avg':>18} = {_number('g_avg'):>7}",
+                f"{'':<53}{'max':>18} = {_number('g_max'):>7}",
+            ]
+        )
         _chi2 = _e_float(result, "chi2")
         _ll = _e_float(result, "ll")
         _p = _e_float(result, "p")

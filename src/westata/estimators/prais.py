@@ -70,7 +70,7 @@ def prais_winsten(
     endog: np.ndarray,
     *,
     maxiter: int = 100,
-    tolerance: float = 1e-8,
+    tolerance: float = 1e-6,
     rho: float | None = None,
     corc: bool = False,
 ) -> tuple[np.ndarray, float, int]:
@@ -109,8 +109,22 @@ def prais_winsten(
         residual = y - x @ updated
         next_rho = _rho_from_residuals(residual)
         if rho is not None or abs(next_rho - current_rho) < tolerance:
-            coefficients = updated
-            current_rho = next_rho if rho is None else current_rho
+            # Stata reports the rho it stopped AT, but the coefficients refitted AT that rho --
+            # not the ones from the previous pass. Measured on icecream.dta: stopping at
+            # rho .8002264 with the previous coefficients gives price -1.0488550 and
+            # _cons .5870043, while refitting once more gives -1.0488545 ... .5870049, which is
+            # what Stata prints (-1.048854, .5870049).
+            final_rho = next_rho if rho is None else current_rho
+            if rho is None:
+                transformer = _transform_corc if corc else _transform
+                final_x = np.column_stack(
+                    [transformer(x[:, j], final_rho) for j in range(x.shape[1])]
+                )
+                final_y = transformer(y, final_rho)
+                coefficients = ols(final_x, final_y)
+            else:
+                coefficients = updated
+            current_rho = final_rho
             break
         coefficients = updated
         current_rho = next_rho
@@ -362,7 +376,7 @@ def prais(
     formula: str,
     *,
     maxiter: int = 100,
-    tolerance: float = 1e-8,
+    tolerance: float = 1e-6,
     corc: bool = False,
 ) -> PraisResult:
     """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.

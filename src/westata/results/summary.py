@@ -2884,14 +2884,19 @@ def _stata_summary(result: Any) -> str:
                     # A Gamma random effect is CLOSED FORM -- nothing is integrated numerically,
                     # so Stata prints neither "Integration method" nor "Integration pts." and the
                     # block is two rows shorter than the logit/probit one.
-                    # The left list here must not be longer than the right: ml_right for a count
-                    # model carries Number of obs / Number of groups / Obs per group / min / avg
-                    # / max / Wald chi2 / Prob > chi2 -- nine rows -- and extra blanks on the left
-                    # pushed the whole block down. Measured in round 240 by printing both lists.
+                    # Row map measured in round 241 by printing both lists:
+                    #
+                    #   idx 8  ''   ''            <- blank, BOTH columns
+                    #   idx 9  ''   'Wald chi2(1)'
+                    #   idx 10 'Log likelihood = ...'   'Prob > chi2'
+                    #
+                    # so the blank goes into ml_right too -- round 240 put it only on the left,
+                    # which is why adding and removing it never moved the Wald row.
                     _left_rows = [
                         f"Group variable: {_entity or '.'}",
                         "",
                         f"Random effects u_i ~ {_dist_name}",
+                        "",
                         "",
                         "",
                         "",
@@ -2930,6 +2935,10 @@ def _stata_summary(result: Any) -> str:
                             ("", ""),
                         ]
                     )
+                else:
+                    # The count shape's blank sits HERE, on the right, so "Wald chi2" lands on
+                    # the row after it. Two entries keep the columns the same length.
+                    _right_rows.extend([("", "")])
             else:
                 # ROW MAP measured in round 238 by printing both lists at the assembly loop:
                 #

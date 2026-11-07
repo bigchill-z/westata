@@ -1388,7 +1388,13 @@ class StataResults:
             name="odds_ratio",
         )
 
-    def summary(self, style: str = "statsmodels", *, odds_ratio: bool = False) -> str:
+    def summary(
+        self,
+        style: str = "statsmodels",
+        *,
+        odds_ratio: bool = False,
+        first: bool = False,
+    ) -> str:
         """Render a text summary.
 
         Parameters
@@ -1399,17 +1405,39 @@ class StataResults:
             Exponentiate the coefficients, their standard errors and both interval
             endpoints, and relabel the column "Odds ratio" -- Stata's ``logit ..., or``.
             z and P>|z| are unaffected, since they come from the untransformed scale.
+        first:
+            Prepend the first-stage regression, as Stata's ``ivregress ..., first`` does. Only
+            available for results that expose ``first_stage()``; the block is the one that method
+            already renders, which matches Stata line for line.
         """
 
+        if first:
+            renderer = getattr(self, "first_stage", None)
+            if renderer is None:
+                raise TypeError(
+                    "summary(first=True): this result has no first-stage regression. "
+                    "Stata's `first` option exists on ivregress/ivreg2 only."
+                )
+            body = (
+                render_summary(self, style)
+                if not odds_ratio
+                else self._odds_ratio_summary(style)
+            )
+            return f"{renderer()}\n\n\n{body}"
         if odds_ratio:
-            # A shallow copy carries the flag without mutating the fit, so two summaries of
-            # the same result can differ. ``copy.copy`` keeps the shared arrays shared.
-            import copy as _copy
-
-            clone = _copy.copy(self)
-            clone._odds_ratio = True
-            return render_summary(clone, style)
+            return self._odds_ratio_summary(style)
         return render_summary(self, style)
+
+    def _odds_ratio_summary(self, style: str) -> str:
+        """The ``odds_ratio=True`` path, split out so ``first=`` can reuse it."""
+
+        # A shallow copy carries the flag without mutating the fit, so two summaries of
+        # the same result can differ. ``copy.copy`` keeps the shared arrays shared.
+        import copy as _copy
+
+        clone = _copy.copy(self)
+        clone._odds_ratio = True
+        return render_summary(clone, style)
 
     def __repr__(self) -> str:
         name = self._model_name or "westata"

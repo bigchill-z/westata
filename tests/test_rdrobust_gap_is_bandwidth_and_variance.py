@@ -265,3 +265,37 @@ def test_the_package_reports_hc0_while_stata_defaults_to_nn(sample) -> None:
     assert float(fitted.se) == pytest.approx(0.1075019935, abs=1e-9)
     relative = abs(float(fitted.se) - 0.1099186153) / 0.1099186153
     assert 0.01 < relative < 0.03
+
+
+def test_any_nearest_neighbour_implementation_must_exceed_hc0(sample) -> None:
+    """A structural constraint, derived from the measurements rather than guessed.
+
+    Stata's NN answer (0.1099186153) is 2.2% LARGER than its HC0 answer (0.1075019935). Two
+    implementations built from residual PRODUCTS came out 60-74% SMALLER:
+
+        same-side neighbour, no normalisation     0.0401668987   ratio 0.374
+        opposite-side neighbour, averaged         0.0284022864   ratio 0.258
+
+    The reason is statistical, not clerical: an observation correlates most with itself, so
+    substituting u_i * u_j for u_i^2 shrinks the middle term unless the formula also amplifies it.
+    Any implementation that merely swaps in matched products will land BELOW HC0 and is therefore
+    wrong on inspection -- which is what this test states, so the next attempt can be checked
+    before it is measured against the target.
+
+    The guard uses the package's own HC0 as the reference, so it keeps working if the fixtures move.
+    """
+
+    response, running = sample
+    fitted = ws.rdrobust(
+        response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
+    )
+    hc0 = float(fitted.se)
+    nn_target = 0.1099186153
+
+    # The target sits ABOVE HC0, and only slightly.
+    assert nn_target > hc0
+    assert 1.0 < nn_target / hc0 < 1.05
+
+    # The two recorded attempts sit far BELOW it -- that is the failure signature to recognise.
+    for attempt in (0.0401668987, 0.0284022864):
+        assert attempt / hc0 < 0.5

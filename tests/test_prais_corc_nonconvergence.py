@@ -71,3 +71,18 @@ def test_a_higher_iteration_limit_does_converge(frame) -> None:
 
     fitted = ws.prais(frame, "consumption ~ price + income", corc=True, maxiter=1000)
     assert float(fitted.rho) == pytest.approx(0.9724596, abs=1e-6)
+
+
+def test_the_converged_coefficients_match_stata(frame) -> None:
+    """Stata with `iterate(1000)`: price -1.075987, income -.0033641, _cons 1.173607, rho .9724596.
+
+    This turns the non-convergence note into a complete account: at the limit where Stata stops the
+    package stops too, and at the limit where it finishes the numbers agree.
+    """
+
+    fitted = ws.prais(frame, "consumption ~ price + income", corc=True, maxiter=1000)
+
+    assert float(fitted.params["price"]) == pytest.approx(-1.075987, abs=1e-6)
+    assert float(fitted.params["income"]) == pytest.approx(-0.0033641, abs=1e-7)
+    assert float(fitted.params["Intercept"]) == pytest.approx(1.173607, abs=1e-6)
+    assert float(fitted.rho) == pytest.approx(0.9724596, abs=1e-7)

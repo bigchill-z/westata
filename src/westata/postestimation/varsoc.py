@@ -227,7 +227,12 @@ class VarSocResult:
                         (29, fpe_text(float(row.fpe), best_fpe)),
                         (39, starred(float(row.aic), best_aic)),
                         (49, starred(float(row.hqic), best_hqic)),
-                        (59, starred(float(row.sbic), best_sbic) + " "),
+                        # A starred value already fills the column the pad would take.
+                        (
+                            59,
+                            starred(float(row.sbic), best_sbic)
+                            + ("" if float(row.sbic) == best_sbic else " "),
+                        ),
                     ]
                 )
                 + " |"

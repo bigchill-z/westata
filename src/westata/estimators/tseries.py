@@ -1671,6 +1671,82 @@ class VARResults:
         frame.index.name = "step"
         return frame
 
+    def fevd_table_as_stata(self, periods: int = 10, *, irfname: str = "var1") -> str:
+        """``fevd_table`` rendered as Stata's ``irf table fevd, noci`` prints it.
+
+        ``fevd_table`` returns a DataFrame because that is more useful to a program; this returns the
+        TEXT Stata prints, which is what a layout comparison needs. Measured from a live run:
+
+            Results from var1
+
+            ------------------------------------------------------
+                     |      (1)         (2)         (3)         (4)
+                Step |     fevd        fevd        fevd        fevd
+            ---------+--------------------------------------------
+                   0 |        0           0           0           0
+                   1 |        1     .000423           0     .999577
+                   2 |  .997265     .001952     .002735     .998048
+            ------------------------------------------------------
+            (1) irfname = var1, impulse = y1, and response = y1.
+            ...
+
+        THE GEOMETRY IS THE SAME AS `irf_table` -- 9-wide first cell, 12-wide after, 54-character
+        rules -- so the two tables read as one family. The number format differs: these are shares,
+        so a bare ``0`` and ``1`` appear where the responses carry six decimals.
+        """
+
+        frame = self.fevd_table(periods=periods)
+        names = list(self.names)
+        # Columns are (impulse, response) with the response varying fastest, which is the order the
+        # DataFrame already carries.
+        ordered = list(frame.columns)
+
+        def _cell(value: float) -> str:
+            if not np.isfinite(value):
+                return "."
+            number = float(value)
+            text = f"{abs(number):.6f}" if abs(number) < 1.0 else f"{abs(number):.6g}"
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+            if number < 0:
+                text = "-" + text
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            return text
+
+        count = len(ordered)
+        inner_width = 9 + 12 * (count - 1)
+        label_cells = "".join(
+            f"{('(' + str(position + 1) + ')'):>{9 if position == 0 else 12}}"
+            for position in range(count)
+        )
+        word_cells = "".join(
+            f"{'fevd':>{9 if position == 0 else 12}}" for position in range(count)
+        )
+        lines = [
+            f"Results from {irfname}",
+            "-" * (9 + inner_width),
+            f"{'':>9}|{label_cells}",
+            f"{'Step':>8} |{word_cells}",
+            "-" * 9 + "+" + "-" * (inner_width - 1),
+        ]
+        for step in range(frame.shape[0]):
+            cells = "".join(
+                f"{_cell(float(value)):>{9 if position == 0 else 12}}"
+                for position, value in enumerate(frame.iloc[step].to_numpy())
+            )
+            lines.append(f"{step:>8} |{cells}")
+        lines.append("-" * (9 + inner_width))
+        for position, (impulse_name, response_name) in enumerate(ordered):
+            lines.append(
+                f"({position + 1}) irfname = {irfname}, "
+                f"impulse = {impulse_name}, "
+                f"and response = {response_name}."
+            )
+        return chr(10).join(lines)
+
     def forecast(self, steps: int = 1) -> np.ndarray:
         """Out-of-sample forecast (Stata ``fcast``).
 

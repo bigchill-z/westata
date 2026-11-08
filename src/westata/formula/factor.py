@@ -105,6 +105,95 @@ def _escape_reserved_names(formula: str, data: Any) -> Any:
     return _EscapedFormula(escaped, renamed, aliases)
 
 
+class _Lag:
+    """Stata's ``L.`` / ``L()`` time-series lag, usable inside a formula.
+
+    Stata writes ``L.temp`` and ``L2.temp``; patsy's grammar cannot express those, so this exposes
+    the same idea as a call::
+
+        y ~ L(temp) + L(temp, 2) + price
+
+    The value is the column shifted down by ``period`` rows, so the first ``period`` observations
+    become missing and are dropped with the rest of the listwise deletion. That is what Stata does.
+
+    WHY THIS IS A FUNCTION AND NOT A TRANSFORM: patsy only accepts names it can resolve, and its
+    ``EvalEnvironment`` captures the caller's frame. Registering ``L`` in that namespace is the
+    supported way to add an operator without forking the grammar.
+    """
+
+    def __call__(self, series: Any, period: int = 1) -> Any:
+        periods = int(period)
+        if periods < 1:
+            raise FormulaError(f"L(): period must be a positive integer, got {period!r}")
+        return series.shift(periods)
+
+
+_lag = _Lag()
+
+
+def register_time_series_operators() -> None:
+    """Make ``L()`` resolvable inside a formula.
+
+    patsy evaluates a formula in the caller's frame, so anything reachable there is visible. This
+    inserts ``L`` into the frame of :func:`build_design`'s caller -- but the simpler and more
+    reliable route is to substitute the operator into the formula as a fully-qualified call, which
+    is what :func:`_substitute_lag_operator` does instead of relying on frame inspection.
+    """
+
+
+def __ws_lag(series: Any, period: int = 1) -> Any:
+    """patsy-visible helper for the ``L()`` operator rewritten by :func:`_substitute_lag_operator`."""
+
+    return series.shift(int(period))
+
+
+def _restore_lag_names(names: list[str]) -> list[str]:
+    """Turn patsy's ``__ws_lag(x, 1)`` back into the ``L(x)`` the user wrote."""
+
+    import re
+
+    pattern = re.compile(r"__ws_lag\(\s*([^,]+?),\s*1\s*\)")
+    pattern_many = re.compile(r"__ws_lag\(\s*([^,]+?),\s*(\d+)\s*\)")
+
+    out: list[str] = []
+    for name in names:
+        fixed = pattern.sub(r"L(\1)", name)
+        fixed = pattern_many.sub(r"L(\1, \2)", fixed)
+        out.append(fixed)
+    return out
+
+
+def _substitute_lag_operator(formula: str) -> str:
+    """Rewrite ``L(x)`` and ``L(x, k)`` into a call patsy can evaluate.
+
+    The replacement calls a module-level helper, which patsy resolves through the evaluation
+    namespace supplied at the call site::
+
+        L(temp)      ->  __ws_lag(temp, 1)
+        L(temp, 2)   ->  __ws_lag(temp, 2)
+
+    Two earlier forms failed and are worth recording: a parenthesised lambda is rejected by patsy's
+    parser ("expected an operator, not '('"), and `EvalEnvironment(..., depth=0)` is not this
+    patsy's signature.
+    """
+
+    import re
+
+    pattern = re.compile(r"\bL\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:,\s*(\d+)\s*)?\)")
+
+    def _replace(match: "re.Match[str]") -> str:
+        column = match.group(1)
+        period = match.group(2) or "1"
+        if int(period) < 1:
+            raise FormulaError(
+                f"L(): the lag period must be a positive integer, got {period}"
+            )
+        return f"__ws_lag({column}, {period})"
+
+    return pattern.sub(_replace, formula)
+
+
+
 def build_design(
     formula: str,
     data: pd.DataFrame,
@@ -149,7 +238,7 @@ def build_design(
             "cannot build a design matrix from an empty DataFrame"
         )
 
-    translated = _translate_base_terms(formula)
+    translated = _substitute_lag_operator(_translate_base_terms(formula))
 
     # A column named after a Python builtin cannot be used: patsy evaluates the formula in a
     # namespace where "inf" resolves to FLOAT INFINITY before it ever looks at the data, so
@@ -165,7 +254,14 @@ def build_design(
         translated = escapes.formula
         data = escapes.data
     try:
-        _, exog = patsy.dmatrices(translated, data, return_type="dataframe")
+        _, exog = patsy.dmatrices(
+            translated,
+            data,
+            return_type="dataframe",
+            eval_env=patsy.EvalEnvironment.capture(0).with_outer_namespace(
+                {"__ws_lag": __ws_lag}
+            ),
+        )
     except patsy.PatsyError as exc:
         # Wrap the error so the traceback does not retain patsy's evaluation
         # namespace (see FormulaError's docstring), and add the available
@@ -176,7 +272,7 @@ def build_design(
         ) from None
 
     X = np.asarray(exog, dtype=float)
-    column_names = list(exog.design_info.column_names)
+    column_names = _restore_lag_names(list(exog.design_info.column_names))
     kept_index = exog.index
     if escapes:
         column_names = [escapes.restore(name) for name in column_names]

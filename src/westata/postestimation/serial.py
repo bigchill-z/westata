@@ -97,9 +97,33 @@ class DurbinWatsonResult:
           1.70435 for the middle one, which is six FIGURES rather than six decimals.
         """
 
-        value = f"{self.d:.6f}".rstrip("0")
-        if value.endswith("."):
-            value += "0"
+        # TWO RULES, SPLIT AT 1 -- the same shape this package has had to apply to several other tables.
+        # Measured at two sample sizes, where the statistic is small:
+        #
+        #     0.0127663  -> .0127663     seven SIGNIFICANT figures, leading zero dropped
+        #     0.0070096  -> .0070096
+        #
+        # while the earlier captures all above 1 were six DECIMALS with the trailing zero trimmed:
+        #
+        #     1.021169   1.704354   1.75295
+        #
+        # Six decimals below 1 gave '.012766' where Stata prints '.0127663'.
+        if abs(float(self.d)) < 1.0:
+            # SEVEN DECIMALS WITH THE TRAILING ZEROS TRIMMED, then the leading zero dropped. Not seven
+            # significant figures: 0.007009565 renders as .0070096 (five significant figures), which
+            # ".6g" shortens to .00700956 and ".7g" lengthens to .007009565. Three values settle it:
+            #
+            #     0.007009565 -> .0070096
+            #     0.01276632  -> .0127663
+            #     0.012766    -> .012766
+            value = f"{abs(float(self.d)):.7f}".rstrip("0")
+            if value.startswith("0."):
+                value = value[1:]
+            value = ("-" if float(self.d) < 0 else "") + value
+        else:
+            value = f"{self.d:.6f}".rstrip("0")
+            if value.endswith("."):
+                value += "0"
         return (
             "\n"
             f"Durbin\u2013Watson d-statistic({self.df:>3.0f}, {self.nobs:>5d})"

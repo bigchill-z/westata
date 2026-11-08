@@ -894,3 +894,64 @@ fpe = ((sample_size + k * equations + 1) / sample_size) ** equations * det
   比"有数值无表格"更难被发现。
 - **下一步**：先只改一个单元格，把 `_format_complex` 的输出与目标位置一起打印出来，
   量出内缩量再一次性套用，不要继续试对齐方向。
+
+### T18. `rcm` 的参数语义：不是协变量调整，是控制单位选择（第 86 轮确认）
+
+报告 C19-01 评 0.033。本轮核实时先**误读了契约**，值得记录。
+
+**第一版误用**：传了 3 列协变量
+
+```python
+ws.rcm(y, df[['p1','p2','p3']], unit, time, treated_unit=9, treatment_period=15)
+```
+
+结果 `r.predictors == ('2','12','15')`——**是单位编号，不是我传的 p1/p2/p3**。
+当时判断为"缺陷"，读源码后确认是**我的用法错了**。
+
+**根因**（`rcm.py:178-181`）：
+
+```python
+primary = x[:, 0]                      # 只取 predictors 的第一列
+lookup[(name, period)] = value         # 每个 (unit, period) 存一个数
+...
+candidates = controls                  # 候选是"控制单位"
+```
+
+**真实契约**（docstring L141-147 明确写着）：
+
+- `predictors`（通常直接传 `response` 本身）= 每个单位在每个期的**结果序列**；
+- 候选预测变量是**控制单位**，不是协变量列；
+- `selected=(1,2,3)` 用于直接指定控制单位（复现 Stata 的 `rcm y x, trunit() trperiod()` 选定同一组）。
+
+**已验证**：`selected=(1,2,3)` 时 `r.predictors == ('1','2','3')`，与传入一致。
+
+- **未完成**：ATT 的数值对照。两次尝试构造的安慰剂数据都退化了
+  （`ctrl` 与 `out` 同值 → Stata att ≈ 0，本包 1.113336），**数据构造有误，不是实现差异**。
+- **下一步**：用 `munnell.dta` 或真实的州级面板做对照，不要用随机生成的同值序列。
+  同时注意 Stata 的 `rcm` 会 `reshape` 并占用 `<var>1` 之类名字，
+  同一会话内重复运行需先 `clear` 或改用不同变量名。
+
+### T18 补充：`rcm` 的 Stata 对照被会话状态卡住（环境事实，第 86 轮）
+
+多次尝试均报 **`variable <var>1 already defined` / `<var>0 already defined`**（`r(110)`），
+分别对 `gdp`、`out`、`yy`、`zz` 四种变量名出现，`clear all` 也无效。
+`StataSession.push()` 不接受 `replace=` 参数。
+
+**结论**：Stata 的 `rcm` 会 `reshape` 出 `<var>0`/`<var>1` 这类临时变量，
+而 `StataSession` 是进程级单例、数据集跨调用保留，所以**同一进程内第二次 `rcm` 必然冲突**。
+
+- **这不是本包缺陷**，是采集脚本的限制。
+- **正确做法**（下次照此执行）：每个 `rcm` 对照都**独立起一个 Python 进程**
+  （即每次 `pwsh` 调用只跑一个 `rcm`），不要在一次调用里先跑本包再跑 Stata。
+- **本轮已验证的部分**：`selected=(1,2,3)` 时 `r.predictors == ('1','2','3')`，契约正确。
+- **仍未验证**：ATT 数值对照。需要用**独立进程**分别跑，下一次执行。
+
+**附：`rcm` 的正确调用形态**（经源码确认）
+
+```python
+ws.rcm(response, response, unit, time,
+       treated_unit=<id>, treatment_period=<first treated period>,
+       selected=(<control units>))
+```
+
+第二个参数是"控制单位序列"，不是协变量矩阵。

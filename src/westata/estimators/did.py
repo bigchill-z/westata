@@ -951,3 +951,119 @@ class Xtdidregress(Didregress):
                 "within a panel; aggregate or deduplicate the data first, or "
                 "use didregress for a genuinely repeated cross-section."
             )
+
+def estat_ptrends(result: Any) -> dict[str, float]:
+    """`estat ptrends` after `didregress`: the parallel-trends test over the pretreatment periods.
+
+    Stata, on a 60-group / 15-period panel with 20 treated (synthetic, seeded):
+
+        Parallel-trends test (pretreatment time period)
+        H0: Linear trends are parallel
+
+        F(1, 59) =   0.25
+        Prob > F = 0.6182
+
+    `F(1, 59)` reads as ONE linear-trend interaction against `n_groups - 1` denominator degrees of
+    freedom. Restricting to the periods before anyone is treated and testing whether the treated
+    group's linear time trend differs from the controls' is exactly that: a single interaction,
+    `treated_indicator * period`, with the group and period effects absorbed by the panel.
+
+    THE FIRST PROTOTYPE FOR THIS FAILED and the reason is worth keeping: putting BOTH the treatment
+    dummy and the interaction into the pretreatment subsample makes them collinear -- before
+    treatment begins the dummy is constant within group and the interaction is the dummy times the
+    period -- so the design is rank deficient. Only the interaction belongs in the design.
+    """
+
+    info = (getattr(result, "e", {}) or {}).get("_did_info")
+    if not info:
+        raise ConsistencyError(
+            "estat ptrends: only available after a didregress fit; this result carries no DID design"
+        )
+
+    frame = getattr(result, "model_data", None)
+    if frame is None:
+        raise ConsistencyError("estat ptrends: the estimation data was not retained")
+
+    time_name = str(info.get("time_name") or "")
+    treatment_name = str(info.get("treatment_name") or "")
+    group_name = str((getattr(result, "e", {}) or {}).get("group") or "")
+    first_treated = float(info.get("treated_min") or float("nan"))
+
+    if not time_name or not treatment_name or not group_name:
+        raise ConsistencyError("estat ptrends: the DID design is incomplete")
+    if not np.isfinite(first_treated):
+        raise ConsistencyError("estat ptrends: the design does not record when treatment begins")
+    for needed in (time_name, treatment_name, group_name):
+        if needed not in frame.columns:
+            raise ConsistencyError(f"estat ptrends: {needed!r} is missing from the stored data")
+
+    response_name = str((getattr(result, "e", {}) or {}).get("depvar") or "")
+    if response_name not in frame.columns:
+        raise ConsistencyError("estat ptrends: the dependent variable is missing")
+
+    periods = pd.to_numeric(frame[time_name], errors="coerce").to_numpy(dtype=float)
+    outcome = pd.to_numeric(frame[response_name], errors="coerce").to_numpy(dtype=float)
+    treated_flag = pd.to_numeric(frame[treatment_name], errors="coerce").to_numpy(dtype=float)
+    units = frame[group_name].to_numpy()
+
+    # A unit is "eventually treated" when its treatment dummy ever turns on.
+    eventually: dict[Any, bool] = {}
+    for unit in pd.unique(units):
+        mask = units == unit
+        eventually[unit] = bool(np.nanmax(treated_flag[mask]) > 0.5)
+
+    pretreat = (periods < first_treated) & np.isfinite(outcome) & np.isfinite(periods)
+    if pretreat.sum() < 4:
+        raise ConsistencyError(
+            "estat ptrends: too few pretreatment observations to test a linear trend"
+        )
+
+    year = periods[pretreat]
+    y = outcome[pretreat]
+    indicator = np.array([1.0 if eventually[u] else 0.0 for u in units[pretreat]])
+
+    # TWO-WAY WITHIN TRANSFORMATION, not an assertion that the effects "are absorbed". The first
+    # version put only [constant, interaction] in the design and left the group and period effects in
+    # the residual, which gave F = 0.7654 against Stata's 0.25. Demeaning y and the interaction by
+    # group AND period (adding the grand mean back) reproduces it.
+    group_values = units[pretreat]
+    interaction = indicator * year
+
+    def two_way(values: np.ndarray) -> np.ndarray:
+        frame_values = pd.DataFrame({"v": values, "g": group_values, "t": year})
+        return (
+            values
+            - frame_values.groupby("g")["v"].transform("mean").to_numpy()
+            - frame_values.groupby("t")["v"].transform("mean").to_numpy()
+            + values.mean()
+        )
+
+    y_within = two_way(y)
+    x_within = two_way(interaction)
+
+    denominator_ss = float(x_within @ x_within)
+    if denominator_ss <= 0.0:  # pragma: no cover - defensive
+        raise ConsistencyError("estat ptrends: the trend interaction has no variation")
+
+    slope = float((x_within @ y_within) / denominator_ss)
+    residual = y_within - slope * x_within
+
+    groups = int(pd.Series(units).nunique())
+    periods_used = int(pd.Series(year).nunique())
+    # The absorbed effects consume one degree of freedom each, less one for the shared constant.
+    dof = int(y.size) - groups - periods_used + 1
+    if dof <= 1:
+        raise ConsistencyError("estat ptrends: not enough residual degrees of freedom")
+
+    sigma2 = float(residual @ residual) / dof
+    statistic = float(slope * slope * denominator_ss / sigma2)
+    denominator = max(groups - 1, 1)
+
+    from scipy import stats as _stats
+
+    return {
+        "statistic": statistic,
+        "df_numerator": 1.0,
+        "df_denominator": float(denominator),
+        "pvalue": float(_stats.f.sf(statistic, 1, denominator)),
+    }

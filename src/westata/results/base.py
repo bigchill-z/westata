@@ -952,6 +952,30 @@ class StataResults:
     # Stata e() scalars
     # ------------------------------------------------------------------
     @property
+    def response_name(self) -> str:
+        """The dependent variable's name, for titles and column headings.
+
+        SOME ESTIMATORS SET THIS AS AN INSTANCE ATTRIBUTE and others do not; ARIMA and GARCH were in
+        the second group, so postestimation code reading it saw None. Falling back to e(depvar), which
+        every fit carries, gives them the same answer the formula-based estimators give.
+
+        A subclass that assigns self.response_name keeps winning, because the instance dictionary is
+        consulted first.
+        """
+
+        stored = self.__dict__.get("response_name")
+        if stored:
+            return str(stored)
+        return str(self._e.get("depvar") or "")
+
+    @response_name.setter
+    def response_name(self, value: object) -> None:
+        # The formula-based estimators ASSIGN this on the result (`results.response_name = ...`), so the
+        # property needs a setter or those fits break. Storing it in the instance dictionary is what the
+        # getter already prefers.
+        self.__dict__["response_name"] = "" if value is None else str(value)
+
+    @property
     def e(self) -> EReturn:
         """Stata ``e()`` scalars (item and attribute access).
 

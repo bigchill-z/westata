@@ -659,3 +659,32 @@ Prob > F = 0.6182
   并按 `didregress` 的聚类口径算 `F`。
 - **建议下一步**：先实现 `estat ptrends`（单参数，参考值已捕获），再考虑
   `granger`/`bdecomp`（多参数，需要各自的时间窗定义）。
+
+### T13 补充：实现 estat ptrends 需要的数据字段已全部确认（第 74 轮）
+
+第 73 轮只捕获了参考值。本轮把实现所需的数据来源逐一定位，但**未落地代码**（见下）。
+
+**e() 里可用的 DID 元信息**——_did_info 是一个 dict：
+
+`python
+{'time_name': 'year', 'treatment_name': 'canal_post',
+ 'control_units': 40, 'treated_units': 20,
+ 'control_min': 1.0, 'control_max': 1.0,
+ 'treated_min': 9.0, 'treated_max': 9.0}
+`
+
+	reated_min = 9.0 就是**处理期起点**，预处理时段即 	ime < 9。
+
+**数据帧**：结果对象上没有 _did_data，但**有 model_data**，它已包含估计样本。
+
+**组变量**：e()['group'] 给出组名（如 county）；_did_info 里没有 group_name。
+
+**模型对象**额外提供 group、	ime、	reatment、depvar，可用于交叉校验。
+
+- **未落地原因**：原型写到一半时发现需要同时适配四个来源
+  （_did_info、e()['group']、model_data、模型属性），
+  且 F(1, 59) 的分母自由度口径需要与 didregress 的聚类设定一致才能对齐 0.25。
+  仓促接线容易产出一个「看起来能跑、数值不对」的实现——比缺失更糟。
+- **下一步**：先写一个只读取上述四处、打印中间量的诊断脚本，确认
+  
+_pretreat、组数、交互项系数，再决定分母自由度的口径。

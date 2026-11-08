@@ -133,19 +133,33 @@ class VarSocResult:
             return text + ("*" if value == best else " ")
 
         def mark_fpe(value: float, best: float) -> str:
-            """Stata's FPE column keeps ONE mantissa digit and TRUNCATES rather than rounds.
+            """Stata's FPE column: DECIMAL to six places normally, scientific only when tiny.
 
-            Measured: the value 6.67195e-08 prints as "6.6e-08", so ``%.1e`` (which gives
-            6.7e-08) is wrong. Truncation is applied to the mantissa only.
+            Measured on two systems of very different scale:
+
+                ordinary scale    .855661        (six decimals, leading zero dropped)
+                scaled by 1e-6    8.6e-25         (one mantissa digit, truncated)
+
+            So the choice is by MAGNITUDE, not by taste. The previous version always produced the
+            scientific form, which is why the ordinary case read "8.6e-01" where Stata prints
+            ".85996". Truncation is applied to the mantissa in the scientific branch only, because
+            Stata prints `6.67195e-08` as `6.6e-08` (%.1e would round it to 6.7e-08).
             """
 
-            if not math.isfinite(value) or value == 0.0:
-                text = f"{value:.1e}".rjust(10)
+            if not math.isfinite(value):
+                return f"{value}".rjust(10) + ("*" if value == best else " ")
+            if value == 0.0:
+                text = ".000000"
+            elif abs(value) >= 1e-3:
+                # Six decimals, Stata's leading-zero drop.
+                text = f"{abs(value):.6f}"[1:] if abs(value) < 1.0 else f"{abs(value):.6f}"
+                if value < 0:
+                    text = "-" + text
             else:
                 exponent = int(math.floor(math.log10(abs(value))))
                 mantissa = math.trunc(abs(value) / 10.0**exponent * 10.0) / 10.0
-                text = f"{'-' if value < 0 else ''}{mantissa:.1f}e{exponent:+03d}".rjust(10)
-            return text + ("*" if value == best else " ")
+                text = f"{'-' if value < 0 else ''}{mantissa:.1f}e{exponent:02d}"
+            return text.rjust(10) + ("*" if value == best else " ")
 
         for row in self.rows:
             lines.append(

@@ -82,21 +82,32 @@ class VarStableResult:
         """
 
         def _bare(number: float) -> str:
-            # SIX DECIMALS WITH THE ZEROS TRIMMED, not six significant figures. The two agree above
-            # 0.1 and diverge below it:
-            #
-            #     0.82182      -> .82182     either rule
-            #     0.044383756  -> .044384    six decimals; ".6g" would give .0443838
-            #
-            # Verified on nine moduli drawn from three samples, 9 of 9.
-            text_value = f"{float(number):.6f}"
-            if "." in text_value:
-                text_value = text_value.rstrip("0").rstrip(".")
+            """The MODULUS column: six significant figures at or above 0.1, six DECIMALS below it.
+
+            arstable_w.ado:254 sets .numfmt %10.7g . %8.7g and _tab prints into a 13-wide field.
+            Measured against r(Modulus) and the printed table together:
+
+                1.0009273   -> 1.00093      six significant figures
+                .95675429   -> .956754
+                .0936159    -> .093616      SIX DECIMALS here; "%6g" gives .0936159
+                .044383756  -> .044384
+                .03918892   -> .039189
+
+            EIGHT OF EIGHT match under this threshold, while a fixed six decimals and a fixed six
+            significant figures each match only five. The fixed WIDTH is what makes it switch: above 0.1
+            the leading digit consumes a column, so precision drops to significant figures.
+            """
+
+            value_abs = abs(float(number))
+            if value_abs >= 0.1:
+                text_value = f"{value_abs:.6g}"
+            else:
+                text_value = f"{value_abs:.6f}"
+                if "." in text_value:
+                    text_value = text_value.rstrip("0").rstrip(".")
             if text_value.startswith("0."):
                 text_value = text_value[1:]
-            elif text_value.startswith("-0."):
-                text_value = "-" + text_value[2:]
-            return text_value
+            return ("-" if float(number) < 0 else "") + text_value
 
         result = [
             "   Eigenvalue stability condition",

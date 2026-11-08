@@ -1594,3 +1594,96 @@ ame.replace(:, #)），
   (c) 验证 zip/zinb 与 logit/probit（后者**无**标题行）互不影响。
 - **教训**：这个块有 3 次「修一处坏一处」的记录（第 226/234/237 轮注释可见），
   本轮再次印证：**必须一次性把三处一起改并验证，不能增量试**。
+
+**第 214 轮补充：`cnt |` 标题与重复分隔线已解决，空标题行来源**未定位**
+
+**已成功验证的两处**（单独应用时输出正确）：
+
+1. `_main_heading = e(depvar)`，在无前缀组第一行前输出，**不加分隔线**：
+   ```
+   78 '-------------+---...'    <- 表头自带
+   14 'cnt          |'          <- 正确新增
+   78 '           x | ...'
+   ```
+   **重复分隔线问题已解决**（第 213 轮的缺陷）。
+
+2. 给组标题分支加 `and not _is_constant_row`（`_is_constant_row = bare.lower() in _GROUP_CONSTANTS`）
+   —— **但这一条没有任何效果**，说明空标题**不来自**该分支。
+
+**仍未定位**：每块 `_cons` 前的那一行
+
+```
+14 '             |'
+```
+
+- 已排除：`_factor` 正则（`Intercept` 与 `inflate#Intercept` **都不匹配**两个正则）；
+- 已排除：`group and group not in seen_groups` 分支（加常量守卫后**无变化**）；
+- **新怀疑**：它可能来自表头部分（`cnt | Coefficient ...` 那一行的配套），即
+  **每个方程块的 `_cons` 行由独立路径渲染**，与组标题机制无关。
+
+- **状态**：**回退**，413 个相关测试通过。
+- **下一步**：在渲染循环内**逐行记录每行由哪个 `lines.append` 产生**（行号 + 内容），
+  而不是继续猜分支。这是本轮应该做而未做的事——**两次改动都是在未定位来源的情况下进行的**。
+- **教训**：当「加了守卫后输出不变」时，应立即停止改代码，转去做来源追踪。
+  本轮浪费在两处无效果的修改上。
+
+### T34. `estat summarize` 带 cluster 时表头是**完全不同的 13 行布局**（第 220 轮定位）
+
+报告 C14-12 相关。实测 `reg y x, vce(cluster g)` 后 `estat summarize` 的完整输出（n=400，16 组）：
+
+```
+27 '  Estimation sample regress'                                 <- 标题独占一行
+69 '                                    Number of obs        =        400'
+69 '                                    Number of clusters   =         16'
+69 '                                    Obs per cluster: min =         25'
+69 '                                                     avg =       25.0'
+69 '                                                     max =         25'
+69 '  -------------------------------------------------------------------'
+69 '      Variable |         Mean      Std. dev.         Min          Max'
+69 '  -------------+-----------------------------------------------------'
+69 '             y |    -.0612005      1.068956    -3.271444     4.247448'
+69 '             x |    -.0137962      1.007031    -2.921721     3.128644'
+69 '  -------------------------------------------------------------------'
+39 '  Std. dev. not adjusted for clustering'                     <- 第 13 行脚注
+```
+
+**已量出的列位置（每行 69 字符）**：
+
+| 段 | 位置 | 内容 |
+|---|---|---|
+| `[0:36]` | 36 宽 | 缩进 |
+| `[36:57]` | 21 宽 | 标签左对齐（`avg`/`max` 右对齐后加空格）|
+| `[57:59]` | | `= ` |
+| `[59:69]` | 10 宽 | 值右对齐 |
+
+**本包当前输出（6 行）**：
+
+```
+69 '  Estimation sample regress                Number of obs =        400'
+69 '  -------------------------------------------------------------------'
+...（缺 4 行 cluster 统计 + 1 行脚注）
+```
+
+**已确认可用的实现片段**（单独应用时前 8 行正确）：
+
+```python
+def _cluster_row(label_text, value_text, right_aligned):
+    if right_aligned:
+        return " " * 36 + label_text.rjust(20) + " = " + value_text.rjust(10)
+    return " " * 36 + label_text.ljust(21) + "= " + value_text.rjust(10)
+```
+
+`self.clusters` 是字典 `{'name','n','min','avg','max'}`，**不是**组大小列表。
+
+- **状态**：**回退**，209 个 summarize 测试通过。
+- **未解决的冲突**：`tests/test_estat_summarize_combinations.py` 与
+  `test_estat_summarize_noheader.py` **要求保留 `clusters` 属性**（第 111 行
+  `assert rendered.clusters is not None`），而我第一版把它设为 `None`，导致 17 个测试失败。
+  **正确做法是保留属性、只用局部标志跳过 group 块**——最后一次尝试做到了，
+  但因缩进错误损坏文件而回退。
+- **下一步**：重做时**只改三处**：
+  (a) 在 `if self.noheader:` 前加 `_clustered = False`；
+  (b) cluster 分支设 `_clustered = True`，**不动 `self.clusters`**；
+  (c) 把 `if self.clusters:` 改成 `if self.clusters and not _clustered:`；
+  以及 (d) 在 `return "\n".join(lines)` 前追加脚注。
+- **风险**：`__slots__` 禁止给实例加属性，必须用局部变量。

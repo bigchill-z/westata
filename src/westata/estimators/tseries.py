@@ -1489,9 +1489,11 @@ class VARResults:
             f"{key:>{9 if position == 0 else 12}}" for position in range(len(pairs))
         )
         inner_width = 9 + 12 * (len(pairs) - 1)
+        # THE RULES ARE 54 CHARACTERS, matching the separator line: 9 + 1 + 44. They were one short,
+        # which is invisible until the whole table is diffed line by line.
         wide_lines = [
             f"Results from {irfname}",
-            "-" * (9 + inner_width - 1),
+            "-" * (9 + inner_width),
             f"{'':>9}|{label_cells}",
             f"{'Step':>8} |{word_cells}",
             "-" * 9 + "+" + "-" * (inner_width - 1),
@@ -1502,12 +1504,24 @@ class VARResults:
                 for position, (impulse_position, response_position) in enumerate(pairs)
             )
             wide_lines.append(f"{step:>8} |{cells}")
-        wide_lines.append("-" * (9 + inner_width - 1))
-        wide_lines.append(
-            f"({irfname}, {key}; impulse = response order = "
-            + ", ".join(f"{names[i]}->{names[r]}" for i, r in pairs)
-            + ")"
-        )
+        wide_lines.append("-" * (9 + inner_width))
+
+        # ONE FOOTNOTE PER COLUMN, numbered to match the headings. Stata writes:
+        #
+        #     (1) irfname = var1, impulse = y1, and response = y1.
+        #     (2) irfname = var1, impulse = y1, and response = y2.
+        #     (3) irfname = var1, impulse = y2, and response = y1.
+        #     (4) irfname = var1, impulse = y2, and response = y2.
+        #
+        # The previous single line ("impulse = response order = y1->y1, ...") carried the same
+        # information in a shape Stata does not use, so a column-by-column comparison could not read
+        # which pair its number referred to.
+        for position, (impulse_position, response_position) in enumerate(pairs):
+            wide_lines.append(
+                f"({position + 1}) irfname = {irfname}, "
+                f"impulse = {names[impulse_position]}, "
+                f"and response = {names[response_position]}."
+            )
         return chr(10).join(wide_lines)
 
     def irf_create(

@@ -99,9 +99,30 @@ def test_the_narrow_numbers_are_unchanged(fitted) -> None:
 
 
 def test_the_footnote_names_every_pair(fitted) -> None:
+    """Stata writes one numbered line per column, not a single summary line.
+
+        (1) irfname = var1, impulse = y1, and response = y1.
+        (2) irfname = var1, impulse = y1, and response = y2.
+        (3) irfname = var1, impulse = y2, and response = y1.
+        (4) irfname = var1, impulse = y2, and response = y2.
+
+    This assertion used to look for the arrow spelling "y1->y1", which was the package's own
+    summary shape rather than Stata's.
+    """
+
     text = fitted.irf_table(periods=1)
-    for pair in ("y1->y1", "y1->y2", "y2->y1", "y2->y2"):
-        assert pair in text, pair
+    pairs = [
+        ("(1)", "y1", "y1"),
+        ("(2)", "y1", "y2"),
+        ("(3)", "y2", "y1"),
+        ("(4)", "y2", "y2"),
+    ]
+    for number, impulse, response in pairs:
+        line = (
+            f"{number} irfname = var1, impulse = {impulse}, "
+            f"and response = {response}."
+        )
+        assert line in text, line
 
 
 #: Captured verbatim from a live `irf table oirf, noci` on the same bivariate VAR(2).

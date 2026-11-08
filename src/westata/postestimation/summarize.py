@@ -719,6 +719,16 @@ def estat_summarize(
     # The other estimators happen to share their Stata names, so only the absorbed regression
     # needs a mapping rather than a general table.
     _command_name = str(getattr(result, "model_name", "") or "") if result is not None else ""
+    # ONLY THE COMMAND ITSELF, WITH ANY ", option" SUFFIX STRIPPED. This package's model_name
+    # carries the estimation option ("xtlogit, re") while Stata's heading names just the
+    # command:
+    #
+    #     xtlogit hi x, re      Stata '  Estimation sample xtlogit'
+    #     xtreg y x, fe         Stata '  Estimation sample xtreg'
+    #     xtreg y x, re         Stata '  Estimation sample xtreg'
+    #
+    # `areg` is reached through the absorbed fit, whose model_name is the BACKEND's.
+    _command_name = _command_name.partition(",")[0].strip()
     if _command_name == "reghdfe":
         _command_name = "areg"
     built.command = _command_name

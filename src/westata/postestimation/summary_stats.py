@@ -211,14 +211,25 @@ class SummarizeDetail:
             put_end(row, "percentile", number(percentiles[slot]))
 
         for slot, row in enumerate(_DETAIL_SMALLEST_ROWS):
-            if slot < count:
-                put_end(row, "extreme", number(ordered[slot]))
+            # AN ABSENT SLOT PRINTS A DOT, not a blank. Measured on a two-value sample, where Stata
+            # shows "." for the three smallest slots it cannot fill:
+            #
+            #     '10%            1              .       Obs                   2'
+            put_end(
+                row,
+                "extreme",
+                number(ordered[slot]) if slot < count else ".",
+            )
 
         for slot, row in enumerate(_DETAIL_LARGEST_ROWS):
-            # The largest values ascend with the row: 41, 67, 89, 103 for ten values.
+            # The largest values ascend with the row: 41, 67, 89, 103 for ten values. A slot the
+            # sample cannot fill prints ".", the same rule as the smallest column.
             index = count - 4 + slot
-            if 0 <= index < count:
-                put_end(row, "extreme", number(ordered[index]))
+            put_end(
+                row,
+                "extreme",
+                number(ordered[index]) if 0 <= index < count else ".",
+            )
 
         for (label, rendered), row in zip(statistics, _DETAIL_STAT_ROWS):
             put(row, 38, label)

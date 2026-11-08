@@ -477,7 +477,13 @@ def test_summary_stata_style_renders() -> None:
         FirstDifferenceOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
     ):
         text = model.fit().summary(style="stata")
-        for token in ("Coefficient", "Std. err.", "P>|t|", "Number of obs", "R-squared"):
+        # `xtreg, re` prints z / P>|z| (its model test is a Wald chi2); fe, be and fd
+        # print t / P>|t| with an F. Measured on munnell.dta against a live Stata.
+        first_line = next(
+            (line for line in text.splitlines() if line.strip()), ""
+        )
+        p_label = "P>|z|" if "Random-effects" in first_line else "P>|t|"
+        for token in ("Coefficient", "Std. err.", p_label, "Number of obs", "R-squared"):
             assert token in text, token
 
 

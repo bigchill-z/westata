@@ -409,6 +409,10 @@ class PanelOLS:
     #: one at a time with `display e(key)` -- a missing scalar prints '.' -- rather than by
     #: searching `ereturn list`, whose output is truncated.
     _omit_e_keys: tuple[str, ...] = ()
+    #: Reference distribution for the per-coefficient tests: Stata's `xtreg, fe` and
+    #: `xtreg, be` print t / P>|t| with df_r, while `xtreg, re` prints z / P>|z| because the
+    #: GLS fit reports a Wald chi2 for the model and a normal reference per coefficient.
+    _coefficient_dist = "t"
 
     #: Whether the estimator regresses on one row per entity (``xtreg, be``),
     #: so that ``e(N)`` counts entities and the response is already a group mean.
@@ -638,7 +642,7 @@ class PanelOLS:
             nobs=nobs,
             df_resid=df_resid,
             df_model=df_model,
-            dist="t",
+            dist=self._coefficient_dist,
             model_name=self._stata_command,
             cov_type=_cov_label(cov_type),
             e=e,
@@ -1939,6 +1943,11 @@ class RandomEffects(PanelOLS):
     # panel-mean residuals. See PanelOLS._swamy_arora_sigma_u.
     _random_effects_decomposition = True
 
+    # Measured on `xtreg lny lnk1 lnk2 lnlabor, re`: the coefficient table reads
+    # "z    P>|z|" and the model test reads "Wald chi2(3)", unlike the fe block which
+    # reads "t    P>|t|" with "F(3, 812)".
+    _coefficient_dist = "z"
+
     # `xtreg, re` publishes neither e(ll) nor e(rss). Measured with `display e(ll)` on
     # munnell.dta: ".". A random-effects fit has no single error scale and no single model
     # test, which is why Stata leaves both out.
@@ -2221,6 +2230,10 @@ class BetweenOLS(RandomEffects):
     # BetweenOLS inherits from RandomEffects the omit list has to be cleared here.
     _omit_e_keys = ()
 
+    # Inherits from RandomEffects, which sets dist=z; xtreg, be prints t / P>|t| with
+    # F(3, 44) for the model test (measured on munnell.dta), so both come back here.
+    _coefficient_dist = "t"
+
     _estimates_on_entity_means = True
     _stores_mss = True
 
@@ -2289,6 +2302,9 @@ class FirstDifferenceOLS(RandomEffects):
     # xtreg, fd DOES store e(ll) and e(rss); only xtreg, re omits them, and this class
     # inherits from RandomEffects.
     _omit_e_keys = ()
+
+    # Inherits dist=z from RandomEffects; xtreg, fd prints t / P>|t|.
+    _coefficient_dist = "t"
 
     #: ``xtreg.sthlp`` gives no chi-square for the first-difference estimator either
     #: (the ``be``/``fe`` blocks list only ``e(F)``).  Inherited from

@@ -1450,7 +1450,28 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     # ``xtivreg`` reports a WALD chi2 where the other panel estimators report an F:
     # measured, "Wald chi2(2)" / "Prob > chi2" against xtreg's "F(1, 149)" / "Prob > F".
     # This applies to BOTH methods -- unlike the Within-R2 blanking, which is fe-only.
-    _uses_wald = str(getattr(result, "model_name", "") or "").startswith("xtivreg")
+    # A random-effects fit reports a WALD chi2, not an F. Measured on munnell.dta with
+    # `xtreg lny lnk1 lnk2 lnlabor, re`:
+    #
+    #   Random-effects GLS regression        Number of obs     =        816
+    #                                        Wald chi2(3)      =    1836.44
+    #   corr(u_i, X) = 0 (assumed)           Prob > chi2       =     0.0000
+    #
+    # against `xtreg ..., fe`, which prints `F(3, 812)` and `Prob > F`. The distinction is not in
+    # e(chi2type) alone -- `re` sets it to "Wald" -- but in whether the command reports a
+    # random-effects GLS fit at all.
+    _model_name_lower = str(getattr(result, "model_name", "") or "").lower()
+    # `e(sigma_u)` is NOT a random-effects marker: `xtreg, fe` stores one too. The title is the
+    # reliable signal, and the test must be a PREFIX -- "re" appears inside "regression", which
+    # once classified every linear fit as random-effects (error.md, round 234).
+    _stored_sigma_u = str((getattr(result, "e", {}) or {}).get("title") or "").strip().startswith(
+        "Random-effects"
+    )
+    _uses_wald = (
+        _model_name_lower.startswith("xtivreg")
+        or _reports_a_chi2_test(result)
+        or (_stored_sigma_u and "mle" not in _model_name_lower)
+    )
     if np.isfinite(fvalue):
         if _uses_wald:
             _test_label = f"Wald chi2({_df_label(df_model)})"
@@ -1465,7 +1486,23 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     #   xtivreg ..., re   corr(u_i, X) = 0 (assumed)
     #   xtivreg ..., fe   corr(u_i, Xb) = -0.0833
     _model_name = str(getattr(result, "model_name", "") or "")
-    if _model_name.startswith("xtivreg") and _model_name.endswith(", re"):
+    # The RE estimator ASSUMES zero correlation between the effects and the regressors, prints
+    # that assumption instead of a number, and labels the regressors "X" rather than "Xb":
+    #
+    #   xtreg ..., re    corr(u_i, X) = 0 (assumed)
+    #   xtreg ..., fe    corr(u_i, Xb) = 0.1074
+    #
+    # The test is the same one the design block uses: a random-effects fit stores e(sigma_u) and
+    # titles itself "Random-effects ...". The title check is a PREFIX, not a substring -- "re" in
+    # "regression" would match every linear fit (error.md item, round 234).
+    _e_for_re = getattr(result, "e", {}) or {}
+    _title_for_re = str(_e_for_re.get("title") or "").strip()
+    # `e(sigma_u)` is stored by `xtreg, fe` too, so it must NOT be part of this test. The title
+    # prefix is the reliable signal; "re" as a substring would match "regression".
+    _re_fit = _title_for_re.startswith("Random-effects") or _model_name.endswith(", re")
+    if _re_fit or (
+        _model_name.startswith("xtivreg") and _model_name.endswith(", re")
+    ):
         left_corr = "corr(u_i, X) = 0 (assumed)"
     elif np.isfinite(corr):
         left_corr = f"corr(u_i, Xb) = {_four(corr)}"

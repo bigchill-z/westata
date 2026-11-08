@@ -125,3 +125,25 @@ L39   nested
 - **结论**：`synth` 并非「完全不可得」。重建需要按 `synth.ado` 的调用顺序实现那六个内核，
   再套上可读的两步优化骨架。工作量是**中等到大**，不是**不可能**。
 - **此前记录有误**，以此条为准。
+
+### T6 补充：lsynth_mata_subr.mlib 已实测，确实不可读
+
+上一节把可读/不可读的边界列清了，但**没有测量库本身**。现已补测：
+
+`
+文件: lsynth_mata_subr.mlib   27068 bytes
+可打印字节: 929 / 27068 = 3.4%
+六个函数名: normalize / regsval / normweights / getabs / roottaker / roundmat
+            全部只是孤立字符串（Contains 为 True，但前后皆二进制）
+`
+
+**3.4% 可打印率与 lrdrobust.mlib 的 1.9% 同级** —— 都是编译后的 Mata 字节码。
+
+**因此**：
+
+- synth 的**顶层流程**（两步优化、V 矩阵、nested）可从 synth.ado 逐行转写；
+- 六个子过程的**数值内容**无法获取，只能按 Synth 论文（Abadie-Diamond-Hainmueller）
+  重新实现，**无法保证与 Stata 逐位一致**。
+
+- **结论修正**：synth 的准确状态是「骨架可转写，内核需按论文重建且无法验证到 Stata 的位级一致」，
+  而**不是**「不可能」，也**不是**「可以照搬」。

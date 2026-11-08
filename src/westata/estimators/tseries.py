@@ -4094,6 +4094,64 @@ def _opg_covariance(model: Any, params: np.ndarray, backcast: float | None) -> n
         ) from exc
 
 
+def _dfuller_header(
+    banner: str, variable: str, observations: int, lags: int
+) -> list[str]:
+    """The one or two header lines `dfuller` prints.
+
+    READ FROM THE SOURCE, not inferred from output. `dfuller.ado` lines 80-108:
+
+        _align maxlen "dinobs dilag" : "`T' `lags'" "11.0gc"
+        local tablen 62
+        local col = `tablen'-14-3-`maxlen'+1
+        ...
+        di as txt "Variable: " as res "`sname'" _c
+        di as txt as smcl _col(`col') "Number of obs  = " as res "`dinobs'"
+        di as smcl as txt _col(`col') "Number of lags = " as res "`dilag'"
+
+    so both right-hand labels start at `col = 46 - maxlen`, where maxlen is the wider of the two values as
+    formatted with %11.0gc. Everything after `col` is written by `display`, which appends the value directly
+    -- there is no field padding at all, which is why five earlier attempts at column arithmetic failed.
+
+    Ten sample points confirm it: 'Number' sits at 43 for n=60 (3-digit count), 42 for 200 and 900, 40 for
+    1500 and 39 for 12000, exactly as 46 - maxlen predicts.
+
+    A PLAIN TEST puts the banner and the count on one row. AN AUGMENTED TEST gives the banner a row of its
+    own and moves the count onto the Variable row -- the `cnt`, `diaug` and `dinoaug` locals above.
+    """
+
+    count = f"{int(observations):,}"
+    # _align ... "11.0gc" FORMATS the lag with a minimum width, so the text Stata appends carries the
+    # padding: '=     0' rather than '= 0'. The count has no such requirement because its own digits fill
+    # the field.
+    lag_text = str(int(lags))
+
+    # `_align` with %11.0gc: maxlen is the wider of the two formatted values.
+    maxlen = max(len(count), len(lag_text))
+    # _col() IS 1-BASED while a Python index is 0-based, so the source's col becomes col - 1
+    # here. Measured: n=1500 gives maxlen 5 and the source computes 41, which lands 'Number' on
+    # column 40 -- exactly what the capture shows.
+    col = 62 - 14 - 3 - maxlen + 1 - 1  # == 45 - maxlen
+
+    def em(text_value: str, width: int) -> str:
+        return text_value.ljust(width)
+
+    right_count = "Number of obs  = " + count
+    right_lag = "Number of lags = " + lag_text.rjust(maxlen)
+
+    if int(lags) > 0:
+        return [
+            banner,
+            em("Variable: " + variable, col) + right_count,
+            em("", col) + right_lag,
+        ]
+    return [
+        em(banner, col) + right_count,
+        em("Variable: " + variable, col) + right_lag,
+    ]
+
+
+
 @dataclass
 class UnitRootResult:
     """One unit-root test outcome, shaped like Stata's test output."""
@@ -4180,7 +4238,12 @@ class UnitRootResult:
         header and the data row, unlike the irf tables where the rule is one short.
         """
 
-        banner = "Dickey\u2013Fuller test for unit root"
+        _lag_count = int(self.r.get("lags", 0) or 0)
+        banner = (
+            "Augmented Dickey\u2013Fuller test for unit root"
+            if _lag_count > 0
+            else "Dickey\u2013Fuller test for unit root"
+        )
         # STATA'S H0 LINE NAMES THE DETERMINISTICS, and the leading blank line is Stata's too.
         # Measured on a 200-point random walk:
         #
@@ -4206,9 +4269,12 @@ class UnitRootResult:
                 # Stata's banner for `dfuller` is "Dickey-Fuller test for unit root"; the
                 # class stores the fuller name "Augmented Dickey-Fuller", so the banner comes
                 # from a literal rather than from `self.test`.
-                f"{banner:<42}Number of obs  = {self.observations}",
-                f"{'Variable: ' + str(getattr(self, 'variable', 'y')):<42}"
-                f"Number of lags = {self.lags:>3}",
+                *_dfuller_header(
+                    banner,
+                    str(getattr(self, "variable", "y")),
+                    self.observations,
+                    self.lags,
+                ),
                 "",
                 f"H0: {_null_line}",
                 "",

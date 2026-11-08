@@ -1221,6 +1221,23 @@ class StataResults:
             returns probabilities). Pass ``kind="xb"`` for the old behaviour.
         """
 
+        # STATA'S SINGULAR SPELLINGS. `predict e1, residual` is what Stata documents and what the
+        # reference book uses, but this method's registry stores the plural "residuals" (inherited
+        # from statsmodels). The mismatch rejected a documented spelling outright:
+        #
+        #     predict: 'regress' supports ('xb', 'stdp', 'stdf', 'residuals', ...); got 'residual'
+        #
+        # Normalising here keeps the registry unchanged while accepting both spellings, which is
+        # the same treatment `resid` already gets.
+        _STATA_PREDICT_ALIASES = {
+            "residual": "residuals",
+            "resid": "residuals",
+            "leverage": "leverage",
+            "hat": "hat",
+        }
+        if kind is not None:
+            kind = _STATA_PREDICT_ALIASES.get(str(kind).strip().lower(), kind)
+
         from westata.postestimation.predict import default_predict_kind, predict
 
         if kind is None:

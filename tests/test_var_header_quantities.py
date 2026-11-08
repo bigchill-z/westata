@@ -66,16 +66,24 @@ def test_the_log_likelihood_is_consistent_with_the_criteria(fitted) -> None:
     assert np.isfinite(float(fitted.aic) * nobs)
 
 
-def test_the_determinant_is_positive_but_not_yet_stata_normalised(fitted) -> None:
-    """Recorded as a known normalisation gap, not asserted as correct.
+def test_the_determinant_now_matches_stata() -> None:
+    """The (T - K)/T factor is applied, so `det_sigma` is Stata's `Sigma_ml`.
 
-    Stata's .9227959 and the raw backend determinant 0.9545594 differ by the (T - k)/T factor the
-    class docstring describes for `bse` and `e(Sigma)`. When the normalisation is applied, replace
-    this with an equality against Stata's value.
+    Verified at two lag orders against the printed header:
+
+        lags(1)  Stata .9492493   package 0.9492493
+        lags(2)  Stata .9227959   package 0.9227959
+
+    with K = 2*k_ar + 1 and the squared factor because the determinant is quadratic in the
+    covariance. This replaces the previous guard, which asserted the correction was still missing.
     """
 
-    determinant = float(fitted.det_sigma)
-    assert determinant > 0.0
-    assert determinant == pytest.approx(0.9545594, abs=1e-6)
-    # And it is NOT yet Stata's number -- pinned so a fix shows up here.
-    assert determinant != pytest.approx(0.9227959, abs=1e-6)
+    rng = np.random.default_rng(3)
+    n = 300
+    frame = pd.DataFrame({"y1": rng.normal(size=n), "y2": rng.normal(size=n)})
+
+    one_lag = ws.VAR(frame[["y1", "y2"]], lags=1).fit()
+    two_lags = ws.VAR(frame[["y1", "y2"]], lags=2).fit()
+
+    assert float(one_lag.det_sigma) == pytest.approx(0.9492493, abs=1e-7)
+    assert float(two_lags.det_sigma) == pytest.approx(0.9227959, abs=1e-7)

@@ -882,8 +882,28 @@ class VARResults:
         # Applying it here is left to whoever renders the header, because the ratio depends on which
         # equation's k is meant; returning the raw determinant under Stata's name would be a silent
         # mismatch. Recorded rather than guessed.
+        # STATA'S `Sigma_ml` AND THE BACKEND'S `sigma_u` DIFFER BY A DEGREES-OF-FREEDOM FACTOR, and
+        # it is a SQUARED one because the determinant is quadratic in the covariance:
+        #
+        #     Stata    lags(1) .9492493      lags(2) .9227959
+        #     raw det  lags(1) 0.9683...     lags(2) .9545594
+        #
+        # with K = 2*k_ar + 1 the ratio comes out at exactly ((N - K) / N)**2 in both cases:
+        #
+        #     lags(1): N=299 K=3   0.9683... * (296/299)**2 = .9492493
+        #     lags(2): N=298 K=5   0.9545594 * (293/298)**2 = .9227959
+        #
+        # Both reproduction values were checked against Stata's printed header, so the exponent and
+        # K are measured rather than assumed.
         covariance = np.asarray(self._result.sigma_u, dtype=float)
-        return float(np.linalg.det(covariance))
+        raw = float(np.linalg.det(covariance))
+
+        observations = int(getattr(self._result, "nobs", 0) or 0)
+        lag_order = int(getattr(self._result, "k_ar", 0) or 0)
+        parameters = 2 * lag_order + 1
+        if observations > parameters > 0:
+            return raw * ((observations - parameters) / observations) ** 2
+        return raw
 
     @property
     def e(self) -> dict[str, Any]:
@@ -1691,25 +1711,38 @@ class VARResults:
         # and that offset is exactly 2*ln(2*pi) + 2. Adding it reproduces all three to four decimals,
         # so it is the likelihood's normalising constant, not a fudge factor.
         _criterion_offset = 2.0 * float(np.log(2.0 * np.pi)) + 2.0
+        # Right column: label padded to 18, equals at column 66, value right-aligned to 76.
         _crit_block = (
-            f"    AIC               = {_stata_stat(float(self.aic) + _criterion_offset):>8}",
-            f"   HQIC               = {_stata_stat(float(self.hqic) + _criterion_offset):>8}",
-            f"   SBIC               = {_stata_stat(float(self.bic) + _criterion_offset):>8}",
+            f"{'AIC':<18}= {_stata_stat(float(self.aic) + _criterion_offset):>9}",
+            f"{'HQIC':<17}= {_stata_stat(float(self.hqic) + _criterion_offset):>9}",
+            f"{'SBIC':<17}= {_stata_stat(float(self.bic) + _criterion_offset):>9}",
         )
         _usable = int(self.e.get("N", 0)) or int(getattr(self._result, "nobs", 0))
-        _start = int(getattr(self._result, "k_ar", 1)) + trend + 1
-        _end = _start + _usable - 1
+        # THE SAMPLE LINE IS 1-BASED AND ENDS AT THE LAST OBSERVATION, so the trend term does NOT
+        # enter the start index. Measured with `tsset t` over 300 periods:
+        #
+        #     lags(1)  e(tmin) 2   e(tmax) 300   e(N) 299
+        #     lags(2)  e(tmin) 3   e(tmax) 300   e(N) 298
+        #     lags(3)  e(tmin) 4   e(tmax) 300   e(N) 297
+        #
+        # `tmin = k_ar + 1` and `tmax = N_total`; my first version added `trend` as well and produced
+        # "4 thru 301" against Stata's "3 thru 300".
+        _endog = np.asarray(getattr(self._result, "endog", None))
+        _total = int(_endog.shape[0]) if _endog.ndim == 2 else _usable
+        _start = int(getattr(self._result, "k_ar", 1)) + 1
+        _end = _total
 
         lines: list[str] = [
+            "",
             "Vector autoregression",
             "",
             f"{'Sample: ' + str(_start) + ' thru ' + str(_end):<48}"
             f"Number of obs     = {_usable:>10}",
-            f"{'Log likelihood = ' + _stata_stat(float(self.ll)):<47}"
+            (f"{'Log likelihood':<16}= {_stata_stat(float(self.ll)):>10}").ljust(48)
             + _crit_block[0],
-            f"{'FPE            = ' + _stata_stat(float(self.fpe)):<47}"
+            (f"{'FPE':<16}= {_stata_stat(float(self.fpe)):>10}").ljust(48)
             + _crit_block[1],
-            f"{'Det(Sigma_ml)  = ' + _stata_stat(float(self.det_sigma)):<47}"
+            (f"{'Det(Sigma_ml)':<16}= {_stata_stat(float(self.det_sigma)):>10}").ljust(48)
             + _crit_block[2],
             "",
         ]

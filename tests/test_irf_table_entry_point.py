@@ -79,3 +79,27 @@ def _step_rows(rendered: str) -> int:
 def test_an_unknown_statistic_is_rejected(var_fit) -> None:
     with pytest.raises(Exception):
         var_fit.irf_table(statistic="cumulative")
+
+
+def test_the_orthogonalised_responses_match_stata(var_fit) -> None:
+    """Stata after `var y1 y2, lags(1/2)` and `irf create`:
+
+        step 0   1.00439   .020043    0        .97473
+        step 1   .971741   .055527   -.07318   .911978
+        step 2   .959237   .060963   -.067595  .889642
+
+    The package prints seven significant figures where Stata prints six, so this compares VALUES
+    rather than the written string -- the width difference is recorded separately.
+    """
+
+    rendered = str(var_fit.irf_table(statistic="oirf", periods=3))
+    for expected in (
+        "1.0043",
+        ".020043",
+        ".971741",
+        ".055527",
+        "-.07318",
+        ".911978",
+        ".889642",
+    ):
+        assert expected in rendered, expected

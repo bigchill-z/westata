@@ -1746,19 +1746,54 @@ class VARResults:
             + _crit_block[2],
             "",
         ]
-        header = f"{'Equation':<16}{'Parms':>8}{'RMSE':>11}{'R-sq':>10}{'chi2':>12}{'P>chi2':>10}"
+        # FIELDS END AT 23, 34, 43, 54 AND 64 -- measured from the DATA row, and the header uses
+        # the same ends:
+        #
+        #     'Equation           Parms      RMSE     R-sq      chi2     P>chi2'   64
+        #     'y1                    5    1.00254   0.0073   2.190942    0.7007'   64
+        def _row(cells: list[str], ends: list[int]) -> str:
+            """Lay out cells so each field ENDS at its measured column.
+
+            ``ends[0]`` is where the first label stops being padded; every later entry is an
+            absolute end column, so the widths are the differences.
+            """
+
+            out = cells[0].ljust(ends[0])
+            previous = ends[0]
+            for cell, end in zip(cells[1:], ends[1:]):
+                out += cell.rjust(end - previous)
+                previous = end
+            return out
+
+        # The DATA row's fields end at 23, 34, 43, 54 and 64; the header's labels are right-aligned
+        # to the same ends, which puts `Parms` one column further right because the label is wider
+        # than its cell -- that is what Stata prints too.
+        # The header's own labels do not end where the data's do -- Stata prints `Parms` ending at
+        # 24 (the data's 5 ends at 23) and `chi2` at 53 (the data's 2.190942 ends at 54). Those are
+        # measured ends, not a layout rule, so the header keeps its own list.
+        _ends = [22, 23, 34, 43, 54, 64]
+        _head_ends = [19, 24, 34, 43, 53, 64]
+        header = _row(
+            ["Equation", "Parms", "RMSE", "R-sq", "chi2", "P>chi2"], _head_ends
+        )
         lines.append(header)
-        lines.append("-" * 67)
+        lines.append("-" * max(64, len(header)))
         for index, equation in enumerate(equations, start=1):
             suffix = f"_{index}"
             lines.append(
-                f"{equation:<16}{int(self.e.get('k' + suffix, per_equation)):>8}"
-                f"{_six(self.e.get('rmse' + suffix)):>11}"
-                f"{_four(self.e.get('r2' + suffix)):>10}"
-                f"{_chi(self.e.get('chi2' + suffix)):>12}"
-                f"{_four(self.e.get('p' + suffix)):>10}"
+                _row(
+                    [
+                        str(equation),
+                        str(int(self.e.get("k" + suffix, per_equation))),
+                        _six(self.e.get("rmse" + suffix)),
+                        _four(self.e.get("r2" + suffix)),
+                        _chi(self.e.get("chi2" + suffix)),
+                        _four(self.e.get("p" + suffix)),
+                    ],
+                    _ends,
+                )
             )
-        lines.append("-" * 67)
+        lines.append("-" * 64)
         lines.append("")
 
         width = 78

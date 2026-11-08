@@ -394,6 +394,9 @@ class PanelOLS:
 
     #: ``xtreg, fe`` is the only variant whose Stata fixture stores ``e(tss)``.
     _stores_totals = True
+    #: Whether e(r2) / e(r2_a) are stored. xtreg, re stores neither -- see the override.
+    _stores_r2 = True
+    _stores_r2_adjusted = True
 
     # ``xtreg_fe.json`` has ll_0 and the absorbed-effects block.
     _stores_ll_0 = True
@@ -1318,8 +1321,10 @@ class PanelOLS:
             "df_m": df_model,
             "df_r": df_resid,
             "df_b": float(df_b),
-            "r2": r2,
-            "r2_a": r2_a,
+            # r2 / r2_a are only stored by the estimators Stata stores them for; `xtreg, re`
+            # does not (see _stores_r2).
+            **({} if not self._stores_r2 else {"r2": r2}),
+            **({} if not self._stores_r2_adjusted else {"r2_a": r2_a}),
             "rmse": rmse,
             "F": f_stat,
             "ll": _gaussian_loglik(rss, nobs),
@@ -1925,6 +1930,12 @@ class RandomEffects(PanelOLS):
 
     # ``xtreg_re.json`` has no rss/mss/tss, no ll_0 and no absorbed block.
     _stores_totals = False
+    # AND NO e(r2) / e(r2_a). Measured with \display e(r2)\ across the three estimators on
+    # munnell.dta: \e\ gives .93913112, \e\ .99388704, e\ "." -- a random-effects fit's
+    # explained share is not one number, which is why Stata reports r2_o / r2_b / r2_w instead.
+    # Subclasses that DO store e(r2) turn these back on (BetweenOLS, FirstDifferenceOLS).
+    _stores_r2 = False
+    _stores_r2_adjusted = False
     _stores_mss = False
     _stores_ll_0 = False
     _stores_absorbed = False
@@ -2175,6 +2186,12 @@ class BetweenOLS(RandomEffects):
     #: ``F * df_m`` under a different name.
     _stores_wald_chi2 = False
 
+    # Same inheritance caveat for e(r2) / e(r2_a): RandomEffects turns them off because
+    # xtreg, re reports the r2_o/r2_b/r2_w decomposition instead of one number, but
+    # xtreg, be DOES store both (measured: e(r2) = .99388704 on munnell), so they return.
+    _stores_r2 = True
+    _stores_r2_adjusted = True
+
     _estimates_on_entity_means = True
     _stores_mss = True
 
@@ -2234,6 +2251,11 @@ class FirstDifferenceOLS(RandomEffects):
     """
 
     _stata_command = "xtreg, fd"
+
+    # `xtreg, fd` stores e(r2), unlike the `re` parent it inherits from. RandomEffects turns
+    # r2 off because its own fit reports the r2_o/r2_b/r2_w decomposition instead.
+    _stores_r2 = True
+    _stores_r2_adjusted = True
 
     #: ``xtreg.sthlp`` gives no chi-square for the first-difference estimator either
     #: (the ``be``/``fe`` blocks list only ``e(F)``).  Inherited from

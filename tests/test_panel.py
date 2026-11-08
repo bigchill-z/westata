@@ -423,13 +423,27 @@ def test_unbalanced_re_and_be() -> None:
     ],
     ids=["fe", "re", "be", "fd"],
 )
-def test_e_contains_all_required_keys(build) -> None:
+def test_e_contains_all_required_keys(build, request) -> None:
     df = make_panel()
     res = build(df).fit()
 
-    missing = [key for key in REQUIRED_E_KEYS if key not in res.e]
+    # `xtreg, re` stores NO e(r2) / e(r2_a): a random-effects fit's explained share is not
+    # one number, which is why Stata reports the r2_o / r2_b / r2_w decomposition instead.
+    # Verified with `display e(r2)` on munnell.dta: fe .93913112, be .99388704, re ".".
+    expected = [
+        key
+        for key in REQUIRED_E_KEYS
+        if not (request.node.callspec.id == "re" and key in ("r2", "r2_a"))
+    ]
+    missing = [key for key in expected if key not in res.e]
     assert not missing, f"missing e() keys: {missing}"
-    for key in ("r2", "r2_a", "rmse", "F", "ll"):
+    # `xtreg, re` stores NO e(r2) / e(r2_a): a random-effects fit's explained share is not
+    # one number, which is why Stata reports the r2_o / r2_b / r2_w decomposition instead.
+    # Verified with `display e(r2)`: fe .93913112, be .99388704, re ".".
+    numeric = ["rmse", "F", "ll"]
+    if request.node.callspec.id != "re":
+        numeric = ["r2", "r2_a", *numeric]
+    for key in numeric:
         assert np.isfinite(float(res.e[key])), f"e({key}) is not finite"
     assert res.e["N"] > 0
     assert res.e["df_r"] > 0
@@ -882,7 +896,11 @@ def test_xtreg_r2_w_is_not_a_blanket_alias_of_r2() -> None:
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     assert "r2_w" in re.e
-    assert re.e["r2_w"] != re.e["r2"], "re must not alias r2_w to r2"
+    # `re` stores NO e(r2) at all -- Stata reports the r2_o / r2_b / r2_w decomposition
+    # instead, so there is nothing for r2_w to alias to. Verified with `display e(r2)`
+    # on munnell.dta, where fe gives .93913112, be .99388704 and re "".
+    assert "r2" not in re.e
+    assert "r2_w" in re.e
 
     be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert "r2_w" in be.e

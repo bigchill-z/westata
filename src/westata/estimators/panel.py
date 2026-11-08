@@ -405,6 +405,10 @@ class PanelOLS:
     # ``xtreg_fe.json`` has ll_0 and the absorbed-effects block.
     _stores_ll_0 = True
     _stores_absorbed = True
+    #: e() keys this estimator must NOT publish because Stata does not store them. Probed
+    #: one at a time with `display e(key)` -- a missing scalar prints '.' -- rather than by
+    #: searching `ereturn list`, whose output is truncated.
+    _omit_e_keys: tuple[str, ...] = ()
 
     #: Whether the estimator regresses on one row per entity (``xtreg, be``),
     #: so that ``e(N)`` counts entities and the response is already a group mean.
@@ -1439,6 +1443,8 @@ class PanelOLS:
                     params=params,
                 )
             )
+        for _key in self._omit_e_keys:
+            e.pop(_key, None)
         return e
 
     def _panel_decomposition(
@@ -1933,6 +1939,19 @@ class RandomEffects(PanelOLS):
     # panel-mean residuals. See PanelOLS._swamy_arora_sigma_u.
     _random_effects_decomposition = True
 
+    # `xtreg, re` publishes neither e(ll) nor e(rss). Measured with `display e(ll)` on
+    # munnell.dta: ".". A random-effects fit has no single error scale and no single model
+    # test, which is why Stata leaves both out.
+    #
+    # AND `estat ic` FAILS THERE: a live `xtreg ..., re` followed by `estat ic` raises
+    # r(321) "likelihood information not found in last estimation results". This package
+    # used to answer the question, because it stored an e(ll) Stata does not have -- so the
+    # correct behaviour is the error, not a recomputed number.
+    _omit_e_keys = (
+        "ll",
+        "rss",
+    )
+
     # ``xtreg_re.json`` has no rss/mss/tss, no ll_0 and no absorbed block.
     _stores_totals = False
     # AND NO e(r2) / e(r2_a). Measured with \display e(r2)\ across the three estimators on
@@ -2197,6 +2216,11 @@ class BetweenOLS(RandomEffects):
     _stores_r2 = True
     _stores_r2_adjusted = True
 
+    # `xtreg, be` DOES store e(rss), e(mss) and e(ll) -- measured with `display e(ll)`,
+    # which returns 53.79388 rather than ".". Only `xtreg, re` omits them, and because
+    # BetweenOLS inherits from RandomEffects the omit list has to be cleared here.
+    _omit_e_keys = ()
+
     _estimates_on_entity_means = True
     _stores_mss = True
 
@@ -2261,6 +2285,10 @@ class FirstDifferenceOLS(RandomEffects):
     # r2 off because its own fit reports the r2_o/r2_b/r2_w decomposition instead.
     _stores_r2 = True
     _stores_r2_adjusted = True
+
+    # xtreg, fd DOES store e(ll) and e(rss); only xtreg, re omits them, and this class
+    # inherits from RandomEffects.
+    _omit_e_keys = ()
 
     #: ``xtreg.sthlp`` gives no chi-square for the first-difference estimator either
     #: (the ``be``/``fe`` blocks list only ``e(F)``).  Inherited from

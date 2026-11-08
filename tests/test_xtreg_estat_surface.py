@@ -61,8 +61,21 @@ def test_summarize_works(panel_fits) -> None:
     assert panel_fits[1].estat_summarize() is not None
 
 
-def test_ic_works(panel_fits) -> None:
-    assert panel_fits[1].estat_ic() is not None
+def test_ic_refuses_for_re_the_way_stata_does(panel_fits) -> None:
+    """`estat ic` after `xtreg, re` is an ERROR in Stata, not a table.
+
+    A live `xtreg lny lnk1 lnk2 lnlabor, re` followed by `estat ic` raises
+
+        r(321): likelihood information not found in last estimation results
+
+    because `xtreg, re` stores no e(ll). This package used to answer anyway, since it published an
+    e(ll) Stata does not have. Storing that key was the defect; refusing is the correct behaviour.
+    """
+
+    import pytest as _pytest
+
+    with _pytest.raises(Exception):
+        panel_fits[1].estat_ic()
 
 
 def test_vce_works(panel_fits) -> None:

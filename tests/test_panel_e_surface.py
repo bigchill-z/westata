@@ -105,12 +105,19 @@ def test_be_stores_mss_and_rss_but_not_tss(frame) -> None:
     assert not _present(macros, "tss")
 
 
-def test_re_stores_neither_mss_nor_tss(frame) -> None:
-    """``xtreg.sthlp:891-951`` lists ``rss`` alone."""
+def test_re_stores_no_sums_of_squares_at_all(frame) -> None:
+    """`xtreg, re` stores NONE of rss / mss / tss -- measured, not read off the help file.
+
+    An earlier version of this test asserted `rss` was present, on the strength of
+    `xtreg.sthlp:891-951` listing it. Probing the live command with `display e(rss)` prints ".",
+    so the help text and the implementation disagree and the implementation wins. The same applies
+    to e(ll): `estat ic` after `xtreg, re` raises r(321) because there is no likelihood stored.
+    """
 
     macros = _e(frame, "RandomEffects")
 
-    assert _present(macros, "rss")
+    for key in ("rss", "mss", "tss", "ll"):
+        assert not _present(macros, key), key
     assert not _present(macros, "mss")
     assert not _present(macros, "tss")
 

@@ -433,14 +433,17 @@ def test_e_contains_all_required_keys(build, request) -> None:
     expected = [
         key
         for key in REQUIRED_E_KEYS
-        if not (request.node.callspec.id == "re" and key in ("r2", "r2_a"))
+        if not (
+            request.node.callspec.id == "re"
+            and key in ("r2", "r2_a", "ll", "rss")
+        )
     ]
     missing = [key for key in expected if key not in res.e]
     assert not missing, f"missing e() keys: {missing}"
     # `xtreg, re` stores NO e(r2) / e(r2_a): a random-effects fit's explained share is not
     # one number, which is why Stata reports the r2_o / r2_b / r2_w decomposition instead.
     # Verified with `display e(r2)`: fe .93913112, be .99388704, re ".".
-    numeric = ["rmse", "F", "ll"]
+    numeric = ["rmse", "F"] if request.node.callspec.id == "re" else ["rmse", "F", "ll"]
     if request.node.callspec.id != "re":
         numeric = ["r2", "r2_a", *numeric]
     for key in numeric:

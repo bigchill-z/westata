@@ -78,7 +78,16 @@ def test_xtreg_allows_exactly_what_the_dispatch_table_allows(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
 
+    # `estat ic` is DISPATCH-allowed for both estimators -- xtreg_estat.ado routes it to
+    # estat_default either way -- but for `re` it fails at RUN time, because `xtreg, re`
+    # stores no e(ll). A live `xtreg ..., re` + `estat ic` raises
+    #   r(321): likelihood information not found in last estimation results
+    # so the refusal belongs here as an execution error, not a dispatch error.
     for method in XTREG_ALLOWED:
+        if estimator == "re" and method == "estat_ic":
+            with pytest.raises(Exception):
+                getattr(result, method)()
+            continue
         assert getattr(result, method)() is not None, (estimator, method)
 
     for method in XTREG_REFUSED:

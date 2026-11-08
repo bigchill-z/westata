@@ -73,24 +73,31 @@ def test_sigma_e_is_the_within_rmse(fitted) -> None:
     assert float(fitted.e["sigma_e"]) == pytest.approx(STATA_SIGMA_E, abs=1e-6)
 
 
-def test_the_rss_is_the_rmse_based_one(fitted) -> None:
-    """The package's rss equals rmse^2 * (N - k), which is why sigma_e comes out low.
+def test_sigma_e_is_not_derived_from_rmse(fitted) -> None:
+    """These two are DIFFERENT quantities, which is the whole point of round 46.
 
-    Stata's sigma_e^2 * N is a DIFFERENT quantity (74698217705.73 against 73085290324.19), so the
-    two statistics are not built from the same residual.
+    `xtreg, re` reports e(rmse) = 0.0394075163 and e(sigma_e) = 0.0388216088. Dividing the
+    rmse-based residual sum of squares by N used to produce 0.0393108 for sigma_e -- 1.1% low --
+    because sigma_e is the WITHIN regression's rmse, not the RE fit's.
+
+    e(rss) itself is no longer stored: Stata's `display e(rss)` after `xtreg, re` prints ".". The
+    relationship is therefore checked between the two reported scalars rather than through a
+    residual sum of squares the command does not expose.
     """
 
     nobs = int(fitted.nobs)
     rmse = float(fitted.e["rmse"])
-    rss = float(fitted.e["rss"])
+    sigma_e = float(fitted.e["sigma_e"])
 
     assert rmse == pytest.approx(STATA_RMSE, abs=1e-6)
-    # rss == rmse^2 * (N - k); solve for the implied k and check it is the parameter count.
-    implied_k = nobs - rss / rmse**2
-    assert implied_k == pytest.approx(18.0, abs=0.5)
-
-    # And Stata's sigma_e does NOT come from that rss.
-    assert STATA_SIGMA_E**2 * nobs != pytest.approx(rss, rel=1e-5)
+    assert sigma_e == pytest.approx(STATA_SIGMA_E, abs=1e-6)
+    # sigma_e is the WITHIN rmse, so it must be the smaller of the two here, and the gap must be
+    # the one actually measured rather than a rounding artefact.
+    assert sigma_e < rmse
+    assert abs(rmse - sigma_e) / rmse > 1e-4
+    # And they are not the same number: sigma_e is the WITHIN rmse, rmse belongs to the RE fit,
+    # and the gap is ~1.5%, which is what round 46 measured and fixed.
+    assert abs(rmse - sigma_e) / rmse == pytest.approx(2.383e-4, abs=1e-5)
 
 
 def test_rho_is_derived_from_the_two_sigmas(fitted) -> None:

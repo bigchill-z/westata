@@ -115,7 +115,7 @@ class VarGrangerResult:
                 _place(
                     row.equation,
                     row.excluded,
-                    f"{row.chi2:.3f}",
+                    _stata_chi2(row.chi2),
                     f"{row.df:.0f}",
                     f"{row.pvalue:.3f}",
                 )
@@ -123,6 +123,26 @@ class VarGrangerResult:
             previous = row.equation
         lines.append("  +" + "-" * 66 + "+")
         return chr(10).join(lines)
+
+
+def _stata_chi2(value: float) -> str:
+    """Stata prints the Granger chi2 with FIVE significant figures and no leading zero.
+
+    Measured from a live `vargranger`:
+
+        1.0532      Stata 1.0532      "%.3f" would give 1.053
+        .56897      Stata .56897      "%.3f" would give 0.569
+
+    Three decimals cannot express either -- the first needs four places and the second five -- so the
+    statistic is rendered at significant figures instead.
+    """
+
+    text = f"{float(value):.5g}"
+    if text.startswith("0."):
+        return text[1:]
+    if text.startswith("-0."):
+        return "-" + text[2:]
+    return text
 
 
 def vargranger(fitted: Any) -> VarGrangerResult:

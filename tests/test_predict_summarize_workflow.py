@@ -79,7 +79,7 @@ def test_the_combined_table_matches_stata_line_for_line(fitted) -> None:
         "-------------+---------------------------------------------------------",
         "          xb |         24    165.9167    42.47537   102.6653   236.5989",
         "         lev |         24        .125    .1107656   .0421769   .5036705",
-        "          ck |         24     .187198    .5508187    2.4e-06   2.253077",
+        "          ck |         24     .187198    .5508187   2.40e-06   2.253077",
     ]
     for line in expected:
         assert line in rendered, line

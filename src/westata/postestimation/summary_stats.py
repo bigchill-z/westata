@@ -44,10 +44,37 @@ def _stata_number(value: float) -> str:
             text = text[1:]
         elif text.startswith("-0."):
             text = "-" + text[2:]
+        # THE EXPONENT IS PADDED BEFORE THE WIDTH TEST. `%.3g` of 1e-12 is "1e-12" -- five characters
+        # of body -- so it fitted the eight-wide field and was returned unpadded, while Stata prints
+        # "1.00e-12". Padding first means the width check sees what will actually be printed.
+        text = _two_place_exponent(text)
         body = text[1:] if text.startswith("-") else text
         if len(body) <= 8:
             break
     return text
+
+
+def _two_place_exponent(text: str) -> str:
+    """Give a scientific-notation string TWO mantissa digits, as Stata prints it.
+
+    Measured on `summarize` of a column whose values are tiny:
+
+        3.33e-13    1.00e-12    -1.87e-09
+
+    never a bare `1e-12`. An exact zero is left alone -- Stata prints `0` there, measured separately.
+    """
+
+    if "e" not in text and "E" not in text:
+        return text
+    mantissa, _, exponent = text.partition("e")
+    if not exponent:
+        mantissa, _, exponent = text.partition("E")
+    sign = ""
+    if mantissa.startswith("-"):
+        sign, mantissa = "-", mantissa[1:]
+    whole, _, fraction = mantissa.partition(".")
+    fraction = (fraction + "00")[:2]
+    return f"{sign}{whole}.{fraction}e{exponent}"
 
 
 @dataclass(frozen=True)

@@ -117,12 +117,37 @@ class VarStableResult:
         ]
         for value, magnitude in zip(self.eigenvalues, self.modulus):
             eigenvalue_text = _format_complex(value)
-            cell = (
-                "  " + eigenvalue_text if len(eigenvalue_text) > 11
-                else eigenvalue_text.rjust(11)
-            )
+            # COLUMN ENDS MEASURED ON A LIVE CAPTURE, then verified in a standalone script before this
+            # edit -- the previous round corrupted this file by rewriting the block in place.
+            #
+            #     '  |   1.000927               |   1.00093   |'       real: value ends at 13
+            #     '  | -.09055651 + .02373722i  |   .093616   |'      complex: real ends 13,
+            #                                                              sign at 15, imaginary 26
+            #
+            # Both shapes therefore end their left field at column 13; a complex value additionally puts
+            # its sign at 15 and its imaginary part at 17..26.
+            if "i" in eigenvalue_text:
+                body = [" "] * 44
+                body[2] = "|"
+                body[29] = "|"
+                body[43] = "|"
+                real_part, _, rest = eigenvalue_text.partition(" ")
+                sign = rest.strip()[0]
+                imaginary = rest.strip()[1:].strip()
+                for offset, character in enumerate(real_part):
+                    body[14 - len(real_part) + offset] = character
+                body[15] = sign
+                for offset, character in enumerate(imaginary):
+                    body[27 - len(imaginary) + offset] = character
+                cell = "".join(body)[:29]
+            else:
+                body = [" "] * 29
+                body[2] = "|"
+                for offset, character in enumerate(eigenvalue_text):
+                    body[14 - len(eigenvalue_text) + offset] = character
+                cell = "".join(body)
             result.append(
-                f"  |{cell.ljust(26)}|{_bare(magnitude).rjust(10).ljust(13)}|"
+                f"{cell}|{_bare(magnitude).rjust(10).ljust(13)}|"
             )
         result.append("  +----------------------------------------+")
         if self.stable:

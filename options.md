@@ -1354,3 +1354,90 @@ cell   = strtrim(sprintf(format, x))   // strtrim 只去两端空格，不截断
 
 - **下一步**：读 .numfmt 方法本身（可能在 _tab.mlib，mata which 查不到）。
   或者用一个小实验：在 Stata 里手动调 _tab 验证。
+
+### T31. 离散模型（Logit/Probit）表头的 `=` 位置与 Stata 不同（第 203 轮）
+
+报告 C11-01 等。大样本复核发现 Logit 表头**右侧 `=` 列位置不对**：
+
+```
+Stata    'Logistic regression                                     Number of obs =  1,500'
+本包     'Logistic regression                                     Number of obs    =  1,500'
+                                                                    ^ 70            ^ 73
+```
+
+**Stata 的 `=` 固定在 70 列，值右对齐到 76 列**，本包在 73/76。
+
+**同时确认正确的**：
+- 左侧 banner 区 52 宽，正确；
+- 数值 `1,500` **带千位分隔符**，正确；
+- `LR chi2(1)`、`Prob > chi2` 的**值都正确**，只是 `=` 列位置错。
+
+**已测量的两种布局（在同一 Stata 输出中）**：
+
+| 行 | `=` 所在列 |
+|---|---|
+| 所有行（含 `Number of obs`、`LR chi2`、`Prob > chi2`）| **70** |
+
+**尚未定位**：Logit 表头的渲染函数不在 `summary.py` 的 `Number of obs` 站点中
+（已检查 L3227/L3286/L3394 三处，分别属于分位数回归、中位数回归和分层模型）。
+需要继续在 `results/base.py` 或离散模型专属路径中查找。
+
+- **状态**：**未修改**。已确认差异性质是**纯布局**（值全对）。
+- **下一步**：`grep "Logistic regression"` 找到 banner 拼装点，再追 `Number of obs` 的宽度参数
+  （应为 13 而非 14，且 `= ` 紧跟其后）。
+- **注意**：这条与 T15–T20 不同，`varsoc` 等表已全部对齐，此为**离散模型专属**问题。
+
+**第 203 轮补充：已排除的候选位置**
+
+检查了全部含 Number of obs 且带宽度参数的站点（共 13 处），逐一确认归属：
+
+| 文件:行 | 归属 |
+|---|---|
+| summary.py:1086 | DID 表头 |
+| summary.py:1319 | ab 模型 |
+| summary.py:1721 | 回归 ANOVA |
+| summary.py:2106/2147 | 其他面板 |
+| summary.py:3227 | 分位数回归 |
+| summary.py:3286 | 中位数回归 |
+| summary.py:3394 | 分层模型 |
+| 	series.py:1921 | VAR 表头 |
+| 	series.py:3036 | ARIMA |
+| discrete.py | **无** |
+| ase.py | **无** |
+
+**结论：Logit/Probit 的表头不在这 13 处中**，它走的是另一条路径
+（可能与 StataResults.summary(style='stata') 的通用块有关，用 Ljust 拼装而非单行 f-string）。
+
+- **下一步**：在 summary(style='stata') 的**主函数体**内搜索 'Number of obs' 的**字符串拼接**，
+  而不是 f-string 格式说明符。
+**第 203 轮补充之二：已定位到具体常量**
+
+`summary.py` 的离散模型表头用 `_left_width` 控制 banner 与右栏的分界（第 2956–2967 行）：
+
+```python
+if _is_tobit or _is_intreg:
+    _left_width = 52
+elif _is_truncreg:
+    _left_width = 48
+elif _splice_panel:
+    _left_width = 53
+else:
+    _left_width = 56        # <-- Logit/Probit 走这里
+```
+
+**普通 Logit 走 `else` 分支取 56，而实测需要 `52`**：
+
+```
+Stata    'Logistic regression                                     Number of obs =  1,500'
+          ^0                      ^52  ^56 (Number 起点)
+本包     'Logistic regression                                     Number of obs    =  1,500'
+                                        ^56 但 '= ' 宽度不同
+```
+
+两者 `Number` 起点同为 56，差异在 **`'Number of obs'` 之后的标签宽度**：
+Stata 是 `'Number of obs '` + `'= '`（无额外填充），本包用了 14 宽再 `= `。
+
+**修正方向**：`else` 分支的右栏标签宽度应从 14 改为 13，或去掉宽度填充直接 `'Number of obs = '`。
+
+- **状态**：未修改。**纯布局**，值全对。
+- **风险**：`_left_width` 与标签宽度共同决定 78 列总宽，改动需同时验证 tobit/intreg/truncreg/xt 各分支。

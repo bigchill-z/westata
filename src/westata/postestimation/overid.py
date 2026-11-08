@@ -135,11 +135,23 @@ class OverIdResult:
                 text = "-" + text[2:]
             return text
 
+        # THE STATISTIC IS RIGHT-ALIGNED TO COLUMN 34, so the gap after "=" varies with its width.
+        # Measured on three rows from two samples:
+        #
+        #     '  Sargan (score) chi2(1) =  1.20073  (p = 0.2732)'    value 28..34
+        #     '  Basmann chi2(1)        =   1.1923  (p = 0.2749)'    value 29..34
+        #     '  Basmann chi2(1)        =   .14737  (p = 0.7011)'    value 29..34
+        #
+        # A fixed two spaces after "=" gave ' .14737' where Stata prints '  .14737', which is why the
+        # discrepancy only appeared on a sample whose Basmann statistic fell below one.
+        def _row(label_text: str, statistic: float, pvalue: float) -> str:
+            head = f"  {label_text + ' chi2(' + f'{self.df:g}' + ')':<22} ="
+            body = _statistic(statistic)
+            gap = " " * max(1, 34 - len(head) - len(body) + 1)
+            return f"{head}{gap}{body}  (p = {pvalue:.4f})"
+
         label = "Sargan (score)" if self.test == "Sargan" else self.test
-        sargan_row = (
-            f"  {label + ' chi2(' + f'{self.df:g}' + ')':<22}"
-            f" =  {_statistic(self.statistic)}  (p = {self.pvalue:.4f})"
-        )
+        sargan_row = _row(label, self.statistic, self.pvalue)
         # Stata indents the heading by TWO spaces -- '  Tests of overidentifying restrictions:'
         # -- while the statistic rows below keep the same two-space indent. Measured in round 171;
         # omitting it made every line-by-line comparison fail on this row alone.
@@ -152,10 +164,7 @@ class OverIdResult:
         #     Sargan (score) chi2(1) =  2.13271  (p = 0.1442)
         lines = ["", "  Tests of overidentifying restrictions:", "", sargan_row]
         if self.basmann is not None:
-            basmann_row = (
-                f"  {'Basmann chi2(' + f'{self.df:g}' + ')':<22}"
-                f" =  {_statistic(self.basmann)}  (p = {self.basmann_pvalue:.4f})"
-            )
+            basmann_row = _row("Basmann", self.basmann, self.basmann_pvalue)
             lines.append(basmann_row)
         return chr(10).join(lines)
 

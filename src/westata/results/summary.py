@@ -3136,6 +3136,31 @@ def _stata_summary(result: Any) -> str:
             right = ""
             if index < len(ml_right):
                 label, value = ml_right[index]
+                label, value = ml_right[index]
+                # THE PRINTED MODEL-TEST P-VALUE IS chi2.sf(chi2, df_m), NOT e(p).
+                # For zip/zinb Stata stores e(p) with rank-1 degrees of freedom:
+                #
+                #     e(chi2) 0.2293346   e(df_m) 1   e(rank) 4   e(p) 0.97272244
+                #
+                # while the header prints "Prob > chi2 = 0.6320", which is
+                # chi2.sf(0.2293346, 1). The package printed e(p) and so showed 0.9727
+                # beside "LR chi2(1) = 0.23" -- two lines that contradict each other.
+                #
+                # For Logit, Probit and Poisson e(p) already equals chi2.sf(chi2, df_m)
+                # to twelve digits, so recomputing is a no-op there and removes the
+                # dependence on which estimator stored what.
+                if label == "Prob > chi2":
+                    _chi2_v = _e_float(result, "chi2")
+                    _df_v = _e_float(result, "df_m")
+                    if (
+                        np.isfinite(_chi2_v)
+                        and np.isfinite(_df_v)
+                        and _df_v > 0
+                        and str(value).strip() not in ("", ".")
+                    ):
+                        from scipy import stats as _st
+
+                        value = f"{float(_st.chi2.sf(_chi2_v, _df_v)):.4f}"
                 # Measured: truncreg's right column is label 18 + "= " + value 4
                 # ("Number of obs     =  85"), where the other ML commands use label 14
                 # + value 6. The block is the same 78 wide either way.

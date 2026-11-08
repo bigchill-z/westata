@@ -177,3 +177,50 @@ def test_the_drop_of_the_constant_is_why_the_backend_was_used_as_is() -> None:
 
     with pytest.raises(ValueError, match="[Cc]onstant"):
         _Backend(wide[["lny"]], wide[["lnk1", "lnk2", "const"]])
+
+
+def test_the_intercept_cannot_be_added_after_the_fit() -> None:
+    """The slopes MOVE once a constant is present, so a post-hoc intercept is meaningless.
+
+    Pinned because that shortcut looks obviously safe -- an added constant is orthogonal to nothing
+    in particular, and "just prepend the mean residual" reads like a no-op. Measured on the real
+    differenced frame:
+
+        without constant   [0.0172119, -0.0163616, 1.0933399]
+        with constant      [0.0075628, -0.1048258, -0.0621289, 1.0405411]
+        slope movement     [-0.1220377, -0.0457672, -0.0527988]
+
+    The differenced covariates do not have zero mean, so omitting the constant makes each slope
+    absorb part of it. Adding the constant afterwards therefore produces a parameter vector that
+    belongs to no model at all -- worse than the current documented deviation.
+    """
+
+    import numpy as np
+
+    frame = pd.read_stata(MUNNELL).copy()
+    frame["sid"] = pd.Categorical(frame["st_abb"]).codes
+    frame["year"] = frame["year"].astype(int)
+    wide = frame.set_index(["sid", "year"])[
+        ["lny", "lnk1", "lnk2", "lnlabor"]
+    ].sort_index()
+
+    differenced = wide.groupby(level=0).diff().dropna()
+    y = differenced["lny"].to_numpy(dtype=float)
+    exog = differenced[["lnk1", "lnk2", "lnlabor"]].to_numpy(dtype=float)
+
+    without = np.linalg.lstsq(exog, y, rcond=None)[0]
+    with_constant = np.linalg.lstsq(
+        np.column_stack([np.ones(y.size), exog]), y, rcond=None
+    )[0]
+
+    assert without == pytest.approx([0.0172119, -0.0163616, 1.0933399], abs=1e-6)
+    assert with_constant == pytest.approx(
+        [0.0075628, -0.1048258, -0.0621289, 1.0405411], abs=1e-6
+    )
+
+    movement = with_constant[1:] - without
+    assert movement == pytest.approx(
+        [-0.1220377, -0.0457672, -0.0527988], abs=1e-6
+    )
+    # Every slope moves by more than 0.04 -- this is not a rounding-level effect.
+    assert np.all(np.abs(movement) > 0.04)

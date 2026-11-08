@@ -1408,14 +1408,39 @@ class VARResults:
         ]
 
         def _wide_cell(value: float) -> str:
+            """SIX SIGNIFICANT FIGURES, leading zero dropped -- what Stata prints here.
+
+            Measured from a live `irf table oirf` after `var y1 y2, lags(1/2)`:
+
+                step 0   1.00439    .020043    0        .97473
+                step 1   .971741    .055527   -.07318   .911978
+
+            Six decimals gave `1.004387`, one figure too many: the earlier version was reading the
+            format off values that happened to sit below one, where six decimals and six significant
+            figures coincide.
+            """
+
             if not np.isfinite(value):
                 return "."
-            text = f"{value:.6f}"
+            number = float(value)
+            # THE FORMAT SWITCHES AT ONE, measured across the whole table:
+            #
+            #     1.004387  -> 1.00439     six SIGNIFICANT figures
+            #     .02004281 -> .020043     six DECIMALS
+            #     .9717408  -> .971741     the two rules coincide below one
+            #
+            # A single rule cannot serve both ends: six decimals gives 1.004387, and six significant
+            # figures gives .0200428 where Stata prints .020043.
+            text = f"{abs(number):.6f}" if abs(number) < 1.0 else f"{abs(number):.6g}"
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+            if number < 0:
+                text = "-" + text
             if text.startswith("0."):
                 text = text[1:]
             elif text.startswith("-0."):
                 text = "-" + text[2:]
-            return text.rstrip("0").rstrip(".") or "0"
+            return text
 
         # Column geometry measured from a live `irf table oirf` on a bivariate VAR(2):
         #

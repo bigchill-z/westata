@@ -57,7 +57,8 @@ def test_the_step_zero_response_of_the_shocked_equation_is_about_one(var_fit) ->
     """An orthogonalised own-shock at step 0 is the shock size, i.e. near 1 on Stata's scale."""
 
     rendered = str(var_fit.irf_table(statistic="oirf", periods=4))
-    assert "1.004387" in rendered
+    # Stata prints six significant figures above one: 1.00439, not 1.004387.
+    assert "1.00439" in rendered
 
 
 def test_more_periods_produce_more_rows(var_fit) -> None:

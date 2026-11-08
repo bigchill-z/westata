@@ -113,9 +113,16 @@ class OvTestResult:
                 # "X = ". Seven characters made "F(3, 23) =    3.08" one column wider than
                 # Stata's "F(3, 23) =   3.08".
                 f"{label} = {self.statistic:>6.2f}",
-                # Stata indents this line by ONE space: " Prob > F = 0.2620". Captured from
-                # a live estat ovtest; the unindented form is 17 characters where Stata's is 18.
-                f" Prob > F = {self.pvalue:>6.4f}",
+                # THE Prob ROW IS AS WIDE AS THE F ROW ABOVE IT, and 'Prob' is right-aligned to that
+                # width rather than indented by a fixed amount. Measured at two sample sizes:
+                #
+                #     n=200   'F(3, 194) =   1.63'   (18)   ' Prob > F = 0.1845'   (18)
+                #     n=1500  'F(3, 1494) =   0.34'  (19)   '  Prob > F = 0.7969'  (19)
+                #
+                # The F row grows by one character when the degrees of freedom reach four digits, and the
+                # Prob row grows with it. A fixed one-space indent is right for the first case only.
+                " " * (len(f"{label} = {self.statistic:>6.2f}") - len(f"Prob > F = {self.pvalue:.4f}"))
+                + f"Prob > F = {self.pvalue:.4f}",
             ]
         )
 

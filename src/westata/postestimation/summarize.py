@@ -198,8 +198,33 @@ def _stata_g(value: float, width: int = 8) -> str:
         elif text.startswith("-0."):
             text = "-" + text[2:]
         if len(text) <= width:
-            return text
-    return f"{number:.1g}"
+            return _two_place_exponent(text)
+    return _two_place_exponent(f"{number:.1g}")
+
+
+def _two_place_exponent(text: str) -> str:
+    """Give a scientific-notation string TWO mantissa digits, as Stata prints it.
+
+    Measured on a `summarize` of a column whose mean is tiny:
+
+        3.33e-13    1.00e-12    -1.87e-09    3.33e-21
+
+    never `1e-12`. Python's `%.3g` drops the trailing zeros, so the mantissa has to be padded back to
+    two decimals -- the same shape as the coefficient tables, where a bare `1` is written `1.00`.
+    An exact zero is NOT converted: Stata prints `0` there, measured separately.
+    """
+
+    if "e" not in text and "E" not in text:
+        return text
+    mantissa, _, exponent = text.partition("e")
+    if not exponent:
+        mantissa, _, exponent = text.partition("E")
+    sign = ""
+    if mantissa.startswith("-"):
+        sign, mantissa = "-", mantissa[1:]
+    whole, _, fraction = mantissa.partition(".")
+    fraction = (fraction + "00")[:2]
+    return f"{sign}{whole}.{fraction}e{exponent}"
 
 
 class SummarizeResult:

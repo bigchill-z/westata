@@ -252,11 +252,17 @@ class VarSocResult:
             else:
                 _lr_start = 20
             _cells: dict[int, str] = {
-                10: number(row.ll),
+                # THE LL CELL IS RIGHT-ALIGNED TO COLUMN 17. Measured on two rows:
+                #
+                #     '-4206.62'  spans 10..17
+                #     '   -4203'  spans 13..17
+                #
+                # A start-anchored 10 left a short value ragged on the left.
+                max(9, 18 - len(number(row.ll))): number(row.ll),
                 _lr_start: lr_cell,
                 30: df_cell,
                 33: p_cell,
-                39: fpe_text(float(row.fpe), best_fpe),
+                max(39, 46 - len(fpe_text(float(row.fpe), best_fpe).rstrip("*"))): fpe_text(float(row.fpe), best_fpe),
             }
             # The measured START column for each criterion's END column.
             _criteria_starts = {56: 49, 66: 59, 76: 69}

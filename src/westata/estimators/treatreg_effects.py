@@ -143,6 +143,12 @@ class TreatmentEffectResult:
     estimator: str = ""
     outcome_model: str = ""
     treatment_model: str = ""
+    #: The observation weights the estimator used, aligned to the estimation sample.
+    #:
+    #: `tebalance summarize` needs these to fill its Weighted column, and nothing else on the result
+    #: carried them -- which is why that column used to repeat the Raw one. Stored as a numpy array
+    #: rather than an AttributeError-prone property so a consumer can check for None.
+    weights: Any = None
 
     def with_header(
         self,
@@ -431,6 +437,7 @@ def _summarise_from_standard_error(
     command: str,
     se_method: str,
     nobs: int = 0,
+    weights: Any = None,
 ) -> TreatmentEffectResult:
     """Build the result from an already-computed standard error."""
 
@@ -463,6 +470,7 @@ def _summarise_from_standard_error(
         estimator=_estimator_label(command),
         outcome_model=_OUTCOME_MODELS.get(command, ""),
         treatment_model=_TREATMENT_MODELS.get(command, ""),
+        weights=weights,
     )
 
 
@@ -474,6 +482,7 @@ def _summarise(
     *,
     command: str,
     se_method: str = _EXACT_SE,
+    weights: Any = None,
 ) -> TreatmentEffectResult:
     """Assemble a :class:`TreatmentEffectResult` from an influence function."""
 
@@ -488,6 +497,7 @@ def _summarise(
         command=command,
         nobs=observations,
         se_method=se_method,
+        weights=weights,
     )
 
 
@@ -1001,6 +1011,22 @@ class IPW:
             a[k + 1, k + 1] = -float(((1.0 - t) * odds).mean())
         return a
 
+    def _analysis_weights(self, p: np.ndarray) -> np.ndarray:
+        """The weights this estimand puts on each observation, for balance diagnostics.
+
+        Stata's `tebalance summarize` fills its Weighted column from these. For the ATE they are
+        `1/p` and `1/(1-p)`; for the ATET the treated keep weight one and the controls get the odds
+        `p/(1-p)`, which is what makes the reweighted controls comparable to the treated.
+
+        Returned at the estimation sample's length, in the same row order as the covariates.
+        """
+
+        treated = self._treated
+        if self._estimand == "ate":
+            return np.where(treated > 0.5, 1.0 / p, 1.0 / (1.0 - p))
+        odds = p / (1.0 - p)
+        return np.where(treated > 0.5, 1.0, odds)
+
     def _hajek_means(self, p: np.ndarray) -> tuple[float, float]:
         """The normalised (Hajek) potential-outcome means at ``p``.
 
@@ -1055,6 +1081,7 @@ class IPW:
             influence1 - influence0,
             potential,
             command=self._command,
+            weights=self._analysis_weights(p),
             se_method=_EXACT_SE,
         )
 
@@ -1215,6 +1242,7 @@ class AIPW(IPW):
             influence1 - influence0,
             potential,
             command=self._command,
+            weights=self._analysis_weights(p),
             se_method=_EXACT_SE,
         )
 

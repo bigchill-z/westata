@@ -181,8 +181,10 @@ class SummarizeDetail:
         kurtosis = m4 / m2**2 if m2 > 0 else float("nan")
 
         statistics = [
-            ("Obs", f"{count:.0f}"),
-            ("Sum of wgt.", f"{count:.0f}"),
+            # THOUSANDS SEPARATORS: Stata prints 1,000 for an observation count of one thousand.
+            # Measured on a 1000-row sample; the earlier "%.0f" gave 1000 and the column shifted.
+            ("Obs", f"{count:,.0f}"),
+            ("Sum of wgt.", f"{count:,.0f}"),
             ("Mean", number(mean)),
             ("Std. dev.", number(deviation)),
             ("Variance", number(variance)),

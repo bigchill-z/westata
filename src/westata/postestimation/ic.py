@@ -145,6 +145,23 @@ class IcResult:
                 return ".".rjust(width)
             return f"{value:.{decimals}f}".rjust(width)
 
+
+        def _sig_cell(value: float, width: int) -> str:
+            """AIC and BIC at SEVEN SIGNIFICANT FIGURES, which is what Stata prints.
+
+            Measured from `estat ic` after `var y1 y2, lags(1/2)`:
+
+                AIC 1135.397    BIC 1168.28
+
+            Four decimals would give 1135.3972 and 1168.2751 -- one character wider and a different
+            rounding. The log-likelihood cells beside them keep their four decimals, so this is a
+            per-column rule rather than a table-wide one.
+            """
+
+            if not np.isfinite(value):
+                return ".".rjust(width)
+            return f"{float(value):.7g}".rjust(width)
+
         row = (
             f"{'.':>12} |{self.n:>11.0f}"
             # FOUR decimals for the log-likelihoods, not five. Measured from a live
@@ -154,7 +171,7 @@ class IcResult:
             # one character wider than the header's.
             f"{_cell(self.ll_null, 11, 4)}{_cell(self.ll_model, 11, 4)}"
             f"{self.df:>8.0f}"
-            f"{_cell(self.aic, 11, 4)}{_cell(self.bic, 11, 4)}"
+            f"{_sig_cell(self.aic, 11)}{_sig_cell(self.bic, 11)}"
         )
         note = "Note: BIC uses N = number of observations. See [R] IC note."
         # Captured byte-exactly from a live `estat ic` on grilic in round 191. SIX lines, and
@@ -247,7 +264,13 @@ def _resolve_df(result: Any, df: float | None) -> float:
         number = float(recorded)
         if np.isfinite(number):
             return number
-    covariance = np.asarray(result.cov_params(), dtype=float)
+    # `cov_params` IS A METHOD ON StataResults AND A PROPERTY ON VARResults, so calling it
+    # unconditionally raised "'numpy.ndarray' object is not callable" for a VAR -- which is how this
+    # was found. Accept both shapes rather than assuming one.
+    _cov = getattr(result, "cov_params", None)
+    if _cov is None:
+        raise ValueError("estat ic needs the coefficient covariance matrix")
+    covariance = np.asarray(_cov() if callable(_cov) else _cov, dtype=float)
     if covariance.ndim != 2 or covariance.size == 0:
         raise ValueError("estat ic needs the coefficient covariance matrix")
     return float(np.linalg.matrix_rank(covariance))

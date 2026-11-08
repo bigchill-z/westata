@@ -103,10 +103,11 @@ def test_the_table_reports_TOTALS_not_the_per_observation_macros(var_fit) -> Non
     rendered = str(var_fit.estat_ic())
     reported = var_fit.estat_ic()
 
-    # The table holds the total, which is N times the per-observation macro. The AIC/BIC
-    # columns print FOUR decimals (Stata shows -109.2389), so compare on that scale.
+    # The table holds the total, which is N times the per-observation macro. The AIC/BIC columns
+    # print SEVEN SIGNIFICANT FIGURES -- measured from a live `estat ic` after
+    # `var y1 y2, lags(1/2)`, which shows "1135.397" and "1168.28", not four decimals.
     total = float(var_fit.e["aic"]) * reported.n
-    assert f"{total:.4f}" in rendered
+    assert f"{total:.7g}" in rendered
     # And the macro on its own is NOT what is printed.
     assert f"{float(var_fit.e['aic']):.4f}" not in rendered
 
@@ -118,7 +119,7 @@ def test_the_bic_total_follows_the_same_scaling(var_fit) -> None:
     reported = var_fit.estat_ic()
 
     total = float(var_fit.e["sbic"]) * reported.n
-    assert f"{total:.4f}" in rendered
+    assert f"{total:.7g}" in rendered
 
 
 def test_the_parameter_count_is_e_k(var_fit) -> None:

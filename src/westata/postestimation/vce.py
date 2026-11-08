@@ -299,13 +299,18 @@ def estat_vce(result: Any, *, correlation: bool = False) -> VceMatrix:
         symmetric matrix.
     """
 
-    try:
-        raw_names = list(result.param_names)
-    except AttributeError as exc:  # pragma: no cover - defensive
+    # `VARResults` AND `VECMResults` DO NOT CARRY `param_names`; they expose `stata_param_names`,
+    # which is the same list already put in Stata's equation-by-equation order. Falling back to it
+    # makes `estat vce` work after `var`, where Stata prints a covariance table.
+    raw_names = getattr(result, "param_names", None)
+    if raw_names is None:
+        raw_names = getattr(result, "stata_param_names", None)
+    if raw_names is None:
         raise TypeError(
-            "estat vce needs a fitted result exposing param_names; got "
+            "estat vce needs a fitted result exposing param_names or stata_param_names; got "
             f"{type(result).__name__}"
-        ) from exc
+        )
+    raw_names = list(raw_names)
 
     # Stata prints the matrix in the SAME row order as the coefficient table, where
     # ``_cons`` comes last.  Without this the two tables of one analysis disagreed on
@@ -314,7 +319,8 @@ def estat_vce(result: Any, *, correlation: bool = False) -> VceMatrix:
     order = _stata_order_of(result, len(raw_names))
     names = [_display_name(raw_names[index]) for index in order]
 
-    cov = np.asarray(result.cov_params(), dtype=float)
+    _cov = getattr(result, "cov_params", None)
+    cov = np.asarray(_cov() if callable(_cov) else _cov, dtype=float)
     if len(order) == cov.shape[0] and order != list(range(len(order))):
         cov = cov[np.ix_(order, order)]
     if not correlation:

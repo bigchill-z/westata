@@ -340,3 +340,32 @@ egress D.（带截距）还是维持现状（无截距、纯组内差分）。
   差分后仍有常数项 = 各组共同的时间趋势，去掉它是有偏的，倾向对齐 Stata。
 - **未处理原因**：修它会改动 FirstDifferenceOLS 的默认设计矩阵，影响 etable、predict
   与多个夹具，需单独一轮并逐一复核。
+
+### T10 补充：linearmodels 禁止差分回归带常数，需替换 backend（第 59 轮）
+
+上一节推断「加截距」是正确做法。第 59 轮**已验证这是对的**：
+
+`
+手动 OLS:  [0.0075628, -0.1048258, -0.0621289, 1.0405411]
+Stata:     [-0.1048258, -0.0621289, 1.0405411, 0.0075628]   ← 逐位一致
+n = 768
+`
+
+**但实现路径被堵住**：linearmodels.panel.FirstDifferenceOLS 直接拒绝常数：
+
+`
+ValueError: Constants are not allowed in first difference regressions.
+`
+
+**这解释了为什么最初会写成「无截距」**：backend 的 API 不允许，代码注释里没有写明这一点，
+于是被当成了统计上的正确选择。
+
+**可行的三条路**：
+
+1. 不用 backend，自己实现差分 OLS（手动版已证明能得到逐位一致的结果，
+   但需要一并处理 cov_type、predict、etable 的对接）；
+2. 保留 backend 做协方差，把常数的贡献事后重参数化（Schur 补）；
+3. 维持现状并在 e(cmd) 与文档中明确标注「不等于 Stata 的任何命令」。
+
+- **未处理**：路线 1 改动面最大但最干净；路线 2 数学上可行但易错。
+  需要一轮专门做，且要逐一复核 predict、etable、summary 三处。

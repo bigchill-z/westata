@@ -80,6 +80,13 @@ def test_the_estimator_omits_the_constant_stata_keeps(fitted) -> None:
     THE DEFECT: differencing removes the entity effect but not a common time trend, so a constant
     belongs in the fit. Stata's _cons is 0.0075628. When this is fixed, assert
     `len(fitted.params) == 4` and check _cons against STATA_PARAMS["_cons"].
+
+    WHY IT CANNOT SIMPLY BE ADDED: `linearmodels.panel.FirstDifferenceOLS` refuses a constant --
+    "ValueError: Constants are not allowed in first difference regressions" -- so the backend has
+    to be replaced or worked around. That is why the omission was never noticed: the library made
+    it look like a modelling choice. A manual OLS on the differenced frame reproduces Stata exactly
+    ([0.0075628, -0.1048258, -0.0621289, 1.0405411]), so the arithmetic is settled; only the
+    plumbing is open.
     """
 
     assert len(fitted.params) == 3

@@ -3890,6 +3890,39 @@ def _stata_summary(result: Any) -> str:
         )
     _GROUP_CONSTANTS = ("intercept", "const", "_cons")
     seen_groups: set[str] = set()
+    # THE MAIN EQUATION PRINTS A HEADING TOO. A two-equation command such as
+    # `zinb cnt x, inflate(z)` prints
+    #
+    #     cnt          |
+    #                x |  ...
+    #            _cons |  ...
+    #     -------------+---...
+    #     inflate      |
+    #
+    # and the main block's parameters simply carry no prefix -- a storage detail rather than a
+    # display one. Empty for single-equation models, which print no heading and must keep doing
+    # so. No rule is emitted with it: the column header above already ends in one, and adding a
+    # second produced two consecutive identical rules in round 213.
+    _main_heading = ""
+    # A SINGLE-EQUATION FIT PRINTS NO HEADING, and _EQUATION_PREFIXES alone does not tell the
+    # two apart: it can be non-empty for unrelated reasons. What distinguishes them is whether
+    # any parameter actually carries a prefix -- measured on logit hi x, whose names are
+    # ['x', '_cons'] yet which briefly gained a spurious 'hi           |' row.
+    _has_prefixed_parameter = any(
+        str(_n).startswith(tuple(_EQUATION_PREFIXES)) for _n in names
+    )
+    if _has_prefixed_parameter:
+        _e_dict = getattr(result, "e", None) or {}
+        _main_heading = str(
+            _e_dict.get("_main_equation") or _e_dict.get("depvar") or ""
+        ).strip()
+
+    class _LastGroupFlag:
+        """Whether the group most recently emitted was a FACTOR group."""
+
+        flag = False
+
+    _last_group_was_factor = _LastGroupFlag()
     #: Sub-labels already emitted inside an arch group ("arch", "garch").
     _arch_subs_seen: set[str] = set()
     if _is_didregress(result) and names:
@@ -3981,6 +4014,9 @@ def _stata_summary(result: Any) -> str:
             _factor = None
         if _skip_sigma_row and str(bare).strip() in ("sigma", "/sigma"):
             continue
+        if not group and _main_heading and "__main__" not in seen_groups:
+            lines.append(f"{_main_heading:<{name_width}} |")
+            seen_groups.add("__main__")
         if group and group not in seen_groups:
             # The FIRST group needs a rule for the EQUATION-prefixed models (zip's "y |" /
             # "inflate |" blocks are separated from the coefficients above them), but NOT
@@ -4012,6 +4048,7 @@ def _stata_summary(result: Any) -> str:
                     "-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2)
                 )
             seen_groups.add(group)
+            _last_group_was_factor.flag = _is_factor_group
             lines.append(
                 f"{group:>{name_width}} |"
                 if _is_factor_group
@@ -4326,7 +4363,27 @@ def _stata_summary(result: Any) -> str:
                     _factor is None
                     and str(bare).strip().lower() in _GROUP_CONSTANTS
                 )
-                if _is_constant_row and seen_groups and lines and "|" in lines[-1]:
+                # THIS BLANK HEADING BELONGS TO A FACTOR BLOCK ONLY. Round 218 added it for
+                # `xtreg y k1 i.year, fe`, where a factor's level rows are followed by a blank
+                # pipe before _cons:
+                #
+                #                 |
+                #           _cons |   2352.891   ...
+                #
+                # An EQUATION block has no factor above its constant, yet `seen_groups` is
+                # already non-empty there (the "inflate" heading), so the guard passed and an
+                # empty '             |' row appeared before each block's _cons -- measured on
+                # `zinb cnt x, inflate(z)` at n=1000.
+                _factor_block_above = bool(
+                    getattr(_last_group_was_factor, "flag", False)
+                )
+                if (
+                    _is_constant_row
+                    and _factor_block_above
+                    and seen_groups
+                    and lines
+                    and "|" in lines[-1]
+                ):
                     if lines[-1].split("|", 1)[0].strip():
                         lines.append(f"{'':>{name_width}} |")
                 # /lnalpha PRINTS NO TEST STATISTIC. Stata leaves its z and P columns empty and

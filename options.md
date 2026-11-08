@@ -51,25 +51,34 @@
 | `teffects` AI-robust 方差 | 未实现 | 六种影响函数形式试过，均差 2.9–3.4%，见 `teffects_ra.py` 文档 |
 | `teffects psmatch` 推断量 | 未实现 | 需完整 Abadie-Imbens 影响函数，docstring 已排除两种简化 |
 
-### T4. `teffects aipw` 点估计低 2.53（未解决）
+### T4. `teffects aipw` 点估计低 2.53（阻塞点已定位到可读源码）
 
-- **现状**：`AIPW(...).fit().estimate` 给 `1619.0528`，Stata 是 `1621.583`。
-- **已定位到小数位**：分臂 OLS 的拟合均值本身**已经精确**——
-  `fitted1 = 6179.1204`（Stata PO(1) = 6179.120）、`fitted0 = 4557.5374`（Stata PO(0) = 4557.537）。
-  所以误差**全部来自修正项没有归零**：
+**重要进展**：`_teffects_gmm_aipw.ado`（1500 行）**是可读的**，核心矩条件已找到。
 
-  ```
-  mean(t*resid1/p)         = -6.5792    （应 ~0）
-  mean((1-t)*resid0/(1-p)) = -4.0489    （应 ~0）
-  ```
+```stata
+* L469  ipw = 1/pij             只看处理组
+* L475  resj = cond(tr, ipw*(depvar-muj), 0) + muj - pop[1,j]
+* L630  CMomentj, ofform=linear:  resj = cond(tr, depvar - muj, 0)
+```
 
-- **已排除 ①**：给结果方程加权（`t/p`、`(1-t)/(1-p)`）能让第一项**恰好为 0**，
-  但点估计变成 `1617.18`，**离 Stata 更远**。最显然的修法不是正确的修法。
-- **已排除 ②**：倾向得分模型与直接对 logit 似然做 BFGS 的结果匹配到 `4e-05`，是 MLE。
-- **阻塞点**：`_teffects_aipw.ado` 委托给 `_teffects_ipwra_gmm`，
-  而算术在**编译后的内置函数**里，无法从安装目录读取。
-- **若需推进**：需要 Stata 的 `teffects` 方法文档（Methods and formulas），
-  或该内置函数的源码。
+- **PO 矩条件**：`t*(1/p)*(y - m) + m - mu` —— 与本包的 `fitted + t*(y-fitted)/p` 形式一致；
+- **条件均值矩条件**：`t*(y - m)` —— 按处理组拟合，也与本包一致。
+
+**真正的差异在求解方式，不在公式**：
+
+```stata
+* L753  dcm = cond(tr, 1-ipw, 1)
+```
+
+`muj` 的导数含 `(1 - 1/p)`，说明 **`muj` 与 `pop` 是联合 GMM 估计的**，
+而不是「先 OLS 拟合、再对 augmented 取均值」。
+
+本包走的是后者，因此**落在另一个点**。修正项 `-6.58` / `-4.05` 不是 bug，
+而是两个估计点之间的差。
+
+- **若需推进**：把 `(pop, cm, ps)` 作为整体做 GMM，用上面三条矩条件联立求解。
+  这是估计器级改动，不是修补。
+- **参考**：`_teffects_gmm_aipw.ado` 在 `ado\base\_\` 下，`findfile` 可定位。
 
 ### T5. `estimate` 之外还差什么，已知清单
 

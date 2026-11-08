@@ -118,7 +118,24 @@ def test_the_aipw_correction_term_should_average_to_zero(data) -> None:
     RULED OUT -- the propensity model. It matches a direct BFGS maximisation of the logit likelihood
     to 4e-05, so the scores are the MLE.
 
-    WHAT REMAINS: Stata's aipw may not use plain per-arm OLS for the outcome models at all.
+    WHAT REMAINS -- and this is now READ FROM THE SOURCE, not inferred:
+    _teffects_gmm_aipw.ado is readable (1500 lines, in ado/base/_/). Its PO moment equation is
+
+        L469  ipw  = 1/pij                       (treated only)
+        L475  resj = cond(tr, ipw*(depvar-muj), 0) + muj - pop[1,j]
+
+    which is exactly the augmented form this package computes. The CONDITIONAL MEAN equation at
+    L630 for oform=linear is 
+esj = cond(tr, depvar - muj, 0) -- per-arm OLS, also the same.
+
+    So the FORMULAS agree. The divergence is in the SOLVER: the derivative block at L753 reads
+
+        dcm = cond(tr, 1-ipw, 1)
+
+    which means muj is differentiated WITH RESPECT TO THE PO PARAMETER pop. Stata estimates
+    (pop, cm, ps) JOINTLY by GMM; this package fits the outcome model first and then averages the
+    augmented values. That lands on a different point, which is what the -6.58 / -4.05 gap is --
+    a difference between two estimators, not a bug in one of them.
     `_teffects_aipw.ado` delegates to `_teffects_ipwra_gmm`, whose arithmetic lives in a compiled
     builtin, so the exact construction is not readable from the installation.
     """

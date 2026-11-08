@@ -1369,6 +1369,13 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     # ``Obs per group`` -- min/avg/max. The counts come from e() when stored; avg is the
     # mean group size, printed with one decimal as Stata does ("6.0" beside "6").
     per_group = e.get("_obs_per_group") or {}
+    # e(N) WINS OVER nobs. `xtreg, be` regresses on one row per entity, so the model's own nobs
+    # is the ENTITY count -- but Stata reports the LONG panel's size under e(N). Measured on
+    # munnell.dta: e(N) = 816 beside e(N_g) = 48 and e(df_r) = 44, so df_r must keep using the
+    # entity count while this header row does not.
+    _header_nobs = _e_float(result, "N")
+    if not np.isfinite(_header_nobs):
+        _header_nobs = nobs
     lines = [
         # A LEADING BLANK LINE: Stata's `xtreg ..., fe` capture starts with a newline, so the block
         # opens with an empty line before the banner. Measured in round 215 on munnell --
@@ -1378,7 +1385,9 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         "",
         row(
             banner,
-            stat("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else "."),
+            stat(
+                "Number of obs",
+                f"{_header_nobs:,.0f}" if np.isfinite(_header_nobs) else "."),
         ),
         row(
             f"Group variable: {group}",
@@ -4578,7 +4587,16 @@ def _stata_summary(result: Any) -> str:
         and str((getattr(result, "e", None) or {}).get("chi2type") or "").lower()
         in ("lr", "wald", "chi2")
     )
-    if _closes_with_border or _is_plain_regression or _is_likelihood_table:
+    # xtreg, be closes its table even though it stores no sigma_u/sigma_e pair -- its
+    # tail is the simple sd(u_i + avg(e_i.)) row and then a full rule. Measured.
+    _is_between_fit = str((getattr(result, "e", {}) or {}).get("title") or "").strip(
+    ).startswith("Between")
+    if (
+        _closes_with_border
+        or _is_plain_regression
+        or _is_likelihood_table
+        or _is_between_fit
+    ):
         lines.append(_border_rule)
 
     # ``reghdfe`` prints an "Absorbed degrees of freedom" table BELOW the closed

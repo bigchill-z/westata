@@ -180,3 +180,79 @@ def test_the_sigma_format_handles_BOTH_stata_shapes() -> None:
         if text.startswith("0."):
             text = text[1:]
         assert text == expected, (value, text, expected)
+
+
+#: Captured verbatim from `xtreg lny lnk1 lnk2 lnlabor, be`.
+STATA_BE_TABLE = [
+    "",
+    "Between regression (regression on group means)  Number of obs     =        816",
+    "Group variable: sid                             Number of groups  =         48",
+    "",
+    "R-squared:                                      Obs per group:",
+    "     Within  = 0.9255                                         min =         17",
+    "     Between = 0.9939                                         avg =       17.0",
+    "     Overall = 0.9924                                         max =         17",
+    "",
+    "                                                F(3,44)           =    2384.61",
+    "sd(u_i + avg(e_i.)) = .0824026                  Prob > F          =     0.0000",
+    "",
+    "------------------------------------------------------------------------------",
+    "         lny | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]",
+    "-------------+----------------------------------------------------------------",
+    "        lnk1 |   .1789629   .0712696     2.51   0.016     .0353285    .3225973",
+    "        lnk2 |   .3017863   .0414154     7.29   0.000      .218319    .3852535",
+    "     lnlabor |   .5752879   .0557899    10.31   0.000     .4628507    .6877251",
+    "       _cons |   1.575286   .2279486     6.91   0.000     1.115885    2.034686",
+    "------------------------------------------------------------------------------",
+]
+
+
+@pytest.fixture(scope="module")
+def be_table():
+    try:
+        frame = pd.read_stata(MUNNELL)
+    except FileNotFoundError:  # pragma: no cover
+        pytest.skip("munnell.dta is not available")
+    frame = frame.copy()
+    frame["sid"] = pd.Categorical(frame["st_abb"]).codes
+    frame["year"] = frame["year"].astype(int)
+    fitted = ws.BetweenOLS.from_formula(
+        "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="sid", time="year"
+    ).fit()
+    return str(fitted.summary(style="stata")).splitlines()
+
+
+def test_the_be_table_matches_stata(be_table) -> None:
+    """`xtreg, be` compares equal on every line too, after rounds 56-57."""
+
+    assert len(be_table) == len(STATA_BE_TABLE)
+    problems = [
+        (index, theirs, ours)
+        for index, (theirs, ours) in enumerate(zip(STATA_BE_TABLE, be_table))
+        if theirs != ours
+    ]
+    assert not problems, problems[:3]
+
+
+def test_be_reports_the_observation_count_not_the_entity_count(be_table) -> None:
+    """e(N) is 816 while e(N_g) is 48 -- and df_r stays 48 - 4.
+
+    `xtreg, be` regresses on one row per entity, so the model's own nobs is the ENTITY count. Stata
+    nonetheless reports the long panel's size under e(N), and keeps e(df_r) on the entity scale.
+    Both facts are visible in the captured table: 816 in the header, F(3,44) in the model test.
+    """
+
+    header = be_table[1]
+    assert "816" in header
+    assert "F(3,44)" in be_table[9]
+
+
+def test_be_closes_its_table_without_a_sigma_pair(be_table) -> None:
+    """The between table ends on a rule even though it stores no sigma_u / sigma_e."""
+
+    assert set(be_table[-1].strip()) == {"-"}
+
+
+def test_be_shows_the_combined_sd_where_others_show_a_correlation(be_table) -> None:
+    row = next(line for line in be_table if line.startswith("sd(u_i + avg(e_i.))"))
+    assert ".0824026" in row

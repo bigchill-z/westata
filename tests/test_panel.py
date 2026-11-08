@@ -196,8 +196,12 @@ def test_be_matches_group_mean_ols() -> None:
 
     np.testing.assert_allclose(res.params.to_numpy(), beta, rtol=0.0, atol=1e-10)
     np.testing.assert_allclose(res.bse.to_numpy(), np.sqrt(np.diag(cov)), rtol=0.0, atol=1e-10)
+    # `nobs` is the ENTITY count because the between fit regresses on group means, but
+    # e(N) is the OBSERVATION count -- Stata reports the long panel's size there.
+    # Measured on munnell.dta: e(N) = 816 beside e(N_g) = 48 and e(df_r) = 44.
     assert res.nobs == N_ENTITIES
-    assert res.e["N"] == N_ENTITIES
+    assert res.e["N"] == N_ENTITIES * N_PERIODS
+    assert res.e["N_g"] == N_ENTITIES
     assert res.df_resid == df_r
 
 

@@ -1561,6 +1561,14 @@ class PanelOLS:
             "g_max": int(panel_sizes.max()),
             "Tcon": int(np.all(panel_sizes == panel_sizes[0])),
         }
+
+        # e(N) IS THE OBSERVATION COUNT, e(N_g) the entity count. `xtreg, be` regresses on
+        # one row per entity so `nobs` here is the group count, but Stata still reports the
+        # LONG panel's size under e(N). Measured on munnell.dta: e(N) = 816 beside
+        # e(N_g) = 48 and e(df_r) = 44 -- and df_r stays 48 - 4, so `nobs` itself must not
+        # change, only what is reported.
+        if self._estimates_on_entity_means and np.isfinite(long_nobs):
+            out["N"] = float(long_nobs)
         #: Whether every entity contributes the same number of periods.  Stata's
         #: ``e(Tcon)``; it decides whether ``theta`` is a single number or a
         #: distribution (``xtreg_re.ado:368-379``).
@@ -2238,8 +2246,9 @@ class BetweenOLS(RandomEffects):
     # `xtreg, be` DOES store e(rss), e(mss) and e(ll) -- measured with `display e(ll)`,
     # which returns 53.79388 rather than ".". Only `xtreg, re` omits them, and because
     # BetweenOLS inherits from RandomEffects the omit list has to be cleared here.
-    _omit_e_keys = ()
-
+    # `xtreg, be` leaves e(df_b) MISSING: `display e(df_b)` prints "." while e(df_m) = 3
+    # and e(df_r) = 44 are both present. The within estimator is the one that stores df_b.
+    _omit_e_keys = ("df_b",)
     # Inherits from RandomEffects, which sets dist=z; xtreg, be prints t / P>|t| with
     # F(3, 44) for the model test (measured on munnell.dta), so both come back here.
     _coefficient_dist = "t"

@@ -164,12 +164,17 @@ class IcResult:
 
         row = (
             f"{'.':>12} |{self.n:>11.0f}"
-            # FOUR decimals for the log-likelihoods, not five. Measured from a live
-            # ``estat ic`` after ``regress y k``: "-124.2294  -102.2761". Printing five put
-            # "-124.22935  -102.27611" in the cells -- correct to more places than Stata
-            # shows, which still fails an exact-layout comparison and makes the columns look
-            # one character wider than the header's.
-            f"{_cell(self.ll_null, 11, 4)}{_cell(self.ll_model, 11, 4)}"
+            # SEVEN SIGNIFICANT FIGURES, not a fixed decimal count. Four decimals matched the one
+            # capture this table was built from -- where every log-likelihood happened to sit near
+            # -400 -- and failed elsewhere:
+            #
+            #     -70.47869   Stata prints all five decimals; four gave -70.4787
+            #     -1085.254   Stata prints three; four gave -1085.2540
+            #     -399.1048   the two coincide, which is why one sample looked right
+            #
+            # Seven significant figures reproduces all of them, and matches the information-criteria
+            # columns beside it.
+            f"{_sig_cell(self.ll_null, 11)}{_sig_cell(self.ll_model, 11)}"
             f"{self.df:>8.0f}"
             f"{_sig_cell(self.aic, 11)}{_sig_cell(self.bic, 11)}"
         )

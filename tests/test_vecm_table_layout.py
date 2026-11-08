@@ -62,8 +62,17 @@ def test_every_header_line_matches_stata(summary) -> None:
         assert expected in lines, repr(expected)
 
 
-def test_the_block_starts_flush(summary) -> None:
-    assert summary.splitlines()[0] == "Vector error-correction model"
+def test_the_block_opens_with_a_blank_then_the_banner(summary) -> None:
+    """Stata's `vec` output starts with an EMPTY line, then the banner.
+
+    The previous version of this test asserted `splitlines()[0]` was the banner, which contradicted
+    the captured header above it -- a live run has the blank first. That assertion is what kept the
+    output one line short of Stata's sixty.
+    """
+
+    lines = summary.splitlines()
+    assert lines[0] == ""
+    assert lines[1] == "Vector error-correction model"
 
 
 def test_aic_has_its_own_row(summary) -> None:

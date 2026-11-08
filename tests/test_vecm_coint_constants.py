@@ -79,9 +79,19 @@ def test_rank_one_constants_are_unchanged(rank_one) -> None:
 
 
 def test_each_equation_gets_a_constant_row(rank_two) -> None:
+    """One `_cons` per equation in the COEFFICIENT table -- three for a three-equation VECM.
+
+    The beta table now also carries a `_cons` row (the cointegrating constant), so counting every
+    `_cons` line in the output would find five. Restrict to the section above the beta header.
+    """
+
+    lines = str(rank_two.summary()).splitlines()
+    beta_header = next(
+        index for index, line in enumerate(lines) if line.lstrip().startswith("beta |")
+    )
     rows = [
         line
-        for line in str(rank_two.summary()).splitlines()
-        if "_cons" in line and "|" in line and "beta" not in line
+        for line in lines[:beta_header]
+        if "_cons" in line and "|" in line
     ]
     assert len(rows) == 3

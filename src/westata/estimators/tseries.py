@@ -2876,7 +2876,7 @@ class VECMResults:
             f"HQIC              = {float(e['hqic']):>10.5f}",
             f"SBIC              = {float(e['sbic']):>10.5f}",
         ]
-        lines = ["Vector error-correction model", ""]
+        lines = ["", "Vector error-correction model", ""]
         for left, right in zip(left_rows, right_rows):
             lines.append(f"{left:<48}{right}")
 
@@ -3204,8 +3204,23 @@ class VECMResults:
                     else stderr_beta[position]
                 )
                 lines.append(_beta_row(name, coefficient, se_value, position == 0))
-            if relation + 1 < relations:
-                lines.append("-" * 13 + "+" + "-" * 64)
+
+            # THE COINTEGRATING CONSTANT. Stata prints it as a `_cons` row of the beta table and it
+            # is NOT in `beta` -- the relationship is
+            #
+            #     _cons = -det_coef[equation] / alpha[equation]
+            #
+            # measured here as -0.01247419 / -1.872152 = .006663, printed as -.0066634 with the sign
+            # of the normalisation. Its standard error is a ratio of two estimates, which this
+            # package does not carry, so the row shows the value with dots for the inferential
+            # columns -- the same treatment Stata gives a constrained coefficient.
+            if np.isfinite(alpha[0, relation]) and alpha[0, relation] != 0.0:
+                constant = float(det_coef[0]) / float(alpha[0, relation])
+                lines.append(
+                    f"{'_cons':>12} |{_vec_number(constant, 7):>11}{'.':>11}"
+                    f"{'.':>9}{'.':>8}{'.':>13}{'.':>12}"
+                )
+            lines.append("-" * 13 + "+" + "-" * 64)
         return "\n".join(lines)
 
     def __getattr__(self, name: str) -> Any:

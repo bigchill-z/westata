@@ -24,9 +24,11 @@
 
 - **现状**：三种组合规则（`mserd`/`msesum`/`msetwo`）已从 `rdbwselect.ado:499/527/537`
   精确转写，7 个守卫覆盖算术与符号方向。
-- **阻塞点**：`C[1..3]` 向量由 `rdrobust_bw()` 在 `l/lrdrobust.mlib` 中计算。
+- **阻塞点**：`C[1..3]` 由 `rdrobust_bw()` 在 `l/lrdrobust.mlib` 中计算。
   `mata which` 确认位置；该文件 321 KB、**可打印字节仅 1.9%**，函数名是孤立字符串，
-  前后皆二进制 —— 编译字节码，与 `synth` 的 Mata 核心同级。
+  前后皆二进制 —— 是编译字节码。注意这与 `synth` **不是同一类**：`synth` 的顶层算法
+  是可读的 `synth.ado`，只有数值子过程在库里（见 T6）；而 `rdrobust` 的带宽选择器
+  **整体**在库里，ado 一侧只有参数设置。
 - **已采取**：`rdrobust` 仍拒绝自动选带宽（`UnsupportedError`），而非接入一个
   会返回 `h=0.0757`（Stata 是 `0.182`）的选择器。
 - **若需推进**：需要 `rdrobust` 官方源码或论文附录的完整 `C[1..3]` 定义。
@@ -44,7 +46,7 @@
 
 | 条目 | 状态 | 依据 |
 |---|---|---|
-| `synth` / `synth2` | 未实现 | 核心在 Mata 字节码，A 类"信息不可得" |
+| `synth` / `synth2` | 未实现 | **顶层算法可读**（`synth.ado` 931 行，含两步优化、V 矩阵、nested 结构）；六个数值子过程在 `lsynth_mata_subr` 库中。见 T6 |
 | `xtserial` | 未实现 | 本机 Stata 未装，`r(111)` |
 | `arimasoc` | 未实现 | — |
 | `rdrobust` 自动带宽 | 部分 | 见 T1 |
@@ -90,3 +92,36 @@
 | `teffects psmatch` | 点估计精确 | `se`/`z`/`p`/CI 为 NaN（需 Abadie-Imbens 影响函数）|
 | `teffects nnmatch`（类） | 点估计精确 | SE 高 0.78%，输出已标注为近似 |
 
+### T6. `synth` / `synth2`：可读与不可读的边界，已用 `findfile` 与 `mata which` 界定
+
+前几轮把 `synth` 一句「核心在 Mata 字节码」概括为 A 类「信息不可得」。**这个判断过粗。**
+
+**可读的部分** — `synth.ado`（`C:\Users\zjl\ado\plus\s\synth.ado`，931 行）：
+
+```
+L367  /* now go to optimization */
+L371  di as res "Second Step: Run Optimization"
+L386  /* Set up V matrix */
+L427  /* now if the user wantes the full nested method, go and get Vstar via nested method */
+L39   nested
+```
+
+即**两步优化流程、V 矩阵构造、`nested` 方法**都在可读代码里。
+
+**不可读的部分** — 六个子过程全部位于 `lsynth_mata_subr` 库，`mata which` 逐个确认：
+
+| 函数 | 所在 |
+|---|---|
+| `normalize()` | `lsynth_mata_subr` |
+| `regsval()` | `lsynth_mata_subr` |
+| `normweights()` | `lsynth_mata_subr` |
+| `getabs()` | `lsynth_mata_subr` |
+| `roottaker()` | `lsynth_mata_subr` |
+| `roundmat()` | `lsynth_mata_subr` |
+
+**这六个是数值内核**（标准化、回归得 V、权重归一、取绝对值、求根、矩阵舍入），
+而损失函数的**结构**由 ado 一侧的 `loss` 变量与 `$bd`/`$marg`/`$maxit`/`$sig` 参数控制。
+
+- **结论**：`synth` 并非「完全不可得」。重建需要按 `synth.ado` 的调用顺序实现那六个内核，
+  再套上可读的两步优化骨架。工作量是**中等到大**，不是**不可能**。
+- **此前记录有误**，以此条为准。

@@ -96,3 +96,56 @@ def test_without_weights_the_two_columns_are_identical(data) -> None:
     assert len(numbers) == 2
     # Both columns hold the same count -- there is no weighting to apply.
     assert numbers[0] == numbers[1]
+
+
+def test_the_ipw_convention_reproduces_stata(data) -> None:
+    """`normalise_counts=True` with ATET weights: counts AND the weighted column both match.
+
+    Stata, after `teffects ipw (re78) (covs), atet` then `tebalance summarize`:
+
+        Number of obs = 445 / 445.0     Treated 185 / 222.0     Control 260 / 223.0
+        age        raw .1072771   weighted  .0087909   variance ratio 1.048712
+        education  raw .1412198   weighted -.0191184   variance ratio 1.33292
+
+    The weighted differences come out within 1e-5 rather than exactly, because the propensity
+    scores differ from Stata's by an optimiser stopping point -- the same gap recorded for the
+    propensity model itself.
+    """
+
+    covariates, treated = data
+    result = ws.IPW(
+        np.zeros(treated.size), treated, covariates, estimand="atet"
+    ).fit()
+
+    summary = ws.tebalance_summarize(
+        treated,
+        covariates,
+        match_weights=result.weights,
+        names=COVARIATES,
+        normalise_counts=True,
+    )
+
+    assert summary.nobs_matched == 445
+    assert summary.treated_matched == 222
+    assert summary.control_matched == 223
+
+    rows = {row.name: row for row in summary.rows}
+    assert rows["age"].matched_std_diff == pytest.approx(0.0087909, abs=1e-5)
+    assert rows["age"].matched_variance_ratio == pytest.approx(1.048712, abs=1e-5)
+    assert rows["education"].matched_std_diff == pytest.approx(-0.0191184, abs=1e-5)
+
+
+def test_the_matching_convention_is_unchanged_by_the_new_flag(data) -> None:
+    """Without `normalise_counts`, the matched-weight path behaves exactly as before.
+
+    That path keeps the treated at their raw mean and reweights only the controls, and its counts
+    are raw weighted sums. Rounding it like the IPW case would be wrong -- and did break two tests
+    before the flag existed.
+    """
+
+    covariates, treated = data
+    plain = ws.tebalance_summarize(treated, covariates, names=COVARIATES)
+    # No weights at all: the two columns coincide and the counts are the raw group sizes.
+    assert plain.treated_matched == plain.treated_raw
+    assert plain.control_matched == plain.control_raw
+    assert plain.nobs_matched == plain.nobs_raw

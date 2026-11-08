@@ -238,3 +238,43 @@ L338  est scalar sigma_e = `s_e'
 - **未处理原因**：移除 13 个键影响面大（`ll`、`rss` 等常被下游代码读取），
   需要先确认没有内部依赖，再按估计器分别加标志。第 48/49 轮已用同样手法处理
   `e(r2)` 与三个平方和，这条路子是验证过的。
+
+### T8 补充：尝试移除失败，下游依赖比预想的多（第 51 轮）
+
+第 50 轮把「影响面大」当作不移除的理由，**没有验证它**。第 51 轮验证了，结论是理由成立，
+但成立的方式和设想不同。
+
+**1. 内部代码没有直接读取这些键。**
+
+用正则扫全库的 `["key"]` / `.get("key")` 形式，命中项绝大多数属于**其他命令**
+（`hdfe`、`systems`、`newey`、`did`），而 `panel.py` 里的命中全是**写入**：
+
+```
+panel.py:1416  e["sum_w"] = float(nobs)        写入
+panel.py:1422  e["rc"] = 0.0                   写入
+panel.py:1746  out["corr"] = float(correlation) 写入
+panel.py:1751  out["ui"] = sigma_u             写入
+```
+
+`summary.py` 里读的 `e("corr")` 是 **GEE/面板的字符串宏**（`"independent"`、`"ar1"`），
+与 `xtreg` 的数值型 `corr` 同名但无关。
+
+**2. 但移除仍然破坏 18 个测试。**
+
+加上 `_omit_e_keys` 后跑面板测试：
+
+```
+18 failed, 471 passed
+```
+
+失败集中在 `test_xtreg_remaining_keys.py`、`test_xtreg_estat_surface.py`、
+`test_xtreg_re_sigma_e.py`——**包括 `estat ic` 直接崩掉**（`ValueError`），
+因为 AIC/BIC 需要 `ll`；`test_the_rss_is_the_rmse_based_one` 需要 `rss`。
+
+**3. 所以真正的关系是**：`e(rss)` 与 `e(ll)` 被 `estat ic`、`estat` 系列和多个夹具当作
+**输入**，不是可选的展示字段。而 Stata 的 `xtreg, re` 虽然不存这两个标量，
+它的 `estat ic` 仍然能算——**因为它从 `e(V)` 和样本量重算，而不是读 `e(ll)`**。
+
+- **结论**：要正确移除，必须先让 `estat ic` 等消费方改走重算路径，
+  再移除标量。这是一条有依赖顺序的改动，不是单纯加个标志。
+- **本轮已回退全部改动**，工作区干净，443 个面板测试通过。

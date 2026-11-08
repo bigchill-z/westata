@@ -397,6 +397,10 @@ class PanelOLS:
     #: Whether e(r2) / e(r2_a) are stored. xtreg, re stores neither -- see the override.
     _stores_r2 = True
     _stores_r2_adjusted = True
+    #: Whether e(tss_within) / e(tss_between) / e(r2_within) are stored. `xtreg, fe` stores
+    #: NONE of them -- verified with `display e(tss_within)` on munnell.dta, which prints
+    #: "." -- while reghdfe does. Those belong to the hdfe adapter, not to the xtreg family.
+    _stores_within_totals = False
 
     # ``xtreg_fe.json`` has ll_0 and the absorbed-effects block.
     _stores_ll_0 = True
@@ -1575,10 +1579,11 @@ class PanelOLS:
             if self._stores_totals:
                 tss_between = float(np.sum((y_bar - y.mean()) ** 2))
                 out["tss"] = tss
-                out["tss_within"] = tss_within
-                out["tss_between"] = tss_between
-                if tss_within > 0:
-                    out["r2_within"] = 1.0 - rss / tss_within
+                if self._stores_within_totals:
+                    out["tss_within"] = tss_within
+                    out["tss_between"] = tss_between
+                    if tss_within > 0:
+                        out["r2_within"] = 1.0 - rss / tss_within
 
         r2_w = _squared_correlation(fitted - f_bar[codes], y - y_bar[codes])
         # Stata's r2_b and r2_o are squared correlations involving the linear predictor on

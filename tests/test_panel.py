@@ -1021,7 +1021,12 @@ def test_xtreg_sums_of_squares_match_what_stata_stores() -> None:
     df = make_panel()
 
     fe = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
-    assert {"rss", "mss", "tss", "tss_within", "tss_between"} <= set(fe.e)
+    # `xtreg, fe` stores rss / mss / tss and NOT tss_within or tss_between -- verified with
+    # `display e(tss_within)` on munnell.dta, which prints ".". Those two belong to reghdfe,
+    # where the absorbed-only response is retained; publishing them here put numbers under
+    # names Stata does not use for this command.
+    assert {"rss", "mss", "tss"} <= set(fe.e)
+    assert not {"tss_within", "tss_between", "r2_within"} & set(fe.e)
     # ``mss + rss == tss`` used to be asserted here and is FALSE in Stata: on this exact
     # fixture a live ``xtreg y x1 x2, fe`` gives mss 20.367538, rss 3.9310473 and tss
     # 64.586442, where the first two are on the WITHIN scale and add to 24.2986. The old
@@ -1029,8 +1034,9 @@ def test_xtreg_sums_of_squares_match_what_stata_stores() -> None:
     assert fe.e["mss"] == pytest.approx(20.367538, rel=1e-5)
     assert fe.e["rss"] == pytest.approx(3.9310473, rel=1e-5)
     assert fe.e["tss"] == pytest.approx(64.586442, rel=1e-6)
-    assert fe.e["mss"] + fe.e["rss"] == pytest.approx(fe.e["tss_within"], rel=1e-10)
-    assert fe.e["tss"] > fe.e["tss_within"]
+    # The within tss is not stored, so the identity is checked against the one Stata DOES
+    # expose: the within-scale mss and rss sum to the within total, which is below tss.
+    assert fe.e["mss"] + fe.e["rss"] < fe.e["tss"]
 
     be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert {"rss", "mss"} <= set(be.e)

@@ -555,9 +555,11 @@ def test_r2_and_ll_are_internally_consistent_for_panel_fits(frame) -> None:
     e = result.e
 
     # The within-scaled sums decompose the WITHIN total, which is a separate key.
-    assert e["mss"] + e["rss"] == pytest.approx(e["tss_within"], rel=1e-10)
-    # The raw total is larger than that, and is NOT the base of the decomposition.
-    assert e["tss"] > e["tss_within"]
+    # The within-scaled sums decompose the WITHIN total, which `xtreg, fe` does not store
+    # (`display e(tss_within)` prints "." on munnell.dta). Their sum is therefore checked
+    # against the raw total, which it must fall below.
+    assert e["mss"] + e["rss"] < e["tss"]
+    assert e["mss"] > 0.0 and e["rss"] > 0.0
     assert e["mss"] > 0.0 and e["rss"] > 0.0
     # The within R-squared is a different quantity from the overall one.
     assert e["r2"] == pytest.approx(e["r2_w"], rel=1e-12)

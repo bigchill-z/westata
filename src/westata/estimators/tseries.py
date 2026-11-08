@@ -1713,9 +1713,9 @@ class VARResults:
         _criterion_offset = 2.0 * float(np.log(2.0 * np.pi)) + 2.0
         # Right column: label padded to 18, equals at column 66, value right-aligned to 76.
         _crit_block = (
-            f"{'AIC':<18}= {_stata_stat(float(self.aic) + _criterion_offset):>9}",
-            f"{'HQIC':<17}= {_stata_stat(float(self.hqic) + _criterion_offset):>9}",
-            f"{'SBIC':<17}= {_stata_stat(float(self.bic) + _criterion_offset):>9}",
+            (f"{'AIC':<18}= {_stata_stat(float(self.aic) + _criterion_offset):>10}"),
+            (f"{'HQIC':<18}= {_stata_stat(float(self.hqic) + _criterion_offset):>10}"),
+            (f"{'SBIC':<18}= {_stata_stat(float(self.bic) + _criterion_offset):>10}"),
         )
         _usable = int(self.e.get("N", 0)) or int(getattr(self._result, "nobs", 0))
         # THE SAMPLE LINE IS 1-BASED AND ENDS AT THE LAST OBSERVATION, so the trend term does NOT
@@ -1738,11 +1738,11 @@ class VARResults:
             "",
             f"{'Sample: ' + str(_start) + ' thru ' + str(_end):<48}"
             f"Number of obs     = {_usable:>10}",
-            (f"{'Log likelihood':<16}= {_stata_stat(float(self.ll)):>10}").ljust(48)
+            (f"{'Log likelihood':<15}= {_stata_stat(float(self.ll)):>10}").ljust(48)
             + _crit_block[0],
-            (f"{'FPE':<16}= {_stata_stat(float(self.fpe)):>10}").ljust(48)
+            (f"{'FPE':<15}= {_stata_stat(float(self.fpe)):>10}").ljust(48)
             + _crit_block[1],
-            (f"{'Det(Sigma_ml)':<16}= {_stata_stat(float(self.det_sigma)):>10}").ljust(48)
+            (f"{'Det(Sigma_ml)':<15}= {_stata_stat(float(self.det_sigma)):>10}").ljust(48)
             + _crit_block[2],
             "",
         ]

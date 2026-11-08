@@ -134,7 +134,8 @@ def render_esttab(
 
     widths = list(_COLUMN_ENDS)
     rule = "-" * _LINE_WIDTH
-    lines: list[str] = []
+    # Stata opens the table with a BLANK LINE, then the column numbers.
+    lines: list[str] = [""]
 
     # "      (1)         (2)" then the mtitle row.
     number_row: list[str] = [" " * _NAME_WIDTH]
@@ -200,6 +201,9 @@ def render_esttab(
                     se_text = f"{head}.{tail}"
                 _cell(f"({se_text})", widths[position], se_pieces)
             lines.append("".join(se_pieces))
+            # A blank row separates one coefficient's block from the next; Stata prints it after
+            # the standard-error line and drops it before the closing rule.
+            lines.append("")
         continue
 
     if lines[-1] == "":
@@ -234,7 +238,7 @@ def render_esttab(
     closing_rule = len(lines) - (1 if se else 0) - (1 if stars else 0) - 1
     padded: list[str] = []
     for position, line in enumerate(lines):
-        if position <= closing_rule and len(line) < _LINE_WIDTH:
+        if line and position <= closing_rule and len(line) < _LINE_WIDTH:
             line = line + " " * (_LINE_WIDTH - len(line))
         padded.append(line)
     return "\n".join(padded)

@@ -65,14 +65,17 @@ def test_esttab_prints_the_column_numbers_then_the_titles(models) -> None:
     """Row 1 is always "(1) (2)"; row 2 is the mtitle row, which is why passing "(1)" duplicates."""
 
     rendered = ws.render_esttab(list(models), model_names=["Model A", "Model B"])
+    # A live `esttab` starts with a blank line; the numbers follow it.
     lines = rendered.splitlines()
-    assert "(1)" in lines[0] and "(2)" in lines[0]
-    assert "Model A" in lines[1] and "Model B" in lines[1]
+    assert lines[0] == ""
+    assert "(1)" in lines[1] and "(2)" in lines[1]
+    assert "Model A" in lines[2] and "Model B" in lines[2]
     assert lines[0] != lines[1]
 
 
 def test_the_default_titles_are_m1_and_m2(models) -> None:
     rendered = ws.render_esttab(list(models), model_names=None)
     lines = rendered.splitlines()
-    assert "(1)" in lines[0]
-    assert "m1" in lines[1] and "m2" in lines[1]
+    assert lines[0] == ""
+    assert "(1)" in lines[1]
+    assert "m1" in lines[2] and "m2" in lines[2]

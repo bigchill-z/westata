@@ -51,9 +51,11 @@ def models():
 def test_mtitle_is_already_implemented(models) -> None:
     """The report says mtitle is missing; the numbered row and name row are both emitted."""
 
+    # Stata opens with a blank line, so the numbers are on line 1 and the titles on line 2.
     lines = etable_as_stata(models, model_names=["m1", "m2"]).splitlines()
-    assert lines[0].strip().startswith("(1)")
-    assert "m1" in lines[1] and "m2" in lines[1]
+    assert lines[0] == ""
+    assert lines[1].strip().startswith("(1)")
+    assert "m1" in lines[2] and "m2" in lines[2]
 
 
 def test_stars_hang_past_the_column(models) -> None:
@@ -99,7 +101,13 @@ def test_rows_are_padded_to_the_table_width(models) -> None:
     """Stata pads every table row to 44 columns; the legend lines are not padded."""
 
     lines = etable_as_stata(models, model_names=["m1", "m2"]).splitlines()
-    table_rows = [line for line in lines if "p<0.05" not in line and "parentheses" not in line]
+    # Blank rows are NOT padded -- Stata emits them empty, and padding them made the
+    # line-wise comparison fail on lines that are supposed to be zero-width.
+    table_rows = [
+        line
+        for line in lines
+        if line and "p<0.05" not in line and "parentheses" not in line
+    ]
     assert table_rows
     for row in table_rows:
         assert len(row) == 44, (len(row), row)

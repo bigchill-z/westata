@@ -163,7 +163,7 @@ class IcResult:
             return f"{float(value):.7g}".rjust(width)
 
         row = (
-            f"{'.':>12} |{self.n:>11.0f}"
+            f"{'.':>12} |{self.n:>11,.0f}"
             # SEVEN SIGNIFICANT FIGURES, not a fixed decimal count. Four decimals matched the one
             # capture this table was built from -- where every log-likelihood happened to sit near
             # -400 -- and failed elsewhere:
@@ -272,6 +272,23 @@ def _resolve_df(result: Any, df: float | None) -> float:
     # `cov_params` IS A METHOD ON StataResults AND A PROPERTY ON VARResults, so calling it
     # unconditionally raised "'numpy.ndarray' object is not callable" for a VAR -- which is how this
     # was found. Accept both shapes rather than assuming one.
+    # AN ABSORBED FIT COUNTS THE CONSTANT, which the covariance matrix cannot show: reg y x,
+    # absorb(id) reports e(rank) = 2 for one regressor while its covariance is 1x1. Measured on a
+    # 200-row panel:
+    #
+    #     Stata   '           . |        200  -353.9896  -352.0299       2   ...'
+    #     package '           . |        200   -761.417  -352.0299       1   ...'
+    #
+    # so for these fits the df column is df_m + 1 rather than the rank of V.
+    _absorbed = getattr(result, "absorbed", None)
+    _df_m = None
+    try:
+        _df_m = float(e["df_m"])
+    except (KeyError, TypeError):
+        _df_m = None
+    if _absorbed is not None and _df_m is not None and np.isfinite(_df_m):
+        return _df_m + 1.0
+
     _cov = getattr(result, "cov_params", None)
     if _cov is None:
         raise ValueError("estat ic needs the coefficient covariance matrix")

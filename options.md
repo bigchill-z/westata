@@ -1549,3 +1549,48 @@ ame.replace(:, #)），
   inflate#z 之前，而不是参数块的末尾。
 - **下一步**：读 _stata_order()，确认它对多方程模型的排序规则；
   正确顺序应为 x, _cons, inflate#z, inflate#Intercept, lnalpha（两个方程各自 _cons 垫底）。
+
+**第 213 轮补充：`cnt |` 标题行已试出可行切入点，但块边界仍需处理**
+
+**已确认的实现路径**（两次改动单独验证过）：
+
+1. 在 `seen_groups` 初始化后加入：
+   ```python
+   _main_equation_heading = str(e.get("_main_equation") or e.get("depvar") or "").strip()
+   ```
+   对 `zinb` 得 `"cnt"`，与 Stata 的 `'cnt          |'` 一致。
+
+2. 在 `group = ""` 的方程前缀循环后加入：
+   ```python
+   if not group and _main_equation_heading and "" not in seen_groups:
+       lines.append("-" * (name_width + 1) + "+" + "-" * (row_width - name_width - 2))
+       lines.append(f"{_main_equation_heading:<{name_width}} |")
+       seen_groups.add("")
+   ```
+
+**实测结果**：`cnt |` 标题**正确出现**，但**同时多了**：
+
+```
+78 '-------------+---...'     <-- 重复分隔线（表头下方已有）
+78 '-------------+---...'     <-- 新加的
+14 'cnt          |'           <-- 正确
+78 '           x | ...'
+14 '             |'           <-- 多余的空标题
+78 '       _cons | ...'
+```
+
+**两个新问题**：
+
+1. **重复分隔线**：表头之后已有一条规则，新加的又加一条；
+2. **`_cons` 前的空标题行**：来自 `inflate#Intercept` 被当作新组时输出了空 `group`。
+
+**根因（第 2 点）**：`Intercept` 在 `inflate#` 前缀下 `bare == "Intercept"`，
+它应被视为**该块的常量**（输出 `_cons`），而不是触发新的组分隔。
+
+- **状态**：**回退**，340 个相关测试通过。
+- **下一步**：需要同时处理三件事才能收敛——
+  (a) 主方程标题**不**添加分隔线（表头已提供）；
+  (b) `inflate#Intercept` 的 `bare` 映射成 `_cons` 后应归入当前组而非新组；
+  (c) 验证 zip/zinb 与 logit/probit（后者**无**标题行）互不影响。
+- **教训**：这个块有 3 次「修一处坏一处」的记录（第 226/234/237 轮注释可见），
+  本轮再次印证：**必须一次性把三处一起改并验证，不能增量试**。

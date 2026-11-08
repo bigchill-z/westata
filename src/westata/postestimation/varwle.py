@@ -106,7 +106,20 @@ def _chi2_cell(value: float) -> str:
     #     796.2418    7 significant figures, four decimals
     #
     # A fixed five decimals gave 741.89158 and 123.12873, both wrong.
+    #
+    # THE LEADING ZERO IS DROPPED, as everywhere else in Stata's tables. Measured on a 300-point sample
+    # where a lag-2 statistic is 0.1923409:
+    #
+    #     Stata    '  |   2 |  .1923409     2     0.908    |'
+    #     package  '  |   2 | 0.1923409     2     0.908    |'
+    #
+    # Small chi-squares are common here -- a Wald test on a lassoed lag often lands below 1 -- which is why
+    # the earlier samples, all with statistics in the tens, never showed it.
     text = f"{float(value):.7g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
     return text.rjust(10)
 
 

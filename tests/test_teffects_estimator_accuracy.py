@@ -111,3 +111,40 @@ def test_ra_and_aipw_should_agree_but_do_not(data) -> None:
     ra = float(ws.RegressionAdjustment(y, treated, x).fit().estimate)
     aipw = float(ws.AIPW(y, treated, x).fit().estimate)
     assert abs(aipw - ra) > 1.0, f"aipw now agrees with ra ({aipw}); update this test"
+
+
+def test_the_propensity_model_is_the_logit_mle(data) -> None:
+    """The AIPW/ipw propensity is the logistic MLE, not a linear-probability regression.
+
+    Worth pinning because diagnosing the aipw discrepancy began by comparing against a least-squares
+    fit of `treat` on the covariates, which gives a much narrower probability range ([0.543, 0.663]
+    against the MLE's [0.195, 0.676]). The package was right and the diagostic was wrong: the
+    coefficients match a direct BFGS maximisation of the logit likelihood to four decimals.
+    """
+
+    import numpy as np
+    from scipy import optimize
+    from scipy.special import expit
+
+    from westata.estimators.treatreg_effects import _LogitPropensity
+
+    x, y, treated = data
+    design = np.column_stack([np.ones(treated.size), x])
+
+    def negative_loglik(beta):
+        eta = design @ beta
+        return -np.sum(treated * eta - np.logaddexp(0.0, eta))
+
+    optimum = optimize.minimize(
+        negative_loglik, np.zeros(design.shape[1]), method="BFGS"
+    )
+    reference = expit(design @ optimum.x)
+
+    fitted = _LogitPropensity(x, treated, command="teipw")
+    mine = fitted.checked_propensity()
+
+    # Two optimisers, two stopping points: measured agreement is 4.2e-05 on the
+    # coefficients. The claim being pinned is WHICH estimator is used, not bit equality.
+    assert np.allclose(mine, reference, atol=1e-3)
+    # The MLE range is wide; a narrower one would indicate a linear-probability fit.
+    assert float(mine.max() - mine.min()) > 0.4

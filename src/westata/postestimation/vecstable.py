@@ -90,7 +90,7 @@ class VecStableResult:
                 "  |"
                 + _cell(_format_complex(value), 26, 11)
                 + "|"
-                + _cell(_stata_number(magnitude), 13, 10)
+                + _cell(_modulus_text(magnitude), 13, 10)
                 + "|"
             )
         lines.append("  " + _rule)
@@ -99,6 +99,35 @@ class VecStableResult:
         else:
             lines.append("   At least one eigenvalue lies outside the unit circle.")
         return "\n".join(lines)
+
+
+def _modulus_text(value: float) -> str:
+    """A VECM eigenvalue modulus, on the same rule `varstable` uses.
+
+    Measured against a live `vecstable` at three sample sizes:
+
+        0.0583546   -> .058355
+        0.03402721  -> .034027
+        1.0009273   -> 1.00093
+        0.96023366  -> .960234
+        0.0936159   -> .093616
+
+    SIX SIGNIFICANT FIGURES at or above 0.1 and SIX DECIMALS below it -- the same threshold that governs
+    `varstable`'s modulus column, because both tables are printed by the same `_tab` machinery into a
+    13-wide field. Six decimals throughout gave .0583546 where Stata prints .058355.
+    """
+
+    number = float(value)
+    magnitude = abs(number)
+    if magnitude >= 0.1:
+        text_value = f"{magnitude:.6g}"
+    else:
+        text_value = f"{magnitude:.6f}"
+        if "." in text_value:
+            text_value = text_value.rstrip("0").rstrip(".")
+    if text_value.startswith("0."):
+        text_value = text_value[1:]
+    return ("-" if number < 0 else "") + text_value
 
 
 def _stata_number(value: float, digits: int = 6) -> str:

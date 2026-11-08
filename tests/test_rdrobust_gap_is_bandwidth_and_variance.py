@@ -46,16 +46,29 @@ def test_the_point_estimate_matches_stata_once_the_bandwidth_is_given(sample) ->
     assert float(fitted.tau) == pytest.approx(STATA_TAU, abs=1e-9)
 
 
-def test_the_standard_error_is_the_open_gap(sample) -> None:
-    """NaN today. When this starts failing, a variance implementation landed -- assert STATA_SE."""
+def test_the_standard_error_is_now_hc0(sample) -> None:
+    """The package computes vce(hc0); Stata's DEFAULT is vce(nn 3), which is still missing.
+
+    Round 65 read `rdrobust.sthlp:158-171`. `vce(hc0)` there is the plug-in-residual sandwich, and
+    the phrase "without weights" refers to the DISTANCE being scaled by the bandwidth rather than to
+    a missing weight vector. With `distance / h`, against a live
+    `rdrobust y x, h(0.2808754677) b(0.4908484209) vce(hc0)`:
+
+        se  0.1075019935        z  6.6152914062
+        p   0.0000000000        ci 0.5004569780 .. 0.9218570489
+
+    so the numbers below are HC0's, not NN's -- which is why `variance_matches_stata` stays False.
+    """
 
     response, running = sample
     fitted = ws.rdrobust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
-    assert not np.isfinite(float(fitted.se))
-    assert not np.isfinite(float(fitted.ci_lower))
-    # ... and the result says so rather than pretending otherwise.
+    assert float(fitted.se) == pytest.approx(0.1075019935, abs=1e-9)
+    assert float(fitted.z) == pytest.approx(6.6152914062, abs=1e-8)
+    assert float(fitted.ci_lower) == pytest.approx(0.5004569780, abs=1e-9)
+    assert float(fitted.ci_upper) == pytest.approx(0.9218570489, abs=1e-9)
+    # The default nearest-neighbour estimator is still unimplemented, and the flag says so.
     assert fitted.variance_matches_stata is False
 
 

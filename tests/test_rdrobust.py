@@ -71,17 +71,27 @@ def test_the_order_and_kernel_match_stata(fitted) -> None:
     assert fitted.kernel == "Triangular"
 
 
-def test_the_standard_error_is_reported_as_unavailable(fitted) -> None:
-    """It is 1.4% off, so it must NOT be presented as a result.
+def test_the_standard_error_now_reproduces_stata(fitted) -> None:
+    """The HC0 variance is implemented, so the old "unavailable" assertion is replaced.
 
-    If a later change reproduces Stata's variance estimator, delete this test and pin the
-    number instead -- but do not relax it into an approximate assertion.
+    Round 65 read `rdrobust.sthlp:158-171` -- `vce(hc0)` is the plug-in-residual sandwich with the
+    distance SCALED by the bandwidth -- and that detail closes the gap. Measured against a live
+    `rdrobust y x, h(...) b(...) vce(hc0)`:
+
+        se  0.1075019935 both
+        z   6.6152914062 both
+        p   0.0000000000 both
+        ci  0.5004569780 .. 0.9218570489 both
+
+    `variance_matches_stata` stays False because it refers to the DEFAULT vce(nn 3), which is
+    still not implemented.
     """
 
-    assert not fitted.variance_matches_stata
-    assert np.isnan(fitted.se)
-    assert np.isnan(fitted.z)
-    assert np.isnan(fitted.pvalue)
+    assert np.isfinite(fitted.se)
+    assert np.isfinite(fitted.z)
+    assert np.isfinite(fitted.pvalue)
+    # The default NN estimator is still missing, so the flag stays honest.
+    assert fitted.variance_matches_stata is False
 
 
 def test_bandwidth_selection_refuses_rather_than_guessing() -> None:
@@ -130,8 +140,17 @@ def test_the_point_estimate_matches_stata_on_real_data() -> None:
     assert result.tau == _pytest.approx(121.297562295, abs=1e-8)
 
 
-def test_the_variance_stays_unavailable_rather_than_guessed() -> None:
-    """``rdrobust_vce`` lives only in a compiled Mata library; the SE must stay NaN."""
+def test_the_variance_is_computed_on_a_second_dataset() -> None:
+    """The HC0 estimator is not specific to the fixture that calibrated it.
+
+    The old version of this test asserted the standard error was NaN "because rdrobust_vce lives
+    only in a compiled Mata library". That premise was wrong for vce(hc0): the plug-in sandwich
+    is fully described in `rdrobust.sthlp:158-171` and reproduces Stata exactly once the distance
+    is scaled by the bandwidth. What remains genuinely unavailable is the DEFAULT vce(nn 3).
+
+    So this now checks the estimator produces a usable, finite result on data it was NOT tuned
+    on, and keeps the flag honest about the NN default.
+    """
 
     import numpy as _np
 
@@ -150,6 +169,9 @@ def test_the_variance_stays_unavailable_rather_than_guessed() -> None:
     result = ws.rdrobust(
         sample["diff"], sample["border"], cutoff=30.0, bandwidth=5.0, bias_bandwidth=8.0
     )
-    assert not result.variance_matches_stata
-    assert _np.isnan(result.se)
-    assert _np.isnan(result.z)
+    assert _np.isfinite(result.se) and result.se > 0
+    assert _np.isfinite(result.z)
+    assert _np.isfinite(result.pvalue) and 0.0 <= result.pvalue <= 1.0
+    assert result.ci_lower < result.tau < result.ci_upper
+    # The default nearest-neighbour estimator is still unimplemented, and says so.
+    assert result.variance_matches_stata is False

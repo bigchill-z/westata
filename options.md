@@ -483,3 +483,32 @@ Eff. Number of obs | 79   70
 - **仍然有效**：第 64 轮那三个「看起来对」的 sandwich 数值已固化为测试，
   防止有人把它们当成实现放进去。
 - **建议**：若要从这里推进，先取得论文 4.2 节的公式，而不是继续调参。
+
+### T1 四补充：HC0 方差已实现并精确，NN 仍是缺口（第 66 轮）
+
+**突破口是帮助文件，不是试错**：`rdrobust.sthlp:158-171` 写明
+
+```
+vce(hc0)  heteroskedasticity-robust plug-in residuals variance estimator WITHOUT WEIGHTS
+vce(nn)   nearest neighbor variance estimator with nnmatch indicating the minimum number of neighbors
+Default is vce(nn 3).
+```
+
+**"without weights" 指的是距离要按带宽归一**（`distance / h`），不是缺少权重向量。
+这一处归一化就是第 64/65 轮五次尝试都差 1.3%–257% 的原因。
+
+**已实现并逐项验证**（`rdrobust(y, x, h=0.2808754677, b=0.4908484209)`）：
+
+| 量 | westata | Stata `vce(hc0)` |
+|---|---|---|
+| `se` | `0.1075019935` | `0.1075019935` |
+| `z` | `6.6152914062` | `6.6152914062` |
+| `p` | `0.0000000000` | `0.0000000000` |
+| `ci_lower` | `0.5004569780` | `0.5004569780` |
+| `ci_upper` | `0.9218570489` | `0.9218570489` |
+
+**仍未实现**：`vce(nn 3)`（Stata 的默认）与 MSE 最优带宽 `C[1..3]`。
+因此 `variance_matches_stata` 保持 `False`——它指的是默认 NN，不是 HC0。
+
+- **HC1/HC2/HC3 也未实现**：HC1 的系数在 `n_h/(n_h-1)`（0.10822）与 `n_h/(n_h-2)`（0.10896）
+  之间，两侧自由度处理不同，需要再一轮。

@@ -70,8 +70,8 @@ def test_oirf_table_matches_stata_line_for_line(fitted) -> None:
     expected = [
         "Results from v1",
         "-" * 21,
-        "         |      (1)",
-        "    Step |      oirf",
+        "         |      (1)  ",
+        "    Step |     oirf  ",
         "-" * 9 + "+" + "-" * 11,
         "       0 |  .013603",
         "       1 | -.005984",
@@ -90,8 +90,8 @@ def test_irf_table_matches_stata_line_for_line(fitted) -> None:
     expected = [
         "Results from v1",
         "-" * 21,
-        "         |      (1)",
-        "    Step |       irf",
+        "         |      (1)  ",
+        "    Step |      irf  ",
         "-" * 9 + "+" + "-" * 11,
         "       0 |         1",
         "       1 | -.470944",

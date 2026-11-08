@@ -1354,24 +1354,39 @@ class VARResults:
             series = values[:, response_index, impulse_index]
 
             def _cell(value: float) -> str:
+                """The same rule as the wide form: six SIGNIFICANT figures at or above one, six
+                DECIMALS below it. Measured from `irf table oirf, impulse(y1) response(y1)`:
+
+                        0 |  1.00439
+                        1 |  .971741
+
+                Six decimals alone printed 1.004387 here.
+                """
+
                 if not np.isfinite(value):
                     return "."
-                text = f"{value:.6f}"
+                number = float(value)
+                text = f"{abs(number):.6f}" if abs(number) < 1.0 else f"{abs(number):.6g}"
+                if "." in text:
+                    text = text.rstrip("0").rstrip(".")
+                if number < 0:
+                    text = "-" + text
                 if text.startswith("0."):
                     text = text[1:]
                 elif text.startswith("-0."):
                     text = "-" + text[2:]
-                return text.rstrip("0").rstrip(".") or "0"
+                return text
 
-            # Geometry measured from Stata's own lines:
-            #   '         |      (1)'   19 chars, pipe at 9
-            #   '    Step |      oirf'  20 chars (the name line is one wider)
-            #   '       0 |  .013603'   19 chars
+            # Geometry measured from Stata's own lines, trailing blanks included:
+            #   '         |      (1)  '   21 chars -- TWO TRAILING SPACES
+            #   '    Step |     oirf  '   21 chars -- five before the word, two after
+            #   '       0 | 1.00439'      18 chars, no padding
+            #   '---------+-----------'   21 chars
             lines = [
                 f"Results from {irfname}",
                 "-" * 21,
-                f"{'':>9}|{'(1)':>9}",
-                f"{'Step':>8} |{key:>10}",
+                f"{'':>9}|{'(1)':>9}  ",
+                f"{'Step':>8} |{key:>9}  ",
                 "-" * 9 + "+" + "-" * 11,
             ]
             for step in range(series.size):

@@ -103,11 +103,20 @@ def test_the_tiny_scale_truncates_rather_than_rounds() -> None:
     assert match, row
 
 
-def test_the_value_difference_is_recorded_not_asserted_away() -> None:
-    """The FPE value is ~1% above Stata's; pinned so a fix shows up here.
+def test_the_fpe_value_now_matches_stata() -> None:
+    """The formula and the sample were both wrong; both are fixed.
 
-    Stata's FPE at lag 0 on this system is .855661. When the degrees-of-freedom factor is corrected,
-    this assertion should be replaced by a comparison against that number.
+    Stata's `varsoc` uses
+
+        fpe = ((T + eqparm) / (T - eqparm))**K * detsig_ml
+
+    with `eqparm` the per-equation parameter count including the constant (lag*K + 1, not the
+    table's k*K + 1), and evaluates EVERY lag on the common window -- the rows left after the
+    largest lag -- which differs from what `var`'s own FPE does.
+
+    Verified on a 200-point seeded system; Stata prints .855661 / .885083 / .903268:
+
+    This replaces the previous guard, which asserted the 1% gap was still present.
     """
 
     rng = np.random.default_rng(11)
@@ -115,7 +124,7 @@ def test_the_value_difference_is_recorded_not_asserted_away() -> None:
     frame = pd.DataFrame({"y1": rng.normal(size=n), "y2": rng.normal(size=n)})
     selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
 
-    observed = float(selection.rows[0].fpe)
-    assert observed == pytest.approx(0.864151, abs=1e-6)
-    # Recorded gap against Stata's .855661.
-    assert observed / 0.855661 == pytest.approx(1.009922, abs=1e-5)
+    observed = [float(row.fpe) for row in selection.rows]
+    assert observed[0] == pytest.approx(0.855661, abs=5e-7)
+    assert observed[1] == pytest.approx(0.885083, abs=5e-7)
+    assert observed[2] == pytest.approx(0.903268, abs=5e-7)

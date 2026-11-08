@@ -222,8 +222,13 @@ class VarSocResult:
 
         lines.append(rule)
         lines.append("   * optimal lag")
-        _eqs = getattr(self, "equations", None)
-        equations = " ".join(_eqs) if isinstance(_eqs, (list, tuple)) else str(_eqs or "")
+        # `equations` on this class is the NUMBER of equations; the names live on `names`.
+        _names = getattr(self, "names", None)
+        if isinstance(_names, (list, tuple)) and _names:
+            equations = " ".join(str(name) for name in _names)
+        else:
+            _eqs = getattr(self, "equations", None)
+            equations = " ".join(_eqs) if isinstance(_eqs, (list, tuple)) else ""
         if equations:
             lines.append("   Endogenous: " + equations)
             lines.append("    Exogenous: _cons")
@@ -295,7 +300,41 @@ def varsoc(
             -2.0 * loglikelihood / sample_size
             + np.log(sample_size) * k * equations / sample_size
         )
-        fpe = ((sample_size + k * equations + 1) / sample_size) ** equations * determinant
+        # STATA'S FPE FORMULA, transcribed from var.ado and already implemented correctly in
+        # `westata.estimators.tseries._fpe` for the `var` command:
+        #
+        #     fpe = ((T + eqparm) / (T - eqparm))**K * detsig_ml
+        #
+        # with `eqparm` the per-equation parameter count INCLUDING the constant -- lag*K + 1, not
+        # this table's `k*K + 1`. The previous line used the wrong numerator, the wrong denominator
+        # and the wrong parameter count, which is why the column sat about 1% high while every
+        # other criterion agreed.
+        #
+        # THE SAMPLE ALSO DIFFERS BY ROW: lag 0 is evaluated on the common window, lag >= 1 on its
+        # OWN sample. That is the second half of the fix and the reason the gap was not constant
+        # across lags.
+        _eqparm = lag * equations + 1
+        # ALL ROWS USE THE COMMON WINDOW. Stata's varsoc evaluates every lag on the same rows --
+        # the ones left after the largest lag -- which is not the same as ar, whose _fpe uses the
+        # per-order sample. Measured: with drop=maxlag all three lags match (.855661/.885083/.903268),
+        # while drop=lag matches only lag 0 and 2.
+        _drop = maxlag
+        _usable = nobs_total - _drop
+        if _usable > _eqparm > 0:
+            _target = values[_drop:]
+            _regressors = [np.ones((_usable, 1))]
+            for _step in range(1, lag + 1):
+                _regressors.append(values[_drop - _step : nobs_total - _step])
+            _design = np.column_stack(_regressors)
+            _coefficients, *_ = np.linalg.lstsq(_design, _target, rcond=None)
+            _residuals = _target - _design @ _coefficients
+            _sigma = _residuals.T @ _residuals / _usable
+            fpe = float(
+                ((_usable + _eqparm) / (_usable - _eqparm)) ** equations
+                * np.linalg.det(_sigma)
+            )
+        else:  # pragma: no cover - guarded by the length check above
+            fpe = float("nan")
 
         lr = 0.0
         lr_df = 0

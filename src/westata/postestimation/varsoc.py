@@ -222,34 +222,41 @@ class VarSocResult:
             #   start-anchored : LL 10, LR 20, df 30, p 33, FPE 39
             #   end-anchored   : AIC 56, HQIC 66, SBIC 76  (lag 2's 5.574 starts at 51, lag 1's
             #                    5.55368 at 49, and BOTH end at 56)
-            _cells: dict[int, tuple[str, str]] = {
-                10: (number(row.ll), "start"),
-                20: (lr_cell, "start"),
-                30: (df_cell, "start"),
-                33: (p_cell, "start"),
-                39: (fpe_text(float(row.fpe), best_fpe), "start"),
-                56: (starred(float(row.aic), best_aic), "end"),
-                66: (starred(float(row.hqic), best_hqic), "end"),
-                76: (starred(float(row.sbic), best_sbic), "end"),
+            # THE CRITERIA START AT THE SAME COLUMN ON EVERY ROW -- 49, 59, 69 -- and only their
+            # ENDS differ (56/57, 66/67, 76/77). Measured on both row kinds:
+            #
+            #     unstarred  FPE ends 46   AIC 49..56   HQIC 59..66   SBIC 69..76
+            #     starred    FPE ends 47   AIC 49..57   HQIC 59..67   SBIC 69..77
+            #
+            # So placing them by START is correct for both, which the end-anchored arithmetic never
+            # achieved: it put AIC on 48 and left HQIC a column behind.
+            _cells: dict[int, str] = {
+                10: number(row.ll),
+                20: lr_cell,
+                30: df_cell,
+                33: p_cell,
+                39: fpe_text(float(row.fpe), best_fpe),
             }
+            # The measured START column for each criterion's END column.
+            _criteria_starts = {56: 49, 66: 59, 76: 69}
+            _criteria = (
+                (56, starred(float(row.aic), best_aic)),
+                (66, starred(float(row.hqic), best_hqic)),
+                (76, starred(float(row.sbic), best_sbic)),
+            )
+
             _out = "  |" + str(int(row.lag)).rjust(4) + " | "
-            # A starred cell ends one column further right, so every later end-anchored cell has to
-            # shift by the number of stars seen so far. Patching columns one at a time left HQIC a
-            # column behind after AIC was fixed.
-            _shift = 0
             for _column in sorted(_cells):
-                _text, _anchor = _cells[_column]
-                if _anchor == "end":
-                    _pad = _column + _shift - len(_out) - len(_text)
-                    _out += " " * max(0, _pad) + _text
-                    if _text.endswith("*"):
-                        _shift += 1
-                else:
-                    _pad = _column - len(_out)
-                    _out += " " * max(0, _pad) + _text
+                _out += " " * max(0, _column - len(_out)) + _cells[_column]
+            for _column, _text in _criteria:
+                # Right-align to the end column, but never start before the measured start column.
+                _by_end = _column - len(_out) - len(_text)
+                _by_start = _criteria_starts[_column] - len(_out)
+                _gap_width = max(1, _by_start, _by_end)
+                _out += " " * _gap_width + _text
             # A starred SBIC ends one column further right, so it takes one less closing space.
-            _gap = 1 if float(row.sbic) == best_sbic else 2
-            lines.append(_out + " " * _gap + "|")
+            _close = 1 if float(row.sbic) == best_sbic else 2
+            lines.append(_out + " " * _close + "|")
 
         lines.append(rule)
         lines.append("   * optimal lag")

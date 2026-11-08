@@ -595,3 +595,34 @@ Stata 显示 `222` 与 `223`，是 `222.5` 的取整差异。
   2. 平衡表的权重列要按 `N/2` 归一，而不是原样求和。
 - **未处理**：需要先给 `StataResults` 增加权重暴露，再改 `tebalance_summarize` 的求和口径，
   两处改动需一起验证。
+
+### T12. 报告 C17-04「`test canal_post post`」的写法与两边实现都不符（第 72 轮）
+
+报告给 C17-04 评 0.5，判定为「近似」。实测两边都**无法执行这个写法**。
+
+**Stata 侧**：`didregress (y) (canal_post), group(county) time(year)` 之后
+
+```
+test canal_post post
+r(111): canal_post not found
+```
+
+`e(b)` 显示系数名是 **`ATET:r1vs0.canal_post`** 加 16 个 `Controls:year` 虚拟变量，共 17 个——
+**没有名为 `post` 的参数**，`canal_post` 也不能直接写。`[ATET]canal_post`、
+`[ATET:r1vs0.canal_post]`、`1.ATET:r1vs0.canal_post` 三种写法**全部报错**。
+
+**本包侧**：`Didregress` 的参数只有 `canal_post`（一个），`post` 已被 `time` 设定吸收，
+`test canal_post post` 抛 `KeyError: coefficient 'post' not found`。
+
+- 所以这一条**不是「布局不同」也不是「近似」**，而是**报告所依据的 Stata 命令在两种实现里都不成立**。
+- **已确认可用的部分**：`test()` 的多约束联合检验本身完全正确——
+  `reg re78 age education black` + `test age education` 对照验证：
+
+  | | westata | Stata |
+  |---|---|---|
+  | 约束行 | `age = 0`、`education = 0` | 同 |
+  | `F` | `4.3307` | `4.33` |
+  | `Prob > F` | `0.0137` | `0.0137` |
+
+- **未能确认**：`didregress` 下的正确 `test` 语法。需要 `didregress` 的 postestimation 文档，
+  而不是继续试字符串。

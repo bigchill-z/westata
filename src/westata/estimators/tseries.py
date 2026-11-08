@@ -71,11 +71,18 @@ def _four(value: Any) -> str:
 
 
 def _six(value: Any) -> str:
-    """The RMSE column.
+    """The RMSE column: SIX SIGNIFICANT DIGITS, leading zero dropped.
 
-    Stata prints ``.013815`` and ``.002508`` here: SIX decimal places with the leading zero
-    dropped, not a fixed number of significant digits. A significant-digit rule matched the
-    first value and produced ``.0025081`` for the second.
+    The previous version used six DECIMAL places, justified by two values that happened to agree.
+    Measured across four cases, the significant-digit rule is the one that holds throughout:
+
+        value       %.6g        %.6f        Stata
+        1.002543    1.00254     1.002543    1.00254
+        .977199     .977199     .977199     .977199
+        1.00483     1.00483     1.004830    1.00483
+        .976998     .976998     .976998     .976998
+
+    so `%.6f` was wrong for the first row and only looked right for values below one.
     """
 
     try:
@@ -84,7 +91,7 @@ def _six(value: Any) -> str:
         return "."
     if number != number:
         return "."
-    text = f"{number:.6f}".rstrip("0").rstrip(".") or ".0"
+    text = f"{number:.6g}"
     if text.startswith("0."):
         text = text[1:]
     elif text.startswith("-0."):
@@ -1771,13 +1778,13 @@ class VARResults:
         # The header's own labels do not end where the data's do -- Stata prints `Parms` ending at
         # 24 (the data's 5 ends at 23) and `chi2` at 53 (the data's 2.190942 ends at 54). Those are
         # measured ends, not a layout rule, so the header keeps its own list.
-        _ends = [22, 23, 34, 43, 54, 64]
+        _ends = [22, 23, 35, 44, 55, 64]
         _head_ends = [19, 24, 34, 43, 53, 64]
         header = _row(
             ["Equation", "Parms", "RMSE", "R-sq", "chi2", "P>chi2"], _head_ends
         )
         lines.append(header)
-        lines.append("-" * max(64, len(header)))
+        lines.append("-" * 64)
         for index, equation in enumerate(equations, start=1):
             suffix = f"_{index}"
             lines.append(

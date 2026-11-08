@@ -4389,7 +4389,21 @@ def _stata_summary(result: Any) -> str:
                 # /lnalpha PRINTS NO TEST STATISTIC. Stata leaves its z and P columns empty and
                 # shows only the coefficient, its standard error and the interval -- measured in
                 # round 244 against `xtpoisson n x1, re`. This package printed -1.38 and 0.168.
-                _hide_stat_p = str(bare).strip() in ("/lnalpha", "lnalpha")
+                # THE z AND P COLUMNS ON /lnalpha DEPEND ON THE COMMAND, not on the row.
+                # Measured at three commands:
+                #
+                #     nbreg cnt x             '  -11.50729    1.719345'   z and P BLANK
+                #     xtpoisson n x1, re                                   z and P BLANK
+                #     zinb cnt x, inflate(z)  '  -6.24   0.000'            z and P PRESENT
+                #
+                # so the two-equation commands print the test statistic on the dispersion row
+                # while the single-equation ones leave it empty. Round 244 measured only
+                # xtpoisson and hid the columns for every command as a result.
+                _model_name = str(getattr(result, "model_name", "") or "").lower()
+                _hide_stat_p = str(bare).strip() in (
+                    "/lnalpha",
+                    "lnalpha",
+                ) and _model_name not in ("zinb", "zip")
                 if _hide_stat_p:
                     # A SPLIT RULE OPENS the auxiliary block, ABOVE /lnalpha. Stata puts it
                     # there, not between /lnalpha and alpha -- measured in round 244.

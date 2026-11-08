@@ -176,18 +176,25 @@ def _weighted_summary(
 
 
 
-def _stata_g(value: float, width: int = 8) -> str:
-    """Stata's column format for these statistics: leading zero dropped, at most 8 characters.
+def _stata_g(value: float, width: int = 9) -> str:
+    """Stata's column format for these statistics: leading zero dropped, seven figures.
 
-    The WIDTH decides the precision, not a fixed significant-digit count -- which is why a
-    single rule kept matching one column and missing the next:
+    THE WIDTH IS NINE, NOT EIGHT. Eight reproduced every cell of the sample this was built
+    from, but that sample's means were all comfortably away from zero:
 
         .3594333   8 chars at 7 significant figures
-        .0657905   9 chars at 7, so Stata falls back to 6
-        .0083425   10 at 7 and 9 at 6, so it prints 5
-        16.42192   8 chars at 7
+        .0657905   9 chars -- 8 gave 6 figures, so the back-off fired and printed 6
+        .0083425   10 chars
 
-    Fitting them all to 8 characters reproduces every cell of the reference table.
+    Checking against two more samples found means like -.0205176 and -.0096412, which are nine
+    characters at seven figures and eight at six. Under `width = 8` those lost their last digit:
+
+        Stata    -.0205176        package  -.020518
+        Stata    -.0096412        package  -.009641
+
+    so the back-off fires whenever a value needs a ninth character, and Stata has no such
+    limit -- it prints seven significant figures and the column is wide enough. Nine is the
+    smallest width that matches all seven measured values.
     """
 
     number = float(value)

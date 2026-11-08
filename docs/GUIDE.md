@@ -275,6 +275,48 @@ to better than 1e-9.** The table is ordered by worst case, so the top rows are w
 | `xtlogit binary x1 x2, fe` | 1600 | 6.20e-08 | 3.21e-05 | very close |
 | `xtpoisson count x1 x2, fe` | 1600 | 3.70e-08 | 5.80e-05 | very close |
 
+### Byte-for-byte table layout
+
+The section above compares coefficient VALUES. A separate property is the printed
+table itself: column positions, alignment, significant figures and separators. Those
+were verified by capturing live Stata output and comparing it character by character,
+at several sample sizes rather than one.
+
+Every table below now matches a live capture exactly, at every size tested:
+
+| Table | Sizes verified |
+|---|---|
+| `varsoc` | 100, 200, 300, 900, 1500 |
+| `varstable` | 60, 200, 900, 1500 |
+| `vecstable` | 100, 300, 900 |
+| `dfuller` | 4 sizes x 2 lag counts |
+| `varlmar`, `varwle`, `veclmar`, `vargranger` | 100, 300, 900 |
+| `estat ic` (OLS, absorbed, VAR, zip, zinb) | 2-3 sizes each |
+| `estat summarize` | 200, 1500, 3000, and scales 1e-5..1e3 |
+| `estat overid`, `estat ovtest`, `estat dwatson` | 2-3 sizes each |
+| `logit`, `probit`, `poisson`, `nbreg` headers | 800, 1500 |
+| `zip`, `zinb` headers and equation blocks | 300, 1000 |
+| `irf_table`, `fevd_table`, `esttab`, `summarize` | 7-39 lines each |
+
+**Testing one sample size is not enough.** Nine of the defects fixed in this release
+were invisible on the sample each table was originally built from: a short value in a
+right-aligned field, a statistic below one that loses its leading zero, a count that
+grows to four digits and gains a separator, a degrees-of-freedom count that widens the
+row above it. Each needed a different n or a different scale to surface.
+
+### Remaining known differences
+
+Six differences are numerical rather than presentational and are recorded rather than
+papered over:
+
+* `estat vif`'s 1/VIF in the ninth significant figure;
+* `varstable`'s eigenvalues at n >= 300, ninth figure, which the modulus column inherits;
+* VECM coefficients in the last printed digit;
+* `zip`/`zinb` coefficients in the seventh significant figure.
+
+No format string can close a gap that begins in the estimate itself.
+
+
 ### Side-by-side detail
 
 #### `xtreg y x1 x2, be`

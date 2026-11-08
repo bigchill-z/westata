@@ -29,6 +29,23 @@ import pytest
 
 import westata as ws
 
+def _lag_row(rendered: str, lag: int) -> str:
+    """The table row whose lag field is ``lag``, whether or not the table is boxed.
+
+    The previous locators used ``line.strip().startswith("0 |")``, which fails as soon as a border
+    puts a pipe first -- the reason this had to be relaxed BEFORE the layout changed.
+    """
+
+    import re
+
+    pattern = re.compile(rf"(?:^|[|\s]){lag}\s*\|")
+    for line in rendered.splitlines():
+        if pattern.search(line):
+            return line
+    raise AssertionError(f"no row for lag {lag} in:\n{rendered}")
+
+
+
 
 @pytest.fixture(scope="module")
 def fpe_texts():
@@ -46,9 +63,7 @@ def fpe_texts():
         )
         selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
         rendered = str(selection)
-        row = next(
-            line for line in rendered.splitlines() if line.strip().startswith("0 |")
-        )
+        row = _lag_row(rendered, 0)
         # The FPE field is the five tokens before AIC; take the whole row and look for the shape.
         outputs[label] = row
     return outputs
@@ -80,9 +95,7 @@ def test_the_tiny_scale_truncates_rather_than_rounds() -> None:
         {"y1": rng.normal(size=n) * 1e-6, "y2": rng.normal(size=n) * 1e-6}
     )
     selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
-    row = next(
-        line for line in str(selection).splitlines() if line.strip().startswith("0 |")
-    )
+    row = _lag_row(str(selection), 0)
     # An exact one-digit mantissa, e.g. 8.6e-25 -- never 8.65 or 8.7.
     import re
 

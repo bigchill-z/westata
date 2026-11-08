@@ -134,18 +134,23 @@ def _format_g(value: Any, digits: int) -> str:
     # significant digits it can afford depend on the magnitude. Taking the largest precision
     # whose rendered width -- counting a negative sign as a character -- fits in 9 matches
     # every value Stata prints here.
-    # ``%9.0g``: seven significant figures, leading zero dropped. This matches Stata on
-    # every value in the equation table and on most coefficients; a handful of small
-    # coefficients come out one digit longer than Stata prints them (.06761177 against
-    # .0676118). That is Stata's display rounding, not a numerical difference -- the extra
-    # digit is carried deliberately, since truncating it would hide real precision.
+    # THE LIMIT IS ON THE NUMBER ITSELF, not on the rendered string: a value keeps dropping a
+    # significantly digit until its BODY (sign excluded) is at most 8 characters. That is why a
+    # negative coefficient can print one digit longer than a positive one of the same size.
+    #
+    #     -.0465397  body 8  -> full precision
+    #      .0575386  body 8  -> one digit shorter
+    #      .058077   body 7
+    #
+    # Measured on six coefficients from the same VAR; all six agree under this rule and the
+    # previous `len(text) <= 9` agreed on none of the positives.
     for candidate in range(int(digits), 0, -1):
         text = f"{number:.{candidate}g}"
         if text.startswith("0."):
             text = text[1:]
         elif text.startswith("-0."):
             text = "-" + text[2:]
-        if len(text) <= 9:
+        if len(text.lstrip("-")) <= 8:
             return text
     return f"{number:.1g}"
 
@@ -165,10 +170,33 @@ def _coefficient_row(
         pvalue = float("nan")
     low = coefficient - critical * standard_error
     high = coefficient + critical * standard_error
-    return (
-        f"{label:>12} |{_seven(coefficient):>12}{_seven(standard_error):>12}"
-        f"{statistic:>8.2f}{pvalue:>8.3f}{_seven(low):>13}{_seven(high):>13} "
-    )
+    # FIELDS END AT 25, 36, 45, 53, 66 AND 78, with the pipe at column 13 -- measured off the
+    # printed table:
+    #
+    #     '         L1. |  -.0465397   .0575386    -0.81   0.419    -.1593133    .0662338'
+    #     '             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]'
+    #
+    # The previous version ended at 79 with the pipe at 14, which shifted every row by one and made
+    # the header rules one character too long.
+    fields = [
+        (12, label),
+        (25, _seven(coefficient)),
+        (36, _seven(standard_error)),
+        (45, f"{statistic:.2f}"),
+        (53, f"{pvalue:.3f}"),
+        (66, _seven(low)),
+        (78, _seven(high)),
+    ]
+    pieces: list[str] = []
+    previous = 0
+    for end, cell in fields:
+        if previous == 12:
+            # Column 13 holds the pipe; the next field starts at 14.
+            pieces.append(" |")
+            previous = 14
+        pieces.append(cell.rjust(end - previous))
+        previous = end
+    return "".join(pieces)
 
 
 def _as_series(endog: Any, name: str = "y") -> pd.Series:
@@ -1805,11 +1833,29 @@ class VARResults:
 
         width = 78
         lines.append("-" * width)
-        lines.append(
-            f"{'':>13} |{'Coefficient':>12}{'Std. err.':>12}{'z':>8}"
-            f"{'P>|z|':>8}{'[95% conf. interval]':>25}"
-        )
-        lines.append("-" * 14 + "+" + "-" * 63)
+        # HEADER LABELS END AT THEIR OWN COLUMNS -- 26, 37, 44, 53 and 78 -- not at the data's
+        # 25/36/45/53/66/78. Measured from the printed line:
+        #
+        #     '             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]'
+        #      ^12 (blank)   ^26        ^37        ^44   ^53      ^78
+        _head_fields = [
+            (12, ""),
+            (26, "Coefficient"),
+            (37, "Std. err."),
+            (44, "z"),
+            (53, "P>|z|"),
+            (78, "[95% conf. interval]"),
+        ]
+        _header = ""
+        _cursor = 0
+        for _end, _cell in _head_fields:
+            if _cursor == 12:
+                _header += " |"
+                _cursor = 14
+            _header += _cell.rjust(_end - _cursor)
+            _cursor = _end
+        lines.append(_header)
+        lines.append("-" * 13 + "+" + "-" * 64)
 
         parameters = np.asarray(self.stata_params, dtype=float)
         covariance = np.asarray(self.stata_cov_params, dtype=float)
@@ -1846,7 +1892,7 @@ class VARResults:
                             critical,
                         )
                     )
-                lines.append(f"{'':>13} |")
+                lines.append(f"{'':>12} |")
             constants = [i for i, name in enumerate(block_names) if name == "_cons"]
             for offset in constants:
                 position = start + offset
@@ -1858,7 +1904,8 @@ class VARResults:
                         critical,
                     )
                 )
-            lines.append("-" * 14 + "+" + "-" * 63)
+            lines.append("-" * 13 + "+" + "-" * 64)
+        lines[-1] = "-" * 78
         _ = trend
         return chr(10).join(lines)
 
@@ -3159,7 +3206,6 @@ class VECMResults:
                 lines.append(_beta_row(name, coefficient, se_value, position == 0))
             if relation + 1 < relations:
                 lines.append("-" * 13 + "+" + "-" * 64)
-        lines.append("-" * 13 + "+" + "-" * 64)
         return "\n".join(lines)
 
     def __getattr__(self, name: str) -> Any:

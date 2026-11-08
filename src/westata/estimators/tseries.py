@@ -3711,6 +3711,10 @@ class UnitRootResult:
     observations: int = 0
     critical: Mapping[str, float] = field(default_factory=dict)
     null: str = ""
+    #: The deterministics the test included -- "n", "c" or "ct". Stata's H0 line depends on
+    #: it: no option prints "Random walk without drift, d = 0", `trend` prints "Random walk
+    #: with or without drift".
+    regression: str = "c"
 
     @property
     def r(self) -> dict[str, Any]:
@@ -3782,7 +3786,21 @@ class UnitRootResult:
         header and the data row, unlike the irf tables where the rule is one short.
         """
 
-        banner = "Dickey-Fuller test for unit root"
+        banner = "Dickey\u2013Fuller test for unit root"
+        # STATA'S H0 LINE NAMES THE DETERMINISTICS, and the leading blank line is Stata's too.
+        # Measured on a 200-point random walk:
+        #
+        #     dfuller y            H0: Random walk without drift, d = 0
+        #     dfuller y, trend     H0: Random walk with or without drift
+        #
+        # The class only stored a generic "unit root (nonstationary)", which is why round 35 left
+        # this line as a known gap.
+        _null_line = {
+            "n": "Random walk, d = 0",
+            "c": "Random walk without drift, d = 0",
+            "ct": "Random walk with or without drift",
+        }.get(str(getattr(self, "regression", "c")), str(self.null))
+        _label_right = "Dickey\u2013Fuller"
         rule = "-" * 62
         levels = sorted(self.critical, key=lambda key: float(str(key).rstrip("%")))
         critical_cells = "".join(
@@ -3790,16 +3808,17 @@ class UnitRootResult:
         )
         return chr(10).join(
             [
+                "",
                 # Stata's banner for `dfuller` is "Dickey-Fuller test for unit root"; the
                 # class stores the fuller name "Augmented Dickey-Fuller", so the banner comes
                 # from a literal rather than from `self.test`.
                 f"{banner:<42}Number of obs  = {self.observations}",
-                f"{'Variable: ' + str(getattr(self, 'variable', 'y')):<41}"
+                f"{'Variable: ' + str(getattr(self, 'variable', 'y')):<42}"
                 f"Number of lags = {self.lags:>3}",
                 "",
-                f"H0: {self.null}",
+                f"H0: {_null_line}",
                 "",
-                f"{'Dickey-Fuller':>52}",
+                f"{_label_right:>52}",
                 f"{'Test':>23}      -------- critical value ---------",
                 f"{'statistic':>23}" + "".join(f"{level:>13}" for level in levels),
                 rule,
@@ -3958,6 +3977,7 @@ def unitroot(
             _dfuller_case(regression), float(outcome.nobs)
         )
         return UnitRootResult(
+        regression=str(regression),
             test="Augmented Dickey-Fuller",
             statistic=float(outcome.statistic),
             pvalue=float(outcome.pvalue),
@@ -3995,6 +4015,7 @@ def unitroot(
         # ``nobs`` arch reports here, so no offset is needed.
         critical = _dfuller_critical(_dfuller_case(regression), float(observations))
         return UnitRootResult(
+        regression=str(regression),
             test="Phillips-Perron",
             statistic=statistic,
             pvalue=float(outcome.pvalue),
@@ -4014,6 +4035,7 @@ def unitroot(
             result_object=True,
         )
         return UnitRootResult(
+        regression=str(regression),
             test="KPSS",
             statistic=float(outcome.statistic),
             pvalue=float(outcome.pvalue),

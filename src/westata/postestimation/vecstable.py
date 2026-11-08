@@ -57,15 +57,43 @@ class VecStableResult:
         )
 
     def __str__(self) -> str:
+        # STATA BOXES THIS TABLE. Measured from `vecstable` on a rank-1, lags(2) system: every line
+        # is 44 characters with the pipes at columns 2, 29 and 43, so the fields are 26 and 13.
+        #
+        #     '  +----------------------------------------+'
+        #     '  |        Eigenvalue        |   Modulus   |'
+        #     '  |--------------------------+-------------|'
+        #     '  |          1               |         1   |'
+        #     '  |   .2681229               |   .268123   |'
+        #     '  |  -.1557235 +  .0329841i  |   .159178   |'
+        #     '  +----------------------------------------+'
+        #
+        # THE CELL RULE, derived by measuring each row rather than trying alignments: a value is
+        # right-aligned to column 11 and then padded to the 26-wide field. That single rule explains
+        # `1` (ten leading spaces), `.2681229` (three) and the modulus column alike. Values LONGER
+        # than 11 start at the field's two-space inset instead, which is what the complex pair does.
+        def _cell(text_value: str, width: int = 26, pivot: int = 11) -> str:
+            if len(text_value) > pivot:
+                return ("  " + text_value).ljust(width)[:width]
+            return text_value.rjust(pivot).ljust(width)
+
+        _rule = "+" + "-" * 40 + "+"
         lines = [
-            "   Eigenvalue stability condition",
             "",
-            f"{'Eigenvalue':>24} | {'Modulus':>10}",
-            "-" * 25 + "+" + "-" * 12,
+            "   Eigenvalue stability condition",
+            "  " + _rule,
+            "  |" + f"{'Eigenvalue':^26}" + "|" + f"{'Modulus':^13}" + "|",
+            "  |" + "-" * 26 + "+" + "-" * 13 + "|",
         ]
         for value, magnitude in zip(self.eigenvalues, self.modulus):
-            lines.append(f"{_format_complex(value):>24} | {magnitude:>10.6g}")
-        lines.append("-" * 25 + "+" + "-" * 12)
+            lines.append(
+                "  |"
+                + _cell(_format_complex(value), 26, 11)
+                + "|"
+                + _cell(_stata_number(magnitude), 13, 10)
+                + "|"
+            )
+        lines.append("  " + _rule)
         if self.stable:
             lines.append("   The VECM specification imposes a unit modulus.")
         else:
@@ -73,13 +101,39 @@ class VecStableResult:
         return "\n".join(lines)
 
 
+def _stata_number(value: float, digits: int = 6) -> str:
+    """Six significant digits with Stata's leading zero dropped."""
+
+    text = f"{value:.{digits}g}"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
 def _format_complex(value: complex) -> str:
     real = float(value.real)
     imaginary = float(value.imag)
     if abs(imaginary) < 1e-12:
-        return f"{real:.7g}"
+        text = f"{real:.7g}"
+        if text.startswith("0."):
+            return text[1:]
+        if text.startswith("-0."):
+            return "-" + text[2:]
+        return text
     sign = "+" if imaginary >= 0 else "-"
-    return f"{real:.7g} {sign} {abs(imaginary):.7g}i"
+
+    def _trim(value: float) -> str:
+        text = f"{value:.7g}"
+        if text.startswith("0."):
+            return text[1:]
+        if text.startswith("-0."):
+            return "-" + text[2:]
+        return text
+
+    # Stata prints `-.1557235 +  .0329841i`: one space before the sign, two after it.
+    return _trim(real) + " " + sign + "  " + _trim(abs(imaginary)) + "i"
 
 
 def vecstable(result: Any) -> VecStableResult:

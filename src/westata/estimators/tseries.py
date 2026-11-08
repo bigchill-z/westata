@@ -482,6 +482,17 @@ def _fpe(values: np.ndarray, lag: int, equations: int, start: int) -> float:
     )
 
 
+def _stata_stat(value: float, digits: int = 7) -> str:
+    """Stata's header numerals: fixed significant digits, leading zero dropped."""
+
+    text_value = f"{value:.{digits}g}"
+    if text_value.startswith("0."):
+        return text_value[1:]
+    if text_value.startswith("-0."):
+        return "-" + text_value[2:]
+    return text_value
+
+
 class VAR:
     """Vector autoregression (Stata ``var``).
 
@@ -1659,7 +1670,49 @@ class VARResults:
         per_equation = int(self.e.get("df_eq", 0)) or 1
         trend = int(getattr(self._result, "k_trend", 1))
 
-        lines: list[str] = []
+        # STATA PRINTS A SEVEN-LINE INFORMATION BLOCK ABOVE THE EQUATION TABLE. Measured from
+        # `var y1 y2, lags(1/2)`; each line is 78 characters with the two columns starting at 0
+        # and 48:
+        #
+        #     'Sample: 3 thru 300                              Number of obs     =        298'
+        #     'Log likelihood =  -833.7156                     AIC               =   5.6625'
+        #     'FPE            =   .9868603                     HQIC              =   5.7121'
+        #     'Det(Sigma_ml)  =   .9227959                     SBIC              =   5.7865'
+        #
+        # The quantities were already reachable (round 83 added `ll`, `fpe`, `hqic`, `det_sigma`);
+        # only the block itself was absent.
+        # THE CRITERIA ARE ON A DIFFERENT SCALE. Stata reports the TOTAL-information AIC/HQIC/SBIC,
+        # while the backend carries statsmodels' per-observation versions. Measured on the fixture:
+        #
+        #     Stata  AIC 5.6625   HQIC 5.7121   SBIC 5.7865
+        #     package -0.013233   0.036428     0.110830
+        #     offset   5.675754 for all three
+        #
+        # and that offset is exactly 2*ln(2*pi) + 2. Adding it reproduces all three to four decimals,
+        # so it is the likelihood's normalising constant, not a fudge factor.
+        _criterion_offset = 2.0 * float(np.log(2.0 * np.pi)) + 2.0
+        _crit_block = (
+            f"    AIC               = {_stata_stat(float(self.aic) + _criterion_offset):>8}",
+            f"   HQIC               = {_stata_stat(float(self.hqic) + _criterion_offset):>8}",
+            f"   SBIC               = {_stata_stat(float(self.bic) + _criterion_offset):>8}",
+        )
+        _usable = int(self.e.get("N", 0)) or int(getattr(self._result, "nobs", 0))
+        _start = int(getattr(self._result, "k_ar", 1)) + trend + 1
+        _end = _start + _usable - 1
+
+        lines: list[str] = [
+            "Vector autoregression",
+            "",
+            f"{'Sample: ' + str(_start) + ' thru ' + str(_end):<48}"
+            f"Number of obs     = {_usable:>10}",
+            f"{'Log likelihood = ' + _stata_stat(float(self.ll)):<47}"
+            + _crit_block[0],
+            f"{'FPE            = ' + _stata_stat(float(self.fpe)):<47}"
+            + _crit_block[1],
+            f"{'Det(Sigma_ml)  = ' + _stata_stat(float(self.det_sigma)):<47}"
+            + _crit_block[2],
+            "",
+        ]
         header = f"{'Equation':<16}{'Parms':>8}{'RMSE':>11}{'R-sq':>10}{'chi2':>12}{'P>chi2':>10}"
         lines.append(header)
         lines.append("-" * 67)

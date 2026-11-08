@@ -58,7 +58,9 @@ def test_the_equation_table_matches_stata(fitted) -> None:
 
 def test_the_equation_table_reports_the_parameter_count(fitted) -> None:
     text = fitted.summary(style="stata")
-    header = text.splitlines()[0]
+    # Stata prints a seven-line information block before the equation table, so the column
+    # header is no longer the first line. Find it rather than indexing.
+    header = next(line for line in text.splitlines() if line.startswith("Equation"))
     for column in ("Equation", "Parms", "RMSE", "R-sq", "chi2", "P>chi2"):
         assert column in header, column
 

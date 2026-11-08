@@ -198,6 +198,43 @@ def _stata_g(value: float, width: int = 9) -> str:
     """
 
     number = float(value)
+    # THE RULE SPLITS AT 1. At or above it Stata prints seven SIGNIFICANT figures; below it,
+    # seven DECIMALS with the zeros trimmed -- which is why a small mean stays in fixed point
+    # instead of becoming an exponent, and why a mid-range value still rounds.
+    #
+    #     value         Stata        %.7f            %.7g
+    #     5.6867388     5.686739     5.6867388      5.686739
+    #     7.0510001     7.051        7.0510001      7.051
+    #     0.00102022    .0010202     .0010202       .00102022
+    #     0.0000567     .0000567     .0000567       5.67e-05
+    #
+    # AND BELOW 1e-7 IT SWITCHES TO AN EXPONENT with two mantissa digits -- -1.32e-07, where
+    # seven decimals would print the useless -.0000001. Twelve values across four sample
+    # scales match under this split; either rule alone reproduces only part of them.
+    # BELOW 1e-5 STATA USES AN EXPONENT. Measured on one sample carrying four magnitudes, so
+    # the boundary is bracketed from both sides in a single table:
+    #
+    #     value          Stata        form
+    #     -6.12e-06      -6.12e-06    exponent
+    #      0.0000101     .0000101     fixed
+    #     -1.38e-07      -1.38e-07    exponent
+    #      0.0001069     .0001069     fixed
+    #
+    # Width alone cannot decide it: -.0000061 is nine characters after the leading zero goes
+    # and -.0000001 is the same length, yet Stata prints one as an exponent and the other as
+    # a decimal too short to read. The magnitude is what separates them.
+    if 0 < abs(number) < 1e-5:
+        return _two_place_exponent("%.2e" % number)
+    if abs(number) < 1:
+        fixed = ("%.7f" % number).rstrip("0")
+        if fixed.endswith("."):
+            fixed = fixed[:-1]
+        if fixed.startswith("0."):
+            fixed = fixed[1:]
+        elif fixed.startswith("-0."):
+            fixed = "-" + fixed[2:]
+        if fixed and len(fixed) <= width:
+            return _two_place_exponent(fixed)
     for digits in range(7, 0, -1):
         text = f"{number:.{digits}g}"
         if text.startswith("0."):

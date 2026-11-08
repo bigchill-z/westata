@@ -55,21 +55,22 @@ def fitted():
     ).fit()
 
 
-def test_sigma_u_is_close_but_not_exact(fitted) -> None:
-    """0.03% off: the panel means are right, the df adjustment differs slightly."""
+def test_sigma_u_is_exact(fitted) -> None:
+    """Exact once sigma_e is right: sigma_u is derived from it by Swamy-Arora."""
 
-    got = float(fitted.e["sigma_u"])
-    assert got == pytest.approx(STATA_SIGMA_U, rel=1e-2)
-    # Pinned as NOT equal, so a future fix shows up here.
-    assert got != pytest.approx(STATA_SIGMA_U, rel=1e-6)
+    assert float(fitted.e["sigma_u"]) == pytest.approx(STATA_SIGMA_U, rel=1e-8)
 
 
-def test_sigma_e_is_the_known_disagreement(fitted) -> None:
-    """1.1% low. When this starts failing, sigma_e was fixed -- replace with equality."""
+def test_sigma_e_is_the_within_rmse(fitted) -> None:
+    """Exact: Stata reports the WITHIN regression's rmse as `xtreg, re`'s sigma_e.
 
-    got = float(fitted.e["sigma_e"])
-    assert got == pytest.approx(9463.8949, abs=1e-3)
-    assert got < STATA_SIGMA_E
+    Fixed in round 46 after reading xtreg_re.ado:128/338, where
+    `s_e = sqrt(e(sse)/e(df_t))` comes from ffxreg2 -- the fixed-effects estimator -- and is then
+    stored as e(sigma_e). It previously came from the RE fit's own residual sum of squares, 1.1%
+    low, which also dragged rho and theta with it.
+    """
+
+    assert float(fitted.e["sigma_e"]) == pytest.approx(STATA_SIGMA_E, abs=1e-6)
 
 
 def test_the_rss_is_the_rmse_based_one(fitted) -> None:

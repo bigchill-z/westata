@@ -1099,6 +1099,72 @@ class PanelOLS:
     #: The long (observation-level) design, needed for the BETWEEN regression.
     _long_design: Any = None
 
+    def _within_rmse(
+        self,
+        response: pd.Series | None,
+        design: tuple[pd.DataFrame, list[str]] | None,
+        codes: np.ndarray | None,
+        n_entities: int,
+    ) -> float:
+        """Root mean square of the WITHIN regression, which Stata reports as e(sigma_e).
+
+        `xtreg, re` fits the within regression internally to obtain its variance components and
+        then reports THAT fit's rmse as its own e(sigma_e). Verified against a live Stata on two
+        fixtures, where `xtreg, fe` e(rmse) and `xtreg, re` e(sigma_e) are identical:
+
+            y ~ k1 + C(year)                9567.754881 both
+            lny ~ lnk1 + lnk2 + lnlabor     0.0388216088 both
+
+        The design, response and panel codes all come from the caller, which already holds them on
+        the fit's own rows. An earlier attempt looked the entity up inside `_data` by name and then
+        by "first column with few levels": the name was absent (entity="st_abb" leaves `state` in
+        the frame) and the guess picked `k1`, reporting 0.0872 against Stata's 0.0388. Using the
+        codes the model itself resolved removes that whole class of error.
+
+        The within rmse is sqrt(within_rss / (N - N_g - K + 1)); the +1 restores the intercept that
+        within-differencing removes. NaN when the pieces are absent, and the caller then keeps the
+        old formula -- an honest NaN beats a silently different number.
+        """
+
+        if response is None or design is None or codes is None:
+            return float("nan")
+        if not n_entities or n_entities <= 1:
+            return float("nan")
+
+        values_y = np.asarray(response, dtype=float).reshape(-1)
+        frame = design[0]
+        matrix = np.asarray(frame.to_numpy(dtype=float), dtype=float)
+        if matrix.ndim != 2 or matrix.shape[0] != values_y.size:
+            return float("nan")
+
+        codes = np.asarray(codes)
+        if codes.size != values_y.size or (codes < 0).any():
+            return float("nan")
+
+        groups = int(np.max(codes)) + 1
+        if groups != int(n_entities):
+            return float("nan")
+        counts = np.bincount(codes, minlength=groups).astype(float)
+        if np.any(counts <= 0):
+            return float("nan")
+
+        means_x = np.zeros((groups, matrix.shape[1]), dtype=float)
+        np.add.at(means_x, codes, matrix)
+        means_x /= counts[:, None]
+
+        within_x = matrix - means_x[codes]
+        means_y = np.bincount(codes, weights=values_y, minlength=groups) / counts
+        within_y = values_y - means_y[codes]
+
+        usable = np.isfinite(within_y) & np.isfinite(within_x).all(axis=1)
+        degrees = int(usable.sum()) - groups - matrix.shape[1] + 1
+        if degrees <= 0:
+            return float("nan")
+
+        beta, *_ = np.linalg.lstsq(within_x[usable], within_y[usable], rcond=None)
+        residual = within_y[usable] - within_x[usable] @ beta
+        return float(np.sqrt(float(residual @ residual) / degrees))
+
     def _swamy_arora_sigma_u(
         self,
         response: np.ndarray,
@@ -1572,26 +1638,41 @@ class PanelOLS:
             self._long_design = None
 
 
-        # e(sigma_e) = sqrt(e(rss)/e(df_r)) where e(df_r) is the reference df.
-        # ``xtreg, re`` divides the residual sum of squares by N, not by the residual degrees of
-        # freedom -- this is a MAXIMUM-LIKELIHOOD standard error, whereas e(rmse) is the
-        # degrees-of-freedom one. Measured on lin_1992 (rss 7.7182918, N 476, df_r 472):
+        # e(sigma_e) FOR xtreg, re IS THE WITHIN REGRESSION'S RMSE. Read out of xtreg_re.ado:
         #
-        #     sqrt(rss/N)    = .12733774   <- Stata e(sigma_e) .12733392
-        #     sqrt(rss/df_r) = .12787616   <- Stata e(rmse)    .12787616  (exact)
+        #     L128  scalar `s_e' = sqrt(e(sse)/e(df_t))   <- fitted by ffxreg2, the FE estimator
+        #     L338  est scalar sigma_e = `s_e'
         #
-        # Both numbers were being reported with the rmse value, which made sigma_e 0.43% high
-        # and pushed rho and theta off with it. The within estimator keeps df_r: it has no
-        # likelihood form and its e(sigma_e) agrees with e(rmse) there.
+        # `xtreg, re` runs a within regression internally to obtain its variance components and
+        # reports THAT regression's root mean square as its own sigma_e. Measured on munnell.dta:
+        # `xtreg, fe` gives e(rmse) = 9567.754881 and `xtreg, re` gives e(sigma_e) = 9567.754881;
+        # on the three-regressor fixture both give 0.0388216088.
+        #
+        # This block used to divide the RE fit's OWN residual sum of squares by N -- a different
+        # quantity (9463.8949 against 9567.7549, 1.1% low) which dragged rho and theta with it.
+        # The RE rss happens to equal rmse^2*(N-k) of the within fit, which is how they got
+        # confused.
+        #
+        # sqrt(within_rss / (N - N_g - K + 1)): the +1 restores the intercept that
+        # within-differencing removes.
         _sigma_divisor = (
             float(nobs)
             if self._random_effects_decomposition and nobs and nobs > 0
             else float(scalar_df) if scalar_df else 0.0
         )
-        sigma_e = (
-            float(np.sqrt(rss / _sigma_divisor))
-            if self._stores_sigma and _sigma_divisor > 0
+        _sigma_within = (
+            self._within_rmse(response, design, codes, n_entities)
+            if self._random_effects_decomposition
             else float("nan")
+        )
+        sigma_e = (
+            float(_sigma_within)
+            if np.isfinite(_sigma_within)
+            else (
+                float(np.sqrt(rss / _sigma_divisor))
+                if self._stores_sigma and _sigma_divisor > 0
+                else float("nan")
+            )
         )
 
         # Variance components, following xtreg_fe.ado:358-430 exactly.

@@ -3170,7 +3170,15 @@ def _stata_summary(result: Any) -> str:
                         # The left column is padded to _left_width (53 here) and the right column
                         # runs to the "=" in column 70 -- a 17-wide label field. Measured on five
                         # rows of a live xtlogit, re.
-                        right = f"{label:<17}= {value:>6}"
+                        # THE LABEL FIELD IS 14 WIDE, which puts = in column 70. Measured on a
+                        # 1500-row logit:
+                        #
+                        #     'Logistic regression   ...   Number of obs =  1,500'
+                        #                                   ^56        ^70
+                        #
+                        # A 17-wide field put the = at 73, and the row came out 81 characters instead
+                        # of 78. The xt-re case this branch shares needs the same 14.
+                        right = f"{label:<14}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:

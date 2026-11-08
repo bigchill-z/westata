@@ -686,8 +686,19 @@ class FEOLS:
         # fixture but need the absorbed-only (FE-demeaned) response, which this
         # adapter does not currently retain; they are left out rather than
         # approximated.  See retest/gaps/linear_iv_ts_gaps.md.
+        # AN ABSORBED FIT'S ll_0 IS THE LIKELIHOOD OF THE FIXED-EFFECTS-ONLY MODEL, not of a plain
+        # intercept. Measured on a 200-row panel against reg y x, absorb(id):
+        #
+        #     e(ll_0) = -353.98962
+        #
+        # which equals -0.5*n*(log(2*pi*sigma2)+1) with sigma2 taken from the GROUP-DEMEANED residuals,
+        # while the ordinary centred tss gives -761.417. _tss_within already computes exactly that sum
+        # of squares for e(tss_within), so it is the right input here too.
+        _ll0_basis = self._tss_within(y, n_effective)
+        if _ll0_basis is None or not np.isfinite(_ll0_basis) or _ll0_basis <= 0:
+            _ll0_basis = tss
         ll_0 = (
-            float(-0.5 * n_effective * (np.log(2 * np.pi) + np.log(tss / n_effective) + 1.0))
+            float(-0.5 * n_effective * (np.log(2 * np.pi) + np.log(_ll0_basis / n_effective) + 1.0))
             if tss > 0
             else float("nan")
         )

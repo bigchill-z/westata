@@ -399,3 +399,34 @@ esid、itted、df_r（765 → 764）、predict（816 → 768）随之调整；
 4. e(cmd) 从 xtreg, fd 改为如实描述。
 
 - **这是完整的估计器替换**，需要一轮专用时间，且必须逐一复核上述四处的消费方。
+
+### T1 补充：给定 Stata 的带宽后，	au 与 Stata 完全一致（第 63 轮实测）
+
+这是本轮最重要的发现，它**缩小了缺口范围**。
+
+`
+rdrobust(y, x, bandwidth=0.2808754677, bias_bandwidth=0.4908484209)
+tau = 0.7111570135      Stata tau_cl = 0.7111570135   ← 逐位一致
+se  = nan               Stata se_tau_cl = 0.1099186153
+`
+
+**结论**：
+drobust 的**点估计器本身完全正确**，缺失的只有两样：
+
+1. **MSE 最优带宽**（h_l = h_r = 0.2808754677、_l = b_r = 0.4908484209）；
+2. **稳健标准误**（se = nan，且 ariance_matches_stata = False 已被如实标注）。
+
+**已确认可用的零件**（
+dbandwidth.py，201 行）：
+
+| 函数 | 状态 |
+|---|---|
+| C_C_TRIANGULAR = 2.576 | 有 |
+| pilot_bandwidth() | 有，本数据给 0.7433（pilot 量级，大于最终 h，方向合理）|
+| 
+d_exponent(1) = 0.2 | 有 |
+| derivative_scale(1) = 1.0 | 有 |
+| combine_mserd/msesum/msetwo | 有 |
+| **C[1..3] 的计算** | **缺**，在 l/lrdrobust.mlib 字节码里 |
+
+- **此前记录说「带宽是唯一缺口」，不准确**：标准误同样缺，且两者独立。

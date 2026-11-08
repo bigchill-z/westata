@@ -1472,12 +1472,19 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         or _reports_a_chi2_test(result)
         or (_stored_sigma_u and "mle" not in _model_name_lower)
     )
-    if np.isfinite(fvalue):
+    _wald_value = _e_float(result, "chi2")
+    if np.isfinite(fvalue) or (_uses_wald and np.isfinite(_wald_value)):
         if _uses_wald:
             _test_label = f"Wald chi2({_df_label(df_model)})"
+            # THE WALD STATISTIC IS e(chi2), NOT e(F). They differ by df_m: on munnell.dta
+            # `xtreg ..., re` stores e(chi2) = 18370.441 and e(F) = 6123.480, and Stata prints the
+            # former next to "Wald chi2(3)". Reading e(F) there produced 6123.48 under a chi2
+            # label -- a number from the right model carrying the wrong name.
+            _test_value = _wald_value
         else:
             _test_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
-        lines.append(row("", stat(_test_label, f"{fvalue:.2f}")))
+            _test_value = fvalue
+        lines.append(row("", stat(_test_label, f"{_test_value:.2f}")))
     left_corr = ""
     # The RE estimator ASSUMES zero correlation between the effects and the regressors --
     # that is what makes it random-effects -- so it prints the assumption rather than a
@@ -4715,7 +4722,18 @@ def _stata_summary(result: Any) -> str:
     # decimals short of what %.8g gives, so the coefficient formatter is the wrong one
     # here. No leading zero, as everywhere else in Stata's output.
     def _panel_stat(value: float) -> str:
-        text = "%.8g" % value
+        """Stata's format for the sigma rows: EIGHT SIGNIFICANT DECIMALS after the leading dot.
+
+        Measured on munnell.dta against `xtreg lny lnk1 lnk2 lnlabor, re`:
+
+            Stata  '     sigma_u |  .08186287'      <- dot at col 16, 8 decimals, 25 wide
+            was    '     sigma_u | .081862869'      <- dot at col 15, 9 decimals
+
+        `%.8g` on 0.081862869 produces 0.081862869 -- nine significant figures -- because the
+        leading zero is not counted. Stata counts a significant digit INSIDE the fraction, so the
+        width has to be computed on the value without its leading "0.".
+        """
+        text = f"{value:.8f}"
         if text.startswith("0."):
             text = text[1:]
         elif text.startswith("-0."):

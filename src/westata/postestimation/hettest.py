@@ -575,14 +575,42 @@ def estat_hettest(
 
     fitted_values = not requested
     if fitted_values:
+        # A DESIGNED-OUT CONSTANT MAKES THE TWO SIDES DIFFERENT WIDTHS. An absorbed-effects fit has
+        # no Intercept in `params` (the effects absorb it) while its design matrix still carries the
+        # column, so a positional product raised "1 coefficients for 2 design columns" on `fe` fits
+        # that had nothing wrong with them.
+        #
+        # Align by NAME instead: a design column with no matching coefficient contributes nothing to
+        # the linear prediction, which is exactly right for an absorbed intercept.
         coefficients = np.asarray(result.params, dtype=float).reshape(-1)
-        if coefficients.size != matrix.shape[1]:
+        parameter_names = list(getattr(result, "param_names", []) or result.params.index)
+        # The design's own names live beside the matrix on the results that carry both.
+        design_names: list[str] = []
+        stored = getattr(result, "design_matrix", None)
+        if isinstance(stored, (tuple, list)) and len(stored) >= 2:
+            candidate = list(stored[1])
+            if len(candidate) == matrix.shape[1]:
+                design_names = [str(name) for name in candidate]
+
+        if coefficients.size == matrix.shape[1]:
+            aux_design = (matrix @ coefficients).reshape(-1, 1)
+        elif design_names:
+            lookup_coefficient = {
+                str(name): float(coefficients[index])
+                for index, name in enumerate(parameter_names)
+            }
+            aligned = np.array(
+                [lookup_coefficient.get(str(name), 0.0) for name in design_names],
+                dtype=float,
+            )
+            aux_design = (matrix @ aligned).reshape(-1, 1)
+        else:
             raise ValueError(
                 "estat hettest cannot rebuild the fitted values: "
                 f"{coefficients.size} coefficients for "
-                f"{matrix.shape[1]} design columns"
+                f"{matrix.shape[1]} design columns, and the result exposes no design names to "
+                "align them by"
             )
-        aux_design = (matrix @ coefficients).reshape(-1, 1)
         used_columns: list[int] = []
         used_names: list[str] = []
     elif source is not None:

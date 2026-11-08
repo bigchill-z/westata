@@ -3167,18 +3167,18 @@ def _stata_summary(result: Any) -> str:
                         # (16) because these rows carry a space before the "=", not a bare one.
                         right = f"{label:>16} = {value:>6}"
                     else:
-                        # The left column is padded to _left_width (53 here) and the right column
-                        # runs to the "=" in column 70 -- a 17-wide label field. Measured on five
-                        # rows of a live xtlogit, re.
-                        # THE LABEL FIELD IS 14 WIDE, which puts = in column 70. Measured on a
-                        # 1500-row logit:
+                        # THE LABEL FIELD WIDTH DEPENDS ON _left_width, because the
+                        # acceptance criterion is that `=` lands in column 70, not that the
+                        # field has any particular width. Two measured shapes:
                         #
-                        #     'Logistic regression   ...   Number of obs =  1,500'
-                        #                                   ^56        ^70
+                        #     plain logit    Number starts 56 -> label 14
+                        #     xtlogit, re    Number starts 53 -> label 17
                         #
-                        # A 17-wide field put the = at 73, and the row came out 81 characters instead
-                        # of 78. The xt-re case this branch shares needs the same 14.
-                        right = f"{label:<14}= {value:>6}"
+                        # A single constant cannot satisfy both: 17 put the plain logit's
+                        # `=` at 73 and made its row 81 characters, and 14 moved the xt-re
+                        # `=` to 67. Deriving it from _left_width keeps column 70 for both.
+                        _label_width = max(70 - _left_width, 6)
+                        right = f"{label:<{_label_width}}= {value:>6}"
             if _is_tobit and line and not right:
                 lines.append(line.rstrip())
             else:

@@ -291,3 +291,53 @@ test_predict_registry.py::test_xtreg_fd_design_matches_its_coefficient_count
 改动触及 `results/base.py`、`results/summary.py` 等共享文件时扩大范围。
 
 - **教训**：把「谨慎」等同于「每次都跑最贵的检查」，是一种伪装成勤奋的浪费。
+
+### 27. 几何对不上两次，就读 `.ado` 源码——不要第三次反推
+
+**实际发生**（第 187–188 轮）：`dfuller` 的表头在 `lags>0` 时与 `lags=0` 结构完全不同。
+我从输出反推列规则，**连续试了 6 次实现**：
+
+| 尝试 | 结果 |
+|---|---|
+| 固定左栏 42 | n=1500 时崩 |
+| 固定左栏 40 | n=200 时崩 |
+| 整行 `rjust(62)` | 左栏被右移 |
+| 左栏 ljust + 尾部 rjust | 差 1 格 |
+| 按 `Number of lags` 锚定 42 | n=900/1500 崩 |
+| `%11.0gc` + 右对齐 | 差 1 格 |
+
+**最后读了 `dfuller.ado`（`findfile dfuller.ado`），答案只有三行**：
+
+```stata
+_align maxlen "dinobs dilag" : "`T' `lags'" "11.0gc"
+local tablen 62
+local col = `tablen'-14-3-`maxlen'+1
+```
+
+`col = 46 - maxlen`；`_col()` **从 1 开始计**（所以 Python 索引是 `45 - maxlen`）；
+`display` **直接拼接值、不补位**——**这一条解释了全部 6 次失败**。
+
+**正确做法**：
+
+```python
+# 1. 先找源码
+s.run('findfile dfuller.ado')          # -> D:\...\ado\base\d\dfuller.ado
+# 2. 搜关键词，不要通读
+grep -n 'Number of obs\|Number of lags\|_col' dfuller.ado
+# 3. 找到 col 的定义，照抄公式
+```
+
+**为什么反推必然失败**：Stata 的 `display` + `_col()` 组合产生的是
+**「列位置 + 直接拼接」**，而不是「字段宽度 + 对齐」。用字段宽度去拟合，
+每次只能对上**恰好没有溢出的那个样本**。
+
+**触发条件**（满足任一条就该去读源码）：
+
+- 同一张表的列规则试了 **2 次**仍有一种样本对不上；
+- 不同样本呈现**互相矛盾**的列位置（如 `Number` 在 40 又 42）；
+- 字段宽度与直觉不符，需要"猜一个 magic number"。
+
+**代价对比**：6 次试错 ≈ 2 小时；`findfile` + 一次 grep ≈ **2 分钟**。
+
+- **教训**：Stata 的表格几何**不是猜出来的**，`ado` 文件里写着确切公式。
+  **两次不成功就停止反推，转去读源码。**

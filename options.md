@@ -626,3 +626,36 @@ r(111): canal_post not found
 
 - **未能确认**：`didregress` 下的正确 `test` 语法。需要 `didregress` 的 postestimation 文档，
   而不是继续试字符串。
+
+### T13. `didregress` 的后估计只有 `estat`/`predict`，五个 `estat` 子命令全部未实现（第 73 轮）
+
+**从文档确认**（`didregress_postestimation.sthlp`，`findfile` 定位）：
+
+`didregress` 的后估计命令只有两类：
+
+- `predict`
+- `estat`，五个子命令：`trendplots`、`ptrends`、`granger`、`grangerplot`、`bdecomp`
+
+**没有 `test`。** 这印证了第 72 轮的发现：`test canal_post post` 之所以两边都报错，
+是因为它不是 `didregress` 的有效后估计命令。
+
+**本包现状**：五个 `estat` **全部未实现**（`hasattr(ws, 'estat_ptrends')` 等均为 `False`）。
+这是真实的能力缺口，比 C17-04 的写法问题更值得处理。
+
+**已取得的参考输出**（`estat ptrends`，合成面板，`n_g=60`、`n_t=15`、20 个处理组）：
+
+```
+Parallel-trends test (pretreatment time period)
+H0: Linear trends are parallel
+
+F(1, 59) =   0.25
+Prob > F = 0.6182
+```
+
+- **`ptrends` 的语义**：在**处理前时段**检验「处理组与对照组的时间趋势是否平行」。
+  自由度 `F(1, 59)` 中的 `1` 说明是**单个线性趋势交互项**，`59 = n_g - 1`。
+- **未实现原因**：第一版原型把 `treat` 与 `canal_post` 同时放进前期子样本，
+  两者完全共线导致矩阵秩亏。正确做法是**只用处理前时段**、把 `treat × year` 作为唯一交互项，
+  并按 `didregress` 的聚类口径算 `F`。
+- **建议下一步**：先实现 `estat ptrends`（单参数，参考值已捕获），再考虑
+  `granger`/`bdecomp`（多参数，需要各自的时间窗定义）。

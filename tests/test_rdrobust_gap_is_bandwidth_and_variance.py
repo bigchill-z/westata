@@ -85,3 +85,92 @@ def test_the_pieces_that_do_exist_are_usable(sample) -> None:
     assert rd_exponent(1) == pytest.approx(0.2)
     assert derivative_scale(1) == pytest.approx(1.0)
     assert C_C_TRIANGULAR == pytest.approx(2.576)
+
+
+def _sandwich_standard_error(sample, mode: str) -> float:
+    """A plain weighted-sandwich se for the local-linear fit, under three variance estimators.
+
+    These are the three things that look like the right formula and are not. Kept as a helper so
+    the test below can show how far each one lands from Stata.
+    """
+
+    response, running = sample
+    h = STATA_H
+    total = 0.0
+    for mask in (running < 0, running >= 0):
+        distance = np.abs(running[mask])
+        values = response[mask]
+        weight = np.maximum(1.0 - distance / h, 0.0)
+        keep = weight > 0
+        distance, values, weight = distance[keep], values[keep], weight[keep]
+        n_h = int(keep.sum())
+
+        design = np.column_stack([np.ones(n_h), distance])
+        normal = design.T @ (weight[:, None] * design)
+        beta = np.linalg.solve(normal, design.T @ (weight * values))
+        residual = values - design @ beta
+
+        if mode == "wsum":
+            sigma2 = float((weight * residual**2).sum() / weight.sum())
+        elif mode == "mean":
+            sigma2 = float((residual**2).mean())
+        else:
+            sigma2 = float((weight * residual**2).sum() / n_h)
+
+        inverse = np.linalg.inv(normal)
+        e1 = np.array([1.0, 0.0])
+        total += float(
+            e1 @ inverse @ (design.T @ ((weight * weight)[:, None] * design))
+            @ inverse @ e1
+        ) * sigma2
+    return float(np.sqrt(total))
+
+
+def test_stata_uses_nearest_neighbour_variance_not_a_sandwich(sample) -> None:
+    """`VCE method = NN` in the Stata header. Three plausible sandwiches all miss.
+
+        mode    computed se      error against 0.1099186153
+        wsum    0.1113851870     +1.33%
+        mean    0.1142912646     +3.98%
+        nh      0.0755949066     -31.3%
+
+    The closest is 1.3% out, which is exactly the size of gap that survives a spot check -- so this
+    is pinned rather than rounded towards.
+
+    CCT's NN estimator pairs each observation with a nearest neighbour ON THE OTHER SIDE and weights
+    those contributions. It is not a re-weighting of the sandwich above, which is why no choice of
+    sigma2 closes the gap.
+    """
+
+    observed = {
+        mode: _sandwich_standard_error(sample, mode) for mode in ("wsum", "mean", "nh")
+    }
+    assert observed["wsum"] == pytest.approx(0.1113851870, abs=1e-9)
+    assert observed["mean"] == pytest.approx(0.1142912646, abs=1e-9)
+    assert observed["nh"] == pytest.approx(0.0755949066, abs=1e-9)
+
+    # None of them is Stata's number, and the closest is still more than 1% away.
+    for value in observed.values():
+        assert value != pytest.approx(STATA_SE, rel=5e-3)
+    closest = min(observed.values(), key=lambda v: abs(v - STATA_SE))
+    assert abs(closest - STATA_SE) / STATA_SE > 0.01
+
+
+def test_the_local_polynomial_itself_is_right(sample) -> None:
+    """The two one-sided intercepts differ by exactly Stata's tau -- so only the variance is open."""
+
+    response, running = sample
+    h = STATA_H
+    intercepts = []
+    for mask in (running < 0, running >= 0):
+        distance = np.abs(running[mask])
+        values = response[mask]
+        weight = np.maximum(1.0 - distance / h, 0.0)
+        keep = weight > 0
+        distance, values, weight = distance[keep], values[keep], weight[keep]
+        design = np.column_stack([np.ones(int(keep.sum())), distance])
+        normal = design.T @ (weight[:, None] * design)
+        beta = np.linalg.solve(normal, design.T @ (weight * values))
+        intercepts.append(float(beta[0]))
+
+    assert intercepts[1] - intercepts[0] == pytest.approx(STATA_TAU, abs=1e-9)

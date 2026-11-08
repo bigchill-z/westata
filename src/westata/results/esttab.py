@@ -196,7 +196,7 @@ def render_esttab(
                 # padded to four places, not three.
                 if abs(se_value) < 1.0 and "." in se_text:
                     head, _, tail = se_text.partition(".")
-                    while len(tail) < 3:
+                    while len(tail.lstrip("0")) < 3:
                         tail += "0"
                     se_text = f"{head}.{tail}"
                 _cell(f"({se_text})", widths[position], se_pieces)

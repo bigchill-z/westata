@@ -941,6 +941,18 @@ class VARResults:
         return raw
 
     @property
+    def model_name(self) -> str:
+        """The estimator name Stata puts in postestimation titles ("... of var model")."""
+
+        return "var"
+
+    @property
+    def response_name(self) -> str:
+        """The endogenous series, space separated -- Stata heads the column block with it."""
+
+        return " ".join(str(name) for name in self.names)
+
+    @property
     def e(self) -> dict[str, Any]:
         """Stata's ``e()`` scalars for ``var``, keyed as ``ereturn list`` shows.
 

@@ -174,3 +174,39 @@ sigma_e，因此偏低。
 必须按其定义（随机效应变换后的残差）实现。
 
 - **若需推进**：需要 xtreg.ado 中 sigma_e 的确切定义，或按 GLS 变换后的残差实现并对照。
+
+### T7 补充：`sigma_e` 的正确公式已从源码读出，接入点尚未打通（第 45 轮）
+
+**已确认的正确公式** —— 来自 `xtreg_re.ado`：
+
+```
+L128  scalar `s_e' = sqrt(e(sse)/e(df_t))     <- 由 ffxreg2（FE 估计器）算出
+L338  est scalar sigma_e = `s_e'
+```
+
+**即 `xtreg, re` 的 `sigma_e` 就是 within 回归的 rmse。** 实测验证：
+
+| 模型 | Stata `xtreg, fe` 的 `e(rmse)` | Stata `xtreg, re` 的 `e(sigma_e)` |
+|---|---|---|
+| `y ~ k1 + C(year)` | `9567.754881` | `9567.754881` |
+| `lny ~ lnk1 + lnk2 + lnlabor` | `0.0388216088` | `0.0388216088` |
+
+**公式**：`sqrt(within_rss / (N - N_g - K + 1))`，`+1` 补回组内去均值消掉的截距。
+手工验证：`sqrt(68747992036.4959 / (816 - 48 - 18 + 1)) = 9567.754881` ✅
+
+**接入失败的三处原因（均实测）**：
+
+1. `_stata_scalars` 里 `_long_response` 为 `None`（只在某些路径填充）；
+2. `_data` **不包含实体列**（`st_abb` 在设计矩阵构造时被消耗）。
+   回退猜列会按错误列分组 —— 实测 `entity="st_abb"` 时按 `k1` 分组，
+   得到 `sigma_e = 0.0872`（应为 `0.0388`）；
+3. `_panel_decomposition` 里的 `resid` 在该处**不是** within 残差
+   （实测其平方和与对应 FE 的 `e(rss)` 不符）。
+
+**正确的接入点**：在 `RandomEffects.fit` 内部显式跑一次 within 回归取 rmse，
+并把结果传进 `_panel_decomposition`；或把 FE 的 `resid` 显式传进去。
+两者都是小改动，但必须先确定 `_long_design` 的行序来源，**不能再靠猜列**。
+
+**一个反向确认**：该三变量模型修复前本包 `sigma_u = 0.0818491`、`sigma_e = 0.0393108`
+（与 `test_xttest0_variance_block` 注释里那两个"旧 bug 值"吻合），
+而 Stata 是 `0.0818629` / `0.0388216`。说明当时的"已修复"结论并不成立。

@@ -143,8 +143,30 @@ def render_esttab(
     for position, _ in enumerate(models):
         _cell(f"({position + 1})", widths[position], number_row)
         _cell(names[position], widths[position], name_row)
+    # Stata prints a rule ABOVE the column numbers too:
+    #     ''
+    #     '--------------------------------------------'
+    #     '                      (1)             (2)   '
+    lines.append(rule)
     lines.append("".join(number_row))
-    lines.append("".join(name_row))
+    if model_names is not None:
+        # The `mtitle` row: Stata prints it only when the caller names the models. Default output
+        # has the dependent-variable row alone, which is one line shorter.
+        lines.append("".join(name_row))
+
+    # THE DEPENDENT-VARIABLE ROW IS ALWAYS PRINTED, mtitle or not:
+    #
+    #     '                      (1)             (2)   '
+    #     '                       m1              m2   '     <- only with mtitle
+    #     '                        y               y   '
+    dep_cells: list[str] = [" " * _NAME_WIDTH]
+    for position, model in enumerate(models):
+        depvar = ""
+        e_block = getattr(model, "e", None)
+        if isinstance(e_block, dict):
+            depvar = str(e_block.get("depvar") or "")
+        _cell(depvar, widths[position], dep_cells)
+    lines.append("".join(dep_cells))
     lines.append(rule)
 
     for label in order:

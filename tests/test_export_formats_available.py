@@ -68,14 +68,35 @@ def test_esttab_prints_the_column_numbers_then_the_titles(models) -> None:
     # A live `esttab` starts with a blank line; the numbers follow it.
     lines = rendered.splitlines()
     assert lines[0] == ""
-    assert "(1)" in lines[1] and "(2)" in lines[1]
-    assert "Model A" in lines[2] and "Model B" in lines[2]
+    assert "(1)" in lines[2] and "(2)" in lines[2]
+    assert "Model A" in lines[3] and "Model B" in lines[3]
     assert lines[0] != lines[1]
 
 
-def test_the_default_titles_are_m1_and_m2(models) -> None:
+def test_the_default_output_has_no_model_title_row(models) -> None:
+    """Stata prints the model-name row only with `mtitle`, so untouched output has ONE title row.
+
+    A live `esttab m1 m2, se` -- note the stored names, still without `mtitle` -- prints:
+
+        ''
+        '--------------------------------------------'
+        '                      (1)             (2)   '
+        '                        y               y   '
+        '--------------------------------------------'
+
+    This test previously asserted that m1/m2 were always present, which is what kept the default
+    table one line longer than Stata's.
+    """
+
     rendered = ws.render_esttab(list(models), model_names=None)
     lines = rendered.splitlines()
     assert lines[0] == ""
-    assert "(1)" in lines[1]
-    assert "m1" in lines[2] and "m2" in lines[2]
+    assert "(1)" in lines[2]
+    # The dependent variable, not a model name. This fixture's response is lnw, so the row
+    # must be checked against the models rather than against a hard-coded name.
+    assert "lnw" in lines[3]
+    assert "m1" not in lines[3] and "m2" not in lines[3]
+
+    # And naming them brings the row back.
+    named = ws.render_esttab(list(models), model_names=["m1", "m2"]).splitlines()
+    assert "m1" in named[3] and "m2" in named[3]

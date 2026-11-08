@@ -52,10 +52,11 @@ def test_mtitle_is_already_implemented(models) -> None:
     """The report says mtitle is missing; the numbered row and name row are both emitted."""
 
     # Stata opens with a blank line, so the numbers are on line 1 and the titles on line 2.
+    # '' / rule / (1)(2) / m1 m2 / y y / rule
     lines = etable_as_stata(models, model_names=["m1", "m2"]).splitlines()
     assert lines[0] == ""
-    assert lines[1].strip().startswith("(1)")
-    assert "m1" in lines[2] and "m2" in lines[2]
+    assert lines[2].strip().startswith("(1)")
+    assert "m1" in lines[3] and "m2" in lines[3]
 
 
 def test_stars_hang_past_the_column(models) -> None:

@@ -88,10 +88,11 @@ def test_each_line_matches_stata(rendered, line: str) -> None:
 def test_the_numbering_and_mtitle_rows_come_first(rendered) -> None:
     # Stata opens the table with a BLANK line; the numbers come second. Measured from a live
     # `esttab m1 m2, se`, whose first line is empty and whose second carries (1) and (2).
+    # Blank, rule, numbers, titles -- a live esttab opens with a rule above the column numbers.
     lines = rendered.splitlines()
     assert lines[0] == ""
-    assert lines[1].strip().startswith("(1)")
-    assert lines[2].strip().startswith("m1")
+    assert lines[2].strip().startswith("(1)")
+    assert lines[3].strip().startswith("m1")
 
 
 def test_the_constant_is_last(rendered) -> None:

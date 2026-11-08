@@ -3052,7 +3052,7 @@ class VECMResults:
                     float(np.sqrt(max(statistic_variance, 0.0))),
                 )
             )
-        lines.append("-" * 13 + "+" + "-" * 64)
+            lines.append("-" * 13 + "+" + "-" * 64)
 
         # ---- cointegrating equations -----------------------------------
         lines.extend(

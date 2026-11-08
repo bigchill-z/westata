@@ -709,5 +709,17 @@ def estat_summarize(
     )
     # Stata heads the table with "Estimation sample <command>"; the name comes from the fit
     # the summary was taken over, which the constructor does not otherwise receive.
-    built.command = str(getattr(result, "model_name", "") or "") if result is not None else ""
+    # THE HEADING NAMES THE STATAL COMMAND, which is not always this package's model name.
+    # `FEOLS` reports `model_name = "reghdfe"` -- the backend it wraps -- while the Stata
+    # command producing the same fit is `areg`, and that is what `estat summarize` prints:
+    #
+    #     Stata    '  Estimation sample areg                   Number of obs =        600'
+    #     package  '  Estimation sample reghdfe                Number of obs =        600'
+    #
+    # The other estimators happen to share their Stata names, so only the absorbed regression
+    # needs a mapping rather than a general table.
+    _command_name = str(getattr(result, "model_name", "") or "") if result is not None else ""
+    if _command_name == "reghdfe":
+        _command_name = "areg"
+    built.command = _command_name
     return built

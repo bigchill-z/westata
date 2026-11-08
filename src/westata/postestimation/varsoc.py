@@ -136,11 +136,22 @@ class VarSocResult:
                 best_lr = row.lr
 
         def place(cells: list[tuple[int, str]]) -> str:
-            """Lay out (end_column, text) pairs so each text ENDS at its column."""
+            """Lay out (start_column, text) pairs so each text BEGINS at its column.
+
+            STATA ANCHORS THESE FIELDS AT THEIR START, not their end -- measured on two rows of the
+            same table:
+
+                lag 0 (all starred)  '.855661*' spans columns 39..47
+                lag 1 (unstarred)    '.885083'  spans columns 39..46
+
+            Same start, one column shorter, and the unstarred row does NOT pad to match: the next
+            field begins at 49 either way. A right-anchored layout cannot express that, which is why
+            four earlier attempts each fixed one row and broke the other.
+            """
 
             out = ""
-            for end, text in cells:
-                out += text.rjust(end - len(out))
+            for start, text in cells:
+                out += " " * max(0, start - len(out)) + text
             return out
 
         def number(value: float, digits: int = 6) -> str:
@@ -203,18 +214,20 @@ class VarSocResult:
             # than its absolute column. The lag field is followed by a pipe before the numbers.
             lines.append(
                 "  |"
-                + place([(4, str(int(row.lag)))])
+                + place([(3, str(int(row.lag)))])
                 + " | "
                 + place(
                     [
-                        (8, number(row.ll)),
-                        (16, lr_cell),
-                        (21, df_cell),
-                        (28, p_cell),
-                        (37, fpe_text(float(row.fpe), best_fpe)),
-                        (47, starred(float(row.aic), best_aic)),
-                        (57, starred(float(row.hqic), best_hqic)),
-                        (67, starred(float(row.sbic), best_sbic)),
+                        # Start columns measured off the printed row, minus the five characters
+                        # already emitted by the caller ("  | N | ").
+                        (0, number(row.ll)),
+                        (10, lr_cell),
+                        (20, df_cell),
+                        (23, p_cell),
+                        (29, fpe_text(float(row.fpe), best_fpe)),
+                        (39, starred(float(row.aic), best_aic)),
+                        (49, starred(float(row.hqic), best_hqic)),
+                        (59, starred(float(row.sbic), best_sbic) + " "),
                     ]
                 )
                 + " |"

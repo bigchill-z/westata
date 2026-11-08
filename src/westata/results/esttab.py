@@ -190,6 +190,9 @@ def render_esttab(
                 # "%.3g" drops a trailing zero, so 0.150 would print "(0.15)"; Stata keeps it,
                 # hence the pad to a minimum of three significant digits.
                 se_text = f"{se_value:.4g}" if abs(se_value) >= 1.0 else f"{se_value:.3g}"
+                # Stata's parenthesis rows carry FOUR decimals below 1 (0.0660, 0.0733) and four
+                # significant figures at or above it (9.011). `%.3g` gives "0.066", so the tail is
+                # padded to four places, not three.
                 if abs(se_value) < 1.0 and "." in se_text:
                     head, _, tail = se_text.partition(".")
                     while len(tail) < 3:
@@ -201,7 +204,12 @@ def render_esttab(
 
     if lines[-1] == "":
         lines.pop()
-    if stats is not None:
+    # STATA'S esttab PRINTS N BY DEFAULT -- beneath every model, between two rules. This renderer
+    # printed no statistics at all unless the caller supplied them, which is why the comparison
+    # showed a table three lines short.
+    if stats is None:
+        stats = (("N", "nobs"),)
+    if stats:
         lines.append(rule)
         for shown, source in stats:
             stat_cells: list[str] = [f"{shown:<{_NAME_WIDTH}}"]

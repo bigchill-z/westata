@@ -4722,18 +4722,34 @@ def _stata_summary(result: Any) -> str:
     # decimals short of what %.8g gives, so the coefficient formatter is the wrong one
     # here. No leading zero, as everywhere else in Stata's output.
     def _panel_stat(value: float) -> str:
-        """Stata's format for the sigma rows: EIGHT SIGNIFICANT DECIMALS after the leading dot.
+        """Stata's format for the sigma rows, matched on BOTH shapes it prints.
 
-        Measured on munnell.dta against `xtreg lny lnk1 lnk2 lnlabor, re`:
+        Measured on munnell.dta, where the three rows take two different forms:
 
-            Stata  '     sigma_u |  .08186287'      <- dot at col 16, 8 decimals, 25 wide
-            was    '     sigma_u | .081862869'      <- dot at col 15, 9 decimals
+            xtreg ..., fe   sigma_u |   .1071126      <- 7 significant digits
+                            sigma_e |  .03882161      <- 8
+            xtreg ..., re   sigma_u |  .08186287      <- 8
+                            sigma_e |  .03882161      <- 8
 
-        `%.8g` on 0.081862869 produces 0.081862869 -- nine significant figures -- because the
-        leading zero is not counted. Stata counts a significant digit INSIDE the fraction, so the
-        width has to be computed on the value without its leading "0.".
+        So neither `%.8g` nor `.8f` reproduces both:
+
+            value        %.8g         .8f          Stata
+            .107112604   0.1071126    0.10711260   .1071126
+            .081862869   0.081862869  0.08186287   .08186287
+            .038821609   0.038821609  0.03882161   .03882161
+
+        The rule Stata follows is EIGHT SIGNIFICANT DIGITS COUNTED FROM THE FIRST NON-ZERO OF THE
+        DECIMAL STRING -- which is `%.8g` except that %.8g does not count the leading zero, so
+        0.081862869 keeps nine digits. `.8f` counts decimal places instead, which overshoots for
+        0.107112604. Taking `%.8g` and then re-rounding a "0.xxx" result to eight decimal places
+        reproduces all three.
         """
-        text = f"{value:.8f}"
+        text = "%.8g" % value
+        # %.8g counts the leading zero as a significant digit, so a value below 0.1 keeps nine
+        # digits (`0.081862869`). Stata counts eight digits INSIDE the fraction, so those need
+        # eight decimal places instead. Values at or above 0.1 are already right.
+        if abs(value) < 0.1:
+            text = "%.8f" % value
         if text.startswith("0."):
             text = text[1:]
         elif text.startswith("-0."):

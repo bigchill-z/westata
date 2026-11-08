@@ -1472,6 +1472,12 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         or _reports_a_chi2_test(result)
         or (_stored_sigma_u and "mle" not in _model_name_lower)
     )
+    # `xtreg, be` titles itself "Between regression ..." and differs in two printed fields:
+    # it omits the space in `F(3,44)` and shows a standard deviation where the others show a
+    # correlation. Measured on munnell.dta.
+    _between_fit = str((getattr(result, "e", {}) or {}).get("title") or "").strip().startswith(
+        "Between"
+    )
     _wald_value = _e_float(result, "chi2")
     if np.isfinite(fvalue) or (_uses_wald and np.isfinite(_wald_value)):
         if _uses_wald:
@@ -1482,7 +1488,8 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
             # label -- a number from the right model carrying the wrong name.
             _test_value = _wald_value
         else:
-            _test_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
+            _comma = "," if _between_fit else ", "
+            _test_label = f"F({_df_label(df_model)}{_comma}{_df_label(df_resid)})"
             _test_value = fvalue
         lines.append(row("", stat(_test_label, f"{_test_value:.2f}")))
     left_corr = ""
@@ -1507,7 +1514,21 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     # `e(sigma_u)` is stored by `xtreg, fe` too, so it must NOT be part of this test. The title
     # prefix is the reliable signal; "re" as a substring would match "regression".
     _re_fit = _title_for_re.startswith("Random-effects") or _model_name.endswith(", re")
-    if _re_fit or (
+    if _between_fit:
+        # `xtreg, be` prints the standard deviation of the combined error, not a correlation:
+        #
+        #   sd(u_i + avg(e_i.)) = .0824026                  Prob > F       = 0.0000
+        #
+        # Verified on munnell.dta: that number IS the between fit's e(rmse), 0.0824026 to
+        # seven decimals, so it is read off rather than modelled.
+        _between_sd = _e_float(result, "rmse")
+        if np.isfinite(_between_sd):
+            # .0824026 -- SEVEN decimal places; %.7g would keep eight digits.
+            _sd_text = "%.7f" % _between_sd
+            if _sd_text.startswith("0."):
+                _sd_text = _sd_text[1:]
+            left_corr = f"sd(u_i + avg(e_i.)) = {_sd_text}"
+    elif _re_fit or (
         _model_name.startswith("xtivreg") and _model_name.endswith(", re")
     ):
         left_corr = "corr(u_i, X) = 0 (assumed)"

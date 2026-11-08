@@ -1650,6 +1650,16 @@ class PanelOLS:
                 )
                 if np.isfinite(within_r2):
                     out["r2_w"] = float(within_r2)
+                # e(r2_o) is the OVERALL R-squared: the squared correlation between the response
+                # and the level linear prediction over the LONG panel, not over entity means.
+                #
+                # `xtreg, be` regresses on group means, so `_level_fitted` there has one row per
+                # entity and the general branch above falls back to `fitted` -- which made r2_o
+                # identical to r2_b. Measured on munnell.dta: Stata prints Overall = 0.9924 with
+                # Between = 0.9939, while this package printed 0.9939 for both.
+                overall_r2 = _squared_correlation(level_pred, y_long)
+                if np.isfinite(overall_r2):
+                    out["r2_o"] = float(overall_r2)
 
         # The random-effects variance decomposition needs the observation-level design.
         if self._random_effects_decomposition and design is not None:

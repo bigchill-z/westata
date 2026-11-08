@@ -1502,3 +1502,50 @@ W: '          x2 |      1.01    0.988100'
 - **性质**：与 VECM 系数（T22）、`varstable` 特征值（T26）同类 —— **底层数值路径差异**。
 - **已确认无格式可修**：`%.6f` 对 `0.98809952` 必然是 `0.988100`，对 `0.98809949` 必然是
   `0.988099`。差异完全由数值本身决定。
+### T29. `dfuller` 的 banner 与表头：两种布局，已量出但未实现对（第 187 轮）
+
+报告 C14-01/02。此前在 `lags(0)`、n=200 下 13 行对齐；换 `lags>0` 与大样本后**标题与表头结构都不同**。
+
+**已用正则逐字符量出（四种组合，全部 62 字符宽）：**
+
+```
+lags=0, n=200
+  'Dickey-Fuller test for unit root          Number of obs  = 199'
+  ^0                ^42                          ^57   ^59..61
+lags=0, n=1500
+  'Dickey-Fuller test for unit root        Number of obs  = 1,499'
+  ^0                ^40                         ^55   ^57..61
+lags=2, n=200
+  'Augmented Dickey-Fuller test for unit root'                        仅 42 字符
+  'Variable: y                               Number of obs  = 197'
+  '                                          Number of lags =   2'
+lags=2, n=1500
+  'Augmented Dickey-Fuller test for unit root'                        仅 42 字符
+  'Variable: y                             Number of obs  = 1,497'
+  '                                        Number of lags =     2'
+```
+
+**规则总结**：
+
+| 项 | 规则 |
+|---|---|
+| `lags=0` | 标题与 `Number of obs` **同一行**；`Variable` 与 `Number of lags` 同一行 |
+| `lags>0` | 标题**独占一行**（42 字符）；`Variable` + `Number of obs`；空左栏 + `Number of lags` |
+| 行宽 | **全部 62 字符** |
+| `=` | 值的**右端在 61 列** |
+| `Number` 起点 | 40 或 42，**随尾部长短浮动**（不是固定左栏宽） |
+
+**已试并全部失败的实现**（每修复一种情况就破坏另一种）：
+
+| 尝试 | 失败点 |
+|---|---|
+| 固定左栏 42 宽 | n=1500 时 `Number` 应在 40 |
+| 固定左栏 40 宽 | n=200 时应在 42 |
+| 整行 `rjust(62)` | 左栏文本被一起右移 |
+| 左栏 `ljust` + 尾部 `rjust` | 差 1–2 个空格，`lags` 的 spacer 与 `obs` 不同 |
+
+- **状态**：**回退**。82 个 dfuller 相关测试全部通过，`lags=0` 的既有 13 行对齐保持。
+- **下一步**：需要先确定 Stata 究竟是「左栏固定 + 右栏固定」还是「整行 62 + 右端 61」。
+  实测数据显示**两种描述都能拟合部分行**，需要更多样本点才能区分。
+- **教训**：这一轮我在同一个行宽上试了 **5 次**——这正是 error.md 里
+  「改动前先测出规则」要避免的。**下次应先采集 ≥ 8 个样本点再动手。**

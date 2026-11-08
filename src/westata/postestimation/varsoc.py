@@ -198,8 +198,12 @@ class VarSocResult:
             "",
             "Lag-order selection criteria",
             "",
-            f"{'   Sample: ' + str(self.sample_start) + ' thru ' + str(self.sample_end):<59}"
-            f"Number of obs = {self.nobs}",
+            # THE BANNER IS RIGHT-ALIGNED TO A 78-COLUMN ROW, not padded to 59. Measured on two tables:
+            # 'Number of obs' begins at 59 when the count is 198 and at 57 when it is 1,496 -- the
+            # separator makes the tail longer and the label moves left.
+            ("   Sample: " + str(self.sample_start) + " thru " + str(self.sample_end)).ljust(
+                78 - len(f"Number of obs = {self.nobs:,}")
+            ) + f"Number of obs = {self.nobs:,}",
             rule,
             "  | Lag |    LL      LR      df    p     FPE       AIC      HQIC      SBIC    |",
             "  |-----+" + "-" * 69 + "|",
@@ -230,9 +234,26 @@ class VarSocResult:
             #
             # So placing them by START is correct for both, which the end-anchored arithmetic never
             # achieved: it put AIC on 48 and left HQIC a column behind.
+            # THE LR CELL IS RIGHT-ALIGNED TO COLUMN 26, unlike the LL cell which is start-anchored.
+            # Measured on two rows of the same table:
+            #
+            #     '-558.096    1412'     1412  ends at 26
+            #     '-789.832   2.223'     2.223 ends at 26
+            #
+            # Placing it by its start (20) put a wide value one column right of a narrow one and pushed
+            # the df column with it -- visible only at n=1500, where the LR statistic reaches five
+            # digits.
+            # THE STAR DOES NOT COUNT TOWARD THE WIDTH -- it spills past the field, exactly as it does
+            # in the criteria columns. Measured: '14.108*' starts one column left of '1412' because only
+            # the digits are aligned to column 26.
+            if lr_cell:
+                _lr_width = len(lr_cell.rstrip("*"))
+                _lr_start = max(19, 26 - _lr_width)
+            else:
+                _lr_start = 20
             _cells: dict[int, str] = {
                 10: number(row.ll),
-                20: lr_cell,
+                _lr_start: lr_cell,
                 30: df_cell,
                 33: p_cell,
                 39: fpe_text(float(row.fpe), best_fpe),

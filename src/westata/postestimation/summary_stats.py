@@ -109,7 +109,7 @@ class SummarizeTable:
             pieces = [f"{str(name):>12} |"]
             for text, end in zip(
                 (
-                    f"{count:.0f}",
+                    f"{count:,.0f}",
                     _stata_number(mean),
                     _stata_number(deviation),
                     _stata_number(minimum),

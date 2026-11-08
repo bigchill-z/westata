@@ -1676,7 +1676,7 @@ def _anova_block(
 
     def _df_cell(df: float) -> str:
         # Stata puts the df right-aligned in 10 with a trailing space, then the MS field.
-        return (f"{df:>10.0f}" if np.isfinite(df) else f"{'.':>10}") + " "
+        return (f"{df:>10,.0f}" if np.isfinite(df) else f"{'.':>10}") + " "
 
     def _ms(value: float, df: float) -> str:
         if not np.isfinite(value) or not np.isfinite(df) or df <= 0:
@@ -1718,7 +1718,7 @@ def _anova_block(
     _chi2_value = _e_float(result, "chi2")
     _chi2_pvalue = _e_float(result, "p")
     right = [
-        f"Number of obs   = {nobs:>9d}",
+        f"Number of obs   = {nobs:>9,.0f}",
         # ``xtpcse``/``xtgls`` report a ``Wald chi2`` MODEL test even though their
         # coefficient tests use t or z.  The captured run shows both at once
         # (``p9_outputs.txt:504-506`` beside a ``z``/``P>|z|`` table), and Stata records
@@ -3224,7 +3224,7 @@ def _stata_summary(result: Any) -> str:
             _reps = _e_float(result, "reps")
             _banner_sq = str((getattr(result, "e", None) or {}).get("title") or "")
             lines.append(
-                f"{_banner_sq:<52}{'Number of obs':<14}= {nobs:>11d}"
+                f"{_banner_sq:<52}{'Number of obs':<14}= {nobs:>11,.0f}"
             )
             for _index, (_q, _r2v) in enumerate(zip(_quantiles, _r2_by_q)):
                 _left = (
@@ -3283,7 +3283,7 @@ def _stata_summary(result: Any) -> str:
         # right-aligned to 78. The deviation values start at column 26, and "Pseudo R2"
         # starts at 52 -- the same column the Number-of-obs label starts at.
         if not _r2_by_q:
-            lines.append(f"{_banner_text:<52}{'Number of obs':<13} = {nobs:>10d}")
+            lines.append(f"{_banner_text:<52}{'Number of obs':<13} = {nobs:>10,.0f}")
         if np.isfinite(sum_rdev):
             about = f" (about {_num(q_v, 8)})" if np.isfinite(q_v) else ""
             lines.append(

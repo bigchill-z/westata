@@ -267,7 +267,7 @@ def render_esttab(
                 if value is None:
                     _cell("", widths[position], stat_cells)
                 elif def_target == "nobs":
-                    _cell(f"{value:,.0f}", widths[position], stat_cells)
+                    _cell(f"{value:.0f}", widths[position], stat_cells)
                 else:
                     _cell(f"{value:.{stats_digits}f}", widths[position], stat_cells)
             lines.append("".join(stat_cells))

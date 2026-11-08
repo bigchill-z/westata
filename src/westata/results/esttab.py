@@ -108,7 +108,29 @@ def render_esttab(
         "0.107" but "4.391"; four gives "0.1066" but "4.3912".
         """
 
-        return f"{value:.4g}" if abs(value) >= 1.0 else f"{value:.3g}"
+        # THREE SIGNIFICANT FIGURES WITH THE TRAILING ZERO KEPT, four at or above one.
+        #
+        # "%.3g" gets the digits right and drops a trailing zero, which is the only difference:
+        #
+        #     0.3772      -> 0.377    (no trailing zero, identical)
+        #     0.1586      -> 0.159
+        #     0.9166      -> 0.917
+        #     0.0430441   -> 0.0430   "%.3g" gives 0.043; Stata keeps the zero
+        #
+        # Verified against a live esttab m0 m1, se where the coefficient is 0.0430441398 and Stata
+        # prints 0.0430. The earlier version differed ONLY on values whose third significant figure
+        # is zero, which is why a single captured table never showed it.
+        number = float(value)
+        if abs(number) >= 1.0:
+            return f"{number:.4g}"
+        digits = f"{abs(number):.3g}"
+        if "e" in digits or "E" in digits:
+            return ("-" if number < 0 else "") + digits
+        whole, _, fraction = digits.partition(".")
+        significant = (fraction.lstrip("0") + "000")[:3]
+        leading_zeros = len(fraction) - len(fraction.lstrip("0"))
+        text_value = f"{whole}.{'0' * leading_zeros}{significant}"
+        return ("-" if number < 0 else "") + text_value
 
     # The union of parameter names, first model first, so the row order is the reader's.
     order: list[str] = []

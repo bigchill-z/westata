@@ -65,6 +65,8 @@ class VarSocResult:
     equations: int
     sample_start: int
     sample_end: int
+    #: The endogenous series names, for the Endogenous: footnote Stata prints.
+    names: tuple[str, ...] = ()
 
     def to_frame(self) -> pd.DataFrame:
         """The table as a DataFrame."""
@@ -212,43 +214,48 @@ class VarSocResult:
                 lr_cell = df_cell = p_cell = ""
             # `place` counts from the first character AFTER "  |", so every end is three lower
             # than its absolute column. The lag field is followed by a pipe before the numbers.
-            lines.append(
-                "  |"
-                + place([(3, str(int(row.lag)))])
-                + " | "
-                + place(
-                    [
-                        # Start columns measured off the printed row, minus the five characters
-                        # already emitted by the caller ("  | N | ").
-                        (0, number(row.ll)),
-                        (10, lr_cell),
-                        (20, df_cell),
-                        (23, p_cell),
-                        (29, fpe_text(float(row.fpe), best_fpe)),
-                        (39, starred(float(row.aic), best_aic)),
-                        (49, starred(float(row.hqic), best_hqic)),
-                        # A starred value already fills the column the pad would take.
-                        (
-                            59,
-                            starred(float(row.sbic), best_sbic)
-                            + ("" if float(row.sbic) == best_sbic else " "),
-                        ),
-                    ]
-                )
-                + " |"
-            )
+            # ABSOLUTE COLUMNS, like round 96's border work. A dict of column -> text is placed
+            # last, so an error in one column cannot shift any other. Every cursor-based attempt
+            # drifted: 125 wide once, fields fused another time, unbalanced parens a third.
+            #
+            # MEASURED (79-wide rows):
+            #   start-anchored : LL 10, LR 20, df 30, p 33, FPE 39
+            #   end-anchored   : AIC 56, HQIC 66, SBIC 76  (lag 2's 5.574 starts at 51, lag 1's
+            #                    5.55368 at 49, and BOTH end at 56)
+            _cells: dict[int, tuple[str, str]] = {
+                10: (number(row.ll), "start"),
+                20: (lr_cell, "start"),
+                30: (df_cell, "start"),
+                33: (p_cell, "start"),
+                39: (fpe_text(float(row.fpe), best_fpe), "start"),
+                56: (starred(float(row.aic), best_aic), "end"),
+                66: (starred(float(row.hqic), best_hqic), "end"),
+                76: (starred(float(row.sbic), best_sbic), "end"),
+            }
+            _out = "  |" + str(int(row.lag)).rjust(4) + " | "
+            # A starred cell ends one column further right, so every later end-anchored cell has to
+            # shift by the number of stars seen so far. Patching columns one at a time left HQIC a
+            # column behind after AIC was fixed.
+            _shift = 0
+            for _column in sorted(_cells):
+                _text, _anchor = _cells[_column]
+                if _anchor == "end":
+                    _pad = _column + _shift - len(_out) - len(_text)
+                    _out += " " * max(0, _pad) + _text
+                    if _text.endswith("*"):
+                        _shift += 1
+                else:
+                    _pad = _column - len(_out)
+                    _out += " " * max(0, _pad) + _text
+            # A starred SBIC ends one column further right, so it takes one less closing space.
+            _gap = 1 if float(row.sbic) == best_sbic else 2
+            lines.append(_out + " " * _gap + "|")
 
         lines.append(rule)
         lines.append("   * optimal lag")
-        # `equations` on this class is the NUMBER of equations; the names live on `names`.
-        _names = getattr(self, "names", None)
-        if isinstance(_names, (list, tuple)) and _names:
-            equations = " ".join(str(name) for name in _names)
-        else:
-            _eqs = getattr(self, "equations", None)
-            equations = " ".join(_eqs) if isinstance(_eqs, (list, tuple)) else ""
-        if equations:
-            lines.append("   Endogenous: " + equations)
+        _names_for_footer = getattr(self, "names", None)
+        if isinstance(_names_for_footer, (list, tuple)) and _names_for_footer:
+            lines.append("   Endogenous: " + " ".join(str(n) for n in _names_for_footer))
             lines.append("    Exogenous: _cons")
         return chr(10).join(lines)
 
@@ -266,6 +273,9 @@ def varsoc(
     rows must already be dropped. ``trend="c"`` fits a constant, which is Stata's default.
     """
 
+    # The series names come from a DataFrame, so the Endogenous footnote can list them.
+    if names is None and hasattr(data, "columns"):
+        names = [str(column) for column in data.columns]
     values = np.asarray(data, dtype=float)
     if values.ndim != 2:
         raise ConsistencyError(
@@ -384,4 +394,5 @@ def varsoc(
         equations=int(equations),
         sample_start=int(maxlag + 1),
         sample_end=int(nobs_total),
+        names=tuple(names) if names else (),
     )

@@ -129,8 +129,8 @@ class VarStableResult:
             result.append("   All the eigenvalues lie inside the unit circle.")
             result.append("   VAR satisfies stability condition.")
         else:
-            result.append("   At least one eigenvalue lies on or outside the unit circle.")
-            result.append("   VAR does NOT satisfy stability condition.")
+            result.append("   At least one eigenvalue is at least 1.0.")
+            result.append("   VAR does not satisfy stability condition.")
         return "\n".join(result)
 
 

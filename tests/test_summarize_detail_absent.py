@@ -19,8 +19,9 @@ statistics on the right:
     95%         95.5             99       Skewness              0
     99%         99.5            100       Kurtosis        1.79976
 
-`summarize()` takes no `detail` parameter, so this is a missing FEATURE rather than a wrong one, and
-options.md T24 records it.
+Round 159 IMPLEMENTED it, so this file now pins the conventions it had to get right instead of its
+absence. The percentile and kurtosis measurements below were taken before the implementer was written
+and are what it follows.
 
 THIS FILE PINS TWO THINGS SO THE GAP STAYS HONEST:
 
@@ -41,18 +42,30 @@ import pytest
 import westata as ws
 
 
-def test_summarize_takes_no_detail_parameter() -> None:
+def test_summarize_takes_a_detail_parameter() -> None:
+    """It did not before round 159; the parameter now exists and renders the block."""
+
     import inspect
 
     signature = inspect.signature(ws.summarize)
-    assert "detail" not in signature.parameters
+    assert "detail" in signature.parameters
 
 
-def test_passing_detail_is_rejected_rather_than_silently_ignored() -> None:
-    """A keyword the function does not take must raise, not produce the basic table."""
-
+def test_detail_returns_the_block_not_the_basic_table() -> None:
     frame = pd.DataFrame({"v": np.arange(1, 101, dtype=float)})
-    with pytest.raises(TypeError):
+    rendered = str(ws.summarize(frame, detail=True))
+    assert "Percentiles" in rendered
+    assert "Skewness" in rendered
+    assert "Kurtosis" in rendered
+
+
+def test_detail_rejects_more_than_one_variable() -> None:
+    """Stata prints one block per variable; this renderer covers a single block."""
+
+    frame = pd.DataFrame(
+        {"v": np.arange(1, 101, dtype=float), "w": np.arange(1, 101, dtype=float)}
+    )
+    with pytest.raises(ValueError):
         ws.summarize(frame, detail=True)
 
 

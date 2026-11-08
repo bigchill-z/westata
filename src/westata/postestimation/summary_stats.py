@@ -123,12 +123,129 @@ class SummarizeTable:
         return chr(10).join(lines)
 
 
+#: The nine percentile points Stata prints, in order.
+_DETAIL_PERCENTILES = (1, 5, 10, 25, 50, 75, 90, 95, 99)
+
+#: Where each field ENDS, measured from Stata's own `summarize v, detail` on ten values. Every field is
+#: right-aligned to its column, so the renderer places text by its right edge:
+#:
+#:     ' 1%            1              1'                              ends at 15 and 30
+#:     '10%          1.5              7       Obs                  10'   ends at 59
+#:     '                        Largest       Std. dev.       37.3989'
+_DETAIL_ENDS = {"percentile": 15, "extreme": 30, "statistic": 60}
+_DETAIL_WIDTH = 61
+
+#: Row layout. The left column skips a row after 25% and after 50%, and the right column's statistics
+#: sit on their own schedule; both were read off the capture rather than derived.
+_DETAIL_PERCENTILE_ROWS = (0, 1, 2, 3, 5, 7, 8, 9, 10)
+_DETAIL_SMALLEST_ROWS = (0, 1, 2, 3)
+_DETAIL_LARGEST_ROWS = (7, 8, 9, 10)
+_DETAIL_STAT_ROWS = (2, 3, 5, 6, 8, 9, 10)
+_DETAIL_HEADING_ROW = 6
+
+
+@dataclass(frozen=True)
+class SummarizeDetail:
+    """The ``summarize v, detail`` block: percentiles and extremes beside the statistics."""
+
+    name: str
+    values: "np.ndarray"
+
+    def __str__(self) -> str:
+        values = np.asarray(self.values, dtype=float)
+        values = values[np.isfinite(values)]
+        ordered = np.sort(values)
+        count = int(ordered.size)
+
+        def number(value: float) -> str:
+            return _stata_number(float(value))
+
+        # STATA'S DEFAULT PERCENTILE IS `averaged_inverted_cdf`, NOT `linear`. Measured on a
+        # deliberately uneven sample where linear disagreed at seven of nine points; options.md T24
+        # records that comparison.
+        percentiles = [
+            float(np.percentile(ordered, point, method="averaged_inverted_cdf"))
+            for point in _DETAIL_PERCENTILES
+        ]
+
+        mean = float(np.mean(ordered)) if count else float("nan")
+        deviation = float(np.std(ordered, ddof=1)) if count > 1 else float("nan")
+        variance = deviation**2 if count > 1 else float("nan")
+        centred = ordered - mean if count else ordered
+        m2 = float(np.mean(centred**2)) if count else float("nan")
+        m3 = float(np.mean(centred**3)) if count else float("nan")
+        m4 = float(np.mean(centred**4)) if count else float("nan")
+        skewness = m3 / m2**1.5 if m2 > 0 else float("nan")
+        # ORIGINAL kurtosis, not the excess one: on the uniform 1..100 series Stata prints 1.79976 and
+        # scipy's excess value is -1.20024.
+        kurtosis = m4 / m2**2 if m2 > 0 else float("nan")
+
+        statistics = [
+            ("Obs", f"{count:.0f}"),
+            ("Sum of wgt.", f"{count:.0f}"),
+            ("Mean", number(mean)),
+            ("Std. dev.", number(deviation)),
+            ("Variance", number(variance)),
+            ("Skewness", number(skewness)),
+            ("Kurtosis", number(kurtosis)),
+        ]
+
+        # A CHARACTER GRID, not accumulating string widths: the columns overlap (a value can reach back
+        # past its neighbour's label) so every field is written into its absolute position.
+        grid = [[" "] * _DETAIL_WIDTH for _ in range(11)]
+
+        def put(row: int, start: int, text: str) -> None:
+            if not text:
+                return
+            start = max(start, 0)
+            if start + len(text) > _DETAIL_WIDTH:
+                start = _DETAIL_WIDTH - len(text)
+            grid[row][start : start + len(text)] = text
+
+        def put_end(row: int, column: str, text: str) -> None:
+            put(row, _DETAIL_ENDS[column] - len(text) + 1, text)
+
+        for slot, row in enumerate(_DETAIL_PERCENTILE_ROWS):
+            label = f"{_DETAIL_PERCENTILES[slot]}%"
+            put(row, 2 - len(label) + 1, label)
+            put_end(row, "percentile", number(percentiles[slot]))
+
+        for slot, row in enumerate(_DETAIL_SMALLEST_ROWS):
+            if slot < count:
+                put_end(row, "extreme", number(ordered[slot]))
+
+        for slot, row in enumerate(_DETAIL_LARGEST_ROWS):
+            # The largest values ascend with the row: 41, 67, 89, 103 for ten values.
+            index = count - 4 + slot
+            if 0 <= index < count:
+                put_end(row, "extreme", number(ordered[index]))
+
+        for (label, rendered), row in zip(statistics, _DETAIL_STAT_ROWS):
+            put(row, 38, label)
+            put_end(row, "statistic", rendered)
+
+        put(_DETAIL_HEADING_ROW, 24, "Largest")
+        put(_DETAIL_HEADING_ROW, 38, "Std. dev.")
+
+        body = ["".join(cells).rstrip() for cells in grid]
+        mean_row = _DETAIL_STAT_ROWS[2]
+        # Stata leaves a blank line between the Sum-of-wgt row and the Mean row.
+        if mean_row > 0:
+            body[mean_row - 1] = ""
+
+        return chr(10).join(
+            ["", " " * 30 + self.name, "-" * _DETAIL_WIDTH, "      Percentiles      Smallest"]
+            + body
+        )
+
+
 def summarize(
     data: Any,
     variables: Sequence[str] | None = None,
     *,
     weights: Any = None,
-) -> SummarizeTable:
+    detail: bool = False,
+) -> Any:
     """Stata's ``summarize`` over ``data`` (a DataFrame, Series or array).
 
     ``variables`` names the columns to report; omitted, every column is included. Missing
@@ -192,4 +309,15 @@ def summarize(
                 float(values.max()),
             )
         )
+    if detail:
+        # summarize, detail reports ONE variable at a time in Stata; with several named it prints a
+        # block per variable. A single block is what the layout capture covers.
+        if len(rows) != 1:
+            raise ValueError(
+                "summarize detail: pass exactly one variable; got "
+                f"{len(rows)}"
+            )
+        name = rows[0][0]
+        column = data[name] if isinstance(data, pd.DataFrame) else data
+        return SummarizeDetail(str(name), np.asarray(column, dtype=float))
     return SummarizeTable(rows=rows)

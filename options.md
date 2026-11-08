@@ -1403,48 +1403,13 @@ an** |
 - **当前状态**：matches_min/max = 1/8 说明允许多个对照共享最近邻（Stata 亦如此），
   这部分逻辑是对的。
 
-### T24. summarize, detail 未实现（第 158 轮实测）
+### T24. ~~summarize, detail 未实现~~ → **第 159 轮已实现并逐字符对齐**
 
-Stata 的 summarize v, detail 输出一个**两栏布局**：左侧百分位数与最小/最大五个值，右侧统计量：
+15 行全部与 Stata 一致（实测 summarize v, detail）。实现要点：
 
-`
-                              v
--------------------------------------------------------------
-      Percentiles      Smallest
- 1%          1.5              1
- 5%          5.5              2
-10%         10.5              3       Obs                 100
-25%         25.5              4       Sum of wgt.         100
+- **百分位数用 veraged_inverted_cdf**（Stata 的 lt 定义），不是 linear；
+- **峰度用原始值**（超额 + 3），非样本校正；
+- **字符网格布局**：左右两栏按绝对列写入，左栏在 25%/50% 后、75% 前各留一个空行。
 
-50%         50.5                      Mean               50.5
-                        Largest       Std. dev.      29.01149
-75%         75.5             97
-90%         90.5             98       Variance       841.6667
-95%         95.5             99       Skewness              0
-99%         99.5            100       Kurtosis        1.79976
-`
+守卫见 	ests/test_summarize_detail_exact.py（18 项）。
 
-**westata 的 summarize() 没有 detail 参数**，只输出基础四列（Obs/Mean/Std. dev./Min/Max）。
-
-- **状态**：缺失功能，按目标口径跳过。
-- **数值基础已具备**：
-umpy.percentile 可算百分位，scipy.stats.skew/kurtosis 可算偏度峰度；
-  缺的是**两栏布局渲染器**。
-- **百分位数定义已核实（关键）**：Stata 的默认分位**不是** 
-umpy 的 linear。
-  在非均匀样本 [1,2,7,11,19,23,41,67,89,103] 上：
-
-  | 分位 | 1% | 5% | 10% | 25% | 50% | 75% | 90% | 95% | 99% |
-  |---|---|---|---|---|---|---|---|---|---|
-  | **Stata** | 1 | 1 | **1.5** | 7 | 21 | 67 | 96 | 103 | 103 |
-  | linear | 1.09 | 1.45 | **1.9** | 8 | 21 | 60.5 | 90.4 | 96.7 | 101.74 |
-  | **veraged_inverted_cdf** | 1 | 1 | **1.5** | 7 | 21 | 67 | 96 | 103 | 103 |
-
-  **linear 在 9 个点里错 7 个。** 用 
-p.percentile(..., method='averaged_inverted_cdf')
-  （即 Stata 文档中的 lt 定义）。midpoint 在均匀样本上碰巧对，非均匀样本立刻露馅；
-  hazen 在这个样本上也对，但只有 veraged_inverted_cdf 是 Stata 文档规定的。
-
-- **峰度约定已核实**：Stata 报 1.79976，而 scipy.stats.kurtosis(x) 给 -1.20024。
-  **kurtosis(x) + 3 = 1.79976 精确相符**，所以 Stata 用的是**原始峰度（非超额）**，
-  与均匀分布的理论值 1.8 一致。实现时直接加 3，不要用样本校正版本。

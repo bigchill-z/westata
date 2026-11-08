@@ -2924,8 +2924,24 @@ def _stata_summary(result: Any) -> str:
         _target_before_ll = len(ml_right) - 1 if np.isfinite(ll) else len(ml_right)
         while len(ml_left) < _target_before_ll:
             ml_left.append("")
+        # THE LOG-LIKELIHOOD'S SIGNIFICANT FIGURES DEPEND ON THE ESTIMATOR, not on the value.
+        # Measured on a live Stata, same header block, three commands:
+        #
+        #     logit hi x        e(ll) -551.8703877742   prints -551.87039      EIGHT figures
+        #     poisson cnt x     e(ll) -1356.3411751131  prints -1356.3412      EIGHT figures
+        #     zip cnt x, ...    e(ll) -1356.7453901697  prints -1356.745       SEVEN figures
+        #
+        # so the zero-inflated family drops one figure where the single-equation commands keep
+        # eight. Using "%.8g" throughout printed -1356.74539 for the zip, and switching wholly to
+        # "%.7g" would have shortened logit's -551.87039 to -551.8704.
+        _ll_digits = (
+            7
+            if str(getattr(result, "model_name", "") or "").lower()
+            in ("zip", "zinb", "ztp", "ztnb")
+            else 8
+        )
         if np.isfinite(ll):
-            ml_left.append("Log likelihood = " + ("%.8g" % ll))
+            ml_left.append("Log likelihood = " + (("%%.%dg" % _ll_digits) % ll))
         # ``truncreg``'s left column is 48 wide, not the 56 the other ML commands use:
         # its "Limit: Lower = ..." row is longer than a banner, so Stata shifts the right
         # column left to keep the block 78 wide -- and the value field shrinks with it

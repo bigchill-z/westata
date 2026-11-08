@@ -2458,11 +2458,15 @@ class VECM:
         self._rank = coint_rank
         self._lags = lags
         self._deterministic = deterministic
-        self._names = (
-            list(names)
-            if names is not None
-            else [f"y{i + 1}" for i in range(values.shape[1])]
-        )
+        # SAME RULE AS VAR: take the column labels from the input when it carries them. The flattening
+        # to ndarray discarded them and the tables then said y1, y2 where the caller passed lny, lnx --
+        # the defect round 162 found in VAR and this class shared.
+        if names is not None:
+            self._names = list(names)
+        elif hasattr(endog, "columns") and len(getattr(endog, "columns")) == values.shape[1]:
+            self._names = [str(column) for column in endog.columns]
+        else:
+            self._names = [f"y{i + 1}" for i in range(values.shape[1])]
 
     def johansen(
         self,
@@ -2688,6 +2692,18 @@ class VECMResults:
         """Estimation-sample size, Stata's ``e(N)``."""
 
         return int(self.raw.nobs)
+
+    @property
+    def model_name(self) -> str:
+        """The estimator name Stata puts in postestimation titles ("... of vec model")."""
+
+        return "vec"
+
+    @property
+    def response_name(self) -> str:
+        """The endogenous series, space separated."""
+
+        return " ".join(str(name) for name in self.names)
 
     @property
     def neqs(self) -> int:

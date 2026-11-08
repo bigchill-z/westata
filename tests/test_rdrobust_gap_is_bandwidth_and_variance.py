@@ -214,3 +214,54 @@ def test_no_plausible_reweighting_of_the_sandwich_reaches_stata() -> None:
     # The closest failure is still 1.3% out -- the size of gap a spot check would pass.
     closest = min(attempts.values(), key=lambda v: abs(v - STATA_SE))
     assert abs(closest - STATA_SE) / STATA_SE > 0.01
+
+
+def test_the_nearest_neighbour_estimator_is_insensitive_to_its_neighbour_count() -> None:
+    """Recorded so the next attempt does not start from "pick one nearest neighbour".
+
+    Stata, with the bandwidth and tau held fixed, changing only `nnmatch`:
+
+        vce(nn 3)    0.1099186153      <- the default
+        vce(nn 10)   0.1105396140
+        vce(nn 100)  0.1083379095
+        vce(hc0)     0.1075019935      <- implemented, exact
+
+    Two things follow. First, the whole range from 3 to 100 neighbours spans about 1%, so the
+    estimator averages matched-residual PRODUCTS rather than depending on any single pairing --
+    which is why round 65's "take the nearest one" reading was 200% out: the pairing was wrong, not
+    the count. Second, NN and HC0 are only 2.2% apart, so the target is a narrow one.
+
+    These are Stata's numbers, not this package's; the package computes HC0 only.
+    """
+
+    stata_values = {
+        "nn 3": 0.1099186153,
+        "nn 10": 0.1105396140,
+        "nn 100": 0.1083379095,
+        "hc0": 0.1075019935,
+    }
+
+    # The neighbour count moves the answer by roughly one percent, not by orders of magnitude.
+    neighbours = [stata_values["nn 3"], stata_values["nn 10"], stata_values["nn 100"]]
+    assert (max(neighbours) - min(neighbours)) / min(neighbours) < 0.03
+
+    # And the implemented estimator is within 2.5% of the unimplemented default.
+    gap = abs(stata_values["hc0"] - stata_values["nn 3"]) / stata_values["nn 3"]
+    assert 0.01 < gap < 0.03
+
+
+def test_the_package_reports_hc0_while_stata_defaults_to_nn(sample) -> None:
+    """The distinction the flag encodes: a right number under the wrong estimator name.
+
+    A default `rdrobust y x` in Stata uses nn 3 and prints 0.1099186153. This package prints
+    0.1075019935, which is the hc0 answer. Both are correct for their own estimator, and the
+    difference is 2.2% -- enough to matter, small enough to pass unnoticed.
+    """
+
+    response, running = sample
+    fitted = ws.rdrobust(
+        response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
+    )
+    assert float(fitted.se) == pytest.approx(0.1075019935, abs=1e-9)
+    relative = abs(float(fitted.se) - 0.1099186153) / 0.1099186153
+    assert 0.01 < relative < 0.03

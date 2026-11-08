@@ -174,3 +174,30 @@ def test_the_local_polynomial_itself_is_right(sample) -> None:
         intercepts.append(float(beta[0]))
 
     assert intercepts[1] - intercepts[0] == pytest.approx(STATA_TAU, abs=1e-9)
+
+
+def test_no_plausible_reweighting_of_the_sandwich_reaches_stata() -> None:
+    """The three sandwich variants are pinned above; both NN readings were tried too.
+
+    Round 65 implemented CCT's nearest-neighbour matching twice -- same-side pairing gave
+    0.3929069802 (+257%) and opposite-side pairing gave 0.3373928805 (+207%), against Stata's
+    0.1099186153. The two errors differ by a factor of three in variance, so no single
+    normalisation reconciles them: the published definition is needed, not a rescaling.
+
+    Those attempts were deleted rather than kept as a helper, because a flawed same-side variant
+    produced a NEGATIVE variance and could not even be sqrt-ed. Recording the magnitudes here is
+    what stops the next attempt from re-deriving them.
+    """
+
+    attempts = {
+        "sandwich wsum": 0.1113851870,
+        "sandwich mean": 0.1142912646,
+        "sandwich nh": 0.0755949066,
+        "nn same side": 0.3929069802,
+        "nn other side": 0.3373928805,
+    }
+    for label, value in attempts.items():
+        assert abs(value - STATA_SE) / STATA_SE > 1e-2, label
+    # The closest failure is still 1.3% out -- the size of gap a spot check would pass.
+    closest = min(attempts.values(), key=lambda v: abs(v - STATA_SE))
+    assert abs(closest - STATA_SE) / STATA_SE > 0.01

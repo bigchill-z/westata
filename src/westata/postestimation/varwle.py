@@ -78,11 +78,36 @@ class VarWleResult:
             lines.append("  |-----+------------------------------|")
             for row in rows:
                 lines.append(
-                    f"  |{row.lag:>4} |{row.chi2:>10.4f}{row.df:>8}{row.pvalue:>13.3f}    |"
+                    f"  |{row.lag:>4} |{_chi2_cell(row.chi2)}{row.df:>6}"
+                    f"{row.pvalue:>10.3f}    |"
                 )
             lines.append("  +------------------------------------+")
             lines.append("")
         return "\n".join(lines).rstrip()
+
+
+def _chi2_cell(value: float) -> str:
+    """A Wald chi-square at five decimals with trailing zeros dropped, in a 10-wide field.
+
+    Measured from a live `varwle`:
+
+        '  |   1 |  72.72164     2     0.000    |'
+        '  |   2 |   72.9294     2     0.000    |'
+
+    72.72164 keeps all five decimals and 72.9294 keeps four -- Stata trims the trailing zero rather than
+    padding to a fixed count.
+    """
+
+    # SEVEN SIGNIFICANT FIGURES, not a fixed decimal count. Measured across the whole table:
+    #
+    #     72.72164    7 significant figures, five decimals
+    #     72.9294     7 significant figures, four decimals
+    #     741.8916    7 significant figures, four decimals
+    #     796.2418    7 significant figures, four decimals
+    #
+    # A fixed five decimals gave 741.89158 and 123.12873, both wrong.
+    text = f"{float(value):.7g}"
+    return text.rjust(10)
 
 
 def varwle(result: Any) -> VarWleResult:

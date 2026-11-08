@@ -561,11 +561,15 @@ class VAR:
         self._data = values
         self._lags = lags
         self._trend = trend
-        self._names = (
-            list(names)
-            if names is not None
-            else [f"y{i + 1}" for i in range(values.shape[1])]
-        )
+        # TAKE THE COLUMN NAMES FROM THE INPUT when it carries them. A DataFrame was flattened to its
+        # values and the labels were then invented as y1, y2 -- so every table that prints an equation
+        # name (varwle, varlmar, irf footnotes) said y1 where the caller had passed dinf.
+        if names is not None:
+            self._names = list(names)
+        elif hasattr(endog, "columns") and len(getattr(endog, "columns")) == values.shape[1]:
+            self._names = [str(column) for column in endog.columns]
+        else:
+            self._names = [f"y{i + 1}" for i in range(values.shape[1])]
         if len(self._names) != values.shape[1]:
             raise ValueError(
                 f"names has {len(self._names)} entries but endog has "

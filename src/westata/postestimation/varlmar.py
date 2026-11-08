@@ -88,6 +88,14 @@ class LmarResult:
         rule = "  |------+-------------------------------|"
         lines = [
             "   Lagrange-multiplier test",
+            # THE TOP BORDER IS A LINE OF ITS OWN, measured from a live arlmar:
+            #
+            #     '   Lagrange-multiplier test'
+            #     '  +--------------------------------------+'
+            #     '  | lag  |      chi2    df   Prob > chi2 |'
+            #
+            # Without it every row below sat one line early and the box looked unclosed at the top.
+            "  +" + "-" * 38 + "+",
             "  | lag  |      chi2    df   Prob > chi2 |",
             rule,
         ]

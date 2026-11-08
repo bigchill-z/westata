@@ -50,3 +50,34 @@
 | `rdrobust` 自动带宽 | 部分 | 见 T1 |
 | `teffects` AI-robust 方差 | 未实现 | 六种影响函数形式试过，均差 2.9–3.4%，见 `teffects_ra.py` 文档 |
 | `teffects psmatch` 推断量 | 未实现 | 需完整 Abadie-Imbens 影响函数，docstring 已排除两种简化 |
+
+### T4. `teffects aipw` 点估计低 2.53（未解决）
+
+- **现状**：`AIPW(...).fit().estimate` 给 `1619.0528`，Stata 是 `1621.583`。
+- **已定位到小数位**：分臂 OLS 的拟合均值本身**已经精确**——
+  `fitted1 = 6179.1204`（Stata PO(1) = 6179.120）、`fitted0 = 4557.5374`（Stata PO(0) = 4557.537）。
+  所以误差**全部来自修正项没有归零**：
+
+  ```
+  mean(t*resid1/p)         = -6.5792    （应 ~0）
+  mean((1-t)*resid0/(1-p)) = -4.0489    （应 ~0）
+  ```
+
+- **已排除 ①**：给结果方程加权（`t/p`、`(1-t)/(1-p)`）能让第一项**恰好为 0**，
+  但点估计变成 `1617.18`，**离 Stata 更远**。最显然的修法不是正确的修法。
+- **已排除 ②**：倾向得分模型与直接对 logit 似然做 BFGS 的结果匹配到 `4e-05`，是 MLE。
+- **阻塞点**：`_teffects_aipw.ado` 委托给 `_teffects_ipwra_gmm`，
+  而算术在**编译后的内置函数**里，无法从安装目录读取。
+- **若需推进**：需要 Stata 的 `teffects` 方法文档（Methods and formulas），
+  或该内置函数的源码。
+
+### T5. `estimate` 之外还差什么，已知清单
+
+| 命令 | 现状 | 与 Stata 的差 |
+|---|---|---|
+| `teffects ra`（类） | **精确** | — |
+| `teffects ipw` | 点估计精确 | SE 高 0.24% |
+| `teffects aipw` | 点估计低 2.53 | 见 T4 |
+| `teffects psmatch` | 点估计精确 | `se`/`z`/`p`/CI 为 NaN（需 Abadie-Imbens 影响函数）|
+| `teffects nnmatch`（类） | 点估计精确 | SE 高 0.78%，输出已标注为近似 |
+

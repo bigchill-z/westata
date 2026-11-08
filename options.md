@@ -301,3 +301,42 @@ panel.py:1751  out["ui"] = sigma_u             写入
 
 - **未处理原因**：四处改动互相关联（`e(N)` 影响 `df_r` 与表头宽度，`r2_o` 需要长面板重建），
   且 `be` 用的人少。已完整记录，下次可从 `r2_o` 入手（它对下游影响最小）。
+
+### T10. xtreg, fd 在 Stata 中不存在，且本包的 d 缺少截距（第 58 轮发现）
+
+**Stata 没有 xtreg, fd。** 实测：
+
+`
+. xtreg lny lnk1 lnk2 lnlabor, fd
+option fd not allowed
+r(198);
+`
+
+help xtreg 的语法只列 
+e、cre、e、e、mle、pa。
+
+**本包内部已记录过这一点**（panel.py:262）：「`xtreg, fd` is deliberately ABSENT:
+it could not be run on this install ... so its banner is unknown. A variant falls back to the
+generic header rather than to a guessed string.」——实现是诚实的，但 e(cmd) 仍写 xtreg, fd，
+使用者会以为存在该命令。
+
+**Stata 的一阶差分等价写法**是 
+egress D.y D.x，实测 N = 768 = 816 - 48，与本包的 
+obs 一致。
+但**系数对不上**：
+
+| | 参数个数 | 值 |
+|---|---|---|
+| 本包 | 3（无截距） | [0.0172119, -0.0163616, 1.0933399] |
+| Stata 
+egress D. | 4（含 _cons） | [-0.1048258, -0.0621289, 1.0405411, 0.0075628] |
+
+**根因**：	ests/test_panel.py:220 用 ols(diffs[x], diffs[y])，而该辅助函数**不加常数列**，
+于是「无截距」被测试固定成了正确行为。
+
+- **影响**：d 的三个系数全部偏离 Stata（lnlabor 差 5%）。
+- **需先决定**：d 应对齐 
+egress D.（带截距）还是维持现状（无截距、纯组内差分）。
+  差分后仍有常数项 = 各组共同的时间趋势，去掉它是有偏的，倾向对齐 Stata。
+- **未处理原因**：修它会改动 FirstDifferenceOLS 的默认设计矩阵，影响 etable、predict
+  与多个夹具，需单独一轮并逐一复核。

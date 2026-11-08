@@ -275,11 +275,21 @@ class VarSocResult:
             _out = "  |" + str(int(row.lag)).rjust(4) + " | "
             for _column in sorted(_cells):
                 _out += " " * max(0, _column - len(_out)) + _cells[_column]
+            # THE NUMBER PART ENDS AT 55, 65 AND 75; A STAR DOES NOT COUNT toward that width.
+            # Measured by scanning two samples character by character:
+            #
+            #     '5.55368'  starts 49, ends 55
+            #     '5.574'    starts 51, ends 55
+            #     '5.74032*' starts 49, digits end 55, star spills to 56
+            #
+            # The earlier start-anchored map ({56: 49, ...}) is the FULL-WIDTH case only, which is why
+            # a short value like 5.574 came out two spaces short.
+            _criteria_ends = {56: 55, 66: 65, 76: 75}
             for _column, _text in _criteria:
-                # Right-align to the end column, but never start before the measured start column.
-                _by_end = _column - len(_out) - len(_text)
-                _by_start = _criteria_starts[_column] - len(_out)
-                _gap_width = max(1, _by_start, _by_end)
+                _bare = _text.rstrip("*")
+                _gap_width = max(
+                    0, (_criteria_ends[_column] - len(_bare) + 1) - len(_out)
+                )
                 _out += " " * _gap_width + _text
             # A starred SBIC ends one column further right, so it takes one less closing space.
             _close = 1 if float(row.sbic) == best_sbic else 2

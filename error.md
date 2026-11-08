@@ -223,3 +223,27 @@ capture noisily display e(key)
 
 - **教训**：探测型断言要选一个**值域互斥**的信号。数值与缺失点的区别在
   「是否恰为 `.`」，不在「是否以 `.` 开头」。
+### 24. 「换个后端」不是局部改动：先数清消费方再动手
+
+第 61–62 轮尝试给 `FirstDifferenceOLS` 补上 Stata 会保留的截距。算术早已验证逐位一致
+（4 个系数 + 4 个标准误，`n=768`、`df=764`），但**两次实现都在测试里翻车**：
+
+- 第 61 轮：事后补截距 → 斜率不变，得到不属于任何模型的参数向量；
+- 第 62 轮：整体重拟合 → **10 个测试失败 + 4 个 collection error**。
+
+失败清单说明了真实依赖：
+
+```
+test_panel_e_identities.py::test_fd_r2_within_and_overall_are_a_recorded_gap
+test_panel_e_surface.py::test_be_and_fd_store_no_sigma_family[FirstDifferenceOLS]
+test_predict_registry.py::test_every_registered_type_runs[xtreg, fd]
+test_predict_registry.py::test_xtreg_fd_design_matches_its_coefficient_count
+```
+
+即 `r2_w`/`r2_o`、`e()` 表面、`predict` 注册表、设计矩阵与系数个数的对应关系，
+**全部依赖「没有截距」这个前提**。
+
+- **教训**：把「需要改的地方」列成清单（第 60 轮做了），不等于清单完整。
+  先跑一次**最小改动**看测试如何失败，失败清单就是最可靠的依赖图。
+- 本次两次尝试后工作区均干净回退，`fd` 相关 22 个测试保持通过。
+- 结论已写入 `options.md` T10：这不是一轮能完成的改动。

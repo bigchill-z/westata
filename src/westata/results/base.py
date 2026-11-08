@@ -341,6 +341,29 @@ class StataResults:
                     for index in members
                     if _bare(index) in self._STATA_CONSTANT_NAMES
                 )
+            # AUXILIARY PARAMETERS COME AFTER EVERY EQUATION BLOCK, not inside the first one.
+            # This branch returns before the single-equation code below, which is where the
+            # auxiliary rule lives -- so `/lnalpha` stayed in the main equation's member list
+            # and sorted ahead of `_cons`. Measured on `zinb cnt x, inflate(z)` (n=1000),
+            # Stata's row order is:
+            #
+            #     x, _cons, | inflate: z, _cons, | /lnalpha, alpha
+            #
+            # while the package produced x, /lnalpha, _cons, ... and put `_cons` inside the
+            # inflate block.
+            def _is_auxiliary(index: int) -> bool:
+                name = names[index].strip()
+                return (
+                    name.startswith("/")
+                    or name.startswith("cut")
+                    or name.startswith("var(e.")
+                    or name in ("lnsig2u", "lnalpha", "lnsigma")
+                )
+
+            _aux = [index for index in ordered_all if _is_auxiliary(index)]
+            if _aux:
+                ordered_all = [index for index in ordered_all if not _is_auxiliary(index)]
+                ordered_all.extend(_aux)
             return ordered_all
 
         constants = [

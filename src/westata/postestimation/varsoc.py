@@ -101,85 +101,133 @@ class VarSocResult:
         return min(minima) if minima else -1
 
     def __str__(self) -> str:
-        lines = [
-            "Lag-order selection criteria",
-            "",
-            f"{'Lag':>3} |{'LL':>10}{'LR':>9}{'df':>6}{'p':>8}"
-            f"{'FPE':>10}{'AIC':>10}{'HQIC':>10}{'SBIC':>10}",
-            "-" * 4 + "+" + "-" * 72,
-        ]
+        """Stata's bordered lag-order table.
+
+        BUILT FROM ABSOLUTE COLUMN ENDS rather than a chain of field widths. The old version
+        concatenated eight segments and every attempt to box it produced a different total width
+        (77, 78, 81, 82, 84) because each segment's change shifted all the rest. With the ends fixed
+        a row is a list of (end_column, text) pairs and cannot drift.
+
+        Measured from `varsoc y1 y2, maxlag(2)`:
+
+            '   Sample: 3 thru 200                                      Number of obs = 198'
+            '  +---------------------------------------------------------------------------+'
+            '  | Lag |    LL      LR      df    p     FPE       AIC      HQIC      SBIC    |'
+            '  |-----+---------------------------------------------------------------------|'
+            '  |   1 | -543.814  1.3069    4  0.860 .885083   5.55368   5.59401   5.65332  |'
+            '  +---------------------------------------------------------------------------+'
+            '   * optimal lag'
+            '   Endogenous: y1 y2'
+            '    Exogenous: _cons'
+
+        Data-row fields end at 7, 18, 26, 31, 38, 46, 56, 66, 76 with the closing pipe at 78; the
+        star replaces the last character of its field, so a starred row is the same width.
+        """
+
         best_aic = min(row.aic for row in self.rows)
         best_hqic = min(row.hqic for row in self.rows)
         best_sbic = min(row.sbic for row in self.rows)
         best_fpe = min(row.fpe for row in self.rows)
-        best_ll = max(row.ll for row in self.rows)
-        # The LR star marks the ORDER SELECTED BY THE SEQUENCE TESTS -- the last lag whose test
-        # is significant -- not the largest LR statistic. Stata's ``varsoc`` output shows the
-        # star on lag 2 (LR 144.93, p 0.000) even though lag 1 has LR 519.63, because lag 3's
-        # test is insignificant (p 0.140). Marking the maximum put the star on lag 1.
+        # The LR star marks the ORDER SELECTED BY THE SEQUENCE TESTS, not the largest LR: Stata
+        # stars the last significant one, which can be a smaller statistic than an earlier lag's.
         best_lr = 0.0
         for row in self.rows:
             if row.lr > 0 and row.lr_pvalue < 0.05:
                 best_lr = row.lr
 
-        # Stata prints every criterion with SIX significant digits and marks the optimum with
-        # "*" -- but it marks only LR, FPE, AIC, HQIC and SBIC, NEVER the log-likelihood. A live
-        # ``varsoc dinf unem, maxlag(4)`` shows the star on LR at lag 2 (144.93*) while LL at
-        # lag 4 (1219.45) carries none, and two decimals against six was a separate mismatch:
-        #
-        #   |   2 |  1213.86  144.93*   4  0.000 1.2e-09* -14.8625* -14.7851* -14.6719* |
-        def mark(value: float, best: float, digits: int = 6) -> str:
-            text = f"{value:.{digits}g}".rjust(10)
-            return text + ("*" if value == best else " ")
+        def place(cells: list[tuple[int, str]]) -> str:
+            """Lay out (end_column, text) pairs so each text ENDS at its column."""
 
-        def mark_fpe(value: float, best: float) -> str:
-            """Stata's FPE column: DECIMAL to six places normally, scientific only when tiny.
+            out = ""
+            for end, text in cells:
+                out += text.rjust(end - len(out))
+            return out
 
-            Measured on two systems of very different scale:
+        def number(value: float, digits: int = 6) -> str:
+            """Significant digits with the leading zero dropped, as Stata prints them."""
 
-                ordinary scale    .855661        (six decimals, leading zero dropped)
-                scaled by 1e-6    8.6e-25         (one mantissa digit, truncated)
+            text = f"{value:.{digits}g}"
+            if text.startswith("0."):
+                return text[1:]
+            if text.startswith("-0."):
+                return "-" + text[2:]
+            return text
 
-            So the choice is by MAGNITUDE, not by taste. The previous version always produced the
-            scientific form, which is why the ordinary case read "8.6e-01" where Stata prints
-            ".85996". Truncation is applied to the mantissa in the scientific branch only, because
-            Stata prints `6.67195e-08` as `6.6e-08` (%.1e would round it to 6.7e-08).
+        def starred(value: float, best: float) -> str:
+            return number(value) + ("*" if value == best else "")
+
+        def fpe_text(value: float, best: float) -> str:
+            """FPE keeps ONE mantissa digit and TRUNCATES when the value is tiny.
+
+            Stata prints 6.67195e-08 as 6.6e-08, so ``%.1e`` (which rounds to 6.7e-08) is wrong.
+            Above 1e-3 it switches to six decimals with the leading zero dropped.
             """
 
+            import math
+
             if not math.isfinite(value):
-                return f"{value}".rjust(10) + ("*" if value == best else " ")
-            if value == 0.0:
-                text = ".000000"
+                body = "."
+            elif value == 0.0:
+                body = ".000000"
             elif abs(value) >= 1e-3:
-                # Six decimals, Stata's leading-zero drop.
-                text = f"{abs(value):.6f}"[1:] if abs(value) < 1.0 else f"{abs(value):.6f}"
+                body = number(abs(value), 6) if abs(value) < 1 else f"{abs(value):.6g}"
                 if value < 0:
-                    text = "-" + text
+                    body = "-" + body
             else:
                 exponent = int(math.floor(math.log10(abs(value))))
                 mantissa = math.trunc(abs(value) / 10.0**exponent * 10.0) / 10.0
-                text = f"{'-' if value < 0 else ''}{mantissa:.1f}e{exponent:02d}"
-            return text.rjust(10) + ("*" if value == best else " ")
+                body = f"{'-' if value < 0 else ''}{mantissa:.1f}e{exponent:02d}"
+            return body + ("*" if value == best else "")
+
+        inner = "-" * 75
+        rule = "  +" + inner + "+"
+        lines = [
+            "",
+            "Lag-order selection criteria",
+            "",
+            f"{'   Sample: ' + str(self.sample_start) + ' thru ' + str(self.sample_end):<59}"
+            f"Number of obs = {self.nobs}",
+            rule,
+            "  | Lag |    LL      LR      df    p     FPE       AIC      HQIC      SBIC    |",
+            "  |-----+" + "-" * 69 + "|",
+        ]
 
         for row in self.rows:
+            if row.lr > 0:
+                lr_cell = number(row.lr, 5) + ("*" if row.lr == best_lr else "")
+                df_cell = str(int(row.lr_df))
+                p_cell = f"{row.lr_pvalue:.3f}"
+            else:
+                lr_cell = df_cell = p_cell = ""
+            # `place` counts from the first character AFTER "  |", so every end is three lower
+            # than its absolute column. The lag field is followed by a pipe before the numbers.
             lines.append(
-                f"{row.lag:>3} |"
-                + f"{row.ll:>10.6g} "
-                + (
-                    f"{row.lr:>9.5g}" + ("*" if row.lr == best_lr else " ")
-                    if row.lr > 0
-                    else " " * 10
+                "  |"
+                + place([(4, str(int(row.lag)))])
+                + " | "
+                + place(
+                    [
+                        (8, number(row.ll)),
+                        (16, lr_cell),
+                        (21, df_cell),
+                        (28, p_cell),
+                        (37, fpe_text(float(row.fpe), best_fpe)),
+                        (47, starred(float(row.aic), best_aic)),
+                        (57, starred(float(row.hqic), best_hqic)),
+                        (67, starred(float(row.sbic), best_sbic)),
+                    ]
                 )
-                + (f"{row.lr_df:>6}" if row.lr > 0 else " " * 6)
-                + (f"{row.lr_pvalue:>7.3f} " if row.lr > 0 else " " * 8)
-                + mark_fpe(row.fpe, best_fpe)
-                + mark(row.aic, best_aic)
-                + mark(row.hqic, best_hqic)
-                + mark(row.sbic, best_sbic)
+                + " |"
             )
-        lines.append("-" * 4 + "+" + "-" * 72)
-        lines.append("  * optimal lag")
-        return "\n".join(lines)
+
+        lines.append(rule)
+        lines.append("   * optimal lag")
+        _eqs = getattr(self, "equations", None)
+        equations = " ".join(_eqs) if isinstance(_eqs, (list, tuple)) else str(_eqs or "")
+        if equations:
+            lines.append("   Endogenous: " + equations)
+            lines.append("    Exogenous: _cons")
+        return chr(10).join(lines)
 
 
 def varsoc(

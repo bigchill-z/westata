@@ -98,6 +98,56 @@ def test_ipw_standard_error_is_within_a_quarter_percent(data) -> None:
     assert relative < 0.005, relative
 
 
+def test_the_aipw_correction_term_should_average_to_zero(data) -> None:
+    """Pins the exact size of the defect, so a future fix shows up as a number.
+
+    The augmented mean is `fitted + mean(t*resid/p)`. On this data `fitted1` and `fitted0` already
+    EQUAL Stata's PO(1) = 6179.120 and PO(0) = 4557.537 to four decimals, so the correction terms
+    are the entire error:
+
+        mean(t*resid1/p)          = -6.5792
+        mean((1-t)*resid0/(1-p))  = -4.0489
+
+    They should be ~0. Stata's own aipw returns the SAME potential-outcome means as its ra here
+    (1621.583 either way), which is exactly what a zero correction produces.
+
+    RULED OUT -- weighted least squares. Fitting the outcome with weights t/p and (1-t)/(1-p) makes
+    the first term exactly 0.0 by construction, but the point estimate then goes to 1617.18, FURTHER
+    from Stata. So the fix is not simply "weight the outcome regression".
+
+    RULED OUT -- the propensity model. It matches a direct BFGS maximisation of the logit likelihood
+    to 4e-05, so the scores are the MLE.
+
+    WHAT REMAINS: Stata's aipw may not use plain per-arm OLS for the outcome models at all.
+    `_teffects_aipw.ado` delegates to `_teffects_ipwra_gmm`, whose arithmetic lives in a compiled
+    builtin, so the exact construction is not readable from the installation.
+    """
+
+    import numpy as np
+
+    from westata.estimators.treatreg_effects import _LogitPropensity
+
+    x, y, treated = data
+    n = y.size
+    arm = treated > 0.5
+    design = np.column_stack([np.ones(n), x])
+    propensity = _LogitPropensity(x, treated, command="teipw").checked_propensity()
+
+    beta1 = np.linalg.lstsq(design[arm], y[arm], rcond=None)[0]
+    beta0 = np.linalg.lstsq(design[~arm], y[~arm], rcond=None)[0]
+    fitted1, fitted0 = design @ beta1, design @ beta0
+
+    # The fitted means alone already equal Stata's potential-outcome means ...
+    assert float(fitted1.mean()) == pytest.approx(6179.120, abs=1e-3)
+    assert float(fitted0.mean()) == pytest.approx(4557.537, abs=1e-3)
+
+    # ... so the correction terms are the whole error, and they are far from zero.
+    correction1 = float((treated * (y - fitted1) / propensity).mean())
+    correction0 = float(((1.0 - treated) * (y - fitted0) / (1.0 - propensity)).mean())
+    assert correction1 == pytest.approx(-6.5792, abs=1e-3)
+    assert correction0 == pytest.approx(-4.0489, abs=1e-3)
+
+
 def test_ra_and_aipw_should_agree_but_do_not(data) -> None:
     """Pins a KNOWN defect so it cannot be mistaken for coverage.
 

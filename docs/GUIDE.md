@@ -187,6 +187,7 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | `tebalance summarize` | `tebalance_summarize(...)` |
 | `didregress` / `xtdidregress` | `Didregress`, `Xtdidregress` |
 | `rcm` | `rcm(...)` — pass `selected=` for a result that matches Stata |
+| `synth` (default path) | `synth(...)` — six `e()` matrices, evidence grade E2 |
 
 Both matching estimators use Stata's tie rule: every control at the k-th smallest
 distance counts as a match, not just the first. That rule is what the numbers hinge
@@ -219,6 +220,28 @@ values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=flo
 ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
 ws.vecrank(values, lags=1)
 ```
+### `prais` and its `corc` option
+
+`corc=True` is a **different table**, not only a different estimate: it drops the transformed
+first observation, so it fits `N-1` rows and its total degrees of freedom are `N-2`.
+
+| item | `prais` | `prais, corc` |
+|---|---|---|
+| banner | `Prais–Winsten AR(1) regression` | `Cochrane–Orcutt AR(1) regression` |
+| `Number of obs` | N | **N-1** |
+| `Total` df | N-1 | **N-2** |
+| `Adj R-squared` | 0.5799 | **0.6068** |
+
+Both variants list coefficients in the **written formula order** with `_cons` last, exactly as
+Stata's `e(b)` does — `consumption ~ temp + price + income` prints `temp, price, income, _cons`.
+
+```python
+# The `corc` table was captured on icecream.dta; here we use the bundled
+# auto.csv columns so this example runs anywhere.
+ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
+ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
+```
+
 
 ### Post-estimation
 
@@ -291,7 +314,9 @@ option changes the statistic itself, not merely its degrees of freedom:
 | 2 | 188.371 | 191.009 |
 
 ```python
-fit = ws.OLS.from_formula("y ~ x", df).fit()
+# The table above was captured from `regress consumption temp price income` on
+# icecream.dta; here we use the bundled auto.csv so the example runs anywhere.
+fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
 
 print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # zero-fill, full sample
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # keep them missing

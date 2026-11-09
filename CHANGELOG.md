@@ -111,6 +111,59 @@ disagree — a future refactor that merges the paths would fail it immediately.
 
 ---
 
+## [0.3.4] - 2026-11-09
+
+### Fixed — `prais ..., corc` printed the wrong table
+
+The **estimates** for `corc` had been right since round 170 — coefficients, `rho` and standard
+errors all matched Stata. The **table** around them did not. Comparing a live
+`prais consumption temp price income, corc` against the package showed six differences:
+
+| item | Stata | package (before) |
+|---|---|---|
+| banner | `Cochrane–Orcutt AR(1) regression` | `Prais–Winsten ...` |
+| leading blank lines | none | **two** |
+| `Number of obs` | **29** | 30 |
+| `Total` df | **28** | 29 |
+| `Total` MS | **.002589018** | .002499741 |
+| `Adj R-squared` | **0.6068** | 0.5927 |
+| coefficient rows | `_cons` **last** | `_cons` **first** |
+
+**The statistic block was computed on the wrong sample size.** `corc` drops the transformed first
+observation, so it fits `N-1` rows and its total degrees of freedom are `N-2`. Every statistic
+that divides by them shifts. RSS, MSS and R-squared never depended on that, which is why the
+numbers looked right while the summary did not.
+
+**The banner and the leading blank lines were hard-coded** for the Prais–Winsten variant.
+
+**The coefficient row order was wrong for BOTH variants.** The design matrix carries the constant
+first, so iterating the parameter names put `_cons` at the TOP of every `prais` table. Stata's
+`e(b)` follows the **written formula order** and puts `_cons` last:
+
+```
+prais consumption temp price income  ->  temp, price, income, _cons
+prais consumption price income temp  ->  price, income, temp, _cons
+```
+
+The two variants are now byte-identical to a live capture, 19 lines each.
+
+### Notes
+
+* A pinned fixture in `tests/test_prais_convergence.py` carried the wrong row order because it had
+  been transcribed from the package's own output rather than from a live capture — the failure
+  mode `error.md` already records. It now carries the captured table.
+* New result attributes: `PraisResult.df_total` and `PraisResult.corc`.
+* Eight new guards; `tests/test_prais_corc_table.py` pins the banner, the leading lines, the two
+  sample sizes, the two adjusted R-squared values and the row order for both variants.
+
+### Known, unchanged
+
+The `corc` estimates themselves were already exact and are untouched. Six numerical differences
+recorded in `options.md` (the `estat vif` 1/VIF ninth figure, `varstable` eigenvalues at n >= 300,
+VECM last digit, `zip`/`zinb` seventh figure) are unrelated to this release and remain open.
+
+---
+
 ## [Unreleased]
 
 ### Fixed — v3 report audit: twelve real defects, eleven claims that did not reproduce

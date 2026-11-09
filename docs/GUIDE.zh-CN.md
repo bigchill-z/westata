@@ -214,6 +214,27 @@ ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
 ws.vecrank(values, lags=1)
 ```
 
+### `prais` 与它的 `corc` 选项
+
+`corc=True` 是**另一张表**，不只是另一个估计量：它丢弃变换后的第一个观测，
+因此拟合 `N-1` 行，总自由度为 `N-2`。
+
+| 项目 | `prais` | `prais, corc` |
+|---|---|---|
+| 标题 | `Prais–Winsten AR(1) regression` | `Cochrane–Orcutt AR(1) regression` |
+| `Number of obs` | N | **N-1** |
+| `Total` 自由度 | N-1 | **N-2** |
+| `Adj R-squared` | 0.5799 | **0.6068** |
+
+两种变体都按**公式书写顺序**列出系数，`_cons` 排在最后，与 Stata 的 `e(b)` 一致
+——`consumption ~ temp + price + income` 打印为 `temp, price, income, _cons`。
+
+```python
+# `corc` 表捕获自 icecream.dta；这里改用随包附带的 auto.csv 列，示例在任何环境都能跑。
+ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
+ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
+```
+
 ### 后估计
 
 | Stata | westata |
@@ -283,7 +304,9 @@ Breusch-Godfrey 与 `estat dwatson` 有一点差别，读输出前值得先知�
 | 2 | 188.371 | 191.009 |
 
 ```python
-fit = ws.OLS.from_formula("y ~ x", df).fit()
+# 上表捕获自 icecream.dta 的 `regress consumption temp price income`；
+# 这里改用随包附带的 auto.csv，示例在任何环境都能直接运行。
+fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
 
 print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # 补零，全样本
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失

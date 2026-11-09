@@ -33,13 +33,23 @@ Verified against a live Stata for both variants: 2 of 2 tables byte-identical, 1
 import warnings
 
 warnings.filterwarnings("ignore")
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 import westata as ws
 
+#: The capture lives OUTSIDE the repository, so it is absent on CI. Every test here skips
+#: rather than errors when it is missing -- a hard-coded Windows path that was unguarded turned
+#: the whole Linux matrix red the first time this file was pushed.
 DATA = r"D:\myCodeProject\test_westata\data\icecream.dta"
 FORMULA = "consumption ~ temp + price + income"
+
+pytestmark = pytest.mark.skipif(
+    not Path(DATA).exists(),
+    reason="icecream.dta is not available on this machine",
+)
 
 
 def _frame() -> pd.DataFrame:

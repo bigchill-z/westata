@@ -168,6 +168,8 @@ class PraisResult:
         "_tss",
         "_r2",
         "_r2_adj",
+        "_df_total",
+        "_corc",
         "_rmse",
         "_fvalue",
         "_p_f",
@@ -247,6 +249,18 @@ class PraisResult:
     @property
     def df_resid(self) -> int:
         return self._df_resid
+
+    @property
+    def df_total(self) -> int:
+        """Total degrees of freedom: `N - 1`, or `N - 2` for `corc`."""
+
+        return self._df_total
+
+    @property
+    def corc(self) -> bool:
+        """Whether the Cochrane-Orcutt transform produced this fit."""
+
+        return self._corc
 
     @property
     def rsquared(self) -> float:
@@ -373,11 +387,28 @@ class PraisResult:
             """Left block padded to column 48, then the right-hand statistics block."""
             return left + " " * max(48 - len(left), 0) + stats_row(label, value)[48:]
 
-        lines = [
-            "",
-            "",
-            "Prais\u2013Winsten AR(1) regression with iterated estimates",
-            "",
+        # THE BANNER NAMES THE TRANSFORM ACTUALLY USED. `prais ..., corc` is
+        # "Cochrane-Orcutt AR(1) regression", not Prais-Winsten, and it opens with NO blank
+        # lines where the Prais-Winsten form starts with two:
+        #
+        #     Stata PW    chr(10) chr(10) 'Prais-Winsten AR(1) regression with iterated estimates'
+        #     Stata CORC  'Cochrane-Orcutt AR(1) regression with iterated estimates'
+        _banner = (
+            "Cochrane\u2013Orcutt AR(1) regression with iterated estimates"
+            if self._corc
+            else "Prais\u2013Winsten AR(1) regression with iterated estimates"
+        )
+        # ``corc`` STARTS AT THE BANNER, with no leading blank; the Prais-Winsten form has
+        # two because its iteration log occupies them. Measured:
+        #
+        #     PW    ['', '', 'Prais-Winsten AR(1) regression ...', '', '      Source | ...']
+        #     CORC  ['Cochrane-Orcutt AR(1) regression ...', '', '      Source | ...']
+        lines = (
+            [_banner, ""]
+            if self._corc
+            else ["", "", _banner, ""]
+        )
+        lines += [
             # The header row's SS/MS end three columns EARLIER than the data rows' do (23/36/45
             # against 26/36/48): Stata centres the short labels over wider numeric fields.
             joined(
@@ -436,7 +467,17 @@ class PraisResult:
         # '       price |  -1.048854    .759751    -1.38   0.179    -2.610545    .5128361':
         # coefficient 25, std. err. 36, t 43, P>|t| 52, interval 65 and 78.
         _COEF_END = (25, 36, 45, 53, 66, 78)
-        for index, name in enumerate(self._names):
+        # ``_cons`` PRINTS LAST, as it does in every Stata coefficient table. The design
+        # matrix carries the constant first (patsy order), so iterating ``_names`` directly
+        # put it at the TOP -- measured against `prais consumption temp price income` and its
+        # `corc` form, whose e(b) column order is temp, price, income, _cons in both cases.
+        _order = sorted(
+            range(len(self._names)),
+            key=lambda i: str(self._names[i]).lower()
+            in {"intercept", "const", "constant", "_cons"},
+        )
+        for index in _order:
+            name = self._names[index]
             low, high = self._conf_int[index]
             # The constant is "_cons" in Stata, whatever the formula called it.
             label = "_cons" if str(name).lower() in {"intercept", "const", "constant"} else str(name)
@@ -520,7 +561,18 @@ def prais(
     tss = float(np.sum((transformed_y - transformed_y.mean()) ** 2))
     mss = tss - rss
     r2 = 1.0 - rss / tss if tss > 0 else 0.0
-    r2_adj = 1.0 - (1.0 - r2) * (y.size - 1) / df_resid if df_resid > 0 else 0.0
+    # ``corc`` FITS ON N-1 OBSERVATIONS, so its total degrees of freedom are N-2, not N-1.
+    # Measured on icecream with `prais consumption temp price income, corc`:
+    #
+    #     Stata    Total df 28   Total MS .002589018   Adj R-squared 0.6068
+    #     package  Total df 29   Total MS .002499741   Adj R-squared 0.5927
+    #
+    # RSS, MSS and R-squared already matched; only the degrees-of-freedom basis was wrong.
+    _n_rows = y.size - 1 if corc else y.size
+    _df_total = _n_rows - 1
+    r2_adj = (
+        1.0 - (1.0 - r2) * _df_total / df_resid if df_resid > 0 else 0.0
+    )
     rmse = float(np.sqrt(rss / df_resid)) if df_resid > 0 else float("nan")
 
     sigma2 = rss / df_resid if df_resid > 0 else float("nan")
@@ -564,7 +616,10 @@ def prais(
         pvalues=pvalues,
         conf_int=conf,
         rho=rho,
-        nobs=int(y.size),
+        # The reported observation count is the one the fit used: `corc` drops the
+        # transformed first row, so Stata prints 29 where the Prais-Winsten variant prints 30.
+        nobs=int(_n_rows),
+        df_total=int(_df_total),
         df_resid=int(df_resid),
         df_model=int(x.shape[1] - 1),
         r2=r2,
@@ -577,5 +632,6 @@ def prais(
         tss=tss,
         dw_original=dw_original,
         dw_transformed=dw_transformed,
+        corc=bool(corc),
         iterations=iterations,
     )

@@ -111,11 +111,30 @@ class BgTestResult:
         return chr(10).join(lines)
 
 
-def estat_bgodfrey(result: Any, *, lags: int | Sequence[int] = 1) -> BgTestResult:
+def estat_bgodfrey(
+    result: Any, *, lags: int | Sequence[int] = 1, nomiss0: bool = False
+) -> BgTestResult:
     """Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.
 
     ``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata
     refuses the test after ``regress, robust`` and so does this.
+
+    ``nomiss0`` keeps the leading missing values of the lagged residuals MISSING instead of
+    replacing them with zero, which shortens the auxiliary regression by ``p`` rows.
+    ``bgodfrey.ado:180-184`` is the whole difference::
+
+        if "`dm'"=="" {
+            foreach i of local reslist {
+                qui replace `i' = 0 if `i' >= . & `touse'
+            }
+        }
+
+    The option is called ``dm`` inside the ado -- "Davidson-MacKinnon method is now
+    miss0" -- so an empty macro means the default (replace with zero) and a set one means
+    keep them missing. Measured on a 200-row series, default against ``nomiss0``:
+
+        lag 1: chi2 187.976  ->  191.674
+        lag 2: chi2 188.371  ->  191.009
     """
 
     if isinstance(lags, int):
@@ -159,21 +178,35 @@ def estat_bgodfrey(result: Any, *, lags: int | Sequence[int] = 1) -> BgTestResul
             )
         lagged: list[np.ndarray] = []
         for depth in range(1, order + 1):
-            block = np.zeros(nobs)
-            # ``bgodfrey.ado:178-180``: leading missing values become ZERO, keeping the full
-            # sample. Dropping them instead shifts every statistic.
+            # ``bgodfrey.ado:180-184``: by DEFAULT the leading missing values of the lagged
+            # residual are replaced by ZERO, keeping the full sample; ``nomiss0`` leaves them
+            # missing so the auxiliary regression loses those rows. Dropping them in the
+            # default case shifts every statistic -- it gives 4.704 where Stata reports 4.237
+            # on icecream.dta -- so the two paths are not interchangeable.
+            if nomiss0:
+                block = np.full(nobs, np.nan)
+            else:
+                block = np.zeros(nobs)
             block[depth:] = values[: nobs - depth]
             lagged.append(block)
         augmented = np.column_stack([exog, *lagged])
-        coefficients, *_ = np.linalg.lstsq(augmented, values, rcond=None)
+        if nomiss0:
+            keep = np.isfinite(augmented).all(axis=1) & np.isfinite(values)
+            augmented = augmented[keep]
+            target = values[keep]
+        else:
+            target = values
+        used = int(target.size)
+        coefficients, *_ = np.linalg.lstsq(augmented, target, rcond=None)
         fitted = augmented @ coefficients
-        residual = values - fitted
-        total = float(np.sum((values - values.mean()) ** 2))
+        residual = target - fitted
+        total = float(np.sum((target - target.mean()) ** 2))
         if total <= 0.0:
             raise ConsistencyError("estat bgodfrey: the residuals are constant")
         r2 = 1.0 - float(residual @ residual) / total
-        # ``return scalar chi2 = e(N)*e(r2)`` -- e(N), the full sample.
-        statistic = float(nobs * r2)
+        # ``return scalar chi2 = e(N)*e(r2)`` -- e(N) of the AUXILIARY regression, which is
+        # the full sample by default and ``nobs - order`` under ``nomiss0``.
+        statistic = float(used * r2)
         rows.append(
             BgTestRow(
                 lags=order,

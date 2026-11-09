@@ -268,6 +268,29 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
 | `xtlogit binary x1 x2, fe` | 1600 | 6.20e-08 | 3.21e-05 | 很接近 |
 | `xtpoisson count x1 x2, fe` | 1600 | 3.70e-08 | 5.80e-05 | 很接近 |
 
+### `estat bgodfrey` 与它的 `nomiss0` 选项
+
+Breusch-Godfrey 与 `estat dwatson` 有一点差别，读输出前值得先知道：
+滞后残差的前 `p` 个缺失值**默认被替换为 0**，辅助回归因此保留全样本。
+`nomiss0` 则保持它们缺失，辅助回归随之少掉 `p` 行。
+
+统计量是 `e(N) * e(r2)`，其中 `e(N)` 是**辅助**回归的观测数，
+所以这个选项改变的是统计量本身，而不只是自由度：
+
+| 阶数 | 默认 | `nomiss0` |
+|---|---|---|
+| 1 | 187.976 | 191.674 |
+| 2 | 188.371 | 191.009 |
+
+```python
+fit = ws.OLS.from_formula("y ~ x", df).fit()
+
+print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # 补零，全样本
+print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失
+```
+
+`bgodfrey.ado` 拒绝在 `regress, robust` 之后运行，本实现同样如此。
+
 ### 表格布局逐字符一致
 
 上一节比较的是系数**数值**。另一项性质是**打印出的表格本身**：列位置、对齐、

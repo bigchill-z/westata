@@ -24,7 +24,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **5835 passing** |
+| Tests | **5872 passing** |
 | Commands covered | 93 registry entries |
 | Evidence | **54 × E3**, 26 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
@@ -69,7 +69,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` then runs the 5839-test suite (5835 pass, 3 skip). It needs no
+`python -m pytest -q` then runs the 5876-test suite (5872 pass, 3 skip). It needs no
 Stata licence: the conformance captures are committed and replayed. Re-running the
 comparisons against live Stata (`retest/`, `docs/collect_comparison.py`) does need one.
 

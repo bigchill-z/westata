@@ -36,7 +36,7 @@ Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 
 | | |
 |---|---|
-| 测试 | **5835 通过** |
+| 测试 | **5872 通过** |
 | 覆盖命令 | 93 条注册条目 |
 | 证据等级 | **54 × E3**，26 × E2，15 × E1 |
 | 独立复测 | 386 个对照点，对真实 Stata 运行（`retest/`） |
@@ -213,7 +213,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              5839 个测试（5835 通过、3 跳过），不需要 Stata 授权
+tests/              5876 个测试（5872 通过、3 跳过），不需要 Stata 授权
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```

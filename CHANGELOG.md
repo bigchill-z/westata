@@ -79,6 +79,38 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.3] - 2026-11-09
+
+### Added — `estat bgodfrey, nomiss0`
+
+`bgodfrey.ado` declares `noMiss0` and passes it to its `Calc` subroutine under the macro name
+`dm`, where the entire difference is three lines (180-184): the **default** replaces the
+leading missing values of the lagged residual with zero and keeps the full sample, while
+**`nomiss0`** leaves them missing so the auxiliary regression loses `p` rows.
+
+Both paths are implemented because they produce different statistics from the same data,
+measured on a 200-row series:
+
+| lag | default | `nomiss0` |
+|---|---|---|
+| 1 | 187.976 | **191.674** |
+| 2 | 188.371 | **191.009** |
+
+The statistic is `e(N) * e(r2)` with `e(N)` the **auxiliary** regression's observation count,
+which is why shortening the sample by `p` changes the statistic itself and not only its
+degrees of freedom.
+
+```python
+ws.estat_bgodfrey(fit, lags=(1, 2))                 # default: zero-fill
+ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True)   # keep them missing
+```
+
+Verified against a live Stata at three sample sizes and three lag orders: **6 of 6
+byte-identical across both modes**. Eight new guards, one of which asserts the two modes must
+disagree — a future refactor that merges the paths would fail it immediately.
+
+---
+
 ## [Unreleased]
 
 ### Fixed — v3 report audit: twelve real defects, eleven claims that did not reproduce

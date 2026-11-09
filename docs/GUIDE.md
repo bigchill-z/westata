@@ -275,6 +275,30 @@ to better than 1e-9.** The table is ordered by worst case, so the top rows are w
 | `xtlogit binary x1 x2, fe` | 1600 | 6.20e-08 | 3.21e-05 | very close |
 | `xtpoisson count x1 x2, fe` | 1600 | 3.70e-08 | 5.80e-05 | very close |
 
+### `estat bgodfrey` and its `nomiss0` option
+
+Breusch-Godfrey differs from `estat dwatson` in one respect worth knowing before reading the
+output: the lagged residuals' leading missing values are **replaced by zero by default**, so
+the auxiliary regression keeps the full sample. `nomiss0` leaves them missing instead, and the
+auxiliary regression then loses `p` rows.
+
+The statistic is `e(N) * e(r2)` where `e(N)` is the **auxiliary** regression's count, so the
+option changes the statistic itself, not merely its degrees of freedom:
+
+| lag | default | `nomiss0` |
+|---|---|---|
+| 1 | 187.976 | 191.674 |
+| 2 | 188.371 | 191.009 |
+
+```python
+fit = ws.OLS.from_formula("y ~ x", df).fit()
+
+print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # zero-fill, full sample
+print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # keep them missing
+```
+
+`bgodfrey.ado` refuses to run after `regress, robust`, and so does this function.
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

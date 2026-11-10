@@ -289,6 +289,32 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
 | `xtlogit binary x1 x2, fe` | 1600 | 6.20e-08 | 3.21e-05 | 很接近 |
 | `xtpoisson count x1 x2, fe` | 1600 | 3.70e-08 | 5.80e-05 | 很接近 |
 
+### `estat ovtest` 与它的 `rhs` 选项
+
+默认检验**拟合值**的幂次；`rhs=True` 检验**自变量**的幂次。
+两个细节决定数值，且都无法从输出看出来：
+
+* **只有连续自变量参与**，每个贡献三个幂次（重标定到 `[0, 1]` 后取 `x^2, x^3, x^4`）。
+  指示变量列被完全跳过。若模型里**没有任何连续自变量**才会被拒绝——这正是 Stata
+  「powers of all explanatory variables collinear」的含义。
+* **幂次排在你自己变量的前面进入辅助模型**，所以与幂次重复的那个**用户变量**才被剔除。
+  `grilic.dta` 上令 `expr2 = expr**2`：
+
+  | | F | p |
+  |---|---|---|
+  | Stata | `F(11, 741) = 1.73` | `0.0626` |
+  | 不按该顺序 | `F(10, 741) = 1.27` | `0.2421` |
+
+  报告的 `df` 数的是**存活的幂次**个数，不是辅助回归的参数个数。
+
+```python
+# lnw/expr2 属于 grilic.dta；本指南的 df 是 auto.csv，故示例改用其中的连续变量。
+# 两种数据下行为相同。
+fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
+print(ws.estat_ovtest(fit))            # 拟合值的幂次
+print(ws.estat_ovtest(fit, rhs=True))  # 自变量的幂次
+```
+
 ### `estat bgodfrey` 与它的 `nomiss0` 选项
 
 Breusch-Godfrey 与 `estat dwatson` 有一点差别，读输出前值得先知道：

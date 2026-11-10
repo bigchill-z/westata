@@ -69,7 +69,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` then runs the 5917-test suite (5910 pass, 3 skip). It needs no
+`python -m pytest -q` then runs the 5936-test suite (5929 pass, 3 skip). It needs no
 Stata licence: the conformance captures are committed and replayed. Re-running the
 comparisons against live Stata (`retest/`, `docs/collect_comparison.py`) does need one.
 

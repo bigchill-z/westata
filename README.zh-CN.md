@@ -144,7 +144,7 @@ print(ws.etable([base, full], model_names=["基础", "完整"]))
 | 受限因变量 | `tobit`、`truncreg`、`intreg`、`heckman`、`etregress` |
 | 分位数与稳健 | `qreg`、`sqreg`、`bsqreg`、`rreg` |
 | 方程组 | `sureg`、`mvreg`、`manova` |
-| 因果推断 | `teffects nnmatch/ra/ipw/aipw`、`didregress`、`xtdidregress` |
+| 因果推断 | `teffects nnmatch/ra/ipw/aipw`、`didregress`、`xtdidregress`、`synth`（默认路径，E2） |
 | 时间序列 | `arima`、`arch`/`garch`、单位根检验 |
 | 后估计 | `test`、`lincom`、`margins`、`predict`、`esttab` 风格的 `etable` |
 
@@ -213,7 +213,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              5917 个测试（5910 通过、3 跳过），不需要 Stata 授权
+tests/              5936 个测试（5929 通过、3 跳过），不需要 Stata 授权
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```
@@ -234,6 +234,12 @@ docs/               GUIDE.md、对照数据、生成脚本
 
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
+- 合成控制 `ws.synth` **只实现默认路径**（证据等级 **E2**）：六个 `e()` 矩阵对拍 6 份
+  StataNow 19.5 全精度捕获，`nested`/`allopt`、`synth2`、图形、placebo 抛
+  `UnsupportedError`。**不承诺 E3 / 逐位一致**：Stata 的 C++ QP 插件非位确定性，
+  且 `H` 秩亏使 RMSPE 有最大 5.6e-4 的实测差。详见
+  [B 档设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
+  [与 Stata 对照说明](docs/USING_WITH_STATA.md)。
 - 本库不做数据管理：没有 `use`、`merge`、`reshape`、`egen` 的对应物，输入是 pandas DataFrame。
 
 ---

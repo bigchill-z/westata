@@ -164,7 +164,100 @@ VECM last digit, `zip`/`zinb` seventh figure) are unrelated to this release and 
 
 ---
 
+## [0.3.5] - 2026-11-10
+
+### Fixed — `estat ovtest, rhs`, two defects in the same command
+
+**A model with three or more indicators raised instead of reporting.** The guard compared the number
+of generated power columns (three per continuous regressor) against the count of every non-constant
+name, dummies included, so one continuous variable beside a two-level factor read `3 <= 3` and the
+command refused:
+
+```
+reg y x1 i.grp      Stata  F(3, 293) = 0.17      package  ValueError
+```
+
+`ovtest.ado` refuses only a model with NO continuous regressor — that is what its message says. The
+guard now derives the count from the power columns themselves.
+
+**The auxiliary model was assembled in the wrong order.** `ovtest.ado:420` is
+
+```stata
+`ver' _regress `lhs' `zlist' `rhs' `wgtexp'
+```
+
+so the generated powers enter BEFORE the user's own regressors, and `_regress` omits any column the
+earlier ones can reproduce. Testing the powers against the finished model gives a different answer
+whenever a user variable duplicates a power — measured on `grilic.dta` with `expr2 = expr^2`:
+
+| | F | p |
+|---|---|---|
+| Stata | `F(11, 741) = 1.73` | `0.0626` |
+| powers last (wrong) | `F(10, 741) = 1.27` | `0.2421` |
+| powers first (correct) | `F(11, 741) = 1.73` | `0.0626` |
+
+The package had been reporting `F(12, 739) = 1.9e+26`: with `expr2` and `expr^2` both in the design
+the auxiliary matrix is singular (condition number 2e10) and the Wald form inverts it.
+
+Order also explains why the reported `df` is 11 rather than 17 — `test zlist` tests only the powers,
+while the regression carries twelve powers plus six regressors minus the two omissions.
+
+### Notes
+
+* Both fixes were found by **reading `ovtest.ado`**, not by tuning: four attempts to infer the rule
+  numerically failed because the two candidate omissions differ in projection residual by only
+  `4.7e-08` and `6.3e-08`. The ordering separates them and is stated in one line of the source.
+* Verified against a live Stata on ten specifications across `grilic.dta` and synthetic data.
+* Nine new guards; `tests/test_ovtest_rhs_design_order.py` pins the design order, the singularity
+  threshold (statistic must stay below 100) and the indicator handling.
+
+---
+
 ## [Unreleased]
+
+### Added — `ws.synth`: Stata's synthetic control, default path (evidence E2)
+
+Implements Stata `synth`'s default (regression-based V + inner constrained QP)
+path as a frozen `SynthResult` dataclass exposing the six `e()` matrices
+verbatim: `V_matrix`, `W_weights`, `X_balance`, `RMSPE`, `Y_treated`,
+`Y_synthetic`, plus `gap`.  No coefficient VCE, standard errors or inference
+are fabricated — Stata's synth has none.
+
+The two compiled Mata kernels previously filed as "information unavailable"
+were **solved exactly** by black-box identification against live StataNow 19.5
+(P0, 2026-11-09): `normalize()` is the sample SD (ddof=1) of
+`[treated | controls]`; `regsval()` is the normalised sum of SQUARED
+per-period multivariate cross-sectional OLS coefficients.  `e(V_matrix)` is
+directly exportable and `regsval` is a deterministic pure function of its
+four matrix arguments.  `scripts/verify_synth_mata_formulas.py` verifies both
+in pure Python without a Stata licence.
+
+Six full-precision `e()` captures (StataNow 19.5 MP / `synth.ado` 0.0.8) are
+committed in `tests/conformance/stata_fixtures/synth_*.json` and compared in
+`tests/conformance/test_stata_synth.py`.  **Measured** E2 bounds across all
+six: `|dV| <= 1e-10` (observed ~1e-13), `|dW| <= 1e-3` (observed **0** at
+Stata's 3-dp `roundmat()`), `|dX_balance|`/`|dY_*| <= 1e-3`,
+`|dRMSPE| <= 1e-2` (worst 5.6e-4).
+
+**E3 is explicitly excluded.** `H = Xco' V Xco` has rank `<= K << J`, so the
+QP optimum is non-unique; Stata's C++ `synthopt.plugin` stops off the optimal
+face at `margin=0.005`, while scipy's SLSQP solves it more tightly.  Stata's
+own two identical runs already differ by `1.471e-11` in RMSPE.  The P1
+design's provisional `|dRMSPE| <= 1e-8` was **falsified by measurement** and
+widened to the observed bound (design S2: measure before writing).
+
+Refused with `UnsupportedError`: `nested`/`allopt` (Stata's closed-source `ml`
+optimiser), `synth2`, figures, `keep()`, placebo.  Rank-deficient `Sxx` is
+refused with `ConsistencyError` (Stata's `invsym()` sweep order is not
+reproduced).  Registry: 95 -> **96 entries, E3 54 / E2 27 / E1 15**.  The
+four "absence guards" were deliberately retired/converted as their own
+docstrings instructed.  See
+[the B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md).
+
+REA reverse engineering was evaluated and **not used**: `rea-agents@6.5.0`
+has zero support for Stata Mata `.mlib` bytecode, and all four native engines
+(Hopper/Ghidra/IDA/JADX) are absent on this machine.  The algorithm was
+recovered from the readable 931-line `synth.ado` + live-Stata oracle instead.
 
 ### Fixed — v3 report audit: twelve real defects, eleven claims that did not reproduce
 

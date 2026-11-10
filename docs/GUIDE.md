@@ -324,6 +324,32 @@ print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # keep them missing
 
 `bgodfrey.ado` refuses to run after `regress, robust`, and so does this function.
 
+### `estat ovtest` and its `rhs` option
+
+The default tests powers of the **fitted values**; `rhs=True` tests powers of the **regressors**.
+Two details decide the numbers and neither is guessable from the output:
+
+* **Only continuous regressors contribute**, three powers each (`x^2, x^3, x^4` after rescaling to
+  `[0, 1]`). Indicator columns are skipped entirely. A model with no continuous regressor at all is
+  refused, which is what Stata's "powers of all explanatory variables collinear" means.
+* **The powers enter the auxiliary model BEFORE your own regressors**, so a variable of yours that
+  duplicates a power is the one omitted. On `grilic.dta` with `expr2 = expr**2`:
+
+  | | F | p |
+  |---|---|---|
+  | Stata | `F(11, 741) = 1.73` | `0.0626` |
+  | without that ordering | `F(10, 741) = 1.27` | `0.2421` |
+
+  The reported `df` counts the surviving **powers**, not the parameters of the auxiliary regression.
+
+```python
+# `lnw`/`expr2` belong to grilic.dta; the guide's `df` is auto.csv, so the example uses
+# continuous columns from it. The behaviour is the same either way.
+fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
+print(ws.estat_ovtest(fit))            # powers of the fitted values
+print(ws.estat_ovtest(fit, rhs=True))  # powers of the regressors
+```
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

@@ -25,10 +25,12 @@ import westata as ws
 
 
 def _ll_row(fitted) -> str:
+    # Option C prints an `Iteration 0:  Log likelihood = ...` line carrying the NULL model's value.
+    # The digit assertions below are about the header row of the fitted model, so skip the preamble.
     return next(
         line
         for line in str(fitted.summary(style="stata")).splitlines()
-        if "Log likelihood" in line
+        if "Log likelihood" in line and not line.startswith("Iteration")
     )
 
 

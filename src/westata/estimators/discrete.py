@@ -465,6 +465,38 @@ class _DiscreteBase:
             None if freq_weights is None else np.asarray(freq_weights, dtype=float).reshape(-1)
         )
 
+    def _count_data_notes(self) -> list[str]:
+        """Stata's deterministic notes when a COUNT model gets a non-count response.
+
+        Unlike the ML iteration log these are DATA-DRIVEN, so they reproduce exactly. Measured on
+        StataNow 19.5 with a uniform(1,5) dependent variable:
+
+            poisson y x
+              note: noncount dependent variable encountered; if you are fitting an
+                    exponential-mean model, consider using robust standard errors.
+
+            nbreg y x
+              note: you are responsible for interpretation of non-count dep. variable
+
+        Stata's check is ``capture assert y == int(y)`` (nbreg.ado:178, poisson.ado), i.e. any
+        non-integer value in the estimation sample triggers it. The poisson second line is indented
+        six spaces. Only the two count commands emit one; logit/probit and zip/zinb do not.
+        """
+
+        command = str(self._stata_command or "").lower()
+        if command not in ("poisson", "nbreg"):
+            return []
+        values = np.asarray(self._y, dtype=float).reshape(-1)
+        finite = values[np.isfinite(values)]
+        if not finite.size or np.all(finite == np.floor(finite)):
+            return []
+        if command == "poisson":
+            return [
+                "note: noncount dependent variable encountered; if you are fitting an",
+                "      exponential-mean model, consider using robust standard errors.",
+            ]
+        return ["note: you are responsible for interpretation of non-count dep. variable"]
+
     @classmethod
     def from_formula(
         cls,
@@ -743,6 +775,9 @@ class _DiscreteBase:
             results.freq_weights = np.asarray(
                 self._freq_weights, dtype=float
             ).reshape(-1)
+        _notes = self._count_data_notes()
+        if _notes:
+            results._stata_notes = _notes
         return results
 
     # ------------------------------------------------------------ housekeeping

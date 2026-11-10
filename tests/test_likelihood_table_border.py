@@ -87,7 +87,13 @@ def test_the_block_length_matches_stata(grilic) -> None:
     """`logit rns s expr, nolog` prints 13 lines; this package now prints the same 13."""
 
     fitted = ws.Logit.from_formula("rns ~ s + expr", grilic).fit()
-    assert len(str(fitted.summary(style="stata")).splitlines()) == 13
+    # Option C prepends `Iteration 0` plus a blank line, so the TOTAL line count grew from 13.
+    # The BORDER rule is about the table block itself, which still has 13 lines; skip the preamble.
+    lines = str(fitted.summary(style="stata")).splitlines()
+    # Skip only the `Iteration 0` LINE; its following blank is the table's original leading blank
+    # and is part of the 13-line body the assertion measures.
+    body = [line for line in lines if not line.startswith("Iteration") and not line.startswith("note:")]
+    assert len(body) == 13, lines[:4]
 
 
 def test_a_panel_likelihood_fit_does_not_gain_the_rule(grilic) -> None:

@@ -2,6 +2,20 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之二、2026-11-10 扩展 `synth` 功能的范围决策
+
+| 决策 | 结果 |
+|---|---|
+| 目标「实现 Stata synth 除图形外的全部功能，数值差异控制在机器精度内」 | **已纠偏**：机器精度在物理上不可达（Stata C++ QP 插件自身非位确定性，两次相同运行 `e(RMSPE)` 差 1.471e-11；`H` 秩亏使最优 W 不唯一；`nested` 外层是 Stata 闭源 `ml model d0`）。按 AGENTS.md §0/§7 先纠偏再执行 |
+| 范围选项 | **用户选「做 A–E 全量功能，精度按实测定级（推荐）」**：实现 `unitnames`、`var(period)`、`keep()`/`replace`、四个优化器参数公开化、缺失警告文案，以及 `nested`/`allopt` 的算法等价实现；每个量标注实测差，能到机器精度的标 E3 子集，不能的如实标 E2 |
+| 明确不做 | 图形（`figure`）、`synth2` 的 placebo/LOO、任何推断量；「全部机器精度」不承诺 |
+| 精度口径 | 逐量实测定级，以 6+ 份活体 Stata 捕获为准；不先拍死容差再凑 |
+
+**当前仍需用户决策的事项**：仅 **P4 推送 PyPI / GitHub 前的确认**（工作区规则要求
+以新版本号推送；本地 0.3.6 已提交，外部推送因 GitHub TLS 阻断 + 缺 PyPI token 未完成）。
+
+---
+
 ## 〇、2026-11-09 `synth` 可行性评估后的决策（B 档）
 
 | 决策 | 结果 |
@@ -17,9 +31,7 @@
 `docs/STATA_ALIGNMENT_SUMMARY.md` 同日修订块）。按本文件规则，已实施/已关闭的决策
 不再作为待办保留，故就地标注；原文保留仅为追溯。
 
-**当前仍需用户决策的事项**：仅 **P4 推送 PyPI / GitHub 前的确认**（工作区规则要求
-以新版本号推送，且推送前完成中英文文档校对；本次为本地提交，未推送）。其余
-B 档范围内全部已拍板并执行。
+B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 
 ---
 
@@ -1723,97 +1735,22 @@ def _cluster_row(label_text, value_text, right_aligned):
   以及 (d) 在 `return "\n".join(lines)` 前追加脚注。
 - **风险**：`__slots__` 禁止给实例加属性，必须用局部变量。
 
----
+# 本轮用户决策（已答复，从 options.md 移除）
 
-## 待决：ML 模型（logit/probit/nbreg/zip）的迭代日志是否打印
+## ① ML 迭代日志 → 选 C（极简版）
 
-### 背景
+只打印 `Iteration 0`（零模型似然，与 Stata 精确一致）+ 最终收敛行，
+省略中间路径（因 Stata 用 `moptimize`，中间值无法复现）。
+编号**跳号**以诚实反映缺失，代码注释注明原因。
 
-`prais` 的迭代日志已完整复现（逐字符一致）。但 ML 离散模型的迭代日志**中间值无法复现**，
-因为 Stata 用的是 `moptimize` 优化器，其迭代路径与 `statsmodels` 不同。
+## ② 收敛警告 → 选「打印警告」
 
-实测 `logit foreign mpg weight`（auto.dta，74 行）：
+优化未收敛时打印 `Warning: Convergence not achieved.`，
+与 Stata 同款，而非静默或抛异常。
 
-| 步骤 | Stata（moptimize）| statsmodels（Newton）|
-|---|---|---|
-| 0 | `-45.03321` | `-45.03321`（零模型，**精确一致**）|
-| 1 | `-29.238536` | `-31.056103` |
-| 2 | `-27.244139` | `-27.724903` |
-| 3 | `-27.175277` | `-27.198004` |
-| 4 | `-27.175156` | `-27.175217` |
-| 5 | `-27.175156` | `-27.175156`（收敛，**精确一致**）|
+## 附带修正
 
-已排除实现问题：`display e(opt)` 实测为 `moptimize`；`technique(bhhh)` 给出**第三条**不同轨迹
-（首步 `-28.036869`）；从零模型走一步 IRLS 得 `-29.898968`，仍不等于 `-29.238536`。
-
-### 三个方案，需你选一个
-
-| 方案 | 内容 | 风险 |
-|---|---|---|
-| **A. 维持现状** | 不打印迭代日志 | 读者看不到 Stata 会显示的信息 |
-| **B. 打印本包轨迹** | 用 `fit(callback=)` 收集 | ⚠️ **每行数值都与 Stata 不同却形似 Stata**，对拍时会误导 |
-| **C. 极简版（推荐）** | 只打 `Iteration 0`（零模型似然，精确一致）+ 最终收敛行 | 中间步骤缺失，但首尾精确 |
-
-**我的建议是 C**：`Iteration 0` 与最终值都精确一致，只省略中间路径，
-并在代码处注明"中间路径为 Stata 的 moptimize 所特有"。
-
-**B 是最危险的**——它会产出一张"看起来像 Stata、但每行都对不上"的表，
-违反本项目"不因格式需要而编造数值"的纪律。
-
-### 若选 C，需要额外确认
-
-Stata 的日志块前后各有空行，且**首行 `Iteration 0` 缺失中间步骤**，
-表格外观会变成：
-
-```
-(空行)
-Iteration 0:  Log likelihood =  -45.03321
-Iteration 1:  Log likelihood = -27.175156      <- 直接跳到收敛值，编号连续但含义不同
-(空行)
-Logistic regression ...
-```
-
-**编号是否要跳号**（如 `Iteration 0` 后直接写 `Iteration 5`）也需你定；
-跳号更诚实，但不连续。
-
----
-
-## 待决：优化未收敛时是否要打印 `Warning: Convergence not achieved.`
-
-### 背景
-
-第 7b 轮用合适数据（`foreign` 是 0/1 数值，不是字符串）重跑 `teffects` 后，
-`teffects ipw (price) (treated mpg weight)` 在 auto.dta 上迭代 **301 次**未收敛，Stata 打印：
-
-```
-Iteration 0:  EE criterion = 6.445e-24  (not concave)
-...
-Iteration 300: EE criterion = ...  (not concave)
-Warning: Convergence not achieved.
-```
-
-这是本次审计中**唯一**出现的 `warning:` 类说明文字（此前 40 个组合全部为零）。
-
-### 现状
-
-- westata 实现了 `IPW` / `AIPW` / `teffects_ra` / `teffects_psmatch` / `teffects_nnmatch`
-- 源码中**没有任何** "not achieved" / "Convergence" 警告字符串
-- 即：优化失败时本包**静默返回**，用户不知道结果不可信
-
-### 判断
-
-这不是"正常输出遗漏"，而是**错误处理缺口**——只在病态数据下触发。
-但它比格式问题更重要：一个未收敛的估计被当成正常结果呈现，是**产品可用性问题**。
-
-### 三个方案，需你选一个
-
-| 方案 | 内容 | 代价 |
-|---|---|---|
-| **A. 维持现状** | 静默返回 | 用户可能把不可信结果当真 |
-| **B. 打印 Stata 同款警告**（推荐）| 在结果对象上标记 `converged=False`，渲染时输出 `Warning: Convergence not achieved.` | 需要改 IPW/AIPW 的拟合入口与所有渲染器 |
-| **C. 抛异常** | 未收敛即失败 | 与 Stata 行为不一致（Stata 仍给结果）|
-
-### 备注
-
-`(not concave)` 标注属于迭代日志的中间状态，与 ML 迭代日志同一个待决项；
-本条只问**最后的 Warning 行**。
+`tests/test_estimator_sweep_status.py` 的
+`test_continuous_models_render_identically[Poisson]` 断言
+`rendered.startswith("\n")`，但 live Stata 在连续因变量下**以 note 开头**，
+所以该断言已过时，需更新为「要么空行、要么 note 行」。

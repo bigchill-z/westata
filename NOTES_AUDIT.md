@@ -426,3 +426,75 @@ westata 的 `IPW`/`AIPW` 在优化失败时**静默返回**，源码里没有任
 | 处理效应（teffects ra/ipw/psmatch/nnmatch）| ✅ |
 | **ML 迭代日志中间值** | ❌ 算法路径差异，待用户决策 |
 | **收敛警告** | ❌ 待用户决策 |
+
+---
+
+## 第 8 轮：源码扫描 + 两项用户决策落地
+
+### 方法升级：从「逐个命令探测」到「扫描 ado 源码」
+
+前七轮只能发现**某个数据集恰好触发**的说明。本轮直接读 3962 个 ado 文件中与 westata 实现
+命令对应的 53 个，抓取所有含 `note:` / `warning:` / `convergence` / `collinear` 的 display 语句，
+**找到 18 个命令的条件分支**——其中绝大多数靠正常运行永远触发不了。
+
+### 新发现的条件说明（已实测触发）
+
+| 命令 | 触发条件 | 文案 |
+|---|---|---|
+| `poisson` | 非整数因变量 | `note: noncount dependent variable encountered; ...`（两行，缩进 6）|
+| `nbreg` | 非整数因变量 | `note: you are responsible for interpretation of non-count dep. variable` |
+| `zip`/`zinb` | 因变量无零值 | `note: <dep> never equal to zero; use poisson instead.` |
+| `prais`/`xtpcse` | 时间序列有缺口 | `note: computations for rho restarted at each gap.` |
+| `teffects ipw` | 迭代未收敛 | `Warning: Convergence not achieved.` |
+
+**westata 全部缺失**（已实测）。其中：
+
+- `zip`/`zinb` 在 westata 中**未实现**，属功能缺失，不是说明遗漏
+- `prais` 的 gap note 依赖 `tsset` 的时间变量，而 westata 只按行顺序，**无法可靠判定**
+- 其余三条已实现（见下）
+
+### 用户决策（本轮答复）
+
+1. **ML 迭代日志 → 选 C**（只打首尾）
+2. **收敛警告 → 选「打印警告」**
+
+### 实现结果
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| `Iteration 0` 行 | 仅 logit/probit（其 `e(ll_0)` 与 Stata **精确一致**）；收敛值保留在表格既有的 `Log likelihood =` 行，不编造编号 | 43 字符逐字符一致 |
+| 收敛警告 | `e(converged)==0` 时表格末尾追加 `Warning: Convergence not achieved.`（实测 Stata 在 321 行中的第 320 行）| 12 个新守卫 |
+| count note | poisson/nbreg 非整数因变量时输出 Stata 同款两行/一行 | 4/4 场景与 Stata 一致，整数数据静默 |
+| 面板 note | 上一轮 `xtlogit, fe` | 485 测试通过 |
+
+**方案 C 的一处诚实收窄**：count 模型的 `e(ll_0)` 与 Stata 的 Iteration 0 **不精确相等**
+（整数数据 `-233.3016` vs `-233.30128`，非整数数据差 0.42），因此不给它们输出迭代行，
+避免产出「形似但对不上」的数字。logit/probit 的 `-45.03321` 则精确一致。
+
+### 前言顺序
+
+Stata 实测（`poisson y x` 非整数因变量）：
+
+```
+note: ...
+      ...                 <- 缩进 6
+(空行)
+Iteration 0:  Log likelihood = ...
+(空行)
+Poisson regression ...
+```
+
+两个前言块各有且仅有一个后续空行。
+
+### 测试契约更新
+
+方案 C 让 ML 表格不再以 banner 开头，9 个既有测试断言（首个非空行 == banner、
+恰好一个前导空行）失效。按用户确认「更新测试，保留方案 C」逐一改为**按内容查找 banner**，
+而非放宽断言；另有 `_ll_row`、alpha 行等改为跳过前言。
+
+### 仍未闭合
+
+- ML **中间**迭代路径（Stata `moptimize` 特有）——方案 C 明确省略，已记录
+- `prais` gap note（缺时间变量语义）
+- `zip`/`zinb` 功能未实现
+- `xtpoisson`/`xtnbreg` 的 `note: N groups dropped`（源码扫描发现，未实测）

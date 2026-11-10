@@ -31,6 +31,13 @@ from westata.results.summary import render_summary
 GENERIC_BANNER = "Stata-style regression results"
 
 
+
+# Option C prints Stata's `Iteration 0` line (and count models may print a `note:`)
+# BEFORE the banner, so the first non-blank line is no longer necessarily the banner.
+def _is_preamble(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith(("Iteration", "note:")) or stripped.startswith("      ")
+
 def _frame(n: int = 250, seed: int = 6500):
     rng = np.random.default_rng(seed)
     covariate = rng.normal(size=n)
@@ -64,7 +71,7 @@ def _banner(rendered: str) -> str:
     # Skip the LEADING blank line the renderer now emits (round 199 restored it; the raw Stata
     # capture starts with a newline for every estimator checked).
     lines = rendered.splitlines()
-    first = next(line for line in lines if line.strip()) if lines else ""
+    first = next((line for line in lines if line.strip() and not _is_preamble(line)), "") if lines else ""
     return re.split(r"\s{2,}", first.strip())[0].strip()
 
 
@@ -109,7 +116,7 @@ def test_plain_regress_prints_no_banner(frame) -> None:
     assert fitted.e["title"] == "Linear regression"
     assert "Linear regression" not in rendered
     # The renderer prefixes one blank line; Stata's own output has it too.
-    first = next(line for line in rendered.splitlines() if line.strip())
+    first = next(line for line in rendered.splitlines() if line.strip() and not _is_preamble(line))
     assert first.lstrip().startswith("Source")
 
 

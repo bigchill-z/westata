@@ -55,23 +55,39 @@ def test_ols_starts_with_one_blank_line(frames) -> None:
 
 
 @pytest.mark.parametrize("model", ["logit", "probit"])
-def test_ml_models_start_with_one_blank_line(frames, model: str) -> None:
-    """They had NONE before round 199; the first attempt gave them TWO."""
+def test_ml_models_open_with_the_iteration_line(frames, model: str) -> None:
+    """Option C: Stata opens with `Iteration 0`, then ONE blank, then the banner.
+
+    A live `logit foreign mpg weight` capture starts with a blank line, six Iteration lines,
+    another blank, then 'Logistic regression'. Option C prints only the first Iteration line (the
+    null-model likelihood, which matches exactly), so the shape is one line + one blank + banner.
+    """
 
     _, frame = frames
     cls = ws.Logit if model == "logit" else ws.Probit
-    rendered = str(cls.from_formula(f"rns ~ s + expr + tenure", frame).fit().summary(style="stata"))
-    assert rendered.startswith("\n")
-    assert not rendered.startswith("\n\n"), "exactly one blank line"
+    lines = str(
+        cls.from_formula("rns ~ s + expr + tenure", frame).fit().summary(style="stata")
+    ).splitlines()
+    assert lines[0].startswith("Iteration 0:  Log likelihood ="), lines[0]
+    assert lines[1] == "", lines[:3]
+    assert lines[2].startswith(
+        "Logistic regression" if model == "logit" else "Probit regression"
+    ), lines[2]
 
 
-def test_the_ml_banner_is_the_second_line(frames) -> None:
+def test_the_ml_banner_follows_the_iteration_line(frames) -> None:
     _, frame = frames
     lines = str(
-        ws.Logit.from_formula("rns ~ s + expr + tenure", frame).fit().summary(style="stata")
+        ws.Logit.from_formula("rns ~ s + expr + tenure", frame).fit().summary(
+            style="stata"
+        )
     ).splitlines()
-    assert lines[0] == ""
-    assert lines[1].startswith("Logistic regression")
+    banner = next(
+        index for index, line in enumerate(lines) if line.startswith("Logistic regression")
+    )
+    assert banner == 2, lines[: banner + 1]
+    assert lines[banner - 1] == "", "exactly one blank between the log and the banner"
+
 
 
 def test_the_strip_is_really_gone() -> None:

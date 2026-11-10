@@ -42,10 +42,13 @@ def _fit(n: int = 1000):
 
 
 def _header() -> list[str]:
+    # Option C puts an `Iteration 0` line (and possibly a `note:`) before the banner, so the
+    # first non-blank line is no longer necessarily the header.
     return [
         line
         for line in str(_fit().summary(style="stata")).splitlines()
         if line.strip()
+        and not line.startswith(("Iteration", "note:"))
     ]
 
 

@@ -872,6 +872,58 @@ def _panel_design_block(result: Any) -> list[str]:
     return lines
 
 
+def _ml_iteration_head(result: Any) -> list[str]:
+    """The ONE ML iteration line the package can reproduce exactly (user's option C).
+
+    Stata's logit/probit/nbreg/zip log records intermediate log-likelihoods from its `moptimize`
+    optimiser; statsmodels' Newton path differs (-31.06 vs -29.24 at step 1). Printing our own
+    trace would look like Stata while disagreeing on every line, so option C prints ONLY
+    ``Iteration 0``, whose value is the null-model likelihood ``e(ll_0)`` and matches Stata exactly:
+
+        Iteration 0:  Log likelihood =  -45.03321
+
+    The CONVERGED value is not repeated here: the table already carries the exact
+    ``Log likelihood = -27.175156`` row in its header. Inventing a second line with a fake step
+    number would fabricate output Stata never prints. Omitting the middle is documented.
+
+    Measured on `logit foreign mpg weight`: the line is 43 characters with two trailing spaces,
+    a blank line follows it, and Stata uses two spaces after the colon.
+    """
+
+    e = getattr(result, "e", {}) or {}
+    model = str(getattr(result, "model_name", "") or "").lower()
+    # ONLY logit/probit have an e(ll_0) equal to Stata's Iteration 0 exactly:
+    #   logit/probit  -45.03321  == Stata -45.03321
+    #   poisson       -233.3016  vs Stata -233.30128 (integer data)
+    #   poisson       -202.39008 vs Stata -201.9655  (non-integer response)
+    # Option C promises exactness, so count models keep their exact header row and emit no line.
+    if model not in ("logit", "probit", "logistic"):
+        return []
+    ll0 = e.get("ll_0")
+    if ll0 is None:
+        return []
+    try:
+        line = f"Iteration 0:  Log likelihood = {float(ll0):>10.5f}"
+    except (TypeError, ValueError):
+        return []
+    return [line.ljust(43)]
+
+
+def _result_notes(result: Any) -> list[str]:
+    """Notes a fitter attached to the result, printed ABOVE the table.
+
+    Estimators set ``result._stata_notes`` for deterministic, data-driven notes (non-count response
+    in a count model, dropped panel groups, ...). They come before the banner and before any
+    iteration log, so they are prepended to the finished table rather than folded into a header
+    block.
+    """
+
+    notes = getattr(result, "_stata_notes", None)
+    if not notes:
+        return []
+    return [str(line) for line in notes]
+
+
 def _panel_drop_notes(result: Any) -> list[str]:
     """The notes Stata prints ABOVE EVERYTHING for a conditional-FE panel fit.
 
@@ -5107,9 +5159,34 @@ def _stata_summary(result: Any) -> str:
     # These notes come before EVERYTHING -- banner, iteration log, design block -- which is why they
     # cannot ride along with the design block: for the non-linear xt family that block renders below
     # the banner.
-    if _drop_notes:
-        # `lines` already opens with the blank line Stata puts after the notes.
-        lines = _drop_notes + lines
+    # ORDER MEASURED ON `poisson y x` WITH A NON-COUNT RESPONSE: notes, blank, iteration log,
+    # blank, banner. Both the notes and the log are optional; each is followed by exactly one
+    # blank line, and the table body itself does not start with one of its own.
+    _all_notes = _result_notes(result) + _drop_notes
+    _head = _ml_iteration_head(result)
+    _preamble: list[str] = []
+    if _all_notes:
+        _preamble.extend(_all_notes)
+        _preamble.append("")
+    if _head:
+        _preamble.extend(_head)
+        _preamble.append("")
+    if _preamble:
+        # Strip any leading blank the body would otherwise add, so the count stays exact.
+        while lines and lines[0] == "":
+            lines = lines[1:]
+        lines = _preamble + lines
+    # STATA PRINTS THE CONVERGENCE WARNING LAST, after the coefficient table and its rule. Measured
+    # on `teffects ipw (price) (treated mpg weight)`: the run iterates 301 times with `(not
+    # concave)` markers, then closes with 'Warning: Convergence not achieved.' at line 320 of 321.
+    #
+    # The package stores `e(converged)` but previously returned an unconverged estimate silently,
+    # so an unreliable result looked identical to a sound one. The user chose to print the warning
+    # (rather than stay silent or raise), which is what Stata does.
+    _e = getattr(result, "e", {}) or {}
+    _converged = _e.get("converged")
+    if _converged is not None and not bool(float(_converged)):
+        lines.append("Warning: Convergence not achieved.")
     return "\n".join(lines)
 
 

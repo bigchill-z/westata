@@ -48,8 +48,19 @@ whose source tree matches the full committed documentation set.
   collinearity notes and its guard fix, plus the `prais` iteration-log / rho
   investigation write-ups in `NOTES_AUDIT.md`.
 
-Full suite at release: `pytest -q` green (see the release run). Local only —
-PyPI / GitHub push is the step this entry accompanies.
+Full suite at release: `pytest -q` green on the committed tree (5963 passed,
+3 skipped, 0 failed); doc guards 77 passed; `twine check` PASSED on both
+0.3.6 artifacts built from a clean `git archive HEAD` export.
+
+**Release status (2026-11-10)**: this version bump, the changelog and the built
+artifacts are committed locally. The external push is **NOT done**: GitHub
+`git push` failed with `Connection was reset` / `Failed to connect to
+github.com port 443` on three attempts (TCP/DNS reachable, TLS/HTTP blocked in
+this environment), and `twine upload` failed with `Credential not found for API
+token` (no `.pypirc`, no `TWINE_*`/`PYPI_API_TOKEN`, no keyring entry). PyPI
+therefore still shows 0.3.5 as latest. Pushing 0.3.6 requires a network path
+to GitHub and a PyPI API token, and must be done by the user. The 0.3.6 wheel
+and sdist are in `dist/` (gitignored).
 
 ---
 

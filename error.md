@@ -2,6 +2,29 @@
 
 > 记录每次测试/排障中发现的、与具体任务无关的通用坑。
 
+## 2026-11-10 发布前必须区分「本地提交」与「外部推送」，并先探测凭据/连通性
+
+发布 `westata 0.3.6` 时，工作区有并发会话的未提交改动（`prais.py` / `summary.py`
+半成品）。若直接在工作区 `python -m build`，会把半成品打进 wheel。
+
+**通用做法**：
+1. 用 `git archive HEAD` 导出**干净提交树**到临时目录（PowerShell 下
+   `git archive | tar` 会把字节流当文本处理而报 `Damaged tar archive`，改用
+   Python `tarfile.open(fileobj=io.BytesIO(subprocess.check_output(...)))`）；
+2. 在导出树里构建，并**校验 wheel 内容**：版本号、`synth.py` 存在、未提交标记
+   不存在、sdist 含中英文 README/CHANGELOG/LICENSE；`twine check` 两个产物；
+3. 推送前先探测外部条件：`git ls-remote`（GitHub）、`Invoke-RestMethod
+   https://pypi.org/pypi/<pkg>/json`（已发布版本）、`keyring` / `.pypirc` /
+   `TWINE_*` / `PYPI_API_TOKEN`（凭据）。**探测失败就如实报告，不要重试到死，
+   更不要把「未推送」写成「已发布」**；
+4. 交付说明必须区分「本地已提交」「已构建并校验」「外部推送受阻及原因」。
+
+**本环境事实**：GitHub 的 `github.com:443` TCP/DNS 可达，但 TLS/HTTP 层连接被
+重置（`Connection was reset` / `Failed to connect ... port 443`），3 次均失败；
+PyPI 上传缺 API token（`Credential not found for API token`，keyring 亦无条目）。
+`git-credentials` 里的 GitHub 凭据**不能**解决传输层阻断。`dist/` 已在
+`.gitignore` 中，产物不会被提交。
+
 ## 2026-11-10 生成器与已提交输出漂移：重跑生成器会「吃掉」别人手工加的章节
 
 `docs/generate_guide.py` / `gen_guide_zh.py` 的模板**落后于**已提交的

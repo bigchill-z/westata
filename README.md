@@ -330,19 +330,15 @@ biasadj()` raises `UnsupportedError`.
 Not implemented, and they raise instead of approximating: Mata, the graphics
 system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
 `xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), `synth2`,
-`synth, figure`, `synth2`'s placebo/LOO, general `gmm`, `nlsur`, multi-way
+`synth, nested`/`allopt`, general `gmm`, `nlsur`, multi-way
 clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
-`ws.synth` implements Stata's **default path plus the extended feature set**:
-`unitnames()`, `var(period)` windows, `keep()`/`replace`, the four optimiser
-settings, missing-value warnings, and an algorithm-equivalent
-`nested`/`allopt` outer V search.  Evidence grade **E2**, graded per quantity
-against 22 full-precision captures from StataNow 19.5: `V` and most
-`W`/`X_balance`/`Y_synthetic` values reach machine precision, while RMSPE has
-bounded differences (rank-deficient QP).  E3 is excluded as a whole-command
-claim; see [the design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md)
-and [the comparison notes](docs/USING_WITH_STATA.md).
+`ws.synth` **is** implemented for Stata's default (regression-based V) path at
+evidence grade **E2**: its six `e()` matrices are compared against six
+full-precision captures from StataNow 19.5.  E3 is explicitly excluded because
+Stata's C++ QP plugin is not bit-deterministic; see
+[the B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md).
 
 `docs/GAP_REGISTER.md` lists every one with its reason. Those are boundary
 statements, not a to-do list.

@@ -234,14 +234,11 @@ docs/               GUIDE.md、对照数据、生成脚本
 
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
-- 合成控制 `ws.synth` 已实现**默认路径 + 扩展功能**：`unitnames()`、
-  `var(period)` 时间窗、`keep()`/`replace`、四个优化器参数、缺失值警告，以及
-  算法等价的 `nested`/`allopt` 外层 V 搜索（证据等级 **E2**，逐量定级）：
-  对拍 22 份 StataNow 19.5 全精度捕获，`V` 与多数 `W`/`X_balance`/`Y_synthetic`
-  达到机器精度，RMSPE 因 `H` 秩亏存在有界差异（良态 ≤3.6e-4、最差 4.74e-1）。
-  **仍拒绝**：`figure`（图形）、`synth2` 的 placebo/LOO、任何推断量；
-  **不承诺整体 E3 / 逐位一致**（QP 最优 W 不唯一）。详见
-  [设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
+- 合成控制 `ws.synth` **只实现默认路径**（证据等级 **E2**）：六个 `e()` 矩阵对拍 6 份
+  StataNow 19.5 全精度捕获，`nested`/`allopt`、`synth2`、图形、placebo 抛
+  `UnsupportedError`。**不承诺 E3 / 逐位一致**：Stata 的 C++ QP 插件非位确定性，
+  且 `H` 秩亏使 RMSPE 有最大 5.6e-4 的实测差。详见
+  [B 档设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
   [与 Stata 对照说明](docs/USING_WITH_STATA.md)。
 - 本库不做数据管理：没有 `use`、`merge`、`reshape`、`egen` 的对应物，输入是 pandas DataFrame。
 

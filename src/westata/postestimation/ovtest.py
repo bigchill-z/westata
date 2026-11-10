@@ -319,10 +319,18 @@ def estat_ovtest(
             columns.append(scaled**power)
             omitted_labels.append(f"{name}^{power}")
 
-    if len(omitted_labels) <= len(
-        [n for n in names if not _is_constant(n)]
-    ):
-        # Only indicators survived: nothing to test.
+    # THE GUARD COUNTS CONTINUOUS REGRESSORS, NOT ALL OF THEM. Comparing the number of power
+    # columns (3 per continuous variable) against every non-constant name made the test fire
+    # whenever the design had at least three indicators -- and with factors present the names
+    # INCLUDED the dummies, so `estat ovtest, rhs` raised on a perfectly ordinary model:
+    #
+    #     reg y x1 i.grp     Stata  F(3, 293) = 0.17   package  ValueError
+    #
+    # What Stata refuses is a model with NO continuous regressor at all, which is exactly
+    # `ovtest.ado`'s message "powers of all explanatory variables collinear". One continuous
+    # variable always contributes its three powers and is testable.
+    _continuous = len(omitted_labels) // len(_POWERS)
+    if _continuous == 0 or not omitted_labels:
         raise ValueError(
             "estat ovtest, rhs: powers of all explanatory variables collinear "
             "(typically because all explanatory variables are indicator variables)"

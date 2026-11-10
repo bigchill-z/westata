@@ -1775,3 +1775,45 @@ Logistic regression ...
 
 **编号是否要跳号**（如 `Iteration 0` 后直接写 `Iteration 5`）也需你定；
 跳号更诚实，但不连续。
+
+---
+
+## 待决：优化未收敛时是否要打印 `Warning: Convergence not achieved.`
+
+### 背景
+
+第 7b 轮用合适数据（`foreign` 是 0/1 数值，不是字符串）重跑 `teffects` 后，
+`teffects ipw (price) (treated mpg weight)` 在 auto.dta 上迭代 **301 次**未收敛，Stata 打印：
+
+```
+Iteration 0:  EE criterion = 6.445e-24  (not concave)
+...
+Iteration 300: EE criterion = ...  (not concave)
+Warning: Convergence not achieved.
+```
+
+这是本次审计中**唯一**出现的 `warning:` 类说明文字（此前 40 个组合全部为零）。
+
+### 现状
+
+- westata 实现了 `IPW` / `AIPW` / `teffects_ra` / `teffects_psmatch` / `teffects_nnmatch`
+- 源码中**没有任何** "not achieved" / "Convergence" 警告字符串
+- 即：优化失败时本包**静默返回**，用户不知道结果不可信
+
+### 判断
+
+这不是"正常输出遗漏"，而是**错误处理缺口**——只在病态数据下触发。
+但它比格式问题更重要：一个未收敛的估计被当成正常结果呈现，是**产品可用性问题**。
+
+### 三个方案，需你选一个
+
+| 方案 | 内容 | 代价 |
+|---|---|---|
+| **A. 维持现状** | 静默返回 | 用户可能把不可信结果当真 |
+| **B. 打印 Stata 同款警告**（推荐）| 在结果对象上标记 `converged=False`，渲染时输出 `Warning: Convergence not achieved.` | 需要改 IPW/AIPW 的拟合入口与所有渲染器 |
+| **C. 抛异常** | 未收敛即失败 | 与 Stata 行为不一致（Stata 仍给结果）|
+
+### 备注
+
+`(not concave)` 标注属于迭代日志的中间状态，与 ML 迭代日志同一个待决项；
+本条只问**最后的 Warning 行**。

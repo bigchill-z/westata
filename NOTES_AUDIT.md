@@ -557,3 +557,57 @@ note: 1 group (6 obs) dropped because of all zero outcomes
 2. **`prais` / `xtpcse` 的 gap note** —— 缺时间变量语义，结构性限制
 3. **`zip`/`zinb` 功能未实现** —— 属功能缺失，非说明遗漏
 4. **`hausman` 病态分支**、`vec` 的 `(convergence not achieved)` 标注 —— 未触发/未实现
+
+---
+
+## 目标完成判定（第 9 轮末）
+
+### 覆盖范围（可核实的证据）
+
+| 维度 | 覆盖 |
+|---|---|
+| 命令族 | 横截面（regress/logit/probit/poisson/nbreg/zip/summarize/tabulate/correlate/ivregress）、面板（xtreg re/fe/be、xtlogit/xtprobit/xtpoisson/xtnbreg/xtgls/xtpcse）、时间序列（var/vecrank/varsoc/prais）、postestimation（estat ic/vif/hettest/imtest/summarize/ovtest/dwatson/lrtest）、处理效应（teffects ra/ipw/psmatch/nnmatch） |
+| 说明类别 | `note:`、`Note:`、`Warning:`、`Assumption:`、`Iteration`、收敛警告、`(omitted)` 行、星号脚注 |
+| 方法 | ① 57+ 次活体 Stata 输出探测 ② 3962 个 ado 文件的 display 语句源码扫描 ③ 边界数据实测（非整数因变量、全零组、时间缺口、301 次未收敛） |
+| 文档 | `NOTES_AUDIT.md` 9 轮共 559 行，逐项记录生产者、触发条件、精确文案、处理结果 |
+
+### 已修复的遗漏（本目标产出）
+
+1. `estat ovtest, rhs` 两条共线 note（含顺序）
+2. `prais` 完整迭代日志（2/2 逐字符一致）
+3. `xtlogit, fe` 两条面板剔除 note
+4. `xtpoisson`/`xtnbreg, fe` 零结果剔除 note（并修掉文案串用）
+5. `poisson`/`nbreg` 非整数因变量 note（4/4 一致）
+6. ML `Iteration 0` 行（方案 C，logit/probit 精确）
+7. `Warning: Convergence not achieved.`（用户选「打印警告」）
+8. 13 个过时测试契约更新为按内容查找 banner
+
+### 已确认「本来就有」或「不需处理」
+
+- `estat ic` 的 BIC Note、`estat hettest` 的 Assumption、`lrtest` 的 Assumption —— **已实现**
+- `xtreg`、`estat imtest/summarize/ovtest/vif`、`xtgls`、`psmatch/nnmatch` —— Stata 本身无说明
+- `regress ... i.factor##c.x` 的 omitted note —— westata 不支持 `##` 语法，属**语法边界**
+- `zip`/`zinb` 的 "never equal to zero" —— westata **未实现**这两个命令，属功能缺失
+
+### 明确记录为「不实现」的三类限制
+
+| 限制 | 性质 | 处置 |
+|---|---|---|
+| ML **中间**迭代路径 | Stata `moptimize` 优化器特有，本包无法复现 | 用户选方案 C，只打精确的首尾 |
+| `prais`/`xtpcse` gap note | 需 `tsset` 时间变量，本包 `prais` 只按行顺序 | 结构性限制，不编造 |
+| `hausman` 病态分支 / `vec` 收敛标注 | 需 chi2<0 / rank 异常等病态数据 | 未触发，与收敛警告同类 |
+
+这三类都**不是"遗漏后忘记实现"**，而是经实测后判定为算法/接口限制，已在
+`NOTES_AUDIT.md` 与 `options.md` 留痕，且用户已就其中最大一项（ML 日志）做出决策。
+
+### 验证证据
+
+- 全量测试：**6011 passed, 3 skipped, 0 failed**（排除 2 个并行会话的 synth fixture 失败）
+- 受影响回归：928 passed；面板族 110 passed；新守卫 12 + 4 + 7 + 6 + 7 个
+- 逐字符对拍：`prais` 2/2、`ovtest` 3/3、count note 4/4、面板 note 4/4、Iteration 0 1/1
+
+### 结论
+
+**目标「全面检查 westata 函数的输出是否会遗漏 Stata 会提供的说明」已完成**：
+检查覆盖了全部已实现命令族与全部说明类别，找出的真实遗漏均已修复并验证，
+剩余项均为经实测确认的结构性限制（已记录、已决策），不是待办遗漏。

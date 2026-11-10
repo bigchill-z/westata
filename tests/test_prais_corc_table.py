@@ -61,24 +61,34 @@ def _rows(fitted) -> list[str]:
 
 
 def test_corc_names_its_own_transform() -> None:
-    """The banner says Cochrane-Orcutt, not Prais-Winsten."""
+    """The banner says Cochrane-Orcutt, not Prais-Winsten.
+
+    It is no longer the FIRST line: the iteration log opens the table.
+    """
 
     rows = _rows(ws.prais(_frame(), FORMULA, corc=True))
-    assert rows[0].startswith("Cochrane"), rows[0]
-    assert "Prais" not in rows[0]
+    banner = next(row for row in rows if "AR(1) regression" in row)
+    assert banner.startswith("Cochrane"), banner
+    assert "Prais" not in banner
 
 
 def test_the_prais_winsten_banner_is_unchanged() -> None:
     rows = _rows(ws.prais(_frame(), FORMULA))
-    assert rows[0].startswith("Prais")
+    banner = next(row for row in rows if "AR(1) regression" in row)
+    assert banner.startswith("Prais"), banner
 
 
-def test_corc_starts_without_leading_blanks() -> None:
-    """Measured: the corc table begins at the banner; the PW table has two blank lines."""
+def test_both_variants_open_with_a_blank_line_then_the_log() -> None:
+    """Measured on a live capture: one blank line, the iteration log, a blank, then the banner.
 
-    raw = str(ws.prais(_frame(), FORMULA, corc=True))
-    assert raw.splitlines()[0].startswith("Cochrane")
-    assert str(ws.prais(_frame(), FORMULA)).splitlines()[0] == ""
+    Earlier this test asserted that `corc` opened AT the banner with no blank -- that was true when
+    the log was missing, because the log was the two blank lines it was reading.
+    """
+
+    for kwargs in ({}, {"corc": True}):
+        lines = str(ws.prais(_frame(), FORMULA, **kwargs)).splitlines()
+        assert lines[0] == "", lines[:3]
+        assert lines[1].startswith("Iteration 0:"), lines[:3]
 
 
 def test_corc_reports_n_minus_one_observations() -> None:

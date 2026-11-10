@@ -39,7 +39,10 @@ FORMULA = "consumption ~ price + income + temp"
 #: From `prais consumption price income temp` on icecream.dta.
 STATA_RHO = 0.8002264
 STATA_COEF = {"price": -1.048854, "income": -0.0008022, "temp": 0.0029541, "_cons": 0.5870049}
-STATA_ITERATIONS = 40
+# display e(ic) after a live prais consumption temp price income reports 41, and the log
+# carries 42 lines (Iteration 0..41). The value was 40 because the log was not reproduced and
+# the loop stopped one pass early.
+STATA_ITERATIONS = 41
 
 
 @pytest.fixture(scope="module")
@@ -99,6 +102,48 @@ def test_corc_uses_the_cochrane_orcutt_transform() -> None:
 _LINE = "-" * 78
 _STEP = "-" * 13 + "+" + "-" * 64
 STATA_TABLE = [
+    "Iteration 0:  rho = 0.0000",
+    "Iteration 1:  rho = 0.4006",
+    "Iteration 2:  rho = 0.4982",
+    "Iteration 3:  rho = 0.5553",
+    "Iteration 4:  rho = 0.5972",
+    "Iteration 5:  rho = 0.6315",
+    "Iteration 6:  rho = 0.6610",
+    "Iteration 7:  rho = 0.6867",
+    "Iteration 8:  rho = 0.7092",
+    "Iteration 9:  rho = 0.7286",
+    "Iteration 10: rho = 0.7448",
+    "Iteration 11: rho = 0.7581",
+    "Iteration 12: rho = 0.7686",
+    "Iteration 13: rho = 0.7768",
+    "Iteration 14: rho = 0.7830",
+    "Iteration 15: rho = 0.7877",
+    "Iteration 16: rho = 0.7911",
+    "Iteration 17: rho = 0.7936",
+    "Iteration 18: rho = 0.7955",
+    "Iteration 19: rho = 0.7968",
+    "Iteration 20: rho = 0.7978",
+    "Iteration 21: rho = 0.7985",
+    "Iteration 22: rho = 0.7990",
+    "Iteration 23: rho = 0.7993",
+    "Iteration 24: rho = 0.7996",
+    "Iteration 25: rho = 0.7998",
+    "Iteration 26: rho = 0.7999",
+    "Iteration 27: rho = 0.8000",
+    "Iteration 28: rho = 0.8001",
+    "Iteration 29: rho = 0.8001",
+    "Iteration 30: rho = 0.8001",
+    "Iteration 31: rho = 0.8002",
+    "Iteration 32: rho = 0.8002",
+    "Iteration 33: rho = 0.8002",
+    "Iteration 34: rho = 0.8002",
+    "Iteration 35: rho = 0.8002",
+    "Iteration 36: rho = 0.8002",
+    "Iteration 37: rho = 0.8002",
+    "Iteration 38: rho = 0.8002",
+    "Iteration 39: rho = 0.8002",
+    "Iteration 40: rho = 0.8002",
+    "Iteration 41: rho = 0.8002",
     "Prais\u2013Winsten AR(1) regression with iterated estimates",
     "      Source |       SS           df       MS      Number of obs   =        30",
     "-------------+----------------------------------   F(3, 26)        =     14.35",

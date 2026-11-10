@@ -855,7 +855,50 @@ def _panel_design_block(result: Any) -> list[str]:
             lines.append(f"{_ll_text:<53}{'Prob > chi2':<17}= {_p:>7.4f}")
         elif _ll_text:
             lines.append(_ll_text)
+    # GROUPS WITH A CONSTANT OUTCOME ARE DROPPED IN CONDITIONAL FE, AND STATA SAYS SO FIRST.
+    # `e(N_drop)`/`e(N_group_drop)` have always been recorded here but were never printed, so a
+    # reader saw `Number of obs = 472` for a 480-row panel with no explanation. Measured on
+    # `xtlogit ybin x z, fe`:
+    #
+    #     note: multiple positive outcomes within groups encountered.
+    #     note: 1 group (8 obs) omitted because of all positive or
+    #           all negative outcomes.
+    #     (blank)
+    #     Iteration 0:  Log likelihood = -228.55058
+    #
+    # The second note wraps with a SIX-space indent under "note: ". Only the "all positive or all
+    # negative" note depends on the drop count; the "multiple positive outcomes" one is unconditional
+    # whenever the conditional likelihood retains any group with more than one success.
     return lines
+
+
+def _panel_drop_notes(result: Any) -> list[str]:
+    """The notes Stata prints ABOVE EVERYTHING for a conditional-FE panel fit.
+
+    These are not part of the design block: that block renders BELOW the banner for the non-linear xt
+    family, while these notes come first of all. Measured on `xtlogit ybin x z, fe`:
+
+        note: multiple positive outcomes within groups encountered.
+        note: 1 group (8 obs) omitted because of all positive or
+              all negative outcomes.
+        (blank)
+
+    The second note wraps with a SIX-space indent. `e(N_drop)`/`e(N_group_drop)` have always been
+    recorded; nothing printed them, so a reader saw `Number of obs = 472` on a 480-row panel with no
+    explanation.
+    """
+
+    e_macros = getattr(result, "e", {}) or {}
+    group_drop = int(e_macros.get("N_group_drop") or 0)
+    if not group_drop:
+        return []
+    obs_drop = int(e_macros.get("N_drop") or 0)
+    plural = "group" if group_drop == 1 else "groups"
+    return [
+        "note: multiple positive outcomes within groups encountered.",
+        f"note: {group_drop} {plural} ({obs_drop} obs) omitted because of all positive or",
+        " " * 6 + "all negative outcomes.",
+    ]
 
 
 def _header_block_kind(result: Any) -> str:
@@ -2073,6 +2116,7 @@ def _stata_summary(result: Any) -> str:
     # then Group variable / Obs per group / LR chi2 / Log likelihood. Appending the panel
     # block here (as every other family does) put it above the banner, so the banner never
     # appeared at all.
+    _drop_notes = _panel_drop_notes(result)
     _defer_panel_block = block == "ml" and bool(panel_lines)
     if panel_lines and not _defer_panel_block:
         lines.extend(panel_lines)
@@ -5060,6 +5104,12 @@ def _stata_summary(result: Any) -> str:
                 f"       Prob > F = {p_absorb:.3f}"
             )
 
+    # These notes come before EVERYTHING -- banner, iteration log, design block -- which is why they
+    # cannot ride along with the design block: for the non-linear xt family that block renders below
+    # the banner.
+    if _drop_notes:
+        # `lines` already opens with the blank line Stata puts after the notes.
+        lines = _drop_notes + lines
     return "\n".join(lines)
 
 

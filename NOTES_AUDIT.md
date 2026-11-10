@@ -110,3 +110,63 @@ Logistic regression                                     Number of obs =     74
    若不能，需在 westata 内自行迭代或用 `retvals`。
 2. 采 `xtlogit, fe` 的说明文字（需换合适数据）。
 3. 检查 `didregress`、`teffects` 等剩余命令族。
+
+---
+
+## 第 4 轮：迭代日志的**算法根因**（本轮）
+
+尝试实现 `prais` 的迭代日志时，从 `prais.ado` 读到了完整机制，
+这解释了为什么 westata 的轨迹与 Stata 不同。
+
+### `prais.ado:172-217` 的循环
+
+```stata
+scalar rho = 0                 // 起点是 0，不是 OLS 残差算出的值
+scalar lastrho = 2
+local it_ct = 0
+while it_ct < iterate & abs(rho - lastrho) > toleran {
+    local lastrho = rho
+    qui predict double resid if touse, resid      // 用当前 rho 拟合后的残差
+    _crcar1 rho rhotype : resid, k(k) rhotype     // 新 rho
+    if it_ct == 0 { di "Iteration 0: rho = " %6.4f 0 }   // Iteration 0 恒打印 0
+    prais_e : rho                                  // 用新 rho 重拟合
+    local it_ct = it_ct + 1
+    di "Iteration `it_ct': rho = " %6.4f rho
+}
+```
+
+### 两处关键发现
+
+**① rho 的定义**（`prais.ado:402-405`）：
+
+```stata
+qui _regress `varlist' l.`varlist' if touse, nocons
+scalar rho = _b[L.`varlist']
+```
+
+即 **rho = 残差对自身一阶滞后做无截距回归的斜率**：
+
+```
+rho = Σ(e_t · e_{t-1}) / Σ(e_{t-1}²)
+```
+
+**不是** `Σ(e_t·e_{t-1}) / Σ(e_t²)`。用后者第一步得 `0.3298`，用前者得 **`0.4006`**——
+**与 Stata 的 `Iteration 1` 精确一致**。
+
+**② westata 的起点不同**：它用 OLS 残差算出的 rho 起步，Stata 从 **0** 起步。
+
+### 为什么本轮没有落地
+
+用正确的 rho 定义 + 从 0 起步后，第 1 步命中 `0.4006`，但**第 2 步起发散**
+（`0.5154, 0.5989…` 对 Stata 的 `0.4008, 0.4009…`）。
+
+说明 `prais_e`（重拟合那一步）的变换与我的 CO 变换不一致。
+`prais_e` 不在 `prais.ado` 里，需另找其定义。
+
+**已回退**：改动破坏了 4 个既有 prais 测试（它们断言输出以 banner 开头），
+在轨迹未对齐前不应牺牲已正确的输出。46 个 prais 测试恢复通过。
+
+### 结论
+
+迭代日志的**格式**已经量清（43 字符/行、`Iteration 0` 恒为 0、前后空行），
+**rho 公式**也已确定。缺的是 `prais_e` 的重拟合细节。

@@ -525,3 +525,27 @@ grep -n 'Number of obs\|Number of lags\|_col' dfuller.ado
 
 - **教训**：Stata 的表格几何**不是猜出来的**，`ado` 文件里写着确切公式。
   **两次不成功就停止反推，转去读源码。**
+
+## 28. 说明性文字的审计要扫源码，不能只靠「跑一遍看输出」
+
+前七轮用「对命令跑一次 Stata、抓 `note:` 开头的行」来查遗漏，15 + 13 + 12 + 17 个
+命令里只发现 2 个 `note:` 生产者。**这个结论是假阴性**。
+
+第 8 轮改为读 ado 源码（3962 个文件里 53 个相关命令），抓所有含
+`note:` / `warning:` / `convergence` / `collinear` 的 display 语句，一次找到
+**18 个命令的条件分支**，其中大部分靠正常运行永远触发不了：
+
+| 分支 | 触发条件 |
+|---|---|
+| `poisson`/`nbreg` 的 noncount note | 因变量非整数 |
+| `zip`/`zinb` 的 "never equal to zero" | 因变量无零值 |
+| `prais`/`xtpcse` 的 gap note | 时间序列有缺口 |
+| `teffects ipw` 的 `Warning: Convergence not achieved.` | 迭代 301 次未收敛 |
+| `xtreg` 的 `Warning: Convergence not achieved.` | 面板 MLE 未收敛 |
+
+**教训**：输出探测只能证明「这个数据集下没有」，不能证明「这个命令不会」。
+条件说明藏在 `if` 里，必须读源码或刻意构造边界数据。
+以后查「Stata 会不会给某类提示」，第一步应是 `grep` ado 源码的 display 语句，
+第二步才用构造数据实测，第三步才对拍本包。
+
+相关：`error.md` #27（几何对不上两次就读 .ado）——本条是它在「说明文字」维度的推广。

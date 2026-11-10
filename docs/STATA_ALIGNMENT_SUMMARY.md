@@ -1339,6 +1339,15 @@ regsval:    Xdm = Xnorm - rowmean(Xnorm)        # 按单位去均值，含 treat
 **不承诺 E3**：`synthopt.plugin` 自身非位确定性，两次相同运行的 RMSPE 差
 **1.471e-11**；W 在 V 偏差 ≤1e-8 时完全不变（被三位舍入吸收）。
 
+> **2026-11-10 扩展轮次更正**（以上为 B 档当时记录，保留为历史）：16 份新活体
+> 捕获（`tests/conformance/stata_fixtures/synth_features.json`）表明该 1.471e-11
+> 抖动是**数据/设定相关**的——同一默认命令连跑两次 RMSPE 完全相同（差 0.0），
+> 默认路径是确定性的。E3 排除的真正原因只剩「`H` 秩亏 ⇒ QP 最优 W 不唯一」。
+> 逐量重新定级：`V` 全部到机器精度（≤1.4e-13），7/9 案例的
+> `W`/`X_balance`/`Y_synthetic` 也到机器精度；两个退化 donor pool 的 W 最差差
+> 1.76e-1、RMSPE 最差差 4.74e-1。`nested allopt` 的 W 逐位一致、RMSPE 差 3.5e-9。
+> 详见 `tests/conformance/test_stata_synth_features.py` 与 registry notes。
+
 **唯一有界未知**：`Sxx` 秩亏时 Stata `invsym()` 的广义逆 sweep 顺序未复现
 （满秩/近共线均已验证 ≤1.4e-15）；`J=1` 时 Stata 自己报 r(3200)。不影响
 `K ≪ J+1` 常规用法 → 实现按 `ConsistencyError` 拒绝秩亏输入，不猜。

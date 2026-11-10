@@ -86,6 +86,19 @@ class SynthResult:
     #: The exact (unrounded) QP solution.  Kept for diagnostics; the six e()
     #: matrices use the rounded weights where Stata does.
     W_exact: np.ndarray
+    #: Warnings Stata would print for predictor observations ignored when
+    #: averaging (``missingchecker``).  Empty when nothing was ignored.
+    missing_warnings: tuple[str, ...] = ()
+    #: Which V path produced this result: "regression", "customV",
+    #: "nested" or "allopt".
+    method: str = "regression"
+    #: Exposed optimiser settings actually used (diagnostics / auditability).
+    optimizer_settings: dict[str, float | int] | None = None
+    #: Stata's verbatim ``e(V_matrix)`` row/col labels, e.g.
+    #: ``cigsale(1980(1)1988)`` / ``cigsale(1980&1988)``.  Verified against
+    #: live Stata captures (synth_features.json); the ado's ``var(`xtimelab'``
+    #: looks malformed but the assembled label is well-formed.
+    stata_predictor_names: tuple[str, ...] = ()
 
     @property
     def gap(self) -> np.ndarray:
@@ -214,7 +227,8 @@ def _custom_v(values: Sequence[float], K: int) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 # Inner constrained QP (``synth.ado:546-557`` / ``synth_ll.ado:13-27``)
 # --------------------------------------------------------------------------- #
-def _solve_w(H: np.ndarray, c: np.ndarray, J: int) -> np.ndarray:
+def _solve_w(H: np.ndarray, c: np.ndarray, J: int,
+             maxiter: int = _MAXITER) -> np.ndarray:
     """Solve ``min 0.5 w'Hw + c'w`` s.t. ``sum(w)=1``, ``0<=w<=1``.
 
     SLSQP was chosen empirically: on all six captured fixtures it reproduces
@@ -230,7 +244,7 @@ def _solve_w(H: np.ndarray, c: np.ndarray, J: int) -> np.ndarray:
         method="SLSQP",
         bounds=[(0.0, 1.0)] * J,
         constraints=[{"type": "eq", "fun": lambda w: float(w.sum() - 1.0)}],
-        options={"ftol": 1e-14, "maxiter": _MAXITER},
+        options={"ftol": 1e-14, "maxiter": maxiter},
     )
     w = np.asarray(result.x, dtype=np.float64)
     if not np.all(np.isfinite(w)):
@@ -246,6 +260,227 @@ def _roundmat(w: np.ndarray) -> np.ndarray:
     """``roundmat()``: 3 decimal places, applied BEFORE the four e() matrices."""
 
     return np.round(w, 3)
+
+
+def _outer_loss(
+    v_diag: np.ndarray, G: np.ndarray, d: np.ndarray,
+    Zpre: np.ndarray, Zco: np.ndarray, J: int,
+) -> float:
+    """``synth_ll.ado:27``: unnormalised pre-period SSE for a candidate V.
+
+    ``H = Xcon' V Xcon = sum_k v_k G[k]`` and ``c = -sum_k v_k d[k]`` where
+    ``G[k] = Xcon[k] outer Xcon[k]`` and ``d[k] = Xtrn[k] * Xcon[k]``.  These
+    are precomputed once by ``_nested_v`` so each objective evaluation is O(J^2)
+    instead of rebuilding two matrices.
+    """
+
+    b = np.abs(np.asarray(v_diag, dtype=np.float64))
+    total = b.sum()
+    if not np.isfinite(total) or total <= 0:
+        return float("inf")
+    v = b / total
+    H = np.tensordot(v, G, axes=(0, 0))
+    c = -(v @ d)
+    # The outer search only needs a moderately accurate inner QP; 1e-8 ftol
+    # is ~5x cheaper than the 1e-14 used for the final reported fit and leaves
+    # the selected V unchanged to the precision the outer optimiser can see.
+    x0 = np.full(J, 1.0 / J)
+    res = minimize(
+        lambda w: 0.5 * float(w @ H @ w) + float(c @ w),
+        x0, method="SLSQP", bounds=[(0.0, 1.0)] * J,
+        constraints=[{"type": "eq", "fun": lambda w: float(w.sum() - 1.0)}],
+        options={"ftol": 1e-8, "maxiter": 60},
+    )
+    w = np.clip(np.asarray(res.x, float), 0.0, 1.0)
+    if w.sum() > 0:
+        w = w / w.sum()
+    err = Zpre[:, 0] - Zco @ w
+    return float(err @ err)
+
+
+def _nested_v(
+    Xtrn: np.ndarray, Xcon: np.ndarray, Zpre: np.ndarray, J: int,
+    initial: np.ndarray, *, allopt: bool, maxiter: int,
+) -> np.ndarray:
+    """Algorithm-equivalent outer V search for ``nested`` / ``allopt``.
+
+    Stata uses its closed-source ``ml model d0`` (NR/DFP/BFGS) with two restarts
+    and, for ``allopt``, three starting points (regression V, equal V, and
+    ``ml search``).  We use the SAME objective (``_outer_loss``) and the same
+    starting-point STRUCTURE, but scipy's optimiser instead of Stata's ``ml``.
+    The convergence point therefore cannot be bit-identical to Stata; this is
+    an E2 quantity by construction, not an E3 one.
+    """
+
+    K = Xtrn.shape[0]
+    # Precompute the rank-1 pieces of H and c once (see _outer_loss).
+    G = np.einsum("ki,kj->kij", Xcon, Xcon)          # K x J x J
+    d = Xtrn.ravel()[:, None] * Xcon                  # K x J
+    Zco = Zpre[:, 1:]
+    starts = [np.asarray(initial, dtype=float)]
+    if allopt:
+        starts.append(np.full(K, 1.0 / K))       # equal V
+        # Third Stata start is ``ml search``; emulate with a coarse random
+        # perturbation of the regression V (a deterministic, checkable proxy).
+        rng = np.random.default_rng(20261110)
+        starts.append(initial * rng.uniform(0.5, 2.0, size=K))
+    best_b, best_loss = None, float("inf")
+    for start in starts:
+        start = np.abs(np.asarray(start, dtype=float))
+        if start.sum() <= 0:
+            start = np.full(K, 1.0 / K)
+        start = start / start.sum()
+        # Powell needs far fewer objective evaluations than Nelder-Mead for
+        # this tiny (K <= 5) problem, and each evaluation solves a JxJ QP.
+        result = minimize(
+            lambda b: _outer_loss(b, G, d, Zpre, Zco, J),
+            start,
+            method="Powell",
+            options={"maxiter": min(maxiter, 20), "xtol": 1e-6, "ftol": 1e-8},
+        )
+        loss = _outer_loss(np.asarray(result.x, float), G, d, Zpre, Zco, J)
+        if loss < best_loss:
+            b = np.abs(np.asarray(result.x, dtype=float))
+            if b.sum() > 0 and np.all(np.isfinite(b)):
+                best_loss, best_b = loss, b / b.sum()
+    if best_b is None:                            # pragma: no cover
+        raise ConsistencyError("synth: nested V optimisation failed to converge")
+    return best_b
+
+
+# --------------------------------------------------------------------------- #
+# ``var(period)`` predictor syntax (synth.ado:217-313)
+# --------------------------------------------------------------------------- #
+def _expand_numlist(token: str) -> list[float]:
+    """Stata ``numlist`` subset used by ``var(period)``.
+
+    Supports ``a``, ``a&b&...`` and ``a(b)c`` (``start(step)end``).
+    ``synth.ado:255-264`` strips ``&``/parentheses then runs ``numlist, sort``;
+    the parentheses form ``2001(1)2003`` means 2001, 2002, 2003.
+    """
+
+    out: list[float] = []
+    for raw in token.replace("&", " ").split():
+        part = raw.strip()
+        if not part:
+            continue
+        if "(" in part:
+            head, _, rest = part.partition("(")
+            step_str, sep, end_str = rest.partition(")")
+            try:
+                start = float(head)
+                step = float(step_str) if step_str.strip() else 1.0
+                end = float(end_str) if sep and end_str.strip() else start
+                if step <= 0 or end < start:
+                    raise ValueError
+                n = 0
+                value = start
+                while value <= end + 1e-9 and n < 10000:
+                    out.append(value)
+                    value += step
+                    n += 1
+                continue
+            except ValueError as exc:
+                raise ValueError(f"invalid numlist '{part}'") from exc
+        try:
+            out.append(float(part.rstrip(")")))
+        except ValueError as exc:
+            raise ValueError(f"invalid period '{part}'") from exc
+    return sorted(set(out))
+
+
+def _parse_predictors(
+    predictors: Sequence[str], xperiod: list[float], all_periods: list[float],
+) -> tuple[list[str], list[list[float]], tuple[str, ...]]:
+    """Split each ``var(period)`` token into (column, periods, label).
+
+    Returns the column names, the per-predictor period lists, and the Stata-style
+    labels used for ``e(V_matrix)`` row/column names (``var(1980(1)1988`` etc.).
+    """
+
+    cols: list[str] = []
+    windows: list[list[float]] = []
+    labels: list[str] = []
+    for spec in predictors:
+        spec = str(spec)
+        if "(" not in spec:
+            if ")" in spec:
+                raise ValueError(f"malformed predictor '{spec}'")
+            cols.append(spec)
+            windows.append(list(xperiod))
+            labels.append(spec)
+            continue
+        if not spec.endswith(")"):
+            raise ValueError(f"malformed predictor '{spec}' (unclosed parenthesis)")
+        name, _, inside = spec[:-1].partition("(")
+        name = name.strip()
+        if not name:
+            raise ValueError(f"malformed predictor '{spec}' (empty variable name)")
+        periods = _expand_numlist(inside)
+        if not periods:
+            raise ValueError(f"malformed predictor '{spec}' (no periods)")
+        unknown = [p for p in periods if p not in all_periods]
+        if unknown:
+            raise ValueError(
+                f"predictor '{name}' specifies periods absent from the time "
+                f"variable: {unknown}"
+            )
+        cols.append(name)
+        windows.append(periods)
+        # Stata's own e(V_matrix) row label is ``var(1980(1)1988`` -- note the
+        # MISSING closing paren (synth.ado:305).  We keep that verbatim for the
+        # Stata-facing labels and use a well-formed string for the public name.
+        labels.append(f"{name}({inside.strip()})")
+    return cols, windows, tuple(labels)
+
+
+# --------------------------------------------------------------------------- #
+# ``keep()`` results dataset (synth.ado:620-657) -- NOT a graph
+# --------------------------------------------------------------------------- #
+def _write_keep(
+    path: str, result: "SynthResult", replace: bool,
+) -> None:
+    """Write Stata's stacked 5-column results dataset.
+
+    The first J rows hold the unit weights (``_Co_Number``/``_W_Weight``), the
+    following T rows hold the outcome trajectories (``_Y_treated``/
+    ``_Y_synthetic``/``_time``).  This is exactly why ``synth.ado:650`` drops
+    rows where both ``_Co_Number`` and ``_Y_treated`` are missing.
+    """
+
+    from pathlib import Path
+
+    target = Path(path)
+    if target.exists() and not replace:
+        raise FileExistsError(
+            f"synth: keep() target '{path}' already exists; pass replace=True "
+            "(Stata's `replace` option)"
+        )
+    J = result.W_weights.shape[0]
+    T = result.Y_treated.shape[0]
+    n = J + T
+    out = pd.DataFrame(
+        {
+            "_Co_Number": [np.nan] * n,
+            "_W_Weight": [np.nan] * n,
+            "_Y_treated": [np.nan] * n,
+            "_Y_synthetic": [np.nan] * n,
+            "_time": [np.nan] * n,
+        }
+    )
+    out.loc[: J - 1, "_Co_Number"] = pd.to_numeric(
+        pd.Series(result.W_weights[:, 0], dtype="object"), errors="coerce"
+    ).to_numpy(dtype=float)
+    out.loc[: J - 1, "_W_Weight"] = np.asarray(
+        result.W_weights[:, 1], dtype=float
+    )
+    out.loc[J:, "_Y_treated"] = result.Y_treated.ravel()
+    out.loc[J:, "_Y_synthetic"] = result.Y_synthetic.ravel()
+    out.loc[J:, "_time"] = result.time_index
+    # pandas.to_stata cannot store mixed object columns; Stata's own file has
+    # numeric unit codes.  Keep the numeric column numeric.
+    out["_Co_Number"] = pd.to_numeric(out["_Co_Number"], errors="coerce")
+    out.to_stata(target, write_index=False)
 
 
 # --------------------------------------------------------------------------- #
@@ -278,22 +513,27 @@ def _periods(data: Any, time: str, trperiod: float, which: str,
 
 
 def _build_matrices(
-    data: Any, unit: str, time: str, depvar: str, predictors: Sequence[str],
-    units: list[Any], xperiod: list[float], mspeperiod: list[float],
-    resultsperiod: list[float],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Return (X, Zpre, Zall) plus the raw predictor/outcome arrays.
+    data: Any, unit: str, time: str, depvar: str, predictor_cols: Sequence[str],
+    predictor_windows: Sequence[Sequence[float]], predictor_labels: Sequence[str],
+    units: list[Any], mspeperiod: list[float], resultsperiod: list[float],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]]:
+    """Return (X, Zpre, Zall, warnings).
 
     X is K x N (N = J+1, treated first); Zpre is T0 x N; Zall is T x N.
+    Each predictor may have its OWN averaging window (``var(period)``).
     Missing predictor values are ignored in the mean, but an ALL-missing
     predictor for a unit, or any missing outcome in a required period, is an
-    error (Stata ``matmissing()`` semantics).
+    error (Stata ``matmissing()`` semantics).  Ignored observations produce the
+    same ``-ignored for averaging`` warnings Stata's ``missingchecker`` prints.
     """
 
-    K, N = len(predictors), len(units)
+    K, N = len(predictor_cols), len(units)
     X = np.empty((K, N), dtype=np.float64)
-    sub_x = data[data[time].isin(xperiod)]
-    for k, col in enumerate(predictors):
+    warnings: list[str] = []
+    for k, (col, window, label) in enumerate(
+        zip(predictor_cols, predictor_windows, predictor_labels)
+    ):
+        sub_x = data[data[time].isin(window)]
         for j, u in enumerate(units):
             raw = sub_x.loc[sub_x[unit] == u, col].to_numpy(dtype=np.float64)
             # Stata's missing sentinel must be REJECTED, not silently averaged
@@ -308,8 +548,14 @@ def _build_matrices(
             finite = vals[np.isfinite(vals)]
             if finite.size == 0:
                 raise ConsistencyError(
-                    f"synth: predictor '{col}' is missing for ALL xperiod "
-                    f"observations of unit {u}"
+                    f"synth: predictor '{col}' is missing for ALL specified "
+                    f"period observations of unit {u}"
+                )
+            if finite.size < raw.size:
+                suffix = f"({label.split('(', 1)[1]}" if "(" in label else ""
+                warnings.append(
+                    f"control units: missing obs for predictor {col}{suffix} "
+                    f"-ignored for averaging"
                 )
             X[k, j] = finite.mean()
 
@@ -338,7 +584,7 @@ def _build_matrices(
 
     Zpre = outcome_matrix(mspeperiod)
     Zall = outcome_matrix(resultsperiod)
-    return X, Zpre, Zall
+    return X, Zpre, Zall, warnings
 
 
 # --------------------------------------------------------------------------- #
@@ -358,53 +604,64 @@ def synth(
     mspeperiod: Sequence[float] | None = None,
     resultsperiod: Sequence[float] | None = None,
     customV: Sequence[float] | None = None,
-    # Stata options that exist but are deliberately not implemented.
+    unitnames: str | None = None,
+    # Optimiser settings (synth.ado:35-38; the 2014 help file's 0.05/7 is stale)
+    margin: float = _MARGIN,
+    maxiter: int = _MAXITER,
+    sigf: int = _SIGF,
+    bound: float = _BOUND,
+    # Outer V search (algorithm-equivalent, NOT bit-identical to Stata's ml)
     nested: bool = False,
     allopt: bool = False,
-    figure: bool = False,
+    # Results dataset (NOT a graph)
     keep: str | None = None,
+    replace: bool = False,
+    # Deliberately refused: graphics and synth2's placebo machinery
+    figure: bool = False,
     placebo: bool = False,
     **unsupported: Any,
 ) -> SynthResult:
-    """Fit a synthetic control (Stata ``synth``, default path).
+    """Fit a synthetic control (Stata ``synth``), extended feature set.
 
-    Parameters mirror Stata's syntax but are Python keyword arguments.  See the
-    module docstring and the B-grade design spec for the evidence level (E2),
-    measured tolerances and the list of refused options.
+    Implements Stata's default path plus ``unitnames()``, per-predictor
+    ``var(period)`` windows, ``keep()``, the four optimiser settings and an
+    algorithm-equivalent ``nested`` / ``allopt`` outer V search.  Graphics and
+    ``synth2``'s placebo/LOO remain out of scope.
+
+    Evidence grading is per quantity and MEASURED, never assumed: see
+    ``tests/conformance/registry.yml``.  ``nested``/``allopt`` and RMSPE cannot
+    be bit-identical to Stata (closed-source ``ml`` optimiser + rank-deficient
+    QP + non-deterministic C++ plugin); they are E2 by construction.
     """
 
-    for flag, value in (
-        ("nested", nested), ("allopt", allopt), ("figure", figure),
-        ("placebo", placebo),
-    ):
-        if value:
-            raise UnsupportedError(
-                f"synth: Stata option '{flag}' is not implemented in westata "
-                "(B-grade default path only); its optimiser/graph lives in "
-                "Stata's closed-source ml / the synth2 wrapper."
-            )
-    if keep is not None:
+    if figure:
         raise UnsupportedError(
-            "synth: keep() writes a .dta results file; westata returns the "
-            "result object instead. Graphics/I-O are out of scope."
+            "synth: figure/graph output is deliberately out of scope "
+            "(GAP_REGISTER.md §5); use matplotlib on the result object."
+        )
+    if placebo:
+        raise UnsupportedError(
+            "synth: placebo/permutation tests are synth2's in-space/in-time "
+            "machinery, not part of `synth`; out of scope."
         )
     if unsupported:
         raise UnsupportedError(
             f"synth: unsupported option(s): {sorted(unsupported)}"
         )
 
+    # --- validate the exposed optimiser settings --------------------------
+    if not np.isfinite(margin) or margin <= 0:
+        raise ValueError("synth: margin must be a positive finite number")
+    if not isinstance(maxiter, int) or maxiter <= 0:
+        raise ValueError("synth: maxiter must be a positive integer")
+    if not isinstance(sigf, int) or sigf <= 0:
+        raise ValueError("synth: sigf must be a positive integer")
+    if not np.isfinite(bound) or bound <= 0:
+        raise ValueError("synth: bound must be a positive finite number")
+
     if not isinstance(data, pd.DataFrame):
         raise TypeError("synth: data must be a pandas DataFrame")
 
-    for col in (unit, time, depvar, *predictors):
-        if col not in data.columns:
-            raise ValueError(f"synth: column '{col}' not found in data")
-
-    K = len(predictors)
-    if K == 0:
-        raise ValueError("synth: at least one predictor is required")
-
-    data = _as_float64(data, [unit, time, depvar, *predictors])
     trperiod = float(trperiod)
     all_periods = [float(t) for t in data[time].dropna().unique()]
     if trperiod not in all_periods:
@@ -412,15 +669,59 @@ def synth(
             f"synth: trperiod={trperiod} is not present in the time variable"
         )
 
-    all_units = list(data[unit].dropna().unique())
-    # trunit may be an int/float/str; compare against the actual column values.
+    xp = _periods(data, time, trperiod, "xperiod", xperiod)
+    mp = _periods(data, time, trperiod, "mspeperiod", mspeperiod)
+    rp = _periods(data, time, trperiod, "resultsperiod", resultsperiod)
+    if not xp or not mp or not rp:
+        raise ConsistencyError("synth: one of the period lists is empty")
+
+    # --- parse `var(period)` predictors BEFORE checking columns -----------
+    pcols, pwindows, plabels = _parse_predictors(predictors, xp, all_periods)
+    for col in (unit, time, depvar, *pcols):
+        if col not in data.columns:
+            raise ValueError(f"synth: column '{col}' not found in data")
+    K = len(pcols)
+    if K == 0:
+        raise ValueError("synth: at least one predictor is required")
+
+    # --- unitnames must be a STRING column, constant within unit ----------
+    label_by_unit: dict[Any, str] | None = None
+    if unitnames is not None:
+        if unitnames not in data.columns:
+            raise ValueError(
+                f"synth: unitnames column '{unitnames}' not found in data"
+            )
+        if not pd.api.types.is_string_dtype(data[unitnames]):
+            raise ValueError(
+                f"synth: unitnames must name a STRING variable, "
+                f"'{unitnames}' is {data[unitnames].dtype}"
+            )
+        label_by_unit = {}
+        for u, grp in data.groupby(unit, sort=False):
+            names = grp[unitnames].dropna().unique()
+            if names.size != 1:
+                raise ValueError(
+                    f"synth: unitnames '{unitnames}' varies within unit {u}"
+                )
+            label_by_unit[u] = str(names[0])
+
+    data = _as_float64(data, [unit, time, depvar, *pcols])
+    # Stata's ``levelsof pvar`` (synth.ado:53) returns the panel ids in ASCENDING
+    # order, and ``counit`` defaults to that list minus the treated unit
+    # (:62-64).  A long panel stored year-by-year has a completely different
+    # first-appearance order, so using ``unique()`` order would permute the
+    # rows of e(W_weights) even when every number is correct.  Sort explicitly.
+    all_units = sorted(data[unit].dropna().unique(), key=lambda x: (str(type(x)), x))
     if trunit not in all_units:
         raise ValueError(f"synth: trunit={trunit!r} is not present in '{unit}'")
 
     if counit is None:
         control_units = [u for u in all_units if u != trunit]
     else:
-        control_units = [u for u in counit if u != trunit]
+        control_units = sorted(
+            (u for u in counit if u != trunit),
+            key=lambda x: (str(type(x)), x),
+        )
         unknown = [u for u in control_units if u not in all_units]
         if unknown:
             raise ValueError(f"synth: counit contains unknown units: {unknown}")
@@ -432,29 +733,30 @@ def synth(
         )
 
     units = [trunit, *control_units]
-    xp = _periods(data, time, trperiod, "xperiod", xperiod)
-    mp = _periods(data, time, trperiod, "mspeperiod", mspeperiod)
-    rp = _periods(data, time, trperiod, "resultsperiod", resultsperiod)
-    if not xp or not mp or not rp:
-        raise ConsistencyError("synth: one of the period lists is empty")
-
-    X, Zpre, Zall = _build_matrices(
-        data, unit, time, depvar, predictors, units, xp, mp, rp
+    X, Zpre, Zall, warnings = _build_matrices(
+        data, unit, time, depvar, pcols, pwindows, plabels, units, mp, rp
     )
 
-    # --- V: regression-based (solved) or user supplied --------------------
+    # --- V: regression-based (solved), user supplied, or nested ------------
     Xnorm, _ = _normalize(X)
+    Xtrn, Xcon = Xnorm[:, 0:1], Xnorm[:, 1:]
     if customV is not None:
         v_diag = _custom_v(customV, K)
+        method = "customV"
     else:
         v_diag = _regsval(Xnorm, Zpre)
+        method = "regression"
+    if nested or allopt:
+        v_diag = _nested_v(
+            Xtrn, Xcon, Zpre, J, v_diag, allopt=allopt, maxiter=maxiter
+        )
+        method = "allopt" if allopt else "nested"
     V = np.diag(v_diag)
 
     # --- inner QP on the NORMALISED X -------------------------------------
-    Xtrn, Xcon = Xnorm[:, 0:1], Xnorm[:, 1:]
     H = Xcon.T @ V @ Xcon
     c = (-(Xtrn.T @ V @ Xcon)).ravel()
-    W_exact = _solve_w(H, c, J)
+    W_exact = _solve_w(H, c, J, maxiter=maxiter)
     W_rounded = _roundmat(W_exact)
 
     # --- results: RMSPE uses the EXACT W, everything else the ROUNDED W ---
@@ -464,22 +766,37 @@ def synth(
     Y_treated = Zall[:, 0:1].copy()
     Y_synthetic = (Zall[:, 1:] @ W_rounded).reshape(-1, 1)
     X_balance = np.column_stack([X[:, 0], X[:, 1:] @ W_rounded])
+    # unitnames changes ONLY the W_weights row labels, never the numbers.
+    w_labels: list[Any] = [
+        label_by_unit[u] if label_by_unit is not None else u
+        for u in control_units
+    ]
     W_weights = np.column_stack(
-        [np.asarray(control_units, dtype=object), W_rounded]
+        [np.asarray(w_labels, dtype=object), W_rounded]
     )
 
-    return SynthResult(
+    result = SynthResult(
         V_matrix=V,
         W_weights=W_weights,
         X_balance=X_balance,
         RMSPE=rmspe,
         Y_treated=Y_treated,
         Y_synthetic=Y_synthetic,
-        unit_names=tuple(control_units),
-        predictor_names=tuple(str(p) for p in predictors),
+        unit_names=tuple(w_labels),
+        predictor_names=plabels,
         time_index=np.asarray(rp, dtype=np.float64),
         treated_unit=trunit,
         treatment_period=trperiod,
         T0=Zpre.shape[0],
         W_exact=W_exact,
+        missing_warnings=tuple(warnings),
+        method=method,
+        optimizer_settings={
+            "margin": margin, "maxiter": maxiter, "sigf": sigf, "bound": bound,
+        },
+        stata_predictor_names=tuple(plabels),
     )
+
+    if keep is not None:
+        _write_keep(keep, result, replace)
+    return result

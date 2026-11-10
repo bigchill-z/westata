@@ -2,6 +2,36 @@
 
 > 记录每次测试/排障中发现的、与具体任务无关的通用坑。
 
+## 2026-11-10 `synth` 扩展轮次：三条契约级教训
+
+**1. 长面板的单位顺序必须与 Stata `levelsof` 对齐，不能信 `unique()`。**
+`e(W_weights)` 的行序是 `levelsof pvar` 的**升序**（`synth.ado:53`，
+`counit` 默认为该列表减去 treated，`:62-64`）。长面板通常按「年×单位」
+存储，`df[unit].unique()` 是**首次出现顺序**，与升序完全不同。实测中
+V 差 ~1e-13（X 完全正确）却报 W 差 0.4~0.8，一度误判为 QP 求解器不一致；
+真相是**同一个 W 被换了行序**（非零权重 0.437/0.423/0.139 逐位对得上，只是
+排在不同行）。修法：`all_units` 与 `control_units` 都显式 `sorted`。
+**教训：矩阵数值全对但「差很大」时，先查行/列对齐，再查算法。**
+
+**2. 新增 fixture 必须满足仓库既有的形状守卫，否则一次带出 3 个失败。**
+`test_stata_e3.py::test_fixture_files_are_valid_json` 与
+`test_fixture_verification_scope.py` 都 glob `*.json`，要求顶层有
+`cases`/`ado`/`stata_version`（或 `scalars["N"]`）、`dataset` 非空，且
+**`cases` 的每个 key 含 `|`**（历史 `model|variant` 约定）。新捕获的
+`synth_features.json` 把元数据放在 `_meta`、case key 用 `var_single_1975`，
+于是 3 个守卫同时变红，看起来像大面积回归。修法：补顶层元数据键，
+case key 统一前缀 `synth|`，读取端 `split("|",1)[-1]` 还原。
+
+**3. 「两次相同运行差 X」这类抖动断言必须写清数据/设定，否则会被反例证伪。**
+P0 在 `cigsale lnincome age15to24 beer retprice` 上测到 RMSPE 抖动
+1.471e-11，被写进 registry/design/USING_WITH_STATA/CHANGELOG 当作
+「E3 排除」的全局依据。扩展轮次对 `cigsale lnincome beer retprice`
+连跑两次，差 **0.0**；改变 `sigf(7)` 才让 RMSPE 变 2.1e-3，而
+`roundmat()` 让 `e(W_weights)` 在所有调参下不变。**默认路径其实是确定性的**，
+E3 排除的真正原因只剩「`H` 秩亏 ⇒ QP 最优 W 不唯一」。
+**教训：把「某次测量」升级为「全局性质」前，必须换数据复核；已写进多处
+的断言更正时要逐处同步，不能只改一处。**
+
 ## 2026-11-10 发布前必须区分「本地提交」与「外部推送」，并先探测凭据/连通性
 
 发布 `westata 0.3.6` 时，工作区有并发会话的未提交改动（`prais.py` / `summary.py`

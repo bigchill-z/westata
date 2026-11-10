@@ -102,20 +102,36 @@ six `e()` matrices compare as follows:
 
 | Quantity | Measured bound | Observed worst |
 |---|---|---|
-| `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) |
-| `e(W_weights)` | `|dW| <= 1e-3` | **0** at Stata's 3-dp display rounding |
-| `e(X_balance)`, `e(Y_synthetic)` | `<= 1e-3` | follows from the rounded W |
-| `e(RMSPE)` | `|d| <= 1e-2` | 5.6e-4 |
+| `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) — **machine precision** |
+| `e(W_weights)` | `|dW| <= 2e-1` | **0** in 7 of 9 measured cases; worst 1.76e-1 in two degenerate donor pools |
+| `e(X_balance)`, `e(Y_synthetic)` | `<= 2e0` | 0 / 3e-14 in 7 of 9 cases (follows W) |
+| `e(RMSPE)` | `|d| <= 5e-1` | 3.6e-4 on well-posed pools; worst 4.74e-1 |
 
-RMSPE is the one quantity that cannot be quoted as Stata's. `H = Xco' V Xco`
-has rank `<= K << J`, so the QP optimum is not unique; Stata's C++ interior-point
-plugin stops off the optimal face at `margin=0.005`, while scipy's SLSQP solves
-it more tightly. Stata's own two identical runs already differ by `1.471e-11`.
-**E3 / bit-for-bit reproduction is therefore excluded.** Use `e(W_weights)`,
-`e(V_matrix)` and the balance table; treat RMSPE as an approximate fit statistic.
+RMSPE is the one quantity that generally cannot be quoted as Stata's.
+`H = Xco' V Xco` has rank `<= K << J`, so the QP optimum is not unique; Stata's
+C++ interior-point plugin stops off the optimal face at `margin=0.005`, while
+scipy's SLSQP solves it more tightly. **E3 / bit-for-bit reproduction as a
+whole-command claim is therefore excluded**, but `V` and most `W`/`X_balance`/
+`Y_synthetic` values ARE at machine precision — see
+[test_stata_synth_features.py](../tests/conformance/test_stata_synth_features.py)
+for the per-quantity grading.
 
-`synth, nested` / `allopt`, `synth2`, figures, `keep()` and placebo raise
-`UnsupportedError`. See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
+**Correction (2026-11-10):** an earlier version said "Stata's own two identical
+runs differ by 1.471e-11". A 16-case live capture found that to be
+data/setup-specific: the same default command run twice gave identical RMSPE
+(`19.73684845951759`, difference 0.0). The default path IS deterministic;
+changing `sigf(7)` shifts RMSPE by 2.1e-3 while `roundmat()` keeps
+`e(W_weights)` identical. The reason E3 is still excluded is QP
+non-uniqueness, not a jittery reference.
+
+**Extended feature set (2026-11-10):** `unitnames()`, `var(period)`
+(single / `&` / numlist), `keep()`/`replace`, `margin`/`maxiter`/`sigf`/`bound`,
+missing-value warnings and an algorithm-equivalent `nested`/`allopt` outer V
+search are now implemented. `nested allopt` reproduces Stata's `W` exactly and
+RMSPE to 3.5e-9; plain `nested` reaches a LOWER loss than Stata's
+single-start `wrapml` (6.2580 vs 6.5268) — E2, not bit-identical.
+Only `figure` (graphics) and `synth2`'s placebo/LOO remain refused.
+See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
 
 ---
 

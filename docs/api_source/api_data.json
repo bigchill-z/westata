@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.4",
+  "westata_version": "0.3.5",
   "exports": [
     {
       "name": "AIPW",
@@ -620,7 +620,7 @@
       "kind": "class",
       "module": "westata.postestimation.ovtest",
       "docstring": "Ramsey's RESET test.\n\nAttributes\n----------\nstatistic, df, df_denom, pvalue:\n    The F statistic, its numerator and denominator degrees of freedom, and\n    the upper-tail p-value.\nomitted:\n    Human-readable description of what the powers were taken of, matching\n    Stata's ``Omitted:`` line.",
-      "signature": "(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str') -> 'None'",
+      "signature": "(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str', dropped: 'Sequence[str]' = ()) -> 'None'",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -986,7 +986,7 @@
       "kind": "class",
       "module": "westata.estimators.synth",
       "docstring": "Outcome of :func:`synth`.\n\nField names mirror Stata's ``e()`` matrices verbatim.  Note ``V_matrix``\n(there is no plain ``e(V)``).  ``synth`` has no coefficient vector, no\ncovariance matrix and no degrees of freedom; those statsmodels-style\nattributes are deliberately ABSENT rather than fabricated.",
-      "signature": "(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray') -> None",
+      "signature": "(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, stata_predictor_names: 'tuple[str, ...]' = ()) -> None",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -1631,8 +1631,8 @@
       "name": "synth",
       "kind": "function",
       "module": "westata.estimators.synth",
-      "docstring": "Fit a synthetic control (Stata ``synth``, default path).\n\nParameters mirror Stata's syntax but are Python keyword arguments.  See the\nmodule docstring and the B-grade design spec for the evidence level (E2),\nmeasured tolerances and the list of refused options.",
-      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, figure: 'bool' = False, keep: 'str | None' = None, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
+      "docstring": "Fit a synthetic control (Stata ``synth``), extended feature set.\n\nImplements Stata's default path plus ``unitnames()``, per-predictor\n``var(period)`` windows, ``keep()``, the four optimiser settings and an\nalgorithm-equivalent ``nested`` / ``allopt`` outer V search.  Graphics and\n``synth2``'s placebo/LOO remain out of scope.\n\nEvidence grading is per quantity and MEASURED, never assumed: see\n``tests/conformance/registry.yml``.  ``nested``/``allopt`` and RMSPE cannot\nbe bit-identical to Stata (closed-source ``ml`` optimiser + rank-deficient\nQP + non-deterministic C++ plugin); they are E2 by construction.",
+      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
     },
     {
       "name": "tebalance_summarize",

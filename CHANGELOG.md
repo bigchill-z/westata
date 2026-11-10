@@ -7,6 +7,59 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — extended `synth` feature set (2026-11-10)
+
+Goal: "implement all Stata `synth` features except graphics, keeping numerical
+differences as close to machine precision as possible".  That literal target
+was **corrected before execution** (AGENTS.md §0/§7): machine precision is not
+physically attainable for RMSPE because `H = Xco' V Xco` is rank-deficient
+(rank <= K << J), so the QP optimum is non-unique and Stata's C++ plugin stops
+off the optimal face at `margin=0.005`.  The approved scope is A-E with
+per-quantity measured grading.
+
+### Added
+* `unitnames()` — string labels on `W_weights` rows ONLY; all numbers unchanged.
+* `var(period)` predictors — single period, `&` concatenation and
+  `a(b)c` numlist windows; each window is ONE predictor (K counts windows).
+  Verbatim Stata `e(V_matrix)` row names preserved in
+  `SynthResult.stata_predictor_names`.
+* `keep()` / `replace` — the stacked 5-column results `.dta`
+  (`_Co_Number`, `_W_Weight`, `_Y_treated`, `_Y_synthetic`, `_time`). NOT a graph.
+* `margin` / `maxiter` / `sigf` / `bound` exposed as validated parameters
+  (defaults from `synth.ado:35-38`, not the stale 2014 help file).
+* `missing_warnings` — the `-ignored for averaging` messages Stata's
+  `missingchecker` prints; `method` / `optimizer_settings` for auditability.
+* `nested` / `allopt` — algorithm-equivalent outer V search (Powell over the
+  `synth_ll.ado:27` objective), NOT Stata's closed-source `ml model d0`.
+
+### Fixed
+* **Unit row ordering**: `e(W_weights)` rows now follow Stata's `levelsof`
+  ascending order (`synth.ado:53,62-64`).  A year-major long panel's
+  first-appearance order had silently permuted the rows; V was already exact
+  (~1e-13) while W appeared to differ by 0.4-0.8.  See `error.md`.
+
+### Measured grading (16 new live captures, `synth_features.json`)
+| Quantity | Measured | Grade |
+|---|---|---|
+| `V_matrix` | <= 1.4e-13 on all 9 comparable cases | machine precision |
+| `W_weights` | exactly 0 in 7/9 cases; worst 1.76e-1 in 2 degenerate donor pools | E2 overall |
+| `X_balance` / `Y_synthetic` | 0 / 3e-14 in 7/9; worst 1.8e0 | follows W |
+| `RMSPE` | <= 3.6e-4 on well-posed pools; worst 4.74e-1 | E2 |
+| `nested allopt` W / RMSPE | dW = 0, dRMSPE = 3.5e-9 | near machine precision |
+| `nested` | our loss 6.2580 < Stata 6.5268 (single-start `wrapml`) | E2, algorithm-equivalent |
+
+**Correction to the 0.3.6 notes**: the claim "two identical Stata runs differ
+by 1.471e-11" was data/setup-specific.  The extended capture ran the same
+default command twice and got identical RMSPE (difference 0.0); `sigf(7)`
+shifts RMSPE by 2.1e-3 while `roundmat()` keeps `e(W_weights)` identical.
+The default path IS deterministic; E3 is still excluded as a whole-command
+claim because of QP non-uniqueness, not a jittery reference.
+
+Still refused: `figure` (graphics, explicitly out of scope), `synth2`'s
+placebo/LOO, and any inferential quantity (Stata `synth` has no `e(V)`).
+
+---
+
 ## [0.3.6] - 2026-11-10
 
 ### Added — `ws.synth` (B grade, evidence E2), plus the documentation pipeline fixes

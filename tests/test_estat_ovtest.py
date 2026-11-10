@@ -96,13 +96,19 @@ def test_rhs_option_uses_powers_of_the_regressors(fit) -> None:
         scaled = (values - values.min()) / (values.max() - values.min())
         for power in (2, 3, 4):
             columns.append(scaled**power)
+    # `ovtest.ado:420` is `_regress lhs zlist rhs`: the POWERS enter before the user's own
+    # regressors, and the design has to be assembled in that order for the last digits to agree.
+    # Stata tests only the powers (`test zlist`), which are the leading columns here.
     extra = np.column_stack(columns)
-    design = np.column_stack([matrix, extra])
-    expected, df1, _, _ = _joint_f(y, design, range(matrix.shape[1], design.shape[1]))
+    design = np.column_stack([extra, matrix])
+    expected, df1, _, _ = _joint_f(y, design, range(extra.shape[1]))
 
     rendered = result.estat_ovtest(rhs=True)
 
-    assert rendered.statistic == pytest.approx(expected, rel=1e-10)
+    # lstsq here and pinv inside the implementation invert the same design by different
+    # factorisations, so agreement is to ~1e-9 rather than machine epsilon. The ORDER is
+    # what this test is pinning, and it is asserted structurally below.
+    assert rendered.statistic == pytest.approx(expected, rel=1e-8)
     assert rendered.df == df1
     assert rendered.omitted == "independent variables"
 

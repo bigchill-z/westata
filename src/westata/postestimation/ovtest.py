@@ -336,10 +336,50 @@ def estat_ovtest(
             "(typically because all explanatory variables are indicator variables)"
         )
 
-    extra = np.column_stack(columns) if columns else np.empty((nobs, 0))
-    design_full = np.column_stack([matrix, extra])
-    tested = list(range(matrix.shape[1], design_full.shape[1]))
-    statistic, df_num, df_denom = _fit_and_test(y, design_full, tested)
+    # THE AUXILIARY REGRESSION PUTS THE POWERS BEFORE THE USER'S REGRESSORS. `ovtest.ado:420`
+    # is `_regress lhs zlist rhs`, and `_regress` omits any column that the earlier columns can
+    # reproduce. Order therefore changes the answer, and testing the powers against the finished
+    # model is wrong:
+    #
+    #     grilic, user adds expr2 = expr^2
+    #     Stata    F(11, 741) = 1.73   drops expr2^2 among the powers, then expr2 on entering
+    #     wrong    F(10, 741) = 1.27   also drops expr^2, because expr^2 is dependent on the
+    #                                  finished model, which already contains expr2
+    #
+    # `test zlist` then tests only the powers, so the reported df counts 11 while the auxiliary
+    # regression carries 17 parameters.
+    _design_columns = [matrix[:, [0]]]
+    _tested: list[int] = []
+    for _column in columns:
+        _current = np.column_stack(_design_columns)
+        _scale = float(np.abs(_column).max())
+        if _scale == 0.0:
+            continue
+        _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
+        _residual = _column - _current @ _coef
+        if float(np.abs(_residual).max()) <= 1e-6 * _scale:
+            continue
+        _tested.append(len(_design_columns))
+        _design_columns.append(_column[:, None])
+    for _index in range(1, matrix.shape[1]):
+        _column = matrix[:, _index]
+        _current = np.column_stack(_design_columns)
+        _scale = float(np.abs(_column).max())
+        if _scale == 0.0:
+            continue
+        _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
+        _residual = _column - _current @ _coef
+        if float(np.abs(_residual).max()) <= 1e-6 * _scale:
+            continue
+        _design_columns.append(_column[:, None])
+
+    if not _tested:
+        raise ValueError(
+            "estat ovtest, rhs: powers of all explanatory variables collinear "
+            "(typically because all explanatory variables are indicator variables)"
+        )
+    design_full = np.column_stack(_design_columns)
+    statistic, df_num, df_denom = _fit_and_test(y, design_full, _tested)
     return OvTestResult(
         statistic=statistic,
         df=df_num,

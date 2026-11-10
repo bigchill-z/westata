@@ -383,3 +383,46 @@ Conditional fixed-effects logistic regression        Number of obs    =    472
 1. `teffects ra/psmatch/ipw`（本次 auto.dta 构造的数据下报 r(2000)，需换合适数据）
 2. `estat fitstat`/`linktest`（Stata 报 r(321)，属 postestimation 未安装命令）
 3. `xtlogit, fe` 的迭代日志（同 ML 类）
+
+---
+
+## 第 7b 轮：`teffects` 闭合，发现最后一类说明文字
+
+### 为什么上一轮全部报错
+
+`auto.dta` 的 `foreign` 是 **0/1 数值**，不是 `"Foreign"` 字符串，
+所以 `(auto["foreign"]=="Foreign")` 造出的 `treated` 只有一个水平，Stata 报
+`r(459): there is only one level in treatment variable`。
+
+改用 `foreign` 本身后全部通过。
+
+### 结果
+
+| 命令 | 说明文字 |
+|---|---|
+| `teffects ra`（两种）| `Iteration k: EE criterion = ...` × 2 |
+| **`teffects ipw`** | **301 行**含 `(not concave)` + **`Warning: Convergence not achieved.`** |
+| `teffects psmatch` / `nnmatch` | 无 |
+| `ipwra` / `aipw` | 语法不合法（本次设定下），未采到 |
+
+### 意义
+
+`Warning: Convergence not achieved.` 是本次审计中**唯一**出现的 `warning:` 类说明
+（此前 40 个组合全部为零）。它不是正常输出，而是**错误处理**：
+westata 的 `IPW`/`AIPW` 在优化失败时**静默返回**，源码里没有任何
+`"not achieved"` / `"Convergence"` 字符串。
+
+按项目规则，这属于产品可用性问题而非格式遗漏，已记入 `options.md` 作为用户决策，
+**未擅自实现**。三个方案：静默 / 打印 Stata 同款警告 / 抛异常。
+
+### 至此审计覆盖
+
+| 命令族 | 状态 |
+|---|---|
+| 横截面（regress/logit/probit/poisson/nbreg/zip/summarize/tabulate/correlate/ivregress）| ✅ |
+| 面板（xtreg re/fe/be、xtlogit fe/re、xtprobit）| ✅ |
+| 时间序列（var/vecrank/varsoc/prais）| ✅ |
+| postestimation（estat ic/vif/hettest/imtest/summarize/ovtest/dwatson）| ✅ |
+| 处理效应（teffects ra/ipw/psmatch/nnmatch）| ✅ |
+| **ML 迭代日志中间值** | ❌ 算法路径差异，待用户决策 |
+| **收敛警告** | ❌ 待用户决策 |

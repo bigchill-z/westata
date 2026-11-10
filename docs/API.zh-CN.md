@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.4 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -10,7 +10,7 @@ _westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
 
 ## 目录
 
-- **稳健标准误** — [Stata `robust` 与 `HC0`/`HC1` 的对应关系](#稳健标准误stata-robust-与-hc0hc1-的对应关系)
+- **稳健标准误** — [Stata `robust` 与 `HC0`/`HC1` 的对应关系](#稳健标准误stata-的-robust-与-hc0hc1-的对应关系)
 - **线性模型与工具变量** — [`OLS`](#ols), [`FEOLS`](#feols), [`PanelOLS`](#panelols), [`RandomEffects`](#randomeffects), [`BetweenOLS`](#betweenols), [`FirstDifferenceOLS`](#firstdifferenceols), [`IV2SLS`](#iv2sls), [`IVLIML`](#ivliml), [`IVGMM`](#ivgmm), [`XtIvreg`](#xtivreg), [`XtGls`](#xtgls), [`XtPcse`](#xtpcse), [`XtAbond`](#xtabond), [`Eivreg`](#eivreg), [`Sureg`](#sureg), [`Mvreg`](#mvreg), [`RobustRegression`](#robustregression), [`QuantileRegression`](#quantileregression), [`Bsqreg`](#bsqreg), [`Sqreg`](#sqreg), [`NeweyWestResult`](#neweywestresult), [`Nl`](#nl)
 - **离散选择、计数与受限因变量** — [`Logit`](#logit), [`Probit`](#probit), [`OrderedLogit`](#orderedlogit), [`OrderedProbit`](#orderedprobit), [`Poisson`](#poisson), [`NegativeBinomial`](#negativebinomial), [`NegativeBinomialNB1`](#negativebinomialnb1), [`ZeroInflatedPoisson`](#zeroinflatedpoisson), [`ZeroInflatedNegativeBinomial`](#zeroinflatednegativebinomial), [`TruncatedPoisson`](#truncatedpoisson), [`TruncatedNegativeBinomial`](#truncatednegativebinomial), [`Tobit`](#tobit), [`Truncreg`](#truncreg), [`Intreg`](#intreg), [`Heckman`](#heckman), [`Etregress`](#etregress), [`Frontier`](#frontier), [`XtLogit`](#xtlogit), [`XtProbit`](#xtprobit), [`XtPoisson`](#xtpoisson), [`XtNbreg`](#xtnbreg), [`XtTobit`](#xttobit)
 - **时间序列、多元与面板单位根** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
@@ -19,7 +19,7 @@ _westata 版本: 0.1.0 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`SummarizeResult`](#summarizeresult), [`dfgls`](#dfgls), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`level`](#level), [`odds_ratios`](#odds_ratios), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -195,7 +195,6 @@ Absorbing 2 HDFE groups                           F(   2,     154)  =      64.05
 -------------+----------------------------------------------------------------
           x1 |   .7872055   .0809428     9.73   0.000     .6273039    .9471072
           x2 |  -.4812685   .0857135    -5.61   0.000    -.6505945   -.3119426
-------------------------------------------------------------------------------
 
 Absorbed degrees of freedom:
 -----------------------------------------------------+
@@ -241,6 +240,7 @@ ws.PanelOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').f
 **输出**
 
 ```text
+
 Fixed-effects (within) regression               Number of obs     =        200
 Group variable: firm                            Number of groups  =         40
 
@@ -258,7 +258,7 @@ corr(u_i, Xb) = 0.0844                          Prob > F          =     0.0000
           x1 |   .7088762   .0749043     9.46   0.000     .5609333    .8568191
           x2 |  -.1092899   .0816583    -1.34   0.183    -.2705726    .0519929
        _cons |   .8444225   .0703358    12.01   0.000     .7055029    .9833422
-------------------------------------------------------------------------------
+-------------+----------------------------------------------------------------
      sigma_u |  .90040934
      sigma_e |  .99008668
          rho |  .45267062   (fraction of variance due to u_i)
@@ -301,6 +301,7 @@ ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='yea
 **输出**
 
 ```text
+
 Random-effects GLS regression                   Number of obs     =        200
 Group variable: firm                            Number of groups  =         40
 
@@ -309,19 +310,19 @@ R-squared:                                      Obs per group:
      Between = 0.2363                                         avg =        5.0
      Overall = 0.2957                                         max =          5
 
-                                                F(2, 197)         =      50.82
-corr(u_i, Xb) = 0.0808                          Prob > F          =     0.0000
+                                                Wald chi2(2)      =     101.64
+corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
 
 ------------------------------------------------------------------------------
-      ypanel | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+      ypanel | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-          x1 |   .7277599    .073114     9.95   0.000     .5835734    .8719464
-          x2 |   -.119745   .0784768    -1.53   0.129    -.2745074    .0350174
-       _cons |   .8440041   .1428722     5.91   0.000     .5622489    1.125759
-------------------------------------------------------------------------------
-     sigma_u |  .89848549
-     sigma_e |  .98921403
-         rho |  .45204775   (fraction of variance due to u_i)
+          x1 |   .7277599    .073114     9.95   0.000     .5844592    .8710606
+          x2 |   -.119745   .0784768    -1.53   0.127    -.2735566    .0340667
+       _cons |   .8440041   .1428722     5.91   0.000     .5639798    1.124028
+-------------+----------------------------------------------------------------
+     sigma_u |  .78751004
+     sigma_e |  .99008668
+         rho |  .38750008   (fraction of variance due to u_i)
 ------------------------------------------------------------------------------
 ```
 
@@ -358,16 +359,17 @@ ws.BetweenOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year')
 **输出**
 
 ```text
-Between regression (regression on group means)  Number of obs     =         40
+
+Between regression (regression on group means)  Number of obs     =        200
 Group variable: firm                            Number of groups  =         40
 
 R-squared:                                      Obs per group:
      Within  = 0.3654                                         min =          5
      Between = 0.2375                                         avg =        5.0
-     Overall = 0.2375                                         max =          5
+     Overall = 0.2954                                         max =          5
 
-                                                F(2, 37)          =       5.76
-                                                Prob > F          =     0.0066
+                                                F(2,37)           =       5.76
+sd(u_i + avg(e_i.)) = .9034525                  Prob > F          =     0.0066
 
 ------------------------------------------------------------------------------
       ypanel | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
@@ -412,7 +414,7 @@ ws.FirstDifferenceOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time
 
 ```text
 
-Group variable:   .                                  Number of groups =      40
+Group variable: .                                 Number of groups =      40
                                                                 Obs per group:
                                                                     min =       5
                                                                     avg =       5
@@ -431,7 +433,6 @@ Root MSE              =     1.3503
 -------------+----------------------------------------------------------------
           x1 |   .6218778    .069845     8.90   0.000     .4839276     .759828
           x2 |  -.1015749   .0754635    -1.35   0.180    -.2506223    .0474726
-------------------------------------------------------------------------------
 ```
 
 **注意:** 公式与所有 patsy 公式一样隐含一个常数项，而该常数项会被静默丢弃：没有保留它的选项，因此 `e(b)` 只含斜率。
@@ -482,7 +483,6 @@ Instrumental-variables 2SLS regression            Number of obs   =        200
        treat |   1.444141   .2839408     5.09   0.000     .8876271    2.000654
           x1 |   .7721013   .0689206    11.20   0.000     .6370194    .9071831
        _cons |   .9463986   .1952162     4.85   0.000     .5637819    1.329015
-------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -535,7 +535,6 @@ Instrumental-variables LIML regression            Number of obs   =        200
        treat |   1.290524   .2830631     4.56   0.000     .7357303    1.845317
           x1 |   .7653347    .069321    11.04   0.000      .629468    .9012013
        _cons |   1.045101   .1948412     5.36   0.000     .6632198    1.426983
-------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3 x2
 ```
@@ -590,7 +589,6 @@ GMM weight matrix: Robust
        treat |   1.444141   .2801603     5.15   0.000     .8950365    1.993245
           x1 |   .7721013   .0603991    12.78   0.000     .6537212    .8904813
        _cons |   .9463986   .1922365     4.92   0.000     .5696219    1.323175
-------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -630,6 +628,7 @@ ws.XtIvreg.from_formula('ypanel ~ x1 + (x2 = x3)', base, entity='firm', time='ye
 **输出**
 
 ```text
+
 Fixed-effects (within) IV regression            Number of obs     =        200
 Group variable: firm                            Number of groups  =         40
 
@@ -647,12 +646,12 @@ corr(u_i, Xb) = -0.0059                         Prob > chi2       =     0.1149
           x1 |   .7464423   .4321449     1.73   0.084    -.1005461    1.593431
           x2 |   4.463368   32.15818     0.14   0.890     -58.5655    67.49223
        _cons |   .5517225   2.083237     0.26   0.791    -3.531347    4.634792
-------------------------------------------------------------------------------
 Endogenous: x2
 Exogenous:  x1 x3
+-------------+----------------------------------------------------------------
      sigma_u |  1.4971249
      sigma_e |  4.4921699
-         rho | .099968137   (fraction of variance due to u_i)
+         rho |  .09996814   (fraction of variance due to u_i)
 ------------------------------------------------------------------------------
  F test that all u_i=0: F(39,158)  =     0.20                Prob > F = 1.0000
 ------------------------------------------------------------------------------
@@ -711,7 +710,6 @@ Estimated coefficients     =         3          Time periods      =          5
           x1 |   .8398055   .0564532    14.88   0.000     .7291592    .9504518
           x2 |  -.5251067   .0582604    -9.01   0.000    -.6392949   -.4109186
        _cons |   .9897201   .0582355    17.00   0.000     .8755807     1.10386
-------------------------------------------------------------------------------
 ```
 
 **注意:** `panels(iid) corr(independent) nmk` 是能复现 `regress` 的组合，因为那里唯一缺少的就是 `nmk` 补上的 `N/(N-k)` 因子。`corr(psar1)`（每个面板单独一个系数）以及 robust/cluster 协方差会直接抛错，而不是把共用 rho 或常规数字挂在错误的标签下一并返回。模块文档字符串提到 `igls`，但 `fit` 并没有该参数，所以传入它会以 `TypeError` 失败，而不会抛 westata 的错误。
@@ -768,7 +766,6 @@ Estimated coefficients     =         3          Prob > chi2       =     0.0000
           x1 |   .8406445   .0649097    12.95   0.000     .7134238    .9678653
           x2 |   -.512087   .0873288    -5.86   0.000    -.6832483   -.3409257
        _cons |   1.005003    .107612     9.34   0.000     .7940868    1.215918
-------------------------------------------------------------------------------
 ```
 
 **注意:** 在平衡面板上 `time=` 可以省略，此时期数按行序位置读取。在非平衡面板上则必须给出：否则抛 `ConsistencyError` 并点明该参数，因为按位置配对行所算出的量并不是协方差。`correlation='ar1'`/`'psar1'` 会用 Prais-Winsten 取代 OLS，一律抛 `UnsupportedError`。
@@ -823,7 +820,6 @@ One-step results
 -------------+----------------------------------------------------------------
         L1.y |   .2296989   .1226223     1.87   0.061    -.0106364    .4700341
           x1 |   .6069829   .1107299     5.48   0.000     .3899563    .8240095
-------------------------------------------------------------------------------
 ```
 
 **注意:** Sargan、Hansen、AR(1) 与 AR(2) 干脆不报告，而不是近似报告：手册并未完整给出它们的精确构造，而一个错误的过度识别统计量比它的缺席更像权威结论。`system=True` 只是把结果标记为系统 GMM——水平方程的矩并未估计，系数仍是差分估计量的。
@@ -875,7 +871,6 @@ Errors-in-variables regression
           x1 |    .934051    .078524    11.90   0.000     .7791954    1.088907
           x2 |  -.5117214   .0713415    -7.17   0.000    -.6524125   -.3710303
        _cons |   .9996233   .0743546    13.44   0.000     .8529901    1.146257
-------------------------------------------------------------------------------
 ```
 
 **注意:** 只提供未调整的 VCE：`cov_type='robust'` 会抛 `UnsupportedError`。若 `reliab` 中给出的名字不是回归元，同样会报错，且消息会列出它实际找到的回归元。
@@ -931,7 +926,6 @@ y1           |
 y2           |
           x2 |  -.3438779   .0691467    -4.97   0.000    -.4794029   -.2083529
        _cons |   1.958213   .0687593    28.48   0.000     1.823447    2.092978
-------------------------------------------------------------------------------
 ```
 
 **注意:** `iterate=True`（Stata 的 `isure`）被拒绝，因为其收敛规则未被精确文档化，而错误的规则会改变最后一次迭代后的每一个标准误。`cov_type='robust'` 走 `reg3` 的稳健三明治，确实会改变所报告的标准误，但 `e(vce)` 仍读作 `'unadjusted'`——若要知道拿到的是哪种 VCE，请读结果对象的 `cov_type` 属性。`cov_type='cluster'` 被拒绝；所有方程必须使用相同的观测，样本不一致会报错，而不是在各样本不等的条件下强行拟合。
@@ -987,7 +981,6 @@ y2           |
           x1 |  -.0832083   .0673049    -1.24   0.218    -.2159389    .0495224
           x2 |  -.3430494   .0694885    -4.94   0.000    -.4800863   -.2060126
        _cons |   1.962931   .0691228    28.40   0.000     1.826615    2.099247
-------------------------------------------------------------------------------
 ```
 
 **注意:** 只实现了未调整的 VCE；`cov_type='robust'` 会抛 `UnsupportedError`，因为该命令只有未调整 VCE 经过与 Stata 的验证。
@@ -1037,7 +1030,6 @@ Robust regression                               Number of obs     =        200
           x1 |   .8381007   .0763045    10.98   0.000     .6876222    .9885792
           x2 |  -.5063725   .0787801    -6.43   0.000    -.6617331   -.3510119
        _cons |   1.019782   .0783655    13.01   0.000     .8652395    1.174325
-------------------------------------------------------------------------------
 ```
 
 **注意:** 报告的 `mss`/`rss`/`mse`/`rmse`/`r2`/`F` 描述的是对调整后响应变量的无权回归——也就是 Stata 真正发布的那个回归——而不是由最终双权重构造的加权平方和，后者是另一个量。
@@ -1086,7 +1078,6 @@ Median regression                                   Number of obs =        200
           x1 |   .8769292   .0996525     8.80   0.000     .6804067    1.073452
           x2 |  -.4154447   .1028856    -4.04   0.000    -.6183432   -.2125463
        _cons |   1.082302    .102344    10.58   0.000     .8804712    1.284132
-------------------------------------------------------------------------------
 ```
 
 **注意:** `e(marginsnotok)` 为 `"stdp stddp residuals"`，因此 `predict` 只提供 `xb`、`stdp` 与 `residuals`；`stddp` 是仅限 `sqreg` 的类型，在 `qreg` 之后调用会报错。
@@ -1135,7 +1126,6 @@ Median regression, bootstrap(50) SEs                Number of obs =         200
           x1 |   .8769292   .1145663     7.65   0.000     .6509953    1.102863
           x2 |  -.4154447    .135737    -3.06   0.003    -.6831289   -.1477606
        _cons |   1.082302   .1080426    10.02   0.000     .8692332     1.29537
-------------------------------------------------------------------------------
 ```
 
 **注意:** bootstrap 种子记录在 `e(seed)` 中，因此**即使未指定种子**也可复现：把 `seed=result.e['seed']` 传回 `fit()`，各次重抽样会完全重复。Stata 通过 `c(seed)` 与 `set seed` 提供同样的保证。另外，行序在重抽样之间会延续（与 Stata 的 `bsampl_w`/`qreg_c` 循环一致），因此每次重抽样并非从原始数据顺序开始。
@@ -1191,7 +1181,6 @@ q75             |
           _cons |   1.687185   .0782618    21.56   0.000     1.532847    1.841524
              x1 |   .8443399   .0861656     9.80   0.000     .6744144    1.014265
              x2 |  -.4856428   .0828392    -5.86   0.000    -.6490082   -.3222775
----------------------------------------------------------------------------------
 ```
 
 **注意:** `stddp` 需要至少两个分位数、且两个方程使用相同回归元的 `sqreg` 结果，否则会报错。默认 `reps=200` 使三分位数的拟合在 200 行数据上耗时约二十秒，因此上例传入了更小的 `reps`，并只取两个分位数。 种子记录在 `e(seed)` 中，把该值传回 `fit(seed=...)` 即可复现未指定种子的拟合。
@@ -1229,7 +1218,6 @@ Maximum lag = 2                                 F(  2,       197) =     107.69
           x1 |   .8406445   .0662943    12.68   0.000     .7099069    .9713822
           x2 |   -.512087   .0707643    -7.24   0.000    -.6516398   -.3725342
        _cons |   1.005003   .0768392    13.08   0.000     .8534696    1.156535
-------------------------------------------------------------------------------
 ```
 
 **注意:** 请求其他任何预测类型都会抛错，并在消息中引述 `newey_p.ado` 的限制，而不是静默转发 `regress` 的十五种类型。
@@ -1281,7 +1269,6 @@ ws.Nl.from_formula('y = {b0} + {b1} * x1', base).fit().summary(style='stata')
 -------------+----------------------------------------------------------------
          /b0 |   .9723568   .0824264    11.80   0.000     .8098105    1.134903
          /b1 |    .842525   .0804234    10.48   0.000     .6839286    1.001121
-------------------------------------------------------------------------------
 ```
 
 **注意:** `fit(strict=True)` 是默认值；优化器不收敛时它会抛 `ConvergenceError`，而不是返回未收敛的结果。该类不保留回归矩阵（`design_matrix` 为 `None`），且 `predict` 没有为 `nl` 注册任何类型，因此即使显式传入 `exog=` 也无法经由它做预测。
@@ -1322,6 +1309,7 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Logistic regression                                     Number of obs =    200
                                                         LR chi2(2)    =  13.90
                                                         Prob > chi2   = 0.0010
@@ -1371,6 +1359,7 @@ ws.Probit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Probit regression                                       Number of obs =    200
                                                         LR chi2(2)    =  13.97
                                                         Prob > chi2   = 0.0009
@@ -1421,6 +1410,7 @@ ws.OrderedLogit.from_formula('yord ~ x1 + x2', d).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Ordered logistic regression                             Number of obs =    200
                                                         LR chi2(2)    =  24.81
                                                         Prob > chi2   = 0.0000
@@ -1473,6 +1463,7 @@ ws.OrderedProbit.from_formula('yord ~ x1 + x2', d).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Ordered probit regression                               Number of obs =    200
                                                         LR chi2(2)    =  24.01
                                                         Prob > chi2   = 0.0000
@@ -1524,6 +1515,7 @@ ws.Poisson.from_formula('ycnt ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Poisson regression                                      Number of obs =    200
                                                         LR chi2(2)    =  35.40
                                                         Prob > chi2   = 0.0000
@@ -1574,8 +1566,9 @@ ws.NegativeBinomial.from_formula('yod ~ x1 + x2', d).fit().summary(style='stata'
 **输出**
 
 ```text
+
 Negative binomial regression                            Number of obs =    200
-                                                        LR chi2(2)    =  33.33
+                                                        LR chi2(1)    =  33.33
 Dispersion: mean                                        Prob > chi2   = 0.0000
 Log likelihood = -472.86915                             Pseudo R2     = 0.0340
 
@@ -1585,12 +1578,12 @@ Log likelihood = -472.86915                             Pseudo R2     = 0.0340
           x1 |   .5272862    .090853     5.80   0.000     .3492176    .7053548
           x2 |   .0058862   .0894056     0.07   0.948    -.1693456    .1811179
        _cons |   1.194401   .0912093    13.10   0.000     1.015634    1.373168
-    /lnalpha |   .2630268   .1342525     1.96   0.050    -.0001032    .5261568
 -------------+----------------------------------------------------------------
-       alpha |   1.300862                                        0           .
+    /lnalpha |   .2630268   .1342525                     -.0001032    .5261568
 -------------+----------------------------------------------------------------
+       alpha |   1.300862   .1746439                      .9998968    1.692416
 ------------------------------------------------------------------------------
-LR test of alpha=0: chibar2(01) = 33.33               Prob >= chibar2 = 0.000
+LR test of alpha=0: chibar2(01) = 469.33              Prob >= chibar2 = 0.000
 ```
 
 **注意:** `e(ll_c)` 是在 Poisson（即 `alpha = 0`）极限处的对数似然，`e(chi2_c)` 是它与 `e(ll)` 之差的二倍；在本数据上 `e(chi2_c)` 精确复现 `2*(e(ll) - e(ll_c))`，因此离散检验可直接由这些宏得到。未注册 `'score'` 预测类型，因为得分会是每个方程一列；`'pr'` 同样需要 `n=`。
@@ -1629,6 +1622,7 @@ ws.NegativeBinomialNB1.from_formula('yod ~ x1 + x2', d).fit().summary(style='sta
 **输出**
 
 ```text
+
 Negative binomial (NB1)                                 Number of obs =    200
                                                         LR chi2(2)    =  35.90
 Log likelihood = -473.81429                             Prob > chi2   = 0.0000
@@ -1678,15 +1672,17 @@ ws.ZeroInflatedPoisson.from_formula('ycnt ~ x1 + x2', base, inflate='x3').fit().
 **输出**
 
 ```text
+
 Zero-inflated Poisson regression                        Number of obs =    200
 Inflation model: logit                                  Nonzero obs   =    148
                                                         Zero obs      =     52
                                                         LR chi2(2)    =  33.03
-Log likelihood = -299.25664                             Prob > chi2   = 0.0000
+Log likelihood = -299.2566                              Prob > chi2   = 0.0000
 
 ------------------------------------------------------------------------------
         ycnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
+ycnt         |
           x1 |   .3327988   .0562969     5.91   0.000     .2224588    .4431387
           x2 |   .0039316   .0591759     0.07   0.947     -.112051    .1199142
        _cons |   .3681895   .0761911     4.83   0.000     .2188577    .5175212
@@ -1736,26 +1732,27 @@ ws.ZeroInflatedNegativeBinomial.from_formula('yz ~ x1 + x2', d, inflate='x3').fi
 **输出**
 
 ```text
+
 Zero-inflated negative binomial regression              Number of obs =    200
 Inflation model: logit                                  Nonzero obs   =     66
                                                         Zero obs      =    134
                                                         LR chi2(2)    =  25.08
-Log likelihood = -235.14016                             Prob > chi2   = 0.0001
+Log likelihood = -235.1402                              Prob > chi2   = 0.0000
 
 ------------------------------------------------------------------------------
           yz | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
+yz           |
           x1 |    .523662    .121246     4.32   0.000     .2860242    .7612998
           x2 |    .306602   .1051965     2.91   0.004     .1004207    .5127834
-    /lnalpha |  -.9197992   .5600437    -1.64   0.101    -2.017465    .1778664
        _cons |   .5377467   .1747467     3.08   0.002     .1952495    .8802439
 -------------+----------------------------------------------------------------
 inflate      |
           x3 |   .8042556   .2505497     3.21   0.001     .3131873    1.295324
        _cons |    .290147   .2802637     1.04   0.301    -.2591598    .8394537
+    /lnalpha |  -.9197992   .5600437    -1.64   0.101    -2.017465    .1778664
 -------------+----------------------------------------------------------------
-       alpha |   .3985991                                        0           .
--------------+----------------------------------------------------------------
+       alpha |   .3985991   .2232329                      .1329922    1.194666
 ------------------------------------------------------------------------------
 LR test of alpha=0: chibar2(01) = 25.08               Prob >= chibar2 = 0.000
 ```
@@ -1796,10 +1793,11 @@ ws.TruncatedPoisson.from_formula('ycnt ~ x1 + x2', d).fit().summary(style='stata
 **输出**
 
 ```text
+
 Zero-truncated Poisson regression                       Number of obs =    148
                                                         LR chi2(2)    =  35.95
                                                         Prob > chi2   = 0.0000
-Log likelihood = -187.99492                             Pseudo R2     = 0.0873
+Log likelihood = -187.9949                              Pseudo R2     = 0.0873
 
 ------------------------------------------------------------------------------
         ycnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
@@ -1846,6 +1844,7 @@ ws.TruncatedNegativeBinomial.from_formula('yod ~ x1', d).fit().summary(style='st
 **输出**
 
 ```text
+
 Truncated negative binomial regression                  Number of obs =    148
 Truncation point = 1                                    LR chi2(1)    =  19.31
                                                         Prob > chi2   = 0.0000
@@ -1856,10 +1855,10 @@ Log likelihood = -360.61677                             Pseudo R2     = 0.0261
 -------------+----------------------------------------------------------------
           x1 |   .5768012   .1302026     4.43   0.000     .3216088    .8319936
        _cons |   .8655364   .2784346     3.11   0.002     .3198146    1.411258
-    /lnalpha |   .9244537   .4734482     1.95   0.051    -.0034877    1.852395
 -------------+----------------------------------------------------------------
-       alpha |   2.520491                                        0           .
+    /lnalpha |   .9244537   .4734482                     -.0034877    1.852395
 -------------+----------------------------------------------------------------
+       alpha |   2.520491   1.193322                      .9965184     6.37507
 ------------------------------------------------------------------------------
 LR test of alpha=0: chibar2(01) = 19.31               Prob >= chibar2 = 0.000
 ```
@@ -1899,6 +1898,7 @@ ws.Tobit.from_formula('ycens ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Tobit regression                                    Number of obs     =    200
                                                            Uncensored =    158
 Limits: Lower =    0                                    Left-censored =     42
@@ -1915,7 +1915,7 @@ Log likelihood = -252.67183                         Pseudo R2         = 0.1818
           x2 |   .0661611   .0717033     0.92   0.357    -.0752391    .2075613
        _cons |   .9811939   .0729483    13.45   0.000     .8373387    1.125049
 -------------+----------------------------------------------------------------
-var(e.ycens)|   .9382956   .1089417                      .7462808    1.179715
+ var(e.ycens)|   .9382956   .1089417                      .7462808    1.179715
 ------------------------------------------------------------------------------
 ```
 
@@ -1954,6 +1954,7 @@ ws.Truncreg.from_formula('y ~ x1 + x2', base, lower=0.0).fit().summary(style='st
 **输出**
 
 ```text
+
 Limit: Lower =    0                             Number of obs     =  151
        Upper = +inf                             Wald chi2(2)      = 65.66
                                                 Prob > chi2       = 0.0000
@@ -2006,6 +2007,7 @@ ws.Intreg.from_formula('lo hi ~ x1', d).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Interval regression                                 Number of obs     =    200
                                                            Uncensored =      0
                                                         Left-censored =      0
@@ -2063,6 +2065,7 @@ ws.Heckman.from_formula('yselect ~ x1 + select(sel ~ x3)', base).fit().summary(s
 **输出**
 
 ```text
+
 Heckman selection model                                 Number of obs =    124
                                                         Wald chi2(1)  = 228.30
                                                         Prob > chi2   = 0.0000
@@ -2081,6 +2084,7 @@ select       |
           x3 |   .8066883   .1199658     6.72   0.000     .5715598    1.041817
        _cons |   .4765848    .105997     4.50   0.000     .2688345     .684335
 ------------------------------------------------------------------------------
+-------------+----------------------------------------------------------------
          rho | -.24996944   (fraction of variance due to u_i)
 ------------------------------------------------------------------------------
 ```
@@ -2120,6 +2124,7 @@ ws.Etregress.from_formula('ytreat ~ x1 + treat(treat ~ x3)', base).fit().summary
 **输出**
 
 ```text
+
 Linear regression with endogenous treatment             Number of obs =    200
 Estimator: Two-step                                     Wald chi2(2)  = 142.69
                                                         Prob > chi2   = 0.0000
@@ -2139,7 +2144,8 @@ treat           |
           _cons |   .5573098   .1093099     5.10   0.000     .3430664    .7715532
              x3 |   .8581738   .1263191     6.79   0.000     .6105928    1.105755
 ---------------------------------------------------------------------------------
-         rho | -.0034200864   (fraction of variance due to u_i)
+----------------+----------------------------------------------------------------
+         rho | -.00342009   (fraction of variance due to u_i)
 ---------------------------------------------------------------------------------
 ```
 
@@ -2178,6 +2184,7 @@ ws.Frontier.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Stoc. frontier normal/half-normal model                 Number of obs =    200
                                                         Wald chi2(2)  = 180.57
 Log likelihood = -291.49689                             Prob > chi2   = 0.0000
@@ -2231,24 +2238,22 @@ ws.XtLogit.from_formula('yb ~ x1', base, entity='firm', method='fe').fit().summa
 **输出**
 
 ```text
-Conditional fixed-effects logistic regression           Number of obs =    185
-                                                        LR chi2(1)    =  13.54
-                                                        Prob > chi2   = 0.0002
-Log likelihood = -71.492167                             Pseudo R2     = 0.0865
 
-Group variable:   firm                               Number of groups =      37
-                                                                Obs per group:
-                                                                    min =       5
-                                                                    avg =       5
-                                                                    max =       5
-                                                     LR chi2(1)       =   13.54
-Log likelihood = -71.49216729                        Prob > chi2      =  0.0002
+Conditional fixed-effects logistic regression        Number of obs    =    185
+Group variable: firm                                 Number of groups =     37
+
+                                                     Obs per group:
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
+
+                                                     LR chi2(1)       =  13.54
+Log likelihood = -71.492167                          Prob > chi2      = 0.0002
 
 ------------------------------------------------------------------------------
-             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+          yb | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
           x1 |   .6103907   .1789254     3.41   0.001     .2597033    .9610781
-------------------------------------------------------------------------------
 ```
 
 **注意:** `method='pa'` 是带可交换工作相关的 GEE，**不是**似然：它不存 `e(ll)`、`e(ll_0)`、`e(r2_p)`、`e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量，并以 `e(estimator)='gee'` 标记。`fe` 路径上的 `e(ll_0)` 是在保留样本上仅含常数项的 logit，这正是 LR 统计量可比的原因。三者都没有注册任何 `predict` 类型。
@@ -2287,21 +2292,22 @@ ws.XtProbit.from_formula('ybp ~ x1', d, entity='firm', method='re').fit().summar
 **输出**
 
 ```text
-Random-effects probit regression                        Number of obs =    200
-                                                        Wald chi2(1)  =  31.47
-                                                        Prob > chi2   = 0.0000
-Log likelihood = -115.42465                             Pseudo R2     = 0.0234
 
-Group variable:   firm                               Number of groups =      40
-                                                                Obs per group:
-                                                                    min =       .
-                                                                    avg =       .
-                                                                    max =       .
-                                                     LR chi2(1)       =   31.47
-Log likelihood = -115.424648                         Prob > chi2      =  0.0000
+Random-effects probit regression                     Number of obs    =    200
+Group variable: firm                                 Number of groups =     40
+
+Random effects u_i ~ Gaussian                        Obs per group:
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
+
+Integration method: mvaghermite                      Integration pts. =     12
+
+                                                     Wald chi2(1)     =  31.47
+Log likelihood = -115.42465                          Prob > chi2      = 0.0000
 
 ------------------------------------------------------------------------------
-             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+         ybp | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
           x1 |   .6975478    .124335     5.61   0.000     .4538557    .9412399
        _cons |  -.1688001   .1333415    -1.27   0.206    -.4301446    .0925444
@@ -2311,6 +2317,7 @@ Log likelihood = -115.424648                         Prob > chi2      =  0.0000
      sigma_u |   .5456262                                        0           .
          rho |   .2294106                                        0           .
 ------------------------------------------------------------------------------
+LR test of rho=0: chibar2(01) = 5.54                   Prob >= chibar2 = 0.009
 ```
 
 **注意:** `method='fe'` 与 `method='pa'` 会按名称被拒绝，报错为 `method='fe' is not available; supported: 're'`（`'pa'` 同），而不是静默映射为 `re`。在组内相关很弱的二值结果上，`/lnsig2u` 的估计可能被推得很负，于是 `sigma_u` 实际为零——这是模型撞到边界，而非未收敛。
@@ -2348,23 +2355,22 @@ ws.XtPoisson.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().s
 **输出**
 
 ```text
-Conditional fixed-effects Poisson regression            Number of obs =    200
-                                                        Wald chi2(1)  =  25.31
-Log likelihood = -203.70227                             Prob > chi2   = 0.0000
 
-Group variable:   .                                  Number of groups =      40
-                                                                Obs per group:
-                                                                    min =       5
-                                                                    avg =       5
-                                                                    max =       5
-                                                     LR chi2(1)       =   25.31
-Log likelihood = -203.702266                         Prob > chi2      =  0.0000
+Conditional fixed-effects Poisson regression         Number of obs    =    200
+Group variable: firm                                 Number of groups =     40
+
+                                                     Obs per group:
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
+
+                                                     Wald chi2(1)     =  25.31
+Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 
 ------------------------------------------------------------------------------
-             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+        ycnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
           x1 |   .3128918   .0621931     5.03   0.000     .1909956     .434788
-------------------------------------------------------------------------------
 ```
 
 **注意:** `method='pa'` 会被拒绝（`supported: 'fe', 're'`）。`fe` 似然没有截距——组效应吸收了它，似然在常数方向上完全平坦——因此 patsy 的截距被移除而不是估计。本类不填 `e(ivar)` 与 `e(tvar)`，因此打印的 `Group variable:` 行显示为 `.`，尽管 `e(N_g)` 确实统计了组数。`predict` 未注册任何类型。
@@ -2402,24 +2408,23 @@ ws.XtNbreg.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().sum
 **输出**
 
 ```text
-Conditional FE negative binomial regression             Number of obs =    200
-                                                        Wald chi2(1)  =  25.31
-Log likelihood = -203.70227                             Prob > chi2   = 0.0000
 
-Group variable:   .                                  Number of groups =      40
-                                                                Obs per group:
-                                                                    min =       5
-                                                                    avg =       5
-                                                                    max =       5
-                                                     LR chi2(1)       =   25.31
-Log likelihood = -203.702266                         Prob > chi2      =  0.0000
+Conditional FE negative binomial regression          Number of obs    =    200
+Group variable: firm                                 Number of groups =     40
+
+                                                     Obs per group:
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
+
+                                                     Wald chi2(1)     =  25.31
+Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 
 ------------------------------------------------------------------------------
-             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+        ycnt | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
           x1 |   .3128918   .0621933     5.03   0.000     .1909953    .4347884
        _cons |   23.17064   38374.96     0.00   1.000    -75190.37    75236.71
-------------------------------------------------------------------------------
 ```
 
 **注意:** 目标函数是准似然，因此 `e(ll)` 并非数据的似然，也不存 AIC/BIC。与 Stata 一样，`_cons` 属于参数向量，但目标函数在该方向上近乎平坦——给每个 `lam_it` 加常数几乎不改变核——所以它的估计值（及其巨大的标准误）依赖优化器，而斜率不然；去掉常数项会改变斜率，因此予以保留。
@@ -2458,18 +2463,19 @@ ws.XtTobit.from_formula('ycensp ~ x1', d, entity='firm', method='re').fit().summ
 **输出**
 
 ```text
-Random-effects tobit regression                         Number of obs =    200
-                                                        Wald chi2(1)  =  80.89
-                                                        Prob > chi2   = 0.0000
-Log likelihood = -271.51546                             Pseudo R2     = 0.1421
 
-Group variable:   .                                  Number of groups =      40
-                                                                Obs per group:
-                                                                    min =       .
-                                                                    avg =       .
-                                                                    max =       .
-                                                     LR chi2(1)       =   80.89
-Log likelihood = -271.5154578                        Prob > chi2      =  0.0000
+Random-effects tobit regression                      Number of obs    =    200
+Group variable: .                                    Number of groups =     40
+
+Random effects u_i ~ Gaussian                        Obs per group:
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
+
+Integration method: mvaghermite                      Integration pts. =     12
+
+                                                     Wald chi2(1)     =  80.89
+Log likelihood = -271.51546                          Prob > chi2      = 0.0000
 
 ------------------------------------------------------------------------------
              | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
@@ -2482,6 +2488,7 @@ Log likelihood = -271.5154578                        Prob > chi2      =  0.0000
 -------------+----------------------------------------------------------------
          rho |   .3634196                                        0           .
 ------------------------------------------------------------------------------
+LR test of rho=0: chibar2(01) = 89.96                  Prob >= chibar2 = 0.000
 ```
 
 **注意:** `method='fe'` 会被拒绝（`supported: 're'`）。求积点数的收益是有上限的——12 是 Stata 的默认值，也是本模块的默认值，在性态良好的面板上增加点数并不改变估计。本类同样不填 `e(ivar)`，因此表头的 `Group variable:` 显示 `.`，而 `e(N_g)` 仍统计组数。`xttobit` 未注册任何 `predict` 类型。
@@ -2518,8 +2525,8 @@ ws.ARIMA(pd.Series(np.cumsum(np.random.default_rng(1).normal(size=120))), order=
 ```text
 ARIMA regression
 
-Sample: 1 thru 120                              Number of obs     =        120
-                                                Wald chi2(1)      =          .
+Sample: 2 thru 120                              Number of obs     =        119
+                                                Wald chi2(1)      =       0.53
 Log likelihood = -149.227                       Prob > chi2       =          .
 
 ------------------------------------------------------------------------------
@@ -2768,7 +2775,7 @@ Levin-Lin-Chu unit-root test
 **签名**
 
 ```python
-ws.UnitRootResult(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '') -> None
+ws.UnitRootResult(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '', regression: 'str' = 'c') -> None
 ```
 
 **示例**
@@ -2780,11 +2787,19 @@ ws.unitroot(np.cumsum(np.random.default_rng(1).normal(size=120)), test='adf', re
 **输出**
 
 ```text
-Augmented Dickey-Fuller
-  statistic = -1.49586   p-value = 0.5356
-  lags = 0   obs = 119
-  critical: 1%: -3.504  5%: -2.889  10%: -2.579
-  H0: unit root (nonstationary)
+
+Dickey–Fuller test for unit root          Number of obs  = 119
+Variable: y                               Number of lags =   0
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)            -1.496       -3.504       -2.889       -2.579
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.5356.
 ```
 
 **注意:** 打印的临界值并非 MacKinnon 响应面数值：`dfuller.ado` 对一张六点表按 N 线性插值，这里给的就是那张表的数，因此区间与 Stata 打印的一致。p 值仍然是 MacKinnon 的。`kpss` 的原假设是反的——其 `H0` 为平稳，Stata 也不为它存 MacKinnon p 值。
@@ -2916,10 +2931,9 @@ Data type: Repeated cross-sectional
            y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
 ATET         |
-     treated |
+       treat |
    (1 vs 0)  |   .2838325   .2816428     1.01   0.320    -.2858438    .8535088
-------------------------------------------------------------------------------
-Note: ATET estimate adjusted for covariates, group effects, and time effects.
+Note: ATET estimate adjusted for group effects and time effects.
 ```
 
 **注意:** 单独的 `"y"` 表示**没有**协变量，与 Stata 的 `(y)` 块完全一致；要包含协变量请写 `"y x1"`，或用 `covariates="all"` 显式推断所有随时间变化的数值列。不随时间变化的处理指示变量就是单位固定效应本身，因此会被 `ConsistencyError` 拒绝（对应 Stata 的 r(198) 共线性诊断），而不是报告求解器剩下的值。`e(r2)`、`e(r2_a)`、`e(rmse)`、`e(F)`、`e(ll)` 是 westata 的增补，并非经 Stata 验证的输出。
@@ -2982,10 +2996,9 @@ Data type: Longitudinal
            y | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
 ATET         |
-     treated |
+       treat |
    (1 vs 0)  |   .2838325   .2517466     1.13   0.266    -.2253731     .793038
-------------------------------------------------------------------------------
-Note: ATET estimate adjusted for covariates, panel effects, and time effects.
+Note: ATET estimate adjusted for panel effects and time effects.
 ```
 
 **注意:** 与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `xtset` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `Didregress` 完全一致这一点只在平衡面板上有保证并经过测试。
@@ -2999,7 +3012,7 @@ Note: ATET estimate adjusted for covariates, panel effects, and time effects.
 **签名**
 
 ```python
-ws.TreatmentEffectResult(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '') -> None
+ws.TreatmentEffectResult(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '', weights: 'Any' = None) -> None
 ```
 
 **示例**
@@ -3402,7 +3415,6 @@ Number of PSUs   =  40                            Population size = 252.433526
           x1 |   .8086296    .059397    13.61   0.000     .6884878    .9287714
           x2 |   -.513372   .0751049    -6.84   0.000     -.665286    -.361458
        _cons |   .9758079   .0831066    11.74   0.000     .8077089    1.143907
-------------------------------------------------------------------------------
 ```
 
 **注意:** 从影响函数里漏掉 `w_i` 或 `(X'WX)^-1`，系数仍然精确而方差会严重失准。基于设计的 `F` 是抽样调整形式 `(d - q + 1)/(d q) * W`，参考分布为 `F(q, d - q + 1)`，并非普通回归的 F；即使系数相同，它也不会等于未加权的 `regress` F。
@@ -3450,7 +3462,6 @@ Number of PSUs   =  40                            Population size = 252.433526
           x1 |   .4975352   .1496844     3.32   0.002     .1947699    .8003005
           x2 |  -.0758175   .1557108    -0.49   0.629    -.3907723    .2391373
        _cons |   .1178733    .161271     0.73   0.469     -.208328    .4440747
-------------------------------------------------------------------------------
 ```
 
 **注意:** 在 fixture 设计上，估计值复现 Stata 到约 5e-10 的相对精度，而这个残差是 Stata 的停机容差、不是本代码的：把 Stata 自己发表的系数代回 Stata 自己的得分方程，残差梯度约 1.7e-8，而这里返回的是精确的极大化点。若把一致性容差收紧到 1e-9 以内，断言的就不是本实现而是 Stata 的不是了。
@@ -3602,6 +3613,7 @@ ws.testnl(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), 'exp(_b[x1]) = 2')
 **输出**
 
 ```text
+
  ( 1)  exp(_b[x1]) = 2
 
        chi2(  1) =    1.36
@@ -3663,9 +3675,22 @@ ws.hausman(fe, re)
 **输出**
 
 ```text
-Hausman test
-  chi2(2) = 1.60
-  Prob > chi2 = 0.4501
+
+                 ---- Coefficients ----
+             |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))
+             |       fe           re         Difference       Std. err.
+-------------+----------------------------------------------------------------
+          x1 |    .7088762     .7277599       -.0188837         .016279
+          x2 |   -.1092899     -.119745        .0104551        .0225716
+------------------------------------------------------------------------------
+                          b = Consistent under H0 and Ha; obtained from xtreg.
+           B = Inconsistent under Ha, efficient under H0; obtained from xtreg.
+
+Test of H0: Difference in coefficients not systematic
+
+    chi2(2) = (b-B)'[(V_b-V_B)^(-1)](b-B)
+            =   1.60
+Prob > chi2 = 0.4501
 ```
 
 **注意:** 当 `V_c - V_e` 非正定时，用伪逆求逆并把统计量取 0 作为下限，而 Stata 会打印它算出的负值。`df`、`p` 与警告仍然一致；不同的只是这个无法解释的统计量的符号，因为伪逆因舍入经常给出约 `-1e-18` 的结果。
@@ -3691,11 +3716,13 @@ ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
 **输出**
 
 ```text
+
  ( 1)  C(treat)[T.1] - base(treat[0])
+
 ------------------------------------------------------------------------------
              | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |   .3762187   .1705568     2.21   0.029    .03986732    .7125702
+         (1) |   .3762187   .1705568     2.21   0.029     .0398673    .7125702
 ------------------------------------------------------------------------------
 ```
 
@@ -3721,11 +3748,13 @@ ws.pwcompare(ws.OLS.from_formula('y ~ x1 + C(g)', d).fit(), 'C(g)')[0]
 **输出**
 
 ```text
+
  ( 1)  C(g)[T.mid] - base(g[lo])
+
 ------------------------------------------------------------------------------
              | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-         (1) |  .05080922   .2187468     0.23   0.817    -.3805904    .4822089
+         (1) |   .0508092   .2187468     0.23   0.817    -.3805904    .4822089
 ------------------------------------------------------------------------------
 ```
 
@@ -3750,7 +3779,9 @@ ws.nlcom(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), 'exp(_b[x1])')
 **输出**
 
 ```text
+
  ( 1)  exp(_b[x1])
+
 ------------------------------------------------------------------------------
              | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
@@ -3781,10 +3812,13 @@ ws.margins(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), dydx='x1', at={'x2
 **输出**
 
 ```text
+
 Average marginal effects                                   Number of obs = 200
 Model VCE: OIM
+
 Expression: Pr(yb), predict()
 dy/dx wrt:  x1
+
 ------------------------------------------------------------------------------
              |            Delta-method
              |      dy/dx   std. err.      z    P>|z|     [95% conf. interval]
@@ -3868,8 +3902,8 @@ ws.estat_endogenous(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 
 ```text
 
-Tests of endogeneity
-H0: Variables are exogenous
+  Tests of endogeneity
+  H0: Variables are exogenous
 
   Durbin (score) chi2(1)          =  1.64391  (p = 0.1998)
   Wu-Hausman F(1,196)             =  1.62438  (p = 0.2040)
@@ -3899,14 +3933,16 @@ ws.estat_firststage(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 
 ```text
 
-First-stage regression summary statistics
---------------------------------------------------------------------------
-             |            Adjusted      Partial
-    Variable |   R-sq.       R-sq.        R-sq.      F(1,197)   Prob > F
--------------+------------------------------------------------------------
-          x2 |  0.0008     -0.0093       0.0008         0.160    0.6897
---------------------------------------------------------------------------
-  Minimum eigenvalue statistic = 0.160
+  First-stage regression summary statistics
+  --------------------------------------------------------------------------
+               |            Adjusted      Partial
+      Variable |   R-sq.       R-sq.        R-sq.      F(1,197)   Prob > F
+  -------------+------------------------------------------------------------
+            x2 |  0.0008     -0.0093       0.0008      0.159849    0.6897
+  --------------------------------------------------------------------------
+
+
+  Minimum eigenvalue statistic = 0.159849    
 
   Critical Values                      # of endogenous regressors:    1
   H0: Instruments are weak             # of excluded instruments:     1
@@ -3975,7 +4011,7 @@ ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 
 ```text
 
-Breusch–Pagan/Cook–Weisberg test for heteroskedasticity
+Breusch–Pagan/Cook–Weisberg test for heteroskedasticity 
 Assumption: Normal error terms
 Variable: Fitted values of y
 
@@ -4085,7 +4121,8 @@ ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 
 ```text
 
-Tests of overidentifying restrictions:
+  Tests of overidentifying restrictions:
+
   Sargan (score) chi2(1) =  .141587  (p = 0.7067)
   Basmann chi2(1)        =  .138854  (p = 0.7094)
 ```
@@ -4120,7 +4157,7 @@ Omitted: Powers of independent variables
 H0: Model has no omitted variables
 
 F(6, 191) =   1.28
-Prob > F = 0.2694
+ Prob > F = 0.2694
 ```
 
 ### `estat_summarize`
@@ -4146,11 +4183,13 @@ ws.estat_summarize(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), variables=['y
 ```text
 
   Estimation sample regress                Number of obs =        200
+
   -------------------------------------------------------------------
       Variable |         Mean      Std. dev.         Min          Max
   -------------+-----------------------------------------------------
-             y |     1.020667      1.447346      -2.7522     4.881985
-            x1 |     .0573402      1.025868     -2.83213     3.278208
+             y |     1.020667      1.447346    -2.752204     4.881985
+            x1 |     .0573402      1.025868    -2.832134     3.278208
+  -------------------------------------------------------------------
 ```
 
 ### `estat_vce`
@@ -4174,14 +4213,14 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().estat_vce(correlation=True)
 **输出**
 
 ```text
+
 Correlation matrix of coefficients
-             | y
-        e(V) |         x1          x2       _cons
+
+        e(V) |         x1          x2       _cons 
 -------------+-----------------------------------
-y            |
-          x1 |          0
-          x2 |  .00379118           0
-       _cons |  -.0560743   -.0640877           0
+          x1 |          0                         
+          x2 |  .00379118           0             
+       _cons | -.05607434  -.06408771           0
 ```
 
 ### `estat_vif`
@@ -4206,7 +4245,7 @@ ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 
 ```text
 
-    Variable |       VIF       1/VIF
+    Variable |       VIF       1/VIF  
 -------------+----------------------
           x1 |      1.00    0.999986
           x2 |      1.00    0.999986
@@ -4500,7 +4539,6 @@ Maximum lag = 2                                 F(  2,       197) =     107.69
           x1 |   .8406445   .0662943    12.68   0.000     .7099069    .9713822
           x2 |   -.512087   .0707643    -7.24   0.000    -.6516398   -.3725342
        _cons |   1.005003   .0768392    13.08   0.000     .8534696    1.156535
-------------------------------------------------------------------------------
 ```
 
 **注意:** 这里的 `time=` 数组扮演 `tsset` 的角色。`base` 自带的 `year` 列在各实体间重复 1..5，对整体样本并不等间隔，`newey` 会拒绝，除非给出 `force=True`；真正的时间序列两者都不需要。
@@ -4526,11 +4564,20 @@ ws.unitroot(base['y'], test='adf', regression='c', maxlag=2)
 **输出**
 
 ```text
-Augmented Dickey-Fuller
-  statistic = -6.70616   p-value = 0.0000
-  lags = 2   obs = 197
-  critical: 1%: -3.478  5%: -2.884  10%: -2.574
-  H0: unit root (nonstationary)
+
+Augmented Dickey–Fuller test for unit root
+Variable: y                               Number of obs  = 197
+                                          Number of lags =   2
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)            -6.706       -3.478       -2.884       -2.574
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.0000.
 ```
 
 **注意:** p 值不受临界值约定的影响，仍是 MacKinnon 值；只有打印出的临界带来自 Stata 的那张表。
@@ -4715,29 +4762,6 @@ x2          -0.512087
 Name: params, dtype: float64
 ```
 
-### `ereturn_list`
-
-**Stata 指令:** `ereturn list`
-
-按 Stata `ereturn list` 的样式打印结果中存储的宏：四个区块（scalars、macros、matrices、functions），以空行开头，名称右对齐到 22 列。
-
-与实时 `regress` 对照，**34 行全部一致**。过滤、排序与几何细节见 [`format_ereturn_list`](#format_ereturn_list)，本方法即其委托目标。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-print(r.ereturn_list())
-```
-
-```text
-scalars:
-                  e(N) =  200
-              e(sum_w) =  200
-               e(df_m) =  2
-               ...
-```
-
 ### `bse`
 
 **Stata 指令:** `regress -- the `Std. err.` column`
@@ -4842,7 +4866,7 @@ r.fvalue
 **输出**
 
 ```text
-90.99954130641446
+90.99954130641439
 ```
 
 ### `llf`
@@ -5055,7 +5079,7 @@ sorted(r.e)
 **输出**
 
 ```text
-['F', 'N', '_aic_is_stata', 'aic', 'bic', 'cmd', 'depvar', 'df_m', 'df_r', 'estat_cmd', 'll', 'll_0', 'marginsok', 'mss', 'properties', 'r2', 'r2_a', 'rank', 'rmse', 'rss', 'sigma', 'sum_w', 'title', 'vce', 'vcetype']
+['F', 'N', '_aic_is_stata', 'aic', 'bic', 'cmd', 'depvar', 'df_m', 'df_r', 'estat_cmd', 'll', 'll_0', 'marginsok', 'model', 'mss', 'predict', 'properties', 'r2', 'r2_a', 'rank', 'rmse', 'rss', 'sigma', 'sum_w', 'title', 'vce', 'vcetype']
 ```
 
 **注意:** 有两个宏是合成出来的，因为每条命令都记录它们：`e(depvar)` 取自响应变量名，`e(cmd)` 取自 `model_name`。`e(cmdline)` 刻意不合成——它记录的是用户键入的原样命令（含选项），本包没有该字符串，编造一个即为伪造值。
@@ -5256,6 +5280,7 @@ r.test('x1 = 0')
 **输出**
 
 ```text
+
  ( 1)  x1 = 0
 
        F(  1,   197) =  134.55
@@ -5286,7 +5311,9 @@ r.lincom('x1 - x2')
 **输出**
 
 ```text
+
  ( 1)  x1 - x2 = 0
+
 ------------------------------------------------------------------------------
            y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
@@ -5326,12 +5353,12 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().predict(kind='pr')[:6]
 
 **Stata 指令:** `(no Stata equivalent -- renders the estimation table Stata prints)`
 
-渲染拟合结果的文本摘要。`style='stata'`（默认）按 Stata 的表格原样输出；需要 statsmodels 风格（`coef`、`AIC:` 等标签）时显式传入 `style='statsmodels'`。
+把拟合结果渲染成文本摘要。`style='statsmodels'`（默认）打印 statsmodels 风格的表格，`style='stata'` 打印同一命令下 Stata 的版式——`regress` 为方差分析与拟合区块加系数表，离散选择模型为 LR 卡方表头与 z 统计量。它**返回**字符串而不是直接打印，因此在 notebook 中会显示，也可以原样写入文件。
 
 **签名**
 
 ```python
-ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False)  ->  str
+ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'
 ```
 
 **示例**
@@ -5362,17 +5389,14 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 
 ### `wald_test`
 
-与 statsmodels 兼容的联合 Wald 检验：`R b = q`，`R` 的每一行对应一条约束。
+**Stata 指令:** `(no Stata spelling -- Stata expresses the same restriction as 'test x1 = 0')`
 
-**`R` 也可以是约束字符串**，与 statsmodels 一致：`r.wald_test("x1 = 0")`。解析工作委托给
-`r.test()`，它本来就支持 Stata 的约束语法，因此字符串返回的 `statistic` / `pvalue` /
-`df_denom` 与矩阵形式相同。`"x1 + x2 = 0"` 这类组合也可用，约束解析器会处理。
-矩阵参数仍保留严格的形状检查——`R` 必须每个参数一列，形状不对依旧报错。
+与 statsmodels 兼容的联合 Wald 检验：`R b = q`，`R` 每行一个约束、**每列对应一个参数**，`q` 默认为零。`scalar=True` 返回 F 检验且 `df_denom = df_resid`，`scalar=False` 返回 chi2 检验，这正是 statsmodels 自身的行为；返回对象与 `test` 返回的是同一个 `WaldTest`，暴露 `statistic`、`df`（分子自由度）、`df_denom`、`pvalue` 与 `distribution`。需要 Stata 的约束语法时请用 `test`——这里是矩阵接口，形状不匹配会抛出 `ValueError`，而不是猜你想检验哪些参数。
+
 **签名**
 
 ```python
-r.wald_test('x1 = 0')                                    # 约束字符串
-r.wald_test(np.array([[0.0, 1.0, 0.0]]), scalar=False)   # 约束矩阵
+ws.wald_test(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'
 ```
 
 **示例**
@@ -5385,6 +5409,7 @@ r.wald_test(np.array([[0.0, 1.0, 0.0]]), scalar=False)
 **输出**
 
 ```text
+
  ( 1)  x1 = 0
 
        chi2(  1) =  134.55
@@ -5579,7 +5604,7 @@ msg
 **输出**
 
 ```text
-weights must be non-negative
+None
 ```
 
 ### `ExpListError`
@@ -5659,7 +5684,7 @@ ws.parse_exp_list('(n=e(N)) (m=r(mean))').evaluate(s)
 **签名**
 
 ```python
-ws.WeightSpec(weights: 'np.ndarray', weight_type: 'str', effective_n: 'float', implies_robust: 'bool', n_obs: 'int') -> None
+ws.WeightSpec(weights: 'np.ndarray', weight_type: 'str', effective_n: 'float', implies_robust: 'bool', n_obs: 'int', dropped: 'int' = 0, kept: 'np.ndarray | None' = None) -> None
 ```
 
 **示例**
@@ -5671,7 +5696,7 @@ ws.normalize_weights(np.array([1.0, 2.0, 3.0, 4.0]), 'pweight')
 **输出**
 
 ```text
-WeightSpec(weights=array([0.4, 0.8, 1.2, 1.6]), weight_type='pweight', effective_n=4.0, implies_robust=True, n_obs=4)
+WeightSpec(weights=array([0.4, 0.8, 1.2, 1.6]), weight_type='pweight', effective_n=4.0, implies_robust=True, n_obs=4, dropped=0, kept=None)
 ```
 
 ### `WEIGHT_TYPES`
@@ -5737,13 +5762,13 @@ ws.estat_vce(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 **输出**
 
 ```text
+
 Covariance matrix of coefficients of regress model
-             | y
-        e(V) |         x1          x2       _cons
+
+        e(V) |         x1          x2       _cons 
 -------------+-----------------------------------
-y            |
-          x1 |  .00525206
-          x2 | 2.0558e-05   .00559838
+          x1 |  .00525206                         
+          x2 |  .00002056   .00559838             
        _cons | -.00030246   -.0003569    .0055396
 ```
 
@@ -5795,6 +5820,7 @@ r.test('x1 = 0')
 **输出**
 
 ```text
+
  ( 1)  x1 = 0
 
        F(  1,   197) =  134.55
@@ -5825,7 +5851,9 @@ r.lincom('x1 - x2')
 **输出**
 
 ```text
+
  ( 1)  x1 - x2 = 0
+
 ------------------------------------------------------------------------------
            y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
@@ -5889,7 +5917,7 @@ ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 
 ```text
 
-    Variable |       VIF       1/VIF
+    Variable |       VIF       1/VIF  
 -------------+----------------------
           x1 |      1.00    0.999986
           x2 |      1.00    0.999986
@@ -5918,10 +5946,13 @@ ws.margins(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), dydx='x1')
 **输出**
 
 ```text
+
 Average marginal effects                                   Number of obs = 200
 Model VCE: OIM
+
 Expression: Pr(yb), predict()
 dy/dx wrt:  x1
+
 ------------------------------------------------------------------------------
              |            Delta-method
              |      dy/dx   std. err.      z    P>|z|     [95% conf. interval]
@@ -6008,7 +6039,7 @@ ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 
 ```text
 
-Breusch–Pagan/Cook–Weisberg test for heteroskedasticity
+Breusch–Pagan/Cook–Weisberg test for heteroskedasticity 
 Assumption: Normal error terms
 Variable: Fitted values of y
 
@@ -6081,7 +6112,7 @@ Omitted: Powers of fitted values of y
 H0: Model has no omitted variables
 
 F(3, 194) =   0.58
-Prob > F = 0.6277
+ Prob > F = 0.6277
 ```
 
 ### `EndogenousResult`
@@ -6107,8 +6138,8 @@ ws.estat_endogenous(iv)
 
 ```text
 
-Tests of endogeneity
-H0: Variables are exogenous
+  Tests of endogeneity
+  H0: Variables are exogenous
 
   Durbin (score) chi2(1)          =  1.64391  (p = 0.1998)
   Wu-Hausman F(1,196)             =  1.62438  (p = 0.2040)
@@ -6137,14 +6168,16 @@ ws.estat_firststage(iv)
 
 ```text
 
-First-stage regression summary statistics
---------------------------------------------------------------------------
-             |            Adjusted      Partial
-    Variable |   R-sq.       R-sq.        R-sq.      F(1,197)   Prob > F
--------------+------------------------------------------------------------
-          x2 |  0.0008     -0.0093       0.0008         0.160    0.6897
---------------------------------------------------------------------------
-  Minimum eigenvalue statistic = 0.160
+  First-stage regression summary statistics
+  --------------------------------------------------------------------------
+               |            Adjusted      Partial
+      Variable |   R-sq.       R-sq.        R-sq.      F(1,197)   Prob > F
+  -------------+------------------------------------------------------------
+            x2 |  0.0008     -0.0093       0.0008      0.159849    0.6897
+  --------------------------------------------------------------------------
+
+
+  Minimum eigenvalue statistic = 0.159849    
 
   Critical Values                      # of endogenous regressors:    1
   H0: Instruments are weak             # of excluded instruments:     1
@@ -6181,9 +6214,10 @@ ws.estat_overid(iv)
 
 ```text
 
-Tests of overidentifying restrictions:
-  Sargan (score) chi2(1) =  .002977  (p = 0.9565)
-  Basmann chi2(1)        =  .002918  (p = 0.9569)
+  Tests of overidentifying restrictions:
+
+  Sargan (score) chi2(1) = .00297725  (p = 0.9565)
+  Basmann chi2(1)        = .00291775  (p = 0.9569)
 ```
 
 ### `LRTestResult`
@@ -6224,7 +6258,7 @@ Hausman 设定检验：`(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`。字段：`sta
 **签名**
 
 ```python
-ws.HausmanResult(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>) -> None
+ws.HausmanResult(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '') -> None
 ```
 
 **示例**
@@ -6238,9 +6272,21 @@ fe.hausman(re)
 **输出**
 
 ```text
-Hausman test
-  chi2(1) = 1.45
-  Prob > chi2 = 0.2280
+
+                 ---- Coefficients ----
+             |      (b)          (B)            (b-B)     sqrt(diag(V_b-V_B))
+             |       fe           re         Difference       Std. err.
+-------------+----------------------------------------------------------------
+          x1 |     .709774     .7287794       -.0190054        .0157648
+------------------------------------------------------------------------------
+                          b = Consistent under H0 and Ha; obtained from xtreg.
+           B = Inconsistent under Ha, efficient under H0; obtained from xtreg.
+
+Test of H0: Difference in coefficients not systematic
+
+    chi2(1) = (b-B)'[(V_b-V_B)^(-1)](b-B)
+            =   1.45
+Prob > chi2 = 0.2280
 ```
 
 **注意:** 差矩阵 `V_c - V_e` 在有限样本中可能奇异或出现负特征值；该检验只比较两个模型共有的系数，`df` 数的就是这些。
@@ -6294,7 +6340,6 @@ Absorbed variable: firm                            No. of categories =      40
 -------------+----------------------------------------------------------------
           x1 |   .8095565   .0872367     9.28   0.000     .6372645    .9818486
        _cons |   .9742472   .0816927    11.93   0.000     .8129043     1.13559
-------------------------------------------------------------------------------
 F test of absorbed indicators: F(39, 159) = 1.095       Prob > F = 0.340
 ```
 
@@ -6387,6 +6432,66 @@ print(round(r.rho, 6))
 None
 ```
 
+### `RandomEffectsMLE`
+
+**Stata 指令:** `xtreg ypanel x1 x2, mle`
+
+用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。
+
+**签名**
+
+```python
+ws.RandomEffectsMLE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+```
+
+**`RandomEffectsMLE.from_formula`**
+
+```python
+RandomEffectsMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+```
+
+**`RandomEffectsMLE.fit`**
+
+```python
+RandomEffectsMLE.fit(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+```
+
+**示例**
+
+```python
+ws.RandomEffectsMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+```
+
+**输出**
+
+```text
+
+Random-effects ML regression                         Number of obs    =    200
+Group variable: firm                                 Number of groups =     40
+
+Random effects u_i ~ Gaussian                        Obs per group:
+                                                                  min =      .
+                                                                  avg =      .
+                                                                  max =      .
+
+                                                     LR chi2(2)       =  82.25
+Log likelihood = -308.62872                          Prob > chi2      = 0.0000
+
+------------------------------------------------------------------------------
+      ypanel | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .7282049    .072845    10.00   0.000     .5854313    .8709784
+          x2 |  -.1199841   .0780419    -1.54   0.124    -.2729434    .0329752
+       _cons |   .8439937   .1404197     6.01   0.000     .5687762    1.119211
+------------------------------------------------------------------------------
+-------------+----------------------------------------------------------------
+    /sigma_u |  .77026643
+    /sigma_e |  .98414177
+         rho |  .37987779
+------------------------------------------------------------------------------
+LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
+```
+
 ### `SummarizeResult`
 
 **Stata 指令:** `estat summarize -- summarize of the estimation sample`
@@ -6415,6 +6520,41 @@ x1        200.0  0.057340   1.025868 -2.832134  3.278208
 x2        200.0  0.063540   0.993631 -2.226171  3.259538
 ```
 
+### `SynthResult`
+
+**Stata 指令:** `ereturn list -- the e() matrices synth stores`
+
+承载 `synth` 结果的冻结数据类。字段名逐字对应 Stata 的 `e()` 矩阵：`V_matrix`（K x K 对角预测变量权重——注意没有普通的 `e(V)`）、`W_weights`、`X_balance`、`RMSPE`、`Y_treated`、`Y_synthetic`，都可通过 `e` 属性一并取得。`gap` 是处理效应路径 `Y_treated - Y_synthetic`，`summary()` 给出紧凑的 Stata 风格报告，`W_exact` 保留未舍入的 QP 解供诊断。它**不是** `StataResults`，因此没有 `params`、`bse` 或 `cov_params`。
+
+**签名**
+
+```python
+ws.SynthResult(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray') -> None
+```
+
+**示例**
+
+```python
+units = [1, 2, 3, 4, 5]
+years = np.arange(1997, 2006)
+u = np.repeat(units, len(years))
+t = np.tile(years, len(units))
+rng = np.random.default_rng(0)
+x1 = 0.5 * u + rng.normal(size=len(u))
+x2 = 0.2 * u + rng.normal(size=len(u))
+y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
+panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
+res = ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)
+res.V_matrix
+```
+
+**输出**
+
+```text
+[[0.757511 0.      ]
+ [0.       0.242489]]
+```
+
 ### `dfgls`
 
 **Stata 指令:** `dfgls varname`
@@ -6424,7 +6564,7 @@ x2        200.0  0.063540   0.993631 -2.226171  3.259538
 **签名**
 
 ```python
-ws.dfgls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = False) -> 'DFGLSResult'
+ws.dfgls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, notrend: 'bool' = False, name: 'str' = '') -> 'DFGLSResult'
 ```
 
 **示例**
@@ -6439,6 +6579,101 @@ print(ws.dfgls(base['y'].to_numpy()))
 None
 ```
 
+### `dfuller`
+
+**Stata 指令:** `dfuller y, lags(2)`
+
+增广 Dickey-Fuller 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`dfuller(y, trend=True)` 等价于 `unitroot(y, test='adf', regression='ct')`，不带选项时 `regression='c'`，显式给 `regression=` 会覆盖 `trend`。`lags=` 对应 Stata 的 `lags(#)`（默认零阶滞后）。返回 `UnitRootResult`，打印形式为 Stata 的 Dickey-Fuller 表，统计量存于 `r(Zt)`，MacKinnon p 值存于 `r(p)`。
+
+**签名**
+
+```python
+ws.dfuller(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'
+```
+
+**示例**
+
+```python
+ws.dfuller(base['y'], lags=2)
+```
+
+**输出**
+
+```text
+
+Augmented Dickey–Fuller test for unit root
+Variable: y                               Number of obs  = 197
+                                          Number of lags =   2
+
+H0: Random walk without drift, d = 0
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)            -6.706       -3.478       -2.884       -2.574
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.0000.
+```
+
+### `ereturn_list`
+
+**Stata 指令:** `ereturn list`
+
+单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : "text"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。
+
+**签名**
+
+```python
+ws.ereturn_list(self) -> 'str'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.ereturn_list()
+```
+
+**输出**
+
+```text
+
+scalars:
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  2
+               e(df_r) =  197
+                  e(F) =  90.99954130641439
+                 e(r2) =  .4802098236178376
+               e(rmse) =  1.048768791147598
+                e(mss) =  200.1836988170982
+                e(rss) =  216.6834475251831
+               e(r2_a) =  .4749327659895922
+                 e(ll) =  -291.7997221200006
+               e(ll_0) =  -357.2327276994888
+               e(rank) =  3
+
+macros:
+              e(title) : "Linear regression"
+          e(marginsok) : "XB default"
+                e(vce) : "ols"
+             e(depvar) : "y"
+                e(cmd) : "regress"
+         e(properties) : "b V"
+            e(predict) : "regres_p"
+              e(model) : "ols"
+          e(estat_cmd) : "regress_estat"
+
+matrices:
+                  e(b) :  1 x 3
+                  e(V) :  3 x 3
+               e(beta) :  1 x 2
+
+functions:
+             e(sample)
+```
+
 ### `estat_bgodfrey`
 
 **Stata 指令:** `estat bgodfrey, lags(#)`
@@ -6448,7 +6683,7 @@ Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**�
 **签名**
 
 ```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1) -> 'BgTestResult'
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False) -> 'BgTestResult'
 ```
 
 **示例**
@@ -6511,17 +6746,146 @@ print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
 None
 ```
 
+### `etable_as_stata`
+
+**Stata 指令:** `esttab m1 m2, se r2 mtitle`
+
+把 `etable` 按 Stata `esttab` 的打印形式渲染出来。它是 `render_esttab` 的便捷封装，转发 `model_names`、`digits`、`se`、`stars` 与 `stats`；`etable` 本身返回数据框（对程序更有用），而本函数返回与 Stata 对比所需的精确文本。两者刻意并存——互不替代。
+
+**签名**
+
+```python
+ws.etable_as_stata(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, digits: 'int' = 3, se: 'bool' = True, stars: 'bool' = True, stats: 'Sequence[tuple[str, str]] | None' = None) -> 'str'
+```
+
+**示例**
+
+```python
+m1 = ws.OLS.from_formula('y ~ x1', base).fit()
+m2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+ws.etable_as_stata([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])
+```
+
+**输出**
+
+```text
+
+--------------------------------------------
+                      (1)             (2)   
+                       m1              m2   
+                        y               y   
+--------------------------------------------
+x1                  0.843***        0.841***
+                 (0.0804)        (0.0725)   
+
+x2                                 -0.512***
+                                 (0.0748)   
+
+_cons               0.972***        1.005***
+                 (0.0824)        (0.0744)   
+--------------------------------------------
+N                     200             200   
+R-sq                0.357           0.480   
+--------------------------------------------
+Standard errors in parentheses
+* p<0.05, ** p<0.01, *** p<0.001
+```
+
+### `f_test`
+
+**Stata 指令:** `test x1 = 0, x2 = 0 (joint F)`
+
+已拟合结果上的 statsmodels 风格联合 F 检验。`r_matrix` 接受一个或多个以逗号分隔的约束字符串（或一个序列），按与 `test` 相同的 Stata 约束语法解析后，以 F 统计量联合报告。返回 `ContrastResults`，含 `statistic`、`pvalue`、`df_num`/`df_denom` 以及 `fvalue`/`tvalue` 别名。这是面向 statsmodels 生态的接口，并非 Stata 自身的 `test` 方法。
+
+**签名**
+
+```python
+ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.f_test('x1 = 0, x2 = 0')
+```
+
+**输出**
+
+```text
+<F contrast: statistic=90.9995, pvalue=1.02109e-28, df_denom=197>
+```
+
+### `first_stage`
+
+**Stata 指令:** `ivregress 2sls ..., first`
+
+IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。
+
+**签名**
+
+```python
+ws.first_stage(self) -> 'str'
+```
+
+**示例**
+
+```python
+r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()
+r.first_stage()
+```
+
+**输出**
+
+```text
+First-stage regressions
+-----------------------
+
+                                                        Number of obs =    200
+                                                        F(2, 197)     =  36.02
+                                                        Prob > F      = 0.0000
+                                                        R-squared     = 0.2678
+                                                        Adj R-squared = 0.2603
+                                                        Root MSE      = 0.4139
+
+------------------------------------------------------------------------------
+       treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
+          x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
+          x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
+------------------------------------------------------------------------------
+```
+
+### `fitted_series`
+
+**Stata 指令:** `predict yhat, xb -- with the estimation sample's index`
+
+以 `pandas.Series` 给出的拟合值，带估计样本索引、名称为 `fittedvalues`。它是普通 `fittedvalues` ndarray 的带标签版本：若把后者直接换成 Series 会破坏按位置访问，因此另设此名。当拟合未保留观测标签时，索引退化为 `RangeIndex`——这是诚实的做法：数值仍在，标签只表示「第 i 行」。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.fitted_series.head()
+```
+
+**输出**
+
+```text
+0    2.524914
+1    0.144945
+2    1.126616
+3    2.107762
+4    0.869349
+Name: fittedvalues, dtype: float64
+```
+
 ### `format_ereturn_list`
 
 **Stata 指令:** `ereturn list`
 
-Stata `ereturn list` 的四个区块：scalars、macros、matrices、functions，顺序固定，每块前有一个空行，整段以空行开头。标量与宏使用不同的分隔（` =  ` 两个空格 对 单个空格加冒号），两块以**类型**划分：字符串归入 macros，数值归入 scalars。
-
-名称右对齐到 22 列；标量值去掉前导零。`scalars` 只打印命令**实际发布**的键 —— `regress` 报告十三个，而 `e(aic)`、`e(bic)`、`e(sigma)` 虽被存储却不打印。未与实时 Stata 对照测量过的命令保留全部标量，因为凭猜测删行比多打印更糟。
-
-`e(cmdline)` 刻意缺失：它记录的是用户实际输入的命令（含选项），本包没有该记录，编造出来就是伪造值。
-
-结果对象带 `ereturn_list()` 时，本函数委托给它，两者不会再出现分歧。
+Stata `ereturn list` 的四个块：scalars、macros、matrices、functions——顺序固定，每块后跟一个空行。标量与宏用**不同的分隔符**（` =  ` 两个空格 对 一个空格加冒号），两块按**类型**划分：字符串进 macros、数字进 scalars，因此以后新增的宏不会被错误归档。标量值打印至多 16 位有效数字，无前导零、无尾随零。
 
 **签名**
 
@@ -6544,14 +6908,14 @@ scalars:
               e(sum_w) =  200
                e(df_m) =  1
                e(df_r) =  198
-                  e(F) =  651.4420949517942
-                 e(r2) =  .7669058301010659
-               e(rmse) =  1.028277863327364
-                e(mss) =  688.8057935688862
-                e(rss) =  209.3563621133996
-               e(r2_a) =  .7657285868187481
-                 e(ll) =  -288.3597581706589
-               e(ll_0) =  -433.9910326118382
+                  e(F) =  109.7490736414687
+                 e(r2) =  .3566186969885982
+               e(rmse) =  1.163859236421547
+                e(mss) =  148.6626185459396
+                e(rss) =  268.2045277963416
+               e(r2_a) =  .3533692964683386
+                 e(ll) =  -313.1309552730224
+               e(ll_0) =  -357.2327276994888
                e(rank) =  2
 
 macros:
@@ -6574,6 +6938,31 @@ functions:
              e(sample)
 ```
 
+### `get_influence`
+
+**Stata 指令:** `(no Stata equivalent -- statsmodels OLSInfluence names)`
+
+已拟合结果的影响度量，命名沿用 statsmodels 的 `OLSInfluence`。返回字典，含 `hat_matrix_diag`（杠杆）、`resid`、`resid_studentized_internal`、`resid_studentized`、`standardized_resid`、`cooks_distance`（数组加观测索引）与 `nobs`。只提供基于杠杆的度量：删除诊断需要逐观测重新拟合，返回「看起来合理但错误」的数组被认为比不提供该键更糟。
+
+**签名**
+
+```python
+ws.get_influence(self) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.get_influence()['hat_matrix_diag'][:5]
+```
+
+**输出**
+
+```text
+[0.024179 0.010089 0.005392 0.011287 0.005195]
+```
+
 ### `kpss`
 
 **Stata 指令:** `kpss varname`
@@ -6583,7 +6972,7 @@ KPSS 平稳性检验——其原假设与旁边的单位根检验**相反**：`H
 **签名**
 
 ```python
-ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None) -> 'KpssResult'
+ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, name: 'str' = '') -> 'KpssResult'
 ```
 
 **示例**
@@ -6620,6 +7009,25 @@ x1         0.709618  0.975431
 
 **注意:** 该属性返回分数；`conf_int()` 仍接受显式 `alpha`，那一次调用里它会覆盖已记录的水平。它只影响区间的报告，**不改变任何系数或标准误**。
 
+### `model`
+
+**Stata 指令:** `(no Stata equivalent -- a statsmodels interop shim)`
+
+以 statsmodels 消费者期待的形式给出的已拟合模型。`statsmodels.stats.anova.anova_lm` 会读取 `res.model` 并由其重新拟合；缺少该属性时该调用会抛 AttributeError。返回的 `ResultModel` 只暴露 `endog`、`exog`、`exog_names` 以及返回本结果自身的 `fit()`——足以满足 `anova_lm` 的契约，而不冒充真正的 statsmodels 模型。过度模仿会诱使调用方依赖并不存在的行为。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.model
+```
+
+**输出**
+
+```text
+<ResultModel: 200 obs, 3 params>
+```
+
 ### `odds_ratios`
 
 **Stata 指令:** `logit ..., or  (column, not a separate function)`
@@ -6638,6 +7046,43 @@ print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', o
 None
 ```
 
+### `pperron`
+
+**Stata 指令:** `pperron y, trend`
+
+Phillips-Perron 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`pperron(y, trend=True)` 等价于 `unitroot(y, test='pp', regression='ct')`，选项映射与 `dfuller` 相同。返回 `UnitRootResult`；当 `lags=None` 时，Newey-West 滞后截断采用与 `dfuller` 相同的默认值。
+
+**签名**
+
+```python
+ws.pperron(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'
+```
+
+**示例**
+
+```python
+ws.pperron(base['y'], trend=True)
+```
+
+**输出**
+
+```text
+
+Augmented Dickey–Fuller test for unit root
+Variable: y                               Number of obs  = 199
+                                          Number of lags =   4
+
+H0: Random walk with or without drift
+
+                                       Dickey–Fuller
+                   Test      -------- critical value ---------
+              statistic           1%           5%          10%
+--------------------------------------------------------------
+ Z(t)           -14.483       -4.007       -3.437       -3.137
+--------------------------------------------------------------
+MacKinnon approximate p-value for Z(t) = 0.0000.
+```
+
 ### `prais`
 
 **Stata 指令:** `prais depvar indepvars`
@@ -6647,7 +7092,7 @@ Prais-Winsten AR(1) 回归：用估计出的自相关系数变换数据后做 GL
 **签名**
 
 ```python
-ws.prais(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-08) -> 'PraisResult'
+ws.prais(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'
 ```
 
 **示例**
@@ -6699,7 +7144,7 @@ round(r.att, 6)
 **签名**
 
 ```python
-ws.rdrobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular') -> 'RdRobustResult'
+ws.rdrobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResult'
 ```
 
 **示例**
@@ -6717,6 +7162,94 @@ round(ws.rdrobust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
 ```
 
 **注意:** 未复现稳健（CCT）标准误：`rdrobust_vce` 只存在于编译后的 lrdrobust.mlib 中，因此 se/z/ci 为 NaN。其外围的组装步骤已用 Stata 自身的 e(V_cl_l)/e(V_cl_r) 验证过。
+
+### `render_esttab`
+
+**Stata 指令:** `esttab m1 m2, se r2 mtitle`
+
+把一个或多个已拟合结果渲染为 Stata `esttab` 打印的**文本**：`(1) (2)` 编号行、给出 `model_names` 时的 `mtitle` 行、带括号内标准误与显著性星号的系数行，以及统计量页脚。`stats` 是 `(标签, 来源)` 对序列，默认给出来自 `nobs` 的 `N`；`stats_digits` 控制页脚小数位。与返回数据框给程序用的 `etable` 不同，本函数返回可打印字符串。实测的 44 列版式最多容纳两个模型。
+
+**签名**
+
+```python
+ws.render_esttab(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None', digits: 'int' = 3, se: 'bool' = True, stars: 'bool' = True, stats: 'Sequence[tuple[str, Any]] | None' = None, stats_digits: 'int' = 3) -> 'str'
+```
+
+**示例**
+
+```python
+m1 = ws.OLS.from_formula('y ~ x1', base).fit()
+m2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+ws.render_esttab([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])
+```
+
+**输出**
+
+```text
+
+--------------------------------------------
+                      (1)             (2)   
+                       m1              m2   
+                        y               y   
+--------------------------------------------
+x1                  0.843***        0.841***
+                 (0.0804)        (0.0725)   
+
+x2                                 -0.512***
+                                 (0.0748)   
+
+_cons               0.972***        1.005***
+                 (0.0824)        (0.0744)   
+--------------------------------------------
+N                     200             200   
+R-sq                0.357           0.480   
+--------------------------------------------
+Standard errors in parentheses
+* p<0.05, ** p<0.01, *** p<0.001
+```
+
+### `resid_series`
+
+**Stata 指令:** `predict e, residuals -- with the estimation sample's index`
+
+以 `pandas.Series` 给出的残差，带估计样本索引、名称为 `resid`，是普通 `resid` ndarray 的带标签版本。它为兼容 statsmodels 而设，同时不改动 ndarray 的按位置访问行为；拟合未保留行标签时索引退化为 `RangeIndex`。对应的拟合值见 `fitted_series`。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.resid_series.head()
+```
+
+**输出**
+
+```text
+0   -0.245449
+1   -0.012850
+2   -1.598986
+3    0.354059
+4    0.682509
+Name: resid, dtype: float64
+```
+
+### `response_name`
+
+**Stata 指令:** `e(depvar)`
+
+被解释变量名，用于标题与列头。有的估计量把它设为实例属性，有的不设（ARIMA 与 GARCH 属于后者），因此该属性回退到 `e(depvar)`——每个拟合都会携带的宏——从而与基于公式的估计量给出相同答案。子类若赋值 `self.response_name` 仍然优先，因为先查实例字典。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.response_name
+```
+
+**输出**
+
+```text
+y
+```
 
 ### `stata_cov_params`
 
@@ -6810,7 +7343,7 @@ Stata 原生 `summarize` 表：每个变量的非缺失数、均值、标准差�
 **签名**
 
 ```python
-ws.summarize(data: 'Any', variables: 'Sequence[str] | None' = None, *, weights: 'Any' = None) -> 'SummarizeTable'
+ws.summarize(data: 'Any', variables: 'Sequence[str] | None' = None, *, weights: 'Any' = None, detail: 'bool' = False) -> 'Any'
 ```
 
 **示例**
@@ -6822,10 +7355,71 @@ ws.summarize(base, ['y', 'x1'])
 **输出**
 
 ```text
+
     Variable |        Obs        Mean    Std. dev.       Min        Max
 -------------+---------------------------------------------------------
            y |        200    1.020667    1.447346  -2.752204   4.881985
           x1 |        200    .0573402    1.025868  -2.832134   3.278208
+```
+
+### `synth`
+
+**Stata 指令:** `synth y x1 x2, trunit(1) trperiod(2005)`
+
+合成控制估计（Stata `synth`，默认基于回归的 V 路径）。用若干控制单元构造加权组合，使其在干预前的预测变量均值上与处理单元匹配，再以之作为反事实。`unit`/`time`/`depvar` 指定面板列，`predictors` 为匹配变量，`trunit`/`trperiod` 为处理单元与干预时点。返回冻结的 `SynthResult` 数据类；由于 `synth` 没有系数向量、没有 `e(V)`、也没有自由度，这些 statsmodels 风格属性被刻意省略而不伪造。示例内联构造一个 5 单元 x 9 期的小平衡面板，因此不依赖任何外部 .dta 文件。
+
+**签名**
+
+```python
+ws.synth(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, figure: 'bool' = False, keep: 'str | None' = None, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'
+```
+
+**示例**
+
+```python
+units = [1, 2, 3, 4, 5]
+years = np.arange(1997, 2006)
+u = np.repeat(units, len(years))
+t = np.tile(years, len(units))
+rng = np.random.default_rng(0)
+x1 = 0.5 * u + rng.normal(size=len(u))
+x2 = 0.2 * u + rng.normal(size=len(u))
+y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
+panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
+ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).RMSPE
+```
+
+**输出**
+
+```text
+1.3651043054505119
+```
+
+**注意:** 仅实现默认路径：`nested`/`allopt`、`figure`、`keep()`、`placebo` 以及任何推断量都会抛出 `UnsupportedError`。`customV` 提供对角预测变量权重；`xperiod`/`mspeperiod`/`resultsperiod` 覆盖预处理窗口。输出的 `W_weights` 按 Stata 做法四舍五入到 3 位小数，而 `RMSPE` 使用精确 QP 权重。
+
+### `t_test`
+
+**Stata 指令:** `test x1 = 0 (single restriction, t form)`
+
+单个线性约束的 statsmodels 风格 t 检验。`r_matrix` 是一个约束字符串（或单元素序列）；`use_t` 强制采用 t 形式，其统计量为相应 F 的平方根。返回 `ContrastResults`，含 `statistic`、`pvalue`、单约束可用的 `conf_int()` 以及 `fvalue`/`tvalue` 别名。若要检验多个联合约束，请改用 `f_test`。
+
+**签名**
+
+```python
+ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.t_test('x1 = 0')
+```
+
+**输出**
+
+```text
+<t contrast: statistic=11.5997, pvalue=4.75584e-24, df_denom=197>
 ```
 
 ### `tebalance_summarize`
@@ -6837,7 +7431,7 @@ ws.summarize(base, ['y', 'x1'])
 **签名**
 
 ```python
-ws.tebalance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = ()) -> 'BalanceSummary'
+ws.tebalance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalise_counts: 'bool' = False) -> 'BalanceSummary'
 ```
 
 **示例**
@@ -6854,18 +7448,20 @@ ws.tebalance_summarize(base['treat'].to_numpy(), base[['x1','x2']].to_numpy(), m
 
 ```text
 Covariate balance summary
-                                Raw    Matched
+
+                         Raw      Matched
 -----------------------------------------
-Number of obs =          200        179
-Treated obs   =          128        128
-Control obs   =           72         51
+Number of obs =          200          179
+Treated obs   =          128          128
+Control obs   =           72           51
 -----------------------------------------
+
 -----------------------------------------------------------------
-                |  Standardized differences    Variance ratio
-                |      Raw      Matched        Raw    Matched
+                |Standardized differences          Variance ratio
+                |        Raw     Matched           Raw    Matched
 ----------------+------------------------------------------------
-              x1 |  -.1960176   -.0278721    1.036638    1.192021
-              x2 |  -.3042354   -.2882414     .770740     .860601
+             x1 |  -.1960176   -.0278721      1.036638   1.192021
+             x2 |  -.3042354   -.2882414      .7707397   .8606013
 -----------------------------------------------------------------
 ```
 
@@ -6904,7 +7500,7 @@ NnmatchResult(ate=1.4150728330730742, nobs=200, treated=128, controls=72, nneigh
 **签名**
 
 ```python
-ws.teffects_psmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-06, outcome: 'str' = '') -> 'PsmatchResult'
+ws.teffects_psmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'PsmatchResult'
 ```
 
 **示例**
@@ -6979,15 +7575,15 @@ ws.vargranger(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fi
 
 ```text
    Granger causality Wald tests
-  +-----------------------------------------------------------------+
+  +------------------------------------------------------------------+
   |          Equation           Excluded |   chi2     df Prob > chi2 |
   |--------------------------------------+---------------------------|
-  |                y1                 y2 |   0.025     1    0.873    |
-  |                y1                ALL |   0.025     1    0.873    |
+  |                y1                 y2 | .025404     1    0.873    |
+  |                y1                ALL | .025404     1    0.873    |
   |--------------------------------------+---------------------------|
-  |                y2                 y1 |   0.553     1    0.457    |
-  |                y2                ALL |   0.553     1    0.457    |
-  +-----------------------------------------------------------------+
+  |                y2                 y1 |  .55296     1    0.457    |
+  |                y2                ALL |  .55296     1    0.457    |
+  +------------------------------------------------------------------+
 ```
 
 **注意:** 即使只排除一个变量，每个方程块仍以 ALL 行结尾；Stata 就是这样打印的，该行与单行完全相同。
@@ -7020,7 +7616,7 @@ None
 
 **Stata 指令:** `varsoc varlist, maxlag(#)`
 
-VAR 的滞后阶选择准则：对每个候选阶数给出最终预测误差、AIC、HQIC 与 SBIC，并按各准则分别给最小者加星。四个准则经常不一致，Stata 是各自加星而不是替你选一个。
+`ws.varsoc` 给出 VAR 的滞后阶选择准则：对每个候选阶数给出最终预测误差、AIC、HQIC 与 SBIC，并按各准则分别给最小者加星。四个准则经常不一致，Stata 是各自加星而不是替你选一个。
 
 **签名**
 
@@ -7044,7 +7640,7 @@ None
 
 **Stata 指令:** `varstable`
 
-已拟合 VAR 的特征值稳定性条件：伴随矩阵各特征值的模与其特征值并列。当所有模都严格落在单位圆内时过程稳定，Stata 会把不满足的标出来。
+`ws.varstable` 检查已拟合 VAR 的特征值稳定性条件：伴随矩阵各特征值的模与其特征值并列。当所有模都严格落在单位圆内时过程稳定，Stata 会把不满足的标出来。
 
 **签名**
 
@@ -7068,7 +7664,7 @@ None
 
 **Stata 指令:** `varwle`
 
-VAR 的 Wald 滞后排除检验：对每个方程，检验每一阶的系数是否联合为零，另加一行 ALL。统计量由系数协方差构造的 Wald chi2，因此需要整个滞后块，而不是逐个系数。
+`ws.varwle` 给出 VAR 的 Wald 滞后排除检验：对每个方程，检验每一阶的系数是否联合为零，另加一行 ALL。统计量由系数协方差构造的 Wald chi2，因此需要整个滞后块，而不是逐个系数。
 
 **签名**
 
@@ -7121,7 +7717,7 @@ Johansen 协整秩检验，含 trace 与最大特征值两种形式及其 5% 临
 **签名**
 
 ```python
-ws.vecrank(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant') -> 'VecRankResult'
+ws.vecrank(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant', show_max: 'bool' = False) -> 'VecRankResult'
 ```
 
 **示例**

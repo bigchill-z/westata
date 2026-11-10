@@ -105,10 +105,14 @@
 
 ## 5. 缺失功能（按目标口径记录并跳过）
 
+> **2026-11-09 更正**：下表中 `synth` 一行是当时的快照，现已失效——`ws.synth`
+> 默认路径已落地（E2），两个 Mata 内核被精确求解；`synth2` 仍不做。原文保留为历史。
+> 详见 `docs/GAP_REGISTER.md` §3.6.4。
+
 | 功能 | 报告条目 | 记录 |
 |---|---|---|
 | `bwselect` / `msetwo` | C16-02 | T1、T3（ADB 字节码）|
-| `synth` / `synth2` | C18-02 | T3、T6（6 个内核不可读）|
+| `synth` / `synth2` | C18-02 | ~~T3、T6（6 个内核不可读）~~ → 2026-11-09 证伪并落地 `synth` E2 |
 | `xtserial` | C12-11 | T3（本机 Stata 未安装）|
 | `summarize, detail` 百分位 | — | ~~T24~~ **已实现** |
 | `teffects psmatch` 方差 | C15-01 | T3、T23 |

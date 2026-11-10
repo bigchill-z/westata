@@ -94,6 +94,29 @@ produce the same permutation.
 `bootstrap` **is** replicate-for-replicate comparable (after repair: `b` gap 0, `se` gap
 1.1e-9). `permute` gives a statistically meaningful p-value but not the same draw sequence.
 
+### `synth` — W exactly, RMSPE bounded (E2)
+
+`ws.synth` implements Stata's **default** path (regression-based V + the inner
+constrained QP). Against six full-precision captures from StataNow 19.5 the
+six `e()` matrices compare as follows:
+
+| Quantity | Measured bound | Observed worst |
+|---|---|---|
+| `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) |
+| `e(W_weights)` | `|dW| <= 1e-3` | **0** at Stata's 3-dp display rounding |
+| `e(X_balance)`, `e(Y_synthetic)` | `<= 1e-3` | follows from the rounded W |
+| `e(RMSPE)` | `|d| <= 1e-2` | 5.6e-4 |
+
+RMSPE is the one quantity that cannot be quoted as Stata's. `H = Xco' V Xco`
+has rank `<= K << J`, so the QP optimum is not unique; Stata's C++ interior-point
+plugin stops off the optimal face at `margin=0.005`, while scipy's SLSQP solves
+it more tightly. Stata's own two identical runs already differ by `1.471e-11`.
+**E3 / bit-for-bit reproduction is therefore excluded.** Use `e(W_weights)`,
+`e(V_matrix)` and the balance table; treat RMSPE as an approximate fit statistic.
+
+`synth, nested` / `allopt`, `synth2`, figures, `keep()` and placebo raise
+`UnsupportedError`. See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
+
 ---
 
 ## Do not compare

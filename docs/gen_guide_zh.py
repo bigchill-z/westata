@@ -313,7 +313,11 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`、`RegressionAdjustment`、`IPW`、`AIPW` |
+| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
+| `tebalance summarize` | `tebalance_summarize(...)` |
 | `didregress` / `xtdidregress` | `Didregress`、`Xtdidregress` |
+| `rcm` | `rcm(...)` —— 需要与 Stata 一致的结果请传 `selected=` |
+| `synth`（默认路径） | `synth(...)` —— 六个 `e()` 矩阵，证据等级 E2 |
 
 ### 时间序列
 

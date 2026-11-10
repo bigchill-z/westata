@@ -1,19 +1,22 @@
-"""The two report rows with no guard, and why they have none.
+"""The report rows that had no guard, and why.
 
-At this point 88 of the 90 scored rows in the assessment report are referenced by a test. The two that are
-not are missing FEATURES rather than unverified ones, and this file records that distinction so the gap does
-not read as unfinished verification:
+At the time this file was written, two of the 90 scored rows were missing
+FEATURES rather than unverified ones::
 
     C16-02   rdrobust bandwidth selection (bwselect, msetwo)   0.0
     C18-02   synth2                                             0.0
 
-NEITHER NAME EXISTS IN THE PACKAGE AT ALL, which is the check this file performs -- not "it raises" but
-"there is nothing to call". options.md records what each would need: T3 lists the two commands, and T6
-documents how much of synth is readable (synth.ado is 931 readable lines; six numeric kernels live in
-lsynth_mata_subr.mlib and cannot be read).
+Those two still do not exist in the package, and the guards below pin that.
 
-A GUARD THAT ASSERTS ABSENCE IS DELIBERATE HERE. The alternative -- pinning that the call raises -- would
-freeze an accident: if someone later implements synth, a test asserting it fails would be actively wrong.
+``synth`` (C18-01) is DIFFERENT: it landed on 2026-11-09 as the B-grade default
+path (see docs/superpowers/specs/2026-11-09-synth-b-design.md).  The original
+guard asserted ``not hasattr(ws, "synth")`` with the explicit note that
+"if someone later implements synth, a test asserting it fails would be
+actively wrong".  It has therefore been converted to a presence + behaviour
+guard rather than deleted: the estimator really is exported now.
+
+``synth2`` remains absent on purpose -- it is a wrapper adding figures,
+placebo/LOO and graphs, all outside westata's scope.
 """
 
 import warnings
@@ -30,11 +33,17 @@ def test_bwselect_is_not_implemented() -> None:
     assert not hasattr(ws, "bwselect")
 
 
-def test_synth_is_not_implemented() -> None:
-    assert not hasattr(ws, "synth")
+def test_synth_is_now_implemented() -> None:
+    """B-grade synth landed; the former absence guard was deliberately retired."""
+
+    assert hasattr(ws, "synth")
+    assert callable(ws.synth)
+    assert hasattr(ws, "SynthResult")
 
 
 def test_synth2_is_not_implemented() -> None:
+    """synth2 is a figure/placebo wrapper, deliberately out of scope."""
+
     assert not hasattr(ws, "synth2")
 
 

@@ -30,6 +30,12 @@ probe*.py
 scratch_*
 tmp_*
 
+# Transient writability probe left by a P0 capture run. The platform denies
+# deleting anything under tests/ (protected DACL, low-integrity token), so this
+# file stays as a self-identifying, non-evidence JSON stub. Never commit it: it
+# is NOT a conformance fixture and carries no numerical evidence.
+tests/conformance/stata_fixtures/_host_probe.json
+
 # Commit-message scratch files.
 commit_msg.txt
 p11_msg.txt

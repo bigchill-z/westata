@@ -89,6 +89,7 @@ from westata.estimators.panel import (
     RandomEffects,
 )
 from westata.estimators.tobit import Tobit
+from westata.estimators.synth import SynthResult, synth
 from westata.estimators.tseries import (
     ARIMA,
     GARCH,
@@ -183,6 +184,8 @@ __all__ = [
     "MultinomialLogit",
     "OrderedProbit",
     "Tobit",
+    "SynthResult",
+    "synth",
     "ARIMA",
     "VAR",
     "VECM",

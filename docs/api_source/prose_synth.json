@@ -1,0 +1,107 @@
+{
+  "_readme": [
+    "Prose for the synthetic-control estimator (ws.synth / ws.SynthResult), the",
+    "maximum-likelihood random-effects estimator, the Stata-spelled unit-root tests,",
+    "the esttab text renderers, and eleven StataResults methods/properties added between",
+    "the first API-reference release and this one. Keys are unique across all prose_*.json.",
+    "Every example is EXECUTED by collect_api_reference.py --check."
+  ],
+  "synth": {
+    "stata": "synth y x1 x2, trunit(1) trperiod(2005)",
+    "en": "Synthetic control estimation (Stata `synth`, default regression-based V path). Builds a weighted combination of the control units that matches the treated unit on pre-intervention predictor means, then uses it as the counterfactual. `unit`/`time`/`depvar` name the panel columns, `predictors` the matching variables, `trunit`/`trperiod` the treated unit and intervention period. Returns a `SynthResult` frozen dataclass; because `synth` has no coefficient vector, no `e(V)` and no degrees of freedom, those statsmodels-style attributes are deliberately absent. The example builds a small balanced 5-unit x 9-period panel inline, so it needs no external .dta file.",
+    "zh": "合成控制估计（Stata `synth`，默认基于回归的 V 路径）。用若干控制单元构造加权组合，使其在干预前的预测变量均值上与处理单元匹配，再以之作为反事实。`unit`/`time`/`depvar` 指定面板列，`predictors` 为匹配变量，`trunit`/`trperiod` 为处理单元与干预时点。返回冻结的 `SynthResult` 数据类；由于 `synth` 没有系数向量、没有 `e(V)`、也没有自由度，这些 statsmodels 风格属性被刻意省略而不伪造。示例内联构造一个 5 单元 x 9 期的小平衡面板，因此不依赖任何外部 .dta 文件。",
+    "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).RMSPE",
+    "notes_en": "Only the DEFAULT path is implemented: `nested`/`allopt`, `figure`, `keep()`, `placebo` and inferential quantities are refused with `UnsupportedError`. `customV` supplies diagonal predictor weights; `xperiod`/`mspeperiod`/`resultsperiod` override the pre-period windows. Reported `W_weights` are rounded to 3 decimals as Stata does, while `RMSPE` uses the exact QP weights.",
+    "notes_zh": "仅实现默认路径：`nested`/`allopt`、`figure`、`keep()`、`placebo` 以及任何推断量都会抛出 `UnsupportedError`。`customV` 提供对角预测变量权重；`xperiod`/`mspeperiod`/`resultsperiod` 覆盖预处理窗口。输出的 `W_weights` 按 Stata 做法四舍五入到 3 位小数，而 `RMSPE` 使用精确 QP 权重。"
+  },
+  "SynthResult": {
+    "stata": "ereturn list -- the e() matrices synth stores",
+    "en": "Frozen dataclass holding the outcome of `synth`. Field names mirror Stata's `e()` matrices verbatim: `V_matrix` (K x K diagonal predictor weights -- note there is no plain `e(V)`), `W_weights`, `X_balance`, `RMSPE`, `Y_treated` and `Y_synthetic`, all reachable together through the `e` property. `gap` is the treatment-effect path `Y_treated - Y_synthetic`, `summary()` renders a compact Stata-style report, and `W_exact` keeps the unrounded QP solution for diagnostics. It is NOT a `StataResults`, so it carries no `params`, `bse` or `cov_params`.",
+    "zh": "承载 `synth` 结果的冻结数据类。字段名逐字对应 Stata 的 `e()` 矩阵：`V_matrix`（K x K 对角预测变量权重——注意没有普通的 `e(V)`）、`W_weights`、`X_balance`、`RMSPE`、`Y_treated`、`Y_synthetic`，都可通过 `e` 属性一并取得。`gap` 是处理效应路径 `Y_treated - Y_synthetic`，`summary()` 给出紧凑的 Stata 风格报告，`W_exact` 保留未舍入的 QP 解供诊断。它**不是** `StataResults`，因此没有 `params`、`bse` 或 `cov_params`。",
+    "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nres = ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)\nres.V_matrix"
+  },
+  "RandomEffectsMLE": {
+    "stata": "xtreg ypanel x1 x2, mle",
+    "en": "Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one.",
+    "zh": "用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。",
+    "example": "ws.RandomEffectsMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')"
+  },
+  "dfuller": {
+    "stata": "dfuller y, lags(2)",
+    "en": "Augmented Dickey-Fuller unit-root test, spelled the way Stata spells it. A thin alias for `unitroot`: `dfuller(y, trend=True)` is `unitroot(y, test='adf', regression='ct')`, no option gives `regression='c'`, and `regression=` overrides `trend`. `lags=` maps to Stata's `lags(#)` (zero lags by default). Returns a `UnitRootResult` whose printed form is Stata's Dickey-Fuller table, with the statistic under `r(Zt)` and the MacKinnon p-value under `r(p)`.",
+    "zh": "增广 Dickey-Fuller 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`dfuller(y, trend=True)` 等价于 `unitroot(y, test='adf', regression='ct')`，不带选项时 `regression='c'`，显式给 `regression=` 会覆盖 `trend`。`lags=` 对应 Stata 的 `lags(#)`（默认零阶滞后）。返回 `UnitRootResult`，打印形式为 Stata 的 Dickey-Fuller 表，统计量存于 `r(Zt)`，MacKinnon p 值存于 `r(p)`。",
+    "example": "ws.dfuller(base['y'], lags=2)"
+  },
+  "pperron": {
+    "stata": "pperron y, trend",
+    "en": "Phillips-Perron unit-root test, spelled the way Stata spells it. A thin alias for `unitroot`: `pperron(y, trend=True)` is `unitroot(y, test='pp', regression='ct')`, with the same option mapping as `dfuller`. Returns a `UnitRootResult`; the Newey-West lag truncation is chosen by the same default as `dfuller` when `lags=None`.",
+    "zh": "Phillips-Perron 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`pperron(y, trend=True)` 等价于 `unitroot(y, test='pp', regression='ct')`，选项映射与 `dfuller` 相同。返回 `UnitRootResult`；当 `lags=None` 时，Newey-West 滞后截断采用与 `dfuller` 相同的默认值。",
+    "example": "ws.pperron(base['y'], trend=True)"
+  },
+  "render_esttab": {
+    "stata": "esttab m1 m2, se r2 mtitle",
+    "en": "Render one or more fitted results as the TEXT Stata's `esttab` prints: a `(1) (2)` numbering row, an `mtitle` row when `model_names` is given, coefficient rows with standard errors in parentheses and significance stars, plus a footer of statistics. `stats` is a sequence of `(label, source)` pairs and defaults to `N` from `nobs`; `stats_digits` controls the footer's decimals. Unlike `etable`, which returns a DataFrame for programs, this returns the printable string. At most two models fit the measured 44-column layout.",
+    "zh": "把一个或多个已拟合结果渲染为 Stata `esttab` 打印的**文本**：`(1) (2)` 编号行、给出 `model_names` 时的 `mtitle` 行、带括号内标准误与显著性星号的系数行，以及统计量页脚。`stats` 是 `(标签, 来源)` 对序列，默认给出来自 `nobs` 的 `N`；`stats_digits` 控制页脚小数位。与返回数据框给程序用的 `etable` 不同，本函数返回可打印字符串。实测的 44 列版式最多容纳两个模型。",
+    "example": "m1 = ws.OLS.from_formula('y ~ x1', base).fit()\nm2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nws.render_esttab([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])"
+  },
+  "etable_as_stata": {
+    "stata": "esttab m1 m2, se r2 mtitle",
+    "en": "`etable` rendered the way Stata's `esttab` prints it. A convenience wrapper over `render_esttab` that forwards `model_names`, `digits`, `se`, `stars` and `stats`; `etable` itself returns a DataFrame because that is more useful to a program, while this returns the exact text a comparison against Stata needs. Both are kept deliberately -- neither substitutes for the other.",
+    "zh": "把 `etable` 按 Stata `esttab` 的打印形式渲染出来。它是 `render_esttab` 的便捷封装，转发 `model_names`、`digits`、`se`、`stars` 与 `stats`；`etable` 本身返回数据框（对程序更有用），而本函数返回与 Stata 对比所需的精确文本。两者刻意并存——互不替代。",
+    "example": "m1 = ws.OLS.from_formula('y ~ x1', base).fit()\nm2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nws.etable_as_stata([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])"
+  },
+  "f_test": {
+    "stata": "test x1 = 0, x2 = 0 (joint F)",
+    "en": "statsmodels-shaped joint F test on a fitted result. `r_matrix` accepts one or more restriction strings separated by commas (or a sequence); they are parsed by the same Stata constraint grammar as `test`, then reported jointly as F. Returns a `ContrastResults` carrying `statistic`, `pvalue`, `df_num`/`df_denom` and the `fvalue`/`tvalue` aliases. This is the statsmodels-ecosystem surface, not Stata's own `test` method.",
+    "zh": "已拟合结果上的 statsmodels 风格联合 F 检验。`r_matrix` 接受一个或多个以逗号分隔的约束字符串（或一个序列），按与 `test` 相同的 Stata 约束语法解析后，以 F 统计量联合报告。返回 `ContrastResults`，含 `statistic`、`pvalue`、`df_num`/`df_denom` 以及 `fvalue`/`tvalue` 别名。这是面向 statsmodels 生态的接口，并非 Stata 自身的 `test` 方法。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.f_test('x1 = 0, x2 = 0')"
+  },
+  "t_test": {
+    "stata": "test x1 = 0 (single restriction, t form)",
+    "en": "statsmodels-shaped t test of a single linear restriction. `r_matrix` is one restriction string (or a one-element sequence); `use_t` forces the t form, whose statistic is the square root of the corresponding F. Returns a `ContrastResults` with `statistic`, `pvalue`, `conf_int()` for a single restriction, and the `fvalue`/`tvalue` aliases. For a joint set of restrictions use `f_test` instead.",
+    "zh": "单个线性约束的 statsmodels 风格 t 检验。`r_matrix` 是一个约束字符串（或单元素序列）；`use_t` 强制采用 t 形式，其统计量为相应 F 的平方根。返回 `ContrastResults`，含 `statistic`、`pvalue`、单约束可用的 `conf_int()` 以及 `fvalue`/`tvalue` 别名。若要检验多个联合约束，请改用 `f_test`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.t_test('x1 = 0')"
+  },
+  "get_influence": {
+    "stata": "(no Stata equivalent -- statsmodels OLSInfluence names)",
+    "en": "Influence measures for a fitted result, named as statsmodels' `OLSInfluence` names them. Returns a dict with `hat_matrix_diag` (leverage), `resid`, `resid_studentized_internal`, `resid_studentized`, `standardized_resid`, `cooks_distance` (array plus observation indices) and `nobs`. Only leverage-based measures are offered: deletion diagnostics would need one re-fit per observation, and returning a plausible-but-wrong array was judged worse than omitting the key.",
+    "zh": "已拟合结果的影响度量，命名沿用 statsmodels 的 `OLSInfluence`。返回字典，含 `hat_matrix_diag`（杠杆）、`resid`、`resid_studentized_internal`、`resid_studentized`、`standardized_resid`、`cooks_distance`（数组加观测索引）与 `nobs`。只提供基于杠杆的度量：删除诊断需要逐观测重新拟合，返回「看起来合理但错误」的数组被认为比不提供该键更糟。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.get_influence()['hat_matrix_diag'][:5]"
+  },
+  "model": {
+    "stata": "(no Stata equivalent -- a statsmodels interop shim)",
+    "en": "The fitted model as statsmodels consumers expect it. `statsmodels.stats.anova.anova_lm` reads `res.model` and re-fits from it; without this attribute that call raised AttributeError. The returned `ResultModel` exposes exactly `endog`, `exog`, `exog_names` and a `fit()` that returns this same result -- enough for `anova_lm`'s contract without pretending to BE a statsmodels model. A wider imitation would invite callers to rely on behaviour that is not there.",
+    "zh": "以 statsmodels 消费者期待的形式给出的已拟合模型。`statsmodels.stats.anova.anova_lm` 会读取 `res.model` 并由其重新拟合；缺少该属性时该调用会抛 AttributeError。返回的 `ResultModel` 只暴露 `endog`、`exog`、`exog_names` 以及返回本结果自身的 `fit()`——足以满足 `anova_lm` 的契约，而不冒充真正的 statsmodels 模型。过度模仿会诱使调用方依赖并不存在的行为。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.model"
+  },
+  "fitted_series": {
+    "stata": "predict yhat, xb -- with the estimation sample's index",
+    "en": "Fitted values as a `pandas.Series` carrying the estimation sample's index and the name `fittedvalues`. This is the labelled counterpart of the plain `fittedvalues` ndarray: replacing that attribute with a Series would break positional access, so the labelled form is a separate name. When the fit did not retain observation labels the index falls back to a `RangeIndex`, which is honest -- the numbers are still there and the labels say only \"row i\".",
+    "zh": "以 `pandas.Series` 给出的拟合值，带估计样本索引、名称为 `fittedvalues`。它是普通 `fittedvalues` ndarray 的带标签版本：若把后者直接换成 Series 会破坏按位置访问，因此另设此名。当拟合未保留观测标签时，索引退化为 `RangeIndex`——这是诚实的做法：数值仍在，标签只表示「第 i 行」。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.fitted_series.head()"
+  },
+  "resid_series": {
+    "stata": "predict e, residuals -- with the estimation sample's index",
+    "en": "Residuals as a `pandas.Series` carrying the estimation sample's index and the name `resid`, the labelled counterpart of the plain `resid` ndarray. It exists for statsmodels parity without changing the ndarray's positional behaviour, and falls back to a `RangeIndex` when the fit retained no row labels. See `fitted_series` for the matching fitted values.",
+    "zh": "以 `pandas.Series` 给出的残差，带估计样本索引、名称为 `resid`，是普通 `resid` ndarray 的带标签版本。它为兼容 statsmodels 而设，同时不改动 ndarray 的按位置访问行为；拟合未保留行标签时索引退化为 `RangeIndex`。对应的拟合值见 `fitted_series`。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.resid_series.head()"
+  },
+  "response_name": {
+    "stata": "e(depvar)",
+    "en": "Name of the dependent variable, used for titles and column headings. Some estimators set it as an instance attribute and others do not (ARIMA and GARCH were in the second group), so the property falls back to `e(depvar)` -- a macro every fit carries -- giving the same answer as the formula-based estimators. A subclass that assigns `self.response_name` keeps winning, because the instance dictionary is consulted first.",
+    "zh": "被解释变量名，用于标题与列头。有的估计量把它设为实例属性，有的不设（ARIMA 与 GARCH 属于后者），因此该属性回退到 `e(depvar)`——每个拟合都会携带的宏——从而与基于公式的估计量给出相同答案。子类若赋值 `self.response_name` 仍然优先，因为先查实例字典。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.response_name"
+  },
+  "first_stage": {
+    "stata": "ivregress 2sls ..., first",
+    "en": "First-stage regression table for an IV fit (Stata `ivregress ..., first`). One block per endogenous regressor, headed \"First-stage regressions\", giving the F, R-squared, adjusted R-squared and Root MSE of that equation, then its coefficient table with the included exogenous variables and excluded instruments. This is a different output from `estat_firststage`, which prints the DIAGNOSTICS for the same equations; Stata offers both and they are not substitutes, so both are kept.",
+    "zh": "IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。",
+    "example": "r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()\nr.first_stage()"
+  },
+  "ereturn_list": {
+    "stata": "ereturn list",
+    "en": "The four sections of Stata's `ereturn list` for one estimation result: scalars as `e(name) = value`, macros as `e(name) : \"text\"`, matrices as `e(name) : r x c`, and functions as bare names. WHICH scalars a command publishes is its own decision, and Stata's choice is narrower than the full `e()` dictionary, so the printed block is a faithful subset rather than a dump. The whole block opens with a blank line, as Stata's does.",
+    "zh": "单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : \"text\"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。",
+    "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.ereturn_list()"
+  }
+}

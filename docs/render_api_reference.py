@@ -30,6 +30,20 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = ROOT / "docs" / "api_source"
 
+#: Standalone reference section on robust/cluster VCE semantics.  It used to be
+#: hand-added to the two generated files AFTER rendering (commits 2bf5900 /
+#: ee7b93a), so a plain re-render silently deleted it and broke
+#: tests/test_robust_vce_mapping.py::test_the_docs_carry_the_panel_note.
+#: It is now data emitted by the renderer itself -- the root-cause fix.
+ROBUST_VCE_PREAMBLE = REFERENCE / "robust_vce_preamble.json"
+
+
+def _load_preamble() -> dict[str, dict[str, str]]:
+    """Load the language-specific robust-VCE reference section."""
+
+    payload = json.loads(ROBUST_VCE_PREAMBLE.read_text(encoding="utf-8"))
+    return {key: value for key, value in payload.items() if not key.startswith("_")}
+
 #: Grouping used for the table of contents. Order matters: it is the reading order.
 FAMILIES: list[tuple[str, str, tuple[str, ...]]] = [
     (
@@ -423,9 +437,20 @@ def render(lang: str, data: dict[str, Any]) -> str:
     parts.append(words["intro"])
     parts.append("")
 
+    # Standalone robust-VCE reference section.  Its TOC bullet goes first, then the
+    # section itself AFTER the TOC (matching the committed layout).  Root cause: this
+    # used to be hand-injected after rendering, so a plain re-render silently dropped
+    # it and broke test_the_docs_carry_the_panel_note.
+    preamble = _load_preamble().get(lang)
+
     # Table of contents.
     parts.append(f"## {words['toc']}")
     parts.append("")
+    if preamble:
+        parts.append(
+            f"- **{preamble['toc_label']}** — "
+            f"[{preamble['toc_text']}](#{preamble['toc_anchor']})"
+        )
     for en_title, zh_title, names in FAMILIES:
         title = en_title if lang == "en" else zh_title
         anchors = ", ".join(f"[`{name}`](#{_anchor(name)})" for name in names if name in prose or name in generated)
@@ -436,6 +461,12 @@ def render(lang: str, data: dict[str, Any]) -> str:
         label = "Other names" if lang == "en" else "其他名称"
         parts.append(f"- **{label}** — " + ", ".join(f"[`{n}`](#{_anchor(n)})" for n in leftovers))
     parts.append("")
+
+    if preamble:
+        parts.append(f"## {preamble['heading']}")
+        parts.append("")
+        parts.append(preamble["body"])
+        parts.append("")
 
     for en_title, zh_title, names in FAMILIES:
         title = en_title if lang == "en" else zh_title

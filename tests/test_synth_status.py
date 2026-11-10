@@ -32,6 +32,21 @@ be checked until it exists.
 
 So: NOT implemented, but the feasibility judgement recorded earlier is revised. This is a
 "readable shell + binary core" problem like dfgls, not a "no source at all" problem.
+
+RESOLVED 2026-11-09 (B-grade implementation):
+The "optimiser out of reach" conclusion above was itself too pessimistic.  P0 black-box
+identification solved BOTH compiled Mata kernels exactly (normalize = sample SD including
+the treated unit; regsval = sum of squared per-period cross-sectional OLS coefficients),
+and showed e(V_matrix) is directly exportable while regsval is a deterministic pure
+function of its four matrix arguments.  See scripts/verify_synth_mata_formulas.py and
+docs/superpowers/specs/2026-11-09-synth-b-design.md.
+
+`ws.synth` now exists for the DEFAULT path (evidence E2).  What genuinely remains out
+of reach is only Stata's closed-source `ml` nested optimiser and the C++ QP plugin's
+exact stopping point: H is rank-deficient, so RMSPE differs by up to 5.6e-4 while the
+reported W matches Stata exactly at 3 decimals.  That gap is measured and disclosed,
+not hidden (registry.yml).  The guard below was deliberately converted from absence
+to presence when the estimator landed.
 """
 
 from __future__ import annotations
@@ -48,12 +63,14 @@ COVARIATES = [
 ]
 
 
-def test_the_package_does_not_export_synth_yet() -> None:
-    """Pinned so this guard has to be changed deliberately when synth lands."""
+def test_the_package_exports_synth() -> None:
+    """The former absence guard, deliberately retired when B-grade synth landed."""
 
     import westata as ws
 
-    assert not hasattr(ws, "synth")
+    assert hasattr(ws, "synth")
+    assert callable(ws.synth)
+    assert hasattr(ws, "SynthResult")
 
 
 @pytest.fixture(scope="module")

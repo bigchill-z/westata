@@ -61,9 +61,17 @@ class StataCapture:
     Attributes
     ----------
     b:
-        Coefficient vector in ``e(b)`` order.
+        Coefficient vector in ``e(b)`` order.  For a matrices-only capture
+        (see :meth:`StataOracle.capture_matrices`) this is an EMPTY 1-D array;
+        it is a sentinel meaning "no coefficient vector was captured", NOT a
+        zero-length estimation result.
     V:
-        Covariance matrix of the estimators.
+        Covariance matrix of the estimators.  For a matrices-only capture this
+        is an EMPTY array (``size == 0``) with the same "not captured" meaning
+        as ``b`` above.  Never mistake a matrices-only capture for a coefficient
+        capture: read ``matrices`` instead.  (An empty 2-D array serialises to
+        ``[]``, so after a ``save``/``load`` round-trip it may come back as an
+        empty 1-D array; emptiness, not ``ndim``, is the sentinel.)
     scalars:
         Scalar ``e()`` results keyed without the ``e()`` wrapper.
     macros:
@@ -72,6 +80,11 @@ class StataCapture:
         Coefficient names in ``e(b)`` order.
     version:
         Stata version string the capture was produced with.
+    matrices:
+        Named Stata ``e()`` matrices, each a full-precision nested list of
+        floats.  Empty for ordinary :meth:`StataOracle.capture` results and for
+        OLD fixtures that predate this field.  Keys are the bare ``e()`` names
+        (e.g. ``"V_matrix"``, ``"W_weights"``), without the ``e(...)`` wrapper.
     """
 
     b: np.ndarray
@@ -80,11 +93,17 @@ class StataCapture:
     macros: dict[str, str]
     names: list[str] = field(default_factory=list)
     version: str = ""
+    matrices: dict[str, list[list[float]]] = field(default_factory=dict)
 
     def __getitem__(self, key: str) -> Any:
         if key in self.scalars:
             return self.scalars[key]
-        raise KeyError(f"{key!r} not in captured e() scalars: {sorted(self.scalars)}")
+        if key in self.matrices:
+            return self.matrices[key]
+        raise KeyError(
+            f"{key!r} not in captured e() scalars or matrices: "
+            f"scalars={sorted(self.scalars)}, matrices={sorted(self.matrices)}"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +113,7 @@ class StataCapture:
             "macros": self.macros,
             "names": self.names,
             "version": self.version,
+            "matrices": self.matrices,
         }
 
     def save(self, path: str | Path) -> Path:
@@ -105,6 +125,8 @@ class StataCapture:
     @classmethod
     def load(cls, path: str | Path) -> "StataCapture":
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        # ``matrices`` is optional so OLD fixtures -- written before this field
+        # existed -- still load byte-for-byte identically for their b/V content.
         return cls(
             b=np.asarray(payload["b"], dtype=float),
             V=np.asarray(payload["V"], dtype=float),
@@ -112,6 +134,10 @@ class StataCapture:
             macros=payload["macros"],
             names=list(payload.get("names", [])),
             version=payload.get("version", ""),
+            matrices={
+                k: [[float(x) for x in row] for row in v]
+                for k, v in payload.get("matrices", {}).items()
+            },
         )
 
 
@@ -268,3 +294,75 @@ class StataOracle:
         """
 
         return ""
+
+    # ------------------------------------------------- matrix-only capturing
+    def capture_matrices(self, names: Sequence[str]) -> StataCapture:
+        """Capture named ``e()`` matrices at full precision, WITHOUT e(b)/e(V).
+
+        Some estimation commands (notably the ``synth`` synthetic-control ado)
+        are ``eclass`` but save no coefficient vector and no covariance matrix.
+        They expose their results as a handful of ``e()`` MATRICES instead.
+        :meth:`capture` cannot represent those (it requires ``e(b)``/``e(V)``),
+        so this method returns a matrices-only :class:`StataCapture`.
+
+        The returned object is deliberately a SENTINEL capture, not a
+        coefficient capture:
+
+        * ``b`` is an empty 1-D ``float`` array (``shape == (0,)``);
+        * ``V`` is an empty ``float`` array (``size == 0``; after a JSON
+          round-trip it may be 1-D, but it stays empty);
+        * ``matrices`` maps each requested bare name to its full-precision
+          nested-list value;
+        * ``scalars``/``macros`` are empty and ``names`` is ``[]``.
+
+        Do NOT read ``b``/``V`` from a matrices-only capture -- they are empty
+        by construction and carry no estimation meaning.  Read ``matrices``.
+
+        Precision
+        ---------
+        Matrix values are read through ``sfi.Matrix.get(name)``, which returns
+        Stata's stored IEEE-754 doubles (a Python ``list`` of ``float``).  No
+        display formatting (e.g. ``%9.0g``) is involved, so the captured values
+        retain full double precision rather than Stata's rounded printout.  This
+        was verified against a live StataNow 19.5 / ``synth`` 0.0.8 session:
+        e(V_matrix) diagonals match the established reference values to all
+        recorded digits.
+
+        Parameters
+        ----------
+        names:
+            Bare ``e()`` matrix names, e.g. ``["V_matrix", "W_weights"]``.
+            A leading ``e(...)`` wrapper is stripped if present, so callers may
+            pass either form.  Each name must name an existing Stata matrix;
+            a missing one raises ``RuntimeError`` rather than being silently
+            dropped (a silent hole would corrupt an evidence fixture).
+        """
+
+        if self._stata is None:
+            raise RuntimeError("StataOracle is not started")
+
+        matrices: dict[str, list[list[float]]] = {}
+        for requested in names:
+            name = _strip_prefix(requested)
+            st_name = f"e({name})"
+            try:
+                raw = self._stata.sfi.Matrix.get(st_name)
+            except Exception as exc:  # pragma: no cover - depends on live Stata
+                raise RuntimeError(
+                    f"Stata matrix {st_name} is not available: {exc}"
+                ) from exc
+            array = np.asarray(raw, dtype=float)
+            if array.ndim == 1:
+                array = array.reshape(-1, 1)
+            matrices[name] = array.tolist()
+
+        version = self._stata_version()
+        return StataCapture(
+            b=np.asarray([], dtype=float),
+            V=np.asarray([], dtype=float).reshape(0, 0),
+            scalars={},
+            macros={},
+            names=[],
+            version=version,
+            matrices=matrices,
+        )

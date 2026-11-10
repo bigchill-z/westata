@@ -5,8 +5,8 @@
 这不是一个 TODO 列表，而是一份**边界声明**。westata 的目标是在**可检验的计量命令集合**上达到与 Stata 数值一致，不是复刻 Stata 的全部功能。凡是不在范围内（Out of Scope）的条目，都会说明**为什么不做**，而不是含糊地留白。
 
 - 基线：StataNow 19.5（MP），`ado/base` 下共 **3,962 个 .ado 文件**
-- 已实现：**93 条命令条目**（见 `tests/conformance/registry.yml`），其中 **52 条 E3**、26 条 E2、**15 条 E1**
-- 测试：**3866 passing**
+- 注册表：**96 条命令条目**（见 `tests/conformance/registry.yml`），其中 **54 条 E3**、27 条 E2、**15 条 E1**
+- 测试：全量 `pytest -q` 通过（数量随套件增长，以实跑为准）
 - 覆盖率：统计估计与后估计领域的**子集**，不是 Stata 的替代品
 
 状态图例：
@@ -20,9 +20,13 @@
 
 ---
 
-## 1. 已实现（93 条命令条目）
+## 1. 已实现（96 条注册表条目）
 
-**52 条 E3、26 条 E2、9 条 E1。**
+**注册表口径：54 条 E3、27 条 E2、15 条 E1**（包含 2026-11-09 新增的
+`synth` E2 条目）。下面按族分类的等级是更早的 **386 点独立复测**口径
+（52 E3 / 26 E2 / 9 E1），两者分母不同：复测只覆盖有布局表的命令，
+注册表还收录了 `estat hettest` / `estat imtest` / `synth` 等无系数表的命令。
+**引用数量时请注明口径**，不要把两套数字混用。
 
 等级来自 **386 点独立复测**（`retest/REPORT.md`、`retest/FIX_REPORT.md`），
 不是来自本库自己的测试。这两个来源差别很大：库自身的测试在 1247 条时全绿，
@@ -179,7 +183,7 @@
 | `stteffects` | ⬜ | 生存处理效应 |
 | `csdid`、`drdid` | ❌ | 用户包，不在 base |
 | `rdrobust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
-| `synth` / `synth2` | ❌ | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；受阻于 `.mlib` 中的嵌套优化器 |
+| `synth` / `synth2` | ✅ `synth` E2（2026-11-09）/ ❌ `synth2` | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；原记「受阻于 `.mlib` 中的嵌套优化器」**已被 P0 实测证伪**：`e(V_matrix)` 可直接导出、`regsval` 是确定性纯函数可辨识、两个内核被精确求解。2026-11-09 用户批准 B 档并已落地 `ws.synth`（默认路径，证据 E2：六个 `e()` 矩阵对拍 6 份全精度 fixture；`nested`/`allopt`/`synth2`/图形/placebo 仍按纪律拒绝）。`synth2` 是图形/placebo 包装器，明确不做 |
 | `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `teffects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
 
 #### 3.6.1 报告 P1 清单实测复核（第 144–145 轮）
@@ -196,7 +200,7 @@
 | C12-11 | `xtserial` 缺失 | **本环境仍无 ado、Stata 报 r(111)/r(199)，无参照可验证**，保持拒绝 |
 | C08-05 | `prais, corc` 缺失 | **`corc=` 已实现**，与 Stata 一样在 icecream.dta 上不收敛且 rho 差 0.005%（第 111 轮） |
 | C13-06 | `irf create` / `.irf` 体系缺失 | **OIRF/FEVD/irf_table 数值早已验证**；第 144 轮新增 `irf_create()` 写出 23 列 `.dta`，5 个数值列与 Stata 精确一致。**限制**：`pandas.to_stata` 无法写 `_dta[]` characteristics，故 Stata 的 `irf table` 仍读不了（r(498)），是数值导出而非 drop-in `.irf` set |
-| C18-01/02 | `synth`/`synth2` 整章缺失 | **仍缺**；但 `synth.ado` 931 行可读，受阻于二进制 `.mlib` 中的嵌套优化器 |
+| C18-01/02 | `synth`/`synth2` 整章缺失 | **2026-11-09 已部分修复**：`synth` 默认路径已落地（B 档 / E2，`ws.synth`，六个 `e()` 矩阵对拍 6 份全精度 fixture）；`synth2` **仍缺**（图形/placebo 包装器，有意不做）。原记「受阻于二进制 `.mlib` 中的嵌套优化器」已由 P0 实测证伪：两个 Mata 内核被精确求解、`e(V_matrix)` 可直接导出。详见 §3.6.4 |
 
 **使用说明**：报告第 620–628 行的 P1 清单与附录评分表（多处 0.00）**不能当作工单**。第 127–135 轮审计发现 12 个 0.00 分项实际存在且数值正确，多为入口名不同（`dfuller`→已补别名）或接口形态差异。
 
@@ -238,7 +242,7 @@
 
 | 类别 | 项 | 证据 | 处理 |
 |---|---|---|---|
-| **A. 可读 ado + 二进制 Mata 核心** | `synth`/`synth2`、`rcm` 自动选择 | `synth.ado` 931 行、`rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中。**第 159 轮确证 `.mlib` 不可反编译**（见下） | **已到边界**，不再重建 |
+| **A. 可读 ado + 二进制 Mata 核心** | ~~`synth`/`synth2`~~ → 2026-11-09 移出（见 §3.6.4）、`rcm` 自动选择 | `rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中。**第 159 轮确证 `.mlib` 不可反编译**（见下） | `synth` 已落地 E2；`rcm` 自动选择仍**已到边界** |
 
 **第 159 轮对「能否反编译 Mata」的最终核实**——此前的说法是「除非反编译 Mata」，现在有了确定答案：
 
@@ -303,6 +307,52 @@ fpe = ((T + eqparm)/(T - eqparm))**K * detsig_ml
 **推论（第 152 轮修正，第 159 轮补证）**：A 类不是「再读一遍 ado 就能解决」的问题。但**不要把「重建失败」直接归入 A 类**——第 151 轮证明 `dfgls` 曾被错误地放在这里，五轮失败的真正原因却是**默认选项写反**（Stata 默认 `trend`，包默认 `notrend`），与 Mata 毫无关系。判断 A 类的正确依据是**确认执行的确实是 `.mlib` 里的编译函数**，而不是「重建结果对不上」。
 
 第 159 轮补上了此前一直缺失的那一环：**A 类的「源码不可得」现在是实测结论，不是猜测**。`.mlib` 不含任何 Mata 语法、Stata 也不提供导出源码的命令。因此 A 类的正确表述是「信息不可得」，与 B 类同源；两者的唯一差别是 B 类连参照输出都拿不到，而 A 类至少能用 Stata 跑出参照值来验证未来的实现。**但既然无法读到算法，写出来的实现就无法逐项验证，按本项目的纪律仍不交付。**
+
+#### 3.6.4 2026-11-09 修订：A 类中 `synth` 的「信息不可得」被证伪，B 档立项
+
+> 保留上文原貌以便追溯；**`synth` 一项以本修订为准**。上文对 `.mlib` 是字节码、无源码的
+> **实测**依然正确，错的是由此推出的「结果不可逐项验证 ⇒ 不交付」。这与 §8.4 记录的
+> 「把可修复错误包装成不可约约定」是同一失败模式。
+
+**两个被实测推翻的事实**（详见 [STATA_ALIGNMENT_SUMMARY.md](STATA_ALIGNMENT_SUMMARY.md)
+的 2026-11-09 修订块，含全部 17 位数字）：
+
+| 原登记 | 实测 |
+|---|---|
+| `e(V_matrix)` 不保存、`e(W_weights)` 需 `keep()`（`STATA_ALIGNMENT_SUMMARY.md:1208`） | `synth.ado:664-682` 存六个 `e()` 矩阵；`matrix list e(V_matrix), format(%21.17f)` 直接给出 ground-truth V；`synth2.ado` 反向读取它们 |
+| `regsval` 脱离上下文返回 0×0、依赖不可读深层状态（第 70/71 轮） | 那次设置的是 `:467-474` 的全局量（定义在调用 `:390` **之后**，只服务 `synth_ll`）；用四个**显式字符串参数**单独调用 → `RC=0`、`vmat − e(V_matrix) = 全零`、`drop _all` 后仍 RC=0 ⇒ **确定性纯函数** |
+
+⇒ `synth` 从 A 类移出。V 的**输出**可全精度导出（绕过 `regsval`），`regsval` 本身可
+**黑箱辨识**；4 个内核（`getabs`/`normweights`/`roundmat`/`roottaker`）已白盒化；
+内层 QP 目标与约束、数据准备、六个 `e()` 的形状全部由 931 行 ado 可读确定。
+「算法不可得」实际收窄为 `regsval`/`normalize` 的**公式**（可辨识），不是「不可得」。
+
+**重新划定的边界（B 档，目标 E2）**：
+
+| 状态 | 项 |
+|---|---|
+| ✅ 可做、可逐项验证 | 默认路径数据准备、V（导出或辨识）、内层 QP、W、六个 `e()` 矩阵、RMSPE、效应路径 |
+| ⛔ 仍不做（原因已定性，非「信息不可得」） | `nested`/`allopt` 的 Stata 闭源 `ml` 收敛点；C++ QP 求解器的 FP/CRT/pivot 数值行为；`synth2`、图形、placebo/LOO；任何标准误/推断伪造；**E3 声明** |
+| 🔧 P0 harness 缺口 | `StataCapture.capture()` 要求 `e(b)/e(V)`，synth 只存六个矩阵 → 需扩展矩阵型 `e()` 捕获 |
+
+**REA 逆向（用户点名评估，结论：不用）**：`rea-agents@6.5.0` 的 `targetFormatSchema`
+枚举 23 种格式无 `mata`/`mlib`，包内 1598 文件零 Stata 支持 ⇒ 对 `.mlib` **零能力**；
+`synthopt.plugin` 是受支持的 `pe`，但本环境 doctor `healthy=false`、4/4 原生引擎全缺，
+且伪代码只能还原已写进帮助文件的 Vanderbei 内点法。「还原算法」已由可读 ado 完成，
+「逐位复现优化器」REA 与任何公开包都做不到——两者必须分开。
+
+**公开包的佐证**：R `Synth`（同作者，`fn.V`/`solution.v`）、`pysyncon`（scipy
+Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点」的环境漂移）均
+**不声称匹配 Stata 数字**，故 E3 无外部捷径；E2 的容差须由 fixture 实测标定后写入
+`registry.yml`，不得先拍死再凑。
+
+**文档与守卫**：本修订**只增补、不删除**上文措辞，故
+`tests/test_register_p1_recheck.py` 的字符串断言保持有效。四个「钉住缺席」的守卫
+（`test_synth_status.py`、`test_the_two_missing_features.py`、
+`test_zero_scored_but_present.py`、`test_register_p1_recheck.py`）在估计器真正落地前不改——
+**该条件已于 2026-11-09 满足**：`ws.synth` 已落地（默认路径 / E2），三个断言缺席的
+守卫已按各自注释的约定**主动改写为存在性检查**（它们原本就写明「若日后实现 synth，
+断言失败的测试反而是错的」）；`test_register_p1_recheck.py` 是文档内容守卫，未改。
 
 ### 3.7 复杂抽样
 

@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.1.0",
+  "westata_version": "0.3.4",
   "exports": [
     {
       "name": "AIPW",
@@ -250,7 +250,7 @@
       "kind": "class",
       "module": "westata.postestimation.modeltests",
       "docstring": "Hausman specification test.\n\nAttributes\n----------\nstatistic:\n    ``(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)``.\ndf:\n    Number of coefficients actually compared (constants excluded).\npvalue:\n    ``P > chi2(df)``.\nexcluded:\n    Parameters that are not present in both models, so could not be compared.",
-      "signature": "(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>) -> None",
+      "signature": "(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '') -> None",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -437,7 +437,7 @@
       "name": "Logit",
       "kind": "class",
       "module": "westata.estimators.discrete",
-      "docstring": "Logistic regression (Stata ``logit``).",
+      "docstring": "Logistic regression (Stata ``logit``).\n\nNO INTERCEPT IS ADDED. The design matrix passed to ``Logit(y, X, ...)`` is taken as COMPLETE,\nexactly as statsmodels treats it. Stata's ``logit y x1 x2`` adds a constant for you, so the two\ncalls are not equivalent:\n\n    ws.Logit(y, X, param_names=[\"x1\", \"x2\"])            # no constant -> different model\n    ws.Logit.from_formula(\"y ~ x1 + x2\", frame)         # constant included, matches Stata\n\nGetting this wrong does not raise: it returns a well-formed fit with plausible coefficients\nthat disagree with Stata, which reads as a numerical defect rather than a missing column.\nMeasured on grilic.dta with a median split of lnw:\n\n    array interface, no constant   coef [.002219, -.000498, .052896]\n    Stata `logit hi s expr tenure`  coef [.459083, .158881, .153049], _cons -6.691539\n\nTo keep the array interface and still match Stata, pass a column of ones yourself:\n\n    X = np.column_stack([np.ones(len(frame)), frame[[\"s\", \"expr\", \"tenure\"]]])\n    ws.Logit(y, X, param_names=[\"_cons\", \"s\", \"expr\", \"tenure\"])",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
@@ -694,7 +694,7 @@
       "name": "Poisson",
       "kind": "class",
       "module": "westata.estimators.discrete",
-      "docstring": "Poisson regression (Stata ``poisson``).",
+      "docstring": "Poisson regression (Stata ``poisson``).\n\nNO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design\nmatrix as complete and what to pass instead.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
@@ -708,13 +708,26 @@
       "signature": "(**values: 'object') -> 'None'",
       "from_formula": null,
       "fit": null,
-      "methods": []
+      "methods": [
+        {
+          "name": "conf_int",
+          "signature": "(self, alpha: 'float' = 0.05) -> 'pd.DataFrame'"
+        },
+        {
+          "name": "cov_params",
+          "signature": "(self) -> 'pd.DataFrame'"
+        },
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        }
+      ]
     },
     {
       "name": "Probit",
       "kind": "class",
       "module": "westata.estimators.discrete",
-      "docstring": "Probit regression (Stata ``probit``).",
+      "docstring": "Probit regression (Stata ``probit``).\n\nNO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design\nmatrix as complete and what to pass instead.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
@@ -735,6 +748,16 @@
       "kind": "class",
       "module": "westata.estimators.panel",
       "docstring": "Random-effects GLS (Stata ``xtreg, re``).\n\nUses linearmodels' default Swamy-Arora variance-component estimator; the\noptional ``small_sample`` refinement is deliberately left off so that the\nestimator is exactly the documented default.",
+      "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
+      "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "methods": []
+    },
+    {
+      "name": "RandomEffectsMLE",
+      "kind": "class",
+      "module": "westata.estimators.panel",
+      "docstring": "Random-effects by MAXIMUM LIKELIHOOD (Stata ``xtreg, mle``).\n\n``xtreg, re`` is a GLS estimator that plugs in Swamy-Arora variance components;\n``xtreg, mle`` maximises the same random-effects likelihood over the coefficients AND the\ntwo variance components at once. They are different estimators and give different numbers:\n\n    re   ltlan .565591486884  ltwlab .144184445858  sigma_u .133248446685\n    mle  ltlan .564328798388  ltwlab .140897433220  sigma_u .214109360143\n\n``sigma_u`` differs by 60%, so this cannot be emulated by adjusting the GLS output.\n\nFitted with statsmodels' ``MixedLM`` (ML, not REML -- Stata's ``xtreg, mle`` maximises the\nfull likelihood). Nelder-Mead is used rather than the default because it lands closer to\nStata's optimum on the reference fit: llf 332.8973943565 against 332.8973943543, with\n``ltlan`` agreeing to 1.6e-7 where the default was 9.8e-7 away.\n\nStandard errors come from the inverse of the observed information, which is what Stata\nreports; the reference values agree to about 1e-6.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
       "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
@@ -959,6 +982,21 @@
       ]
     },
     {
+      "name": "SynthResult",
+      "kind": "class",
+      "module": "westata.estimators.synth",
+      "docstring": "Outcome of :func:`synth`.\n\nField names mirror Stata's ``e()`` matrices verbatim.  Note ``V_matrix``\n(there is no plain ``e(V)``).  ``synth`` has no coefficient vector, no\ncovariance matrix and no degrees of freedom; those statsmodels-style\nattributes are deliberately ABSENT rather than fabricated.",
+      "signature": "(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        }
+      ]
+    },
+    {
       "name": "Tobit",
       "kind": "class",
       "module": "westata.estimators.tobit",
@@ -973,7 +1011,7 @@
       "kind": "class",
       "module": "westata.estimators.treatreg_effects",
       "docstring": "A treatment effect together with its potential-outcome means.\n\nAttributes\n----------\nestimand:\n    ``\"ATE\"`` or ``\"ATET\"`` -- which quantity ``estimate`` refers to.\nestimate, std_err, z, pvalue, ci_lower, ci_upper:\n    The effect, its standard error, the normal-based test statistic and\n    two-sided p-value, and the 95% Wald interval.  ``teffects`` reports a\n    standard normal reference distribution, so ``z`` and ``pvalue`` use\n    :func:`scipy.stats.norm` rather than a t distribution.\npotential_outcomes:\n    ``{\"0\": (mean, se), \"1\": (mean, se)}`` -- Stata's ``POmean`` rows.  Each\n    mean carries its own standard error and is *not* a function of\n    ``estimate``, so the two are stored separately.\nse_method:\n    How ``std_err`` was produced.  ``\"influence function\"`` means the exact\n    delta-method variance Stata uses.  ``\"Abadie-Imbens approximation\"``\n    flags a number that is close to Stata's without matching it, so callers\n    never have to guess whether a standard error is conformant.\nnobs, estimator, outcome_model, treatment_model:\n    The header block Stata prints above the table\n    (``p11_outputs.txt:8-11``)::\n\n        Treatment-effects estimation    Number of obs     =      1,200\n        Estimator      : regression adjustment\n        Outcome model  : linear\n        Treatment model: none\n\n    Recorded separately because they describe the *method*, not the\n    estimate, and Stata shows them before the coefficient table.",
-      "signature": "(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '') -> None",
+      "signature": "(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '', weights: 'Any' = None) -> None",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -1036,7 +1074,7 @@
       "kind": "class",
       "module": "westata.estimators.tseries",
       "docstring": "One unit-root test outcome, shaped like Stata's test output.",
-      "signature": "(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '') -> None",
+      "signature": "(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '', regression: 'str' = 'c') -> None",
       "from_formula": null,
       "fit": null,
       "methods": []
@@ -1160,7 +1198,7 @@
       "kind": "class",
       "module": "westata.data.weights",
       "docstring": "Normalized weights plus the metadata the estimators need.\n\nAttributes\n----------\nweights:\n    Weights to use in the weighted least-squares problem, already\n    normalized according to the Stata rules for ``weight_type``.\nweight_type:\n    One of ``\"fweight\"``, ``\"aweight\"``, ``\"pweight\"``, ``\"iweight\"``.\neffective_n:\n    Sample size to use in degrees-of-freedom calculations.\nimplies_robust:\n    True for ``pweight``: Stata's ``[pw=w]`` implies ``vce(robust)``.\nn_obs:\n    Number of rows in the data (not the effective sample size).",
-      "signature": "(weights: 'np.ndarray', weight_type: 'str', effective_n: 'float', implies_robust: 'bool', n_obs: 'int') -> None",
+      "signature": "(weights: 'np.ndarray', weight_type: 'str', effective_n: 'float', implies_robust: 'bool', n_obs: 'int', dropped: 'int' = 0, kept: 'np.ndarray | None' = None) -> None",
       "from_formula": null,
       "fit": null,
       "methods": []
@@ -1341,15 +1379,22 @@
       "name": "dfgls",
       "kind": "function",
       "module": "westata.postestimation.dfgls",
-      "docstring": "DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) trend]``.\n\n``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)``, which is ``dfgls``'s\ndefault (``dfgls.ado:64``).",
-      "signature": "(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = False) -> 'DFGLSResult'"
+      "docstring": "DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.\n\n**Stata defaults to a TREND, not to no trend.** ``dfgls.ado:39-46`` sets ``trend=1`` unless\nthe user writes ``notrend``; the earlier version of this function defaulted to ``False`` and\nso implemented Stata's ``notrend`` case while being compared against Stata's default output.\nThat single inverted default is the whole reason rounds 119-123 spent five rounds seeing\ntau +0.806 against Stata's -1.284 and concluding the algorithm was unexplainable.\n\nMeasured on nelson_plosser.dta's lrgnp (both from live Stata):\n\n    dfgls lrgnp             lag 10  tau = -1.284   (default, trend)\n    dfgls lrgnp, notrend    lag 10  tau = +0.806   (the no-trend case)\n\n``trend=False`` or ``notrend=True`` selects the second. With the trend the detrending uses\n``cbar=-13.5`` and subtracts ``b_iota + b_qdtrd*t``; without it, ``cbar=-7`` and only\n``b_iota``. Both cases reproduce Stata to the printed digit.\n\n``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)`` (``dfgls.ado:64``).",
+      "signature": "(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, notrend: 'bool' = False, name: 'str' = '') -> 'DFGLSResult'"
+    },
+    {
+      "name": "dfuller",
+      "kind": "function",
+      "module": "westata.estimators.tseries",
+      "docstring": "Augmented Dickey-Fuller test, spelled the way Stata spells it.\n\nA thin alias: ``dfuller(y, trend=True)`` is ``unitroot(y, test=\"adf\", regression=\"ct\")``.\nIt exists because ``unitroot`` is not the name a Stata user reaches for, and the option\nmapping is not guessable:\n\n    no option     ->  regression=\"c\"\n    , trend       ->  regression=\"ct\"\n    , noconstant  ->  regression=\"n\"\n\nMeasured against a live Stata on nelson_plosser.dta, where the numbers already matched:\n\n    dfuller lrgnp, trend    Z(t) -2.026     unitroot(..., regression=\"ct\")  -2.0262\n    dfuller d.lrgnp         Z(t) -5.322     unitroot(..., regression=\"c\")   -5.3216\n\n``lags=`` maps to ``maxlag``; Stata's default is zero lags, which is what ``None`` gives.\nPassing ``regression=`` overrides ``trend``.",
+      "signature": "(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'"
     },
     {
       "name": "estat_bgodfrey",
       "kind": "function",
       "module": "westata.postestimation.bgodfrey",
-      "docstring": "Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.\n\n``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata\nrefuses the test after ``regress, robust`` and so does this.",
-      "signature": "(result: 'Any', *, lags: 'int | Sequence[int]' = 1) -> 'BgTestResult'"
+      "docstring": "Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.\n\n``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata\nrefuses the test after ``regress, robust`` and so does this.\n\n``nomiss0`` keeps the leading missing values of the lagged residuals MISSING instead of\nreplacing them with zero, which shortens the auxiliary regression by ``p`` rows.\n``bgodfrey.ado:180-184`` is the whole difference::\n\n    if \"`dm'\"==\"\" {\n        foreach i of local reslist {\n            qui replace `i' = 0 if `i' >= . & `touse'\n        }\n    }\n\nThe option is called ``dm`` inside the ado -- \"Davidson-MacKinnon method is now\nmiss0\" -- so an empty macro means the default (replace with zero) and a set one means\nkeep them missing. Measured on a 200-row series, default against ``nomiss0``:\n\n    lag 1: chi2 187.976  ->  191.674\n    lag 2: chi2 188.371  ->  191.009",
+      "signature": "(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False) -> 'BgTestResult'"
     },
     {
       "name": "estat_classification",
@@ -1450,10 +1495,17 @@
       "signature": "(result: 'Any', *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'VifResult'"
     },
     {
+      "name": "etable_as_stata",
+      "kind": "function",
+      "module": "westata.results.esttab",
+      "docstring": "``etable`` rendered as ``esttab`` prints it.\n\n``etable`` returns a DataFrame because that is more useful to a program; this returns the\nTEXT Stata prints, which is what a comparison needs. Both are kept: neither is a\nsubstitute for the other.",
+      "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, digits: 'int' = 3, se: 'bool' = True, stars: 'bool' = True, stats: 'Sequence[tuple[str, str]] | None' = None) -> 'str'"
+    },
+    {
       "name": "format_ereturn_list",
       "kind": "function",
       "module": "westata.postestimation.ereturn",
-      "docstring": "Render ``ereturn list`` for a fitted result object.\n\n``result`` must expose ``e`` (a mapping). Matrices are discovered through\n``cov_params()`` (reported as ``e(V)``) and the parameter vector (``e(b)``); a result that\nsupplies neither simply gets no matrices block entries.",
+      "docstring": "Render ``ereturn list`` for a fitted result object.\n\n``result`` must expose ``e`` (a mapping). Matrices are discovered through\n``cov_params()`` (reported as ``e(V)``) and the parameter vector (``e(b)``); a result that\nsupplies neither simply gets no matrices block entries.\n\nDELEGATES TO THE RESULT'S OWN RENDERER when it has one. Round 255 found this free function\nand ``StataResults.ereturn_list`` had drifted apart: 38 lines against 34, no leading blank\nline, a different scalar order, an extra e(sigma) row, and an e(F) that predated the\nmean-square fix. A live ``ereturn list`` STARTS with a newline and prints 35 lines, which is\nwhat the method produces -- so the method is authoritative and this wrapper follows it. The\nolder body is kept below only for results that are not StataResults (a duck-typed object with\njust ``e`` and ``params``).",
       "signature": "(result: 'Any') -> 'str'"
     },
     {
@@ -1474,8 +1526,8 @@
       "name": "kpss",
       "kind": "function",
       "module": "westata.postestimation.kpss",
-      "docstring": "KPSS test for stationarity, as ``kpss varname``.\n\n``trend=True`` is Stata's DEFAULT (``trend stationary``); pass ``trend=False`` for its\n``notrend`` option. ``maxlag=None`` uses KPSS's rule, ``int(4*(n/100)**0.25)``.",
-      "signature": "(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None) -> 'KpssResult'"
+      "docstring": "KPSS test for stationarity, as ``kpss varname``.\n\n``trend=True`` is Stata's DEFAULT (``trend stationary``); pass ``trend=False`` for its\n``notrend`` option. ``maxlag=None`` uses KPSS's rule, ``int(4*(n/100)**0.25)``. Supplying\n``maxlag`` explicitly also changes the printed Maxlag line, because Stata only says \"chosen by\nSchwert criterion\" for the automatic choice.\n\n``name`` is optional: Stata prints the variable name in the title and H0 line, but a bare\nndarray has no name, so the generic wording is kept when it is omitted.",
+      "signature": "(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, name: 'str' = '') -> 'KpssResult'"
     },
     {
       "name": "levin_lin_chu",
@@ -1527,11 +1579,18 @@
       "signature": "(text: 'str') -> 'ParsedExpressionList'"
     },
     {
+      "name": "pperron",
+      "kind": "function",
+      "module": "westata.estimators.tseries",
+      "docstring": "Phillips-Perron test, spelled the way Stata spells it.\n\n``pperron(y, trend=True)`` is ``unitroot(y, test=\"pp\", regression=\"ct\")``; the option mapping\nis the same as :func:`dfuller`.",
+      "signature": "(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'"
+    },
+    {
       "name": "prais",
       "kind": "function",
       "module": "westata.estimators.prais",
-      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\n``formula`` is a statsmodels/patsy style spec such as ``\"y ~ x1 + x2\"``. The data must\nalready be in time order through ``frame``'s row order.",
-      "signature": "(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-08) -> 'PraisResult'"
+      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\n``formula`` is a statsmodels/patsy style spec such as ``\"y ~ x1 + x2\"``. The data must\nalready be in time order through ``frame``'s row order.\n\n``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops\nthe first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in\nboth the coefficients and the estimated rho, so it is a separate estimator, not a\ncosmetic switch.",
+      "signature": "(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'"
     },
     {
       "name": "pwcompare",
@@ -1552,21 +1611,35 @@
       "kind": "function",
       "module": "westata.estimators.rdrobust",
       "docstring": "Sharp RD estimate at ``cutoff``.\n\nBandwidth selection is not implemented: pass ``bandwidth`` explicitly, or the default\n``None`` raises rather than silently choosing one. Stata's MSE-optimal selector is a\nseparate, considerably larger piece of work.",
-      "signature": "(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular') -> 'RdRobustResult'"
+      "signature": "(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResult'"
+    },
+    {
+      "name": "render_esttab",
+      "kind": "function",
+      "module": "westata.results.esttab",
+      "docstring": "Render ``results`` as Stata's ``esttab`` prints them.",
+      "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None', digits: 'int' = 3, se: 'bool' = True, stars: 'bool' = True, stats: 'Sequence[tuple[str, Any]] | None' = None, stats_digits: 'int' = 3) -> 'str'"
     },
     {
       "name": "summarize",
       "kind": "function",
       "module": "westata.postestimation.summary_stats",
       "docstring": "Stata's ``summarize`` over ``data`` (a DataFrame, Series or array).\n\n``variables`` names the columns to report; omitted, every column is included. Missing\nvalues are excluded per variable, exactly as Stata's ``Obs`` column reports the number of\nnon-missing observations.",
-      "signature": "(data: 'Any', variables: 'Sequence[str] | None' = None, *, weights: 'Any' = None) -> 'SummarizeTable'"
+      "signature": "(data: 'Any', variables: 'Sequence[str] | None' = None, *, weights: 'Any' = None, detail: 'bool' = False) -> 'Any'"
+    },
+    {
+      "name": "synth",
+      "kind": "function",
+      "module": "westata.estimators.synth",
+      "docstring": "Fit a synthetic control (Stata ``synth``, default path).\n\nParameters mirror Stata's syntax but are Python keyword arguments.  See the\nmodule docstring and the B-grade design spec for the evidence level (E2),\nmeasured tolerances and the list of refused options.",
+      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, figure: 'bool' = False, keep: 'str | None' = None, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
     },
     {
       "name": "tebalance_summarize",
       "kind": "function",
       "module": "westata.postestimation.tebalance",
       "docstring": "Balance table comparing raw and matched means/variances.\n\n``covariates`` is an ``(n, k)`` array; ``match_weights`` holds the control-side matching\nweights (one per observation, zero for untreated controls that were never used, and zero\nfor all treated rows). ``names`` labels the columns.",
-      "signature": "(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = ()) -> 'BalanceSummary'"
+      "signature": "(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalise_counts: 'bool' = False) -> 'BalanceSummary'"
     },
     {
       "name": "teffects_nnmatch",
@@ -1579,8 +1652,8 @@
       "name": "teffects_psmatch",
       "kind": "function",
       "module": "westata.estimators.psmatch",
-      "docstring": "ATET by propensity-score matching, as ``teffects psmatch ..., atet``.\n\n``covariates`` is an ``(n, k)`` array. The propensity score comes from a logit of\n``treatment`` on those covariates with an intercept, which is what Stata's treatment\nmodel does by default (verified: the logit coefficients agree to 1e-7).\n\n``nneighbor`` is Stata's ``nn()``; ties at the k-th smallest distance are ALL included,\nso the realised number of matches can exceed it. ``tie_tolerance`` is the absolute\npropensity-score difference still considered a tie; 1e-8 through 1e-6 were measured to\ngive identical results on the reference sample, so the default is deliberately on the\ngenerous side of the logit's own convergence precision.\n\nThe AI-robust standard error is NOT computed (see the module docstring), so the\ninferential fields stay NaN.",
-      "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-06, outcome: 'str' = '') -> 'PsmatchResult'"
+      "docstring": "ATET by propensity-score matching, as ``teffects psmatch ..., atet``.\n\n``covariates`` is an ``(n, k)`` array. The propensity score comes from a logit of\n``treatment`` on those covariates with an intercept, which is what Stata's treatment\nmodel does by default (verified: the logit coefficients agree to 1e-7).\n\n``nneighbor`` is Stata's ``nn()``; ties at the k-th smallest distance are ALL included,\nso the realised number of matches can exceed it.\n\n``tie_tolerance`` is the absolute propensity-score difference still counted as a tie. It\nmust be TIGHT. The old 1e-6 default lumped two controls 0.0011575908 and 0.00115824\napart -- a difference of 6e-7 -- into one tie for treated unit 2, which reported four\nmatches where Stata uses three. Measured across nn(1) to nn(5) on nsw_dw::\n\n    tolerance   matches Stata\n    1e-6        4 of 5      (nn(3) gives 2412.8207 against 2397.636)\n    1e-9        5 of 5\n    1e-12       5 of 5\n    0           5 of 5\n\n1e-9 separates distinct distances while still absorbing the logit's own numerical noise,\nwhich is far below that scale.\n\n``caliper`` is Stata's ``caliper(#)``: a control further than # in propensity-score\ndistance is ineligible, and a treated unit with nothing inside the caliper is dropped\nfrom the estimate (Stata reports those as \"no matches\"). ``None`` means no cap, which is\nthe default.\n\nThe AI-robust standard error is NOT computed (see the module docstring), so the\ninferential fields stay NaN.",
+      "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'PsmatchResult'"
     },
     {
       "name": "teffects_ra",
@@ -1607,7 +1680,7 @@
       "name": "vargranger",
       "kind": "function",
       "module": "westata.postestimation.vargranger",
-      "docstring": "Build the ``vargranger`` table for a fitted ``VARResults``.",
+      "docstring": "Build the ``vargranger`` table for a fitted ``VARResults``.\n\nStata's ``vargranger`` refuses anything but a var/svar/ivsvar/xtvar estimate::\n\n    vargranger only works with estimates from var, svar, ivsvar,or xtvar\n\nA VECM is not among them. Passing one must say so rather than surface an AttributeError from\nthe missing ``granger_causality``, which names neither the test nor the reason.",
       "signature": "(fitted: 'Any') -> 'VarGrangerResult'"
     },
     {
@@ -1649,8 +1722,8 @@
       "name": "vecrank",
       "kind": "function",
       "module": "westata.postestimation.vecrank",
-      "docstring": "Johansen cointegration rank test, as ``vecrank``.\n\n``data`` holds the endogenous series in time order (rows) by equation (columns); missing\nrows must already be dropped. ``lags`` counts the VAR lag order as Stata does, so the\nnumber of differenced lags is ``lags - 1``.",
-      "signature": "(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant') -> 'VecRankResult'"
+      "docstring": "Johansen cointegration rank test, as ``vecrank``.\n\n``data`` holds the endogenous series in time order (rows) by equation (columns); missing\nrows must already be dropped. ``lags`` counts the VAR lag order as Stata does, so the\nnumber of differenced lags is ``lags - 1``.\n\n``show_max=True`` is Stata's ``max`` option: the trace table is printed with a SECOND table of\nmaximum-eigenvalue statistics below it. Stata always shows both when ``max`` is given, so this\nis a display flag -- the ``maximum`` and ``maximum_critical`` fields are populated either way.",
+      "signature": "(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant', show_max: 'bool' = False) -> 'VecRankResult'"
     },
     {
       "name": "vecstable",
@@ -1693,6 +1766,11 @@
         "docstring": "Return the covariance matrix of the parameter estimates."
       },
       {
+        "name": "ereturn_list",
+        "signature": "(self) -> 'str'",
+        "docstring": "Stata's ``ereturn list`` -- the four sections of one estimation result.\n\nCaptured from a live ``quietly regress lnw s expr`` then ``ereturn list`` (round 249):\n\n    (blank)\n    scalars:\n                      e(N) =  758\n                   e(df_m) =  2\n                      e(F) =  160.164773596988\n    (blank)\n    macros:\n                e(cmdline) : \"regress lnw s expr\"\n                  e(title) : \"Linear regression\"\n    (blank)\n    matrices:\n                      e(b) :  1 x 3\n                      e(V) :  3 x 3\n    (blank)\n    functions:\n                 e(sample)\n\nThe three column shapes differ: a scalar is ``<name> = <value>`` with the name\nRIGHT-aligned to column 21; a macro is ``<name> : \"<text>\"`` with the name right-aligned\nto 21 and the text in double quotes; a matrix is ``<name> :  <r> x <c>`` with TWO spaces\nafter the colon (Stata pads to align the dimensions); a function is just the name.\nThe whole block opens with a blank line, like every other Stata output block."
+      },
+      {
         "name": "estat_auc",
         "signature": "(self) -> 'Any'",
         "docstring": "Stata's ``estat auc`` -- the area under the ROC curve.\n\n``logit_estat.ado:19-21`` dispatches the subcommand to ``lroc, nograph``."
@@ -1701,6 +1779,11 @@
         "name": "estat_classification",
         "signature": "(self, **kwargs: 'Any') -> 'Any'",
         "docstring": "Stata's ``estat classification`` -- the 2x2 classification table."
+      },
+      {
+        "name": "estat_dwatson",
+        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "docstring": "Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.\n\n``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some\ntime, but it was never reachable from a fitted result: the report's chapter 7-9 checks\ncall ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,\nthe wiring was missing."
       },
       {
         "name": "estat_endogenous",
@@ -1783,6 +1866,21 @@
         "docstring": "Stata's ``estat weakrobust`` -- inference robust to weak instruments.\n\nReports the Anderson-Rubin test, whose distribution does not depend on instrument\nstrength.  The conditional likelihood-ratio test (the overidentified default in\nStata) is refused with its reason; see\n:func:`westata.postestimation.weakrobust.estat_weakrobust`."
       },
       {
+        "name": "f_test",
+        "signature": "(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'",
+        "docstring": "statsmodels' ``f_test``: one or more restrictions reported jointly as F."
+      },
+      {
+        "name": "first_stage",
+        "signature": "(self) -> 'str'",
+        "docstring": "Stata's ``ivregress ..., first`` -- the first-stage regression table.\n\nOne block per endogenous regressor, headed \"First-stage regressions\": the F,\nR-squared, adjusted R-squared and Root MSE of that equation, then its\ncoefficient table with the included exogenous variables and the excluded\ninstruments.\n\nThis is a different output from :meth:`estat_firststage`, which prints the\nDIAGNOSTICS for the same equations. Stata offers both and they are not\nsubstitutes, so both are here."
+      },
+      {
+        "name": "get_influence",
+        "signature": "(self) -> 'Any'",
+        "docstring": "Influence measures, named as statsmodels' ``OLSInfluence`` names them."
+      },
+      {
         "name": "hausman",
         "signature": "(self, efficient: 'Any', **kwargs: 'Any') -> 'Any'",
         "docstring": "Hausman specification test (Stata `hausman`).\n\nKeyword arguments are forwarded to\n:func:`westata.postestimation.modeltests.hausman`, so the Stata\n``hausman ..., constant`` option is reachable from a result object too:\n``fe.hausman(re, constant=True)``."
@@ -1829,8 +1927,13 @@
       },
       {
         "name": "summary",
-        "signature": "(self, style: 'str' = 'statsmodels', *, odds_ratio: 'bool' = False) -> 'str'",
-        "docstring": "Render a text summary.\n\nParameters\n----------\nstyle:\n    ``\"statsmodels\"`` (default) or ``\"stata\"``.\nodds_ratio:\n    Exponentiate the coefficients, their standard errors and both interval\n    endpoints, and relabel the column \"Odds ratio\" -- Stata's ``logit ..., or``.\n    z and P>|z| are unaffected, since they come from the untransformed scale."
+        "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'",
+        "docstring": "Render a text summary.\n\nParameters\n----------\nstyle:\n    ``\"stata\"`` (default) or ``\"statsmodels\"``. The default is Stata's layout because this\n    package exists to reproduce it; pass ``style=\"statsmodels\"`` for the statsmodels table.\nodds_ratio:\n    Exponentiate the coefficients, their standard errors and both interval\n    endpoints, and relabel the column \"Odds ratio\" -- Stata's ``logit ..., or``.\n    z and P>|z| are unaffected, since they come from the untransformed scale.\nfirst:\n    Prepend the first-stage regression, as Stata's ``ivregress ..., first`` does. Only\n    available for results that expose ``first_stage()``; the block is the one that method\n    already renders, which matches Stata line for line."
+      },
+      {
+        "name": "t_test",
+        "signature": "(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'",
+        "docstring": "statsmodels' ``t_test``: a single restriction reported as a t statistic."
       },
       {
         "name": "test",
@@ -1845,7 +1948,7 @@
       {
         "name": "wald_test",
         "signature": "(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'",
-        "docstring": "statsmodels-compatible joint Wald test.\n\nMirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object\nwith ``statistic``, ``df_denom``, ``df_num`` and ``pvalue``.  When\n``scalar`` is False a chi2 test is returned instead of the F test, which\nmatches statsmodels' documented behaviour."
+        "docstring": "statsmodels-compatible joint Wald test.\n\nMirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object with\n``statistic``, ``df_denom``, ``df_num`` and ``pvalue``. When ``scalar`` is False a\nchi2 test is returned instead of the F test, matching statsmodels' behaviour.\n\nR MAY BE A CONSTRAINT STRING, as statsmodels allows: ``wald_test(\"s = 0\")``.\nstatsmodels accepts a formula-like expression and so does this method -- the parsing\nis delegated to :meth:`test`, which already speaks Stata's constraint syntax. Only the\nreturn SHAPE differs: ``test`` reports Stata's F statistic with ``df``/``df_denom``,\nwhich is what a caller of ``wald_test`` is asking for anyway."
       }
     ],
     "properties": [
@@ -1890,6 +1993,10 @@
         "docstring": "Stata ``e()`` scalars (item and attribute access).\n\nTwo macros are synthesised when the estimator did not record them, because\nevery estimation command documents both and a consumer reading ``e()``\ncannot tell \"not recorded\" from \"not applicable\":\n\n* ``e(depvar)`` falls back to ``response_name`` (``logit.sthlp:264`` and\n  five other help files list \"name of dependent variable\");\n* ``e(cmd)`` falls back to ``model_name``, which already holds Stata's\n  command name (``regress``, ``logit``, ``reghdfe``, ...).\n\n``e(cmdline)`` is deliberately NOT synthesised: it records the command as\nthe user TYPED it, including options, and this package has no such string.\nInventing one would be a fabricated value rather than a recovered one."
       },
       {
+        "name": "fitted_series",
+        "docstring": "The fitted values with the estimation sample's index attached; see ``resid_series``."
+      },
+      {
         "name": "fittedvalues",
         "docstring": ""
       },
@@ -1912,6 +2019,10 @@
       {
         "name": "llf",
         "docstring": "Log-likelihood from ``e(ll)``; NaN when not recorded."
+      },
+      {
+        "name": "model",
+        "docstring": "The fitted model, as statsmodels exposes it.\n\n``statsmodels.stats.anova.anova_lm`` reads ``res.model`` and re-fits from it, so its\nabsence made ``anova_lm(westata_result)`` raise AttributeError. The object returned\nhere carries ``endog``, ``exog``, ``exog_names`` and a ``fit()`` that returns this\nsame result -- enough for anova_lm's contract without pretending to BE a\nstatsmodels model."
       },
       {
         "name": "model_name",
@@ -1940,6 +2051,14 @@
       {
         "name": "resid",
         "docstring": ""
+      },
+      {
+        "name": "resid_series",
+        "docstring": "The residuals with the ESTIMATION SAMPLE's index attached.\n\nv2 report section 6 wants ``resid`` itself to be a Series, as statsmodels returns it.\nReplacing the attribute would break positional access -- round 19 measured that cost on\n``beta`` with a KeyError from an existing test -- so the labelled form is a separate\nname, exactly as ``beta_labelled`` is.\n\nFalls back to a default RangeIndex when the fit did not retain the observation index,\nwhich is honest: the numbers are still there, and the index says only \"row i\"."
+      },
+      {
+        "name": "response_name",
+        "docstring": "The dependent variable's name, for titles and column headings.\n\nSOME ESTIMATORS SET THIS AS AN INSTANCE ATTRIBUTE and others do not; ARIMA and GARCH were in\nthe second group, so postestimation code reading it saw None. Falling back to e(depvar), which\nevery fit carries, gives them the same answer the formula-based estimators give.\n\nA subclass that assigns self.response_name keeps winning, because the instance dictionary is\nconsulted first."
       },
       {
         "name": "rsquared",
@@ -3419,6 +3538,104 @@
       "en": "Regression-adjustment treatment effect: fit the outcome model separately in the treated and control groups, then average the predicted difference over the estimand's population (`ate` over everyone, `atet` over the treated). The point estimate is exact; the standard error is not reproduced because the sandwich is computed inside Stata's builtin `gmm`, so se/z/p/ci are NaN.",
       "zh": "回归调整法处理效应：在处理组与对照组分别拟合结果模型，再对估计量的总体平均预测差（`ate` 对所有个体、`atet` 对处理组）。点估计精确；标准误未复现，因为 sandwich 由 Stata 内置 `gmm` 计算，因此 se/z/p/ci 为 NaN。",
       "example": "print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)"
+    },
+    "synth": {
+      "stata": "synth y x1 x2, trunit(1) trperiod(2005)",
+      "en": "Synthetic control estimation (Stata `synth`, default regression-based V path). Builds a weighted combination of the control units that matches the treated unit on pre-intervention predictor means, then uses it as the counterfactual. `unit`/`time`/`depvar` name the panel columns, `predictors` the matching variables, `trunit`/`trperiod` the treated unit and intervention period. Returns a `SynthResult` frozen dataclass; because `synth` has no coefficient vector, no `e(V)` and no degrees of freedom, those statsmodels-style attributes are deliberately absent. The example builds a small balanced 5-unit x 9-period panel inline, so it needs no external .dta file.",
+      "zh": "合成控制估计（Stata `synth`，默认基于回归的 V 路径）。用若干控制单元构造加权组合，使其在干预前的预测变量均值上与处理单元匹配，再以之作为反事实。`unit`/`time`/`depvar` 指定面板列，`predictors` 为匹配变量，`trunit`/`trperiod` 为处理单元与干预时点。返回冻结的 `SynthResult` 数据类；由于 `synth` 没有系数向量、没有 `e(V)`、也没有自由度，这些 statsmodels 风格属性被刻意省略而不伪造。示例内联构造一个 5 单元 x 9 期的小平衡面板，因此不依赖任何外部 .dta 文件。",
+      "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).RMSPE",
+      "notes_en": "Only the DEFAULT path is implemented: `nested`/`allopt`, `figure`, `keep()`, `placebo` and inferential quantities are refused with `UnsupportedError`. `customV` supplies diagonal predictor weights; `xperiod`/`mspeperiod`/`resultsperiod` override the pre-period windows. Reported `W_weights` are rounded to 3 decimals as Stata does, while `RMSPE` uses the exact QP weights.",
+      "notes_zh": "仅实现默认路径：`nested`/`allopt`、`figure`、`keep()`、`placebo` 以及任何推断量都会抛出 `UnsupportedError`。`customV` 提供对角预测变量权重；`xperiod`/`mspeperiod`/`resultsperiod` 覆盖预处理窗口。输出的 `W_weights` 按 Stata 做法四舍五入到 3 位小数，而 `RMSPE` 使用精确 QP 权重。"
+    },
+    "SynthResult": {
+      "stata": "ereturn list -- the e() matrices synth stores",
+      "en": "Frozen dataclass holding the outcome of `synth`. Field names mirror Stata's `e()` matrices verbatim: `V_matrix` (K x K diagonal predictor weights -- note there is no plain `e(V)`), `W_weights`, `X_balance`, `RMSPE`, `Y_treated` and `Y_synthetic`, all reachable together through the `e` property. `gap` is the treatment-effect path `Y_treated - Y_synthetic`, `summary()` renders a compact Stata-style report, and `W_exact` keeps the unrounded QP solution for diagnostics. It is NOT a `StataResults`, so it carries no `params`, `bse` or `cov_params`.",
+      "zh": "承载 `synth` 结果的冻结数据类。字段名逐字对应 Stata 的 `e()` 矩阵：`V_matrix`（K x K 对角预测变量权重——注意没有普通的 `e(V)`）、`W_weights`、`X_balance`、`RMSPE`、`Y_treated`、`Y_synthetic`，都可通过 `e` 属性一并取得。`gap` 是处理效应路径 `Y_treated - Y_synthetic`，`summary()` 给出紧凑的 Stata 风格报告，`W_exact` 保留未舍入的 QP 解供诊断。它**不是** `StataResults`，因此没有 `params`、`bse` 或 `cov_params`。",
+      "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nres = ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)\nres.V_matrix"
+    },
+    "RandomEffectsMLE": {
+      "stata": "xtreg ypanel x1 x2, mle",
+      "en": "Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one.",
+      "zh": "用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。",
+      "example": "ws.RandomEffectsMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')"
+    },
+    "dfuller": {
+      "stata": "dfuller y, lags(2)",
+      "en": "Augmented Dickey-Fuller unit-root test, spelled the way Stata spells it. A thin alias for `unitroot`: `dfuller(y, trend=True)` is `unitroot(y, test='adf', regression='ct')`, no option gives `regression='c'`, and `regression=` overrides `trend`. `lags=` maps to Stata's `lags(#)` (zero lags by default). Returns a `UnitRootResult` whose printed form is Stata's Dickey-Fuller table, with the statistic under `r(Zt)` and the MacKinnon p-value under `r(p)`.",
+      "zh": "增广 Dickey-Fuller 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`dfuller(y, trend=True)` 等价于 `unitroot(y, test='adf', regression='ct')`，不带选项时 `regression='c'`，显式给 `regression=` 会覆盖 `trend`。`lags=` 对应 Stata 的 `lags(#)`（默认零阶滞后）。返回 `UnitRootResult`，打印形式为 Stata 的 Dickey-Fuller 表，统计量存于 `r(Zt)`，MacKinnon p 值存于 `r(p)`。",
+      "example": "ws.dfuller(base['y'], lags=2)"
+    },
+    "pperron": {
+      "stata": "pperron y, trend",
+      "en": "Phillips-Perron unit-root test, spelled the way Stata spells it. A thin alias for `unitroot`: `pperron(y, trend=True)` is `unitroot(y, test='pp', regression='ct')`, with the same option mapping as `dfuller`. Returns a `UnitRootResult`; the Newey-West lag truncation is chosen by the same default as `dfuller` when `lags=None`.",
+      "zh": "Phillips-Perron 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封装：`pperron(y, trend=True)` 等价于 `unitroot(y, test='pp', regression='ct')`，选项映射与 `dfuller` 相同。返回 `UnitRootResult`；当 `lags=None` 时，Newey-West 滞后截断采用与 `dfuller` 相同的默认值。",
+      "example": "ws.pperron(base['y'], trend=True)"
+    },
+    "render_esttab": {
+      "stata": "esttab m1 m2, se r2 mtitle",
+      "en": "Render one or more fitted results as the TEXT Stata's `esttab` prints: a `(1) (2)` numbering row, an `mtitle` row when `model_names` is given, coefficient rows with standard errors in parentheses and significance stars, plus a footer of statistics. `stats` is a sequence of `(label, source)` pairs and defaults to `N` from `nobs`; `stats_digits` controls the footer's decimals. Unlike `etable`, which returns a DataFrame for programs, this returns the printable string. At most two models fit the measured 44-column layout.",
+      "zh": "把一个或多个已拟合结果渲染为 Stata `esttab` 打印的**文本**：`(1) (2)` 编号行、给出 `model_names` 时的 `mtitle` 行、带括号内标准误与显著性星号的系数行，以及统计量页脚。`stats` 是 `(标签, 来源)` 对序列，默认给出来自 `nobs` 的 `N`；`stats_digits` 控制页脚小数位。与返回数据框给程序用的 `etable` 不同，本函数返回可打印字符串。实测的 44 列版式最多容纳两个模型。",
+      "example": "m1 = ws.OLS.from_formula('y ~ x1', base).fit()\nm2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nws.render_esttab([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])"
+    },
+    "etable_as_stata": {
+      "stata": "esttab m1 m2, se r2 mtitle",
+      "en": "`etable` rendered the way Stata's `esttab` prints it. A convenience wrapper over `render_esttab` that forwards `model_names`, `digits`, `se`, `stars` and `stats`; `etable` itself returns a DataFrame because that is more useful to a program, while this returns the exact text a comparison against Stata needs. Both are kept deliberately -- neither substitutes for the other.",
+      "zh": "把 `etable` 按 Stata `esttab` 的打印形式渲染出来。它是 `render_esttab` 的便捷封装，转发 `model_names`、`digits`、`se`、`stars` 与 `stats`；`etable` 本身返回数据框（对程序更有用），而本函数返回与 Stata 对比所需的精确文本。两者刻意并存——互不替代。",
+      "example": "m1 = ws.OLS.from_formula('y ~ x1', base).fit()\nm2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nws.etable_as_stata([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])"
+    },
+    "f_test": {
+      "stata": "test x1 = 0, x2 = 0 (joint F)",
+      "en": "statsmodels-shaped joint F test on a fitted result. `r_matrix` accepts one or more restriction strings separated by commas (or a sequence); they are parsed by the same Stata constraint grammar as `test`, then reported jointly as F. Returns a `ContrastResults` carrying `statistic`, `pvalue`, `df_num`/`df_denom` and the `fvalue`/`tvalue` aliases. This is the statsmodels-ecosystem surface, not Stata's own `test` method.",
+      "zh": "已拟合结果上的 statsmodels 风格联合 F 检验。`r_matrix` 接受一个或多个以逗号分隔的约束字符串（或一个序列），按与 `test` 相同的 Stata 约束语法解析后，以 F 统计量联合报告。返回 `ContrastResults`，含 `statistic`、`pvalue`、`df_num`/`df_denom` 以及 `fvalue`/`tvalue` 别名。这是面向 statsmodels 生态的接口，并非 Stata 自身的 `test` 方法。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.f_test('x1 = 0, x2 = 0')"
+    },
+    "t_test": {
+      "stata": "test x1 = 0 (single restriction, t form)",
+      "en": "statsmodels-shaped t test of a single linear restriction. `r_matrix` is one restriction string (or a one-element sequence); `use_t` forces the t form, whose statistic is the square root of the corresponding F. Returns a `ContrastResults` with `statistic`, `pvalue`, `conf_int()` for a single restriction, and the `fvalue`/`tvalue` aliases. For a joint set of restrictions use `f_test` instead.",
+      "zh": "单个线性约束的 statsmodels 风格 t 检验。`r_matrix` 是一个约束字符串（或单元素序列）；`use_t` 强制采用 t 形式，其统计量为相应 F 的平方根。返回 `ContrastResults`，含 `statistic`、`pvalue`、单约束可用的 `conf_int()` 以及 `fvalue`/`tvalue` 别名。若要检验多个联合约束，请改用 `f_test`。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.t_test('x1 = 0')"
+    },
+    "get_influence": {
+      "stata": "(no Stata equivalent -- statsmodels OLSInfluence names)",
+      "en": "Influence measures for a fitted result, named as statsmodels' `OLSInfluence` names them. Returns a dict with `hat_matrix_diag` (leverage), `resid`, `resid_studentized_internal`, `resid_studentized`, `standardized_resid`, `cooks_distance` (array plus observation indices) and `nobs`. Only leverage-based measures are offered: deletion diagnostics would need one re-fit per observation, and returning a plausible-but-wrong array was judged worse than omitting the key.",
+      "zh": "已拟合结果的影响度量，命名沿用 statsmodels 的 `OLSInfluence`。返回字典，含 `hat_matrix_diag`（杠杆）、`resid`、`resid_studentized_internal`、`resid_studentized`、`standardized_resid`、`cooks_distance`（数组加观测索引）与 `nobs`。只提供基于杠杆的度量：删除诊断需要逐观测重新拟合，返回「看起来合理但错误」的数组被认为比不提供该键更糟。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.get_influence()['hat_matrix_diag'][:5]"
+    },
+    "model": {
+      "stata": "(no Stata equivalent -- a statsmodels interop shim)",
+      "en": "The fitted model as statsmodels consumers expect it. `statsmodels.stats.anova.anova_lm` reads `res.model` and re-fits from it; without this attribute that call raised AttributeError. The returned `ResultModel` exposes exactly `endog`, `exog`, `exog_names` and a `fit()` that returns this same result -- enough for `anova_lm`'s contract without pretending to BE a statsmodels model. A wider imitation would invite callers to rely on behaviour that is not there.",
+      "zh": "以 statsmodels 消费者期待的形式给出的已拟合模型。`statsmodels.stats.anova.anova_lm` 会读取 `res.model` 并由其重新拟合；缺少该属性时该调用会抛 AttributeError。返回的 `ResultModel` 只暴露 `endog`、`exog`、`exog_names` 以及返回本结果自身的 `fit()`——足以满足 `anova_lm` 的契约，而不冒充真正的 statsmodels 模型。过度模仿会诱使调用方依赖并不存在的行为。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.model"
+    },
+    "fitted_series": {
+      "stata": "predict yhat, xb -- with the estimation sample's index",
+      "en": "Fitted values as a `pandas.Series` carrying the estimation sample's index and the name `fittedvalues`. This is the labelled counterpart of the plain `fittedvalues` ndarray: replacing that attribute with a Series would break positional access, so the labelled form is a separate name. When the fit did not retain observation labels the index falls back to a `RangeIndex`, which is honest -- the numbers are still there and the labels say only \"row i\".",
+      "zh": "以 `pandas.Series` 给出的拟合值，带估计样本索引、名称为 `fittedvalues`。它是普通 `fittedvalues` ndarray 的带标签版本：若把后者直接换成 Series 会破坏按位置访问，因此另设此名。当拟合未保留观测标签时，索引退化为 `RangeIndex`——这是诚实的做法：数值仍在，标签只表示「第 i 行」。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.fitted_series.head()"
+    },
+    "resid_series": {
+      "stata": "predict e, residuals -- with the estimation sample's index",
+      "en": "Residuals as a `pandas.Series` carrying the estimation sample's index and the name `resid`, the labelled counterpart of the plain `resid` ndarray. It exists for statsmodels parity without changing the ndarray's positional behaviour, and falls back to a `RangeIndex` when the fit retained no row labels. See `fitted_series` for the matching fitted values.",
+      "zh": "以 `pandas.Series` 给出的残差，带估计样本索引、名称为 `resid`，是普通 `resid` ndarray 的带标签版本。它为兼容 statsmodels 而设，同时不改动 ndarray 的按位置访问行为；拟合未保留行标签时索引退化为 `RangeIndex`。对应的拟合值见 `fitted_series`。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.resid_series.head()"
+    },
+    "response_name": {
+      "stata": "e(depvar)",
+      "en": "Name of the dependent variable, used for titles and column headings. Some estimators set it as an instance attribute and others do not (ARIMA and GARCH were in the second group), so the property falls back to `e(depvar)` -- a macro every fit carries -- giving the same answer as the formula-based estimators. A subclass that assigns `self.response_name` keeps winning, because the instance dictionary is consulted first.",
+      "zh": "被解释变量名，用于标题与列头。有的估计量把它设为实例属性，有的不设（ARIMA 与 GARCH 属于后者），因此该属性回退到 `e(depvar)`——每个拟合都会携带的宏——从而与基于公式的估计量给出相同答案。子类若赋值 `self.response_name` 仍然优先，因为先查实例字典。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.response_name"
+    },
+    "first_stage": {
+      "stata": "ivregress 2sls ..., first",
+      "en": "First-stage regression table for an IV fit (Stata `ivregress ..., first`). One block per endogenous regressor, headed \"First-stage regressions\", giving the F, R-squared, adjusted R-squared and Root MSE of that equation, then its coefficient table with the included exogenous variables and excluded instruments. This is a different output from `estat_firststage`, which prints the DIAGNOSTICS for the same equations; Stata offers both and they are not substitutes, so both are kept.",
+      "zh": "IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。",
+      "example": "r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()\nr.first_stage()"
+    },
+    "ereturn_list": {
+      "stata": "ereturn list",
+      "en": "The four sections of Stata's `ereturn list` for one estimation result: scalars as `e(name) = value`, macros as `e(name) : \"text\"`, matrices as `e(name) : r x c`, and functions as bare names. WHICH scalars a command publishes is its own decision, and Stata's choice is narrower than the full `e()` dictionary, so the printed block is a faithful subset rather than a dump. The whole block opens with a blank line, as Stata's does.",
+      "zh": "单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : \"text\"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。",
+      "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.ereturn_list()"
     }
   }
 }

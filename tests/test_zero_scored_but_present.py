@@ -64,7 +64,13 @@ def test_predict_p_matches_the_manual_link_inverse(logit_fit) -> None:
 
 
 def test_the_absent_features_are_still_absent() -> None:
-    """Pinned so that 'not implemented' is a checked statement rather than an assumption."""
+    """Pinned so that 'not implemented' is a checked statement rather than an assumption.
 
-    for name in ("synth", "synth2", "xtserial"):
+    ``synth`` was removed from this list on 2026-11-09 when the B-grade default
+    path landed (it is now covered by tests/test_synth.py and the E2 fixture
+    comparisons).  ``synth2`` and ``xtserial`` remain deliberately absent.
+    """
+
+    for name in ("synth2", "xtserial"):
         assert not hasattr(ws, name), f"{name} now exists -- update the report row"
+    assert callable(ws.synth)

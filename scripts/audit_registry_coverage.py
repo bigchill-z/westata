@@ -54,6 +54,7 @@ NO_TABLE = {
     "permute": "prefix command: re-runs a wrapped estimation",
     "bootstrap / permute expressions (exp_list)": "prefix command",
     "etable": "renders an already-fitted model: no table of its own",
+    "synth": "returns six e() matrices, not a coefficient table; compared against 6 committed full-precision Stata captures in tests/conformance/test_stata_synth.py",
     "estat szroeter": "post-estimation: returns r()",
     "estat esize": "post-estimation: returns r()",
     "estat moran": "post-estimation: returns r()",

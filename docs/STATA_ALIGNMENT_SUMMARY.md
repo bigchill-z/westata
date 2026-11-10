@@ -3,6 +3,14 @@
 本文档汇总针对 `westata_vs_Stata_差距评估报告.md` 所列出差距的处理结果，把每一项的
 **验证证据**写清楚，使「已实现」「已验证」「已知差异」「明确未做」四者界限分明。
 
+> **2026-11-09 更正（B 档落地）**：本文件中关于 `synth` 的「⛔ 6 类途径已穷尽」
+> （§745）、「未实现，但源码可得」（§1358）、「A 类：信息不可得」（§1651）等均为
+> **当时快照，现已失效**。`ws.synth` 默认路径已落地并对拍 6 份全精度 fixture（E2）；
+> `e(V_matrix)` 可导出、`regsval` 为确定性纯函数、`normalize`/`regsval` 两个编译内核
+> 被黑箱辨识精确求解。完整修订见本文「`synth` 的 V 权重」章节末尾的同日修订块、
+> `docs/GAP_REGISTER.md` §3.6.4 与 B 档设计规格。**E3 仍排除**（QP 秩亏 +
+> 插件非位确定性）。原文保留为历史，不再作为现状。
+
 **原则**：一条结论只有在有 Stata 实测值或可重跑的闭式检验支撑时才算成立。本文档中每个
 数字都写明了它来自运行的哪个命令、哪份数据。
 
@@ -1236,6 +1244,114 @@ mata: regsval("`Xtr'","`Xco'","`Ztr'","`Zco'")     // 四个参数
 
 **结论**：唯一剩余路径是取得作者源码或文献中的 `regsval` 定义，不在本环境可达范围内。
 `vec` 主表也已从「规则未定」推进到 9 个 `e()` 标量全部精确。
+
+#### 2026-11-09 修订：上面两条「封死」的结论已被实测证伪（B 档立项依据）
+
+> 保留上文原貌以便追溯；**以本修订为准**。这是本项目第三次「把可修复的错误写成不可约约定」
+> （前两次：`bgodfrey` 实为未查用户 ado 路径、`dfgls` 实为默认选项写反）。上文错在两处
+> **事实**，不在推理：
+
+1. **上表第 4 行「`synth` 不保存 `e(V)`/`e(V_matrix)`、`e(W_weights)` 需 `keep()`」是错的。**
+   `synth.ado:664-682` 在 `ereturn clear` 后存了六个 `e()` 矩阵：`e(Y_treated)`(:666)、
+   `e(Y_synthetic)`(:667)、`e(W_weights)`(:677)、`e(X_balance)`(:678)、
+   **`e(V_matrix)`(:681)**、`e(RMSPE)`(:682)。`synth.sthlp:290-330` 逐项列出；
+   `synth2.ado:162-163/168/174/216/640` 直接读取它们，说明是稳定契约而非偶然。
+   注意 **名字是 `V_matrix`，没有 `e(V)`** —— 按「`e(V)` 不存在」去写捕获会静默拿到空矩阵。
+   `keep()`（`synth.ado:648-657`）只是另存一个 `.dta`，与 `e()` 是两条独立通道。
+
+   活体 StataNow 19.5 实测（`synth cigsale lnincome age15to24 beer retprice,
+   trunit(3) trperiod(1989)`，`synth_smoking.dta`，`format(%21.17f)`）：
+
+   ```
+   e(V_matrix) = diag(0.02017586234387460, 0.07051094571756153,
+                      0.25958848171523474, 0.64972471022332912)
+   e(RMSPE)    = 10.50086835465610413
+   customV(1 1 1 1) -> V = diag(.25,.25,.25,.25), RMSPE = 7.89695568405810899
+   mspeperiod(1980(1)1988) -> V = diag(.00817867291892540, .07983644228549265,
+                                       .22995854230012880, .68202634249545313)
+   ```
+
+2. **上表第 3 行与 §1234-1237 的 `regsval` 结论是类别错误。** `synth.ado:467-474` 的全局量
+   定义在 `regsval` 调用（`:390`）**之后**，只服务于 `synth_ll.ado`/`ml`；`regsval` 收的是
+   **四个显式字符串矩阵名**（`:390`）。第 70/71 轮没有测到这条路径。
+
+   用正确形状的真实矩阵单独调用（活体 Stata）：
+
+   ```
+   mata: regsval("xtrmat","xcomat","ZtrR","ZcoR")   -> RC=0, vmat[4,4]
+   vmat - e(V_matrix)                               -> 全零矩阵（17 位逐位一致）
+   drop _all 后再调用                                -> RC=0（不依赖数据集在内存）
+   扰动 ZcoR[1,1] +10                               -> 输出随之变化（确实依赖 Z）
+   ```
+
+   ⇒ **`regsval` 是 `(Xtr_norm, Xco_norm, Ztr, Zco) -> V` 的确定性纯函数**，输入输出可任意
+   构造、全精度采集。因此「唯一剩余路径是取得作者源码、不在本环境可达」**不成立**：
+   黑箱辨识可行，且比反编译 `.mlib` 更直接。
+
+**已白盒化的 Mata 内核**（活体单独调用实测）：`getabs(-2,3,-5) -> (0.2,0.3,0.5)`
+即 `|b|/Σ|b|`；`normweights(1,2,3,4) -> diag(0.1,0.2,0.3,0.4)`；`roundmat` = 3 位小数；
+`roottaker` = 逐元素 sqrt。**8 个内核全枚举**：`emptymat`、`switchmat`、`normalize`、
+`regsval`、`normweights`、`getabs`、`roottaker`、`roundmat`（上文只列了 6 个，漏了数据准备
+路径里的 `emptymat`(:206/:209) 与 `switchmat`(:809)）。
+
+**仍需注意的实现细节**（均为可读源码，非二进制）：
+- 优化用 *normalized* X（`:378-384`），但 `e(X_balance)` 用 *原始* X（`:560-561`、`:606-607`）——
+  写反会全错。
+- `roundmat`（`:589-590`）在 `Xsynth/Xbal/Ysynth/wsolout`（`:594/:606/:616`）**之前**、RMSPE
+  （`:564`）**之后** ⇒ 那四个 `e()` 与 `keep()` 用**舍入后**的 W，只有 `e(RMSPE)` 用精确 W。
+  实测后果：六份 fixture 中 `e(W_weights)` 的列和为 **0.999 / 1.001**（非 1.0），因为三位
+  舍入破坏了归一化。**实现必须照抄，不要「修正」回和为 1**——那会与 Stata 的
+  `e(Y_synthetic)`/`e(X_balance)` 全部对不上。
+- **帮助文件默认值过时**：`synth.sthlp:270/274` 写 `margin=0.05, sigf=7`，而 2026 版 ado
+  （`:35/:37`）是 **`margin=0.005, sigf=12`**。移植必须以源码为准。
+- `synth_ll.ado:27-30` 同时含**外层损失**（非「只覆盖内层」）；外层是 Stata 闭源
+  `ml model d0`，默认 `tech(nr dfp bfgs)`（`:437`），收敛点不可逐位复刻。
+
+**边界重新划定（B 档决策，2026-11-09）**：`信息不可得` 不再指整个内核，而只限
+① `nested` 的 Stata `ml` 收敛点；② C++ QP 求解器（`synthopt.plugin`）的数值行为
+（Cholesky/pivot/容差/FP-CRT-BLAS）；③ `StataCapture.capture()` 只认 `e(b)/e(V)` 的 harness
+形态缺口（已列为 P0 工作项）。目标：默认路径对齐到 **E2（有界、已测量差异）**，
+不承诺 E3；`nested`/`allopt`/`synth2`/图形/placebo 仍不做。
+
+#### P0 结果补记（2026-11-09 当日，B 档立项后）：两个内核已精确求解
+
+黑箱辨识 + 纯 Python 独立复现（`scripts/verify_synth_mata_formulas.py`，4/4 PASS、无需
+Stata licence）得出：
+
+```
+normalize:  V = [Xtr | Xco]  (K x N, N=J+1，treated 在第 0 列)
+            s[k] = quadvariance(V[k,])^0.5 = 样本标准差 (ddof=1)，含 treated
+            xtrmat = Xtr / s ;  xcomat = Xco / s[:,None]
+
+regsval:    Xdm = Xnorm - rowmean(Xnorm)        # 按单位去均值，含 treated
+            Zdm[t,] = Z[t,] - mean_u(Z[t,])     # 按单位去均值（每期一个截距）
+            B = solve(Xdm @ Xdm.T, Xdm @ Zdm.T)  # K x T0，逐期截面多元 OLS
+            V = diag( sum_t B[k,t]^2 / sum_k sum_t B[k,t]^2 )
+```
+
+即 V 权重是「**逐期截面回归系数的平方和**」，不是 R²、不是 |b|、不是相关系数。
+实测精度：11 组构造数据 ≤9.1e-15；smoking 两种 mspeperiod ≤8.6e-14；Basque
+两/六预测变量 ≤3.3e-16 / 5.1e-13；`xtrmat` ≤2.8e-14。两份已有文档里
+「beer/age15to24 顺序不一致」的疑点已查明：仅是 varlist 顺序不同，同一公式。
+
+**E2 容差（实证标定，非拍脑袋）**：`|dV| ≤ 1e-10`（实测 ~1e-13，留 1000× 余量）、
+`|dW| ≤ 1e-3`（`roundmat` 三位舍入）、`|dRMSPE| ≤ 1e-8`（实测 ~1e-11）。
+**不承诺 E3**：`synthopt.plugin` 自身非位确定性，两次相同运行的 RMSPE 差
+**1.471e-11**；W 在 V 偏差 ≤1e-8 时完全不变（被三位舍入吸收）。
+
+**唯一有界未知**：`Sxx` 秩亏时 Stata `invsym()` 的广义逆 sweep 顺序未复现
+（满秩/近共线均已验证 ≤1.4e-15）；`J=1` 时 Stata 自己报 r(3200)。不影响
+`K ≪ J+1` 常规用法 → 实现按 `ConsistencyError` 拒绝秩亏输入，不猜。
+
+**两个数据契约陷阱**（实测，写进实现）：`.dta` 数值列是 float32、`state` 是带值标签的
+int32 category（须 `convert_categoricals=False` + `astype(float64)`，否则 V 偏 ~3e-7）；
+`Xtr`/`Ztr` 的 treated 单位在**第 0 列**，X 行=预测变量、Z 行=时间，维度不同不可混。
+
+**REA 逆向结论（用户点名评估）**：`rea-agents@6.5.0` 的 `targetFormatSchema` 枚举 23 种
+格式中**无 `mata`/`mlib`/Stata**，包内 1598 文件扫描零支持 ⇒ 对 `.mlib` 零能力；
+`synthopt.plugin` 虽是受支持的 `pe`，但本环境 doctor `healthy=false`、Hopper/Ghidra/IDA/JADX
+**4/4 引擎全缺**、无 MCP 连接，且伪代码只能还原已写在 `synth.sthlp:263-267` 的 Vanderbei
+内点法。**REA 不是本任务的工具**；路径是「活体 Stata 采集 + 黑箱辨识」。
 
 ---
 

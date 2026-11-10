@@ -341,7 +341,12 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`, `RegressionAdjustment`, `IPW`, `AIPW` |
+| `teffects nnmatch ..., atet` / `caliper()` | `teffects_nnmatch(...)` — the function form adds `caliper` and `tie_tolerance` |
+| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
+| `tebalance summarize` | `tebalance_summarize(...)` |
 | `didregress` / `xtdidregress` | `Didregress`, `Xtdidregress` |
+| `rcm` | `rcm(...)` — pass `selected=` for a result that matches Stata |
+| `synth` (default path) | `synth(...)` — six `e()` matrices, evidence grade E2 |
 
 ### Time series
 

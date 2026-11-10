@@ -1127,3 +1127,16 @@
   verified_by: lead
   date: 2026-11-04
   notes: "E3 against `estat imtest, white double`. The df defect this round fixed was silent: the statistic was already correct, but chi2_h/chi2_t used the NOMINAL column count instead of the rank, so an indicator's squared column (x^2 == x for x in {0,1}) was counted as a degree of freedom Stata had dropped. On mpg~weight+foreign that is df 5 against Stata's 4, which inflates the p-value and can flip a rejection. One precision caveat is recorded rather than emulated: imtest.ado:35 computes in FLOAT unless `,double` is given, so Stata's own two captures differ around 1e-8 (default 9.794147910432786 vs double 9.794148277797737). This module computes in double, so it matches `,double` to 1e-12 and the float default only to 1e-8; reproducing float32 accumulation bit-for-bit would make the answer depend on rounding order, which is a property of Stata's storage type rather than of the statistic. Both columns are committed in the fixture so the gap stays documented. See docs/TESTING_SOP.md."
+
+- command: synth
+  level: E2
+  tolerance: 1.0e-2
+  sources:
+    - type: published_output
+      ref: "6 full-precision e() matrix captures from StataNow 19.5 MP / synth.ado v0.0.8 (2026-04-29), captured by scripts/capture_synth_fixtures.py into tests/conformance/stata_fixtures/synth_*.json -- smoking.dta default/customV/mspeperiod/xperiod/counit plus basque.dta default"
+      dataset: smoking.dta, basque.dta
+    - type: invariant
+      ref: "scripts/verify_synth_mata_formulas.py (4/4, no Stata licence) pins normalize() and regsval() in closed form against live-Stata values to 8.8e-14; tests/conformance/test_stata_synth.py compares V/W/X_balance/Y_*/RMSPE against all 6 fixtures"
+  verified_by: lead
+  date: 2026-11-09
+  notes: "B-grade E2 (bounded, measured differences). The two compiled Mata kernels were SOLVED exactly in P0 by black-box identification: normalize() = sample SD (ddof=1) of [treated|controls]; regsval() = diag of the sum of SQUARED per-period multivariate cross-sectional OLS coefficients. e(V_matrix) is directly exportable, and regsval is a deterministic pure function of its 4 matrix arguments -- the earlier 'information unavailable / only author source can help' verdict was falsified by live Stata. MEASURED bounds across all 6 fixtures: |dV| <= 1e-10 (observed ~1e-13), |dW| <= 1e-3 and observed EXACTLY 0 at 3 dp in every case, |dX_balance|/|dY_*| <= 1e-3, |dRMSPE| <= 1e-2 (worst observed 5.6e-4 on smoking_default). E3 excluded / E3 排除: synthopt.plugin is not bit-deterministic (two identical Stata runs differ by 1.471e-11 in RMSPE) and H = Xco' V Xco has rank <= K << J, so the QP optimum is non-unique; Stata's C++ interior-point solver stops off the optimal face at margin=0.005 while scipy SLSQP solves it more tightly. The P1 design's provisional |dRMSPE| <= 1e-8 was FALSIFIED by measurement and widened to the observed bound (design S2 requires measuring before writing, not fitting a guessed number). nested/allopt (Stata's closed-source ml optimiser), synth2, figures, keep(), placebo and any inferential quantity raise UnsupportedError rather than returning a plausible guess. Rank-deficient Sxx is refused with ConsistencyError (Stata's invsym() sweep order is not reproduced). See docs/superpowers/specs/2026-11-09-synth-b-design.md."

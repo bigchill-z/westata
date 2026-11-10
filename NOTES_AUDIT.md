@@ -170,3 +170,92 @@ rho = Σ(e_t · e_{t-1}) / Σ(e_{t-1}²)
 
 迭代日志的**格式**已经量清（43 字符/行、`Iteration 0` 恒为 0、前后空行），
 **rho 公式**也已确定。缺的是 `prais_e` 的重拟合细节。
+
+---
+
+## 第 5 轮：`prais` 迭代日志的**算法已完整解出**（未落地）
+
+前一轮卡在"第 2 步发散"。本轮读 `_crcar1.ado` 与 `prais_e.ado` 后，
+**完整算法已确定，并用独立脚本 100% 复现**（含最终值）。
+
+### 三个必要条件（缺一不可）
+
+**① rho 的公式** —— `_crcar1.ado:37-42`（默认 `regress` 分支）：
+
+```stata
+gen double vals = resids * l.resids
+sum vals;  scalar numer = r(sum)
+replace vals = l.resids^2 if vals != .
+sum vals;  scalar rho = numer / r(sum)
+```
+
+即 **`rho = Σ(eₜ·eₜ₋₁) / Σ(eₜ₋₁²)`**（westata 的 `_rho_from_residuals` 已是此式）。
+
+**② corc 的变换丢弃首行** —— `prais_e.ado:28-33`：corc 模式**不做**首观测的
+`sqrt(1-ρ²)` 替换，于是首行的滞后是缺失值，`_regress` **丢弃该行**。
+（westata 的 `_transform_corc` 已是 `values[1:] - rho*values[:-1]`，正确。）
+
+**③ 迭代的先后顺序** —— `prais.ado:172-217`，这是之前所有失败的根本原因：
+
+```stata
+rho = 0 ; lastrho = 2 ; it_ct = 0
+while it_ct < iterate & abs(rho - lastrho) > toleran {
+    lastrho = rho
+    predict resid            // 【上一轮拟合】的残差（首轮是普通 OLS）
+    rho = crcar1(resid)      // 由该残差算新 rho
+    if it_ct == 0 { 打印 "Iteration 0:  rho = 0" }   // 字面量 0
+    prais_e : rho            // 【用新 rho 拟合】
+    it_ct++
+    打印 "Iteration it_ct:  rho = <rho>"
+}
+```
+
+**每一轮打印的 rho，既是本轮残差步的结果，也是下一轮拟合采用的 rho。**
+把"拟合"和"算 rho"当成一个整体、并用 OLS 估计值重新播种，
+就会得到 `0.3895, 0.3975, 0.3999…` 而不是 Stata 的 `0.4008, 0.4009…`。
+
+### 独立脚本验证结果（100% 命中）
+
+```
+--- corc ---
+  Iteration 0:  rho = 0.0000
+  Iteration 1:  rho = 0.4006
+  Iteration 2:  rho = 0.4008
+  Iteration 3:  rho = 0.4009
+  Iteration 4:  rho = 0.4009
+  Iteration 5:  rho = 0.4009
+  Iteration 6:  rho = 0.4009
+  Iteration 7:  rho = 0.4009
+  final rho = 0.4009256
+```
+
+与 Stata 的 `0.0000 0.4006 0.4008 0.4009 0.4009 0.4009 0.4009 0.4009` **逐值一致**，
+最终值 `.4009256` 一致。
+
+### 为什么仍未落地
+
+在 `prais.py` 中改写循环时，我连续三次把「拟合用哪个 rho」与「记录哪个 rho」混在
+`current_rho` 一个变量里，导致：迭代次数 11、19（应 7），或最终 rho 漂移
+（`0.4009249` 对 `.4009256`）。
+
+**已回退**，46 个 prais 测试恢复通过。
+
+### 下次落地的正确写法
+
+需要**两个独立变量**，不能复用 `current_rho`：
+
+```python
+rho   = 0.0          # 拟合所用（首轮 0）
+last  = 2.0
+it    = 0
+trace = [(0, 0.0)]
+while it < maxiter and abs(rho - last) > tolerance:
+    last = rho
+    resid = y - x @ coefficients      # 上一轮拟合的残差
+    rho   = _rho_from_residuals(resid)
+    coefficients = ols(transform(x, rho), transform(y, rho))
+    it += 1
+    trace.append((it, rho))
+```
+
+注意循环**以 `rho` 为拟合参数**，`coefficients` 随之更新；判据是 `rho` 与 `last` 之差。

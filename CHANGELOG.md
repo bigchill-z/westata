@@ -7,6 +7,52 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.6] - 2026-11-10
+
+### Added — `ws.synth` (B grade, evidence E2), plus the documentation pipeline fixes
+
+This release publishes the synthetic-control work that was committed as `7aa470b`
+(and the four subsequent `ovtest` / `prais` documentation commits) under a fresh
+version number. PyPI 0.3.5 already carried `ws.synth`; 0.3.6 is the first release
+whose source tree matches the full committed documentation set.
+
+* **`ws.synth` / `SynthResult`** implement Stata `synth`'s DEFAULT path
+  (regression-based V + inner constrained QP) and expose the six `e()` matrices
+  verbatim: `V_matrix`, `W_weights`, `X_balance`, `RMSPE`, `Y_treated`,
+  `Y_synthetic`, plus `gap`. No coefficient VCE or inference is fabricated.
+* The two compiled Mata kernels were **solved exactly** by black-box
+  identification against live StataNow 19.5: `normalize()` = sample SD (ddof=1)
+  of `[treated | controls]`; `regsval()` = normalised sum of SQUARED per-period
+  multivariate cross-sectional OLS coefficients. `scripts/verify_synth_mata_formulas.py`
+  verifies both in pure Python without a Stata licence (4/4, ~8e-14).
+* Six full-precision Stata captures committed in
+  `tests/conformance/stata_fixtures/synth_*.json`; `StataCapture.capture_matrices()`
+  added to the oracle; `tests/conformance/test_stata_synth.py` compares every
+  quantity.
+* **E2, measured bounds**: `|dV| <= 1e-10` (observed ~1e-13), `|dW| <= 1e-3`
+  (observed 0 at Stata's 3-dp `roundmat()`), `|dRMSPE| <= 1e-2` (worst 5.6e-4).
+  The P1 design's provisional `|dRMSPE| <= 1e-8` was **falsified by measurement**
+  and widened (design S2: measure before writing): `H = Xco' V Xco` is
+  rank-deficient, so the QP optimum is non-unique and Stata's C++ plugin stops
+  off the optimal face at `margin=0.005`. **E3 / bit-for-bit is excluded** —
+  Stata's own two identical runs differ by `1.471e-11` in RMSPE.
+* Refused with `UnsupportedError`: `nested`/`allopt`, `synth2`, figures,
+  `keep()`, placebo. Rank-deficient `Sxx` raises `ConsistencyError`.
+* Registry: 96 entries (54 E3 / 27 E2 / 15 E1); `UNACCOUNTED FOR: 0`.
+* API reference: 16 previously undocumented public names now have prose; the
+  renderer emits the robust-VCE preamble itself, so a plain re-render no longer
+  deletes it. EN/ZH README, GUIDE, API, USING_WITH_STATA, GAP_REGISTER and the
+  [B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md) are
+  synced.
+* Also in this release (from the four commits after `7aa470b`): `estat ovtest, rhs`
+  collinearity notes and its guard fix, plus the `prais` iteration-log / rho
+  investigation write-ups in `NOTES_AUDIT.md`.
+
+Full suite at release: `pytest -q` green (see the release run). Local only —
+PyPI / GitHub push is the step this entry accompanies.
+
+---
+
 ## [0.3.2] - 2026-11-09
 
 ### Fixed — 表格布局与格式的多样本复核（第 175–221 轮）

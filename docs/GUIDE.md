@@ -350,6 +350,30 @@ print(ws.estat_ovtest(fit))            # powers of the fitted values
 print(ws.estat_ovtest(fit, rhs=True))  # powers of the regressors
 ```
 
+### Explanatory text Stata prints around a table
+
+Stata's output is more than the numbers: it prints notes, warnings and iteration logs that explain
+what happened to the DATA. The package reproduces the ones that are deterministic, and deliberately
+does not fabricate the ones that belong to Stata's own optimiser.
+
+| Where | Text | Reproduced |
+|---|---|---|
+| `estat ovtest, rhs` | `note: <name> omitted because of collinearity.` | yes, in Stata's order |
+| `prais` / `prais, corc` | `Iteration k:  rho = 0.0000` ... (full log) | yes, byte-for-byte |
+| `xtlogit, fe` | `note: multiple positive outcomes within groups encountered.` + the wrapped group line | yes |
+| `xtpoisson, fe` / `xtnbreg, fe` | `note: N group(s) (N obs) dropped because of all zero outcomes` | yes; the wording is command-specific |
+| `poisson` / `nbreg` on a non-integer response | `note: noncount dependent variable encountered; ...` / `note: you are responsible for interpretation of non-count dep. variable` | yes |
+| `logit` / `probit` | `Iteration 0:  Log likelihood = -45.03321` | yes, the null-model value, exactly |
+| any ML estimator whose optimiser did not converge | `Warning: Convergence not achieved.` (last line) | yes |
+
+**Two deliberate omissions.** The ML *intermediate* log-likelihoods come from Stata's `moptimize`
+path and cannot be reproduced by a different optimiser; printing our own would look like Stata while
+disagreeing on every line. Only `Iteration 0` and the header's exact `Log likelihood = ...` row are
+shown. The `prais` / `xtpcse` note about time gaps requires a `tsset` time variable, which this API
+does not take, so it is not guessed.
+
+The full audit — 9 rounds, 57+ live captures, a scan of 3962 `.ado` files — is in `NOTES_AUDIT.md`.
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

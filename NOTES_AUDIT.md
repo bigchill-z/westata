@@ -314,3 +314,72 @@ model.fit(method="newton", disp=False,
 只省略中间路径；并在实现处注明这是 Stata 的 moptimize 路径所特有。
 
 但这仍需用户确认，因为它是"部分复现"而非"完全一致"。
+
+---
+
+## 第 7 轮：`xtlogit, fe` 的两条面板 note **已实现**
+
+### 发现的遗漏
+
+`e(N_drop)` / `e(N_group_drop)` 一直被记录，但**从未打印**。
+于是一个 480 行的面板报告 `Number of obs = 472`，却不解释少了哪 8 行。
+
+Stata 的完整输出（`xtlogit ybin x z, fe`）：
+
+```
+note: multiple positive outcomes within groups encountered.
+note: 1 group (8 obs) omitted because of all positive or
+      all negative outcomes.
+(空行)
+Iteration 0:  Log likelihood = -228.55058
+...
+(空行)
+Conditional fixed-effects logistic regression        Number of obs    =    472
+```
+
+第二条 note 折行后**缩进 6 空格**，且 group/groups 随数量变化。
+
+### 一个结构陷阱
+
+这些 note **不能放进 `_panel_design_block`**：对于 xt 非线性命令族，那个块是**在 banner 之后**才渲染的
+（`_defer_panel_block`），而 note 必须在**最前面**。
+
+第一次尝试正是放错了位置，结果完全不显示。
+最终用独立的 `_panel_drop_notes(result)` 生成，并**前置到最终表格**。
+
+### 验证
+
+| 项 | 结果 |
+|---|---|
+| 前 4 行（两条 note + 空行 + banner）| 与 Stata **逐字符一致** |
+| `re` 模式 | 不带这两条 note ✓ |
+| 无剔除组的面板 | 静默 ✓ |
+| `e()` 中的计数 | 保留 ✓ |
+| 面板/xtlogit/prais/ovtest 测试 | **485 passed** |
+| 新守卫 | 7 个 |
+
+提交 `f966c8b`。
+
+---
+
+## 第 7 轮同时确认：**这些说明已经存在，无需处理**
+
+| 命令 | 说明文字 | westata |
+|---|---|---|
+| `estat ic` | `Note: BIC uses N = number of observations. See [R] IC note.` | ✅ 已有 |
+| `estat hettest` | `Assumption: Normal error terms` | ✅ 已有 |
+| `xtreg, fe/re/be` | 无说明 | — |
+| `estat imtest`/`summarize`/`ovtest`/`vif` | 无说明 | — |
+| `teffects` 三个变体 | 本次数据下命令报错，未采到 | 待查 |
+
+## 唯一剩余的已知缺口
+
+**ML 迭代日志**（`logit`/`probit`/`nbreg`/`zip`/`xtprobit`/`xtlogit`）——
+中间值由 Stata 的 `moptimize` 路径决定，本包无法复现。
+三个方案已写入 `options.md`，**需用户决定**，本轮不擅自实现。
+
+## 待查（低优先）
+
+1. `teffects ra/psmatch/ipw`（本次 auto.dta 构造的数据下报 r(2000)，需换合适数据）
+2. `estat fitstat`/`linktest`（Stata 报 r(321)，属 postestimation 未安装命令）
+3. `xtlogit, fe` 的迭代日志（同 ML 类）

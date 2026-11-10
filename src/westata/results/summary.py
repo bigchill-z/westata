@@ -946,6 +946,27 @@ def _panel_drop_notes(result: Any) -> list[str]:
         return []
     obs_drop = int(e_macros.get("N_drop") or 0)
     plural = "group" if group_drop == 1 else "groups"
+
+    # THE WORDING IS COMMAND-SPECIFIC. Round 9 measured both on the same panel:
+    #
+    #     xtlogit, fe    note: multiple positive outcomes within groups encountered.
+    #                    note: 1 group (8 obs) omitted because of all positive or
+    #                          all negative outcomes.
+    #
+    #     xtpoisson, fe  note: 1 group (6 obs) dropped because of all zero outcomes
+    #
+    # Reusing the xtlogit text for a POISSON fit prints nonsense ("all positive or all negative"
+    # has no meaning for a count outcome). Dispatch on the estimator, not on the drop count.
+    model = str(getattr(result, "model_name", "") or "").lower()
+    command = str(e_macros.get("cmd") or "").lower()
+    if model.startswith("xtpoisson") or command == "xtpoisson":
+        return [
+            f"note: {group_drop} {plural} ({obs_drop} obs) dropped because of all zero outcomes"
+        ]
+    if model.startswith("xtnbreg") or command == "xtnbreg":
+        return [
+            f"note: {group_drop} {plural} ({obs_drop} obs) dropped because of all zero outcomes"
+        ]
     return [
         "note: multiple positive outcomes within groups encountered.",
         f"note: {group_drop} {plural} ({obs_drop} obs) omitted because of all positive or",

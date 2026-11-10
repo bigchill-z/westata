@@ -498,3 +498,62 @@ Poisson regression ...
 - `prais` gap note（缺时间变量语义）
 - `zip`/`zinb` 功能未实现
 - `xtpoisson`/`xtnbreg` 的 `note: N groups dropped`（源码扫描发现，未实测）
+
+---
+
+## 第 9 轮：源码扫描余项对拍，修掉一处**文案串用**
+
+### 检查范围
+
+对源码扫描发现的、前几轮尚未对拍的命令，用**刻意构造的边界数据**实测 Stata：
+
+| 命令 | 构造 | Stata 说明 |
+|---|---|---|
+| `lrtest` | 嵌套模型 | `Assumption: . nested within full` |
+| `xtpoisson, fe` | 一个全零结果组 | `note: 1 group (6 obs) dropped because of all zero outcomes` |
+| `xtpcse`/`prais` gap | 时间序列缺口 | 需 `tsset`，本包无时间变量语义 |
+| `xtgls` | 异方差面板 | 无说明 |
+| `hausman` | fe/re 对比 | 正常数据无说明（两条 `Warning: chi2 < 0` / rank Note 属病态分支）|
+
+### 发现并修复：面板剔除 note 的**文案串用**
+
+第 7 轮把 `_panel_drop_notes` 做成通用逻辑时，对所有条件 FE 命令都套用了 xtlogit 的文案。
+于是 `xtpoisson, fe` 打印：
+
+```
+note: multiple positive outcomes within groups encountered.
+note: 1 group (6 obs) omitted because of all positive or
+      all negative outcomes.
+```
+
+**这在计数模型里语义荒谬**（没有"全正/全负"），而 Stata 实际只打印一行：
+
+```
+note: 1 group (6 obs) dropped because of all zero outcomes
+```
+
+已按 `model_name` / `e(cmd)` 分派：`xtpoisson`/`xtnbreg` 用零结果文案，`xtlogit` 保持两行文案。
+
+### 已确认无需处理
+
+- `lrtest` 的 `Assumption:` 行 westata **已有**（`modeltests.py:112`）
+- `hausman` 的两条说明只在 chi2<0 / rank 异常时触发，与收敛警告同类
+- `xtgls` 正常拟合无说明
+- `xtpcse`/`prais` 的 gap note 需要 `tsset` 时间变量，而 westata 的 `prais` 只按行顺序，
+  **无法可靠判定** → 记录为结构性限制，不擅自编造
+
+### 验证
+
+| 项 | 结果 |
+|---|---|
+| `xtpoisson, fe` 与 Stata 逐行一致 | ✓ 单行 note + 空行 + banner |
+| `xtlogit, fe` 两行文案未被破坏 | ✓ |
+| 新守卫 | 4 个（`test_panel_drop_note_wording.py`）|
+| 受影响回归 | **928 passed** |
+
+### 仍未闭合（如实记录）
+
+1. **ML 中间迭代路径** —— 方案 C 明确省略，用户已确认
+2. **`prais` / `xtpcse` 的 gap note** —— 缺时间变量语义，结构性限制
+3. **`zip`/`zinb` 功能未实现** —— 属功能缺失，非说明遗漏
+4. **`hausman` 病态分支**、`vec` 的 `(convergence not achieved)` 标注 —— 未触发/未实现

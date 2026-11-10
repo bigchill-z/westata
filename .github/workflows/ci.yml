@@ -44,14 +44,22 @@ jobs:
         run: |
           python -m pytest -q -rf --tb=short
 
+      # The step summary is readable through the API without authentication, while the raw job
+      # log is not. Writing the failures there makes the next report diagnosable from here.
       - name: Summarise failures
         if: failure()
         run: |
-          echo "=== failed tests ==="
-          python -m pytest -q -rf --tb=no 2>&1 | grep -E '^FAILED|^ERROR' || true
-          echo "=== environment ==="
-          python -V
-          python -m pip list
+          {
+            echo '### Failed tests'
+            echo '```'
+            python -m pytest -q -rf --tb=no 2>&1 | grep -E '^FAILED|^ERROR' || echo 'no FAILED lines'
+            echo '```'
+            echo '### Environment'
+            echo '```'
+            python -V
+            python -m pip list
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # The wheel was once installable-but-unimportable: `pip install` reported success while
       # `import westata` raised ModuleNotFoundError for pyfixest. Nothing in the test suite could see that,

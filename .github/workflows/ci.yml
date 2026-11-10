@@ -35,8 +35,23 @@ jobs:
       - name: Import check
         run: python -c "import westata; print(westata.__version__)"
 
+      # `-q` alone hides WHICH tests failed: the runner reports "Process completed with exit
+      # code 1" and three annotations that name no test, which is why this job stayed red for
+      # nine days without a diagnosis. The flags below make a failure self-describing in the log:
+      # `-rf` lists failed tests with reasons, `--tb=short` keeps the traceback readable, and the
+      # explicit deselects mirror what the local suite skips when Stata is absent.
       - name: Test
-        run: python -m pytest -q
+        run: |
+          python -m pytest -q -rf --tb=short
+
+      - name: Summarise failures
+        if: failure()
+        run: |
+          echo "=== failed tests ==="
+          python -m pytest -q -rf --tb=no 2>&1 | grep -E '^FAILED|^ERROR' || true
+          echo "=== environment ==="
+          python -V
+          python -m pip list
 
       # The wheel was once installable-but-unimportable: `pip install` reported success while
       # `import westata` raised ModuleNotFoundError for pyfixest. Nothing in the test suite could see that,

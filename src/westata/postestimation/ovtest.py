@@ -62,7 +62,7 @@ class OvTestResult:
         Stata's ``Omitted:`` line.
     """
 
-    __slots__ = ("statistic", "df", "df_denom", "pvalue", "omitted")
+    __slots__ = ("statistic", "df", "df_denom", "pvalue", "omitted", "dropped")
 
     def __init__(
         self,
@@ -72,12 +72,16 @@ class OvTestResult:
         df_denom: float,
         pvalue: float,
         omitted: str,
+        dropped: Sequence[str] = (),
     ) -> None:
         self.statistic = float(statistic)
         self.df = float(df)
         self.df_denom = float(df_denom)
         self.pvalue = float(pvalue)
         self.omitted = str(omitted)
+        #: Columns the auxiliary regression could not identify, in the order Stata reports them.
+        #: Each produces a "note: <name> omitted because of collinearity." line ABOVE the table.
+        self.dropped = tuple(str(name) for name in dropped)
 
     def __repr__(self) -> str:
         return (
@@ -101,8 +105,22 @@ class OvTestResult:
         """
 
         label = f"F({self.df:g}, {self.df_denom:g})"
+        # A COLLINEAR COLUMN EARNS A NOTE ABOVE THE TABLE, one line each, in the order the ado
+        # prints them. Measured on grilic after a user adds expr2 = expr^2:
+        #
+        #     note: expr2 omitted because of collinearity.
+        #     note: expr2^2 omitted because of collinearity.
+        #     (blank)
+        #     Ramsey RESET test for omitted variables
+        #
+        # The default path never produces one -- it fits powers of a single fitted-value vector,
+        # which cannot duplicate a regressor -- so this stays empty there.
+        notes = [
+            f"note: {name} omitted because of collinearity." for name in self.dropped
+        ]
         return chr(10).join(
-            [
+            notes
+            + [
                 "",
                 "Ramsey RESET test for omitted variables",
                 f"Omitted: Powers of {self.omitted}",
@@ -350,14 +368,20 @@ def estat_ovtest(
     # regression carries 17 parameters.
     _design_columns = [matrix[:, [0]]]
     _tested: list[int] = []
-    for _column in columns:
+    #: Columns `_regress` cannot identify, in the order it meets them. Stata prints one
+    #: "note: <name> omitted because of collinearity." line per entry, above the table.
+    _dropped_regressors: list[str] = []
+    _dropped_powers: list[str] = []
+    for _label, _column in zip(omitted_labels, columns):
         _current = np.column_stack(_design_columns)
         _scale = float(np.abs(_column).max())
         if _scale == 0.0:
+            _dropped.append(_label)
             continue
         _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
         _residual = _column - _current @ _coef
         if float(np.abs(_residual).max()) <= 1e-6 * _scale:
+            _dropped_powers.append(_label)
             continue
         _tested.append(len(_design_columns))
         _design_columns.append(_column[:, None])
@@ -370,8 +394,17 @@ def estat_ovtest(
         _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
         _residual = _column - _current @ _coef
         if float(np.abs(_residual).max()) <= 1e-6 * _scale:
+            _dropped_regressors.append(str(names[_index]))
             continue
         _design_columns.append(_column[:, None])
+    # STATA LISTS THE USER'S REGRESSORS BEFORE THE POWERS in its notes, even though the powers
+    # are what enter the model first. `ovtest.ado:310,373` builds `ckdrp` from `e(b)`'s column
+    # order, so `expr2` precedes the generated `expr2^2`; the loop at 431 then prints them in
+    # that order. Measured on grilic:
+    #
+    #     note: expr2 omitted because of collinearity.
+    #     note: expr2^2 omitted because of collinearity.
+    _dropped = _dropped_regressors + _dropped_powers
 
     if not _tested:
         raise ValueError(
@@ -386,4 +419,5 @@ def estat_ovtest(
         df_denom=df_denom,
         pvalue=float(stats.f.sf(statistic, df_num, df_denom)),
         omitted="independent variables",
+        dropped=_dropped,
     )

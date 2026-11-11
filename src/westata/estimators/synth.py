@@ -57,6 +57,17 @@ _MAXITER = 1000
 _SIGF = 12
 _BOUND = 10
 
+#: ``ml`` options that Stata accepts via ``*`` but that cannot change our
+#: numbers (they switch/steer Stata's closed-source ml optimiser, which we do
+#: not reproduce).  Recorded on the result so a caller is never misled.
+NUMERICALLY_INACTIVE_ML = frozenset({
+    "technique", "nrtolerance", "nonrtolerance", "difficult", "search", "trace",
+})
+
+#: QP-plugin settings whose Stata effect comes from the C++ interior-point
+#: convergence behaviour; our SLSQP/Powell solvers have no counterpart.
+NUMERICALLY_INACTIVE_QP = frozenset({"sigf", "margin", "bound"})
+
 
 # --------------------------------------------------------------------------- #
 # Result object -- a frozen dataclass, NOT StataResults (there is no e(b)/e(V))
@@ -97,6 +108,22 @@ class SynthResult:
     #: Which QP solver produced the weights: "SLSQP" or "interior-point".
     #: Recorded so a caller can audit which measured E2 bound applies.
     qp_solver: str = "SLSQP"
+    #: Display labels for the control units, used by ``keep()`` for the
+    #: ``_Co_Number`` column.  Stata's ``keep()`` stores VALUE LABELS (state
+    #: names) there when the panel variable has a label set; ``W_weights``
+    #: itself keeps the underlying codes so the numeric contract is unchanged.
+    unit_labels: tuple[str, ...] = ()
+    #: Underlying numeric unit codes (parallel to ``unit_labels``).  ``keep()``
+    #: writes these as the numeric ``_Co_Number`` and attaches ``unit_labels``
+    #: as Stata value labels.
+    unit_codes: tuple[Any, ...] = ()
+    #: Options that are ACCEPTED and RECORDED but do NOT change any number.
+    #: Stata's ``sigf``/``margin``/``bound`` shift RMSPE by altering its C++
+    #: interior-point plugin's convergence (measured: sigf(7) -2.1e-3,
+    #: margin(0.05) +4.6e-8, bound(1) +5.3e-8); ``technique`` switches
+    #: Stata's closed-source ml optimiser.  Our SLSQP/Powell solvers have no
+    #: counterpart, so we refuse to fake an effect.  Empty by default.
+    numerically_inactive: tuple[str, ...] = ()
     #: Stata's verbatim ``e(V_matrix)`` row/col labels, e.g.
     #: ``cigsale(1980(1)1988)`` / ``cigsale(1980&1988)``.  Verified against
     #: live Stata captures (synth_features.json); the ado's ``var(`xtimelab'``
@@ -241,17 +268,34 @@ def _solve_w(H: np.ndarray, c: np.ndarray, J: int,
     """
 
     x0 = np.full(J, 1.0 / J)
+    # Stata's `maxiter()` is the C++ interior-point plugin's iteration cap;
+    # live measurement shows 10 and 1000 give IDENTICAL results because the
+    # plugin converges quickly.  SLSQP needs more iterations for a
+    # rank-deficient H, so a small user maxiter must NOT silently truncate the
+    # solve -- that would return a plausible-but-wrong W (measured: maxiter=10
+    # gave RMSPE 16.5 instead of 19.7).  Give SLSQP a safe floor and treat
+    # `maxiter` as an upper bound only; then VERIFY convergence explicitly.
+    slsqp_maxiter = max(200, min(maxiter, 2000))
     result = minimize(
         lambda w: 0.5 * float(w @ H @ w) + float(c @ w),
         x0,
         method="SLSQP",
         bounds=[(0.0, 1.0)] * J,
         constraints=[{"type": "eq", "fun": lambda w: float(w.sum() - 1.0)}],
-        options={"ftol": 1e-14, "maxiter": maxiter},
+        options={"ftol": 1e-14, "maxiter": slsqp_maxiter},
     )
     w = np.asarray(result.x, dtype=np.float64)
     if not np.all(np.isfinite(w)):
         raise ConsistencyError("synth: QP returned non-finite unit weights")
+    # SLSQP occasionally reports a benign non-success status on this
+    # rank-deficient problem while still landing on the right face.  Refuse
+    # only when the returned point is demonstrably infeasible.
+    eq_err = abs(float(w.sum() - 1.0))
+    if eq_err > 1e-4:
+        raise ConsistencyError(
+            f"synth: QP returned an infeasible point (maxiter={maxiter}, "
+            f"sum(w)-1={eq_err:.2e}); refusing to return a wrong W"
+        )
     # Clip tiny numerical excursions, then renormalise (the equality
     # constraint is satisfied to ftol, not exactly).
     w = np.clip(w, 0.0, 1.0)
@@ -506,12 +550,19 @@ def _parse_predictors(
 def _write_keep(
     path: str, result: "SynthResult", replace: bool,
 ) -> None:
-    """Write Stata's stacked 5-column results dataset.
+    """Write Stata's SIDE-BY-SIDE 5-column results dataset.
 
-    The first J rows hold the unit weights (``_Co_Number``/``_W_Weight``), the
-    following T rows hold the outcome trajectories (``_Y_treated``/
-    ``_Y_synthetic``/``_time``).  This is exactly why ``synth.ado:650`` drops
-    rows where both ``_Co_Number`` and ``_Y_treated`` are missing.
+    ``synth.ado:620-650`` uses ``svmat`` to append the weight columns (J rows)
+    and the outcome columns (T rows) to the SAME dataset, starting at row 0.
+    The result therefore has ``max(J, T)`` rows, NOT ``J + T``: the weight
+    columns are populated on the first J rows and the outcome columns on the
+    first T rows, with the shorter block leaving its columns missing at the
+    end.  ``:650`` drops only rows where BOTH are missing.
+
+    Verified against live StataNow 19.5: for J=38, T=31 the file has 38 rows,
+    ``_Co_Number``/``_W_Weight`` non-null 38 times and ``_Y_*``/``_time`` 31
+    times.  ``_Co_Number`` carries the unit value labels (state names) when a
+    label set / ``unitnames()`` is in play; we preserve string labels as such.
     """
 
     from pathlib import Path
@@ -524,29 +575,50 @@ def _write_keep(
         )
     J = result.W_weights.shape[0]
     T = result.Y_treated.shape[0]
-    n = J + T
+    n = max(J, T)
     out = pd.DataFrame(
         {
-            "_Co_Number": [np.nan] * n,
-            "_W_Weight": [np.nan] * n,
-            "_Y_treated": [np.nan] * n,
-            "_Y_synthetic": [np.nan] * n,
-            "_time": [np.nan] * n,
+            "_Co_Number": pd.Series([np.nan] * n, dtype="object"),
+            "_W_Weight": np.full(n, np.nan),
+            "_Y_treated": np.full(n, np.nan),
+            "_Y_synthetic": np.full(n, np.nan),
+            "_time": np.full(n, np.nan),
         }
     )
-    out.loc[: J - 1, "_Co_Number"] = pd.to_numeric(
-        pd.Series(result.W_weights[:, 0], dtype="object"), errors="coerce"
-    ).to_numpy(dtype=float)
-    out.loc[: J - 1, "_W_Weight"] = np.asarray(
-        result.W_weights[:, 1], dtype=float
+    # Both blocks start at row 0 (svmat appends COLUMNS, not rows).
+    # Stata's _Co_Number is a NUMERIC column carrying VALUE LABELS, so we write
+    # the numeric codes and attach the labels via to_stata(value_labels=...).
+    # That keeps all J rows non-null (a string column would turn the trailing
+    # rows into empty strings) and reproduces the labelled display exactly.
+    raw_codes = (
+        list(result.unit_codes[:J])
+        if result.unit_codes and len(result.unit_codes) >= J
+        else list(result.W_weights[:J, 0])
     )
-    out.loc[J:, "_Y_treated"] = result.Y_treated.ravel()
-    out.loc[J:, "_Y_synthetic"] = result.Y_synthetic.ravel()
-    out.loc[J:, "_time"] = result.time_index
-    # pandas.to_stata cannot store mixed object columns; Stata's own file has
-    # numeric unit codes.  Keep the numeric column numeric.
+    codes = pd.to_numeric(
+        pd.Series(raw_codes, dtype="object"), errors="coerce"
+    ).to_numpy(dtype=float)
+    out.loc[: J - 1, "_Co_Number"] = codes
+    out.loc[: J - 1, "_W_Weight"] = np.asarray(
+        result.W_weights[:J, 1], dtype=float
+    )
+    out.loc[: T - 1, "_Y_treated"] = result.Y_treated.ravel()
+    out.loc[: T - 1, "_Y_synthetic"] = result.Y_synthetic.ravel()
+    out.loc[: T - 1, "_time"] = result.time_index
     out["_Co_Number"] = pd.to_numeric(out["_Co_Number"], errors="coerce")
-    out.to_stata(target, write_index=False)
+
+    # Attach value labels only when they are MEANINGFUL (not just the string
+    # form of the numeric code).  Stata does the same when no label set exists.
+    value_labels: dict[float, str] | None = None
+    if result.unit_labels and len(result.unit_labels) >= J:
+        pairs = {
+            float(code): str(lab)
+            for code, lab in zip(codes, result.unit_labels[:J])
+            if np.isfinite(code) and str(lab) != str(code)
+        }
+        if pairs:
+            value_labels = {"_Co_Number": pairs}
+    out.to_stata(target, write_index=False, value_labels=value_labels)
 
 
 # --------------------------------------------------------------------------- #
@@ -679,6 +751,17 @@ def synth(
     # Outer V search (algorithm-equivalent, NOT bit-identical to Stata's ml)
     nested: bool = False,
     allopt: bool = False,
+    # `ml maximize` options accepted by Stata via `*`/mlopts (synth.ado:41,434).
+    # They are validated and RECORDED.  iterate() maps faithfully to the outer
+    # optimiser's iteration budget; technique() is recorded but cannot change
+    # our single Powell-based outer algorithm (documented, not faked).
+    technique: str | None = None,
+    iterate: int | None = None,
+    nrtolerance: float | None = None,
+    nonrtolerance: bool = False,
+    difficult: bool = False,
+    search: str | None = None,
+    trace: bool = False,
     # Results dataset (NOT a graph)
     keep: str | None = None,
     replace: bool = False,
@@ -714,6 +797,38 @@ def synth(
         raise UnsupportedError(
             f"synth: unsupported option(s): {sorted(unsupported)}"
         )
+
+    # --- validate Stata's `ml` options (synth.ado:41,434) -----------------
+    # Stata forwards these via `*` to `mlopts`, then `wrapml` passes them to
+    # `ml model d0 ... maximize`.  We validate the same shapes and record them.
+    ml_given = any(
+        x is not None and x is not False
+        for x in (technique, iterate, nrtolerance, nonrtolerance,
+                  difficult, search, trace)
+    )
+    if ml_given and not (nested or allopt):
+        raise ValueError(
+            "synth: ml options (technique/iterate/nrtolerance/...) only apply "
+            "to the nested/allopt outer search; pass nested=True or allopt=True"
+        )
+    if technique is not None and not isinstance(technique, str):
+        raise TypeError("synth: technique must be a string, e.g. 'bfgs'")
+    if iterate is not None and (not isinstance(iterate, int) or iterate <= 0):
+        raise ValueError("synth: iterate must be a positive integer")
+    if nrtolerance is not None and (
+        not np.isfinite(nrtolerance) or nrtolerance <= 0
+    ):
+        raise ValueError("synth: nrtolerance must be a positive finite number")
+    if search is not None and not isinstance(search, str):
+        raise TypeError("synth: search must be a string, e.g. 'on'/'off'")
+    ml_settings: dict[str, Any] = {}
+    for key, value in (
+        ("technique", technique), ("iterate", iterate),
+        ("nrtolerance", nrtolerance), ("nonrtolerance", nonrtolerance),
+        ("difficult", difficult), ("search", search), ("trace", trace),
+    ):
+        if value is not None and value is not False:
+            ml_settings[key] = value
 
     # --- validate the exposed optimiser settings --------------------------
     if not np.isfinite(margin) or margin <= 0:
@@ -813,8 +928,11 @@ def synth(
         v_diag = _regsval(Xnorm, Zpre)
         method = "regression"
     if nested or allopt:
+        # Stata's `iterate(#)` caps the ml optimiser; map it faithfully to the
+        # outer search's iteration budget (synth.ado:441-446, wrapml:846-895).
+        outer_maxiter = iterate if iterate is not None else maxiter
         v_diag = _nested_v(
-            Xtrn, Xcon, Zpre, J, v_diag, allopt=allopt, maxiter=maxiter
+            Xtrn, Xcon, Zpre, J, v_diag, allopt=allopt, maxiter=outer_maxiter
         )
         method = "allopt" if allopt else "nested"
     V = np.diag(v_diag)
@@ -852,6 +970,16 @@ def synth(
     W_weights = np.column_stack(
         [np.asarray(w_labels, dtype=object), W_rounded]
     )
+    # keep()'s _Co_Number shows VALUE LABELS.  Stata derives them from the
+    # panel variable's label set even when unitnames() is absent (synth.ado:81
+    # `local clab: value label pvar`), but that label set lives in the .dta
+    # file, not in a DataFrame we receive.  So: honour unitnames() when given,
+    # and otherwise fall back to the code as text (what Stata shows when no
+    # label set exists).  Documented in USING_WITH_STATA.md.
+    if label_by_unit is not None:
+        keep_labels = tuple(label_by_unit[u] for u in control_units)
+    else:
+        keep_labels = tuple(str(u) for u in control_units)
 
     result = SynthResult(
         V_matrix=V,
@@ -871,8 +999,22 @@ def synth(
         method=method,
         optimizer_settings={
             "margin": margin, "maxiter": maxiter, "sigf": sigf, "bound": bound,
+            **ml_settings,
         },
         qp_solver=qp_solver,
+        unit_labels=keep_labels,
+        unit_codes=tuple(control_units),
+        numerically_inactive=tuple(
+            sorted(
+                {k for k in ml_settings if k in NUMERICALLY_INACTIVE_ML}
+                | {
+                    k for k in NUMERICALLY_INACTIVE_QP
+                    if (k == "sigf" and sigf != _SIGF)
+                    or (k == "margin" and margin != _MARGIN)
+                    or (k == "bound" and bound != _BOUND)
+                }
+            )
+        ),
         stata_predictor_names=tuple(plabels),
     )
 

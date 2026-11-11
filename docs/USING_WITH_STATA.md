@@ -133,13 +133,33 @@ changing `sigf(7)` shifts RMSPE by 2.1e-3 while `roundmat()` keeps
 `e(W_weights)` identical. The reason E3 is still excluded is QP
 non-uniqueness, not a jittery reference.
 
-**Extended feature set (2026-11-10):** `unitnames()`, `var(period)`
+**Extended feature set (2026-11-10/11):** `unitnames()`, `var(period)`
 (single / `&` / numlist), `keep()`/`replace`, `margin`/`maxiter`/`sigf`/`bound`,
-missing-value warnings and an algorithm-equivalent `nested`/`allopt` outer V
-search are now implemented. `nested allopt` reproduces Stata's `W` exactly and
-RMSPE to 3.5e-9; plain `nested` reaches a LOWER loss than Stata's
-single-start `wrapml` (6.2580 vs 6.5268) — E2, not bit-identical.
-Only `figure` (graphics) and `synth2`'s placebo/LOO remain refused.
+`ml` options (`technique`/`iterate`/`nrtolerance`/`nonrtolerance`/`difficult`/
+`search`/`trace`), missing-value warnings and an algorithm-equivalent
+`nested`/`allopt` outer V search are now implemented. `nested allopt`
+reproduces Stata's `W` exactly and RMSPE to 3.5e-9; plain `nested` reaches a
+LOWER loss than Stata's single-start `wrapml` (6.2580 vs 6.5268) — E2, not
+bit-identical.
+
+`keep()` now matches Stata's exported `.dta` cell-for-cell: it is a
+**side-by-side** layout with `max(J, T)` rows (not a vertical `J+T`
+concatenation), and `_Co_Number` is a labelled numeric column.  Without
+`unitnames()`, Stata derives the unit labels from the `.dta` file's value-label
+set, which a plain DataFrame does not carry; pass `unitnames()` to reproduce
+the displayed names.
+
+**Explicitly flagged as numerically inactive** (`SynthResult.numerically_inactive`):
+`sigf`/`margin`/`bound` shift Stata's RMSPE through its C++ interior-point
+plugin's convergence, and `technique()` switches Stata's closed-source `ml`
+optimiser.  Our SLSQP/Powell solvers have no counterpart, so these options
+are accepted, validated and RECORDED but do not change any number.  They are
+NOT approximated — an `ftol` sweep was non-monotonic and a single-start
+Powell sweep never lands on Stata's nested RMSPE, so faking a match would be
+coefficient-fitting.
+
+Only `figure` (graphics, explicitly out of scope) and `synth2`'s
+placebo/LOO remain refused.
 See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
 
 ---

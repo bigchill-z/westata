@@ -138,6 +138,13 @@ def test_malformed_var_period_is_rejected() -> None:
 
 # --------------------------------------------------------------- C. keep() results dataset
 def test_keep_writes_the_five_column_stacked_dataset(tmp_path) -> None:
+    """Stata's keep() is a SIDE-BY-SIDE layout, not a vertical concatenation.
+
+    Verified against live StataNow 19.5 (2026-11-11): 38 rows = max(J, T);
+    the weight columns are present on ALL rows, the outcome columns only on
+    the first T rows.  Earlier this test asserted the wrong (J+T) layout.
+    """
+
     path = tmp_path / "synth_results.dta"
     _base(keep=str(path))
     assert path.exists()
@@ -145,9 +152,29 @@ def test_keep_writes_the_five_column_stacked_dataset(tmp_path) -> None:
     assert list(df.columns) == [
         "_Co_Number", "_W_Weight", "_Y_treated", "_Y_synthetic", "_time"
     ], df.columns.tolist()
-    # Stacked layout: J weight rows followed by T outcome rows.
-    assert df["_W_Weight"].notna().sum() == 4          # J = 4 controls
-    assert df["_Y_treated"].notna().sum() == 9         # T = 9 result periods
+    # J = 4 controls, T = 9 result periods -> 9 rows (max), not 4+9 = 13.
+    assert len(df) == 9
+    # Weight columns occupy the first J rows; outcome columns the first T rows.
+    assert df["_Co_Number"].notna().sum() == 4
+    assert df["_W_Weight"].notna().sum() == 4
+    assert df["_Y_treated"].notna().sum() == 9
+    assert df["_Y_synthetic"].notna().sum() == 9
+    assert df["_time"].notna().sum() == 9
+    # Both blocks start at row 0 (Stata svmat appends columns, not rows).
+    assert df["_Y_treated"].iloc[0] == df["_Y_treated"].dropna().iloc[0]
+    assert df["_W_Weight"].iloc[0] >= 0
+    assert pd.isna(df["_Co_Number"].iloc[8])       # row 8 is beyond J=4
+
+
+def test_keep_co_number_is_a_string_label_not_a_raw_code(tmp_path) -> None:
+    """Stata stores _Co_Number with value labels (state names)."""
+
+    path = tmp_path / "synth_results_labeled.dta"
+    _base(keep=str(path), unitnames="unitname")
+    df = pd.read_stata(path)
+    # With unitnames the first column must carry the STRING labels.
+    assert "Beta" in set(df["_Co_Number"].dropna().astype(str))
+    assert "Gamma" in set(df["_Co_Number"].dropna().astype(str))
 
 
 def test_keep_refuses_to_overwrite_unless_replace(tmp_path) -> None:
@@ -163,6 +190,20 @@ def test_tuning_parameters_are_accepted() -> None:
     res = _base(margin=0.05, maxiter=500, sigf=7, bound=5)
     assert isinstance(res, SynthResult)
     assert np.isfinite(res.RMSPE)
+
+
+def test_small_maxiter_does_not_silently_return_an_unconverged_qp() -> None:
+    """Regression: maxiter=10 once truncated SLSQP and produced a wrong W.
+
+    Stata's maxiter(10) and maxiter(1000) give IDENTICAL RMSPE, so a small
+    user value must not change westata's numbers either.
+    """
+
+    a = _base()
+    for n in (1, 10, 2000):
+        b = _base(maxiter=n)
+        np.testing.assert_allclose(b.V_matrix, a.V_matrix, atol=1e-12)
+        np.testing.assert_allclose(b.RMSPE, a.RMSPE, atol=1e-10)
 
 
 def test_invalid_tuning_parameters_are_rejected() -> None:

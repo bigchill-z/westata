@@ -235,11 +235,15 @@ docs/               GUIDE.md、对照数据、生成脚本
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
 - 合成控制 `ws.synth` 已实现**默认路径 + 扩展功能**（`unitnames`、`var(period)`、
-  `keep()`、四个优化器参数、`nested`/`allopt` 算法等价实现），证据等级 **E2、
-  逐量定级**：对拍 22 份 StataNow 19.5 全精度捕获，`V` 达机器精度（≤1.4e-13），
-  8 个案例中 6 个的 `W`/`X_balance`/`Y_synthetic` 逐位一致，最差 `|dW|` 9e-3、
-  `|dRMSPE|` 6.9e-2（近秩 1 的退化池，用自适应内点法 QP 复刻了 Stata 插件的
-  早停轨迹）。**仍拒绝** `figure`（图形）、`synth2` 的 placebo/LOO、任何推断量；
+  `keep()`/`replace`、四个优化器参数、Stata 经 `*` 转发的 `ml` 选项、
+  `nested`/`allopt` 算法等价实现）。`keep()` 现已与 Stata 导出的 `.dta` 逐格
+  一致。证据等级 **E2、逐量定级**：对拍 22 份 StataNow 19.5 全精度捕获，
+  `V` 达机器精度（≤1.4e-13），8 个案例中 6 个的 `W`/`X_balance`/
+  `Y_synthetic` 逐位一致，最差 `|dW|` 9e-3、`|dRMSPE|` 6.9e-2。
+  **被接受但数值上不生效**的参数会在结果对象
+  `SynthResult.numerically_inactive` 中显式标出（`sigf`/`margin`/`bound`/
+  `technique` 作用于 Stata 闭源 C++/ml 优化器，本库不复刻、也不伪造）。
+  **仍拒绝** `figure`（图形）、`synth2` 的 placebo/LOO、任何推断量；
   **不承诺整体 E3 / 逐位一致**（QP 最优 W 不唯一）。详见
   [设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
   [与 Stata 对照说明](docs/USING_WITH_STATA.md)。

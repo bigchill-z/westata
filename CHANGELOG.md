@@ -7,6 +7,74 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — close the remaining non-graphics gaps (2026-11-11)
+
+Goal: "finish the remaining gaps by priority".  Three items, done in order.
+
+### P1 — `keep()` layout bug (FIXED)
+
+The previous implementation wrote a **69-row vertical concatenation**
+(J + T).  Live StataNow 19.5 shows `keep()` uses `svmat` to append the weight
+and outcome blocks as COLUMNS starting at row 0, giving **38 rows = max(J, T)**
+for J=38, T=31: `_Co_Number`/`_W_Weight` populated on all 38 rows,
+`_Y_treated`/`_Y_synthetic`/`_time` on the first 31.  Verified cell by cell
+against a fresh live capture: shape `(38,5)`, non-null counts
+`38/38/31/31/31`, `_Y_synthetic[0] = 133.07500119018556` (full precision),
+`_time` 1970..2000, trailing rows NaN.
+
+Also fixed: `_Co_Number` is now a NUMERIC column with Stata VALUE LABELS
+(`to_stata(value_labels=...)`), not a string column that silently turned
+trailing rows into empty strings.  `SynthResult.unit_labels` / `unit_codes`
+carry the labels.  With `unitnames()` the labels are the supplied strings;
+without it Stata derives labels from the `.dta` file, which a plain DataFrame
+does not carry, so the codes are shown (documented, not faked).
+
+**Corrected an earlier mis-statement**: this capture found
+`e(Y_synthetic)[0] == keep _Y_synthetic[0] == 133.07500119018556`.
+A previous note claimed `keep()` used a pre-roundmat W — that was specific to
+an earlier capture and is NOT a general rule.
+
+### P2 — `ml` optimisation options (ADDED)
+
+Stata's `synth.ado:41` forwards arbitrary `ml maximize` options via `*` and
+`:434` parses them with `mlopts`; `wrapml` passes them to `ml model d0`.
+Measured live: `technique(bfgs)` changes nested RMSPE
+(6.5268 -> 6.2639), `iterate(2)` changes it (6.5630), while
+`nonrtolerance` / `difficult` / `search(on)` do not change the single-start
+result.  `westata.synth` now accepts, validates and RECORDS
+`technique` / `iterate` / `nrtolerance` / `nonrtolerance` / `difficult` /
+`search` / `trace` on the nested/allopt path.  `iterate()` maps faithfully to
+the outer optimiser's iteration budget.  Rejected on the non-nested path
+(they would be inert there).
+
+### P3 — the irreducible boundaries (ASSESSED, documented not faked)
+
+* **Fixed a real bug**: a small `maxiter` (e.g. 10) used to truncate SLSQP and
+  silently return an unconverged W (RMSPE 16.5 instead of 19.7).  Stata's
+  `maxiter(10)` and `maxiter(1000)` give IDENTICAL results, so `maxiter` is now
+  an upper bound with a safe SLSQP floor plus an explicit infeasibility check.
+  A regression test pins this.
+* **Assessed and stopped**: `sigf` / `margin` / `bound` shift Stata's RMSPE
+  through its C++ interior-point plugin's convergence (measured
+  `sigf(7) -2.1e-3`, `margin(0.05) +4.6e-8`, `bound(1) +5.3e-8`), and
+  `technique()` switches Stata's closed-source `ml` NR/DFP/BFGS optimiser.
+  Our SLSQP/Powell solvers have no counterpart.  An `ftol` sweep gave a
+  NON-MONOTONIC, chaotic RMSPE response (no faithful mapping), and a
+  single-start Powell sweep never lands on Stata's nested RMSPE 6.5268
+  (it converges to 6.2580).  Forcing a match would be coefficient-fitting,
+  which this project refuses.  These options are ACCEPTED and RECORDED, and
+  `SynthResult.numerically_inactive` explicitly flags the ones that do not
+  move any number.
+
+### Result
+
+`keep()` now reproduces Stata's exported file cell-for-cell.  All `ml`
+options Stata accepts are accepted.  The remaining gap is confined to
+Stata's closed-source optimiser semantics and is explicitly flagged rather
+than approximated.
+
+---
+
 ## [Unreleased] — adaptive interior-point QP refinement (2026-11-11)
 
 Goal: "further approach" the two remaining E2 gaps.  Root cause found and

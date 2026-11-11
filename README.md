@@ -336,13 +336,20 @@ clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
 `ws.synth` implements Stata's **default path plus the extended feature set**
-(`unitnames`, `var(period)`, `keep()`, the four optimiser settings, and an
-algorithm-equivalent `nested`/`allopt` search).  Evidence grade **E2**, graded
-per quantity against 22 full-precision StataNow 19.5 captures: `V` and 6 of 8
+(`unitnames`, `var(period)`, `keep()`/`replace`, the four optimiser settings,
+Stata's forwarded `ml` options, and an algorithm-equivalent
+`nested`/`allopt` search).  `keep()` now reproduces Stata's exported `.dta`
+cell-for-cell.  Evidence grade **E2**, graded per quantity against 22
+full-precision StataNow 19.5 captures: `V` and 6 of 8
 `W`/`X_balance`/`Y_synthetic` values reach machine precision; the remaining
 two near-rank-1 pools are within 9e-3 / 6.9e-2 after an adaptive interior-point
-QP that reproduces Stata's plugin trajectory.  E3 is excluded as a
-whole-command claim (QP optimum non-unique); see
+QP that reproduces Stata's plugin trajectory.
+
+Options accepted but **numerically inactive** are flagged explicitly on the
+result (`SynthResult.numerically_inactive`): `sigf`/`margin`/`bound` and
+`technique()` steer Stata's closed-source C++/ml optimisers, which we do not
+reproduce; they are never faked.  E3 is excluded as a whole-command claim
+(QP optimum non-unique); see
 [the design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md) and
 [the comparison notes](docs/USING_WITH_STATA.md).
 

@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.5 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.6 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -6534,7 +6534,7 @@ x2        200.0  0.063540   0.993631 -2.226171  3.259538
 **签名**
 
 ```python
-ws.SynthResult(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, stata_predictor_names: 'tuple[str, ...]' = ()) -> None
+ws.SynthResult(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, qp_solver: 'str' = 'SLSQP', unit_labels: 'tuple[str, ...]' = (), unit_codes: 'tuple[Any, ...]' = (), numerically_inactive: 'tuple[str, ...]' = (), stata_predictor_names: 'tuple[str, ...]' = ()) -> None
 ```
 
 **示例**
@@ -7376,7 +7376,7 @@ ws.summarize(base, ['y', 'x1'])
 **签名**
 
 ```python
-ws.synth(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'
+ws.synth(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'
 ```
 
 **示例**

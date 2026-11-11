@@ -103,16 +103,25 @@ six `e()` matrices compare as follows:
 | Quantity | Measured bound | Observed worst |
 |---|---|---|
 | `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) — **machine precision** |
-| `e(W_weights)` | `|dW| <= 2e-1` | **0** in 7 of 9 measured cases; worst 1.76e-1 in two degenerate donor pools |
-| `e(X_balance)`, `e(Y_synthetic)` | `<= 2e0` | 0 / 3e-14 in 7 of 9 cases (follows W) |
-| `e(RMSPE)` | `|d| <= 5e-1` | 3.6e-4 on well-posed pools; worst 4.74e-1 |
+| `e(W_weights)` | `|dW| <= 2e-2` | **0** in 6 of 8 measured cases; worst 9e-3 in the two near-rank-1 pools |
+| `e(X_balance)`, `e(Y_synthetic)` | `<= 4e-1` | 0 / 3e-14 in 6 of 8 cases; worst 2.9e-1 |
+| `e(RMSPE)` | `|d| <= 1e-1` | 3.6e-4 on well-posed pools; worst 6.9e-2 |
 
-RMSPE is the one quantity that generally cannot be quoted as Stata's.
-`H = Xco' V Xco` has rank `<= K << J`, so the QP optimum is not unique; Stata's
-C++ interior-point plugin stops off the optimal face at `margin=0.005`, while
-scipy's SLSQP solves it more tightly. **E3 / bit-for-bit reproduction as a
-whole-command claim is therefore excluded**, but `V` and most `W`/`X_balance`/
-`Y_synthetic` values ARE at machine precision — see
+**2026-11-11 refinement.**  The two divergent cases had `Vmax > 0.98`: `H` is
+effectively rank 1, so the QP optimum face is very high-dimensional.  Stata's
+Vanderbei/LOQO **interior-point** plugin returns an early-stopped dense iterate
+(one dominant weight + 1e-3 weights on nearly all controls); scipy SLSQP
+converged to a sparse vertex.  Both are on the SAME optimal face (QP objective
+agrees to ~1e-6).  An adaptive primal-dual interior-point solver, stopped on
+the complementarity gap derived from Stata's public `margin=0.005`, reproduces
+that trajectory; SLSQP is retained when `Vmax <= 0.98` because it already
+matches exactly there.  `SynthResult.qp_solver` records the choice.  Measured
+improvement: dW 0.176/0.081 -> **0.009/0.003**, RMSPE 0.474/0.336 ->
+**0.0096/0.0688**, with zero regression on the 6 exact cases.
+
+**E3 / bit-for-bit reproduction as a whole-command claim is still excluded**
+(QP optimum non-unique), but `V` and 6 of 8 `W`/`X_balance`/`Y_synthetic`
+values ARE at machine precision — see
 [test_stata_synth_features.py](../tests/conformance/test_stata_synth_features.py)
 for the per-quantity grading.
 

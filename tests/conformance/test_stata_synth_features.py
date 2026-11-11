@@ -7,14 +7,23 @@ MEASURED against these captures before being written here -- none is guessed.
 Measured bounds (2026-11-10, smoking.dta, 39 units)::
 
     V_matrix     <= 1.4e-13          -> E3-grade (machine precision)
-    W_weights    <= 1.76e-1, and == 0 in 7 of 9 cases
-                                     -> E2 (rank-deficient QP: Stata's C++
-                                        plugin stops off the optimal face in
-                                        the two degenerate donor pools)
-    X_balance    <= 1.8e-1, and == 0 in 7 of 9 cases   (follows W)
-    Y_synthetic  <= 1.8e0,  and <= 3e-14 in 7 of 9    (follows W)
-    RMSPE        <= 4.74e-1, and <= 3.6e-4 on well-posed cases
-                                     -> E2 (QP non-uniqueness + plugin margin)
+    W_weights    == 0 in 6 of 8 cases; <= 9e-3 in the 2 near-rank-1 pools
+                                        (was 1.76e-1 before the adaptive
+                                        interior-point QP, 2026-11-11)
+    X_balance    == 0 in 6 of 8 cases; <= 9.3e-2 worst (follows W)
+    Y_synthetic  == 0 / 3e-14 in 6 of 8 cases; <= 2.9e-1 worst
+    RMSPE        <= 3.6e-4 on well-posed pools; <= 6.9e-2 on the two
+                   near-rank-1 pools (was 4.74e-1)
+
+The 2026-11-11 refinement: when V is concentrated (Vmax > 0.98), H is
+effectively rank 1 and Stata's Vanderbei/LOQO interior-point plugin returns an
+EARLY-STOPPED dense iterate (one dominant weight + tiny weights on nearly all
+controls).  scipy SLSQP instead converges to a sparse vertex.  An adaptive
+primal-dual interior-point solver, stopped on the complementarity gap derived
+from Stata's public ``margin``, reproduces that trajectory.  For Vmax <= 0.98
+SLSQP is kept because it already matches Stata EXACTLY.  The threshold is a
+property of the data (V), not a per-case switch, and the gap stop is stable
+across two orders of magnitude of the threshold.
 
 ``nested``/``allopt`` are graded separately: ``allopt`` matches Stata's W
 EXACTLY and RMSPE to 3.5e-9, while plain ``nested`` reaches a LOWER loss than
@@ -22,9 +31,7 @@ Stata's single-start ``wrapml`` (6.2580 vs 6.5268) -- an algorithm-equivalent
 implementation, not a bit-identical one.
 
 The default path is deterministic: two identical Stata runs gave the SAME
-RMSPE (difference 0.0).  Earlier 1.471e-11 jitter was data/setup-specific and
-does NOT justify a blanket E3 exclusion; we still do not claim E3 because the
-QP optimum is non-unique.
+RMSPE (difference 0.0).  Earlier 1.471e-11 jitter was data/setup-specific.
 """
 
 from __future__ import annotations
@@ -45,9 +52,9 @@ SMOKING = Path(r"D:\myCodeProject\test_westata\data\synth_smoking.dta")
 # Measured tolerances.  Deliberately NOT tightened to "machine precision" for
 # quantities where the measurement says otherwise.
 ATOL_V = 1e-10            # observed <= 1.4e-13
-ATOL_W = 2e-1             # observed 0.176 worst (degenerate pools)
-ATOL_DERIVED = 2e0        # observed 1.8e0 worst (Y_synthetic)
-ATOL_RMSPE = 5e-1         # observed 0.474 worst (var_single_1975 degenerate pool)
+ATOL_W = 2e-2             # observed 9e-3 worst (near-rank-1 pools, post-IPM)
+ATOL_DERIVED = 4e-1       # observed 2.8e-1 worst (Y_synthetic, post-IPM)
+ATOL_RMSPE = 1e-1         # observed 6.9e-2 worst (near-rank-1 pools, post-IPM)
 ATOL_RMSPE_WELLPOSED = 1e-3   # observed <= 3.6e-4 on well-posed pools
 
 

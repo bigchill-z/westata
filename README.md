@@ -69,9 +69,10 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` runs 6014 tests (6011 pass, 3 skip). Two conformance checks fail only when the untracked `synth_features.json` from an in-progress parallel session is present; the committed tree is green. It needs no
-Stata licence: the conformance captures are committed and replayed. Re-running the
-comparisons against live Stata (`retest/`, `docs/collect_comparison.py`) does need one.
+`python -m pytest -q` runs 6054 tests (6051 pass, 3 skip) on the committed tree.
+The conformance captures (including `synth_features.json`) are committed, so the
+suite needs no Stata licence. Re-running the comparisons against live Stata
+(`retest/`, `docs/collect_comparison.py`) does need one.
 
 ## Quick start
 
@@ -151,7 +152,7 @@ full.estat_vce().to_frame()                  # full symmetric matrix as a DataFr
 | Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |
 | Ordered | `OrderedLogit` / `OrderedProbit` | `ologit` / `oprobit` |
 | Censored | `Tobit` (self-implemented) | `tobit` |
-| Synthetic control | `synth` (default path, E2) | `synth` |
+| Synthetic control | `synth` (extended, E2 by quantity) | `synth` |
 | Time series | `ARIMA` / `VAR` / `VECM` / `GARCH` / `unitroot` | `arima` / `var` / `vec` / `arch` / `dfuller` |
 | Postestimation | `test` / `lincom` / `margins` / `predict` | same names |
 | Reporting | `etable` | `esttab` |
@@ -330,15 +331,20 @@ biasadj()` raises `UnsupportedError`.
 Not implemented, and they raise instead of approximating: Mata, the graphics
 system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
 `xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), `synth2`,
-`synth, nested`/`allopt`, general `gmm`, `nlsur`, multi-way
+`synth, figure`, `synth2`'s placebo/LOO, general `gmm`, `nlsur`, multi-way
 clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
-`ws.synth` **is** implemented for Stata's default (regression-based V) path at
-evidence grade **E2**: its six `e()` matrices are compared against six
-full-precision captures from StataNow 19.5.  E3 is explicitly excluded because
-Stata's C++ QP plugin is not bit-deterministic; see
-[the B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md).
+`ws.synth` implements Stata's **default path plus the extended feature set**
+(`unitnames`, `var(period)`, `keep()`, the four optimiser settings, and an
+algorithm-equivalent `nested`/`allopt` search).  Evidence grade **E2**, graded
+per quantity against 22 full-precision StataNow 19.5 captures: `V` and 6 of 8
+`W`/`X_balance`/`Y_synthetic` values reach machine precision; the remaining
+two near-rank-1 pools are within 9e-3 / 6.9e-2 after an adaptive interior-point
+QP that reproduces Stata's plugin trajectory.  E3 is excluded as a
+whole-command claim (QP optimum non-unique); see
+[the design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md) and
+[the comparison notes](docs/USING_WITH_STATA.md).
 
 `docs/GAP_REGISTER.md` lists every one with its reason. Those are boundary
 statements, not a to-do list.

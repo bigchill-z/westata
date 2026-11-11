@@ -213,7 +213,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              6014 个测试（6011 通过、3 跳过）；另有 2 个 conformance 检查仅在并行会话未提交的 synth_features.json 存在时失败，已提交代码树全绿。不需要 Stata 授权
+tests/              6054 个测试（6051 通过、3 跳过）；conformance 捕获（含 synth_features.json）均已提交，无需 Stata 授权即可重放
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```
@@ -234,11 +234,14 @@ docs/               GUIDE.md、对照数据、生成脚本
 
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
-- 合成控制 `ws.synth` **只实现默认路径**（证据等级 **E2**）：六个 `e()` 矩阵对拍 6 份
-  StataNow 19.5 全精度捕获，`nested`/`allopt`、`synth2`、图形、placebo 抛
-  `UnsupportedError`。**不承诺 E3 / 逐位一致**：Stata 的 C++ QP 插件非位确定性，
-  且 `H` 秩亏使 RMSPE 有最大 5.6e-4 的实测差。详见
-  [B 档设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
+- 合成控制 `ws.synth` 已实现**默认路径 + 扩展功能**（`unitnames`、`var(period)`、
+  `keep()`、四个优化器参数、`nested`/`allopt` 算法等价实现），证据等级 **E2、
+  逐量定级**：对拍 22 份 StataNow 19.5 全精度捕获，`V` 达机器精度（≤1.4e-13），
+  8 个案例中 6 个的 `W`/`X_balance`/`Y_synthetic` 逐位一致，最差 `|dW|` 9e-3、
+  `|dRMSPE|` 6.9e-2（近秩 1 的退化池，用自适应内点法 QP 复刻了 Stata 插件的
+  早停轨迹）。**仍拒绝** `figure`（图形）、`synth2` 的 placebo/LOO、任何推断量；
+  **不承诺整体 E3 / 逐位一致**（QP 最优 W 不唯一）。详见
+  [设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
   [与 Stata 对照说明](docs/USING_WITH_STATA.md)。
 - 本库不做数据管理：没有 `use`、`merge`、`reshape`、`egen` 的对应物，输入是 pandas DataFrame。
 

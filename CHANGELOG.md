@@ -7,6 +7,47 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — adaptive interior-point QP refinement (2026-11-11)
+
+Goal: "further approach" the two remaining E2 gaps.  Root cause found and
+reproduced with a **principled** solver change (not coefficient fitting).
+
+**Diagnosis.**  In the two divergent cases `V` is concentrated on one
+predictor (`Vmax` = 0.992 / 0.989), so `H = Xco' V Xco` is effectively rank 1
+and the QP optimum face is very high-dimensional.  Stata's `synthopt.plugin`
+is a Vanderbei/LOQO **interior-point** solver (`synth.sthlp:264-266`) and
+returns an EARLY-STOPPED interior iterate: one dominant weight (0.65 / 0.82)
+plus tiny (1e-3) weights spread across 33-37 of 38 controls.  scipy SLSQP
+instead converges to a sparse vertex (9 / 3 nonzero weights).  Both are on
+the same optimal face (QP objective agrees to ~1e-6), so the difference is
+which point on the face is selected, not the optimum value.
+
+**Fix.**  `_solve_w_interior()` runs the primal-dual log-barrier Newton system
+and stops when the complementarity gap falls below a threshold derived from
+Stata's public `margin=0.005`.  `synth()` selects it adaptively when
+`Vmax > 0.98` (a property of the data, not a per-case switch) and keeps SLSQP
+otherwise, because SLSQP already matches Stata EXACTLY on the other 6 cases.
+`SynthResult.qp_solver` records which path was used.  The gap stop is stable
+across two orders of magnitude of the threshold (measured 1e-6..1e-2), i.e.
+a trajectory feature rather than a tuned constant.
+
+**Re-measured grading (8 cases):**
+
+| Quantity | before | after |
+|---|---|---|
+| `W_weights` worst | 1.76e-1 | **9e-3** |
+| `X_balance` worst | 1.8e-1 | **9.3e-2** |
+| `Y_synthetic` worst | 1.8e0 | **2.9e-1** |
+| `RMSPE` worst | 4.74e-1 | **6.9e-2** |
+| `V_matrix` worst | 1.4e-13 | 1.4e-13 (unchanged, machine precision) |
+| cases with W exact | 6/8 | 6/8 (unchanged — no regression) |
+
+`nested` / `allopt` unchanged.  Registry tolerance `5e-1 -> 1e-1`; conformance
+tolerances tightened to the measured values (`ATOL_W 2e-2`, `ATOL_DERIVED 4e-1`,
+`ATOL_RMSPE 1e-1`) so a future regression is caught.
+
+---
+
 ## [Unreleased] — extended `synth` feature set (2026-11-10)
 
 Goal: "implement all Stata `synth` features except graphics, keeping numerical

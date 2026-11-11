@@ -1765,3 +1765,60 @@ def _cluster_row(label_text, value_text, right_aligned):
 `test_continuous_models_render_identically[Poisson]` 断言
 `rendered.startswith("\n")`，但 live Stata 在连续因变量下**以 note 开头**，
 所以该断言已过时，需更新为「要么空行、要么 note 行」。
+
+---
+
+## 已知数值差异：`predict, lev` 的 `max/mean` 在第 7 位有效数字分叉
+
+### 现象
+
+用户用例（`nerlove.dta`，把第 1 行的 `lnq` 放大 100 倍制造极端杠杆点）：
+
+```python
+df.loc[0, "lnq"] *= 100
+model = ws.OLS.from_formula("lntc ~ lnq + lnpl + lnpk + lnpf", df).fit()
+lev = model.predict(kind="lev")
+lev = df["lev"].describe(); lev["max"] / lev["mean"]
+```
+
+| | westata | Stata |
+|---|---|---|
+| `max` | 0.892811312091**491** | 0.892811312091**496** |
+| `mean` | 0.0344827586206**93** | 0.0344827586206**91** |
+| `sum` | 5.000000000000433 | 5.000000000000249 |
+| **`max/mean`** | **25.8915280506510** | **25.8915277443713** |
+
+第 7 位有效数字开始分叉：`25.89152` 相同，之后 `8050` vs `7744`。
+
+### 根因
+
+**单个杠杆值本身几乎完全一致**（第 1 个观测差 5e-15），差异来自**求和累加顺序**：
+
+- Stata 的 `summarize` 用 Kahan 补偿求和
+- westata 的 `pandas.Series.mean()` 用普通 pairwise 求和
+
+`sum` 差 1.8e-13 → `mean` 差 2e-15 → 但 `max/mean` 是**比值**，把相对误差放大到 1.2e-8。
+
+`sum(hat) = k = 5` 这个帽子矩阵恒等式**两边都满足**，所以不是算法错误。
+
+### 为什么暂不修
+
+对齐需要让求和使用与 Stata 相同的累加顺序（Kahan）。但：
+
+- `mean`/`describe` 被大量命令共用（`summarize`、`estat summarize`、各模型的 `e()`）
+- 改动会波及所有依赖求和顺序的输出，风险大于 1.2e-8 的收益
+
+与已记录的 `estat vif` 第 9 位有效数字、`varstable` n≥300 特征值同类，属**末位数值路径差异**。
+
+### 证据强度（诚实标注）
+
+**单次实测**，未做多数据集验证。若要确认这是稳定的求和顺序差异而非该数据集的偶然，
+应换 3–5 个数据集复测 `sum(hat)` 与 `mean` 的末位差。
+
+### 若要推进，三个选项
+
+| 方案 | 内容 | 代价 |
+|---|---|---|
+| A. 维持现状（当前）| 记录为已知差异 | `max/mean` 类比值最多差 ~1e-8 |
+| B. 仅对 leverage 用 Kahan 求和 | 局部改动，只影响 `predict lev` 的汇总 | 需自定义 `describe` 路径 |
+| C. 全局改 Kahan 求和 | 所有 `mean` 类输出与 Stata 对齐 | 波及面大，需全量回归 |

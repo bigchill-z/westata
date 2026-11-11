@@ -90,6 +90,7 @@ from westata.estimators.panel import (
 )
 from westata.estimators.tobit import Tobit
 from westata.estimators.synth import SynthResult, synth
+from westata.estimators.synth2 import Synth2Result, synth2
 from westata.estimators.tseries import (
     ARIMA,
     GARCH,
@@ -186,6 +187,8 @@ __all__ = [
     "Tobit",
     "SynthResult",
     "synth",
+    "Synth2Result",
+    "synth2",
     "ARIMA",
     "VAR",
     "VECM",

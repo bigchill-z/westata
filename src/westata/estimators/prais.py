@@ -73,11 +73,31 @@ def prais_winsten(
     tolerance: float = 1e-6,
     rho: float | None = None,
     corc: bool = False,
-) -> tuple[np.ndarray, float, int]:
-    """Iterated Prais-Winsten estimate.
+) -> tuple[np.ndarray, float, int, list[tuple[int, float]]]:
+    """Iterated Prais-Winsten / Cochrane-Orcutt estimate.
 
-    Returns ``(coefficients, rho, iterations)``. ``rho`` may be given to run a single
-    Cochrane-Orcutt style pass instead of iterating.
+    Returns ``(coefficients, rho, iterations, trace)``. ``rho`` may be given to run a single pass
+    instead of iterating; the trace is then empty.
+
+    ``trace`` is the sequence Stata prints as its iteration log, as ``(iteration, rho)`` pairs with
+    ``Iteration 0`` a literal zero. Reproducing it needs the ado's PASS ORDER, not only its
+    arithmetic (``prais.ado:172-217``)::
+
+        lastrho = 2 ; rho = 0
+        while abs(rho - lastrho) > tol {
+            lastrho = rho
+            resid = y - X b        <- residual of the PREVIOUS fit (plain OLS on pass 1)
+            rho   = crcar1(resid)  <- the value that gets printed
+            b     = fit AT rho     <- and the value the next pass fits with
+        }
+
+    ``rho`` is the loop variable and the fit input; the coefficients follow it. Re-seeding ``rho``
+    from the OLS estimate, or treating the fit and the estimate as one unit, produces
+    ``0.3895, 0.3975, ...`` where Stata has ``0.4008, 0.4009, ...``.
+
+    Two further conditions are satisfied elsewhere: ``_rho_from_residuals`` is the slope of the
+    residual on its own lag with no constant (``_crcar1.ado:37-42``), and ``_transform_corc`` drops
+    the first row (``prais_e.ado:28-33``).
     """
 
     x = np.asarray(exog, dtype=float)
@@ -87,57 +107,47 @@ def prais_winsten(
             f"prais: design is {x.shape} but the response has {y.size} values"
         )
 
+    transform = _transform_corc if corc else _transform
+
     def ols(design: np.ndarray, response: np.ndarray) -> np.ndarray:
         return np.linalg.lstsq(design, response, rcond=None)[0]
 
     coefficients = ols(x, y)
-    current_rho = _rho_from_residuals(y - x @ coefficients) if rho is None else float(rho)
 
+    # A FIXED RHO RUNS EXACTLY ONE PASS AND PRINTS NO LOG -- the value was supplied, not estimated.
+    if rho is not None:
+        fixed = float(rho)
+        transformed_x = np.column_stack(
+            [transform(x[:, j], fixed) for j in range(x.shape[1])]
+        )
+        return ols(transformed_x, transform(y, fixed)), fixed, 1, []
+
+    current_rho = 0.0
+    previous_rho = 2.0
+    trace: list[tuple[int, float]] = [(0, 0.0)]
     iterations = 0
-    for iterations in range(1, maxiter + 1):
+
+    while iterations < maxiter and abs(current_rho - previous_rho) > tolerance:
+        previous_rho = current_rho
+        residual = y - x @ coefficients
+        current_rho = _rho_from_residuals(residual)
         if abs(current_rho) >= 1.0:
-            raise ConvergenceError(
+            failure = ConvergenceError(
                 f"prais: the estimated AR(1) coefficient {current_rho:.6f} is not inside "
                 "(-1, 1); the series is not stationary"
             )
-        transformer = _transform_corc if corc else _transform
+            failure.rho = current_rho  # type: ignore[attr-defined]
+            raise failure
         transformed_x = np.column_stack(
-            [transformer(x[:, j], current_rho) for j in range(x.shape[1])]
+            [transform(x[:, j], current_rho) for j in range(x.shape[1])]
         )
-        transformed_y = transformer(y, current_rho)
-        updated = ols(transformed_x, transformed_y)
-        residual = y - x @ updated
-        next_rho = _rho_from_residuals(residual)
-        if rho is not None or abs(next_rho - current_rho) < tolerance:
-            # Stata reports the rho it stopped AT, but the coefficients refitted AT that rho --
-            # not the ones from the previous pass. Measured on icecream.dta: stopping at
-            # rho .8002264 with the previous coefficients gives price -1.0488550 and
-            # _cons .5870043, while refitting once more gives -1.0488545 ... .5870049, which is
-            # what Stata prints (-1.048854, .5870049).
-            final_rho = next_rho if rho is None else current_rho
-            if rho is None:
-                transformer = _transform_corc if corc else _transform
-                final_x = np.column_stack(
-                    [transformer(x[:, j], final_rho) for j in range(x.shape[1])]
-                )
-                final_y = transformer(y, final_rho)
-                coefficients = ols(final_x, final_y)
-            else:
-                coefficients = updated
-            current_rho = final_rho
-            break
-        coefficients = updated
-        current_rho = next_rho
-    else:
-        # Stata prints the value it reached BEFORE reporting r(430):
-        #
-        #   rho |   .9724118
-        #   convergence not achieved
-        #   r(430);
-        #
-        # so the estimate travels on the exception rather than being discarded. Without it a
-        # caller cannot tell a rho of .97 that is still creeping from one that is oscillating
-        # wildly, and has to re-run with a raised tolerance to find out.
+        coefficients = ols(transformed_x, transform(y, current_rho))
+        iterations += 1
+        trace.append((iterations, current_rho))
+
+    if iterations >= maxiter:
+        # Stata prints the value it reached BEFORE reporting r(430), so the estimate travels on the
+        # exception rather than being discarded.
         failure = ConvergenceError(
             f"prais: rho did not converge in {maxiter} iterations; last value "
             f"{current_rho:.7f}"
@@ -145,7 +155,7 @@ def prais_winsten(
         failure.rho = current_rho  # type: ignore[attr-defined]
         raise failure
 
-    return coefficients, current_rho, iterations
+    return coefficients, current_rho, iterations, trace
 
 
 class PraisResult:
@@ -176,6 +186,7 @@ class PraisResult:
         "_dw_original",
         "_dw_transformed",
         "_iterations",
+        "_rho_trace",
     )
 
     def __init__(self, **values: object) -> None:
@@ -249,6 +260,12 @@ class PraisResult:
     @property
     def df_resid(self) -> int:
         return self._df_resid
+
+    @property
+    def rho_trace(self) -> tuple[float, ...]:
+        """The rho sequence Stata prints as its iteration log, ``Iteration 0`` first."""
+
+        return tuple(self._rho_trace)
 
     @property
     def df_total(self) -> int:
@@ -403,11 +420,27 @@ class PraisResult:
         #
         #     PW    ['', '', 'Prais-Winsten AR(1) regression ...', '', '      Source | ...']
         #     CORC  ['Cochrane-Orcutt AR(1) regression ...', '', '      Source | ...']
-        lines = (
-            [_banner, ""]
-            if self._corc
-            else ["", "", _banner, ""]
-        )
+        # THE ITERATION LOG OPENS THE TABLE: a blank line, one line per pass, a blank line, then
+        # the banner. Measured on both variants of `prais consumption temp price income`:
+        #
+        #     ''
+        #     'Iteration 0:  rho = 0.0000'
+        #     ...
+        #     ''
+        #     'Cochrane-Orcutt AR(1) regression with iterated estimates'
+        #
+        # The rho carries FOUR decimals here ('0.0000'), unlike the table body, where Stata drops
+        # the leading zero.
+        # THE SPACING NARROWS AT TWO DIGITS. prais.ado:181-184 sets `spacing` to two spaces while
+        # `it_ct < 9` and one from 10 on, so the column stays aligned as the label grows:
+        #
+        #     'Iteration 9:  rho = 0.7427'
+        #     'Iteration 10: rho = 0.7448'
+        _log = [
+            f"Iteration {index}:{'  ' if index < 10 else ' '}rho = {value:.4f}"
+            for index, value in enumerate(self._rho_trace)
+        ]
+        lines = ["", *_log, "", _banner, ""]
         lines += [
             # The header row's SS/MS end three columns EARLIER than the data rows' do (23/36/45
             # against 26/36/48): Stata centres the short labels over wider numeric fields.
@@ -533,7 +566,7 @@ def prais(
     y = frame.loc[kept_index, lhs].to_numpy(dtype=float)
     x = np.asarray(design, dtype=float)
 
-    coefficients, rho, iterations = prais_winsten(
+    coefficients, rho, iterations, rho_trace = prais_winsten(
         x, y, maxiter=maxiter, tolerance=tolerance, corc=corc
     )
 
@@ -634,4 +667,5 @@ def prais(
         dw_transformed=dw_transformed,
         corc=bool(corc),
         iterations=iterations,
+        rho_trace=[value for _index, value in rho_trace],
     )

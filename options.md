@@ -2,6 +2,31 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之三、2026-11-11 `synth2` 非图形功能的范围决策
+
+| 决策 | 结果 |
+|---|---|
+| 范围 | **用户选「一次做完整非图形 synth2」**：主拟合、拟合统计、6 列平衡表、U_wt/V_wt、空间安慰剂（含 cutoff 与逐期双侧/右侧/左侧 p 值）、时间安慰剂、留一包络 |
+| 验收口径 | **用户选「逐量对拍活体 Stata，如实定级」**：公式层标机器精度子集、重跑链路标 E2 并写实测差；不先拍死容差再凑 |
+| `frame()` / `symbol()` | **用户选「不实现，由结果对象承载」**：Stata frame 是其特有概念，全部结果放 `Synth2Result` 属性 |
+| 明确不做 | `figure`/`nofigure`/`savegraph`/`show`/`graphlist`（纯图形）、参数推断、E3 整体声明 |
+
+---
+
+## 〇之二、2026-11-10 扩展 `synth` 功能的范围决策
+
+| 决策 | 结果 |
+|---|---|
+| 目标「实现 Stata synth 除图形外的全部功能，数值差异控制在机器精度内」 | **已纠偏**：机器精度在物理上不可达（Stata C++ QP 插件自身非位确定性，两次相同运行 `e(RMSPE)` 差 1.471e-11；`H` 秩亏使最优 W 不唯一；`nested` 外层是 Stata 闭源 `ml model d0`）。按 AGENTS.md §0/§7 先纠偏再执行 |
+| 范围选项 | **用户选「做 A–E 全量功能，精度按实测定级（推荐）」**：实现 `unitnames`、`var(period)`、`keep()`/`replace`、四个优化器参数公开化、缺失警告文案，以及 `nested`/`allopt` 的算法等价实现；每个量标注实测差，能到机器精度的标 E3 子集，不能的如实标 E2 |
+| 明确不做 | 图形（`figure`）、任何推断量；`synth2` 的 placebo/LOO 已于 2026-11-11 单独实现（见 〇之三）；「全部机器精度」不承诺 |
+| 精度口径 | 逐量实测定级，以 6+ 份活体 Stata 捕获为准；不先拍死容差再凑 |
+
+**当前仍需用户决策的事项**：仅 **P4 推送 PyPI / GitHub 前的确认**（工作区规则要求
+以新版本号推送；本地 0.3.6 已提交，外部推送因 GitHub TLS 阻断 + 缺 PyPI token 未完成）。
+
+---
+
 ## 〇、2026-11-09 `synth` 可行性评估后的决策（B 档）
 
 | 决策 | 结果 |
@@ -17,9 +42,7 @@
 `docs/STATA_ALIGNMENT_SUMMARY.md` 同日修订块）。按本文件规则，已实施/已关闭的决策
 不再作为待办保留，故就地标注；原文保留仅为追溯。
 
-**当前仍需用户决策的事项**：仅 **P4 推送 PyPI / GitHub 前的确认**（工作区规则要求
-以新版本号推送，且推送前完成中英文文档校对；本次为本地提交，未推送）。其余
-B 档范围内全部已拍板并执行。
+B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 
 ---
 
@@ -1722,3 +1745,23 @@ def _cluster_row(label_text, value_text, right_aligned):
   (c) 把 `if self.clusters:` 改成 `if self.clusters and not _clustered:`；
   以及 (d) 在 `return "\n".join(lines)` 前追加脚注。
 - **风险**：`__slots__` 禁止给实例加属性，必须用局部变量。
+
+# 本轮用户决策（已答复，从 options.md 移除）
+
+## ① ML 迭代日志 → 选 C（极简版）
+
+只打印 `Iteration 0`（零模型似然，与 Stata 精确一致）+ 最终收敛行，
+省略中间路径（因 Stata 用 `moptimize`，中间值无法复现）。
+编号**跳号**以诚实反映缺失，代码注释注明原因。
+
+## ② 收敛警告 → 选「打印警告」
+
+优化未收敛时打印 `Warning: Convergence not achieved.`，
+与 Stata 同款，而非静默或抛异常。
+
+## 附带修正
+
+`tests/test_estimator_sweep_status.py` 的
+`test_continuous_models_render_identically[Poisson]` 断言
+`rendered.startswith("\n")`，但 live Stata 在连续因变量下**以 note 开头**，
+所以该断言已过时，需更新为「要么空行、要么 note 行」。

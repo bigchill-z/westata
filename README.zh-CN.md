@@ -38,7 +38,7 @@ Stata 口径的计量经济学实现，API 沿用 statsmodels 风格。
 |---|---|
 | 测试 | **全量 `pytest -q` 通过** |
 | 覆盖命令 | 96 条注册条目 |
-| 证据等级 | **54 × E3**，27 × E2，15 × E1 |
+| 证据等级 | **54 × E3**，28 × E2，15 × E1 |
 | 独立复测 | 386 个对照点，对真实 Stata 运行（`retest/`） |
 | 同数据对照 | 21 条命令、71 个参数，逐值比对（`docs/GUIDE.md`）|
 
@@ -144,7 +144,7 @@ print(ws.etable([base, full], model_names=["基础", "完整"]))
 | 受限因变量 | `tobit`、`truncreg`、`intreg`、`heckman`、`etregress` |
 | 分位数与稳健 | `qreg`、`sqreg`、`bsqreg`、`rreg` |
 | 方程组 | `sureg`、`mvreg`、`manova` |
-| 因果推断 | `teffects nnmatch/ra/ipw/aipw`、`didregress`、`xtdidregress`、`synth`（默认路径，E2） |
+| 因果推断 | `teffects nnmatch/ra/ipw/aipw`、`didregress`、`xtdidregress`、`synth`（扩展，按量 E2）、`synth2`（非图形，按量 E2） |
 | 时间序列 | `arima`、`arch`/`garch`、单位根检验 |
 | 后估计 | `test`、`lincom`、`margins`、`predict`、`esttab` 风格的 `etable` |
 
@@ -213,7 +213,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              5936 个测试（5929 通过、3 跳过），不需要 Stata 授权
+tests/              6123 个测试（6120 通过、3 跳过）；conformance 捕获（含 synth/synth2 fixtures）均已提交，无需 Stata 授权即可重放
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```
@@ -234,12 +234,18 @@ docs/               GUIDE.md、对照数据、生成脚本
 
 - `teffects nnmatch, biasadj()` 未实现（抛 `UnsupportedError`）。
 - 部分 Stata 选项未覆盖（如 `vce(jackknife)`、若干 `margins` 子选项）。
-- 合成控制 `ws.synth` **只实现默认路径**（证据等级 **E2**）：六个 `e()` 矩阵对拍 6 份
-  StataNow 19.5 全精度捕获，`nested`/`allopt`、`synth2`、图形、placebo 抛
-  `UnsupportedError`。**不承诺 E3 / 逐位一致**：Stata 的 C++ QP 插件非位确定性，
-  且 `H` 秩亏使 RMSPE 有最大 5.6e-4 的实测差。详见
-  [B 档设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
-  [与 Stata 对照说明](docs/USING_WITH_STATA.md)。
+- `ws.synth` 已实现**默认路径 + 扩展功能**（`unitnames`、`var(period)`、
+  `keep()`/`replace`、四个优化器参数、Stata 经 `*` 转发的 `ml` 选项、
+  `nested`/`allopt` 算法等价实现）。`ws.synth2` 已实现 **`synth2` 的全部
+  非图形功能**：拟合统计、6 列平衡表、空间安慰剂（含 cutoff 与逐期双侧/右侧/
+  左侧 p 值）、时间安慰剂、留一法包络。两者均按量定级 **E2**：公式层
+  （`V`/`bal`/`U_wt`/`V_wt`/`r2`/`att`）达机器精度，重跑链路继承
+  `ws.synth` 秩亏 QP 的差异（实测界见
+  [与 Stata 对照说明](docs/USING_WITH_STATA.md) 与 registry）。
+  **仍拒绝** `figure`/`nofigure`/`savegraph`/`show`（图形）、Stata
+  `frame()`/`symbol()`、任何参数推断；**不承诺整体 E3 / 逐位一致**。详见
+  [synth 设计规格](docs/superpowers/specs/2026-11-09-synth-b-design.md) 与
+  [synth2 设计规格](docs/superpowers/specs/2026-11-11-synth2-design.md)。
 - 本库不做数据管理：没有 `use`、`merge`、`reshape`、`egen` 的对应物，输入是 pandas DataFrame。
 
 ---

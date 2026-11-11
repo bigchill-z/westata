@@ -1,0 +1,199 @@
+{
+  "_comment": "Full-precision synth2 e() capture from live StataNow 19.5 MP. Evidence artifact only; asserts no conformance level.",
+  "ado": "synth2.ado v2.1.0 (Guanpeng Yan & Qiang Chen 05/10/2023)",
+  "stata_version": "19.5",
+  "stata_release": "19.5",
+  "dataset": "D:/myCodeProject/test_westata/data/synth_smoking.dta",
+  "captured": "2026-11-11",
+  "cases": {
+    "synth2|placebo_period_1985": {
+      "id": "synth2|placebo_period_1985",
+      "command": "synth2 cigsale lnincome age15to24 beer retprice cigsale(1980) cigsale(1975), trunit(3) trperiod(1989) xperiod(1980(1)1984) nofigure placebo(period(1985))",
+      "dataset": "D:/myCodeProject/test_westata/data/synth_smoking.dta",
+      "stata_version": "19.5",
+      "stata_release": "19.5",
+      "ado": "synth2.ado v2.1.0 (Guanpeng Yan & Qiang Chen 05/10/2023)",
+      "ok": true,
+      "scalars": {
+        "N": 1209.0,
+        "T": 31.0,
+        "T0": 19.0,
+        "T1": 12.0,
+        "K": 6.0,
+        "J": 39.0,
+        "rmse": 2.690358399368341,
+        "r2": 0.9196343390843125,
+        "att": -19.88723341623942
+      },
+      "matrices": {
+        "bal": [
+          [
+            0.00131505430718004,
+            10.037218856811524,
+            9.885878080940248,
+            -1.5077959146877817,
+            9.7891795911287,
+            -2.4711951509804653
+          ],
+          [
+            0.0005173050336034308,
+            0.1815354973077774,
+            0.18299439933001996,
+            0.803645592117519,
+            0.18141807082452271,
+            -0.06468513596302738
+          ],
+          [
+            0.003281572012337091,
+            25.0,
+            23.92289953994751,
+            -4.308401840209952,
+            23.694736731679814,
+            -5.221053073280746
+          ],
+          [
+            0.0032266379884114977,
+            76.22000122070312,
+            76.84630025711058,
+            0.8216990637325505,
+            71.83526330245168,
+            -5.75273923908105
+          ],
+          [
+            0.5051469277374446,
+            120.19999694824219,
+            120.74840003204345,
+            0.45624217780755316,
+            138.08947372436523,
+            14.883092537702991
+          ],
+          [
+            0.4865125029210234,
+            127.0999984741211,
+            126.84049964904784,
+            -0.20416902296508388,
+            136.93157898752312,
+            7.735311275714807
+          ]
+        ],
+        "U_wt": [
+          [
+            0.346
+          ],
+          [
+            0.278
+          ],
+          [
+            0.183
+          ],
+          [
+            0.115
+          ],
+          [
+            0.079
+          ]
+        ],
+        "V_wt": [
+          [
+            0.00131505430718004,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0005173050336034308,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.003281572012337091,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0032266379884114977,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5051469277374446,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.4865125029210234
+          ]
+        ]
+      },
+      "matrix_names": {
+        "bal": {
+          "rows": [
+            "lnincome",
+            "age15to24",
+            "beer",
+            "retprice",
+            "cigsale(1980)",
+            "cigsale(1975)"
+          ],
+          "cols": [
+            "Vweight",
+            "Treated",
+            "ValueSyntheticControl",
+            "BiasSyntheticControl",
+            "ValueAverageControl",
+            "BiasAverageControl"
+          ]
+        },
+        "U_wt": {
+          "rows": [
+            "Utah",
+            "Nevada",
+            "Connecticut",
+            "Wisconsin",
+            "Colorado"
+          ],
+          "cols": [
+            "Weight"
+          ]
+        },
+        "V_wt": {
+          "rows": [
+            "lnincome",
+            "age15to24",
+            "beer",
+            "retprice",
+            "cigsale(1980)",
+            "cigsale(1975)"
+          ],
+          "cols": [
+            "lnincome",
+            "age15to24",
+            "beer",
+            "retprice",
+            "cigsale(1980)",
+            "cigsale(1975)"
+          ]
+        }
+      }
+    }
+  }
+}

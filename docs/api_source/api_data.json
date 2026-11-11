@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.4",
+  "westata_version": "0.3.6",
   "exports": [
     {
       "name": "AIPW",
@@ -620,7 +620,7 @@
       "kind": "class",
       "module": "westata.postestimation.ovtest",
       "docstring": "Ramsey's RESET test.\n\nAttributes\n----------\nstatistic, df, df_denom, pvalue:\n    The F statistic, its numerator and denominator degrees of freedom, and\n    the upper-tail p-value.\nomitted:\n    Human-readable description of what the powers were taken of, matching\n    Stata's ``Omitted:`` line.",
-      "signature": "(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str') -> 'None'",
+      "signature": "(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str', dropped: 'Sequence[str]' = ()) -> 'None'",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -982,11 +982,26 @@
       ]
     },
     {
+      "name": "Synth2Result",
+      "kind": "class",
+      "module": "westata.estimators.synth2",
+      "docstring": "Outcome of :func:`synth2`.\n\nField names mirror Stata's ``e()`` verbatim.  Note ``synth2`` calls\n``ereturn clear`` (``synth2.ado:330``) and therefore does NOT expose\n``synth``'s ``e(Y_synthetic)``/``e(V_matrix)`` etc. -- only its own\nsurface below, plus ``synth_result`` for callers who need the raw fit.",
+      "signature": "(N: 'int', T: 'int', T0: 'int', T1: 'int', K: 'int', J: 'int', rmse: 'float', r2: 'float', att: 'float', bal: 'np.ndarray', U_wt: 'np.ndarray', V_wt: 'np.ndarray', mspe: 'np.ndarray | None' = None, pval: 'np.ndarray | None' = None, Y_treated: 'np.ndarray | None' = None, Y_synthetic: 'np.ndarray | None' = None, time_index: 'np.ndarray | None' = None, placebo_probability: 'float | None' = None, placebo_removed: 'tuple[Any, ...]' = (), mspe_names: 'tuple[str, ...]' = (), time_placebo: 'dict[float, dict[str, np.ndarray]]' = <factory>, loo_min: 'np.ndarray | None' = None, loo_max: 'np.ndarray | None' = None, loo_effect_min: 'np.ndarray | None' = None, loo_effect_max: 'np.ndarray | None' = None, loo_n_runs: 'int' = 0, loo_units: 'tuple[Any, ...]' = (), synth_result: 'SynthResult | None' = None, method: 'str' = 'regression', numerically_inactive: 'tuple[str, ...]' = ()) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        }
+      ]
+    },
+    {
       "name": "SynthResult",
       "kind": "class",
       "module": "westata.estimators.synth",
       "docstring": "Outcome of :func:`synth`.\n\nField names mirror Stata's ``e()`` matrices verbatim.  Note ``V_matrix``\n(there is no plain ``e(V)``).  ``synth`` has no coefficient vector, no\ncovariance matrix and no degrees of freedom; those statsmodels-style\nattributes are deliberately ABSENT rather than fabricated.",
-      "signature": "(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray') -> None",
+      "signature": "(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, qp_solver: 'str' = 'SLSQP', unit_labels: 'tuple[str, ...]' = (), unit_codes: 'tuple[Any, ...]' = (), numerically_inactive: 'tuple[str, ...]' = (), stata_predictor_names: 'tuple[str, ...]' = ()) -> None",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -1631,8 +1646,15 @@
       "name": "synth",
       "kind": "function",
       "module": "westata.estimators.synth",
-      "docstring": "Fit a synthetic control (Stata ``synth``, default path).\n\nParameters mirror Stata's syntax but are Python keyword arguments.  See the\nmodule docstring and the B-grade design spec for the evidence level (E2),\nmeasured tolerances and the list of refused options.",
-      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, figure: 'bool' = False, keep: 'str | None' = None, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
+      "docstring": "Fit a synthetic control (Stata ``synth``), extended feature set.\n\nImplements Stata's default path plus ``unitnames()``, per-predictor\n``var(period)`` windows, ``keep()``, the four optimiser settings and an\nalgorithm-equivalent ``nested`` / ``allopt`` outer V search.  Graphics and\n``synth2``'s placebo/LOO remain out of scope.\n\nEvidence grading is per quantity and MEASURED, never assumed: see\n``tests/conformance/registry.yml``.  ``nested``/``allopt`` and RMSPE cannot\nbe bit-identical to Stata (closed-source ``ml`` optimiser + rank-deficient\nQP + non-deterministic C++ plugin); they are E2 by construction.",
+      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
+    },
+    {
+      "name": "synth2",
+      "kind": "function",
+      "module": "westata.estimators.synth2",
+      "docstring": "Fit Stata ``synth2``'s NON-GRAPHICS feature set.\n\nAll optimisation is delegated to :func:`westata.synth`.  See the module\ndocstring and ``docs/superpowers/specs/2026-11-11-synth2-design.md`` for\nthe per-quantity evidence grading and the exact ado formulas.",
+      "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None, **unsupported: 'Any') -> 'Synth2Result'"
     },
     {
       "name": "tebalance_summarize",
@@ -3636,6 +3658,20 @@
       "en": "The four sections of Stata's `ereturn list` for one estimation result: scalars as `e(name) = value`, macros as `e(name) : \"text\"`, matrices as `e(name) : r x c`, and functions as bare names. WHICH scalars a command publishes is its own decision, and Stata's choice is narrower than the full `e()` dictionary, so the printed block is a faithful subset rather than a dump. The whole block opens with a blank line, as Stata's does.",
       "zh": "单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : \"text\"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。",
       "example": "r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr.ereturn_list()"
+    },
+    "synth2": {
+      "stata": "synth2 y x1 x2, trunit(1) trperiod(2005)",
+      "en": "Stata `synth2`'s NON-GRAPHICS feature set. `synth2` is a wrapper: all optimisation is delegated to `ws.synth`, and it adds fit statistics (`rmse`/`r2`/`att`), a 6-column covariate balance table (`bal`), non-zero unit weights (`U_wt`), the V diagonal (`V_wt`), in-space placebo (fake treatment units -> `mspe` + pointwise two/right/left p-values `pval`, with optional `cut()`), in-time placebo (`placebo('period(2001)')`, re-estimation only, no inference), and leave-one-out min/max envelopes (`loo=True`). Options map to Stata's: `counit`, `preperiod`, `postperiod`, `xperiod`, `mspeperiod`, `customV`, `nested`, `allopt`, and the four optimiser settings. Returns a `Synth2Result` frozen dataclass. Graphics-only options (`figure`/`nofigure`/`savegraph`/`show`) and Stata `frame()`/`symbol()` are deliberately refused/omitted; all results are attributes of the returned object. Evidence grade E2 by quantity: the formula layer (bal/U_wt/V_wt) reaches machine precision, while the re-fit chain inherits `ws.synth`'s rank-deficient-QP differences.",
+      "zh": "Stata `synth2` 的非图形功能实现。`synth2` 是包装器：全部优化委托给 `ws.synth`，自身增加拟合统计量（`rmse`/`r2`/`att`）、6 列协变量平衡表（`bal`）、非零单位权重（`U_wt`）、V 对角矩阵（`V_wt`）、空间安慰剂（假处理单位 -> `mspe` + 逐期双侧/右侧/左侧 p 值 `pval`，可选 `cut()`）、时间安慰剂（`placebo('period(2001)')`，仅重估、无推断）以及留一法逐期 min/max 包络（`loo=True`）。选项与 Stata 对应：`counit`、`preperiod`、`postperiod`、`xperiod`、`mspeperiod`、`customV`、`nested`、`allopt` 及四个优化器参数。返回冻结的 `Synth2Result`。纯图形选项（`figure`/`nofigure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()` 明确拒绝/不实现，全部结果由结果对象属性承载。证据等级按量定为 E2：公式层（bal/U_wt/V_wt）达机器精度，重跑链路继承 `ws.synth` 秩亏 QP 的差异。",
+      "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).rmse",
+      "notes_en": "`synth2.ado:330` calls `ereturn clear` and wipes `synth`'s e(); the Python result surface is synth2's own, plus `synth_result` for the raw fit. `R2` uses the SYNTHETIC outcome's pretreatment deviations as denominator (ado:647, non-standard). Aggregate probability and pointwise p-values INCLUDE the treated unit in the denominator with >= comparisons (ado:441/940/947-949). In-time placebo produces NO mspe/pval. `frame()`/`symbol()` are Stata-specific result-dataset mechanisms, replaced by Synth2Result attributes.",
+      "notes_zh": "`synth2.ado:330` 用 `ereturn clear` 清空 `synth` 的 e()，Python 结果面是 synth2 自己的，另附 `synth_result` 保留原始拟合。`R2` 分母是合成值的处理前离差（ado:647，非标准）。聚合概率与逐期 p 值把处理组自身计入分母且用 >= 比较（ado:441/940/947-949）。时间安慰剂不产生 mspe/pval。`frame()`/`symbol()` 是 Stata 特有的结果数据集机制，由 Synth2Result 属性替代。"
+    },
+    "Synth2Result": {
+      "stata": "ereturn list -- the e() surface synth2 stores (synth's e() is wiped)",
+      "en": "Frozen dataclass holding the outcome of `synth2`. Field names mirror Stata's `e()` verbatim: scalars `N/T/T0/T1/K/J/rmse/r2/att`, matrices `bal` (K x 6), `U_wt`, `V_wt`, `mspe` (in-space placebo only), `pval` (in-space placebo only), trajectories `Y_treated`/`Y_synthetic`/`time_index` with a `gap` property, placebo fields (`placebo_probability`, `placebo_removed`, `mspe_names`, `time_placebo`), LOO envelopes (`loo_min`/`loo_max`/`loo_effect_min`/`loo_effect_max`/`loo_n_runs`), and audit fields (`synth_result`, `method`, `numerically_inactive`). `summary()` renders a compact Stata-style report. It is NOT a `StataResults`: no `params`, `bse`, `cov_params` or `df_resid` are fabricated. The 6 `bal` columns are `Vweight, Treated, ValueSyntheticControl, BiasSyntheticControl, ValueAverageControl, BiasAverageControl`; `Bias% = (Value/Treated - 1)*100` (ado:181).",
+      "zh": "保存 `synth2` 结果的冻结 dataclass（`synth` 的 e() 已被清空）。字段逐字对应 Stata 的 `e()`：标量 `N/T/T0/T1/K/J/rmse/r2/att`，矩阵 `bal`（K x 6）、`U_wt`、`V_wt`、`mspe`（仅空间安慰剂）、`pval`（仅空间安慰剂），轨迹 `Y_treated`/`Y_synthetic`/`time_index` 及 `gap` 属性，安慰剂字段（`placebo_probability`、`placebo_removed`、`mspe_names`、`time_placebo`），留一包络（`loo_min`/`loo_max`/`loo_effect_min`/`loo_effect_max`/`loo_n_runs`），以及审计字段（`synth_result`、`method`、`numerically_inactive`）。`summary()` 渲染紧凑的 Stata 风格报表。它不是 `StataResults`：不伪造 `params`、`bse`、`cov_params`、`df_resid`。`bal` 的 6 列为 `Vweight, Treated, ValueSyntheticControl, BiasSyntheticControl, ValueAverageControl, BiasAverageControl`；`Bias% = (Value/Treated - 1)*100`（ado:181）。",
+      "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nres = ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)\nres.bal"
     }
   }
 }

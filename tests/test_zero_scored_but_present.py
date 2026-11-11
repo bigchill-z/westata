@@ -9,9 +9,12 @@ C11-08  predict p / pr            WORKS, two spellings plus the default
 C20-02  to_markdown/to_latex      WORKS (round 212)
 
 STILL GENUINELY ABSENT, and confirmed absent rather than assumed:
-C18-01/02  synth, synth2          no such symbol in the package at all
 C12-11     xtserial               no such symbol
 C15-03     caliper                no such argument
+
+SINCE IMPLEMENTED (both were 0.00 in the original snapshot):
+C18-01     synth                  landed 2026-11-09 (default + extended, E2)
+C18-02     synth2                 landed 2026-11-11 (non-graphics, E2)
 
 STILL OPEN, not re-audited this round:
 C12-09     xtreg ..., fe i.year   per-year coefficient rows are absorbed by PanelOLS
@@ -66,11 +69,13 @@ def test_predict_p_matches_the_manual_link_inverse(logit_fit) -> None:
 def test_the_absent_features_are_still_absent() -> None:
     """Pinned so that 'not implemented' is a checked statement rather than an assumption.
 
-    ``synth`` was removed from this list on 2026-11-09 when the B-grade default
-    path landed (it is now covered by tests/test_synth.py and the E2 fixture
-    comparisons).  ``synth2`` and ``xtserial`` remain deliberately absent.
+    ``synth`` was removed on 2026-11-09 (B-grade default path) and ``synth2``
+    on 2026-11-11 (non-graphics feature set); both are now covered by their
+    own tests and E2 fixture comparisons.  Only ``xtserial`` remains absent.
     """
 
-    for name in ("synth2", "xtserial"):
+    for name in ("xtserial",):
         assert not hasattr(ws, name), f"{name} now exists -- update the report row"
+    assert callable(ws.synth)
+    assert callable(ws.synth2)
     assert callable(ws.synth)

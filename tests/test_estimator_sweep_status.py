@@ -54,7 +54,15 @@ def test_continuous_models_render_identically(frames, model: str) -> None:
     cls = getattr(ws, model)
     rendered = str(cls.from_formula("lnw ~ s + expr", small).fit().summary(style="stata"))
     assert "Coefficient  Std. err." in rendered
-    assert rendered.startswith("\n")
+    # A count model fed a continuous response opens with Stata's noncount note, not a blank line.
+    # Live capture: `poisson y x` with a uniform(1,5) y starts with
+    #   'note: noncount dependent variable encountered; if you are fitting an'
+    # so the old `startswith("\n")` assertion was only true when no note fired.
+    assert (
+        rendered.startswith("\n")
+        or rendered.startswith("note:")
+        or rendered.startswith("Iteration 0:")
+    ), rendered.splitlines()[0]
 
 
 @pytest.mark.parametrize("model", ["Logit", "Probit"])

@@ -102,20 +102,98 @@ six `e()` matrices compare as follows:
 
 | Quantity | Measured bound | Observed worst |
 |---|---|---|
-| `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) |
-| `e(W_weights)` | `|dW| <= 1e-3` | **0** at Stata's 3-dp display rounding |
-| `e(X_balance)`, `e(Y_synthetic)` | `<= 1e-3` | follows from the rounded W |
-| `e(RMSPE)` | `|d| <= 1e-2` | 5.6e-4 |
+| `e(V_matrix)` | `|dV| <= 1e-10` | ~1e-13 (the two compiled Mata kernels were solved exactly) — **machine precision** |
+| `e(W_weights)` | `|dW| <= 2e-2` | **0** in 6 of 8 measured cases; worst 9e-3 in the two near-rank-1 pools |
+| `e(X_balance)`, `e(Y_synthetic)` | `<= 4e-1` | 0 / 3e-14 in 6 of 8 cases; worst 2.9e-1 |
+| `e(RMSPE)` | `|d| <= 1e-1` | 3.6e-4 on well-posed pools; worst 6.9e-2 |
 
-RMSPE is the one quantity that cannot be quoted as Stata's. `H = Xco' V Xco`
-has rank `<= K << J`, so the QP optimum is not unique; Stata's C++ interior-point
-plugin stops off the optimal face at `margin=0.005`, while scipy's SLSQP solves
-it more tightly. Stata's own two identical runs already differ by `1.471e-11`.
-**E3 / bit-for-bit reproduction is therefore excluded.** Use `e(W_weights)`,
-`e(V_matrix)` and the balance table; treat RMSPE as an approximate fit statistic.
+**2026-11-11 refinement.**  The two divergent cases had `Vmax > 0.98`: `H` is
+effectively rank 1, so the QP optimum face is very high-dimensional.  Stata's
+Vanderbei/LOQO **interior-point** plugin returns an early-stopped dense iterate
+(one dominant weight + 1e-3 weights on nearly all controls); scipy SLSQP
+converged to a sparse vertex.  Both are on the SAME optimal face (QP objective
+agrees to ~1e-6).  An adaptive primal-dual interior-point solver, stopped on
+the complementarity gap derived from Stata's public `margin=0.005`, reproduces
+that trajectory; SLSQP is retained when `Vmax <= 0.98` because it already
+matches exactly there.  `SynthResult.qp_solver` records the choice.  Measured
+improvement: dW 0.176/0.081 -> **0.009/0.003**, RMSPE 0.474/0.336 ->
+**0.0096/0.0688**, with zero regression on the 6 exact cases.
 
-`synth, nested` / `allopt`, `synth2`, figures, `keep()` and placebo raise
-`UnsupportedError`. See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
+**E3 / bit-for-bit reproduction as a whole-command claim is still excluded**
+(QP optimum non-unique), but `V` and 6 of 8 `W`/`X_balance`/`Y_synthetic`
+values ARE at machine precision — see
+[test_stata_synth_features.py](../tests/conformance/test_stata_synth_features.py)
+for the per-quantity grading.
+
+**Correction (2026-11-10):** an earlier version said "Stata's own two identical
+runs differ by 1.471e-11". A 16-case live capture found that to be
+data/setup-specific: the same default command run twice gave identical RMSPE
+(`19.73684845951759`, difference 0.0). The default path IS deterministic;
+changing `sigf(7)` shifts RMSPE by 2.1e-3 while `roundmat()` keeps
+`e(W_weights)` identical. The reason E3 is still excluded is QP
+non-uniqueness, not a jittery reference.
+
+**Extended feature set (2026-11-10/11):** `unitnames()`, `var(period)`
+(single / `&` / numlist), `keep()`/`replace`, `margin`/`maxiter`/`sigf`/`bound`,
+`ml` options (`technique`/`iterate`/`nrtolerance`/`nonrtolerance`/`difficult`/
+`search`/`trace`), missing-value warnings and an algorithm-equivalent
+`nested`/`allopt` outer V search are now implemented. `nested allopt`
+reproduces Stata's `W` exactly and RMSPE to 3.5e-9; plain `nested` reaches a
+LOWER loss than Stata's single-start `wrapml` (6.2580 vs 6.5268) — E2, not
+bit-identical.
+
+`keep()` now matches Stata's exported `.dta` cell-for-cell: it is a
+**side-by-side** layout with `max(J, T)` rows (not a vertical `J+T`
+concatenation), and `_Co_Number` is a labelled numeric column.  Without
+`unitnames()`, Stata derives the unit labels from the `.dta` file's value-label
+set, which a plain DataFrame does not carry; pass `unitnames()` to reproduce
+the displayed names.
+
+**Explicitly flagged as numerically inactive** (`SynthResult.numerically_inactive`):
+`sigf`/`margin`/`bound` shift Stata's RMSPE through its C++ interior-point
+plugin's convergence, and `technique()` switches Stata's closed-source `ml`
+optimiser.  Our SLSQP/Powell solvers have no counterpart, so these options
+are accepted, validated and RECORDED but do not change any number.  They are
+NOT approximated — an `ftol` sweep was non-monotonic and a single-start
+Powell sweep never lands on Stata's nested RMSPE, so faking a match would be
+coefficient-fitting.
+
+## `synth2` — non-graphics feature set (2026-11-11)
+
+`ws.synth2` implements the full NON-GRAPHICS surface of Stata `synth2`
+(v2.1.0).  `synth2` is a WRAPPER: all optimisation is delegated to
+`ws.synth`, and it adds fit statistics (`rmse`/`r2`/`att`), a 6-column
+covariate balance table (`bal`), non-zero unit weights (`U_wt`), the V
+diagonal (`V_wt`), in-space placebo (`mspe` + pointwise two/right/left
+`pval`, with `cut()`), in-time placebo (re-estimation only, NO inference),
+and leave-one-out min/max envelopes.
+
+**Measured grading** (5 live captures, California/ADH2010 specification;
+see [test_stata_synth2.py](../tests/conformance/test_stata_synth2.py)):
+
+| Quantity | Measured | Grade |
+|---|---|---|
+| `e(N/T/T0/T1/K/J)` | exact | machine precision |
+| `e(bal)` | <= 6.6e-14 | machine precision |
+| `e(U_wt)` | exact | machine precision |
+| `e(V_wt)` | <= 1.2e-14 | machine precision |
+| `e(r2)` / `e(att)` | <= 1.4e-8 / 2.7e-7 | E2 (inherits synth RMSPE) |
+| `e(rmse)` | <= 2.7e-5 | E2 |
+| `e(pval)` | <= 3.8e-6 (no cutoff), <= 1.8e-2 (cut(2)) | E2 |
+| `e(mspe)` | per-row max|d| median 1.5e-3, 80% <= 1e-2, max 2.1e1 on 2 of 39 degenerate fake units | E2 |
+
+Three semantic traps are transcribed verbatim from `synth2.ado` and pinned
+by mutation tests: (1) `R2`'s denominator is the **synthetic** outcome's
+pretreatment deviations (`:647`, non-standard); (2) the aggregate probability
+and pointwise p-values **include the treated unit** in the denominator with
+`>=` comparisons (`:441/940/947-949`); (3) `ereturn clear` (`:330`) wipes
+`synth`'s e(), so the result surface is `synth2`'s own.
+
+Graphics-only options (`figure`/`nofigure`/`savegraph`/`show`/`graphlist`)
+and Stata's `frame()`/`symbol()` result-dataset mechanism are deliberately
+refused/omitted — all results are attributes of the returned
+`Synth2Result`.  Only graphics remain out of scope.
+See the [synth2 design spec](superpowers/specs/2026-11-11-synth2-design.md).
 
 ---
 

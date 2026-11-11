@@ -7,6 +7,293 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — `ws.synth2` non-graphics feature set (2026-11-11)
+
+Goal: "implement synth2's non-graphics features".  Design approved in
+`docs/superpowers/specs/2026-11-11-synth2-design.md`; three decisions were
+made up front (full non-graphics scope, per-quantity measured grading against
+live Stata, and `frame()`/`symbol()` replaced by result-object attributes).
+
+### Added
+* `ws.synth2` / `Synth2Result`: a frozen dataclass exposing Stata `synth2`'s
+  own e() surface.  `synth2` is a WRAPPER -- all optimisation is delegated to
+  `ws.synth` (`synth2.ado:157/269/417/516`) -- so it adds NO estimator.
+* Fit statistics (`rmse`/`r2`/`att`) per `synth2.ado:636-672/753`, including
+  the NON-standard `R2` whose denominator is the SYNTHETIC outcome's
+  pretreatment deviations (`:647`).
+* 6-column covariate balance table (`bal`) per `:174-183` with
+  `Bias% = (Value/Treated - 1)*100` and the "Average Control" column.
+* `U_wt` (non-zero unit weights, descending) and `V_wt` (V diagonal).
+* **In-space placebo**: re-run `synth` for every fake treatment unit, build
+  the `mspe` matrix `[PreMSPE, PostMSPE, RatioPostPre, RatioTrCtrl]`, apply
+  `cut()` filtering, compute the aggregate probability and pointwise
+  two-sided / right-sided / left-sided `pval` (`:409-459`, Mata `:935-960`).
+  The treated unit is INCLUDED in every denominator with `>=` comparisons.
+* **In-time placebo**: re-run `synth` for each fake treatment period, exposing
+  the re-estimated trajectories.  NO mspe/pval (`:502-552`), pinned by a test.
+* **Leave-one-out**: re-run `synth` excluding each positive-weight donor,
+  returning per-period min/max envelopes (`:261-299`).
+* Full Stata input-validation contract (`:61-132`): `trunit`/`trperiod`
+  presence, `counit`/`ctrlunit` conflict, `preperiod`/`postperiod` row deletion,
+  placebo `period()` < trperiod, `cutoff` >= 1.
+* Graphics-only options explicitly refused: `figure`/`nofigure`/`savegraph`/
+  `show`/`symbol`/`frame`.
+
+### Evidence
+* 5 full-precision live-StataNow-19.5 captures
+  (`tests/conformance/stata_fixtures/synth2_*.json`): main, `placebo(unit)`,
+  `placebo(unit cut(2))`, `placebo(period(1985))`, `loo` (+ frame envelopes).
+  `scripts/capture_synth2_fixtures.py` regenerates them.
+* `tests/conformance/test_stata_synth2.py` compares every e() quantity;
+  `tests/test_synth2.py` (35 unit tests, TDD) pins the formulas, validation
+  paths and two mutation guards (R2 denominator, p-value self-inclusion).
+* MEASURED per-quantity bounds: `e(N/T/T0/T1/K/J)` exact; `e(bal)` <= 6.6e-14,
+  `e(U_wt)` exact, `e(V_wt)` <= 1.2e-14 (machine precision); `e(r2)` <= 1.4e-8,
+  `e(att)` <= 2.7e-7, `e(rmse)` <= 2.7e-5; `e(pval)` <= 3.8e-6 (no cutoff)
+  / <= 1.8e-2 (cut(2)); `e(mspe)` per-row max|d| median 1.5e-3, 80% <= 1e-2,
+  max 2.1e1 on 2 of 39 degenerate fake units (rank-deficient QP, same E2 root
+  cause as `synth`).  E3 excluded as a whole-command claim.
+* Registry 96 -> 97 entries (E2 27 -> 28); `NO_TABLE["synth2"]` added.
+* Two "absence guards" (`test_the_two_missing_features.py`,
+  `test_zero_scored_but_present.py`) converted to presence + behaviour checks.
+
+### Fixed (while implementing)
+* `_average_control_means` used the global `xperiod` window for predictors
+  carrying their own `(period)` suffix, producing NaN for `cigsale(1975)`.
+  Stata's `synth2_balance` (`:574-575`) uses each predictor's OWN window.
+* `ws.synth`'s QP feasibility check rejected SLSQP's benign ~4e-4 equality
+  residual BEFORE clip+renormalisation, which broke in-space placebo re-fits
+  on some degenerate fake units.  Fixed by normalising first and refusing only
+  a genuinely infeasible point.  No regression on the existing 218 tests.
+* `synth2`'s `control_units` were in first-appearance order (year-major panel),
+  mis-aligning the `mspe` rows.  Now sorted like Stata's `levelsof`.
+
+### Result
+Full `pytest -q` green (see the release run).  Graphics remain out of scope;
+external PyPI/GitHub push is still blocked by the environment (GitHub TLS +
+missing PyPI token) and is a separate confirmation.
+
+---
+
+## [Unreleased] — close the remaining non-graphics gaps (2026-11-11)
+
+Goal: "finish the remaining gaps by priority".  Three items, done in order.
+
+### P1 — `keep()` layout bug (FIXED)
+
+The previous implementation wrote a **69-row vertical concatenation**
+(J + T).  Live StataNow 19.5 shows `keep()` uses `svmat` to append the weight
+and outcome blocks as COLUMNS starting at row 0, giving **38 rows = max(J, T)**
+for J=38, T=31: `_Co_Number`/`_W_Weight` populated on all 38 rows,
+`_Y_treated`/`_Y_synthetic`/`_time` on the first 31.  Verified cell by cell
+against a fresh live capture: shape `(38,5)`, non-null counts
+`38/38/31/31/31`, `_Y_synthetic[0] = 133.07500119018556` (full precision),
+`_time` 1970..2000, trailing rows NaN.
+
+Also fixed: `_Co_Number` is now a NUMERIC column with Stata VALUE LABELS
+(`to_stata(value_labels=...)`), not a string column that silently turned
+trailing rows into empty strings.  `SynthResult.unit_labels` / `unit_codes`
+carry the labels.  With `unitnames()` the labels are the supplied strings;
+without it Stata derives labels from the `.dta` file, which a plain DataFrame
+does not carry, so the codes are shown (documented, not faked).
+
+**Corrected an earlier mis-statement**: this capture found
+`e(Y_synthetic)[0] == keep _Y_synthetic[0] == 133.07500119018556`.
+A previous note claimed `keep()` used a pre-roundmat W — that was specific to
+an earlier capture and is NOT a general rule.
+
+### P2 — `ml` optimisation options (ADDED)
+
+Stata's `synth.ado:41` forwards arbitrary `ml maximize` options via `*` and
+`:434` parses them with `mlopts`; `wrapml` passes them to `ml model d0`.
+Measured live: `technique(bfgs)` changes nested RMSPE
+(6.5268 -> 6.2639), `iterate(2)` changes it (6.5630), while
+`nonrtolerance` / `difficult` / `search(on)` do not change the single-start
+result.  `westata.synth` now accepts, validates and RECORDS
+`technique` / `iterate` / `nrtolerance` / `nonrtolerance` / `difficult` /
+`search` / `trace` on the nested/allopt path.  `iterate()` maps faithfully to
+the outer optimiser's iteration budget.  Rejected on the non-nested path
+(they would be inert there).
+
+### P3 — the irreducible boundaries (ASSESSED, documented not faked)
+
+* **Fixed a real bug**: a small `maxiter` (e.g. 10) used to truncate SLSQP and
+  silently return an unconverged W (RMSPE 16.5 instead of 19.7).  Stata's
+  `maxiter(10)` and `maxiter(1000)` give IDENTICAL results, so `maxiter` is now
+  an upper bound with a safe SLSQP floor plus an explicit infeasibility check.
+  A regression test pins this.
+* **Assessed and stopped**: `sigf` / `margin` / `bound` shift Stata's RMSPE
+  through its C++ interior-point plugin's convergence (measured
+  `sigf(7) -2.1e-3`, `margin(0.05) +4.6e-8`, `bound(1) +5.3e-8`), and
+  `technique()` switches Stata's closed-source `ml` NR/DFP/BFGS optimiser.
+  Our SLSQP/Powell solvers have no counterpart.  An `ftol` sweep gave a
+  NON-MONOTONIC, chaotic RMSPE response (no faithful mapping), and a
+  single-start Powell sweep never lands on Stata's nested RMSPE 6.5268
+  (it converges to 6.2580).  Forcing a match would be coefficient-fitting,
+  which this project refuses.  These options are ACCEPTED and RECORDED, and
+  `SynthResult.numerically_inactive` explicitly flags the ones that do not
+  move any number.
+
+### Result
+
+`keep()` now reproduces Stata's exported file cell-for-cell.  All `ml`
+options Stata accepts are accepted.  The remaining gap is confined to
+Stata's closed-source optimiser semantics and is explicitly flagged rather
+than approximated.
+
+---
+
+## [Unreleased] — adaptive interior-point QP refinement (2026-11-11)
+
+Goal: "further approach" the two remaining E2 gaps.  Root cause found and
+reproduced with a **principled** solver change (not coefficient fitting).
+
+**Diagnosis.**  In the two divergent cases `V` is concentrated on one
+predictor (`Vmax` = 0.992 / 0.989), so `H = Xco' V Xco` is effectively rank 1
+and the QP optimum face is very high-dimensional.  Stata's `synthopt.plugin`
+is a Vanderbei/LOQO **interior-point** solver (`synth.sthlp:264-266`) and
+returns an EARLY-STOPPED interior iterate: one dominant weight (0.65 / 0.82)
+plus tiny (1e-3) weights spread across 33-37 of 38 controls.  scipy SLSQP
+instead converges to a sparse vertex (9 / 3 nonzero weights).  Both are on
+the same optimal face (QP objective agrees to ~1e-6), so the difference is
+which point on the face is selected, not the optimum value.
+
+**Fix.**  `_solve_w_interior()` runs the primal-dual log-barrier Newton system
+and stops when the complementarity gap falls below a threshold derived from
+Stata's public `margin=0.005`.  `synth()` selects it adaptively when
+`Vmax > 0.98` (a property of the data, not a per-case switch) and keeps SLSQP
+otherwise, because SLSQP already matches Stata EXACTLY on the other 6 cases.
+`SynthResult.qp_solver` records which path was used.  The gap stop is stable
+across two orders of magnitude of the threshold (measured 1e-6..1e-2), i.e.
+a trajectory feature rather than a tuned constant.
+
+**Re-measured grading (8 cases):**
+
+| Quantity | before | after |
+|---|---|---|
+| `W_weights` worst | 1.76e-1 | **9e-3** |
+| `X_balance` worst | 1.8e-1 | **9.3e-2** |
+| `Y_synthetic` worst | 1.8e0 | **2.9e-1** |
+| `RMSPE` worst | 4.74e-1 | **6.9e-2** |
+| `V_matrix` worst | 1.4e-13 | 1.4e-13 (unchanged, machine precision) |
+| cases with W exact | 6/8 | 6/8 (unchanged — no regression) |
+
+`nested` / `allopt` unchanged.  Registry tolerance `5e-1 -> 1e-1`; conformance
+tolerances tightened to the measured values (`ATOL_W 2e-2`, `ATOL_DERIVED 4e-1`,
+`ATOL_RMSPE 1e-1`) so a future regression is caught.
+
+---
+
+## [Unreleased] — extended `synth` feature set (2026-11-10)
+
+Goal: "implement all Stata `synth` features except graphics, keeping numerical
+differences as close to machine precision as possible".  That literal target
+was **corrected before execution** (AGENTS.md §0/§7): machine precision is not
+physically attainable for RMSPE because `H = Xco' V Xco` is rank-deficient
+(rank <= K << J), so the QP optimum is non-unique and Stata's C++ plugin stops
+off the optimal face at `margin=0.005`.  The approved scope is A-E with
+per-quantity measured grading.
+
+### Added
+* `unitnames()` — string labels on `W_weights` rows ONLY; all numbers unchanged.
+* `var(period)` predictors — single period, `&` concatenation and
+  `a(b)c` numlist windows; each window is ONE predictor (K counts windows).
+  Verbatim Stata `e(V_matrix)` row names preserved in
+  `SynthResult.stata_predictor_names`.
+* `keep()` / `replace` — the stacked 5-column results `.dta`
+  (`_Co_Number`, `_W_Weight`, `_Y_treated`, `_Y_synthetic`, `_time`). NOT a graph.
+* `margin` / `maxiter` / `sigf` / `bound` exposed as validated parameters
+  (defaults from `synth.ado:35-38`, not the stale 2014 help file).
+* `missing_warnings` — the `-ignored for averaging` messages Stata's
+  `missingchecker` prints; `method` / `optimizer_settings` for auditability.
+* `nested` / `allopt` — algorithm-equivalent outer V search (Powell over the
+  `synth_ll.ado:27` objective), NOT Stata's closed-source `ml model d0`.
+
+### Fixed
+* **Unit row ordering**: `e(W_weights)` rows now follow Stata's `levelsof`
+  ascending order (`synth.ado:53,62-64`).  A year-major long panel's
+  first-appearance order had silently permuted the rows; V was already exact
+  (~1e-13) while W appeared to differ by 0.4-0.8.  See `error.md`.
+
+### Measured grading (16 new live captures, `synth_features.json`)
+| Quantity | Measured | Grade |
+|---|---|---|
+| `V_matrix` | <= 1.4e-13 on all 9 comparable cases | machine precision |
+| `W_weights` | exactly 0 in 7/9 cases; worst 1.76e-1 in 2 degenerate donor pools | E2 overall |
+| `X_balance` / `Y_synthetic` | 0 / 3e-14 in 7/9; worst 1.8e0 | follows W |
+| `RMSPE` | <= 3.6e-4 on well-posed pools; worst 4.74e-1 | E2 |
+| `nested allopt` W / RMSPE | dW = 0, dRMSPE = 3.5e-9 | near machine precision |
+| `nested` | our loss 6.2580 < Stata 6.5268 (single-start `wrapml`) | E2, algorithm-equivalent |
+
+**Correction to the 0.3.6 notes**: the claim "two identical Stata runs differ
+by 1.471e-11" was data/setup-specific.  The extended capture ran the same
+default command twice and got identical RMSPE (difference 0.0); `sigf(7)`
+shifts RMSPE by 2.1e-3 while `roundmat()` keeps `e(W_weights)` identical.
+The default path IS deterministic; E3 is still excluded as a whole-command
+claim because of QP non-uniqueness, not a jittery reference.
+
+Still refused: `figure` (graphics, explicitly out of scope), `synth2`'s
+placebo/LOO, and any inferential quantity (Stata `synth` has no `e(V)`).
+
+---
+
+## [0.3.6] - 2026-11-10
+
+### Added — `ws.synth` (B grade, evidence E2), plus the documentation pipeline fixes
+
+This release publishes the synthetic-control work that was committed as `7aa470b`
+(and the four subsequent `ovtest` / `prais` documentation commits) under a fresh
+version number. PyPI 0.3.5 already carried `ws.synth`; 0.3.6 is the first release
+whose source tree matches the full committed documentation set.
+
+* **`ws.synth` / `SynthResult`** implement Stata `synth`'s DEFAULT path
+  (regression-based V + inner constrained QP) and expose the six `e()` matrices
+  verbatim: `V_matrix`, `W_weights`, `X_balance`, `RMSPE`, `Y_treated`,
+  `Y_synthetic`, plus `gap`. No coefficient VCE or inference is fabricated.
+* The two compiled Mata kernels were **solved exactly** by black-box
+  identification against live StataNow 19.5: `normalize()` = sample SD (ddof=1)
+  of `[treated | controls]`; `regsval()` = normalised sum of SQUARED per-period
+  multivariate cross-sectional OLS coefficients. `scripts/verify_synth_mata_formulas.py`
+  verifies both in pure Python without a Stata licence (4/4, ~8e-14).
+* Six full-precision Stata captures committed in
+  `tests/conformance/stata_fixtures/synth_*.json`; `StataCapture.capture_matrices()`
+  added to the oracle; `tests/conformance/test_stata_synth.py` compares every
+  quantity.
+* **E2, measured bounds**: `|dV| <= 1e-10` (observed ~1e-13), `|dW| <= 1e-3`
+  (observed 0 at Stata's 3-dp `roundmat()`), `|dRMSPE| <= 1e-2` (worst 5.6e-4).
+  The P1 design's provisional `|dRMSPE| <= 1e-8` was **falsified by measurement**
+  and widened (design S2: measure before writing): `H = Xco' V Xco` is
+  rank-deficient, so the QP optimum is non-unique and Stata's C++ plugin stops
+  off the optimal face at `margin=0.005`. **E3 / bit-for-bit is excluded** —
+  Stata's own two identical runs differ by `1.471e-11` in RMSPE.
+* Refused with `UnsupportedError`: `nested`/`allopt`, `synth2`, figures,
+  `keep()`, placebo. Rank-deficient `Sxx` raises `ConsistencyError`.
+* Registry: 96 entries (54 E3 / 27 E2 / 15 E1); `UNACCOUNTED FOR: 0`.
+* API reference: 16 previously undocumented public names now have prose; the
+  renderer emits the robust-VCE preamble itself, so a plain re-render no longer
+  deletes it. EN/ZH README, GUIDE, API, USING_WITH_STATA, GAP_REGISTER and the
+  [B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md) are
+  synced.
+* Also in this release (from the four commits after `7aa470b`): `estat ovtest, rhs`
+  collinearity notes and its guard fix, plus the `prais` iteration-log / rho
+  investigation write-ups in `NOTES_AUDIT.md`.
+
+Full suite at release: `pytest -q` green on the committed tree (5963 passed,
+3 skipped, 0 failed); doc guards 77 passed; `twine check` PASSED on both
+0.3.6 artifacts built from a clean `git archive HEAD` export.
+
+**Release status (2026-11-10)**: this version bump, the changelog and the built
+artifacts are committed locally. The external push is **NOT done**: GitHub
+`git push` failed with `Connection was reset` / `Failed to connect to
+github.com port 443` on three attempts (TCP/DNS reachable, TLS/HTTP blocked in
+this environment), and `twine upload` failed with `Credential not found for API
+token` (no `.pypirc`, no `TWINE_*`/`PYPI_API_TOKEN`, no keyring entry). PyPI
+therefore still shows 0.3.5 as latest. Pushing 0.3.6 requires a network path
+to GitHub and a PyPI API token, and must be done by the user. The 0.3.6 wheel
+and sdist are in `dist/` (gitignored).
+
+---
+
 ## [0.3.2] - 2026-11-09
 
 ### Fixed — 表格布局与格式的多样本复核（第 175–221 轮）

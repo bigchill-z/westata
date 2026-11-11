@@ -189,14 +189,18 @@ def test_custom_v_with_wrong_length_is_rejected() -> None:
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"nested": True},
-        {"allopt": True},
         {"figure": True},
-        {"keep": "out.dta"},
         {"placebo": True},
     ],
 )
 def test_unsupported_stata_options_raise_unsupportederror(kwargs) -> None:
+    """Graphics and synth2's placebo/LOO remain deliberately refused.
+
+    ``nested``/``allopt`` and ``keep()`` used to be here too; they were
+    implemented in the extended feature set (goal round 1) and are covered by
+    tests/test_synth_extended.py instead.
+    """
+
     with pytest.raises(UnsupportedError):
         synth(
             _panel(), unit="unit", time="year", depvar="y",

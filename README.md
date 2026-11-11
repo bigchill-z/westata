@@ -26,7 +26,7 @@ this in Python, do I get the same numbers Stata would print?*
 |---|---|
 | Tests | **full suite green (see `pytest -q`)** |
 | Commands covered | 96 registry entries |
-| Evidence | **54 × E3**, 27 × E2, 15 × E1 |
+| Evidence | **54 × E3**, 28 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
@@ -69,9 +69,10 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` then runs the 5936-test suite (5929 pass, 3 skip). It needs no
-Stata licence: the conformance captures are committed and replayed. Re-running the
-comparisons against live Stata (`retest/`, `docs/collect_comparison.py`) does need one.
+`python -m pytest -q` runs 6123 tests (6120 pass, 3 skip) on the committed tree.
+The conformance captures (including `synth_features.json`) are committed, so the
+suite needs no Stata licence. Re-running the comparisons against live Stata
+(`retest/`, `docs/collect_comparison.py`) does need one.
 
 ## Quick start
 
@@ -151,7 +152,7 @@ full.estat_vce().to_frame()                  # full symmetric matrix as a DataFr
 | Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |
 | Ordered | `OrderedLogit` / `OrderedProbit` | `ologit` / `oprobit` |
 | Censored | `Tobit` (self-implemented) | `tobit` |
-| Synthetic control | `synth` (default path, E2) | `synth` |
+| Synthetic control | `synth` (extended, E2 by quantity); `synth2` (non-graphics, E2 by quantity) | `synth`, `synth2` |
 | Time series | `ARIMA` / `VAR` / `VECM` / `GARCH` / `unitroot` | `arima` / `var` / `vec` / `arch` / `dfuller` |
 | Postestimation | `test` / `lincom` / `margins` / `predict` | same names |
 | Reporting | `etable` | `esttab` |
@@ -329,16 +330,31 @@ biasadj()` raises `UnsupportedError`.
 
 Not implemented, and they raise instead of approximating: Mata, the graphics
 system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
-`xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), `synth2`,
-`synth, nested`/`allopt`, general `gmm`, `nlsur`, multi-way
+`xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), graphics for
+`synth`/`synth2`, general `gmm`, `nlsur`, multi-way
 clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
-`ws.synth` **is** implemented for Stata's default (regression-based V) path at
-evidence grade **E2**: its six `e()` matrices are compared against six
-full-precision captures from StataNow 19.5.  E3 is explicitly excluded because
-Stata's C++ QP plugin is not bit-deterministic; see
-[the B-grade design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md).
+`ws.synth` implements Stata's **default path plus the extended feature set**
+(`unitnames`, `var(period)`, `keep()`/`replace`, the four optimiser settings,
+Stata's forwarded `ml` options, and an algorithm-equivalent
+`nested`/`allopt` search).  `ws.synth2` implements **`synth2`'s full
+non-graphics feature set**: fit statistics, a 6-column balance table,
+in-space placebo (with cutoff and pointwise two/right/left p-values),
+in-time placebo, and leave-one-out envelopes.  Both are graded **E2** per
+quantity against committed full-precision StataNow 19.5 captures: the formula
+layer (`V`, `bal`, `U_wt`, `V_wt`, `r2`, `att`) reaches machine precision,
+while the re-fit chain inherits `ws.synth`'s rank-deficient-QP differences
+(measured bounds in [the comparison notes](docs/USING_WITH_STATA.md) and
+`tests/conformance/registry.yml`).
+
+Options accepted but **numerically inactive** are flagged explicitly on the
+result (`SynthResult.numerically_inactive`): `sigf`/`margin`/`bound` and
+`technique()` steer Stata's closed-source C++/ml optimisers, which we do not
+reproduce; they are never faked.  E3 is excluded as a whole-command claim
+(QP optimum non-unique); see
+[the design spec](docs/superpowers/specs/2026-11-09-synth-b-design.md) and
+[the comparison notes](docs/USING_WITH_STATA.md).
 
 `docs/GAP_REGISTER.md` lists every one with its reason. Those are boundary
 statements, not a to-do list.

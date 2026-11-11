@@ -43,6 +43,13 @@ EXPECTED = {
 }
 
 
+
+# Option C prints Stata's `Iteration 0` line (and count models may print a `note:`)
+# BEFORE the banner, so the first non-blank line is no longer necessarily the banner.
+def _is_preamble(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith(("Iteration", "note:")) or stripped.startswith("      ")
+
 def _frame(n: int = 250, seed: int = 7000):
     rng = np.random.default_rng(seed)
     covariate = rng.normal(size=n)
@@ -81,7 +88,8 @@ def test_the_stata_banner_uses_that_title(frame, command: str) -> None:
     fitted = BUILDERS[command](frame)
     # Skip the leading blank line restored in round 199.
     first_line = next(
-        line for line in render_summary(fitted, style="stata").splitlines() if line.strip()
+        line for line in render_summary(fitted, style="stata").splitlines()
+        if line.strip() and not _is_preamble(line)
     ).strip()
     # The ML header is a TWO-COLUMN block: the banner shares its first line with
     # "Number of obs" (measured against Stata). Split on the run of spaces between the
@@ -98,7 +106,7 @@ def test_poisson_is_no_longer_the_generic_banner(frame) -> None:
         next(
         line
         for line in render_summary(BUILDERS["poisson"](frame), style="stata").splitlines()
-        if line.strip()
+        if line.strip() and not _is_preamble(line)
     ).strip()
     )
 

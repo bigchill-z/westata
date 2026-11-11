@@ -855,7 +855,123 @@ def _panel_design_block(result: Any) -> list[str]:
             lines.append(f"{_ll_text:<53}{'Prob > chi2':<17}= {_p:>7.4f}")
         elif _ll_text:
             lines.append(_ll_text)
+    # GROUPS WITH A CONSTANT OUTCOME ARE DROPPED IN CONDITIONAL FE, AND STATA SAYS SO FIRST.
+    # `e(N_drop)`/`e(N_group_drop)` have always been recorded here but were never printed, so a
+    # reader saw `Number of obs = 472` for a 480-row panel with no explanation. Measured on
+    # `xtlogit ybin x z, fe`:
+    #
+    #     note: multiple positive outcomes within groups encountered.
+    #     note: 1 group (8 obs) omitted because of all positive or
+    #           all negative outcomes.
+    #     (blank)
+    #     Iteration 0:  Log likelihood = -228.55058
+    #
+    # The second note wraps with a SIX-space indent under "note: ". Only the "all positive or all
+    # negative" note depends on the drop count; the "multiple positive outcomes" one is unconditional
+    # whenever the conditional likelihood retains any group with more than one success.
     return lines
+
+
+def _ml_iteration_head(result: Any) -> list[str]:
+    """The ONE ML iteration line the package can reproduce exactly (user's option C).
+
+    Stata's logit/probit/nbreg/zip log records intermediate log-likelihoods from its `moptimize`
+    optimiser; statsmodels' Newton path differs (-31.06 vs -29.24 at step 1). Printing our own
+    trace would look like Stata while disagreeing on every line, so option C prints ONLY
+    ``Iteration 0``, whose value is the null-model likelihood ``e(ll_0)`` and matches Stata exactly:
+
+        Iteration 0:  Log likelihood =  -45.03321
+
+    The CONVERGED value is not repeated here: the table already carries the exact
+    ``Log likelihood = -27.175156`` row in its header. Inventing a second line with a fake step
+    number would fabricate output Stata never prints. Omitting the middle is documented.
+
+    Measured on `logit foreign mpg weight`: the line is 43 characters with two trailing spaces,
+    a blank line follows it, and Stata uses two spaces after the colon.
+    """
+
+    e = getattr(result, "e", {}) or {}
+    model = str(getattr(result, "model_name", "") or "").lower()
+    # ONLY logit/probit have an e(ll_0) equal to Stata's Iteration 0 exactly:
+    #   logit/probit  -45.03321  == Stata -45.03321
+    #   poisson       -233.3016  vs Stata -233.30128 (integer data)
+    #   poisson       -202.39008 vs Stata -201.9655  (non-integer response)
+    # Option C promises exactness, so count models keep their exact header row and emit no line.
+    if model not in ("logit", "probit", "logistic"):
+        return []
+    ll0 = e.get("ll_0")
+    if ll0 is None:
+        return []
+    try:
+        line = f"Iteration 0:  Log likelihood = {float(ll0):>10.5f}"
+    except (TypeError, ValueError):
+        return []
+    return [line.ljust(43)]
+
+
+def _result_notes(result: Any) -> list[str]:
+    """Notes a fitter attached to the result, printed ABOVE the table.
+
+    Estimators set ``result._stata_notes`` for deterministic, data-driven notes (non-count response
+    in a count model, dropped panel groups, ...). They come before the banner and before any
+    iteration log, so they are prepended to the finished table rather than folded into a header
+    block.
+    """
+
+    notes = getattr(result, "_stata_notes", None)
+    if not notes:
+        return []
+    return [str(line) for line in notes]
+
+
+def _panel_drop_notes(result: Any) -> list[str]:
+    """The notes Stata prints ABOVE EVERYTHING for a conditional-FE panel fit.
+
+    These are not part of the design block: that block renders BELOW the banner for the non-linear xt
+    family, while these notes come first of all. Measured on `xtlogit ybin x z, fe`:
+
+        note: multiple positive outcomes within groups encountered.
+        note: 1 group (8 obs) omitted because of all positive or
+              all negative outcomes.
+        (blank)
+
+    The second note wraps with a SIX-space indent. `e(N_drop)`/`e(N_group_drop)` have always been
+    recorded; nothing printed them, so a reader saw `Number of obs = 472` on a 480-row panel with no
+    explanation.
+    """
+
+    e_macros = getattr(result, "e", {}) or {}
+    group_drop = int(e_macros.get("N_group_drop") or 0)
+    if not group_drop:
+        return []
+    obs_drop = int(e_macros.get("N_drop") or 0)
+    plural = "group" if group_drop == 1 else "groups"
+
+    # THE WORDING IS COMMAND-SPECIFIC. Round 9 measured both on the same panel:
+    #
+    #     xtlogit, fe    note: multiple positive outcomes within groups encountered.
+    #                    note: 1 group (8 obs) omitted because of all positive or
+    #                          all negative outcomes.
+    #
+    #     xtpoisson, fe  note: 1 group (6 obs) dropped because of all zero outcomes
+    #
+    # Reusing the xtlogit text for a POISSON fit prints nonsense ("all positive or all negative"
+    # has no meaning for a count outcome). Dispatch on the estimator, not on the drop count.
+    model = str(getattr(result, "model_name", "") or "").lower()
+    command = str(e_macros.get("cmd") or "").lower()
+    if model.startswith("xtpoisson") or command == "xtpoisson":
+        return [
+            f"note: {group_drop} {plural} ({obs_drop} obs) dropped because of all zero outcomes"
+        ]
+    if model.startswith("xtnbreg") or command == "xtnbreg":
+        return [
+            f"note: {group_drop} {plural} ({obs_drop} obs) dropped because of all zero outcomes"
+        ]
+    return [
+        "note: multiple positive outcomes within groups encountered.",
+        f"note: {group_drop} {plural} ({obs_drop} obs) omitted because of all positive or",
+        " " * 6 + "all negative outcomes.",
+    ]
 
 
 def _header_block_kind(result: Any) -> str:
@@ -2073,6 +2189,7 @@ def _stata_summary(result: Any) -> str:
     # then Group variable / Obs per group / LR chi2 / Log likelihood. Appending the panel
     # block here (as every other family does) put it above the banner, so the banner never
     # appeared at all.
+    _drop_notes = _panel_drop_notes(result)
     _defer_panel_block = block == "ml" and bool(panel_lines)
     if panel_lines and not _defer_panel_block:
         lines.extend(panel_lines)
@@ -5060,6 +5177,37 @@ def _stata_summary(result: Any) -> str:
                 f"       Prob > F = {p_absorb:.3f}"
             )
 
+    # These notes come before EVERYTHING -- banner, iteration log, design block -- which is why they
+    # cannot ride along with the design block: for the non-linear xt family that block renders below
+    # the banner.
+    # ORDER MEASURED ON `poisson y x` WITH A NON-COUNT RESPONSE: notes, blank, iteration log,
+    # blank, banner. Both the notes and the log are optional; each is followed by exactly one
+    # blank line, and the table body itself does not start with one of its own.
+    _all_notes = _result_notes(result) + _drop_notes
+    _head = _ml_iteration_head(result)
+    _preamble: list[str] = []
+    if _all_notes:
+        _preamble.extend(_all_notes)
+        _preamble.append("")
+    if _head:
+        _preamble.extend(_head)
+        _preamble.append("")
+    if _preamble:
+        # Strip any leading blank the body would otherwise add, so the count stays exact.
+        while lines and lines[0] == "":
+            lines = lines[1:]
+        lines = _preamble + lines
+    # STATA PRINTS THE CONVERGENCE WARNING LAST, after the coefficient table and its rule. Measured
+    # on `teffects ipw (price) (treated mpg weight)`: the run iterates 301 times with `(not
+    # concave)` markers, then closes with 'Warning: Convergence not achieved.' at line 320 of 321.
+    #
+    # The package stores `e(converged)` but previously returned an unconverged estimate silently,
+    # so an unreliable result looked identical to a sound one. The user chose to print the warning
+    # (rather than stay silent or raise), which is what Stata does.
+    _e = getattr(result, "e", {}) or {}
+    _converged = _e.get("converged")
+    if _converged is not None and not bool(float(_converged)):
+        lines.append("Warning: Convergence not achieved.")
     return "\n".join(lines)
 
 

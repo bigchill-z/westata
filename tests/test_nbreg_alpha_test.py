@@ -68,15 +68,24 @@ def test_the_constant_only_likelihood_is_a_different_number(nbreg) -> None:
 def test_the_alpha_test_prints_zero(nbreg) -> None:
     """Stata: chibar2(01) = 0.00 -- the negative likelihood difference is clamped."""
 
-    tail = str(nbreg.summary(style="stata")).splitlines()[-1]
-    assert "LR test of alpha=0" in tail
+    # A convergence warning may follow the table, so the dispersion line is not necessarily the
+    # LAST line anymore. Find it by content instead.
+    tail = next(
+        line
+        for line in str(nbreg.summary(style="stata")).splitlines()
+        if "LR test of alpha=0" in line
+    )
     assert "chibar2(01) = 0.00" in tail
 
 
 def test_the_alpha_test_is_not_the_model_test(nbreg) -> None:
     """69.88 is the MODEL statistic; it must not appear on the dispersion line."""
 
-    tail = str(nbreg.summary(style="stata")).splitlines()[-1]
+    tail = next(
+        line
+        for line in str(nbreg.summary(style="stata")).splitlines()
+        if "LR test of alpha=0" in line
+    )
     assert "chibar2(01) = 69" not in tail
 
 

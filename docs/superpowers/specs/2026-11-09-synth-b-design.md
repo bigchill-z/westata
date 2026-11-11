@@ -26,16 +26,26 @@
 - G4：保持 westata 既有纪律：结果对象不伪造系数 VCE；`e()` 键名逐字对齐 Stata；
   中英文 README/GUIDE/API 文档同步校对。
 
-### 1.2 非目标（B 档边界，均为已定性而非「信息不可得」）
+### 1.2 非目标（B 档边界；2026-11-10 扩展后重新划定）
 
-| 不做 | 原因 |
-|---|---|
-| `nested` / `allopt` 位级一致 | 外层是 Stata 闭源 `ml model d0`（NR/DFP/BFGS + `difficult`/`nrtolerance` 重试），收敛点不可逐位复刻；→ `UnsupportedError` |
-| `synth2` | 纯包装器 + 图形/placebo/LOO，超出本项目图形边界 |
-| 图形 / `keep()` 的 `.dta` 导出 | `GAP_REGISTER.md §5` 已明确图形 ❌ |
-| placebo / LOO / 推断 / 标准误 | Stata `synth` 本身无 `e(V)` 与推断量；伪造会违反 G3 |
-| **E3 / 逐位一致声明** | `synthopt.plugin` 自身非位确定性（两次相同运行 RMSPE 差 **1.471e-11**） |
-| REA 逆向 | 实测 `rea-agents@6.5.0` 对 Stata `.mlib` 零支持、本机 4/4 原生引擎全缺 |
+> **2026-11-10 更新**：用户通过 goal「实现 Stata synth 除图形外的全部功能」把范围
+> 扩大。下表标注了哪些 B 档排除项已在扩展轮次实现；详细实测见 §5 与
+> `tests/conformance/test_stata_synth_features.py`。
+
+| 项 | B 档（2026-11-09） | 扩展后（2026-11-10） |
+|---|---|---|
+| `unitnames()` | 未做 | ✅ 实现（只改 `W_weights` 行标签，数值不变） |
+| `var(period)`（单期 / `&` / numlist） | 未做 | ✅ 实现（每个窗口算一个预测变量） |
+| `keep()` / `replace` | ❌ 抛 `UnsupportedError` | ✅ 实现（5 列堆叠 `.dta`，非图形） |
+| `margin/maxiter/sigf/bound` | 未暴露 | ✅ 公开参数（实测只影响 RMSPE，不影响 `W_weights`） |
+| 缺失值 `-ignored for averaging` 警告 | 未做 | ✅ 实现（`missing_warnings`） |
+| `nested` / `allopt` | ❌ 抛 `UnsupportedError` | ✅ **算法等价**实现（Powell 外层）；`allopt` 的 W 与 Stata 逐位一致、RMSPE 差 3.5e-9；`nested` 单次起点比 Stata 找到更低损失（E2，非逐位一致） |
+| `synth2` | 明确不做 | **仍不做**（图形/placebo/LOO 包装器） |
+| 图形 `figure` | 明确不做 | **仍不做**（本轮目标明确排除图形） |
+| placebo / LOO | 明确不做 | **仍不做**（`synth2` 的机制，非 `synth` 自带） |
+| 推断 / 标准误 | 明确不做 | **仍不做**（Stata `synth` 无 `e(V)`，伪造违反 G3） |
+| **E3 / 全命令逐位一致** | 排除 | **仍排除为整体声明**；但 `V` 与 7/9 案例的 `W`/`X_balance`/`Y_synthetic` 已实测到机器精度，按量定级 |
+| REA 逆向 | 不用 | 仍不用 |
 
 ### 1.3 成功标准
 
@@ -213,7 +223,17 @@ min ½ W'HW + c'W      s.t. ΣW = 1, 0 ≤ W ≤ 1
 
 ## 5. 证据与容差（实证标定，非拍脑袋）
 
-| 量 | 实测差 | 声明容差 | 依据 |
+> **2026-11-11 最终状态**（下表为 B 档当时记录，保留为历史）。经扩展功能 +
+> 自适应内点法 QP 两轮改进，8 个可比对案例的**最终实测界**：
+> `|dV| ≤ 1.4e-13`（机器精度，全部）；`|dW| = 0` 于 6/8、最差 **9e-3**；
+> `|dX_balance| = 0` 于 6/8、最差 **9.3e-2**；
+> `|dY_synthetic| ≤ 3e-14` 于 6/8、最差 **2.9e-1**；
+> `|dRMSPE| ≤ 3.6e-4` 于良态池、最差 **6.9e-2**。
+> `nested allopt` 的 W 逐位一致、RMSPE 差 3.5e-9。
+> 逐量守卫与最新数字见 `tests/conformance/test_stata_synth_features.py`
+> 与 `tests/test_synth_qp_refinement.py`。
+
+| 量 | 实测差（B 档当时） | 声明容差（当时） | 依据 |
 |---|---|---|---|
 | `V` 对角 | ≤8.6e-14（满秩） | **≤1e-10**（相对，留 1000× 余量） | 11 构造 + 4 真实数据集 |
 | `W`（逐元素） | **0**（V 偏差 ≤1e-8 时三位舍入完全吸收） | **≤1e-3** | `roundmat` 显示精度 |
@@ -229,10 +249,15 @@ min ½ W'HW + c'W      s.t. ΣW = 1, 0 ≤ W ≤ 1
 > 并在 registry notes、CHANGELOG、USING_WITH_STATA.md 三处一致披露。**E3 排除的
 > 物理原因不变**（插件自身抖动 1.471e-11），但数值差距比原估计大 5 个数量级。
 
-**E3 明确排除**：两次相同 `synth` 运行的 `e(RMSPE)` 为
-`10.500868354649425` vs `10.500868354634719`（差 1.471e-11），
-另有独立实测 `10.500868354656104`。参照源本身非确定 ⇒ 逐位一致无意义。
-这是「构造性 E2」，与 `docs/GAP_REGISTER.md §8.6` 的 bootstrap 同类。
+**2026-11-10 扩展功能实测更正**：`synth_features.json` 的 16 份活体捕获表明，
+「两次相同运行差 1.471e-11」是**数据/设定相关**的：对同一 `cigsale lnincome
+beer retprice` 默认命令连跑两次，`e(RMSPE)` 都是 `19.73684845951759`（差 **0.0**）。
+改变 `sigf(7)` 会让 RMSPE 变 2.1e-3，而 `roundmat()` 让 `e(W_weights)` 在
+所有调参下完全不变。因此**默认路径是确定性的**；E3 排除的真正原因只剩
+「`H` 秩亏 ⇒ QP 最优 W 不唯一 + C++ 插件以 `margin=0.005` 停在最优面外」，
+不是「参照源每次都不同」。先前那句 1.471e-11 的断言保留为历史，不再作为
+全局依据。逐量定级见 `tests/conformance/test_stata_synth_features.py` 模块
+docstring 与 registry notes。
 
 `registry.yml` 条目形状（照 `tobit` E2 条目：`:125-138`）：
 

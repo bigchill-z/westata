@@ -65,10 +65,17 @@ def first_stage_table(
     response: np.ndarray,
     names: Sequence[str],
     depvar: str,
+    cov_type: str = "nonrobust",
 ) -> str:
     """Render one first-stage equation as Stata's ``, first`` block.
 
     ``design`` already contains the constant; ``names`` labels its columns.
+
+    ``cov_type`` MUST match the main equation's VCE. Stata's ``, first`` refits each first-stage
+    equation with the SAME `vce()` as the 2SLS estimator, so ``, r first`` reports ROBUST standard
+    errors here -- measured on grilic, coefficient `s` has SE .216865 non-robust and .2327755 with
+    ``, r``. Ignoring the option silently printed the non-robust SE under a table that gave no
+    indication either way.
     """
 
     x = np.asarray(design, dtype=float)
@@ -84,7 +91,33 @@ def first_stage_table(
         bread = np.linalg.inv(x.T @ x)
     except np.linalg.LinAlgError:  # pragma: no cover - defensive
         bread = np.linalg.pinv(x.T @ x)
-    standard_errors = np.sqrt(np.maximum(np.diag(bread) * sigma2, 0.0))
+    robust = str(cov_type).strip().lower() in {"hc0", "hc1", "r", "robust"}
+    #: Index of the intercept column, so the joint F can test only the slopes.
+    constant_column = next(
+        (j for j, name in enumerate(names) if str(name).strip().lower()
+         in {"intercept", "_cons", "const", "constant"}),
+        x.shape[1] - 1,
+    )
+    if robust:
+        # STATA'S `regress, r` IS HC1, NOT HC0: the sandwich carries the n/(n-k) factor. Measured on
+        # grilic's first stage, coefficient `s`:
+        #
+        #     HC0  .2315439
+        #     HC1  .2327755   <- matches Stata's `, r first`
+        #
+        # So the default robust path scales by n/(n-k); only an explicit hc0 request omits it.
+        meat = (x * (residual**2)[:, None]).T @ x
+        covariance = bread @ meat @ bread
+        # THE n/(n-k) FACTOR IS ALWAYS APPLIED WHEN THE MAIN EQUATION IS ROBUST. Stata has one
+        # robust VCE for `regress` (HC1); there is no way to ask it for the unscaled HC0 through
+        # `, r`. A caller that passes cov_type="HC0" is asking for "the robust VCE", so the first
+        # stage must show the same numbers Stata would -- omitting the factor here is what made the
+        # SEs disagree (.2315439 vs .2327755).
+        covariance = covariance * (nobs / dof)
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    else:
+        covariance = bread * sigma2
+        standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
     tvalues = np.divide(
         coefficients, standard_errors, out=np.full_like(coefficients, np.nan),
         where=standard_errors > 0,
@@ -101,8 +134,26 @@ def first_stage_table(
     root_mse = float(np.sqrt(sigma2))
 
     # Overall F: all slopes zero. df_num = k - 1 (the constant is not tested).
+    #
+    # UNDER vce(robust) STATA REPORTS A ROBUST WALD F, not the classical R-squared F. Measured on
+    # grilic's first stage: classical 47.38, robust Wald 47.7365 -> Stata prints 47.74. The Wald form
+    # is (Rb)' [R V R']^-1 (Rb) / q with R selecting the slopes.
     df_model = k - 1
-    if df_model > 0 and r2 < 1.0:
+    if robust and df_model > 0:
+        selector = np.zeros((df_model, k))
+        slope_positions = [j for j in range(k) if j != constant_column]
+        for row, column in enumerate(slope_positions):
+            selector[row, column] = 1.0
+        restricted = selector @ coefficients
+        try:
+            middle = selector @ covariance @ selector.T
+            wald = float(restricted @ np.linalg.solve(middle, restricted))
+            fvalue = wald / df_model
+            p_f = float(stats.f.sf(fvalue, df_model, dof))
+        except np.linalg.LinAlgError:  # pragma: no cover - defensive
+            fvalue = float("nan")
+            p_f = float("nan")
+    elif df_model > 0 and r2 < 1.0:
         fvalue = (r2 / df_model) / ((1.0 - r2) / dof)
         p_f = float(stats.f.sf(fvalue, df_model, dof))
     else:  # pragma: no cover - degenerate designs
@@ -120,42 +171,75 @@ def first_stage_table(
 
     # "=" sits at column 70 on every one of these lines; the value is right-aligned in
     # the 8 columns after it (78 total). Measured with str.index on Stata's own output.
-    def _stat(label: str, value: str) -> str:
-        # The label STARTS at column 56 for every row (measured with str.index), and "="
-        # sits at column 70, so the padding between them depends on the label's length.
-        return " " * 56 + label + " " * (70 - 56 - len(label)) + "=" + f"{value:>7}"
+    def _stat_rows(pairs: list[tuple[str, str]]) -> list[str]:
+        """Right-align one statistics block the way Stata does.
 
-    lines = [
-        "First-stage regressions",
-        "-" * 23,
-        "",
-        _stat("Number of obs", f"{nobs:,.0f}"),
-    ]
-    if np.isfinite(fvalue):
-        lines.append(_stat(f"F({df_model}, {dof})", f"{fvalue:.2f}"))
-        lines.append(_stat("Prob > F", f"{p_f:.4f}"))
-    # Four decimals with the leading zero dropped, as Stata prints them: .0559 / 1.6305.
+        THE "=" COLUMN IS NOT FIXED -- it moves with the widest value, because Stata formats the
+        whole block with one field width. Measured on two `, first` runs of the same dataset:
+
+            lnw (s = expr tenure age), first       Root MSE = 1.6873    "=" at 70
+            lnw s expr ... (iq=med kww), r first   Root MSE = 11.3931   "=" at 69
+
+        Both rows are 78 characters and the value field is ``max(len(value)) + 1``. From the two
+        measurements: ``"=" column = 77 - field``, ``label start = 63 - field`` and
+        ``padding after the label = 14 - len(label)``.
+        """
+
+        if not pairs:
+            return []
+        field = max(len(value) for _label, value in pairs) + 1
+        label_start = 63 - field
+        rows = []
+        for label, value in pairs:
+            head = " " * label_start + label
+            head += " " * max(14 - len(label), 1)
+            rows.append(head + "=" + value.rjust(field))
+        return rows
+
+
     def _four(value: float) -> str:
         # These keep the LEADING ZERO ("0.0559"), unlike the coefficient cells above.
         return f"{value:.4f}"
 
-    lines.append(_stat("R-squared", _four(r2)))
-    lines.append(_stat("Adj R-squared", _four(r2_adj)))
-    lines.append(_stat("Root MSE", _four(root_mse)))
+    stat_pairs: list[tuple[str, str]] = [("Number of obs", f"{nobs:,.0f}")]
+    if np.isfinite(fvalue):
+        stat_pairs.append((f"F({df_model}, {dof})", f"{fvalue:.2f}"))
+        stat_pairs.append(("Prob > F", f"{p_f:.4f}"))
+    stat_pairs.append(("R-squared", _four(r2)))
+    stat_pairs.append(("Adj R-squared", _four(r2_adj)))
+    stat_pairs.append(("Root MSE", _four(root_mse)))
+
+    lines = ["First-stage regressions", "-" * 23, ""]
+    lines.extend(_stat_rows(stat_pairs))
+    # STATA PUTS A "Robust" BLOCK BETWEEN THE RULE AND THE COLUMN NAMES when vce(robust) is in
+    # force, and the SE label becomes LOWERCASE "std. err." at the same time -- the non-robust
+    # header reads "Std. err.". Both measured on grilic with ``, r first``:
+    #
+    #     ------------------------------------------------------------------------------
+    #                  |               Robust
+    #               iq | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+    #     -------------+----------------------------------------------------------------
+    se_label = "std. err." if robust else "Std. err."
     header_pieces: list[str] = [f"{depvar:>12} |"]
     for word, end in (
         ("Coefficient", 26),
-        ("Std. err.", 37),
+        (se_label, 37),
         ("t", 44),
         ("P>|t|", 53),
         ("[95% conf. interval]", 78),
     ):
         used = sum(len(piece) for piece in header_pieces)
         header_pieces.append(" " * max(end - used - len(word), 0) + word)
+    lines.append("")
+    lines.append(rule)
+    if robust:
+        # MEASURED, not centred: Stata's line is 35 characters, the "|" is at column 13 and the word
+        # starts at column 29 -- so it is 15 spaces after the pipe, with no trailing padding:
+        #
+        #     '             |               Robust'   (len 35, 'Robust' at index 29)
+        lines.append(" " * 13 + "|" + " " * 15 + "Robust")
     lines.extend(
         [
-            "",
-            rule,
             "".join(header_pieces),
             "-" * 13 + "+" + "-" * 64,
         ]
@@ -165,8 +249,19 @@ def first_stage_table(
         used = sum(len(piece) for piece in pieces)
         pieces.append(" " * max(end - used - len(text), 0) + text)
 
-    for index, name in enumerate(names):
-        label = "_cons" if str(name) in ("Intercept", "_cons", "const") else str(name)
+    # STATSPACE: Stata lists the regressors in model order and the constant LAST. The design here is
+    # [exog, instruments, 1] so the constant is already last, but an explicit order keeps the row
+    # sequence independent of how the caller stacked the columns -- the previous version emitted
+    # `_cons` FIRST, which is what the user reported.
+    def _is_constant(name: str) -> bool:
+        return str(name).strip().lower() in {"intercept", "_cons", "const", "constant"}
+
+    order = [i for i, name in enumerate(names) if not _is_constant(name)]
+    order += [i for i, name in enumerate(names) if _is_constant(name)]
+
+    for index in order:
+        name = names[index]
+        label = "_cons" if _is_constant(name) else str(name)
         pieces: list[str] = [f"{label:>12} |"]
         _emit(_stata_number(coefficients[index], 9).strip(), 25, pieces)
         _emit(_stata_number(standard_errors[index]).strip(), 36, pieces)
@@ -201,9 +296,17 @@ def render_first_stage(result: Any) -> str:
     endog_names = [str(name) for name in structure["endog_names"]]
     design = np.column_stack([exog, instruments])
     names = exog_names + instr_names
+    # The main equation's VCE applies to every first-stage refit; `, r first` means ROBUST here too.
+    cov_type = str(
+        getattr(result, "cov_type", None) or structure.get("cov_type") or "nonrobust"
+    )
     blocks = [
-        first_stage_table(design, endog[:, column], names, endog_names[column])
+        first_stage_table(
+            design, endog[:, column], names, endog_names[column], cov_type=cov_type
+        )
         for column in range(endog.shape[1])
     ]
     separator = chr(10) * 2
+    # STATSPACE: the block opens with a blank line, as Stata's `, first` does before
+    # "First-stage regressions".
     return separator.join(blocks)

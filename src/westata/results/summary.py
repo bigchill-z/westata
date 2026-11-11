@@ -4973,6 +4973,19 @@ def _stata_summary(result: Any) -> str:
         _e = getattr(result, "e", None) or {}
         _endog = [str(name) for name in (_e.get("endog") or [])]
         _exog = [str(name) for name in (_e.get("exog") or [])]
+        # STATSPACE: the roles block follows a CLOSING RULE for the coefficient table. Measured on
+        # `ivregress 2sls ..., r`:
+        #
+        #     '       _cons |   3.218043   .3983683     8.08   0.000     2.437256    3.998831'
+        #     '------------------------------------------------------------------------------'
+        #     'Endogenous: iq'
+        #     'Exogenous:  s expr tenure rns smsa med kww'
+        #
+        # The generic renderer already emits the rule for most tables; this adds it only when the
+        # last line is not already a full-width rule, so the two paths cannot double it.
+        rule = "-" * 78
+        if (_endog or _exog) and (not lines or lines[-1].rstrip() != rule):
+            lines.append(rule)
         if _endog:
             lines.append("Endogenous: " + " ".join(_endog))
         if _exog:

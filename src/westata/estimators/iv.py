@@ -1074,6 +1074,10 @@ class IV2SLS:
         canonical: str = "nonrobust",
     ) -> dict[str, Any]:
         """Build the ``e()`` scalars for the fitted model."""
+        #: True for every robust VCE the package accepts; drives e(vcetype)/e(vce).
+        _robust_vce = str(canonical).strip().lower() in {
+            "robust", "hc0", "hc1", "hc2", "hc3", "hc"
+        }
 
         nobs, k_params = X.shape
         # ``[R] ivregress`` leaves e(df_r) missing: the reported t/z inference is
@@ -1176,7 +1180,17 @@ class IV2SLS:
             # 2sls and liml store "", while gmm stores "Robust" because its weight matrix
             # is estimated robustly. That macro is what draws the banner row above the
             # coefficient header, so without it the gmm table was missing that row.
-            "vcetype": "Robust" if self._stata_command == "ivregress gmm" else "",
+            # ``e(vcetype)`` FOLLOWS THE VCE, NOT THE ESTIMATOR. The earlier note claimed
+            # gmm was the only method to set it; live `display e(vcetype) e(vce)` refutes that:
+            #
+            #     ivregress 2sls ..., r     "Robust"  "robust"
+            #     ivregress 2sls ...        ""        ""
+            #     ivregress gmm ...         "Robust"  "robust"
+            #
+            # That macro draws the "Robust" banner over the coefficient header and lowercases
+            # the "std. err." label, so an empty string suppressed both on a robust 2sls.
+            "vcetype": "Robust" if _robust_vce else "",
+            "vce": "robust" if _robust_vce else "",
             "endog": list(getattr(self, "_endog_names", [])),
             "exog": [
                 name

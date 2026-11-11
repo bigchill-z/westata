@@ -1552,7 +1552,20 @@ class StataResults:
                 if not odds_ratio
                 else self._odds_ratio_summary(style)
             )
-            return f"{renderer()}\n\n\n{body}"
+            # STATSPACE, measured on `ivregress 2sls ..., r first`:
+            #
+            #   line 0     blank
+            #   line 1..n  the first-stage block
+            #   blank, blank
+            #   the 2SLS table
+            #
+            # The body passed in here does NOT carry its own leading blank, so the separator
+            # supplies both of the two blanks after the block.
+            # The body opens with its OWN blank line (Stata prints one before the 2SLS
+            # banner). Strip it so the separator delivers exactly the two blanks measured
+            # between the blocks instead of three.
+            _body = body[1:] if body.startswith("\n") else body
+            return f"\n{renderer()}\n\n\n{_body}"
         if odds_ratio:
             return self._odds_ratio_summary(style)
         return render_summary(self, style)

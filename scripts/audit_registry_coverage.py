@@ -55,6 +55,7 @@ NO_TABLE = {
     "bootstrap / permute expressions (exp_list)": "prefix command",
     "etable": "renders an already-fitted model: no table of its own",
     "synth": "returns six e() matrices, not a coefficient table; compared against 6 committed full-precision Stata captures in tests/conformance/test_stata_synth.py",
+    "synth2": "wrapper: returns e() fit stats / balance / placebo / loo matrices, not a coefficient table; compared against 5 committed full-precision Stata captures in tests/conformance/test_stata_synth2.py",
     "estat szroeter": "post-estimation: returns r()",
     "estat esize": "post-estimation: returns r()",
     "estat moran": "post-estimation: returns r()",

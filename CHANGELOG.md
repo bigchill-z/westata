@@ -7,6 +7,74 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — `ws.synth2` non-graphics feature set (2026-11-11)
+
+Goal: "implement synth2's non-graphics features".  Design approved in
+`docs/superpowers/specs/2026-11-11-synth2-design.md`; three decisions were
+made up front (full non-graphics scope, per-quantity measured grading against
+live Stata, and `frame()`/`symbol()` replaced by result-object attributes).
+
+### Added
+* `ws.synth2` / `Synth2Result`: a frozen dataclass exposing Stata `synth2`'s
+  own e() surface.  `synth2` is a WRAPPER -- all optimisation is delegated to
+  `ws.synth` (`synth2.ado:157/269/417/516`) -- so it adds NO estimator.
+* Fit statistics (`rmse`/`r2`/`att`) per `synth2.ado:636-672/753`, including
+  the NON-standard `R2` whose denominator is the SYNTHETIC outcome's
+  pretreatment deviations (`:647`).
+* 6-column covariate balance table (`bal`) per `:174-183` with
+  `Bias% = (Value/Treated - 1)*100` and the "Average Control" column.
+* `U_wt` (non-zero unit weights, descending) and `V_wt` (V diagonal).
+* **In-space placebo**: re-run `synth` for every fake treatment unit, build
+  the `mspe` matrix `[PreMSPE, PostMSPE, RatioPostPre, RatioTrCtrl]`, apply
+  `cut()` filtering, compute the aggregate probability and pointwise
+  two-sided / right-sided / left-sided `pval` (`:409-459`, Mata `:935-960`).
+  The treated unit is INCLUDED in every denominator with `>=` comparisons.
+* **In-time placebo**: re-run `synth` for each fake treatment period, exposing
+  the re-estimated trajectories.  NO mspe/pval (`:502-552`), pinned by a test.
+* **Leave-one-out**: re-run `synth` excluding each positive-weight donor,
+  returning per-period min/max envelopes (`:261-299`).
+* Full Stata input-validation contract (`:61-132`): `trunit`/`trperiod`
+  presence, `counit`/`ctrlunit` conflict, `preperiod`/`postperiod` row deletion,
+  placebo `period()` < trperiod, `cutoff` >= 1.
+* Graphics-only options explicitly refused: `figure`/`nofigure`/`savegraph`/
+  `show`/`symbol`/`frame`.
+
+### Evidence
+* 5 full-precision live-StataNow-19.5 captures
+  (`tests/conformance/stata_fixtures/synth2_*.json`): main, `placebo(unit)`,
+  `placebo(unit cut(2))`, `placebo(period(1985))`, `loo` (+ frame envelopes).
+  `scripts/capture_synth2_fixtures.py` regenerates them.
+* `tests/conformance/test_stata_synth2.py` compares every e() quantity;
+  `tests/test_synth2.py` (35 unit tests, TDD) pins the formulas, validation
+  paths and two mutation guards (R2 denominator, p-value self-inclusion).
+* MEASURED per-quantity bounds: `e(N/T/T0/T1/K/J)` exact; `e(bal)` <= 6.6e-14,
+  `e(U_wt)` exact, `e(V_wt)` <= 1.2e-14 (machine precision); `e(r2)` <= 1.4e-8,
+  `e(att)` <= 2.7e-7, `e(rmse)` <= 2.7e-5; `e(pval)` <= 3.8e-6 (no cutoff)
+  / <= 1.8e-2 (cut(2)); `e(mspe)` per-row max|d| median 1.5e-3, 80% <= 1e-2,
+  max 2.1e1 on 2 of 39 degenerate fake units (rank-deficient QP, same E2 root
+  cause as `synth`).  E3 excluded as a whole-command claim.
+* Registry 96 -> 97 entries (E2 27 -> 28); `NO_TABLE["synth2"]` added.
+* Two "absence guards" (`test_the_two_missing_features.py`,
+  `test_zero_scored_but_present.py`) converted to presence + behaviour checks.
+
+### Fixed (while implementing)
+* `_average_control_means` used the global `xperiod` window for predictors
+  carrying their own `(period)` suffix, producing NaN for `cigsale(1975)`.
+  Stata's `synth2_balance` (`:574-575`) uses each predictor's OWN window.
+* `ws.synth`'s QP feasibility check rejected SLSQP's benign ~4e-4 equality
+  residual BEFORE clip+renormalisation, which broke in-space placebo re-fits
+  on some degenerate fake units.  Fixed by normalising first and refusing only
+  a genuinely infeasible point.  No regression on the existing 218 tests.
+* `synth2`'s `control_units` were in first-appearance order (year-major panel),
+  mis-aligning the `mspe` rows.  Now sorted like Stata's `levelsof`.
+
+### Result
+Full `pytest -q` green (see the release run).  Graphics remain out of scope;
+external PyPI/GitHub push is still blocked by the environment (GitHub TLS +
+missing PyPI token) and is a separate confirmation.
+
+---
+
 ## [Unreleased] — close the remaining non-graphics gaps (2026-11-11)
 
 Goal: "finish the remaining gaps by priority".  Three items, done in order.

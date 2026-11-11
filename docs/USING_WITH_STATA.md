@@ -158,9 +158,42 @@ NOT approximated — an `ftol` sweep was non-monotonic and a single-start
 Powell sweep never lands on Stata's nested RMSPE, so faking a match would be
 coefficient-fitting.
 
-Only `figure` (graphics, explicitly out of scope) and `synth2`'s
-placebo/LOO remain refused.
-See the [B-grade design spec](superpowers/specs/2026-11-09-synth-b-design.md).
+## `synth2` — non-graphics feature set (2026-11-11)
+
+`ws.synth2` implements the full NON-GRAPHICS surface of Stata `synth2`
+(v2.1.0).  `synth2` is a WRAPPER: all optimisation is delegated to
+`ws.synth`, and it adds fit statistics (`rmse`/`r2`/`att`), a 6-column
+covariate balance table (`bal`), non-zero unit weights (`U_wt`), the V
+diagonal (`V_wt`), in-space placebo (`mspe` + pointwise two/right/left
+`pval`, with `cut()`), in-time placebo (re-estimation only, NO inference),
+and leave-one-out min/max envelopes.
+
+**Measured grading** (5 live captures, California/ADH2010 specification;
+see [test_stata_synth2.py](../tests/conformance/test_stata_synth2.py)):
+
+| Quantity | Measured | Grade |
+|---|---|---|
+| `e(N/T/T0/T1/K/J)` | exact | machine precision |
+| `e(bal)` | <= 6.6e-14 | machine precision |
+| `e(U_wt)` | exact | machine precision |
+| `e(V_wt)` | <= 1.2e-14 | machine precision |
+| `e(r2)` / `e(att)` | <= 1.4e-8 / 2.7e-7 | E2 (inherits synth RMSPE) |
+| `e(rmse)` | <= 2.7e-5 | E2 |
+| `e(pval)` | <= 3.8e-6 (no cutoff), <= 1.8e-2 (cut(2)) | E2 |
+| `e(mspe)` | per-row max|d| median 1.5e-3, 80% <= 1e-2, max 2.1e1 on 2 of 39 degenerate fake units | E2 |
+
+Three semantic traps are transcribed verbatim from `synth2.ado` and pinned
+by mutation tests: (1) `R2`'s denominator is the **synthetic** outcome's
+pretreatment deviations (`:647`, non-standard); (2) the aggregate probability
+and pointwise p-values **include the treated unit** in the denominator with
+`>=` comparisons (`:441/940/947-949`); (3) `ereturn clear` (`:330`) wipes
+`synth`'s e(), so the result surface is `synth2`'s own.
+
+Graphics-only options (`figure`/`nofigure`/`savegraph`/`show`/`graphlist`)
+and Stata's `frame()`/`symbol()` result-dataset mechanism are deliberately
+refused/omitted — all results are attributes of the returned
+`Synth2Result`.  Only graphics remain out of scope.
+See the [synth2 design spec](superpowers/specs/2026-11-11-synth2-design.md).
 
 ---
 

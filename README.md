@@ -26,7 +26,7 @@ this in Python, do I get the same numbers Stata would print?*
 |---|---|
 | Tests | **full suite green (see `pytest -q`)** |
 | Commands covered | 96 registry entries |
-| Evidence | **54 × E3**, 27 × E2, 15 × E1 |
+| Evidence | **54 × E3**, 28 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are
@@ -69,7 +69,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` runs 6054 tests (6051 pass, 3 skip) on the committed tree.
+`python -m pytest -q` runs 6123 tests (6120 pass, 3 skip) on the committed tree.
 The conformance captures (including `synth_features.json`) are committed, so the
 suite needs no Stata licence. Re-running the comparisons against live Stata
 (`retest/`, `docs/collect_comparison.py`) does need one.
@@ -152,7 +152,7 @@ full.estat_vce().to_frame()                  # full symmetric matrix as a DataFr
 | Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |
 | Ordered | `OrderedLogit` / `OrderedProbit` | `ologit` / `oprobit` |
 | Censored | `Tobit` (self-implemented) | `tobit` |
-| Synthetic control | `synth` (extended, E2 by quantity) | `synth` |
+| Synthetic control | `synth` (extended, E2 by quantity); `synth2` (non-graphics, E2 by quantity) | `synth`, `synth2` |
 | Time series | `ARIMA` / `VAR` / `VECM` / `GARCH` / `unitroot` | `arima` / `var` / `vec` / `arch` / `dfuller` |
 | Postestimation | `test` / `lincom` / `margins` / `predict` | same names |
 | Reporting | `etable` | `esttab` |
@@ -330,20 +330,23 @@ biasadj()` raises `UnsupportedError`.
 
 Not implemented, and they raise instead of approximating: Mata, the graphics
 system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
-`xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), `synth2`,
-`synth, figure`, `synth2`'s placebo/LOO, general `gmm`, `nlsur`, multi-way
+`xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), graphics for
+`synth`/`synth2`, general `gmm`, `nlsur`, multi-way
 clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
 `ws.synth` implements Stata's **default path plus the extended feature set**
 (`unitnames`, `var(period)`, `keep()`/`replace`, the four optimiser settings,
 Stata's forwarded `ml` options, and an algorithm-equivalent
-`nested`/`allopt` search).  `keep()` now reproduces Stata's exported `.dta`
-cell-for-cell.  Evidence grade **E2**, graded per quantity against 22
-full-precision StataNow 19.5 captures: `V` and 6 of 8
-`W`/`X_balance`/`Y_synthetic` values reach machine precision; the remaining
-two near-rank-1 pools are within 9e-3 / 6.9e-2 after an adaptive interior-point
-QP that reproduces Stata's plugin trajectory.
+`nested`/`allopt` search).  `ws.synth2` implements **`synth2`'s full
+non-graphics feature set**: fit statistics, a 6-column balance table,
+in-space placebo (with cutoff and pointwise two/right/left p-values),
+in-time placebo, and leave-one-out envelopes.  Both are graded **E2** per
+quantity against committed full-precision StataNow 19.5 captures: the formula
+layer (`V`, `bal`, `U_wt`, `V_wt`, `r2`, `att`) reaches machine precision,
+while the re-fit chain inherits `ws.synth`'s rank-deficient-QP differences
+(measured bounds in [the comparison notes](docs/USING_WITH_STATA.md) and
+`tests/conformance/registry.yml`).
 
 Options accepted but **numerically inactive** are flagged explicitly on the
 result (`SynthResult.numerically_inactive`): `sigf`/`margin`/`bound` and

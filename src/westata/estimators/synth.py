@@ -287,19 +287,19 @@ def _solve_w(H: np.ndarray, c: np.ndarray, J: int,
     w = np.asarray(result.x, dtype=np.float64)
     if not np.all(np.isfinite(w)):
         raise ConsistencyError("synth: QP returned non-finite unit weights")
-    # SLSQP occasionally reports a benign non-success status on this
-    # rank-deficient problem while still landing on the right face.  Refuse
-    # only when the returned point is demonstrably infeasible.
-    eq_err = abs(float(w.sum() - 1.0))
-    if eq_err > 1e-4:
-        raise ConsistencyError(
-            f"synth: QP returned an infeasible point (maxiter={maxiter}, "
-            f"sum(w)-1={eq_err:.2e}); refusing to return a wrong W"
-        )
-    # Clip tiny numerical excursions, then renormalise (the equality
-    # constraint is satisfied to ftol, not exactly).
+    # SLSQP on a severely rank-deficient H can stop with a small equality
+    # residual (e.g. 4e-4) while still being on the optimal face.  Clipping
+    # and renormalising REPAIRS that numerical error; it is not a wrong
+    # solution.  (A 1e-4 pre-normalisation rejection broke in-space placebo
+    # re-fits, where Stata's plugin likewise returns a usable point.)
     w = np.clip(w, 0.0, 1.0)
-    w = w / w.sum()
+    total = float(w.sum())
+    if not np.isfinite(total) or total <= 0:
+        raise ConsistencyError(
+            f"synth: QP returned an infeasible point (sum(w)={total}); "
+            "refusing to return a wrong W"
+        )
+    w = w / total
     return w
 
 

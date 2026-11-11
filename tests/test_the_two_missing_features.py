@@ -6,17 +6,18 @@ FEATURES rather than unverified ones::
     C16-02   rdrobust bandwidth selection (bwselect, msetwo)   0.0
     C18-02   synth2                                             0.0
 
-Those two still do not exist in the package, and the guards below pin that.
+``bwselect`` still does not exist.  Both ``synth`` (C18-01) and ``synth2``
+(C18-02) have since landed, so their absence guards were deliberately
+converted to presence + behaviour guards rather than deleted -- a test
+asserting a landed estimator fails would be actively wrong.
 
-``synth`` (C18-01) is DIFFERENT: it landed on 2026-11-09 as the B-grade default
-path (see docs/superpowers/specs/2026-11-09-synth-b-design.md).  The original
-guard asserted ``not hasattr(ws, "synth")`` with the explicit note that
-"if someone later implements synth, a test asserting it fails would be
-actively wrong".  It has therefore been converted to a presence + behaviour
-guard rather than deleted: the estimator really is exported now.
+* ``synth`` landed 2026-11-09 (B-grade default path, then the extended
+  non-graphics feature set): docs/superpowers/specs/2026-11-09-synth-b-design.md
+* ``synth2`` landed 2026-11-11 (non-graphics feature set: fit statistics,
+  balance table, in-space/in-time placebo, LOO):
+  docs/superpowers/specs/2026-11-11-synth2-design.md
 
-``synth2`` remains absent on purpose -- it is a wrapper adding figures,
-placebo/LOO and graphs, all outside westata's scope.
+Graphics remain out of scope for both.
 """
 
 import warnings
@@ -41,10 +42,12 @@ def test_synth_is_now_implemented() -> None:
     assert hasattr(ws, "SynthResult")
 
 
-def test_synth2_is_not_implemented() -> None:
-    """synth2 is a figure/placebo wrapper, deliberately out of scope."""
+def test_synth2_is_now_implemented() -> None:
+    """synth2's NON-GRAPHICS feature set landed; graphics remain excluded."""
 
-    assert not hasattr(ws, "synth2")
+    assert hasattr(ws, "synth2")
+    assert callable(ws.synth2)
+    assert hasattr(ws, "Synth2Result")
 
 
 def test_rdrobust_itself_works_with_explicit_bandwidths() -> None:

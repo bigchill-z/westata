@@ -183,7 +183,7 @@
 | `stteffects` | ⬜ | 生存处理效应 |
 | `csdid`、`drdid` | ❌ | 用户包，不在 base |
 | `rdrobust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
-| `synth` / `synth2` | ✅ `synth` E2（2026-11-09）/ ❌ `synth2` | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；原记「受阻于 `.mlib` 中的嵌套优化器」**已被 P0 实测证伪**：`e(V_matrix)` 可直接导出、`regsval` 是确定性纯函数可辨识、两个内核被精确求解。2026-11-09 用户批准 B 档并已落地 `ws.synth`（默认路径，证据 E2：六个 `e()` 矩阵对拍 6 份全精度 fixture；`nested`/`allopt`/`synth2`/图形/placebo 仍按纪律拒绝）。`synth2` 是图形/placebo 包装器，明确不做 |
+| `synth` / `synth2` | ✅ 两者均 E2（`synth` 2026-11-09，`synth2` 2026-11-11） | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；原记「受阻于 `.mlib` 中的嵌套优化器」**已被 P0 实测证伪**：`e(V_matrix)` 可直接导出、`regsval` 是确定性纯函数可辨识、两个内核被精确求解。2026-11-09 落地 `ws.synth`（默认路径 → 扩展功能，E2：逐量对拍 22 份全精度 fixture）。**2026-11-11 `ws.synth2` 落地非图形全部功能**（拟合统计、6 列平衡表、U_wt/V_wt、空间安慰剂含 cutoff 与逐期双侧/右侧/左侧 p 值、时间安慰剂、留一包络，E2：对拍 5 份全精度 fixture，设计与实测界见 `docs/superpowers/specs/2026-11-11-synth2-design.md`）。**仍不做**：两者的一切图形（`figure`/`nofigure`/`savegraph`/`show`/`graphlist`）、Stata `frame()`/`symbol()`、任何参数推断 |
 | `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `teffects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
 
 #### 3.6.1 报告 P1 清单实测复核（第 144–145 轮）
@@ -200,7 +200,7 @@
 | C12-11 | `xtserial` 缺失 | **本环境仍无 ado、Stata 报 r(111)/r(199)，无参照可验证**，保持拒绝 |
 | C08-05 | `prais, corc` 缺失 | **`corc=` 已实现**，与 Stata 一样在 icecream.dta 上不收敛且 rho 差 0.005%（第 111 轮） |
 | C13-06 | `irf create` / `.irf` 体系缺失 | **OIRF/FEVD/irf_table 数值早已验证**；第 144 轮新增 `irf_create()` 写出 23 列 `.dta`，5 个数值列与 Stata 精确一致。**限制**：`pandas.to_stata` 无法写 `_dta[]` characteristics，故 Stata 的 `irf table` 仍读不了（r(498)），是数值导出而非 drop-in `.irf` set |
-| C18-01/02 | `synth`/`synth2` 整章缺失 | **2026-11-09 已部分修复**：`synth` 默认路径已落地（B 档 / E2，`ws.synth`，六个 `e()` 矩阵对拍 6 份全精度 fixture）；`synth2` **仍缺**（图形/placebo 包装器，有意不做）。原记「受阻于二进制 `.mlib` 中的嵌套优化器」已由 P0 实测证伪：两个 Mata 内核被精确求解、`e(V_matrix)` 可直接导出。详见 §3.6.4 |
+| C18-01/02 | `synth`/`synth2` 整章缺失 | **复核当时**：`synth` 已于 2026-11-09 落地（B 档 / E2，`ws.synth`，六个 `e()` 矩阵对拍 6 份全精度 fixture），而 `synth2` **仍缺**（当时记为图形/placebo 包装器，有意不做）。**后续补齐**：2026-11-11 `synth` 扩展功能全量落地；同日 `synth2` 非图形全部功能落地（E2，对拍 5 份全精度 fixture，见 `docs/superpowers/specs/2026-11-11-synth2-design.md`），现两者仅图形（`figure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()` 不做。原记「受阻于二进制 `.mlib` 中的嵌套优化器」已由 P0 实测证伪：两个 Mata 内核被精确求解、`e(V_matrix)` 可直接导出。详见 §3.6.4 |
 
 **使用说明**：报告第 620–628 行的 P1 清单与附录评分表（多处 0.00）**不能当作工单**。第 127–135 轮审计发现 12 个 0.00 分项实际存在且数值正确，多为入口名不同（`dfuller`→已补别名）或接口形态差异。
 
@@ -242,7 +242,7 @@
 
 | 类别 | 项 | 证据 | 处理 |
 |---|---|---|---|
-| **A. 可读 ado + 二进制 Mata 核心** | ~~`synth`/`synth2`~~ → 2026-11-09 移出（见 §3.6.4）、`rcm` 自动选择 | `rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中。**第 159 轮确证 `.mlib` 不可反编译**（见下） | `synth` 已落地 E2；`rcm` 自动选择仍**已到边界** |
+| **A. 可读 ado + 二进制 Mata 核心** | ~~`synth`/`synth2`~~ → 2026-11-09/11-11 移出（见 §3.6.4）、`rcm` 自动选择 | `rcm.ado` 1126 行可读，但优化器/选择逻辑在 `.mlib` 中。**第 159 轮确证 `.mlib` 不可反编译**（见下） | `synth` 与 `synth2`（非图形）均已落地 E2；`rcm` 自动选择仍**已到边界** |
 
 **第 159 轮对「能否反编译 Mata」的最终核实**——此前的说法是「除非反编译 Mata」，现在有了确定答案：
 
@@ -332,7 +332,7 @@ fpe = ((T + eqparm)/(T - eqparm))**K * detsig_ml
 | 状态 | 项 |
 |---|---|
 | ✅ 可做、可逐项验证 | 默认路径数据准备、V（导出或辨识）、内层 QP、W、六个 `e()` 矩阵、RMSPE、效应路径 |
-| ⛔ 仍不做（原因已定性，非「信息不可得」） | `nested`/`allopt` 的 Stata 闭源 `ml` 收敛点；C++ QP 求解器的 FP/CRT/pivot 数值行为；`synth2`、图形、placebo/LOO；任何标准误/推断伪造；**E3 声明** |
+| ⛔ 仍不做（原因已定性，非「信息不可得」） | `nested`/`allopt` 的 Stata 闭源 `ml` 收敛点；C++ QP 求解器的 FP/CRT/pivot 数值行为；`synth`/`synth2` 的**图形**（`figure`/`nofigure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()`；任何标准误/推断伪造；**E3 声明** |
 | 🔧 P0 harness 缺口 | `StataCapture.capture()` 要求 `e(b)/e(V)`，synth 只存六个矩阵 → 需扩展矩阵型 `e()` 捕获 |
 
 **REA 逆向（用户点名评估，结论：不用）**：`rea-agents@6.5.0` 的 `targetFormatSchema`

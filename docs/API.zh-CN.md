@@ -19,7 +19,7 @@ _westata 版本: 0.3.6 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -6525,6 +6525,41 @@ x1        200.0  0.057340   1.025868 -2.832134  3.278208
 x2        200.0  0.063540   0.993631 -2.226171  3.259538
 ```
 
+### `Synth2Result`
+
+**Stata 指令:** `ereturn list -- the e() surface synth2 stores (synth's e() is wiped)`
+
+保存 `synth2` 结果的冻结 dataclass（`synth` 的 e() 已被清空）。字段逐字对应 Stata 的 `e()`：标量 `N/T/T0/T1/K/J/rmse/r2/att`，矩阵 `bal`（K x 6）、`U_wt`、`V_wt`、`mspe`（仅空间安慰剂）、`pval`（仅空间安慰剂），轨迹 `Y_treated`/`Y_synthetic`/`time_index` 及 `gap` 属性，安慰剂字段（`placebo_probability`、`placebo_removed`、`mspe_names`、`time_placebo`），留一包络（`loo_min`/`loo_max`/`loo_effect_min`/`loo_effect_max`/`loo_n_runs`），以及审计字段（`synth_result`、`method`、`numerically_inactive`）。`summary()` 渲染紧凑的 Stata 风格报表。它不是 `StataResults`：不伪造 `params`、`bse`、`cov_params`、`df_resid`。`bal` 的 6 列为 `Vweight, Treated, ValueSyntheticControl, BiasSyntheticControl, ValueAverageControl, BiasAverageControl`；`Bias% = (Value/Treated - 1)*100`（ado:181）。
+
+**签名**
+
+```python
+ws.Synth2Result(N: 'int', T: 'int', T0: 'int', T1: 'int', K: 'int', J: 'int', rmse: 'float', r2: 'float', att: 'float', bal: 'np.ndarray', U_wt: 'np.ndarray', V_wt: 'np.ndarray', mspe: 'np.ndarray | None' = None, pval: 'np.ndarray | None' = None, Y_treated: 'np.ndarray | None' = None, Y_synthetic: 'np.ndarray | None' = None, time_index: 'np.ndarray | None' = None, placebo_probability: 'float | None' = None, placebo_removed: 'tuple[Any, ...]' = (), mspe_names: 'tuple[str, ...]' = (), time_placebo: 'dict[float, dict[str, np.ndarray]]' = <factory>, loo_min: 'np.ndarray | None' = None, loo_max: 'np.ndarray | None' = None, loo_effect_min: 'np.ndarray | None' = None, loo_effect_max: 'np.ndarray | None' = None, loo_n_runs: 'int' = 0, loo_units: 'tuple[Any, ...]' = (), synth_result: 'SynthResult | None' = None, method: 'str' = 'regression', numerically_inactive: 'tuple[str, ...]' = ()) -> None
+```
+
+**示例**
+
+```python
+units = [1, 2, 3, 4, 5]
+years = np.arange(1997, 2006)
+u = np.repeat(units, len(years))
+t = np.tile(years, len(units))
+rng = np.random.default_rng(0)
+x1 = 0.5 * u + rng.normal(size=len(u))
+x2 = 0.2 * u + rng.normal(size=len(u))
+y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
+panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
+res = ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)
+res.bal
+```
+
+**输出**
+
+```text
+[[  0.757511   0.851994   1.094422  28.454142   1.70489  100.105787]
+ [  0.242489   0.870713   0.700712 -19.524351   0.678917 -22.02742 ]]
+```
+
 ### `SynthResult`
 
 **Stata 指令:** `ereturn list -- the e() matrices synth stores`
@@ -7401,6 +7436,41 @@ ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], t
 ```
 
 **注意:** 仅实现默认路径：`nested`/`allopt`、`figure`、`keep()`、`placebo` 以及任何推断量都会抛出 `UnsupportedError`。`customV` 提供对角预测变量权重；`xperiod`/`mspeperiod`/`resultsperiod` 覆盖预处理窗口。输出的 `W_weights` 按 Stata 做法四舍五入到 3 位小数，而 `RMSPE` 使用精确 QP 权重。
+
+### `synth2`
+
+**Stata 指令:** `synth2 y x1 x2, trunit(1) trperiod(2005)`
+
+Stata `synth2` 的非图形功能实现。`synth2` 是包装器：全部优化委托给 `ws.synth`，自身增加拟合统计量（`rmse`/`r2`/`att`）、6 列协变量平衡表（`bal`）、非零单位权重（`U_wt`）、V 对角矩阵（`V_wt`）、空间安慰剂（假处理单位 -> `mspe` + 逐期双侧/右侧/左侧 p 值 `pval`，可选 `cut()`）、时间安慰剂（`placebo('period(2001)')`，仅重估、无推断）以及留一法逐期 min/max 包络（`loo=True`）。选项与 Stata 对应：`counit`、`preperiod`、`postperiod`、`xperiod`、`mspeperiod`、`customV`、`nested`、`allopt` 及四个优化器参数。返回冻结的 `Synth2Result`。纯图形选项（`figure`/`nofigure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()` 明确拒绝/不实现，全部结果由结果对象属性承载。证据等级按量定为 E2：公式层（bal/U_wt/V_wt）达机器精度，重跑链路继承 `ws.synth` 秩亏 QP 的差异。
+
+**签名**
+
+```python
+ws.synth2(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None, **unsupported: 'Any') -> 'Synth2Result'
+```
+
+**示例**
+
+```python
+units = [1, 2, 3, 4, 5]
+years = np.arange(1997, 2006)
+u = np.repeat(units, len(years))
+t = np.tile(years, len(units))
+rng = np.random.default_rng(0)
+x1 = 0.5 * u + rng.normal(size=len(u))
+x2 = 0.2 * u + rng.normal(size=len(u))
+y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
+panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
+ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).rmse
+```
+
+**输出**
+
+```text
+1.3651043054505119
+```
+
+**注意:** `synth2.ado:330` 用 `ereturn clear` 清空 `synth` 的 e()，Python 结果面是 synth2 自己的，另附 `synth_result` 保留原始拟合。`R2` 分母是合成值的处理前离差（ado:647，非标准）。聚合概率与逐期 p 值把处理组自身计入分母且用 >= 比较（ado:441/940/947-949）。时间安慰剂不产生 mspe/pval。`frame()`/`symbol()` 是 Stata 特有的结果数据集机制，由 Synth2Result 属性替代。
 
 ### `t_test`
 

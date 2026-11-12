@@ -7,6 +7,67 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.8] - 2026-11-12
+
+### Added — `hausman ..., sigmamore` / `sigmaless`
+
+Stata's two sigma options now work. `hausman.ado:162-173` rescales one VCE **before** differencing —
+the consistent estimator's for `sigmamore`, the efficient one's for `sigmaless` — by the square of
+the `s2` ratio, where `s2` is `e(sigma)` falling back to **`e(rmse)` itself**, not its square
+(`hausman.ado:113-116`).
+
+```python
+ws.hausman(iv, ols, constant=True, sigmamore=True)
+```
+
+Measured against a live Stata on grilic (`reg` + `ivregress 2sls`, then `hausman iv ols`):
+
+| options | chi2 | df |
+|---|---|---|
+| default | 3.422654895 | 6 |
+| `constant` | 3.422654895 | 7 |
+| `sigmamore` | 3.843794583 | **1** |
+| `sigmamore constant` | 3.843794583 | **1** |
+| `sigmaless` | 3.437051055 | **1** |
+
+`df` is the **rank** of the differenced matrix, which Stata takes from `MatGinv` using
+`tol = max(singular value) * n * 1e-9` (`hausman.ado:606-628`); NumPy's default tolerance is about
+1e-16 relative and keeps directions Stata discards, putting the statistic on the wrong df.
+
+### Fixed — `hausman` notes and the constant row
+
+* The five-line rank note now opens the output when the rank is below the number tested:
+
+  ```
+  Note: the rank of the differenced variance matrix (1) does not equal the number
+          of coefficients being tested (6); be sure this is what you expect, or
+          ...
+  ```
+
+  Continuation lines indent eight spaces; `test.` is followed by two spaces.
+
+* `(V_b-V_B is not positive definite)` is appended as the last line when the difference needs a
+  generalised inverse.
+
+* The constant row is labelled `_cons` (was `Intercept`), and coefficients use a magnitude-dependent
+  decimal count — **six places at or above 1, seven below** — so `3.2180433224` prints as
+  `3.218043` rather than `3.2180433`.
+
+All four option combinations are byte-identical to Stata (20, 21, 27 and 28 lines), provided the
+caller labels the estimates the way `estimates store` would via `estimation_label`.
+
+### Docs — `first_stage()` vs `estat firststage`
+
+`render_first_stage()` now states the split explicitly. The two are different Stata outputs and both
+were already implemented:
+
+| Stata | westata | shape |
+|---|---|---|
+| `ivregress ..., first` | `result.first_stage()` | coefficient table |
+| `estat firststage` | `ws.estat_firststage(result)` | R-sq panel, no coefficients |
+
+---
+
 ## [0.3.7] — the `tsset` axis for the serial-correlation tests (2026-11-12)
 
 Released together with everything still listed as `[Unreleased]` below, since 0.3.6

@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.6 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.8 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -3669,7 +3669,7 @@ Prob > chi2 = 0.0095
 **签名**
 
 ```python
-ws.hausman(consistent: 'Any', efficient: 'Any', *, constant: 'bool' = False) -> 'HausmanResult'
+ws.hausman(consistent: 'Any', efficient: 'Any', *, constant: 'bool' = False, sigmamore: 'bool' = False, sigmaless: 'bool' = False) -> 'HausmanResult'
 ```
 
 **示例**
@@ -6266,7 +6266,7 @@ Hausman 设定检验：`(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`。字段：`sta
 **签名**
 
 ```python
-ws.HausmanResult(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '') -> None
+ws.HausmanResult(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '', tested_count: 'int | None' = None, not_positive_definite: 'bool' = False) -> None
 ```
 
 **示例**

@@ -425,6 +425,45 @@ two estimators' signatures do not take (the serial-correlation commands above do
 
 The full audit — 9 rounds, 57+ live captures, a scan of 3962 `.ado` files — is in `NOTES_AUDIT.md`.
 
+### `hausman` and its `sigmamore` / `sigmaless` options
+
+`ws.hausman(consistent, efficient, ...)` reproduces Stata's `hausman`. The two sigma options are
+sometimes needed when the estimators' VCEs are not directly comparable:
+
+```python
+iv = ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit()
+ols = ws.OLS.from_formula("price ~ weight + mpg", df).fit()
+
+print(ws.hausman(iv, ols).statistic)                    # Stata: hausman iv ols
+print(ws.hausman(iv, ols, constant=True).statistic)     # hausman iv ols, constant
+print(ws.hausman(iv, ols, sigmamore=True).statistic)    # hausman iv ols, sigmamore
+```
+
+They rescale one VCE **before** differencing — the consistent side for `sigmamore`, the efficient side
+for `sigmaless` — by the squared ratio of the `s2` values, where `s2` is `e(sigma)` falling back to
+**`e(rmse)` itself** rather than its square.
+
+**The reported `df` is the rank of the differenced matrix, not the number of coefficients.** A rank
+that falls short also adds Stata's five-line `Note:` at the top, and a difference that is not positive
+definite ends with `(V_b-V_B is not positive definite)`. Measured on grilic with `reg` plus
+`ivregress 2sls`, then `hausman iv ols`:
+
+| options | chi2 | df |
+|---|---|---|
+| default | 3.422654895 | 6 |
+| `constant` | 3.422654895 | 7 |
+| `sigmamore` | 3.843794583 | 1 |
+| `sigmamore constant` | 3.843794583 | 1 |
+| `sigmaless` | 3.437051055 | 1 |
+
+Column headings come from the `estimates store` names in Stata. Set `estimation_label` on each result
+to match:
+
+```python
+# set on the two results before calling hausman:
+iv.estimation_label, ols.estimation_label = "iv", "ols"
+```
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

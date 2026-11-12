@@ -341,6 +341,43 @@ print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # 补零，全样本
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失
 ```
 
+### `hausman` 与它的 `sigmamore` / `sigmaless` 选项
+
+`ws.hausman(consistent, efficient, ...)` 复现 Stata 的 `hausman`。当两个估计量的 VCE 不可直接比较时，
+需要这两个 sigma 选项：
+
+```python
+iv = ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit()
+ols = ws.OLS.from_formula("price ~ weight + mpg", df).fit()
+
+print(ws.hausman(iv, ols).statistic)                    # Stata: hausman iv ols
+print(ws.hausman(iv, ols, constant=True).statistic)     # hausman iv ols, constant
+print(ws.hausman(iv, ols, sigmamore=True).statistic)    # hausman iv ols, sigmamore
+```
+
+它们会在**做差之前**缩放其中一个 VCE——`sigmamore` 缩放一致估计量一侧，`sigmaless` 缩放有效估计量一侧
+——缩放因子是 `s2` 之比的平方，而 `s2` 取 `e(sigma)`，缺失时回退到 **`e(rmse)` 本身**
+（不是它的平方）。
+
+**报告的 `df` 是差分矩阵的秩，不是系数个数。** 秩小于系数个数时，输出顶部还会多出 Stata 那条
+五行 `Note:`；差分矩阵非正定时，最后一行是 `(V_b-V_B is not positive definite)`。
+在 grilic 上用 `reg` 加 `ivregress 2sls`、再执行 `hausman iv ols` 的实测：
+
+| 选项 | chi2 | df |
+|---|---|---|
+| 默认 | 3.422654895 | 6 |
+| `constant` | 3.422654895 | 7 |
+| `sigmamore` | 3.843794583 | 1 |
+| `sigmamore constant` | 3.843794583 | 1 |
+| `sigmaless` | 3.437051055 | 1 |
+
+Stata 的列标题取 `estimates store` 时起的名字。设置每个结果的 `estimation_label` 即可对齐：
+
+```python
+# set on the two results before calling hausman:
+iv.estimation_label, ols.estimation_label = "iv", "ols"
+```
+
 ### `tsset` 的对应物：`time=` 参数
 
 Stata 里 `estat bgodfrey` / `estat dwatson` / `wntestq` / `corrgram` 都先调

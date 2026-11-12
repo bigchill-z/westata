@@ -590,8 +590,61 @@ def _comparable_names(
     return comparable, excluded
 
 
+def _hausman_sigma(result: Any) -> float | None:
+    """``s2`` for ``sigmamore``/``sigmaless``: ``e(sigma)`` or, when missing, ``e(rmse)``.
+
+    ``hausman.ado:113-116`` spells the fallback out and it is NOT squared:
+
+        scalar s2_i = e(sigma)
+        if s2_i == . scalar s2_i = e(rmse)
+
+    The caller squares the RATIO, so using ``e(rmse)**2`` here squares twice and changes the answer.
+    """
+
+    e = getattr(result, "e", None) or {}
+    for key in ("sigma", "rmse"):
+        value = e.get(key)
+        if value is None:
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(number) and number != 0.0:
+            return number
+    return None
+
+
+def _stata_generalised_inverse(matrix: np.ndarray) -> tuple[np.ndarray, int]:
+    """Moore-Penrose inverse with Stata's own rank tolerance (``hausman.ado:606-628``).
+
+    Stata computes ``tol = max(singular value) * n * 1.0e-9`` and treats every singular value at or
+    below it as ZERO, which is what sets ``r(rank)`` and the reported degrees of freedom. NumPy's
+    ``pinv`` uses ``max(shape) * eps * max(sv)`` (about 1e-16 relative), so on a matrix whose small
+    singular values are 1e-9-ish it keeps directions Stata discards -- the statistic then comes out
+    over a wrongly large df.
+    """
+
+    values, weights, right = np.linalg.svd(np.asarray(matrix, dtype=float))
+    count = weights.size
+    empty = np.zeros_like(np.asarray(matrix, dtype=float))
+    if count == 0 or not np.isfinite(weights).all():
+        return empty, 0
+    tolerance = float(weights.max()) * count * 1.0e-9
+    keep = weights > tolerance
+    if not keep.any():
+        return empty, 0
+    reciprocal = np.where(keep, 1.0 / np.where(keep, weights, 1.0), 0.0)
+    return (right.T * reciprocal) @ values.T, int(keep.sum())
+
+
 def hausman(
-    consistent: Any, efficient: Any, *, constant: bool = False
+    consistent: Any,
+    efficient: Any,
+    *,
+    constant: bool = False,
+    sigmamore: bool = False,
+    sigmaless: bool = False,
 ) -> HausmanResult:
     """Hausman test of the efficient estimator's consistency (``[R] hausman``).
 
@@ -602,6 +655,15 @@ def hausman(
     efficient:
         Efficient under the null but inconsistent under the alternative, e.g.
         ``xtreg, re``.
+    sigmamore: bool, default False
+        Stata's ``hausman ..., sigmamore``: rescale the CONSISTENT estimator's
+        covariance by ``(s2_efficient / s2_consistent) ** 2`` before differencing,
+        where ``s2`` is ``e(sigma)`` and falls back to ``e(rmse)`` when that is
+        missing. Use it when the two estimators are fit on the same sample but
+        the robust VCEs are not directly comparable.
+    sigmaless: bool, default False
+        The mirror: rescale the EFFICIENT estimator's covariance by
+        ``(s2_consistent / s2_efficient) ** 2``.
     constant:
         Include the intercept in the comparison (Stata's ``hausman ...,
         constant``).  The default ``False`` is Stata's default and excludes it,
@@ -672,11 +734,34 @@ def hausman(
     consistent_cov = np.asarray(consistent.cov_params(), dtype=float)
     efficient_cov = np.asarray(efficient.cov_params(), dtype=float)
 
+    consistent_slice = consistent_cov[np.ix_(consistent_index, consistent_index)]
+    efficient_slice = efficient_cov[np.ix_(efficient_index, efficient_index)]
+
+    # ``sigmamore`` / ``sigmaless`` RESCALE ONE VCE BEFORE DIFFERENCING, they do not invert differently.
+    # `hausman.ado:162-173`:
+    #
+    #     if "sigmamore" {  matrix V1 = ((s2_2/s2_1)^2) * V1  }   // V1 = the CONSISTENT estimator
+    #     else           {  matrix V2 = ((s2_1/s2_2)^2) * V2  }   // V2 = the EFFICIENT one
+    #
+    # and `hausman.ado:113-116` defines s2 as e(sigma) falling back to e(rmse) -- NOT e(rmse)^2.
+    # Getting that fallback wrong is not subtle: on grilic it leaves the difference full rank where
+    # Stata reports rank 1. With the fallback right, chi2(1) = 3.8437945826 against Stata's
+    # 3.8437945825639 and p = .0499304001 against .0499304000722989.
+    if sigmamore or sigmaless:
+        s2_consistent = _hausman_sigma(consistent)
+        s2_efficient = _hausman_sigma(efficient)
+        if s2_consistent is None or s2_efficient is None:
+            raise ConsistencyError(
+                "hausman: sigmamore/sigmaless need e(sigma) or e(rmse) on both results, "
+                "which Stata also requires ('Estimators do not save e(sigma) or e(rmse)')"
+            )
+        if sigmamore:
+            consistent_slice = (s2_efficient / s2_consistent) ** 2 * consistent_slice
+        else:
+            efficient_slice = (s2_consistent / s2_efficient) ** 2 * efficient_slice
+
     difference = consistent_params[consistent_index] - efficient_params[efficient_index]
-    difference_cov = (
-        consistent_cov[np.ix_(consistent_index, consistent_index)]
-        - efficient_cov[np.ix_(efficient_index, efficient_index)]
-    )
+    difference_cov = consistent_slice - efficient_slice
 
     # Stata inverts with a generalised inverse when the difference is not
     # positive definite, and warns. Reproduce that rather than raising: a non-PD
@@ -689,6 +774,7 @@ def hausman(
 
     if positive_definite:
         solved = np.linalg.solve(symmetric, difference)
+        rank = len(comparable)
     else:
         warnings.warn(
             "hausman: the difference V_consistent - V_efficient is not positive "
@@ -697,14 +783,42 @@ def hausman(
             RuntimeWarning,
             stacklevel=2,
         )
-        solved = np.linalg.pinv(symmetric) @ difference
+        inverse, rank = _stata_generalised_inverse(symmetric)
+        solved = inverse @ difference
 
     statistic = float(difference @ solved)
     # A generalised inverse can produce a tiny negative quadratic form; see the
     # Notes section of this function's docstring for why the floor is kept even
     # though Stata would print the negative value.
     statistic = max(statistic, 0.0)
-    df = float(len(comparable))
+    # STATA'S DF IS THE RANK OF THE GENERALISED INVERSE, not the coefficient count. hausman.ado
+    # fills r(df) from the rank MatGinv computed, so a rank-deficient difference reports fewer
+    # degrees of freedom -- on grilic, sigmamore gives rank 1 over 7 coefficients, hence chi2(1).
+    #
+    # Rank 0 means the two estimators are numerically IDENTICAL (comparing a model with itself):
+    # the quadratic form is exactly 0, so the honest reading is "no evidence against H0", i.e.
+    # p = 1. Stata cannot reach this state because `hausman` refuses an estimator against itself,
+    # but this package's callers can, and returning NaN for a perfectly defined zero test would be
+    # worse than returning the limit.
+    # A rank of 0 means the difference matrix is numerically zero: the two estimators are the same
+    # model. The quadratic form is exactly 0, so p = 1 is the honest limit, and the df falls back to
+    # the coefficient count because reporting chi2(0) would describe no distribution at all.
+    df = float(rank) if rank > 0 else float(len(comparable))
+    if rank == 0:
+        return HausmanResult(
+            statistic=0.0,
+            df=df,
+            pvalue=1.0,
+            excluded=excluded,
+            names=list(comparable),
+            consistent=consistent_params[consistent_index],
+            efficient=efficient_params[efficient_index],
+            standard_errors=np.sqrt(np.abs(np.diag(symmetric))),
+            consistent_label=_side_label(consistent),
+            efficient_label=_side_label(efficient),
+            consistent_command=_command_name(consistent),
+            efficient_command=_command_name(efficient),
+        )
 
     # The coefficient table Stata prints above the summary. ``comparable`` holds the names in the
     # order both estimates share them, so the rows line up with the printed (b)/(B)/(b-B).

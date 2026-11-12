@@ -160,6 +160,13 @@ class HausmanResult:
     efficient_label: str = ""
     consistent_command: str = ""
     efficient_command: str = ""
+    #: ``chi2(df)`` Stata reports is the RANK of the differenced matrix; when that rank is smaller
+    #: than the number of coefficients tested, Stata opens the output with a five-line ``Note:``
+    #: naming both numbers. ``None`` keeps ``df`` itself as the tested count.
+    tested_count: int | None = None
+    #: Stata appends ``(V_b-V_B is not positive definite)`` under the summary when the differenced
+    #: covariance has a non-positive eigenvalue, which is also when it needs the generalised inverse.
+    not_positive_definite: bool = False
 
     def __str__(self) -> str:
         """Reproduce ``hausman``'s coefficient table, as Stata prints it.
@@ -209,7 +216,18 @@ class HausmanResult:
             significant digits) from values a decade apart.
             """
 
-            text = f"{float(value):.7f}"
+            # THE DECIMAL COUNT DEPENDS ON THE MAGNITUDE, and the split is at 1.0: values at or
+            # above 1 get SIX places, values below get SEVEN. Measured on the same table:
+            #
+            #     3.218043   3.895172   <- 6 places
+            #     .0139284   .1272224   <- 7 places
+            #
+            # A fixed seven places (the previous rule) printed 3.2180433 where Stata has 3.218043,
+            # one character too wide for every coefficient above 1. Eight values spanning both
+            # branches pin the rule; "%.6g" would have dropped trailing digits instead.
+            magnitude = abs(float(value))
+            places = 6 if magnitude >= 1.0 else 7
+            text = f"{float(value):.{places}f}"
             if "." in text:
                 text = text.rstrip("0").rstrip(".")
             if text.startswith("0."):
@@ -245,6 +263,12 @@ class HausmanResult:
             "-------------+" + "-" * 64,
         ]
         for index, name in enumerate(self.names):
+            # STATA LABELS THE INTERCEPT "_cons", never "Intercept". The compared names come from the
+            # result's parameter list, which uses patsy's spelling, so the row printed
+            # "   Intercept |" where Stata has "       _cons |" -- a different label AND a different
+            # column width because the two words differ by four characters.
+            if str(name).strip().lower() in ("intercept", "const", "constant"):
+                name = "_cons"
             error = errors[index]
             # The standard error uses the same rule as the coefficients -- seven decimals, no
             # leading zero -- and "." when the difference has no estimable variance.
@@ -295,6 +319,41 @@ class HausmanResult:
         lines.append(f"    chi2({self.df:g}) = (b-B)'[(V_b-V_B)^(-1)](b-B)")
         lines.append(f"            = {self.statistic:>6.2f}")
         lines.append(f"Prob > chi2 = {self.pvalue:.4f}")
+        # THE RANK NOTE IS THE FIRST THING STATA PRINTS, before the coefficient table, and only when
+        # the differenced matrix's rank is smaller than the number of coefficients tested. Measured
+        # on `hausman iv ols, sigmamore` (rank 1 over 6 coefficients):
+        #
+        #     (blank)
+        #     Note: the rank of the differenced variance matrix (1) does not equal the number
+        #             of coefficients being tested (6); be sure this is what you expect, or
+        #             there may be problems computing the test.  Examine the output of your
+        #             estimators for anything unexpected and possibly consider scaling your
+        #             variables so that the coefficients are on a similar scale.
+        #     (blank)
+        #
+        # The continuation lines are indented EIGHT spaces; there are TWO spaces after "test.".
+        if (
+            self.tested_count is not None
+            and int(self.tested_count) > int(self.df)
+        ):
+            lines.insert(
+                0,
+                chr(10).join(
+                    [
+                        "",
+                        "Note: the rank of the differenced variance matrix "
+                        f"({int(self.df)}) does not equal the number",
+                        "        of coefficients being tested "
+                        f"({int(self.tested_count)}); be sure this is what you expect, or",
+                        "        there may be problems computing the test.  Examine the output of your",
+                        "        estimators for anything unexpected and possibly consider scaling your",
+                        "        variables so that the coefficients are on a similar scale.",
+                    ]
+                ),
+            )
+        # ... and the non-positive-definite marker is the LAST line, after the summary.
+        if self.not_positive_definite:
+            lines.append("(V_b-V_B is not positive definite)")
         return chr(10).join(lines)
 
     def to_dict(self) -> dict[str, float]:
@@ -836,4 +895,6 @@ def hausman(
         efficient_label=_side_label(efficient),
         consistent_command=_command_name(consistent),
         efficient_command=_command_name(efficient),
+        tested_count=len(comparable),
+        not_positive_definite=not positive_definite,
     )

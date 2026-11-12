@@ -2,6 +2,30 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之四、2026-11-12 0.3.7 发布：GitHub 已完成，PyPI 缺凭证
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | **0.3.7**（PyPI 上最新为 0.3.6，故必须升号；已改 `pyproject.toml` 与 CHANGELOG） |
+| GitHub | **已完成**：`4898737` 已推送 `origin/main`，annotated tag `v0.3.7` 已推送 |
+| 产物 | `dist/westata-0.3.7-py3-none-any.whl` 与 `dist/westata-0.3.7.tar.gz`，`twine check` 两项均 PASSED；已装入干净目录实测版本 0.3.7、且序列相关命令数值正确 |
+| PyPI 上传 | ⚠️ **仍待用户提供凭证**：本机无 `~/.pypirc`、无 `TWINE_PASSWORD`/`PYPI_TOKEN`、keyring（WinVault）无记录；twine 报 `NonInteractive: Credential not found for API token`。网络已通（`upload.pypi.org` 返回 200） |
+| 需用户做 | 提供 PyPI API token（用户名 `__token__`，密码 `pypi-...`），或在 GitHub 仓库上配置 Trusted Publishing（当前环境不被 twine 识别为可信发布环境） |
+
+**发布命令（拿到 token 后一条即可）**：
+
+```powershell
+$env:TWINE_USERNAME = "__token__"; $env:TWINE_PASSWORD = "pypi-..."
+.venv\Scripts\python.exe -m twine upload dist\*
+```
+
+> 注：本轮合并 `origin/main` 时，远端提交 `3d22b69` 自述其树与本地 `aeb29d7` 逐字节相同
+> （当时 git 传输被阻断，改用 Git Data API 推送）。合并前已用
+> `git diff aeb29d7 origin/main` 验证为空；合并中的 5 个冲突文件一律取本地版本，
+> 因为这些文件的远端版本正是 `aeb29d7` 的旧内容。
+
+---
+
 ## 〇之三、2026-11-11 `synth2` 非图形功能的范围决策
 
 | 决策 | 结果 |
@@ -22,8 +46,9 @@
 | 明确不做 | 图形（`figure`）、任何推断量；`synth2` 的 placebo/LOO 已于 2026-11-11 单独实现（见 〇之三）；「全部机器精度」不承诺 |
 | 精度口径 | 逐量实测定级，以 6+ 份活体 Stata 捕获为准；不先拍死容差再凑 |
 
-**当前仍需用户决策的事项**：仅 **P4 推送 PyPI / GitHub 前的确认**（工作区规则要求
-以新版本号推送；本地 0.3.6 已提交，外部推送因 GitHub TLS 阻断 + 缺 PyPI token 未完成）。
+**当前仍需用户决策的事项**：**仅 PyPI 0.3.7 的 API token**（GitHub 已推送完毕，
+产物已构建并校验，见上方「〇之四」）。此前记录的「GitHub TLS 阻断 + 缺 PyPI token」
+中，GitHub 部分已随本轮网络恢复完成推送。
 
 ---
 

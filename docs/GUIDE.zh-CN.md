@@ -327,8 +327,10 @@ Breusch-Godfrey 与 `estat dwatson` 有一点差别，读输出前值得先知�
 
 | 阶数 | 默认 | `nomiss0` |
 |---|---|---|
-| 1 | 187.976 | 191.674 |
-| 2 | 188.371 | 191.009 |
+| 1 | 4.237 | 4.704 |
+| 2 | 4.487 | 5.111 |
+| 3 | 4.775 | 5.053 |
+| 4 | 5.099 | 5.679 |
 
 ```python
 # 上表捕获自 icecream.dta 的 `regress consumption temp price income`；
@@ -339,7 +341,47 @@ print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # 补零，全样本
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失
 ```
 
-`bgodfrey.ado` 拒绝在 `regress, robust` 之后运行，本实现同样如此。
+### `tsset` 的对应物：`time=` 参数
+
+Stata 里 `estat bgodfrey` / `estat dwatson` / `wntestq` / `corrgram` 都先调
+`_ts ... , sort onepanel` 取时间变量，再用 `tsrevar l(...)` 或 `L.` 造滞后。
+**`L.` 是定义在时间轴上的**，所以某个期在样本里缺失时，该行的滞后是**缺失值**，
+而不是上一行——把缺口两侧直接接起来会得到一个看着合理、实际不同的数。
+
+本 API 没有 `tsset` 这一步，行序即时间序。若样本有缺口，用 `time=` 把时间轴交给它：
+
+```python
+# 加一列期号，并故意抹掉其中一期：不给 `time=` 时滞后会把缺口两侧的行接起来，
+# 而这正是 `L.` 不会做的事。
+time_series = df.assign(year=range(1, len(df) + 1)).drop(index=10).reset_index(drop=True)
+gapped = ws.OLS.from_formula("price ~ mpg + weight", time_series).fit()
+
+ws.estat_bgodfrey(gapped, lags=1)               # 按行序取滞后
+ws.estat_bgodfrey(gapped, lags=1, time="year")  # 按 year 取滞后，缺口处滞后缺失
+```
+
+`time=` 接受**列名**或**与估计样本等长的期数值数组**；`delta=` 对应 `tsset` 的
+`Delta:`（默认 1，必须是正整数，分数期值 `tsset` 自身就拒绝）。
+
+实测口径（`icecream.dta`，删掉 `time == 5`，重估 n = 29）：
+
+| 命令 | 按行序 | `time=`（= Stata） |
+|---|---|---|
+| `estat bgodfrey, lags(1)` | 3.286 | **4.220** |
+| `estat dwatson` | 1.0868969 | **.8930395** |
+| `wntestq e1, lags(4)` | 4.3302 | **3.9550** |
+
+有缺口时 Stata 会先打一行说明，本包逐字符复现：
+
+* `estat bgodfrey` / `estat dwatson`：`Number of gaps in sample = 1`（其后空一行再打表）
+* `wntestq` / `corrgram`：`(note: time series has 1 gap)`（复数时 `gaps`）
+
+**默认滞后阶数是 `max(1, min(int(n/2) - 2, 40))`**（`ac.ado:71`、`corrgram.ado:18`），
+与上一次回归估了几个参数无关，且有 **40 的上限**。
+在 n = 758 上 Stata 报 `chi2(40)`，而不是按 `(n-k)//2` 会得到的 377。
+
+面板数据一律拒绝：`_ts ..., onepanel` 的后果是 `sample may not include multiple panels`
+（r(459)）；`areg` / `reghdfe` / `newey` / `xtreg` 拟合则报 `estat bgodfrey not valid`（r(321)）。
 
 ### Stata 在表格前后打印的说明文字
 
@@ -359,8 +401,8 @@ Stata 的输出不只是数字：它还会打印 note、警告和迭代日志，
 **两处刻意省略**。ML 的**中间**对数似然来自 Stata 的 `moptimize` 路径，
 换一个优化器就无法复现；打印本包自己的轨迹会「形似 Stata 却每行都对不上」。
 因此只显示 `Iteration 0` 与表头中本来精确的 `Log likelihood = ...` 行。
-`prais` / `xtpcse` 关于时间缺口的 note 需要 `tsset` 时间变量，而本 API 不接收该变量，
-故不猜测。
+`prais` / `xtpcse` 关于时间缺口的 note 需要 `tsset` 时间变量，
+而这两个估计量的签名不接收它（上文那些序列相关命令可以，通过 `time=`），故不猜测。
 
 完整审计（9 轮、57+ 次活体捕获、扫描 3962 个 `.ado` 文件）见 `NOTES_AUDIT.md`。
 

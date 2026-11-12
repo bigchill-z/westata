@@ -310,8 +310,10 @@ option changes the statistic itself, not merely its degrees of freedom:
 
 | lag | default | `nomiss0` |
 |---|---|---|
-| 1 | 187.976 | 191.674 |
-| 2 | 188.371 | 191.009 |
+| 1 | 4.237 | 4.704 |
+| 2 | 4.487 | 5.111 |
+| 3 | 4.775 | 5.053 |
+| 4 | 5.099 | 5.679 |
 
 ```python
 # The table above was captured from `regress consumption temp price income` on
@@ -323,6 +325,54 @@ print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # keep them missing
 ```
 
 `bgodfrey.ado` refuses to run after `regress, robust`, and so does this function.
+`vce(cluster)` is `e(vcetype) = Robust` in Stata's eyes too, so it is refused as well.
+
+### The `tsset` equivalent: `time=`
+
+In Stata, `estat bgodfrey` / `estat dwatson` / `wntestq` / `corrgram` all fetch the time
+variable with `_ts ..., sort onepanel` and then build their lags with `tsrevar l(...)` or `L.`.
+**`L.` is defined on the time axis**, so when a period is missing from the sample that row's
+lag is MISSING rather than the previous row -- joining the two sides of a gap produces a number
+that looks plausible and is not Stata's.
+
+This API has no `tsset` step: row order IS time order. When the sample has gaps, hand over the
+axis with `time=`:
+
+```python
+# A period column plus one deliberately missing period: without `time=` the lag pairs the
+# rows on either side of the gap, which is NOT what `L.` does.
+time_series = df.assign(year=range(1, len(df) + 1)).drop(index=10).reset_index(drop=True)
+gapped = ws.OLS.from_formula("price ~ mpg + weight", time_series).fit()
+
+ws.estat_bgodfrey(gapped, lags=1)              # lags by row order
+ws.estat_bgodfrey(gapped, lags=1, time="year")  # lags on `year`; missing across the gap
+```
+
+`time=` takes a **column name** or an **array of period values the length of the estimation
+sample**; `delta=` is `tsset`'s `Delta:` (default 1, must be a positive integer -- `tsset`
+itself refuses fractional periods).
+
+Measured on `icecream.dta` with `time == 5` dropped and the model re-fitted (n = 29):
+
+| command | by row order | `time=` (= Stata) |
+|---|---|---|
+| `estat bgodfrey, lags(1)` | 3.286 | **4.220** |
+| `estat dwatson` | 1.0868969 | **.8930395** |
+| `wntestq e1, lags(4)` | 4.3302 | **3.9550** |
+
+With gaps Stata announces them, and this package reproduces the wording exactly:
+
+* `estat bgodfrey` / `estat dwatson`: `Number of gaps in sample = 1` (then a blank line)
+* `wntestq` / `corrgram`: `(note: time series has 1 gap)` (`gaps` in the plural)
+
+**The default lag order is `max(1, min(int(n/2) - 2, 40))`** (`ac.ado:71`,
+`corrgram.ado:18`). It does not depend on how many parameters the previous regression
+estimated, and it is **capped at 40**: at n = 758 Stata reports `chi2(40)`, not the 377 an
+`(n-k)//2` rule would give.
+
+Panel data is refused outright: `_ts ..., onepanel` answers `sample may not include multiple
+panels` (r(459)), and `areg` / `reghdfe` / `newey` / `xtreg` fits answer
+`estat bgodfrey not valid` (r(321)).
 
 ### `estat ovtest` and its `rhs` option
 
@@ -369,8 +419,9 @@ does not fabricate the ones that belong to Stata's own optimiser.
 **Two deliberate omissions.** The ML *intermediate* log-likelihoods come from Stata's `moptimize`
 path and cannot be reproduced by a different optimiser; printing our own would look like Stata while
 disagreeing on every line. Only `Iteration 0` and the header's exact `Log likelihood = ...` row are
-shown. The `prais` / `xtpcse` note about time gaps requires a `tsset` time variable, which this API
-does not take, so it is not guessed.
+shown. The `prais` / `xtpcse` note about time gaps requires a `tsset` time variable, which those
+two estimators' signatures do not take (the serial-correlation commands above do, through
+`time=`), so it is not guessed.
 
 The full audit — 9 rounds, 57+ live captures, a scan of 3962 `.ado` files — is in `NOTES_AUDIT.md`.
 

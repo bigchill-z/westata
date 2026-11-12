@@ -388,26 +388,26 @@
   },
   "estat_dwatson": {
     "stata": "estat dwatson",
-    "en": "Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table.",
-    "zh": "残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。",
+    "en": "Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table. `time=` stands in for `tsset`: across a gap the straddling pair is skipped rather than differenced, and a `Number of gaps in sample = N` line is printed first. Measured on icecream.dta with `time == 5` dropped: .8930395 under `time=`, 1.0868969 by row order.",
+    "zh": "残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。`time=` 即 `tsset` 的替代：跨缺口的那一对观测被跳过而不是相减，并先打印一行 `Number of gaps in sample = N`。实测 `icecream.dta` 删去 `time == 5` 后：`time=` 下为 .8930395，按行序为 1.0868969。",
     "example": "print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))"
   },
   "estat_bgodfrey": {
     "stata": "estat bgodfrey, lags(#)",
-    "en": "Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test.",
-    "zh": "Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。",
+    "en": "Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test. Lags follow the TIME axis, not the row axis: pass `time=` (a column name of the estimation frame, or the period values) to reproduce `tsset` semantics, where a period missing from the sample makes that lag missing rather than pairing the neighbouring rows. Measured on icecream.dta with `time == 5` dropped, Stata's 4.220 against 3.286 by row order. Missing lags are zero-filled by default and kept missing under `nomiss0`. Refused after a robust or clustered VCE, on panel data spanning several units, and on non-`regress` fits, as Stata refuses them (r(198)/r(459)/r(321)).",
+    "zh": "Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。",
     "example": "print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
   },
   "estat_corrgram": {
     "stata": "estat corrgram",
-    "en": "Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. Only the NUMERIC columns are reproduced; Stata draws an ASCII bar chart beside them and plotting is outside this package's scope.",
-    "zh": "`estat_corrgram` 给出相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。只复现**数值列**；Stata 在旁边画 ASCII 条形图，而绘图不在本包范围内。",
+    "en": "Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.",
+    "zh": "相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。",
     "example": "print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))"
   },
   "wntestq": {
     "stata": "wntestq varname, lags(#)",
-    "en": "Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean.",
-    "zh": "白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入的是数值序列，或一个你要取其残差的结果对象。",
+    "en": "Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean. The default order is `max(1, min(int(n/2) - 2, 40))` (`ac.ado:71`), independent of any previous regression's parameter count and capped at 40 -- at n = 758 Stata reports chi2(40), not 377. `time=` gives it the `tsset` axis; a gap then drops those pairs from the autocovariance sums and adds a `(note: time series has N gaps)` line.",
+    "zh": "白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。",
     "example": "print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
   },
   "xttest0": {

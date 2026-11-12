@@ -7,6 +7,58 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] — the `tsset` axis for the serial-correlation tests (2026-11-12)
+
+Reported as a user question: "Stata needs `tsset` before `estat bgodfrey`; what is the
+equivalent here?"  Answering it turned up three defects that all four commands shared.
+
+### Added
+* **`time=` on `ws.estat_bgodfrey` / `ws.estat_dwatson` / `ws.wntestq` /
+  `ws.estat_corrgram`** — the `tsset` equivalent.  Either a column name of the
+  retained estimation frame or the period values themselves, plus `delta=` for
+  `tsset, delta(#)`.  With it, a period absent from the sample makes that lag
+  MISSING, which is what `L.` does; without it the lags come from row order, as
+  before, so every existing call is unchanged.
+* `n_gaps` on all four results, and Stata's own announcement reproduced byte for
+  byte: `Number of gaps in sample = N` (bgodfrey/dwatson) and
+  `(note: time series has N gap(s))` (wntestq/corrgram).
+* `result.estat_bgodfrey()`, `result.estat_corrgram()` and `result.wntestq()`.
+  `estat dwatson` got this wiring in round 93; the other three were reachable only
+  as module functions, so the serial commands had inconsistent surfaces.
+* `ws.wntestq` and `ws.estat_corrgram` accept a **bare numeric series**, which is
+  what `wntestq e1` takes in Stata; previously a raw array raised
+  `ConsistencyError` even though `docs/API.md` promised it worked.
+* Refusals matching Stata: clustered VCE (`vce(cluster)` sets `e(vcetype)=Robust`,
+  which `bgodfrey.ado:5-10` rejects), panel data spanning several units
+  (`sample may not include multiple panels`, r(459)) for all four commands, and
+  non-`regress` fits (`estat bgodfrey not valid`, r(321)).
+* New module `westata/postestimation/ts_lags.py` holding the shared time-axis
+  arithmetic, because four commands need it and four divergent copies is how one
+  bug becomes four different wrong answers.
+
+### Fixed
+* **Lags were taken by ROW POSITION instead of on the time axis.**  Dropping
+  `time == 5` from icecream.dta and re-fitting: Stata reports `estat bgodfrey`
+  4.220/4.476/4.787/5.048, `estat dwatson` .8930395 and `wntestq` Q 3.9550; this
+  package gave 3.286/3.363/3.403/5.084, 1.0868969 and 4.3302.  All three now match
+  with `time=`, and a test pins the disagreement so the flag cannot become
+  decorative.
+* **The default lag order was `(n - k)//2`.**  `ac.ado:71` and `corrgram.ado:18`
+  both say `max(1, min(int(n/2) - 2, 40))`: independent of the previous
+  regression's parameter count and **capped at 40**.  The two rules agree only at
+  `k == 4`, which every fixture in this repository happened to have, so the bug was
+  invisible on the documented examples; at n = 758 the old rule claimed 377 lags
+  where Stata reports `chi2(40)`.  Verified at n = 10, 20, 30, 40, 50, 60, 70, 80,
+  90, 95, 99, 101, 120, 150, 200, 500, 758.
+* `wntestq`'s and `corrgram`'s docstrings claimed the default was `(n - k)//2`
+  "measured against Stata"; the measurement had been taken on a four-parameter fit
+  and generalised without varying `k` or reaching the 40 cap.
+* `postestimation/serial.py`'s module docstring declared `estat bgodfrey`
+  "deliberately NOT implemented"; it has been implemented since round 191 in
+  `bgodfrey.py`, so the claim was stale.
+
+---
+
 ## [Unreleased] — `ws.synth2` non-graphics feature set (2026-11-11)
 
 Goal: "implement synth2's non-graphics features".  Design approved in

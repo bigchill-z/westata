@@ -484,6 +484,7 @@ Instrumental-variables 2SLS regression            Number of obs   =        200
        treat |   1.444141   .2839408     5.09   0.000     .8876271    2.000654
           x1 |   .7721013   .0689206    11.20   0.000     .6370194    .9071831
        _cons |   .9463986   .1952162     4.85   0.000     .5637819    1.329015
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -536,6 +537,7 @@ Instrumental-variables LIML regression            Number of obs   =        200
        treat |   1.290524   .2830631     4.56   0.000     .7357303    1.845317
           x1 |   .7653347    .069321    11.04   0.000      .629468    .9012013
        _cons |   1.045101   .1948412     5.36   0.000     .6632198    1.426983
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3 x2
 ```
@@ -584,12 +586,12 @@ Instrumental-variables GMM regression             Number of obs   =        200
 GMM weight matrix: Robust
 
 ------------------------------------------------------------------------------
-             |               Robust
-      ytreat | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+      ytreat | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
        treat |   1.444141   .2801603     5.15   0.000     .8950365    1.993245
           x1 |   .7721013   .0603991    12.78   0.000     .6537212    .8904813
        _cons |   .9463986   .1922365     4.92   0.000     .5696219    1.323175
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -647,6 +649,7 @@ corr(u_i, Xb) = -0.0059                         Prob > chi2       =     0.1149
           x1 |   .7464423   .4321449     1.73   0.084    -.1005461    1.593431
           x2 |   4.463368   32.15818     0.14   0.890     -58.5655    67.49223
        _cons |   .5517225   2.083237     0.26   0.791    -3.531347    4.634792
+------------------------------------------------------------------------------
 Endogenous: x2
 Exogenous:  x1 x3
 -------------+----------------------------------------------------------------
@@ -6719,12 +6722,12 @@ functions:
 
 **Stata:** `estat bgodfrey, lags(#)`
 
-Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test.
+Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test. Lags follow the TIME axis, not the row axis: pass `time=` (a column name of the estimation frame, or the period values) to reproduce `tsset` semantics, where a period missing from the sample makes that lag missing rather than pairing the neighbouring rows. Measured on icecream.dta with `time == 5` dropped, Stata's 4.220 against 3.286 by row order. Missing lags are zero-filled by default and kept missing under `nomiss0`. Refused after a robust or clustered VCE, on panel data spanning several units, and on non-`regress` fits, as Stata refuses them (r(198)/r(459)/r(321)).
 
 **Signature**
 
 ```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False) -> 'BgTestResult'
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
 ```
 
 **Example**
@@ -6743,12 +6746,12 @@ None
 
 **Stata:** `estat corrgram`
 
-Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. Only the NUMERIC columns are reproduced; Stata draws an ASCII bar chart beside them and plotting is outside this package's scope.
+Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.
 
 **Signature**
 
 ```python
-ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None) -> 'Correlogram'
+ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
 ```
 
 **Example**
@@ -6767,12 +6770,12 @@ None
 
 **Stata:** `estat dwatson`
 
-Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table.
+Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table. `time=` stands in for `tsset`: across a gap the straddling pair is skipped rather than differenced, and a `Number of gaps in sample = N` line is printed first. Measured on icecream.dta with `time == 5` dropped: .8930395 under `time=`, 1.0868969 by row order.
 
 **Signature**
 
 ```python
-ws.estat_dwatson(result: 'Any') -> 'DurbinWatsonResult'
+ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
 ```
 
 **Example**
@@ -6892,9 +6895,9 @@ First-stage regressions
 ------------------------------------------------------------------------------
        treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
           x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
           x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
+       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
 ------------------------------------------------------------------------------
 ```
 
@@ -7838,12 +7841,12 @@ None
 
 **Stata:** `wntestq varname, lags(#)`
 
-Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean.
+Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean. The default order is `max(1, min(int(n/2) - 2, 40))` (`ac.ado:71`), independent of any previous regression's parameter count and capped at 40 -- at n = 758 Stata reports chi2(40), not 377. `time=` gives it the `tsset` axis; a gap then drops those pairs from the autocovariance sums and adds a `(note: time series has N gaps)` line.
 
 **Signature**
 
 ```python
-ws.wntestq(result: 'Any', *, lags: 'int | None' = None) -> 'PortmanteauResult'
+ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
 ```
 
 **Example**

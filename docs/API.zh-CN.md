@@ -483,6 +483,7 @@ Instrumental-variables 2SLS regression            Number of obs   =        200
        treat |   1.444141   .2839408     5.09   0.000     .8876271    2.000654
           x1 |   .7721013   .0689206    11.20   0.000     .6370194    .9071831
        _cons |   .9463986   .1952162     4.85   0.000     .5637819    1.329015
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -535,6 +536,7 @@ Instrumental-variables LIML regression            Number of obs   =        200
        treat |   1.290524   .2830631     4.56   0.000     .7357303    1.845317
           x1 |   .7653347    .069321    11.04   0.000      .629468    .9012013
        _cons |   1.045101   .1948412     5.36   0.000     .6632198    1.426983
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3 x2
 ```
@@ -583,12 +585,12 @@ Instrumental-variables GMM regression             Number of obs   =        200
 GMM weight matrix: Robust
 
 ------------------------------------------------------------------------------
-             |               Robust
-      ytreat | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+      ytreat | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
        treat |   1.444141   .2801603     5.15   0.000     .8950365    1.993245
           x1 |   .7721013   .0603991    12.78   0.000     .6537212    .8904813
        _cons |   .9463986   .1922365     4.92   0.000     .5696219    1.323175
+------------------------------------------------------------------------------
 Endogenous: treat
 Exogenous:  x1 x3
 ```
@@ -646,6 +648,7 @@ corr(u_i, Xb) = -0.0059                         Prob > chi2       =     0.1149
           x1 |   .7464423   .4321449     1.73   0.084    -.1005461    1.593431
           x2 |   4.463368   32.15818     0.14   0.890     -58.5655    67.49223
        _cons |   .5517225   2.083237     0.26   0.791    -3.531347    4.634792
+------------------------------------------------------------------------------
 Endogenous: x2
 Exogenous:  x1 x3
 -------------+----------------------------------------------------------------
@@ -6718,12 +6721,12 @@ functions:
 
 **Stata 指令:** `estat bgodfrey, lags(#)`
 
-Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。
+Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。
 
 **签名**
 
 ```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False) -> 'BgTestResult'
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
 ```
 
 **示例**
@@ -6742,12 +6745,12 @@ None
 
 **Stata 指令:** `estat corrgram`
 
-`estat_corrgram` 给出相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。只复现**数值列**；Stata 在旁边画 ASCII 条形图，而绘图不在本包范围内。
+相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。
 
 **签名**
 
 ```python
-ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None) -> 'Correlogram'
+ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
 ```
 
 **示例**
@@ -6766,12 +6769,12 @@ None
 
 **Stata 指令:** `estat dwatson`
 
-残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。
+残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。`time=` 即 `tsset` 的替代：跨缺口的那一对观测被跳过而不是相减，并先打印一行 `Number of gaps in sample = N`。实测 `icecream.dta` 删去 `time == 5` 后：`time=` 下为 .8930395，按行序为 1.0868969。
 
 **签名**
 
 ```python
-ws.estat_dwatson(result: 'Any') -> 'DurbinWatsonResult'
+ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
 ```
 
 **示例**
@@ -6891,9 +6894,9 @@ First-stage regressions
 ------------------------------------------------------------------------------
        treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
           x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
           x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
+       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
 ------------------------------------------------------------------------------
 ```
 
@@ -7837,12 +7840,12 @@ None
 
 **Stata 指令:** `wntestq varname, lags(#)`
 
-白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入的是数值序列，或一个你要取其残差的结果对象。
+白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。
 
 **签名**
 
 ```python
-ws.wntestq(result: 'Any', *, lags: 'int | None' = None) -> 'PortmanteauResult'
+ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
 ```
 
 **示例**

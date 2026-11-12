@@ -731,11 +731,47 @@ class StataResults:
         time, but it was never reachable from a fitted result: the report's chapter 7-9 checks
         call ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,
         the wiring was missing.
+
+        Pass ``time=`` to make the differences follow a ``tsset`` axis; without it they follow
+        the row order, which is only the same thing when the sample has no gaps.
         """
 
         from westata.postestimation.serial import estat_dwatson
 
         return estat_dwatson(self, **kwargs)
+
+    def estat_bgodfrey(self, **kwargs: Any) -> Any:
+        """Stata's ``estat bgodfrey`` -- the Breusch-Godfrey LM test for autocorrelation.
+
+        The implementation has existed in ``westata.postestimation.bgodfrey`` since round 191
+        but was only reachable as ``ws.estat_bgodfrey(result)``; ``estat dwatson`` got its
+        wiring in round 93 and this one was left behind, so the two serial-correlation
+        commands had different surfaces. Pass ``time=`` for the ``tsset`` axis and
+        ``lags=``/``nomiss0=`` as in Stata.
+        """
+
+        from westata.postestimation.bgodfrey import estat_bgodfrey
+
+        return estat_bgodfrey(self, **kwargs)
+
+    def estat_corrgram(self, **kwargs: Any) -> Any:
+        """Stata's ``corrgram`` -- autocorrelations, partial autocorrelations and Q.
+
+        Stata spells it ``corrgram`` rather than ``estat corrgram``; the method name follows
+        the ``estat_``-prefixed convention the rest of this object uses so that
+        ``ws.estat_corrgram(...)`` and ``result.estat_corrgram()`` stay symmetrical.
+        """
+
+        from westata.postestimation.serial import estat_corrgram
+
+        return estat_corrgram(self, **kwargs)
+
+    def wntestq(self, **kwargs: Any) -> Any:
+        """Stata's ``wntestq`` -- the Ljung-Box portmanteau Q for white noise."""
+
+        from westata.postestimation.serial import wntestq
+
+        return wntestq(self, **kwargs)
 
     def estat_firststage(self, **kwargs: Any) -> Any:
         """Stata's ``estat firststage`` -- IV first-stage diagnostics.

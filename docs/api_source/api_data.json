@@ -1408,8 +1408,8 @@
       "name": "estat_bgodfrey",
       "kind": "function",
       "module": "westata.postestimation.bgodfrey",
-      "docstring": "Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.\n\n``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata\nrefuses the test after ``regress, robust`` and so does this.\n\n``nomiss0`` keeps the leading missing values of the lagged residuals MISSING instead of\nreplacing them with zero, which shortens the auxiliary regression by ``p`` rows.\n``bgodfrey.ado:180-184`` is the whole difference::\n\n    if \"`dm'\"==\"\" {\n        foreach i of local reslist {\n            qui replace `i' = 0 if `i' >= . & `touse'\n        }\n    }\n\nThe option is called ``dm`` inside the ado -- \"Davidson-MacKinnon method is now\nmiss0\" -- so an empty macro means the default (replace with zero) and a set one means\nkeep them missing. Measured on a 200-row series, default against ``nomiss0``:\n\n    lag 1: chi2 187.976  ->  191.674\n    lag 2: chi2 188.371  ->  191.009",
-      "signature": "(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False) -> 'BgTestResult'"
+      "docstring": "Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.\n\n``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata\nrefuses the test after ``regress, robust`` and so does this -- including\n``vce(cluster)``, which Stata treats as robust.\n\n``nomiss0`` keeps the leading missing values of the lagged residuals MISSING instead of\nreplacing them with zero, which shortens the auxiliary regression by ``p`` rows.\n``bgodfrey.ado:180-184`` is the whole difference::\n\n    if \"`dm'\"==\"\" {\n        foreach i of local reslist {\n            qui replace `i' = 0 if `i' >= . & `touse'\n        }\n    }\n\nThe option is called ``dm`` inside the ado -- \"Davidson-MacKinnon method is now\nmiss0\" -- so an empty macro means the default (replace with zero) and a set one means\nkeep them missing. Measured on a 200-row series, default against ``nomiss0``:\n\n    lag 1: chi2 187.976  ->  191.674\n    lag 2: chi2 188.371  ->  191.009\n\nParameters\n----------\ntime:\n    Stands in for ``tsset``. Either the NAME of a column in the fit's estimation frame\n    or the period values themselves, one per estimation row. When given, the lags are\n    taken on the time axis: a period that is absent from the sample produces a MISSING\n    lag instead of silently pairing the rows on either side. Omitting it lags by row\n    order, which is only correct when the rows are already a contiguous period\n    sequence. Measured on icecream.dta with ``time == 5`` dropped, Stata's\n    4.220 / 4.476 / 4.787 / 5.048 against 3.286 / 3.363 / 3.403 / 5.084 by row order.\ndelta:\n    The lag step, ``tsset``'s ``Delta:``. One unless the data declare otherwise; an\n    explicit ``tsset t, delta(2)`` is the only case that differs. Must be a positive\n    integer, which is ``tsset``'s own rule (r(451) for fractional periods).\n\nRaises\n------\nConsistencyError\n    After a robust or clustered VCE, on a panel spanning several units, or when\n    ``time`` cannot be resolved against the estimation sample.\nValueError\n    For a bad lag order or a non-integer ``delta``.",
+      "signature": "(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'"
     },
     {
       "name": "estat_classification",
@@ -1422,15 +1422,15 @@
       "name": "estat_corrgram",
       "kind": "function",
       "module": "westata.postestimation.serial",
-      "docstring": "``corrgram``: autocorrelations, partial autocorrelations and Q at each lag.\n\n``corrgram.ado:68`` accumulates ``Q = n(n+2) sum ac^2/(n-k)`` as it goes, so the Q column\nis the Ljung-Box statistic using lags ``1..k`` -- which is why the last row equals what\n``wntestq`` reports for the same order.\n\nThe partial autocorrelation is the Durbin-Levinson recursion, matching Stata's ``pac``.",
-      "signature": "(result: 'Any', *, lags: 'int | None' = None) -> 'Correlogram'"
+      "docstring": "``corrgram``: autocorrelations, partial autocorrelations and Q at each lag.\n\n``corrgram.ado:68`` accumulates ``Q = n(n+2) sum ac^2/(n-k)`` as it goes, so the Q column\nis the Ljung-Box statistic using lags ``1..k`` -- which is why the last row equals what\n``wntestq`` reports for the same order.\n\nThe default order is ``max(1, min(int(n/2) - 2, 40))`` (``corrgram.ado:18``), not a\nfunction of the previous regression's parameter count.\n\n``time`` stands in for ``tsset``; see :func:`estat_dwatson`.",
+      "signature": "(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'"
     },
     {
       "name": "estat_dwatson",
       "kind": "function",
       "module": "westata.postestimation.serial",
-      "docstring": "Durbin-Watson d.\n\n.. math:: d = \\sum_{t=2}^{n}(e_t - e_{t-1})^2 / \\sum_{t=1}^{n} e_t^2\n\nMeasured on icecream.dta after ``reg consumption temp price income``: 1.021169.",
-      "signature": "(result: 'Any') -> 'DurbinWatsonResult'"
+      "docstring": "Durbin-Watson d.\n\n.. math:: d = \\sum_{t=2}^{n}(e_t - e_{t-1})^2 / \\sum_{t=1}^{n} e_t^2\n\nMeasured on icecream.dta after ``reg consumption temp price income``: 1.021169.\n\n``time`` stands in for ``tsset`` and is what decides which differences exist: with a\nperiod missing from the sample, the pair straddling the gap is dropped rather than\ndifferenced, because ``L.`` is undefined across it. Measured on icecream.dta with\n``time == 5`` dropped: Stata reports ``.8930395``, and differencing adjacent ROWS gives\n``1.0868969``.",
+      "signature": "(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'"
     },
     {
       "name": "estat_endogenous",
@@ -1758,8 +1758,8 @@
       "name": "wntestq",
       "kind": "function",
       "module": "westata.postestimation.serial",
-      "docstring": "Ljung-Box Q, as ``wntestq``.\n\n``corrgram.ado:68`` builds it as\n\n.. math:: Q = n(n+2) \\sum_{k=1}^{p} \\hat\\rho_k^2 / (n-k)\n\nand by default ``wntestq`` uses ``floor((n - k) / 2)`` lags, where ``k`` is the number of\nestimated parameters -- measured: 30 observations and a 4-parameter ``reg`` give\n``chi2(13)``, i.e. ``(30 - 4) // 2``, NOT ``n // 2 = 15``. Measured: Q 26.1974, p .0160;\nwith ``lags(10)``: Q 16.3718, p .0895.",
-      "signature": "(result: 'Any', *, lags: 'int | None' = None) -> 'PortmanteauResult'"
+      "docstring": "Ljung-Box Q, as ``wntestq``.\n\n``corrgram.ado:68`` builds it as\n\n.. math:: Q = n(n+2) \\sum_{k=1}^{p} \\hat\\rho_k^2 / (n-k)\n\n``wntestq.ado:16-24`` takes the default lag count from ``ac``, so it is\n``max(1, min(int(n/2) - 2, 40))`` -- measured: 30 observations give ``chi2(13)``, and\n758 give ``chi2(40)`` rather than the 377 an ``(n-k)//2`` rule would claim. Measured\nnumbers: Q 26.1974, p .0160; with ``lags(10)``: Q 16.3718, p .0895.\n\n``time`` stands in for ``tsset``; see :func:`estat_dwatson`.",
+      "signature": "(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'"
     },
     {
       "name": "xttest0",
@@ -1798,14 +1798,24 @@
         "docstring": "Stata's ``estat auc`` -- the area under the ROC curve.\n\n``logit_estat.ado:19-21`` dispatches the subcommand to ``lroc, nograph``."
       },
       {
+        "name": "estat_bgodfrey",
+        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "docstring": "Stata's ``estat bgodfrey`` -- the Breusch-Godfrey LM test for autocorrelation.\n\nThe implementation has existed in ``westata.postestimation.bgodfrey`` since round 191\nbut was only reachable as ``ws.estat_bgodfrey(result)``; ``estat dwatson`` got its\nwiring in round 93 and this one was left behind, so the two serial-correlation\ncommands had different surfaces. Pass ``time=`` for the ``tsset`` axis and\n``lags=``/``nomiss0=`` as in Stata."
+      },
+      {
         "name": "estat_classification",
         "signature": "(self, **kwargs: 'Any') -> 'Any'",
         "docstring": "Stata's ``estat classification`` -- the 2x2 classification table."
       },
       {
+        "name": "estat_corrgram",
+        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "docstring": "Stata's ``corrgram`` -- autocorrelations, partial autocorrelations and Q.\n\nStata spells it ``corrgram`` rather than ``estat corrgram``; the method name follows\nthe ``estat_``-prefixed convention the rest of this object uses so that\n``ws.estat_corrgram(...)`` and ``result.estat_corrgram()`` stay symmetrical."
+      },
+      {
         "name": "estat_dwatson",
         "signature": "(self, **kwargs: 'Any') -> 'Any'",
-        "docstring": "Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.\n\n``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some\ntime, but it was never reachable from a fitted result: the report's chapter 7-9 checks\ncall ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,\nthe wiring was missing."
+        "docstring": "Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.\n\n``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some\ntime, but it was never reachable from a fitted result: the report's chapter 7-9 checks\ncall ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,\nthe wiring was missing.\n\nPass ``time=`` to make the differences follow a ``tsset`` axis; without it they follow\nthe row order, which is only the same thing when the sample has no gaps."
       },
       {
         "name": "estat_endogenous",
@@ -1971,6 +1981,11 @@
         "name": "wald_test",
         "signature": "(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'",
         "docstring": "statsmodels-compatible joint Wald test.\n\nMirrors ``statsmodels``' ``wald_test(R, q, scalar)``: returns an object with\n``statistic``, ``df_denom``, ``df_num`` and ``pvalue``. When ``scalar`` is False a\nchi2 test is returned instead of the F test, matching statsmodels' behaviour.\n\nR MAY BE A CONSTRAINT STRING, as statsmodels allows: ``wald_test(\"s = 0\")``.\nstatsmodels accepts a formula-like expression and so does this method -- the parsing\nis delegated to :meth:`test`, which already speaks Stata's constraint syntax. Only the\nreturn SHAPE differs: ``test`` reports Stata's F statistic with ``df``/``df_denom``,\nwhich is what a caller of ``wald_test`` is asking for anyway."
+      },
+      {
+        "name": "wntestq",
+        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "docstring": "Stata's ``wntestq`` -- the Ljung-Box portmanteau Q for white noise."
       }
     ],
     "properties": [
@@ -3483,26 +3498,26 @@
     },
     "estat_dwatson": {
       "stata": "estat dwatson",
-      "en": "Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table.",
-      "zh": "残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。",
+      "en": "Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table. `time=` stands in for `tsset`: across a gap the straddling pair is skipped rather than differenced, and a `Number of gaps in sample = N` line is printed first. Measured on icecream.dta with `time == 5` dropped: .8930395 under `time=`, 1.0868969 by row order.",
+      "zh": "残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。`time=` 即 `tsset` 的替代：跨缺口的那一对观测被跳过而不是相减，并先打印一行 `Number of gaps in sample = N`。实测 `icecream.dta` 删去 `time == 5` 后：`time=` 下为 .8930395，按行序为 1.0868969。",
       "example": "print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))"
     },
     "estat_bgodfrey": {
       "stata": "estat bgodfrey, lags(#)",
-      "en": "Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test.",
-      "zh": "Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。",
+      "en": "Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test. Lags follow the TIME axis, not the row axis: pass `time=` (a column name of the estimation frame, or the period values) to reproduce `tsset` semantics, where a period missing from the sample makes that lag missing rather than pairing the neighbouring rows. Measured on icecream.dta with `time == 5` dropped, Stata's 4.220 against 3.286 by row order. Missing lags are zero-filled by default and kept missing under `nomiss0`. Refused after a robust or clustered VCE, on panel data spanning several units, and on non-`regress` fits, as Stata refuses them (r(198)/r(459)/r(321)).",
+      "zh": "Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。",
       "example": "print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
     },
     "estat_corrgram": {
       "stata": "estat corrgram",
-      "en": "Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. Only the NUMERIC columns are reproduced; Stata draws an ASCII bar chart beside them and plotting is outside this package's scope.",
-      "zh": "`estat_corrgram` 给出相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。只复现**数值列**；Stata 在旁边画 ASCII 条形图，而绘图不在本包范围内。",
+      "en": "Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.",
+      "zh": "相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。",
       "example": "print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))"
     },
     "wntestq": {
       "stata": "wntestq varname, lags(#)",
-      "en": "Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean.",
-      "zh": "白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入的是数值序列，或一个你要取其残差的结果对象。",
+      "en": "Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean. The default order is `max(1, min(int(n/2) - 2, 40))` (`ac.ado:71`), independent of any previous regression's parameter count and capped at 40 -- at n = 758 Stata reports chi2(40), not 377. `time=` gives it the `tsset` axis; a gap then drops those pairs from the autocovariance sums and adds a `(note: time series has N gaps)` line.",
+      "zh": "白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。",
       "example": "print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
     },
     "xttest0": {

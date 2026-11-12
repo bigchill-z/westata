@@ -7,7 +7,10 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
-## [Unreleased] — the `tsset` axis for the serial-correlation tests (2026-11-12)
+## [0.3.7] — the `tsset` axis for the serial-correlation tests (2026-11-12)
+
+Released together with everything still listed as `[Unreleased]` below, since 0.3.6
+was the last build published to PyPI.
 
 Reported as a user question: "Stata needs `tsset` before `estat bgodfrey`; what is the
 equivalent here?"  Answering it turned up three defects that all four commands shared.
@@ -59,7 +62,7 @@ equivalent here?"  Answering it turned up three defects that all four commands s
 
 ---
 
-## [Unreleased] — `ws.synth2` non-graphics feature set (2026-11-11)
+## [0.3.7] — `ws.synth2` non-graphics feature set (2026-11-11)
 
 Goal: "implement synth2's non-graphics features".  Design approved in
 `docs/superpowers/specs/2026-11-11-synth2-design.md`; three decisions were
@@ -127,7 +130,7 @@ missing PyPI token) and is a separate confirmation.
 
 ---
 
-## [Unreleased] — close the remaining non-graphics gaps (2026-11-11)
+## [0.3.7] — close the remaining non-graphics gaps (2026-11-11)
 
 Goal: "finish the remaining gaps by priority".  Three items, done in order.
 
@@ -195,7 +198,7 @@ than approximated.
 
 ---
 
-## [Unreleased] — adaptive interior-point QP refinement (2026-11-11)
+## [0.3.7] — adaptive interior-point QP refinement (2026-11-11)
 
 Goal: "further approach" the two remaining E2 gaps.  Root cause found and
 reproduced with a **principled** solver change (not coefficient fitting).
@@ -236,7 +239,7 @@ tolerances tightened to the measured values (`ATOL_W 2e-2`, `ATOL_DERIVED 4e-1`,
 
 ---
 
-## [Unreleased] — extended `synth` feature set (2026-11-10)
+## [0.3.7] — extended `synth` feature set (2026-11-10)
 
 Goal: "implement all Stata `synth` features except graphics, keeping numerical
 differences as close to machine precision as possible".  That literal target
@@ -552,7 +555,7 @@ while the regression carries twelve powers plus six regressors minus the two omi
 
 ---
 
-## [Unreleased]
+## [0.3.7]
 
 ### Added — `ws.synth`: Stata's synthetic control, default path (evidence E2)
 

@@ -275,11 +275,27 @@ def first_stage_table(
 
 
 def render_first_stage(result: Any) -> str:
-    """First-stage table(s) for an IV result, one block per endogenous regressor.
+    """The ``, first`` BLOCK: the fitted coefficients of each first-stage equation.
 
-    Reads ``result.iv_structure``, which ``IV2SLS.fit`` attaches precisely so the
-    auxiliary regressions can be rebuilt (``, first`` and ``estat firststage`` need the
-    same pieces).
+    THIS IS NOT ``estat firststage``. Stata has two different things here and they are easy to
+    confuse:
+
+        ivregress 2sls ..., first     the full first-stage REGRESSION TABLE -- coefficients,
+                                      standard errors, t, p, interval, for every regressor and
+                                      instrument. One block per endogenous regressor.
+                                      -> ``result.first_stage()`` / ``summary(first=True)``
+
+        estat firststage              a SUMMARY: R-sq, adjusted R-sq, partial R-sq, the
+                                      instrument F and its p, plus the Stock-Yogo critical-value
+                                      panel. No coefficients at all.
+                                      -> ``ws.estat_firststage(result)``
+
+    Calling ``first_stage()`` when ``estat firststage`` was meant produces a table with a completely
+    different shape, which reads as a mismatch rather than a wrong entry point. Both are implemented;
+    measured on grilic, ``estat_firststage`` reproduces Stata's 22 lines exactly.
+
+    Reads ``result.iv_structure``, which ``IV2SLS.fit`` attaches so the auxiliary regressions can be
+    rebuilt.
     """
 
     structure = getattr(result, "iv_structure", None)

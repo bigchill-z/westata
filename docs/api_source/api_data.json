@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.9",
+  "westata_version": "0.3.10",
   "exports": [
     {
       "name": "AIPW",
@@ -1632,8 +1632,8 @@
       "name": "render_estimates_table",
       "kind": "function",
       "module": "westata.results.estimates_table",
-      "docstring": "Reproduce ``estimates table m1 m2 ..., b se``.\n\n``model_names`` is the equivalent of the ``estimates store`` names: Stata prints whatever the\nmodels were stored as, abbreviated to ten characters where needed.",
-      "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True) -> 'str'"
+      "docstring": "Reproduce ``estimates table m1 m2 ..., b se``.\n\n``model_names`` is the equivalent of the ``estimates store`` names: Stata prints whatever the\nmodels were stored as, abbreviated to ten characters where needed.\n\n``star`` is Stata's ``star(...)``: a descending triple of p-value thresholds. Passing it changes\nthe LAYOUT, not just the cells -- see the measurement notes in the body.\n\n``mtitle`` selects the **``esttab`` shape** instead of the ``estimates table`` one: a header with\n``(1) (2) ...`` numbers and the model names, no ``Variable |`` gutter, a ``12 + 16*n`` rule and\nthree-significant-figure coefficients. ``stats`` adds the footer rows that ``esttab`` prints for\nnames such as ``\"N\"``, ``\"r2\"``, ``\"r2_a\"`` and ``\"rmse\"``.",
+      "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True, star: 'Sequence[float] | None' = None, mtitle: 'bool' = False, stats: 'Sequence[str] | None' = None) -> 'str'"
     },
     {
       "name": "render_esttab",

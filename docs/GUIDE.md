@@ -484,6 +484,45 @@ eight decimals below.
 so a table mixing OLS and IV models needs `cov_type="HC1"` on the OLS fits and `"HC0"` on the IV ones.
 Using HC0 throughout scales every OLS standard error by `sqrt(n/(n-k))`.
 
+### `estimates table`, `esttab` and their options
+
+`ws.render_estimates_table` serves both Stata layouts from one entry point. They are **different
+tables**, not a flag on one:
+
+```python
+fits = [
+    ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
+    ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
+    ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit(cov_type="HC0"),
+]
+names = ["ols_a", "ols_b", "tsls"]
+
+print(ws.render_estimates_table(fits, model_names=names, se=True))
+# Stata: estimates table ols_a ols_b tsls, b se
+
+print(ws.render_estimates_table(fits, model_names=names, star=(0.1, 0.05, 0.01)))
+# Stata: estimates table ..., star(0.1 0.05 0.01)
+
+print(ws.render_estimates_table(
+    fits, model_names=names, se=True, star=(0.1, 0.05, 0.01),
+    mtitle=True, stats=["N", "r2"],
+))
+# Stata: esttab ..., se r2 mtitle star(* 0.1 ** 0.05 *** 0.01)
+```
+
+| | `estimates table` | `star(...)` | `mtitle=True` (esttab) |
+|---|---|---|---|
+| rule | `14 + 13n` | `14 + 16n` | `12 + 16n` |
+| label gutter | `    Variable \| ` | same | none |
+| standard-error row | yes | no | yes |
+| value format | 8 significant / 8 decimals | same | 3 significant (4 at or above 1) |
+| footer | `Legend: b/se` | `Legend: * p<.1; ...` | `N` / `R-sq` rows + two notes |
+
+**`star()` changes the column width**, and the stars hang *after* a right-aligned number, so a
+starred coefficient reaches further right than the error cell beneath it.
+
+`stats` accepts `N`, `r2`, `r2_a` and `rmse`.
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

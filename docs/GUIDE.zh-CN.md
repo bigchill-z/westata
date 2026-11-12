@@ -484,6 +484,43 @@ print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True)
 OLS 与 IV 模型的表格需要在 OLS 上用 `cov_type="HC1"`、在 IV 上用 `"HC0"`。若统一用 HC0，
 每个 OLS 标准误都会被 `sqrt(n/(n-k))` 缩放。
 
+### `estimates table`、`esttab` 与它们的选项
+
+`ws.render_estimates_table` 用同一个入口服务 Stata 的两种表格。它们是**不同的表**，不是一个开关：
+
+```python
+fits = [
+    ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
+    ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
+    ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit(cov_type="HC0"),
+]
+names = ["ols_a", "ols_b", "tsls"]
+
+print(ws.render_estimates_table(fits, model_names=names, se=True))
+# Stata: estimates table ols_a ols_b tsls, b se
+
+print(ws.render_estimates_table(fits, model_names=names, star=(0.1, 0.05, 0.01)))
+# Stata: estimates table ..., star(0.1 0.05 0.01)
+
+print(ws.render_estimates_table(
+    fits, model_names=names, se=True, star=(0.1, 0.05, 0.01),
+    mtitle=True, stats=["N", "r2"],
+))
+# Stata: esttab ..., se r2 mtitle star(* 0.1 ** 0.05 *** 0.01)
+```
+
+| | `estimates table` | `star(...)` | `mtitle=True`（esttab）|
+|---|---|---|---|
+| 规则线 | `14 + 13n` | `14 + 16n` | `12 + 16n` |
+| 标签槽 | `    Variable \| ` | 同左 | 无 |
+| 标准误行 | 有 | 无 | 有 |
+| 数值格式 | 8 位有效 / 8 位小数 | 同左 | 3 位有效（≥1 时 4 位）|
+| 表尾 | `Legend: b/se` | `Legend: * p<.1; ...` | `N` / `R-sq` 行 + 两行注记 |
+
+**`star()` 会改变列宽**，且星号挂在右对齐数字**之后**，因此带星的系数比其下的标准误更靠右。
+
+`stats` 接受 `N`、`r2`、`r2_a`、`rmse`。
+
 ### 表格布局逐字符一致
 
 上一节比较的是系数**数值**。另一项性质是**打印出的表格本身**：列位置、对齐、

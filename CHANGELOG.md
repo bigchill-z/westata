@@ -7,6 +7,65 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.10] - 2026-11-13
+
+### Added — `render_estimates_table` gains `star(...)`, `mtitle` and `stats`
+
+`estimates table` and `esttab` are **two different tables**, and the package previously served only
+the first. Both are now reachable from one entry point:
+
+```python
+# Stata: estimates table m1 m2 m3 m4, b se
+ws.render_estimates_table([m1, m2, m3, m4], model_names=names, se=True)
+
+# Stata: estimates table m1 m2 m3 m4, star(0.1 0.05 0.01)
+ws.render_estimates_table([m1, m2, m3, m4], model_names=names, star=(0.1, 0.05, 0.01))
+
+# Stata: esttab m1 m2 m3 m4, se r2 mtitle star(* 0.1 ** 0.05 *** 0.01)
+ws.render_estimates_table(
+    [m1, m2, m3, m4],
+    model_names=names,
+    se=True,
+    star=(0.1, 0.05, 0.01),
+    mtitle=True,
+    stats=["N", "r2"],
+)
+```
+
+#### `star(...)` changes the layout, not just the cells
+
+| | `b se` | `star(...)` |
+|---|---|---|
+| column width | 13 | **16** |
+| rule | `14 + 13n` = 66 | **`14 + 16n` = 78** |
+| standard-error row | present | **gone** |
+| name-abbreviation limit | 10 chars | **12 chars** |
+
+The number right-aligns to offset 11 inside the 16-wide field and its stars follow immediately, so
+`-.04352713` carries five trailing spaces rather than two.
+
+#### `mtitle=True` switches to the `esttab` shape
+
+A different table altogether: no `Variable |` gutter (the label takes the first 12 columns), a
+`12 + 16n` rule (76 for four models), a `(1) (2) ...` row above the model names, coefficients at
+three significant figures below 1 and four at or above with the leading zero kept, and a statistics
+footer closed by two unpadded note lines.
+
+**The star run hangs AFTER the number.** The number right-aligns in a 13-wide field and the stars
+follow, which is why `.103***` reaches column 28 while `(0.00621)` beneath stops at 25, and why
+`-.0745**` ends one column earlier than `-.0841***`.
+
+`stats` accepts esttab's names: `N`, `r2`, `r2_a`, `rmse`. An unknown name keeps its label and prints
+blank cells instead of raising.
+
+### Verified
+
+Both shapes compared byte for byte against live Stata on grilic: 20 lines for `b se`, 27 for
+`star(...)`, 31 for the full `esttab ..., se r2 mtitle star(...)`. Full suite: **6208 passed,
+3 skipped, 0 failed**.
+
+---
+
 ## [0.3.9] - 2026-11-12
 
 ### Added — `ws.render_estimates_table`, Stata's `estimates table`

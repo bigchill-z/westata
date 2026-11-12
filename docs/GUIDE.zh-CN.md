@@ -406,6 +406,29 @@ Stata 的输出不只是数字：它还会打印 note、警告和迭代日志，
 
 完整审计（9 轮、57+ 次活体捕获、扫描 3962 个 `.ado` 文件）见 `NOTES_AUDIT.md`。
 
+### Stata 在表格前后打印的说明文字
+
+Stata 的输出不只是数字：它还会打印 note、警告和迭代日志，解释**数据发生了什么**。
+本包复现其中确定性的部分，并刻意不伪造属于 Stata 自身优化器的内容。
+
+| 位置 | 文字 | 是否复现 |
+|---|---|---|
+| `estat ovtest, rhs` | `note: <name> omitted because of collinearity.` | 是，按 Stata 的顺序 |
+| `prais` / `prais, corc` | `Iteration k:  rho = 0.0000` …（完整日志） | 是，逐字符一致 |
+| `xtlogit, fe` | `note: multiple positive outcomes within groups encountered.` 及折行的组说明 | 是 |
+| `xtpoisson, fe` / `xtnbreg, fe` | `note: N group(s) (N obs) dropped because of all zero outcomes` | 是；文案按命令区分 |
+| `poisson` / `nbreg` 用于非整数因变量 | `note: noncount dependent variable encountered; ...` / `note: you are responsible for interpretation of non-count dep. variable` | 是 |
+| `logit` / `probit` | `Iteration 0:  Log likelihood = -45.03321` | 是，零模型值，精确一致 |
+| 优化未收敛的 ML 估计 | `Warning: Convergence not achieved.`（末行） | 是 |
+
+**两处刻意省略**。ML 的**中间**对数似然来自 Stata 的 `moptimize` 路径，
+换一个优化器就无法复现；打印本包自己的轨迹会「形似 Stata 却每行都对不上」。
+因此只显示 `Iteration 0` 与表头中本来精确的 `Log likelihood = ...` 行。
+`prais` / `xtpcse` 关于时间缺口的 note 需要 `tsset` 时间变量，而本 API 不接收该变量，
+故不猜测。
+
+完整审计（9 轮、57+ 次活体捕获、扫描 3962 个 `.ado` 文件）见 `NOTES_AUDIT.md`。
+
 ### 表格布局逐字符一致
 
 上一节比较的是系数**数值**。另一项性质是**打印出的表格本身**：列位置、对齐、

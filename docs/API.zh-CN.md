@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.8 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.9 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -19,7 +19,7 @@ _westata 版本: 0.3.8 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -7205,6 +7205,43 @@ round(ws.rdrobust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
 ```
 
 **注意:** 未复现稳健（CCT）标准误：`rdrobust_vce` 只存在于编译后的 lrdrobust.mlib 中，因此 se/z/ci 为 NaN。其外围的组装步骤已用 Stata 自身的 e(V_cl_l)/e(V_cl_r) 验证过。
+
+### `render_estimates_table`
+
+**Stata 指令:** `estimates table m1 m2 ..., b se`
+
+把任意多个已拟合模型并排，采用 Stata `estimates table` 的布局——它与 `esttab` 是不同的形态：没有列号、没有依赖变量行，末尾以 `Legend: b/se` 收尾。每个模型一列，系数一行、标准误在下一行。
+
+**签名**
+
+```python
+ws.render_estimates_table(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True) -> 'str'
+```
+
+**示例**
+
+```python
+ws.render_estimates_table([ws.OLS.from_formula('y ~ x1', base).fit(), ws.OLS.from_formula('y ~ x1 + x2', base).fit()], model_names=['a', 'b'])
+```
+
+**输出**
+
+```text
+
+----------------------------------------
+    Variable |     a            b       
+-------------+--------------------------
+          x1 |  .84252495    .84064454  
+             |  .08042338    .07247108  
+          x2 |              -.51208701  
+             |                .0748223  
+       _cons |  .97235675    1.0050025  
+             |  .08242638    .07442849  
+----------------------------------------
+                            Legend: b/se
+```
+
+**注意:** 几何是推导出来的：14 字符标签槽，之后每个模型 13 列，规则线为 14 + 13*n 个字符、'+' 位于索引 13。名称居中，超过十个字符则缩写。数值在 |v|≥1 时用八位有效数字，否则八位小数。注意 VCE 约定：Stata 的 `regress, r` 是 HC1，`ivregress ..., r` 是 HC0；混合 OLS 与 IV 的表格需要对 OLS 用 cov_type='HC1'、对 IV 用 'HC0'。
 
 ### `render_esttab`
 

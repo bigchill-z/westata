@@ -7,6 +7,48 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.9] - 2026-11-12
+
+### Added — `ws.render_estimates_table`, Stata's `estimates table`
+
+`estimates table` is a **different command** from `esttab`, and the package only had the latter.
+`etable_as_stata` / `render_esttab` also cap the table at two models, so a four-model comparison was
+impossible.
+
+```python
+ws.render_estimates_table([m1, m2, m3, m4],
+                          model_names=["ols_no_iq", "ols_with_iq", "tsls", "liml"],
+                          se=True)
+```
+
+The geometry is **derived, not tabulated**:
+
+| item | rule |
+|---|---|
+| rule length | `14 + 13 * n` (40 / 53 / 66 for 2 / 3 / 4 models) |
+| `+` in the separator | at index 13 |
+| column width | 13, of which the value right-aligns in the first 11 |
+| names | centred, odd remainder on the LEFT |
+| long names | past ten characters: eight + `~` + the last character (`ols_with_iq` → `ols_with~q`) |
+| values | eight **significant figures** at or above 1, eight **decimals** below, trailing zeros trimmed |
+
+Verified byte-identical to a live `estimates table ols_no_iq ols_with_iq tsls liml, b se`: 20 lines,
+zero differences including trailing spaces.
+
+### Note — the robust VCE differs between `regress` and `ivregress`
+
+Worth recording because it silently changed every standard error in that table:
+
+| Stata | westata |
+|---|---|
+| `regress ..., r` | `cov_type="HC1"` |
+| `ivregress ..., r` | `cov_type="HC0"` |
+
+Using `HC0` for the OLS columns scales every SE by `sqrt(n/(n-k))` — on grilic, `0.0061852491`
+against Stata's `0.0062098752`.
+
+---
+
 ## [0.3.8] - 2026-11-12
 
 ### Added — `hausman ..., sigmamore` / `sigmaless`

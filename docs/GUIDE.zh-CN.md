@@ -466,6 +466,24 @@ Stata 的输出不只是数字：它还会打印 note、警告和迭代日志，
 
 完整审计（9 轮、57+ 次活体捕获、扫描 3962 个 `.ado` 文件）见 `NOTES_AUDIT.md`。
 
+### `estimates table` —— 多个模型并排
+
+`ws.render_estimates_table` 复现 Stata 的 `estimates table m1 m2 ..., b se`。它与 `esttab` 是**不同的
+布局**（没有列号、没有依赖变量行、末尾有 `Legend:` 行），并且支持任意多个模型。
+
+```python
+fit_a = ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1")
+fit_b = ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
+print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True))
+```
+
+几何是固定且可推导的：14 字符的标签槽，之后每个模型 13 列；名称居中、超过十个字符缩写；
+数值在 `|v|≥1` 时用八位有效数字，否则用八位小数。
+
+**稳健 VCE 因命令而异。** `regress ..., r` 是 HC1，而 `ivregress ..., r` 是 HC0；因此混合
+OLS 与 IV 模型的表格需要在 OLS 上用 `cov_type="HC1"`、在 IV 上用 `"HC0"`。若统一用 HC0，
+每个 OLS 标准误都会被 `sqrt(n/(n-k))` 缩放。
+
 ### 表格布局逐字符一致
 
 上一节比较的是系数**数值**。另一项性质是**打印出的表格本身**：列位置、对齐、

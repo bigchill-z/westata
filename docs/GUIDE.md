@@ -464,6 +464,26 @@ to match:
 iv.estimation_label, ols.estimation_label = "iv", "ols"
 ```
 
+### `estimates table` — several models side by side
+
+`ws.render_estimates_table` reproduces Stata's `estimates table m1 m2 ..., b se`. It is a **different
+layout** from `esttab` (no column numbers, no dependent-variable row, a `Legend:` line at the end) and
+it accepts any number of models.
+
+```python
+fit_a = ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1")
+fit_b = ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
+print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True))
+```
+
+The geometry is fixed and derived: a 14-character gutter, then 13 columns per model; names are
+centred and abbreviated past ten characters; values use eight significant figures at or above 1 and
+eight decimals below.
+
+**The robust VCE differs between commands.** `regress ..., r` is HC1 while `ivregress ..., r` is HC0,
+so a table mixing OLS and IV models needs `cov_type="HC1"` on the OLS fits and `"HC0"` on the IV ones.
+Using HC0 throughout scales every OLS standard error by `sqrt(n/(n-k))`.
+
 ### Byte-for-byte table layout
 
 The section above compares coefficient VALUES. A separate property is the printed

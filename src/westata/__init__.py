@@ -169,6 +169,7 @@ from westata.postestimation import (
 )
 from westata.protocols import SSC
 from westata.report import etable, to_latex, to_markdown
+from westata.results.estimates_table import render_estimates_table
 from westata.results.esttab import etable_as_stata, render_esttab
 
 # The version is read from the INSTALLED package metadata, which is what pip writes and what
@@ -350,6 +351,7 @@ __all__ = [
     "etable",
     "etable_as_stata",
     "render_esttab",
+    "render_estimates_table",
     "to_latex",
     "to_markdown",
     "WEIGHT_TYPES",

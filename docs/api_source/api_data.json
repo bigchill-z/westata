@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.8",
+  "westata_version": "0.3.9",
   "exports": [
     {
       "name": "AIPW",
@@ -1629,6 +1629,13 @@
       "signature": "(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResult'"
     },
     {
+      "name": "render_estimates_table",
+      "kind": "function",
+      "module": "westata.results.estimates_table",
+      "docstring": "Reproduce ``estimates table m1 m2 ..., b se``.\n\n``model_names`` is the equivalent of the ``estimates store`` names: Stata prints whatever the\nmodels were stored as, abbreviated to ten characters where needed.",
+      "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True) -> 'str'"
+    },
+    {
       "name": "render_esttab",
       "kind": "function",
       "module": "westata.results.esttab",
@@ -2553,6 +2560,14 @@
       "example": "ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()",
       "notes_en": "The property returns the fraction; `conf_int()` still accepts an explicit `alpha`, which wins over the recorded level for that call. Only weighted and unweighted estimation are affected -- this is a reporting choice and never changes a coefficient or a standard error.",
       "notes_zh": "该属性返回分数；`conf_int()` 仍接受显式 `alpha`，那一次调用里它会覆盖已记录的水平。它只影响区间的报告，**不改变任何系数或标准误**。"
+    },
+    "render_estimates_table": {
+      "stata": "estimates table m1 m2 ..., b se",
+      "en": "Stacks any number of fitted models side by side in Stata's `estimates table` layout, a different shape from `esttab`: no column numbers, no dependent-variable row, and a `Legend: b/se` line closes the table. Coefficients sit on one row and their standard errors on the row beneath, per model column.",
+      "zh": "把任意多个已拟合模型并排，采用 Stata `estimates table` 的布局——它与 `esttab` 是不同的形态：没有列号、没有依赖变量行，末尾以 `Legend: b/se` 收尾。每个模型一列，系数一行、标准误在下一行。",
+      "notes_en": "Geometry is derived, not tabulated: a 14-character gutter then 13 columns per model, so the rule is 14 + 13*n characters and '+' sits at index 13. Names are centred and abbreviated past ten characters. Values use eight significant figures at or above 1 and eight decimals below. NOTE the VCE convention: Stata's `regress, r` is HC1 while `ivregress ..., r` is HC0, so a table mixing OLS and IV needs cov_type='HC1' for the OLS fits and 'HC0' for the IV ones.",
+      "notes_zh": "几何是推导出来的：14 字符标签槽，之后每个模型 13 列，规则线为 14 + 13*n 个字符、'+' 位于索引 13。名称居中，超过十个字符则缩写。数值在 |v|≥1 时用八位有效数字，否则八位小数。注意 VCE 约定：Stata 的 `regress, r` 是 HC1，`ivregress ..., r` 是 HC0；混合 OLS 与 IV 的表格需要对 OLS 用 cov_type='HC1'、对 IV 用 'HC0'。",
+      "example": "ws.render_estimates_table([ws.OLS.from_formula('y ~ x1', base).fit(), ws.OLS.from_formula('y ~ x1 + x2', base).fit()], model_names=['a', 'b'])"
     },
     "OLS": {
       "stata": "regress y x1 x2",

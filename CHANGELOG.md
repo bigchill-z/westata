@@ -7,6 +7,74 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.12] - 2026-11-13
+
+### Fixed — a robust ML fit reports a *pseudo*likelihood
+
+`logit`/`probit` printed `Log likelihood` even when the VCE was robust or clustered. Stata switches
+the label in both the banner and the iteration trace, because the standard errors then come from a
+quasi-ML sandwich rather than the information matrix:
+
+| VCE | label |
+|---|---|
+| `nonrobust` | `Log likelihood = ...` |
+| `robust` / `cluster` / `HC0` / `HC1` | `Log pseudolikelihood = ...` |
+
+```
+Log pseudolikelihood = -1105.0306                       Pseudo R2     = 0.2020
+Iteration 0:  Log pseudolikelihood = -1384.7284
+```
+
+### Fixed — the leading blank line, and the iteration precision
+
+Three cases, measured on a live session:
+
+| command | line 0 |
+|---|---|
+| `logit y x` | blank, then `Iteration 0` |
+| `xtlogit y x, fe` (prints notes) | `note: ...` directly, **no** blank |
+| `xtlogit y x, fe nolog` | `note: ...` directly, **no** blank |
+
+The leading blank therefore belongs to the **iteration trace alone**. The old code stripped every
+leading blank, so noted tables looked correct by accident while a plain `logit` was missing its
+blank line.
+
+The iteration value is also emitted at **eight significant figures** rather than a fixed decimal
+count — `-441.45229` has five decimals and `-1384.7284` has four, and both are eight significant
+figures. A fixed four decimals printed `-441.4523`, one digit short.
+
+### Documented — which `cov_type` matches `logit ..., r`
+
+A user compared `logit survive ... [fweight=freq], r` with westata's expanded weights plus
+`cov_type="HC1"` and saw different standard errors. The VCE **scale factor differs by command**, and
+`logit, r` uses `N/(N-1)`, which this package already implements as `cov_type="robust"`:
+
+| call | `se[child]` |
+|---|---|
+| Stata `logit, r` | `0.2767452` |
+| `cov_type="HC1"` | `0.2770602` — inflated by 1.00137 |
+| `cov_type="robust"` | `0.2767452` |
+
+```python
+ws.Logit.from_formula(formula, expanded).fit(cov_type="robust")
+```
+
+`HC0`/`HC1` are statsmodels' conventions, not Stata's: `regress, r` is HC1, `ivregress, r` is HC0,
+and `logit, r` is `N/(N-1)`. The reliable way to choose is to compute `Stata_se / HC0_se` and square
+it. `WEIGHTED_LOGIT_SPEC.md` records the measurements.
+
+### Verified
+
+With Stata's intermediate `Iteration 1..4` lines removed — the documented decision, since statsmodels
+reaches the same optimum along a different path and printing its intermediate values would fabricate
+output Stata never produces — the two outputs are **byte-identical**: 19 lines, zero differences.
+
+Full suite **6257 passed, 3 skipped, 0 failed**, with 9 new guards in
+`tests/test_weighted_logit_pseudolikelihood.py`. Five stale assertions that expected no leading blank
+were corrected against Stata's real structure.
+
+---
+
 ## [0.3.11] - 2026-11-13
 
 ### Added — `render_estimates_table(..., pvalues=True)`

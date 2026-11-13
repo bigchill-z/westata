@@ -149,6 +149,36 @@ ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
+### 哪个 `cov_type` 对应 Stata 的 `, r`
+
+稳健 VCE 的缩放因子**因命令而异**，字母 `r` 并不能唯一确定它：
+
+| Stata | westata |
+|---|---|
+| `regress ..., r` | `cov_type="HC1"` |
+| `ivregress ..., r` | `cov_type="HC0"` |
+| `logit ... , r` / `probit ..., r` | `cov_type="robust"` |
+
+对 ML 命令，`robust` 用 `N/(N-1)`——这正是 Stata 的做法；而 `HC1` 用 statsmodels 的
+`N/(N-K)`，会把每个标准误都放大。以 titanic 加 `[fweight=freq]` 为例：
+
+| 调用 | `se[child]` |
+|---|---|
+| Stata `logit ..., r` | `0.2767452` |
+| `cov_type="HC1"` | `0.2770602` |
+| `cov_type="robust"` | `0.2767452` |
+
+```python
+# auto.csv carries `foreign` as an indicator, so this is a runnable ML example.
+print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit(cov_type="robust").summary())
+```
+
+与其猜，不如算 `Stata_se / HC0_se` 再平方：等于 `N/(N-K)` 就用 `HC1`，
+等于 `N/(N-1)` 就用 `robust`，等于 `1` 就用 `HC0`。
+
+稳健的 ML 拟合还会**改名对数似然**：Stata 打印 `Log pseudolikelihood`，
+因为标准误来自拟似然的 sandwich 而非信息矩阵。
+
 ### 分位数与稳健回归
 
 | Stata | westata |

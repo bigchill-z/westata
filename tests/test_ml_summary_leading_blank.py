@@ -68,11 +68,13 @@ def test_ml_models_open_with_the_iteration_line(frames, model: str) -> None:
     lines = str(
         cls.from_formula("rns ~ s + expr + tenure", frame).fit().summary(style="stata")
     ).splitlines()
-    assert lines[0].startswith("Iteration 0:  Log likelihood ="), lines[0]
-    assert lines[1] == "", lines[:3]
-    assert lines[2].startswith(
+    # MEASURED: Stata opens with a blank line, THEN the trace, THEN another blank.
+    assert lines[0] == "", lines[:4]
+    assert lines[1].startswith("Iteration 0:  Log likelihood ="), lines[:4]
+    assert lines[2] == "", lines[:4]
+    assert lines[3].startswith(
         "Logistic regression" if model == "logit" else "Probit regression"
-    ), lines[2]
+    ), lines[:4]
 
 
 def test_the_ml_banner_follows_the_iteration_line(frames) -> None:
@@ -85,7 +87,7 @@ def test_the_ml_banner_follows_the_iteration_line(frames) -> None:
     banner = next(
         index for index, line in enumerate(lines) if line.startswith("Logistic regression")
     )
-    assert banner == 2, lines[: banner + 1]
+    assert banner == 3, lines[: banner + 1]
     assert lines[banner - 1] == "", "exactly one blank between the log and the banner"
 
 

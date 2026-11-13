@@ -902,11 +902,23 @@ def _ml_iteration_head(result: Any) -> list[str]:
     ll0 = e.get("ll_0")
     if ll0 is None:
         return []
+    # MEASURED: with a robust VCE the trace says `Log pseudolikelihood`, and Stata prints the SAME
+    # precision it uses for the banner -- four decimals here (`-1384.7284`), not the five this
+    # function used to emit (`-1384.72836`). Both are taken from the result rather than fixed.
+    _vce = str(getattr(result, "cov_type", "") or "").lower()
+    _pseudo = _vce in ("robust", "hc0", "hc1", "cluster")
     try:
-        line = f"Iteration 0:  Log likelihood = {float(ll0):>10.5f}"
+        _digits = 4
+        label = "Log pseudolikelihood" if _pseudo else "Log likelihood"
+        # MEASURED, and the precision is EIGHT SIGNIFICANT FIGURES rather than a fixed decimal
+        # count -- both captures agree:
+        #     'Iteration 0:  Log likelihood = -441.45229  '      (five decimals)
+        #     'Iteration 0:  Log pseudolikelihood = -1384.7284  ' (four decimals)
+        # A fixed four decimals produced '-441.4523', which is one digit short of Stata.
+        line = f"Iteration 0:  {label} = {float(ll0):>10.8g}  "
     except (TypeError, ValueError):
         return []
-    return [line.ljust(43)]
+    return [line]
 
 
 def _result_notes(result: Any) -> list[str]:
@@ -3058,7 +3070,15 @@ def _stata_summary(result: Any) -> str:
             else 8
         )
         if np.isfinite(ll):
-            ml_left.append("Log likelihood = " + (("%%.%dg" % _ll_digits) % ll))
+            # MEASURED: `logit y x, r` prints `Log pseudolikelihood = ...` while the nonrobust form
+            # prints `Log likelihood = ...`. The same swap appears in the iteration trace. Stata's
+            # rule is that a robust/cluster VCE makes the reported value a pseudo-likelihood.
+            _vce = str(getattr(result, "cov_type", "") or "").lower()
+            _pseudo = _vce in ("robust", "hc0", "hc1", "cluster")
+            ml_left.append(
+                ("Log pseudolikelihood = " if _pseudo else "Log likelihood = ")
+                + (("%%.%dg" % _ll_digits) % ll)
+            )
         # ``truncreg``'s left column is 48 wide, not the 56 the other ML commands use:
         # its "Limit: Lower = ..." row is longer than a banner, so Stata shifts the right
         # column left to keep the block 78 wide -- and the value field shrinks with it
@@ -5206,10 +5226,16 @@ def _stata_summary(result: Any) -> str:
         _preamble.extend(_head)
         _preamble.append("")
     if _preamble:
-        # Strip any leading blank the body would otherwise add, so the count stays exact.
         while lines and lines[0] == "":
             lines = lines[1:]
-        lines = _preamble + lines
+        # MEASURED, three cases:
+        #   logit y x                     ''            then 'Iteration 0: ...'
+        #   xtlogit y x, fe               'note: ...'    FIRST, no blank line
+        #   xtlogit y x, fe nolog         'note: ...'    FIRST, no blank line
+        # The leading blank therefore belongs to the ITERATION TRACE alone; notes open the output
+        # directly. When both appear, the trace follows the notes and no blank precedes either.
+        _leading_blank = bool(_head) and not _all_notes
+        lines = ([""] if _leading_blank else []) + _preamble + lines
     # STATA PRINTS THE CONVERGENCE WARNING LAST, after the coefficient table and its rule. Measured
     # on `teffects ipw (price) (treated mpg weight)`: the run iterates 301 times with `(not
     # concave)` markers, then closes with 'Warning: Convergence not achieved.' at line 320 of 321.

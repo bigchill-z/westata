@@ -92,7 +92,18 @@ def test_the_block_length_matches_stata(grilic) -> None:
     lines = str(fitted.summary(style="stata")).splitlines()
     # Skip only the `Iteration 0` LINE; its following blank is the table's original leading blank
     # and is part of the 13-line body the assertion measures.
-    body = [line for line in lines if not line.startswith("Iteration") and not line.startswith("note:")]
+    # MEASURED: Stata `logit rns s expr, nolog` prints 13 lines and OPENS WITH A BLANK LINE. With
+    # `Iteration 0` prepended the output is '' / trace / '' / banner... -- so BOTH the trace line and
+    # the blank after it are the addition, not just the trace.
+    body = [
+        line
+        for index, line in enumerate(lines)
+        if not line.startswith("Iteration")
+        and not line.startswith("note:")
+        and not (
+            line == "" and index > 0 and lines[index - 1].startswith("Iteration")
+        )
+    ]
     assert len(body) == 13, lines[:4]
 
 

@@ -770,3 +770,51 @@ def _version_key(version):
 
 **教训**：`pytest -q | Select-Object -Last N` 在结束前**没有任何输出**，
 不能靠"没有新输出"判断卡死；必须另查进程状态。
+## 31. 稳健 VCE 的尺度因子要按命令查，`HC1` 不是万能对应
+
+用户对比 Stata `logit ..., [fweight=freq], r` 与 westata 展开权重 + `cov_type="HC1"`，标准误对不上：
+
+| 做法 | se[child] |
+|---|---|
+| Stata `logit, r` | 0.2767452 |
+| westata `cov_type="HC1"` | 0.2770602（偏大 1.00137 倍）|
+| westata `cov_type="robust"` | 0.2767452 ✅ |
+
+`HC1` 用 statsmodels 的 `N/(N-K)`；Stata 的 `logit, r` 用 **`N/(N-1)`**，而包的 `robust`
+分支（`discrete.py:155`）**本来就实现了 `N/(N-1)`**。
+
+**教训**：`HC0`/`HC1` 是 statsmodels 的约定，不是 Stata 的。判断"该用哪个"必须**实测**：
+先算 `Stata_se / HC0_se`，平方后看它等于 `N/(N-K)`、`N/(N-1)` 还是别的。
+不要因为"Stata 写的是 r，所以用 HC1"就想当然——`regress, r` 是 HC1，`ivregress, r` 是 HC0，
+`logit, r` 又是 `N/(N-1)`，三个命令三种尺度。
+
+## 32. 行数对不上时先分清"哪部分是新增的"
+
+`logit` 的 `summary()` 在修复后多了 `Iteration 0` 行，导致
+`test_likelihood_table_border` 从 13 行变 14 行。
+
+该测试的过滤逻辑只去掉了 `Iteration` 行，**没去掉它后面的空行**。Stata 的真实结构是：
+
+    logit y x, nolog     '' / banner / ...            13 行
+    logit y x            '' / Iteration 0 / '' / banner / ...   15 行
+
+所以新增的是**"迭代行 + 其后空行"两行**，不是一行。
+
+**教训**：给"新增了哪些行"下结论前，把两边逐行列出来对比，别按直觉只减掉最显眼的那一行。
+过滤器写的是"去掉 X"，但真实增量是"X 及其伴随物"。
+
+## 33. 前导空行的归属：note 没有，迭代日志才有
+
+同一轮里三种场景的 Stata 首行：
+
+| 命令 | 第 0 行 |
+|---|---|
+| `logit y x` | `''`（空行）|
+| `xtlogit y x, fe`（打印 note）| `note: ...`（**无空行**）|
+| `xtlogit y x, fe nolog` | `note: ...`（**无空行**）|
+
+旧代码剥掉了所有前导空行，于是：**有 note 的表碰巧正确，纯 logit 缺空行**。
+这种"一半对一半错"的 bug 最容易被漏掉——因为验证时只抽了有 note 的那个案例。
+
+**教训**：输出首行的对齐规则要**按分支分别实测**，不能用一个案例推全体。
+`_preamble` 里 note 和迭代日志是两条路径，空行归属也不同。

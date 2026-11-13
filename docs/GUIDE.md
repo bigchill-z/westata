@@ -154,6 +154,36 @@ ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
+### Which `cov_type` matches Stata's `, r`
+
+The robust VCE scale factor **differs by command**, and the letter `r` does not identify it:
+
+| Stata | westata |
+|---|---|
+| `regress ..., r` | `cov_type="HC1"` |
+| `ivregress ..., r` | `cov_type="HC0"` |
+| `logit ... , r` / `probit ..., r` | `cov_type="robust"` |
+
+For an ML command, `robust` applies `N/(N-1)` — which is what Stata does — while `HC1` applies
+statsmodels' `N/(N-K)` and inflates every standard error. On titanic with `[fweight=freq]`:
+
+| call | `se[child]` |
+|---|---|
+| Stata `logit ..., r` | `0.2767452` |
+| `cov_type="HC1"` | `0.2770602` |
+| `cov_type="robust"` | `0.2767452` |
+
+```python
+# auto.csv carries `foreign` as an indicator, so this is a runnable ML example.
+print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit(cov_type="robust").summary())
+```
+
+To choose rather than guess, compute `Stata_se / HC0_se` and square it: `N/(N-K)` means `HC1`,
+`N/(N-1)` means `robust`, `1` means `HC0`.
+
+A robust ML fit also **renames the log-likelihood**: Stata prints `Log pseudolikelihood`, because the
+standard errors come from a quasi-ML sandwich rather than the information matrix.
+
 ### Quantile and robust regression
 
 | Stata | westata |

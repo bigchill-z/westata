@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.11 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.12 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -1312,6 +1312,7 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Iteration 0:  Log likelihood = -137.98875  
 
 Logistic regression                                     Number of obs =    200
@@ -1363,6 +1364,7 @@ ws.Probit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata')
 **输出**
 
 ```text
+
 Iteration 0:  Log likelihood = -137.98875  
 
 Probit regression                                       Number of obs =    200

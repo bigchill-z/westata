@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.11",
+  "westata_version": "0.3.12",
   "exports": [
     {
       "name": "AIPW",

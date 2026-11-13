@@ -41,14 +41,19 @@ def _count(seed: int = 4) -> pd.DataFrame:
 # ---------------------------------------------------------------- option C
 def test_logit_opens_with_the_exact_iteration_zero_line() -> None:
     fitted = ws.Logit.from_formula("foreign ~ mpg + weight", _auto()).fit()
-    first = str(fitted.summary()).splitlines()[0]
+    # MEASURED: line 0 is the blank Stata opens with; the trace is line 1. The two spaces before
+    # the value come from right-aligning it in a fixed field.
+    lines = str(fitted.summary()).splitlines()
+    assert lines[0] == "", lines[:3]
+    first = lines[1]
     assert first == "Iteration 0:  Log likelihood =  -45.03321  ", repr(first)
 
 
 def test_a_blank_line_separates_the_log_from_the_banner() -> None:
     lines = str(ws.Logit.from_formula("foreign ~ mpg + weight", _auto()).fit().summary()).splitlines()
-    assert lines[1] == ""
-    assert lines[2].startswith("Logistic regression"), lines[2]
+    # '' / Iteration 0 / '' / banner -- so the separating blank is at index 2.
+    assert lines[2] == "", lines[:4]
+    assert lines[3].startswith("Logistic regression"), lines[:4]
 
 
 def test_the_converged_likelihood_stays_in_the_header() -> None:

@@ -75,6 +75,7 @@ from scipy.stats import norm
 
 from westata.errors import ConsistencyError
 from westata.formula.factor import build_design
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = [
     "AIPW",
@@ -96,7 +97,7 @@ _APPROX_SE = "Abadie-Imbens approximation"
 
 
 @dataclass(frozen=True)
-class TreatmentEffectResult:
+class TreatmentEffectResult(ResultSerialisation):
     """A treatment effect together with its potential-outcome means.
 
     Attributes
@@ -620,7 +621,7 @@ class RegressionAdjustment:
         self._estimand = _valid_estimand(estimand)
 
     @classmethod
-    def from_formula(
+    def from_variables(
         cls,
         outcome: str,
         treatment: str,
@@ -656,6 +657,23 @@ class RegressionAdjustment:
             command=cls._command,
         )
         return cls(y, treated, x, estimand=estimand)
+
+    @classmethod
+    def from_formula(  # noqa: D401 - deprecation shim, see from_variables
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        **kwargs: Any,
+    ) -> Any:
+        """Deprecated alias of :meth:`from_variables` (R3.2).
+
+        ``teffects`` and friends take VARIABLE NAMES, not a formula, so ``from_formula``
+        was a name that promised syntax the method does not accept.  Kept for one
+        release because the call sites in ``retest/`` still use it; they migrate next.
+        """
+
+        return cls.from_variables(outcome, treatment, data, **kwargs)
 
     # ------------------------------------------------------------------ fit
     def _arm_fit(
@@ -938,7 +956,7 @@ class IPW:
         self._estimand = _valid_estimand(estimand)
 
     @classmethod
-    def from_formula(
+    def from_variables(
         cls,
         outcome: str,
         treatment: str,
@@ -957,6 +975,23 @@ class IPW:
             command=cls._command,
         )
         return cls(y, treated, x, estimand=estimand)
+
+    @classmethod
+    def from_formula(  # noqa: D401 - deprecation shim, see from_variables
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        **kwargs: Any,
+    ) -> Any:
+        """Deprecated alias of :meth:`from_variables` (R3.2).
+
+        ``teffects`` and friends take VARIABLE NAMES, not a formula, so ``from_formula``
+        was a name that promised syntax the method does not accept.  Kept for one
+        release because the call sites in ``retest/`` still use it; they migrate next.
+        """
+
+        return cls.from_variables(outcome, treatment, data, **kwargs)
 
     # ------------------------------------------------------------------ fit
     def _moments(
@@ -1320,7 +1355,7 @@ class NearestNeighbourMatching:
         self._estimand = _valid_estimand(estimand)
 
     @classmethod
-    def from_formula(
+    def from_variables(
         cls,
         outcome: str,
         treatment: str,
@@ -1340,6 +1375,23 @@ class NearestNeighbourMatching:
             command=cls._command,
         )
         return cls(y, treated, x, nneighbor=nneighbor, estimand=estimand)
+
+    @classmethod
+    def from_formula(  # noqa: D401 - deprecation shim, see from_variables
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        **kwargs: Any,
+    ) -> Any:
+        """Deprecated alias of :meth:`from_variables` (R3.2).
+
+        ``teffects`` and friends take VARIABLE NAMES, not a formula, so ``from_formula``
+        was a name that promised syntax the method does not accept.  Kept for one
+        release because the call sites in ``retest/`` still use it; they migrate next.
+        """
+
+        return cls.from_variables(outcome, treatment, data, **kwargs)
 
     # -------------------------------------------------------------- distance
     def _metric_covariates(self) -> np.ndarray:

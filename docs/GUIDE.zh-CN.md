@@ -301,6 +301,9 @@ ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
 | `test` | `res.test(...)` |
 | `lincom` | `res.lincom(...)` |
 | `margins` | `res.margins(...)` |
+| `linktest` | `ws.linktest(res)` |
+| `suest` | `ws.suest([fit_a, fit_b])` |
+| `vargranger` | `ws.vargranger(var_fit)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
 | `summarize` | `ws.summarize(frame, ["y", "x1"])` |

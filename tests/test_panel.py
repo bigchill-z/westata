@@ -649,7 +649,15 @@ def test_robust_is_statas_clustered_vce_not_hc1() -> None:
     # ``HC1`` is accepted as an alias for the same spelling, not as HC1.
     alias = model.fit(cov_type="HC1")
     np.testing.assert_allclose(alias.cov_params(), res.cov_params(), rtol=0.0, atol=0.0)
-    assert res.cov_type == "robust"
+    # The LABEL must say ``cluster``, not ``robust`` (R3.7.3).  Everything above in this
+    # test proves the covariance IS a clustered one; a result labelled ``"robust"``
+    # invites comparison with ``OLS(cov_type="robust")``, which is HC1 and differs by an
+    # order of magnitude.  The label now names what was computed.
+    assert res.cov_type == "cluster"
+    assert alias.cov_type == "cluster", (
+        "cov_type='HC1' on a panel estimator computes vce(cluster panelvar), so it must "
+        "not be labelled HC1"
+    )
 
 
 def test_nonrobust_is_the_default() -> None:

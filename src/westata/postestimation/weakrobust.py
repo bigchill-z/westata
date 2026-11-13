@@ -29,6 +29,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 from scipy import stats as scipy_stats
+from westata.postestimation.names import require_iv_structure
 
 
 @dataclass
@@ -81,18 +82,9 @@ class WeakRobustResult:
 
 
 def _require_iv(result: Any) -> dict[str, Any]:
-    structure = getattr(result, "iv_structure", None)
-    if structure is None:
-        raise NotImplementedError(
-            "estat weakrobust is only defined after an instrumental-variables fit: "
-            "Stata reaches it through ivregress_estat, and it needs the split between "
-            "included exogenous regressors, endogenous regressors and excluded "
-            f"instruments; got {getattr(result, 'model_name', 'an unnamed model')!r} "
-            "without that structure"
-        )
-    if structure["endog"].shape[1] == 0:
-        raise ValueError("estat weakrobust: model contains no endogenous variables")
-    return structure
+    """Delegate to the shared check (R6.1); see names.require_iv_structure."""
+
+    return require_iv_structure(result, 'estat weakrobust')
 
 
 def _is_constant_column(column: np.ndarray) -> bool:
@@ -238,7 +230,6 @@ def estat_weakrobust(
     ar: bool | None = None,
     clr: bool | None = None,
     betanull: Any = None,
-    level: float = 95.0,
 ) -> WeakRobustResult:
     """Stata's ``estat weakrobust``.
 
@@ -262,12 +253,15 @@ def estat_weakrobust(
         A sequence longer or shorter than the number of endogenous regressors is
         refused, because silently padding or truncating would test a different
         hypothesis than the caller wrote.
-    level:
-        Confidence level, in percent.  Relevant only to the ``ci`` option, which is not
-        implemented (it needs the inverted test, not the statistic).
 
     Notes
     -----
+    ``level`` was REMOVED rather than converted.  It only ever fed Stata's ``ci``
+    option, which is not implemented here (it needs the inverted test, not the
+    statistic), so every accepted value was discarded -- a percentage default of
+    ``95.0`` that no caller could observe.  Deleting a dead parameter is honest;
+    retuning its unit would have advertised a feature that does not exist (R3.3, R1.5).
+
     ``sthlp:365-373`` makes the DEFAULT depend on identification: Anderson-Rubin when
     just identified, CLR when overidentified.  Since only AR is implemented, an
     overidentified model without ``ar`` refuses rather than silently reporting a

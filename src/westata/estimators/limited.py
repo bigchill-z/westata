@@ -131,6 +131,7 @@ from westata.estimators.discrete import _DiscreteBase
 from westata.estimators.tobit import _numerical_hessian
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import slope_positions
 
 __all__ = ["Etregress", "Heckman", "Intreg", "Truncreg"]
 
@@ -242,32 +243,13 @@ def _gaussian_pseudo_r2(
 
 
 def _slope_positions(names: Sequence[str]) -> list[int]:
-    """Indices of the coefficients a Stata Wald/LR test covers.
+    """Delegate to the shared rule (R6.1); pass only the family differences."""
 
-    Stata's ``Wald chi2(k)`` for these commands counts the structural regressor
-    slopes of the outcome equation.  Excluded:
-
-    * the constant, however the estimator spells it (``Intercept``, ``_cons``,
-      or an equation-prefixed ``y:Intercept``);
-    * the estimated scale (``/sigma``, ``/lnsigma``);
-    * the generated regressors -- ``lambda`` (Heckman) and the control-function
-      residual (``Etregress``) -- because they are auxiliary parameters, not
-      regressors whose null Stata tests;
-    * every coefficient of the selection/treatment equation (``select:`` /
-      ``treat:``), which belongs to a different equation.
-    """
-
-    positions = []
-    for position, name in enumerate(names):
-        leaf = name.split(":", 1)[-1]
-        if leaf in ("Intercept", "_cons", "lambda"):
-            continue
-        if name.startswith("/") or name.startswith("select:") or name.startswith(
-            "treat:"
-        ):
-            continue
-        positions.append(position)
-    return positions
+    return slope_positions(
+        names,
+        excluded_equations=("select:", "treat:"),
+        extra_auxiliary=("lambda",),
+    )
 
 
 def _wald_statistic(
@@ -1857,15 +1839,26 @@ class Heckman:
     # ------------------------------------------------------------------- fit
     def fit(
         self,
-        method: str = "twostep",
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: Any = None,
         *,
+        method: str = "twostep",
         maxiter: int = 200,
         strict: bool = False,
     ) -> StataResults:
-        """Estimate by the two-step (Heckman 1979) procedure."""
+        """Estimate by the two-step (Heckman 1979) procedure.
+
+        ``cov_type`` comes first (R2.1) and ``method`` is keyword-only (R2.2):
+        ``method`` selects WHICH MODEL is estimated, so in the house convention it
+        belongs with the model, not with the estimator settings.  It stays accepted
+        here rather than moving to ``from_formula`` because ``Heckman`` is also
+        constructible from raw arrays, where there is no formula call to attach it
+        to; ``XtLogit`` and friends put it on ``from_formula`` because that is their
+        only public constructor.  What must NOT happen is the old order, where
+        ``fit("HC1")`` silently became ``method="HC1"`` and then failed with a
+        message about methods rather than about covariance.
+        """
 
         normalized = str(method).strip().lower()
         if normalized in ("ml", "mle", "maximumlikelihood"):
@@ -2361,15 +2354,20 @@ class Etregress:
 
     def fit(
         self,
-        method: str = "control",
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: Any = None,
         *,
+        method: str = "control",
         maxiter: int = 200,
         strict: bool = False,
     ) -> StataResults:
         """Estimate by the control-function (two-step) procedure.
+
+        ``cov_type`` is first and ``method`` is keyword-only, for the same reason as
+        :meth:`Heckman.fit`: the old order made ``fit("robust")`` assign to ``method``
+        and report an unimplemented METHOD, which points the caller at the wrong
+        argument entirely (R2.1, R2.2).
 
         NOTE ON THE DEFAULT. Stata's bare ``etregress`` runs MAXIMUM LIKELIHOOD, so its
         header says "Estimator: Maximum likelihood" and reports /athrho and /lnsigma. This

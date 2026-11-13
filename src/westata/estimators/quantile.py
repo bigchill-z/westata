@@ -137,7 +137,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from westata.errors import ConsistencyError, ConvergenceError
+from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
@@ -153,6 +153,13 @@ _HUBER_C = 1.345
 _BIWEIGHT_C = 4.685
 #: Consistency factor turning the MAD into a scale estimate for normal errors.
 _MAD_TO_SIGMA = 0.6745
+
+#: What ``results.cov_type`` reports for each accepted ``cov_type`` (R3.7.2).
+#:
+#: ``qreg``'s robust VCE is ``tau(1-tau) J^-1 (X'X) J^-1`` -- not HC0, not HC1, and
+#: not derivable from either.  Storing the raw ``"robust"`` made a ``qreg`` result look
+#: interchangeable with ``OLS(cov_type="robust")`` (HC1) when the two numbers differ.
+_QREG_COV_LABEL = {"iid": "iid", "robust": "QREG_ROBUST"}
 
 
 def solve_lad(
@@ -457,7 +464,10 @@ class QuantileRegression:
             df_model=float(k - 1),
             dist="t",
             model_name=self._stata_command,
-            cov_type=normalized,
+            # `qreg`'s robust VCE is `tau(1-tau) J^-1 (X'X) J^-1` -- its own estimator,
+            # neither HC0 nor HC1 (R3.7.2).  Storing the raw "robust" made this result
+            # look interchangeable with `OLS(cov_type="robust")`, which is HC1.
+            cov_type=_QREG_COV_LABEL.get(normalized, normalized),
             e=e,
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
@@ -695,6 +705,30 @@ class RobustRegression:
             )
         if tolerance <= 0:
             raise ValueError(f"rreg: tolerance must be positive, got {tolerance!r}")
+
+        # `rreg` has no `vce()` at all: Stata computes the covariance from the
+        # biweight iteration's own scale (`e(rmse)^2 (X'X)^-1`), and there is no
+        # `, vce(robust)` syntax to ask for anything else.  Accepting `cov_type` and
+        # returning the default silently would let a caller believe the variance changed
+        # when it did not -- measured: `fit(cov_type="robust").bse` was bit-identical to
+        # `fit().bse` (R3.7.0a, R2.6).
+        if cov_type is not None and str(cov_type).strip().lower() not in (
+            "",
+            "nonrobust",
+            "unadjusted",
+        ):
+            raise UnsupportedError(
+                f"rreg: cov_type={cov_type!r} is not available. Stata's `rreg` has no "
+                "vce() option at all: its covariance comes from the biweight "
+                "iteration's own scale, so there is no robust/cluster variant to "
+                "select. Accepting the argument silently would report unchanged "
+                "standard errors under a different label."
+            )
+        if cov_kwds:
+            raise UnsupportedError(
+                f"rreg: cov_kwds={dict(cov_kwds)!r} has no meaning; `rreg` exposes no "
+                "vce() option"
+            )
 
         keep = self._cooks_distance_screen()
         X = self._X[keep]

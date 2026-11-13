@@ -99,7 +99,7 @@ def test_without_weights_the_two_columns_are_identical(data) -> None:
 
 
 def test_the_ipw_convention_reproduces_stata(data) -> None:
-    """`normalise_counts=True` with ATET weights: counts AND the weighted column both match.
+    """`normalize_counts=True` with ATET weights: counts AND the weighted column both match.
 
     Stata, after `teffects ipw (re78) (covs), atet` then `tebalance summarize`:
 
@@ -122,7 +122,7 @@ def test_the_ipw_convention_reproduces_stata(data) -> None:
         covariates,
         match_weights=result.weights,
         names=COVARIATES,
-        normalise_counts=True,
+        normalize_counts=True,
     )
 
     assert summary.nobs_matched == 445
@@ -136,7 +136,7 @@ def test_the_ipw_convention_reproduces_stata(data) -> None:
 
 
 def test_the_matching_convention_is_unchanged_by_the_new_flag(data) -> None:
-    """Without `normalise_counts`, the matched-weight path behaves exactly as before.
+    """Without `normalize_counts`, the matched-weight path behaves exactly as before.
 
     That path keeps the treated at their raw mean and reweights only the controls, and its counts
     are raw weighted sums. Rounding it like the IPW case would be wrong -- and did break two tests

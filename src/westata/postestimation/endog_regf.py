@@ -47,14 +47,14 @@ from typing import Any, Sequence
 
 import numpy as np
 from scipy import stats
+from westata.postestimation.names import is_constant_name
 
-__all__ = ["RegFResult", "endog_regF_test"]
+#: The constant-name test lives in `names.py` (R6.1).
+_is_constant = is_constant_name
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
+__all__ = ["RegFResult", "endog_regf_test"]
 
 
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 class RegFResult:
@@ -109,7 +109,7 @@ class RegFResult:
         }
 
 
-def endog_regF_test(
+def endog_regf_test(
     structure: dict[str, Any],
     response: np.ndarray,
     *,

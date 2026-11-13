@@ -56,11 +56,15 @@ import numpy as np
 from scipy import stats
 
 from westata.errors import ConsistencyError
+from westata.postestimation.names import CONSTANT_SPELLINGS, is_constant_name
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
 
 __all__ = ["HausmanResult", "LRTestResult", "hausman", "lrtest"]
 
 #: Names the constant can appear under in westata's results.
-_CONSTANT_NAMES = frozenset({"Intercept", "_cons", "const"})
 
 
 @dataclass(frozen=True)
@@ -609,11 +613,11 @@ def _comparable_names(
             return names
         by_lower = {str(name).lower(): name for name in names}
         # The constant is spelled differently on the two lists ("_cons" against "Intercept"),
-        # so it is matched through _CONSTANT_NAMES rather than by name.
-        # _CONSTANT_NAMES mixes cases ("Intercept" is capitalised, "_cons" is not), so the
+        # so it is matched through CONSTANT_SPELLINGS rather than by name.
+        # CONSTANT_SPELLINGS mixes cases ("Intercept" is capitalised, "_cons" is not), so the
         # comparison has to be case-insensitive on BOTH sides -- matching only the candidate to
         # a lowercased set made every constant look absent and silently fell back to param order.
-        constants_lower = {name.lower() for name in _CONSTANT_NAMES}
+        constants_lower = {name.lower() for name in CONSTANT_SPELLINGS}
         constant_patsy = next(
             (name for name in names if str(name).lower() in constants_lower), None
         )
@@ -637,14 +641,14 @@ def _comparable_names(
     comparable = [
         name
         for name in consistent_names
-        if name in efficient_set and (constant or name not in _CONSTANT_NAMES)
+        if name in efficient_set and (constant or not is_constant_name(name))
     ]
     excluded: list[str] = []
     for name in consistent_names:
-        if name not in efficient_set and name not in _CONSTANT_NAMES:
+        if name not in efficient_set and not is_constant_name(name):
             excluded.append(name)
     for name in efficient_names:
-        if name not in consistent_set and name not in _CONSTANT_NAMES:
+        if name not in consistent_set and not is_constant_name(name):
             excluded.append(name)
     return comparable, excluded
 

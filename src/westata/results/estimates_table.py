@@ -28,6 +28,7 @@ from decimal import Decimal
 from typing import Any, Sequence
 
 import numpy as np
+from westata.results.stars import stars
 
 __all__ = ["render_estimates_table"]
 
@@ -100,21 +101,9 @@ def _threshold(level: float) -> str:
 
 
 def _stars(pvalue: float, thresholds: Sequence[float]) -> str:
-    """The star run for one coefficient, given a DESCENDING threshold triple.
+    """Delegate to the one star rule (R6.1); see results.stars.stars."""
 
-    Stata's ``star(0.1 0.05 0.01)`` yields ``***`` when p < .01, ``**`` when p < .05 and ``*`` when
-    p < .1. The list is zipped against the marks in reverse, so the largest threshold gets one star.
-    """
-
-    if not pvalue == pvalue:  # NaN
-        return ""
-    # ASCENDING list, and the count is position-based from the TOP: p < .01 gets three stars because
-    # .01 is the SMALLEST threshold. Walk from the smallest upward and stop at the first that holds.
-    ordered = sorted(float(level) for level in thresholds)
-    for index, level in enumerate(ordered):
-        if pvalue < level:
-            return "*" * (len(ordered) - index)
-    return ""
+    return stars(pvalue, thresholds)
 
 
 def _nobs(model: Any) -> float | None:

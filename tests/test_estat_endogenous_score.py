@@ -362,11 +362,11 @@ def test_regF_r_names(frame) -> None:
 def test_robust_regF_differs_from_the_robust_score(frame) -> None:
     """Two different tests; ``regF`` is reachable through its own constructor."""
 
-    from westata.postestimation.endog_regf import endog_regF_test
+    from westata.postestimation.endog_regf import endog_regf_test
 
     result = ws.IV2SLS.from_formula("y ~ [x ~ z1 + z2]", frame).fit(cov_type="HC1")
     score = result.estat_endogenous()
-    regf = endog_regF_test(
+    regf = endog_regf_test(
         result.iv_structure, frame["y"].to_numpy(float), cov_type="robust"
     )
 

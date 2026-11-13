@@ -2,6 +2,204 @@
 
 > 记录每次测试/排障中发现的、与具体任务无关的通用坑。
 
+## 2026-11-14 打包发布前，`collect_api_reference.py --check` 是文档门禁
+
+发布 0.3.13 前跑文档检查，发现 **52 个新导出的名字没有 prose**（工具报 49，
+补上 3 个后是 52）。也就是说：新增了公共 API 而手册没跟上，读者查不到。
+
+两个具体坑：
+
+1. **测试套件通过 ≠ 文档完整**。`tests/test_api_reference_is_in_sync.py` 的 18 项
+   全绿，但 `collect_api_reference.py --check` 报 52 个缺口——前者只校验**已有**
+   条目的一致性，不校验**覆盖**。发布前必须单独跑后者。
+2. **测试读的是 `api_data.json` 里内嵌的 prose**，不是 `prose_*.json` 源文件。
+   改完 prose 必须重跑 `collect_api_reference.py` + `render_api_reference.py`，
+   否则测试看到的是旧数据，会给出「失败但原因不明」的假象。
+
+**通用做法**：凡是「生成型文档」，发布检查顺序固定为
+`collect --check` → `collect` → `render` → 跑文档测试，缺一步就会出现
+「测试绿但手册缺页」。
+
+顺带记录本轮补文档时发现的真实缺陷：`VECMResults.conf_int()` 调用了
+`self.raw.conf_int()`，而 statsmodels 的 VECM 结果**没有**这个方法
+（只有分块的 `conf_int_alpha/beta/gamma/det_coef`，且返回结构化数组）。
+这个包装方法从落地起就是坏的，任何调用都 `AttributeError`，
+而没有任何测试覆盖它——因为没人调用过。
+
+## 2026-11-14 「待修 0 条」可能只说明检查器没看那些地方
+
+把规范基线降到 0 之后复核，发现**四处盲区**——每一处都让「0 条」变成假象：
+
+| 盲区 | 后果 | 实测规模 |
+|---|---|---|
+| 只遍历 `__all__` | 未被导出的结果类完全不可见 | 21 个公共结果类（`PanelUnitRootResult` 等）逃过两轮检查 |
+| 只看类名不看可达性 | 用户能拿到却无法命名的对象 | 同上 |
+| 不检查返回注解 | `from_formula` 注解指向私有基类 | 11 个估计器 |
+| 只检查一侧 | `estat_*` 只有方法形式、没有函数形式 | 6 个命令 |
+
+**通用做法**：
+
+1. **"清零"之后要反过来问：这条规则怎么才能不触发？** 如果答案是"换个写法就看不见"，
+   规则就有盲区。本轮的 21 个未导出结果类就是这么找到的——它们明明以 `Result`
+   结尾，却因为不在 `__all__` 里而躲过了"所有 Result 都要有 `to_dict`"的检查。
+2. **校验器的判定范围要覆盖「用户能拿到的东西」，不是「导出表里的东西」。**
+   改为扫描源码里所有公共 `*Result/*Table/*Matrix` 类，并要求每个都被某个包导出。
+3. **对称性检查成本最低、收益最高**：`estat_*` 函数的集合与 `StataResults` 方法的
+   集合逐名比对，一行代码就发现了 6 个缺口。凡是「同一功能两个入口」的地方都值得这么查。
+4. **注解也是契约**。`-> "_DiscreteBase"` 描述了一个调用者看不到的类；机械检查
+   「返回注解要么是公共类、要么是绑定 TypeVar」几乎零成本。
+
+新增的四条规则（R5.2 扩展、R5.6、R5.7、以及此前的 R5.5）都属于同一类修正：
+**先证明检查器没有盲区，再宣称达到目标。**
+
+## 2026-11-14 批量改写源码时，`\x0c` 会被当成换行，LF 会变成 CRLF
+
+本轮做 R6.1（消除重复 helper）时，用脚本批量改写 `panel.py`，把一段**注释里的
+`\x0c`（换页符）**拆成了真正的换行：
+
+```python
+# 原文（一行，\x0c 是转义后的换页符）
+# munnell.dta: \<FF>e\ gives .93913112, \<BS>e\ .99388704, e\ "." -- ...
+
+# 被我的脚本写成了两行，且 \\ 变成行尾续行符
+# munnell.dta: \
+e\ gives .93913112, ...
+```
+
+结果：`SyntaxError: unexpected character after line continuation character`，
+**整个 `panel.py` 无法导入**。而当时 `import westata` 仍然成功——因为
+`.pyc` 缓存还在，直到一次全量测试才暴露（47 failed + 20 errors）。
+
+**通用做法**：
+
+1. **批量改写源码必须保留原始字节语义**：读用 `read_bytes()`，写用
+   `write_bytes()`，不要经过 `read_text/write_text` 往返——文本模式会做换行
+   规范化，也会把某些控制字符重新解释。
+2. **改动后立刻对每个写过的文件做 `compile(raw_bytes, path, 'exec')`**，
+   不要等测试。一条循环几秒钟，能立刻定位是哪个文件坏了。
+3. **`import westata` 成功不代表文件没问题**：`.pyc` 会让旧的编译结果继续生效。
+   判断依据是「重新编译原始字节」，不是「导入成功」。
+4. 本仓库源码是 **LF**，HEAD 里 `panel.py` 的 CRLF 计数为 0；用
+   `Set-Content`/`write_text` 写回会引入 CRLF，造成整文件 diff。改动要用
+   `write_bytes(encode('utf-8'))`，且显式保留 `\n`。
+
+## 2026-11-13 改「标签」会静默破坏所有按字符串判断的下游
+
+R3.7.2 把结果对象上的 `cov_type` 从「用户输入的回声」改成「规范值」后，
+`Logit(cov_type="robust").cov_type` 从 `"robust"` 变成 `"ML_ROBUST"`。
+数值一个没动，但**五个后估计模块各自写了一份字符串判断**：
+
+```python
+# 改动前，五个文件各有一份
+cov_type in ("hc0", "hc1", "hc2", "hc3", "robust")     # hettest / imtest / endogenous / overid
+cov_type in robust_names or ("robust" in cov_type ...)  # ts_lags
+```
+
+于是 `estat hettest` 在 robust 拟合后**不再拒绝**，会打印一个 Stata 明确不给的检验。
+最要命的是：**没有数值型测试能发现它**，因为数字只在错误的路径上才会产生，
+而对拍 fixture 从不走那条路。
+
+**通用做法**：
+
+1. **凡「修改既有字段的取值域」，必须先全局搜索该字段的字符串比较**，
+   而不是只改生产方。`grep -rn 'cov_type.*robust'` 一条命令就能列出全部五个点。
+2. **这类谓词只能有一个定义**。本次抽到
+   `postestimation/vce_labels.py`，暴露为 `is_robust` / `is_hac` / `is_clustered`；
+   物理上列举所有合法标签，不用子串匹配（子串会把未来新增的 `cluster_threeway`
+   漏掉或误纳）。
+3. **配一个「标签全覆盖」测试**：把所有可能产生的标签逐个喂给谓词，
+   再逐条验证守卫仍然触发。本次即 `tests/test_cov_type_labels.py` 的 31 个用例。
+4. 顺带修掉的一处：`summary.py` 用同一个字符串判断决定打印
+   `Log likelihood` 还是 `Log pseudolikelihood`，且这段逻辑**写了两遍**；
+   改标签后表头静默退回 `Log likelihood`，被 `test_weighted_logit_pseudolikelihood`
+   抓到。已抽成 `_PSEUDO_LIKELIHOOD_COV_TYPES` 常量。
+
+## 2026-11-13 同一个字符串在不同族里代表不同的统计量：`cov_type="robust"`
+
+用户指出「Stata 不同模型的 robust 会对应 westata 同种模型不同的 cov_type」。
+逐族实测，比用户描述的还严重——`robust` 在 westata 里有 **5 种语义**，
+其中 3 种公式不同，1 种被静默吞掉：
+
+| 族 | `cov_type="robust"` 实际是 | 结果回显 |
+|---|---|---|
+| `OLS` | `HC1`（`n/(n-k)`） | `'HC1'` ✅ |
+| `IV2SLS` | `HC0`（无 `n/(n-k)`） | `'HC0'` ✅ |
+| `Logit`/`Poisson` | **第三种**：`n/(n-1)` 的 ML 三明治 | `'robust'` ❌ |
+| `PanelOLS` | **`vce(cluster panelvar)`**（与 HC 无关） | `'robust'` ❌ |
+| `QuantileRegression` | `qreg` 专属 `tau(1-tau) J⁻¹(X'X)J⁻¹` | `'robust'` ❌ |
+| `RobustRegression` | **静默降级为默认值**，`bse` 逐位不变 | `'nonrobust'` ❌ |
+
+```python
+# 最坏的一种：不报错、不回显、数值也不变
+a = ws.RobustRegression.from_formula("y~x", df).fit()
+b = ws.RobustRegression.from_formula("y~x", df).fit(cov_type="robust")
+np.allclose(a.bse, b.bse)     # True —— cov_type 被整个吞掉
+```
+
+**为什么会漏掉**：`vce/dispatch.py:48` 有一条全局别名 `"ROBUST": "HC1"`，
+它对 7 个族中的 6 个都不成立，只有 `OLS` 成立。各估计族于是各自打补丁：
+`iv.py:266` 覆写成 HC0，`panel.py:220` 覆写成 cluster，`discrete.py:154`
+自己实现第三种，`hdfe.py:114` 直接拒绝。**没有一个地方能回答「robust 是什么」**。
+
+**通用做法**：
+
+1. **别名必须解析，不能透传**。`robust` 只是用户写的字面量，结果对象里存的必须是
+   解析后的规范值（`HC1`/`HC0`/`ML_ROBUST`/`cluster`），否则下游无法判断用了哪种。
+2. **同一词汇在跨族接口上必须显式列表**。本仓库现在有
+   `scripts/check_api_conventions.py` 里的 `COV_TYPE_ROBUST_TARGETS`（逐族目标值）与
+   `COV_TYPE_ROBUST_REFUSED`（拒绝名单），并由
+   `test_cov_type_family_table_covers_every_estimator` 强制**每个可估类都要有决定**
+   ——新增估计器若不定这一行，测试直接失败。
+3. **默认别名要按「最少假设」选，不能按「最常见」选**。取 `HC1` 作全局默认，
+   等于把 OLS 的语义强加给 IV 与 ML；正确做法是不设全局默认，
+   让每个族自己声明。
+4. **在单参数模型上对拍会掩盖公式差异**：`n/(n-1)` 与 `n/(n-k)` 在 k=1 时相等。
+   验证 `robust` 语义必须用 **k≥2** 的模型，否则二者「一致」。
+
+## 2026-11-13 接口一致性从来没有被机械校验，于是自由生长了 38 个版本
+
+数值对拍做得再好也管不住接口。本轮把 167 个顶层导出、65 个可估类、149 个公共函数
+的签名全量扫了一遍，发现 116 处接口层偏离，其中**会静默算错数**的有 5 处：
+
+```python
+# 1. fit() 第一个位置参数不是 cov_type
+m = ws.PanelOLS.from_formula("y ~ x", panel, entity="firm", time="year")
+m.fit("HC1").cov_type      # -> 'nonrobust'，bse 与 m.fit() 完全一致
+# "HC1" 被当成真值赋给 entity_effects，cov_type 收到 None。调用成功，数字错误。
+
+# 2. **kwargs 收下即丢
+ws.XtUnitroot.from_formula(...).fit(zzz=[1,2,3])   # 正常返回 PanelUnitRootResult
+ws.VECM(...).fit(bogus=1)                          # 正常返回 VECMResults
+
+# 3. level 有两套单位
+ws.margins(res, level=0.95)          # 分数
+estat_esize(res, level=95.0)         # 百分数，内部算 (100-level)/2
+estat_esize(res, level=0.95)         # -> 49.5% 区间，静默错
+
+# 4. 死参数
+ws.im_pesaran_shin(panel, ..., level=0.5)   # level 从未被引用，输出与默认完全相同
+
+# 5. __all__ 名不副实
+from westata.results import *   # AttributeError: render_estimates_table
+```
+
+**通用做法**：凡「签名/默认值/参数单位/导出表」这类**声明性接口**，
+必须有一份规范 + 一个能跑的校验器，否则它一定会漂移——数值测试只能发现
+「算错了」，发现不了「参数被吃掉但结果看起来正常」。本次产出：
+
+* 规范：`docs/API_CONVENTIONS.md`（R1–R6，每条挂实测证据与行号）
+* 校验器：`python scripts/check_api_conventions.py`（`--strict` 供 CI）
+* 基线：116 条，103 待修；按「会算错数 → 可用性 → 命名 → 结构」五阶段收敛
+
+教训补两条：
+
+1. **`**kwargs` 是接口的静默腐蚀剂**。允许它出现在公共入口的两个条件缺一不可：
+   （a）转发给有真实签名的被调方；（b）未知键会抛 `TypeError`。
+   `synth(..., **unsupported)` 属合规（聚合成 `UnsupportedError` 明确报错），
+   `VECM.fit(**_ )` 属不合规（什么都不做）。校验器按「函数体是否提及该名字」判定。
+2. **参数名 `level` 必须钉死单位**。同一生态里 `0.95` 与 `95.0` 并存时，
+   错的那一方不会报错，只会给出 `49.5%` 这种看似合理的区间。
+
 ## 2026-11-12 「默认值」类规则：只在一个参数配置下对拍，等于没对拍
 
 `corrgram` / `wntestq` 的默认滞后阶数一直是 `(n-k)//2`，且 docstring 写着「measured
@@ -770,6 +968,7 @@ def _version_key(version):
 
 **教训**：`pytest -q | Select-Object -Last N` 在结束前**没有任何输出**，
 不能靠"没有新输出"判断卡死；必须另查进程状态。
+
 ## 31. 稳健 VCE 的尺度因子要按命令查，`HC1` 不是万能对应
 
 用户对比 Stata `logit ..., [fweight=freq], r` 与 westata 展开权重 + `cov_type="HC1"`，标准误对不上：

@@ -62,13 +62,15 @@ from westata.expressions.explist import (
 )
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import ols_coefficients
 
 __all__ = ["Bootstrap", "Jackknife", "Permute"]
 
 
 def _ols(design: np.ndarray, response: np.ndarray) -> np.ndarray:
-    coefficients, *_ = np.linalg.lstsq(design, response, rcond=None)
-    return coefficients
+    """Delegate to the one least-squares implementation (R6.1)."""
+
+    return ols_coefficients(design, response)
 
 
 def _bsampl_w(size: int, generator: Mt19937_64) -> np.ndarray:

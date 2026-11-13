@@ -44,6 +44,14 @@ jobs:
         run: |
           python -m pytest -q -rf --tb=short
 
+      # The public-API conventions are ENFORCED as of the 0.3.13 cleanup: every
+      # rule in docs/API_CONVENTIONS.md now has zero unfixed findings, so `--strict`
+      # passing is a real gate rather than a formality.
+      # `tests/test_api_conventions.py` complements this by failing if a rule stops
+      # being able to fire at all, and by keeping the document in step.
+      - name: Public-API conventions (strict)
+        run: python scripts/check_api_conventions.py --strict
+
       # The step summary is readable through the API without authentication, while the raw job
       # log is not. Writing the failures there makes the next report diagnosable from here.
       - name: Summarise failures

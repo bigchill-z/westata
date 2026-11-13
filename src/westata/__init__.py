@@ -10,8 +10,14 @@ from westata.expressions.explist import (
     parse_exp_list,
 )
 from westata.estimators import (
+    estat_ptrends,
+    NnmatchResult,
+    PsmatchResult,
+    RdRobustResult,
+    TefectsRaResult,
     PraisResult,
     prais,
+    prais_winsten,
     rdrobust,
     teffects_ra,
     teffects_nnmatch,
@@ -110,6 +116,28 @@ from westata.errors import (
     WestataError,
 )
 from westata.postestimation import (
+    BgTestResult,
+    Correlogram,
+    DFGLSResult,
+    DurbinWatsonResult,
+    KpssResult,
+    LmarResult,
+    MTestResult,
+    MTEST_METHODS,
+    PortmanteauResult,
+    SummarizeTable,
+    SUPPORTED_TYPES,
+    VarSocResult,
+    VarStableResult,
+    VarWleResult,
+    VecRankResult,
+    VecStableResult,
+    XtTest0Result,
+    adjust_pvalues,
+    lincom_as_stata,
+    predict,
+    supported_types,
+    test_as_stata,
     summarize,
     vargranger,
     format_ereturn_list,
@@ -158,6 +186,16 @@ from westata.postestimation import (
     estat_overid,
     estat_ovtest,
     estat_summarize,
+    estat_auc,
+    estat_esize,
+    estat_moran,
+    estat_mundlak,
+    estat_szroeter,
+    estat_weakrobust,
+    linktest,
+    suest,
+    endog_regf_test,
+    endog_score_test,
     estat_vce,
     estat_vif,
     hausman,
@@ -168,6 +206,7 @@ from westata.postestimation import (
     testnl,
 )
 from westata.protocols import SSC
+from westata.results import EReturn, StataResults
 from westata.report import etable, to_latex, to_markdown
 from westata.results.estimates_table import render_estimates_table
 from westata.results.esttab import etable_as_stata, render_esttab
@@ -197,9 +236,66 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "estat_ptrends",
+    "endog_score_test",
+    "endog_regf_test",
+    "suest",
+    "linktest",
+    "estat_weakrobust",
+    "estat_szroeter",
+    "estat_mundlak",
+    "estat_moran",
+    "estat_esize",
+    "estat_auc",
+    "ContrastResults",
+    "PwCompareTable",
+    "ContrastResult",
+    "WeakRobustResult",
+    "VarGrangerResult",
+    "SzroeterTable",
+    "SzroeterResult",
+    "SucestResult",
+    "RcmResult",
+    "MundlakResult",
+    "MoranResult",
+    "LinkTestResult",
+    "LfitResult",
+    "EffectSizeResult",
+    "EndogScoreResult",
+    "RegFResult",
+    "AucResult",
+    "JohansenResult",
+    "VECMResults",
+    "VARResults",
+    "PanelUnitRootResult",
+    "BgTestResult",
+    "Correlogram",
+    "DFGLSResult",
+    "DurbinWatsonResult",
+    "EReturn",
+    "KpssResult",
+    "LmarResult",
+    "MTEST_METHODS",
+    "MTestResult",
+    "NnmatchResult",
     "ParsedExpressionList",
+    "PortmanteauResult",
+    "PsmatchResult",
+    "RdRobustResult",
+    "SUPPORTED_TYPES",
+    "StataResults",
     "StoredResults",
     "ExpListError",
+    "SummarizeTable",
+    "TefectsRaResult",
+    "VarSocResult",
+    "VarStableResult",
+    "VarWleResult",
+    "VecRankResult",
+    "VecStableResult",
+    "XtTest0Result",
+    "adjust_pvalues",
+    "lincom_as_stata",
     "parse_exp_list",
     "LlcResult",
     "levin_lin_chu",
@@ -253,13 +349,17 @@ __all__ = [
     "HausmanResult",
     "PraisResult",
     "prais",
+    "prais_winsten",
+    "predict",
     "rdrobust",
+    "supported_types",
     "teffects_ra",
     "teffects_nnmatch",
     "teffects_psmatch",
     "tebalance_summarize",
     "rcm",
     "format_ereturn_list",
+    "test_as_stata",
     "vargranger",
     "summarize",
     "LRTestResult",
@@ -363,5 +463,28 @@ __all__ = [
     "FormulaError",
     "UnsupportedError",
     "WeightError",
-    "__version__",
-]
+    "__version__",]
+
+# Result types returned by the commands above (R5.2): a caller can receive one of
+# these objects, so it must be nameable from the top level.
+from westata.postestimation import AucResult
+from westata.postestimation import ContrastResult
+from westata.results.ecosystem import ContrastResults
+from westata.postestimation import EffectSizeResult
+from westata.postestimation import EndogScoreResult
+from westata.estimators import JohansenResult
+from westata.postestimation import LfitResult
+from westata.postestimation import LinkTestResult
+from westata.postestimation import MoranResult
+from westata.postestimation import MundlakResult
+from westata.estimators import PanelUnitRootResult
+from westata.postestimation import PwCompareTable
+from westata.postestimation import RcmResult
+from westata.postestimation import RegFResult
+from westata.postestimation import SucestResult
+from westata.postestimation import SzroeterResult
+from westata.postestimation import SzroeterTable
+from westata.estimators import VARResults
+from westata.estimators import VECMResults
+from westata.postestimation import VarGrangerResult
+from westata.postestimation import WeakRobustResult

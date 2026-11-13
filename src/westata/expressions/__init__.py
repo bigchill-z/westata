@@ -1,4 +1,4 @@
-﻿"""Stata expression-list parsing and evaluation."""
+"""Stata expression-list parsing and evaluation."""
 
 from westata.expressions.explist import (
     ExpListError,

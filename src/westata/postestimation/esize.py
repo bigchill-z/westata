@@ -50,14 +50,14 @@ class EffectSizeResult:
         (``sthlp:610-612``).  ``None`` for epsilon/omega, where the help file documents no
         interval.
     level:
-        Confidence level, in percent.
+        Confidence level as a FRACTION (``0.95``), never a percentage (R3.3).
     """
 
     kind: str
     estimate: float
     ci_lower: float | None = None
     ci_upper: float | None = None
-    level: float = 95.0
+    level: float = 0.95
 
     def __str__(self) -> str:
         labels = {
@@ -69,7 +69,8 @@ class EffectSizeResult:
         lines = ["", "Effect sizes for linear models", ""]
         header = f"  {label:>18}"
         if self.ci_lower is not None:
-            header += f"   [{(100.0 - self.level) / 2:>4.1f}% Conf. Interval]"
+            # `level` is a fraction (0.95), so the printed tail is (1 - level)/2 = 2.5%.
+            header += f"   [{(1.0 - self.level) * 50.0:>4.1f}% Conf. Interval]"
         lines.append(header)
         row = f"  {self.estimate:>18.6f}"
         if self.ci_lower is not None:
@@ -99,7 +100,7 @@ def _noncentral_f_bounds(
     ``eta2 = lambda / (lambda + N)``, so the bounds on ``lambda`` convert directly.
     """
 
-    alpha = 1.0 - level / 100.0
+    alpha = 1.0 - level
     total = df_num + df_denom + 1.0
 
     def lower_gap(noncentrality: float) -> float:
@@ -117,8 +118,21 @@ def _noncentral_f_bounds(
     def solve(function, low: float, high: float) -> float:
         try:
             return float(brentq(function, low, high, maxiter=200))
-        except ValueError:  # pragma: no cover - bracket failure on extreme fits
-            return float("nan")
+        except ValueError:
+            # No sign change on [low, high].  That is not a numerical accident: it is
+            # what happens when the observed F is SMALLER than every noncentral-F
+            # upper quantile over the whole domain (``lower_gap`` stays positive) or
+            # larger than every lower quantile (``upper_gap`` stays negative).  The
+            # correct limit is the edge of the parameter space, i.e. noncentrality 0
+            # -- an effect size of 0 -- not NaN.  Returning NaN here made
+            # ``estat_esize().ci_lower`` NaN for every ordinary fit (measured: F=1.24
+            # on df=(2,197) gave ci=(nan, 0.0522)), which `test_estat_esize` then
+            # asserted as `nan < nan`.
+            if function(low) > 0 and function(high) > 0:
+                return 0.0
+            if function(low) < 0 and function(high) < 0:
+                return float(high)
+            return float("nan")  # pragma: no cover - unreachable bracket failure
 
     lower_noncentrality = solve(lower_gap, 0.0, 1e4)
     upper_noncentrality = solve(upper_gap, 0.0, 1e4)
@@ -136,7 +150,7 @@ def estat_esize(
     *,
     epsilon: bool = False,
     omega: bool = False,
-    level: float = 95.0,
+    level: float = 0.95,
 ) -> EffectSizeResult:
     """Stata's ``estat esize``.
 
@@ -148,7 +162,13 @@ def estat_esize(
         Report omega-squared (``sthlp:624-626``).  Mutually exclusive with ``epsilon``
         (``esize.ado:14``: ``opts_exclusive "`epsilon' `omega'"``).
     level:
-        Confidence level in percent, used for the eta-squared interval.
+        Confidence level as a FRACTION (``0.95``), never a percentage (R3.3).
+
+        This used to default to ``95.0``.  Every other ``level`` in the package is a
+        fraction (``margins``, ``nlcom``, ``lincom_as_stata``, ``contrast``), so a
+        caller who passed ``level=0.95`` here got ``(100 - 0.95) / 2 = 49.5%``
+        intervals -- a plausible-looking number, silently wrong.  Verified: the old
+        expression printed ``[49.5% Conf. Interval]``.
 
     Raises
     ------

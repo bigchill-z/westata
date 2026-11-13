@@ -75,6 +75,7 @@ from scipy import optimize, stats
 from westata.errors import ConsistencyError, ConvergenceError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import numerical_hessian
 
 __all__ = ["Tobit"]
 
@@ -625,30 +626,6 @@ class Tobit:
 
 
 def _numerical_hessian(func: Any, x: np.ndarray, step: float = 1e-5) -> np.ndarray:
-    """Central-difference Hessian with a scaled step."""
+    """Delegate to the shared rule (R6.1); see least_squares.numerical_hessian."""
 
-    x = np.asarray(x, dtype=float)
-    n = x.size
-    hessian = np.zeros((n, n), dtype=float)
-    h = step * np.maximum(np.abs(x), 1.0)
-
-    for i in range(n):
-        for j in range(i, n):
-            ei = np.zeros(n)
-            ej = np.zeros(n)
-            ei[i] = h[i]
-            ej[j] = h[j]
-            if i == j:
-                value = (
-                    func(x + ei) - 2.0 * func(x) + func(x - ei)
-                ) / (h[i] ** 2)
-            else:
-                value = (
-                    func(x + ei + ej)
-                    - func(x + ei - ej)
-                    - func(x - ei + ej)
-                    + func(x - ei - ej)
-                ) / (4.0 * h[i] * h[j])
-            hessian[i, j] = value
-            hessian[j, i] = value
-    return hessian
+    return numerical_hessian(func, x, step=step)

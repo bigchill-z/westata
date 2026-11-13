@@ -85,11 +85,32 @@ def test_the_interval_is_within_the_unit_range(fitted) -> None:
 
 
 def test_a_wider_level_gives_a_wider_interval(fitted) -> None:
-    narrow = fitted[1].estat_esize(level=90)
-    wide = fitted[1].estat_esize(level=99)
+    """`level` is a FRACTION here, like every other `level` in the package (R3.3).
 
-    assert wide.ci_lower < narrow.ci_lower
+    This used to pass ``level=90`` / ``level=99``, which read as percentages because
+    ``estat_esize`` was the one command that took them that way.  It now takes
+    ``0.90`` / ``0.99``; passing 90 would ask for a 9000% interval.
+    """
+
+    narrow = fitted[1].estat_esize(level=0.90)
+    wide = fitted[1].estat_esize(level=0.99)
+
+    assert np.isfinite(narrow.ci_upper) and np.isfinite(wide.ci_upper)
+    assert wide.ci_lower <= narrow.ci_lower
     assert wide.ci_upper > narrow.ci_upper
+
+
+def test_the_lower_bound_is_zero_not_nan_when_f_is_small(fitted) -> None:
+    """A small F puts the whole noncentrality domain outside the bracket.
+
+    ``lower_gap`` is then positive everywhere, so there is no root to solve for and
+    the mathematically correct lower limit is noncentrality 0 (effect size 0), NOT
+    NaN.  This was a real defect: every ordinary fit reported ``ci_lower=nan``.
+    """
+
+    reported = fitted[1].estat_esize()
+    assert np.isfinite(reported.ci_lower), "ci_lower must be a number, not nan"
+    assert reported.ci_lower >= 0.0
 
 
 def test_the_interval_narrows_with_more_data() -> None:

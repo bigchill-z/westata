@@ -73,12 +73,13 @@ from typing import Any, Sequence
 import numpy as np
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["TefectsRaResult", "teffects_ra"]
 
 
 @dataclass(frozen=True)
-class TefectsRaResult:
+class TefectsRaResult(ResultSerialisation):
     """``teffects ra``: regression-adjustment treatment effects."""
 
     ate: float

@@ -44,12 +44,13 @@ import numpy as np
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["RdRobustResult", "rdrobust"]
 
 
 @dataclass(frozen=True)
-class RdRobustResult:
+class RdRobustResult(ResultSerialisation):
     """``rdrobust``: sharp RD estimate at a cutoff.
 
     ``se``/``z``/``pvalue``/``ci`` are ``nan`` when the variance estimator could not be

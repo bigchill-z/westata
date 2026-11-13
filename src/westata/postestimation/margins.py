@@ -215,6 +215,23 @@ class MarginsTable(list):
 
         return self.render()
 
+    def to_dict(self) -> list[dict[str, Any]]:
+        """One dict per row, in table order (R4.1).
+
+        A LIST rather than a dict, because this object is a list: ``margins`` with
+        several terms produces several rows, and collapsing them into one dict would
+        hide all but the last.
+        """
+
+        return [row.to_dict() for row in self]
+
+    def to_frame(self) -> Any:
+        """The margins table as a DataFrame, one row per margin (R4.1)."""
+
+        import pandas as pd
+
+        return pd.DataFrame(self.to_dict())
+
     def render(self) -> str:
         """Stata's full margins table."""
 

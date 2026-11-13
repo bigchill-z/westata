@@ -26,6 +26,9 @@ from typing import Any, Sequence
 import numpy as np
 import pandas as pd
 
+from westata.results.serialisation import ResultSerialisation
+from westata.results.summary import stata_number
+
 __all__ = ["SummarizeTable", "summarize"]
 
 #: Column ends, measured by re.finditer on Stata's own DATA row: Obs 25, Mean 37,
@@ -33,52 +36,20 @@ __all__ = ["SummarizeTable", "summarize"]
 _COLUMN_ENDS = (25, 37, 49, 60, 71)
 
 
-def _stata_number(value: float) -> str:
-    """Stata's ``%9.0g``: widest representation that fits, no leading zero."""
+def _stata_number(value: float, *args: Any, **kwargs: Any) -> str:
+    """Delegate to the one implementation (R6.1); see results.summary.stata_number."""
 
-    if value is None or not np.isfinite(value):
-        return "."
-    for precision in range(9, 0, -1):
-        text = f"%.{precision}g" % value
-        if text.startswith("0."):
-            text = text[1:]
-        elif text.startswith("-0."):
-            text = "-" + text[2:]
-        # THE EXPONENT IS PADDED BEFORE THE WIDTH TEST. `%.3g` of 1e-12 is "1e-12" -- five characters
-        # of body -- so it fitted the eight-wide field and was returned unpadded, while Stata prints
-        # "1.00e-12". Padding first means the width check sees what will actually be printed.
-        text = _two_place_exponent(text)
-        body = text[1:] if text.startswith("-") else text
-        if len(body) <= 8:
-            break
-    return text
+    # `summarize`'s column is EIGHT wide, uses the exponent unchanged (no fixed
+    # fallback), and pads it to two digits (`2.4e-06` -> `2.40e-06`).  Those three
+    # settings are what distinguished this copy from `summary.py`'s; the rule itself
+    # is shared, so the difference is a parameter rather than a second implementation.
+    return stata_number(value, width=9, fixed_fallback=False, pad_exponent=True)
 
 
-def _two_place_exponent(text: str) -> str:
-    """Give a scientific-notation string TWO mantissa digits, as Stata prints it.
-
-    Measured on `summarize` of a column whose values are tiny:
-
-        3.33e-13    1.00e-12    -1.87e-09
-
-    never a bare `1e-12`. An exact zero is left alone -- Stata prints `0` there, measured separately.
-    """
-
-    if "e" not in text and "E" not in text:
-        return text
-    mantissa, _, exponent = text.partition("e")
-    if not exponent:
-        mantissa, _, exponent = text.partition("E")
-    sign = ""
-    if mantissa.startswith("-"):
-        sign, mantissa = "-", mantissa[1:]
-    whole, _, fraction = mantissa.partition(".")
-    fraction = (fraction + "00")[:2]
-    return f"{sign}{whole}.{fraction}e{exponent}"
 
 
 @dataclass(frozen=True)
-class SummarizeTable:
+class SummarizeTable(ResultSerialisation):
     """The ``summarize`` table."""
 
     rows: list[tuple[str, float, float, float, float, float]]

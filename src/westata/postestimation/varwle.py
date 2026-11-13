@@ -38,6 +38,7 @@ import numpy as np
 from scipy import stats
 
 from westata.errors import ConsistencyError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["VarWleResult", "varwle"]
 
@@ -54,7 +55,7 @@ class VarWleRow:
 
 
 @dataclass(frozen=True)
-class VarWleResult:
+class VarWleResult(ResultSerialisation):
     """``varwle``: Wald tests that each lag's coefficients are jointly zero."""
 
     rows: tuple[VarWleRow, ...]

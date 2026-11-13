@@ -57,13 +57,16 @@ from typing import Any
 import numpy as np
 from scipy import stats
 
+from westata.postestimation import vce_labels
+from westata.postestimation.names import is_constant_name, require_iv_structure
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
+
 __all__ = ["EndogenousResult", "estat_endogenous"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 def _six_g(value: float) -> str:
@@ -188,19 +191,9 @@ class EndogenousResult:
 
 
 def _require_iv(result: Any) -> dict[str, Any]:
-    structure = getattr(result, "iv_structure", None)
-    if structure is None:
-        raise NotImplementedError(
-            "estat endogenous is only defined after an instrumental-variables "
-            "fit: Stata reaches it through ivregress_estat and it needs the "
-            "split between included exogenous regressors, endogenous "
-            "regressors and excluded instruments; got "
-            f"{getattr(result, 'model_name', 'an unnamed model')!r} without that "
-            "structure"
-        )
-    if structure["endog"].shape[1] == 0:
-        raise ValueError("estat endogenous: model contains no endogenous variables")
-    return structure
+    """Delegate to the shared check (R6.1); see names.require_iv_structure."""
+
+    return require_iv_structure(result, 'estat endogenous')
 
 
 def _ols_mss(
@@ -288,9 +281,9 @@ def estat_endogenous(
         )
 
     cov_type = str(getattr(result, "cov_type", "nonrobust")).strip().lower()
-    is_hac = "hac" in cov_type or "newey" in cov_type
-    is_clustered = "cluster" in cov_type
-    is_robust = cov_type in ("hc0", "hc1", "hc2", "hc3", "robust")
+    is_hac = vce_labels.is_hac(cov_type)
+    is_clustered = vce_labels.is_clustered(cov_type)
+    robust = vce_labels.is_robust(cov_type)
 
     if lags is not None and not is_hac:
         raise ValueError(
@@ -302,19 +295,19 @@ def estat_endogenous(
         # ``ivregress_estat.ado:1134-1136``: a clustered VCE gets ONLY ``regF``
         # (the score tests are not run there).  ``regF`` is the augmented-
         # regression F test, implemented in ``endog_regf``.
-        from westata.postestimation.endog_regf import endog_regF_test
+        from westata.postestimation.endog_regf import endog_regf_test
 
         fitted = np.asarray(result.fittedvalues, dtype=float).reshape(-1)
         residual = np.asarray(result.resid, dtype=float).reshape(-1)
         labels = getattr(result, "cluster_labels", None)
-        return endog_regF_test(
+        return endog_regf_test(
             structure,
             fitted + residual,
             cov_type="cluster",
             cluster_labels=labels,
         )
 
-    if is_robust or is_hac:
+    if robust or is_hac:
         from westata.postestimation.endog_score import endog_score_test
 
         # The estimation-sample response is rebuilt from the fitted values and

@@ -19,7 +19,7 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 - **Postestimation functions** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **Working with a fitted result** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **Errors and support types** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **Other names** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
+- **Other names** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
 
 ## Robust standard errors: Stata's `robust` versus `HC0`/`HC1`
 
@@ -229,7 +229,7 @@ PanelOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', ti
 **`PanelOLS.fit`**
 
 ```python
-PanelOLS.fit(self, entity_effects: 'bool' = True, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+PanelOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = True, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -290,7 +290,7 @@ RandomEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str
 **`RandomEffects.fit`**
 
 ```python
-RandomEffects.fit(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+RandomEffects.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -348,7 +348,7 @@ BetweenOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', 
 **`BetweenOLS.fit`**
 
 ```python
-BetweenOLS.fit(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+BetweenOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -402,7 +402,7 @@ FirstDifferenceOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity:
 **`FirstDifferenceOLS.fit`**
 
 ```python
-FirstDifferenceOLS.fit(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+FirstDifferenceOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -783,7 +783,7 @@ Arellano-Bond / Blundell-Bond dynamic panel GMM -- Stata's `xtabond` family. One
 **Signature**
 
 ```python
-ws.XtAbond(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str]' = ('L1.y',), exog_names: 'Sequence[str]' = ('x1',), system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.XtAbond(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str] | None' = None, exog_names: 'Sequence[str] | None' = None, system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
 **`XtAbond.from_formula`**
@@ -1295,7 +1295,7 @@ ws.Logit(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, f
 **`Logit.from_formula`**
 
 ```python
-Logit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+Logit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`Logit.fit`**
@@ -1347,7 +1347,7 @@ ws.Probit(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, 
 **`Probit.from_formula`**
 
 ```python
-Probit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+Probit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`Probit.fit`**
@@ -1399,7 +1399,7 @@ ws.OrderedLogit(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = 
 **`OrderedLogit.from_formula`**
 
 ```python
-OrderedLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_Ordered'"
+OrderedLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`OrderedLogit.fit`**
@@ -1452,7 +1452,7 @@ ws.OrderedProbit(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' =
 **`OrderedProbit.from_formula`**
 
 ```python
-OrderedProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_Ordered'"
+OrderedProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`OrderedProbit.fit`**
@@ -1505,7 +1505,7 @@ ws.Poisson(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None,
 **`Poisson.from_formula`**
 
 ```python
-Poisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+Poisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`Poisson.fit`**
@@ -1555,7 +1555,7 @@ ws.NegativeBinomial(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None
 **`NegativeBinomial.from_formula`**
 
 ```python
-NegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+NegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`NegativeBinomial.fit`**
@@ -1611,7 +1611,7 @@ ws.NegativeBinomialNB1(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | N
 **`NegativeBinomialNB1.from_formula`**
 
 ```python
-NegativeBinomialNB1.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+NegativeBinomialNB1.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`NegativeBinomialNB1.fit`**
@@ -1662,7 +1662,7 @@ ws.ZeroInflatedPoisson(endog: 'Any', exog: 'Any', *, inflate_exog: 'Any' = None,
 **`ZeroInflatedPoisson.from_formula`**
 
 ```python
-ZeroInflatedPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_ZeroInflatedBase'"
+ZeroInflatedPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_ZeroInflatedBaseT'"
 ```
 
 **`ZeroInflatedPoisson.fit`**
@@ -1718,7 +1718,7 @@ ws.ZeroInflatedNegativeBinomial(endog: 'Any', exog: 'Any', *, inflate_exog: 'Any
 **`ZeroInflatedNegativeBinomial.from_formula`**
 
 ```python
-ZeroInflatedNegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_ZeroInflatedBase'"
+ZeroInflatedNegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_ZeroInflatedBaseT'"
 ```
 
 **`ZeroInflatedNegativeBinomial.fit`**
@@ -1782,7 +1782,7 @@ ws.TruncatedPoisson(endog: 'Any', exog: 'Any', *, lower: 'float | None' = 1, upp
 **`TruncatedPoisson.from_formula`**
 
 ```python
-TruncatedPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> "'_TruncatedBase'"
+TruncatedPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> "'_TruncatedBaseT'"
 ```
 
 **`TruncatedPoisson.fit`**
@@ -1833,7 +1833,7 @@ ws.TruncatedNegativeBinomial(endog: 'Any', exog: 'Any', *, lower: 'float | None'
 **`TruncatedNegativeBinomial.from_formula`**
 
 ```python
-TruncatedNegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> "'_TruncatedBase'"
+TruncatedNegativeBinomial.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> "'_TruncatedBaseT'"
 ```
 
 **`TruncatedNegativeBinomial.fit`**
@@ -2061,7 +2061,7 @@ Heckman.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = No
 **`Heckman.fit`**
 
 ```python
-Heckman.fit(self, method: 'str' = 'twostep', cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
+Heckman.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'twostep', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -2120,7 +2120,7 @@ Etregress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = 
 **`Etregress.fit`**
 
 ```python
-Etregress.fit(self, method: 'str' = 'control', cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
+Etregress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'control', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -2661,7 +2661,7 @@ ws.VECM(endog: 'Any', *, coint_rank: 'int' = 1, lags: 'int' = 1, deterministic: 
 **`VECM.fit`**
 
 ```python
-VECM.fit(self, cov_type: 'str | None' = None, **_: 'Any') -> 'Any'
+VECM.fit(self, cov_type: 'str | None' = None) -> 'Any'
 ```
 
 **Example**
@@ -2689,7 +2689,7 @@ Panel unit-root tests by the Im-Pesaran-Shin (`test="ips"`) and Levin-Lin-Chu (`
 **Signature**
 
 ```python
-ws.XtUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str' = 'y') -> 'None'
+ws.XtUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str | None' = None) -> 'None'
 ```
 
 **`XtUnitroot.from_formula`**
@@ -2701,7 +2701,7 @@ XtUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', 
 **`XtUnitroot.fit`**
 
 ```python
-XtUnitroot.fit(self, **_ignored: 'Any') -> 'PanelUnitRootResult'
+XtUnitroot.fit(self) -> 'PanelUnitRootResult'
 ```
 
 **Example**
@@ -3056,7 +3056,7 @@ ws.IPW(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' = 'ate') -> 'None'
 **`IPW.from_formula`**
 
 ```python
-IPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> "'IPW'"
+IPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'
 ```
 
 **`IPW.fit`**
@@ -3101,7 +3101,7 @@ ws.AIPW(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' = 'ate') -> 'None
 **`AIPW.from_formula`**
 
 ```python
-AIPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> "'IPW'"
+AIPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'
 ```
 
 **`AIPW.fit`**
@@ -3146,7 +3146,7 @@ ws.NearestNeighbourMatching(y: 'Any', treated: 'Any', x: 'Any', *, nneighbor: 'i
 **`NearestNeighbourMatching.from_formula`**
 
 ```python
-NearestNeighbourMatching.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, nneighbor: 'int' = 1, estimand: 'str' = 'ate', subset: 'Any' = None) -> "'NearestNeighbourMatching'"
+NearestNeighbourMatching.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'
 ```
 
 **`NearestNeighbourMatching.fit`**
@@ -3192,7 +3192,7 @@ ws.RegressionAdjustment(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' =
 **`RegressionAdjustment.from_formula`**
 
 ```python
-RegressionAdjustment.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> "'RegressionAdjustment'"
+RegressionAdjustment.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'
 ```
 
 **`RegressionAdjustment.fit`**
@@ -4273,7 +4273,7 @@ Area under the ROC curve after `logit` or `probit` (Stata `estat auc`, which `lo
 **Signature**
 
 ```python
-ws.estat_auc(self) -> 'Any'
+ws.estat_auc(result: 'Any') -> 'AucResult'
 ```
 
 **Example**
@@ -4299,7 +4299,7 @@ Effect sizes for a linear model (Stata `estat esize`): eta-squared, which is R-s
 **Signature**
 
 ```python
-ws.estat_esize(self, **kwargs: 'Any') -> 'Any'
+ws.estat_esize(result: 'Any', *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'EffectSizeResult'
 ```
 
 **Example**
@@ -4329,7 +4329,7 @@ Moran's test for spatial correlation in the residuals after `regress` (Stata `es
 **Signature**
 
 ```python
-ws.estat_moran(self, *args: 'Any', **kwargs: 'Any') -> 'Any'
+ws.estat_moran(result: 'Any', errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'MoranResult'
 ```
 
 **Example**
@@ -4367,7 +4367,7 @@ The Mundlak specification test after `xtreg` (Stata `estat mundlak`): the within
 **Signature**
 
 ```python
-ws.estat_mundlak(self, **kwargs: 'Any') -> 'Any'
+ws.estat_mundlak(result: 'Any', *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'MundlakResult'
 ```
 
 **Example**
@@ -4399,7 +4399,7 @@ Szroeter's rank test for heteroskedasticity (Stata `estat szroeter`), one chi2(1
 **Signature**
 
 ```python
-ws.estat_szroeter(self, *args: 'Any', **kwargs: 'Any') -> 'Any'
+ws.estat_szroeter(result: 'Any', variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'SzroeterResult | SzroeterTable'
 ```
 
 **Example**
@@ -4434,7 +4434,7 @@ Weak-instrument-robust inference (Stata `estat weakrobust`): it reports the Ande
 **Signature**
 
 ```python
-ws.estat_weakrobust(self, **kwargs: 'Any') -> 'Any'
+ws.estat_weakrobust(result: 'Any', *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'WeakRobustResult'
 ```
 
 **Example**
@@ -4463,7 +4463,7 @@ Pregibon's link test for a specification error (Stata `linktest`). The model is 
 **Signature**
 
 ```python
-ws.linktest(self) -> 'Any'
+ws.linktest(result: 'Any') -> 'LinkTestResult'
 ```
 
 **Example**
@@ -4496,7 +4496,7 @@ Stack several fits into one parameter vector and one simultaneous sandwich covar
 **Signature**
 
 ```python
-ws.suest(self, *others: 'Any', **kwargs: 'Any') -> 'Any'
+ws.suest(models: 'Sequence[Any]', *, names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'SucestResult'
 ```
 
 **Example**
@@ -4602,7 +4602,7 @@ Levin-Lin-Chu panel unit-root test (Stata `xtunitroot llc`). The frame must be i
 **Signature**
 
 ```python
-ws.levin_lin_chu(frame: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResult'
+ws.levin_lin_chu(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResult'
 ```
 
 **Example**
@@ -4631,7 +4631,7 @@ Im-Pesaran-Shin panel unit-root test (Stata `xtunitroot ips`). `trend=True` adds
 **Signature**
 
 ```python
-ws.im_pesaran_shin(frame: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResult'
+ws.im_pesaran_shin(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResult'
 ```
 
 **Example**
@@ -5005,6 +5005,12 @@ None
 **Stata:** `(the object every estimation command returns, analogous to Stata's e() results)`
 
 The object returned by every `fit()`. It carries a statsmodels-compatible surface (`params`, `bse`, `pvalues`, `conf_int`, `cov_params`), the Stata `e()` macros as a dictionary, and the postestimation commands as methods -- `test`, `lincom`, `margins`, `predict`, and the twenty `estat_*` forwarders. This is where most day-to-day work happens after a fit.
+
+**Signature**
+
+```python
+ws.StataResults(*, params: 'np.ndarray', param_names: 'list[str]', cov: 'np.ndarray', resid: 'np.ndarray', fittedvalues: 'np.ndarray', nobs: 'int', df_resid: 'float', df_model: 'float', dist: 'str' = 't', model_name: 'str' = '', cov_type: 'str' = 'nonrobust', e: 'Mapping[str, Any] | None' = None, design_matrix: 'tuple[np.ndarray, list[str]] | None' = None, model_data: 'pd.DataFrame | None' = None, level: 'float | None' = None) -> 'None'
+```
 
 **Example**
 
@@ -5548,7 +5554,7 @@ Wald test of linear hypotheses (Stata `test`). A bare coefficient list (`'x1 x2'
 **Signature**
 
 ```python
-ws.test(self, *specs: 'Any', **kwargs: 'Any') -> 'Any'
+ws.test(self, *specs: 'Any', coef: 'bool' = False) -> 'Any'
 ```
 
 **Example**
@@ -5579,7 +5585,7 @@ One linear combination of the coefficients (Stata `lincom`): `L b` with standard
 **Signature**
 
 ```python
-ws.lincom(self, expression: 'str', **kwargs: 'Any') -> 'Any'
+ws.lincom(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'
 ```
 
 **Example**
@@ -5613,7 +5619,7 @@ Typed prediction (Stata `predict newvar, <type>`). `kind` selects the type and `
 **Signature**
 
 ```python
-ws.predict(self, exog: 'Any' = None, kind: 'str | None' = None, **kwargs: 'Any') -> 'Any'
+ws.predict(result: 'Any', exog: 'np.ndarray', kind: 'str | None' = None, *, lower: 'float | None' = None, upper: 'float | None' = None, outcome: 'int | None' = None, n: 'int | float | None' = None) -> 'np.ndarray'
 ```
 
 **Example**
@@ -6793,13 +6799,13 @@ Linear regression absorbing categorical indicators -- Stata's `areg`. This is a 
 **Signature**
 
 ```python
-ws.Areg(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, noabsorb: 'bool' = False) -> 'None'
+ws.Areg(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, absorb_test: 'bool' = True, noabsorb: 'bool | None' = None) -> 'None'
 ```
 
 **`Areg.from_formula`**
 
 ```python
-Areg.from_formula(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None, noabsorb: 'bool' = False) -> "'Areg'"
+Areg.from_formula(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None, absorb_test: 'bool' = True, noabsorb: 'bool | None' = None) -> "'Areg'"
 ```
 
 **`Areg.fit`**
@@ -6835,6 +6841,428 @@ F test of absorbed indicators: F(39, 159) = 1.095       Prob > F = 0.340
 
 **Notes:** `absorb=` is required -- without it this is just `regress`. `_cons` is the group-size-weighted average of the absorbed effects; an FE model does not identify a constant separately from them, so only a normalisation fixes it and this is areg's. The clustered covariance uses `K = k_reported + (k_absorb - 1)` in the CR1 factor, whereas `reghdfe` uses `k_reported`: the absorbed levels consume degrees of freedom in areg's convention. That difference is NOT uniform across cluster/absorb pairings, so the correction is applied only when `e(rank)` shows the dummies are not already counted. With multiway clustering the two commands' factors differ in structure rather than by a parameter count, so the covariance is rebuilt on the full design instead of scaled. `noabsorb=True` skips the absorbed-indicator F test (Stata's `noabsorbtest`), leaving `e(F_absorb)`/`e(p_absorb)` absent.
 
+### `AucResult`
+
+**Stata:** `estat auc after logit/probit`
+
+The object `estat_auc` returns: the area under the ROC curve (`area`) and the number of observations it was computed on (`n`). Read the numbers with `to_dict()`; `str()` is not defined because Stata prints a one-line table rather than a block.
+
+**Signature**
+
+```python
+ws.AucResult(*, area: 'float', n: 'int') -> 'None'
+```
+
+**Example**
+
+```python
+r = ws.estat_auc(ws.Logit.from_formula('yb ~ x1', base).fit())
+print(round(r.area, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `BgTestResult`
+
+**Stata:** `estat bgodfrey`
+
+The object `estat_bgodfrey` returns, one row per tested lag order: `to_frame()` gives the lag, the chi-square statistic and its p-value for each row.
+
+**Signature**
+
+```python
+ws.BgTestResult(rows: 'tuple[BgTestRow, ...]', nobs: 'int', n_gaps: 'int' = 0) -> None
+```
+
+**Example**
+
+```python
+r = ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1', base).fit(), lags=[1, 2])
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `ContrastResult`
+
+**Stata:** `contrast`
+
+A list of `LincomResult` rows (one per comparison) that also carries the joint Wald test Stata prints in the ANOVA block: `term`, `fvalue`, `df`, `df_denom` and `pvalue`. `to_frame()` gives the per-comparison table.
+
+**Signature**
+
+```python
+ws.ContrastResult(rows, *, term, fvalue, df, pvalue, df_denom)
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
+r = ws.contrast(fit, 'firm')
+print(len(r))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `ContrastResults`
+
+**Stata:** `statsmodels-style contrast result`
+
+The statsmodels-shaped contrast object the statsmodels compatibility helpers build. It is NOT one of this package's estimation results: it carries `statistic`, `pvalue`, `df_num`, `df_resid`, `hypotheses` and `summary()`, and deliberately exposes no `params`/`bse` vector.
+
+**Signature**
+
+```python
+ws.ContrastResults(*, statistic: 'float', pvalue: 'float', df_num: 'float', df_resid: 'float', use_t: 'bool', hypotheses: 'Sequence[str]', estimate: 'float', standard_error: 'float', param_names: 'Sequence[str]', distribution: 'str') -> 'None'
+```
+
+**Example**
+
+```python
+from westata.results.ecosystem import build_contrast
+fit = ws.OLS.from_formula('y ~ x1', base).fit()
+c = build_contrast(fit, 'x1 = 0')
+print(round(c.pvalue, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `Correlogram`
+
+**Stata:** `estat corrgram`
+
+The object `estat_corrgram` returns: one row per lag with the autocorrelation, partial autocorrelation and their Q statistics. `to_frame()` gives the table; `to_dict()` gives one dict per row.
+
+**Signature**
+
+```python
+ws.Correlogram(rows: 'tuple[CorrelogramRow, ...]', n_gaps: 'int' = 0) -> None
+```
+
+**Example**
+
+```python
+r = ws.estat_corrgram(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `DFGLSResult`
+
+**Stata:** `dfgls`
+
+The object `dfgls` returns: one cell per candidate lag order (`to_frame()` is the table Stata prints), plus `trend` (which deterministic case was run) and `variable`.
+
+**Signature**
+
+```python
+ws.DFGLSResult(cells: 'tuple[DFGLSCell, ...]', trend: 'bool', variable: 'str' = '') -> None
+```
+
+**Example**
+
+```python
+r = ws.dfgls(base.y.to_numpy())
+print(r.to_frame().head(3))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `DurbinWatsonResult`
+
+**Stata:** `estat dwatson`
+
+The object `estat_dwatson` returns: the Durbin-Watson statistic `d`, its degrees of freedom `df`, the sample size `nobs`, and `n_gaps` (missing periods the time axis had to skip).
+
+**Signature**
+
+```python
+ws.DurbinWatsonResult(d: 'float', df: 'float', nobs: 'int', n_gaps: 'int' = 0) -> None
+```
+
+**Example**
+
+```python
+r = ws.estat_dwatson(ws.OLS.from_formula('y ~ x1', base).fit())
+print(round(r.d, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `EReturn`
+
+**Stata:** `ereturn list`
+
+Stata's `e()` block as a dictionary. Results carry their scalars in a plain mapping, and this type makes lookups like `result.e['N']` readable while still behaving as a dict.
+
+**Signature**
+
+```python
+ws.EReturn(mapping: 'Mapping[str, Any] | None' = None, /, **kwargs: 'Any') -> 'None'
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1', base).fit()
+print(fit.e['N'], round(fit.e['r2'], 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `EffectSizeResult`
+
+**Stata:** `estat esize`
+
+The object `estat_esize` returns: `kind` ('eta2'/'epsilon2'/'omega2'), the `estimate`, and for eta-squared the confidence bounds `ci_lower`/`ci_upper` at the requested `level` (a fraction, e.g. 0.95).
+
+**Signature**
+
+```python
+ws.EffectSizeResult(kind: 'str', estimate: 'float', ci_lower: 'float | None' = None, ci_upper: 'float | None' = None, level: 'float' = 0.95) -> None
+```
+
+**Example**
+
+```python
+r = ws.estat_esize(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+print(round(r.estimate, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `EndogScoreResult`
+
+**Stata:** `estat endogenous (score form)`
+
+The object `endog_score_test` returns. `to_dict()` gives the robust score statistic, its degrees of freedom and p-value; this is the form Stata uses when the VCE is robust or clustered.
+
+**Signature**
+
+```python
+ws.EndogScoreResult(*, statistic: 'float', df: 'float', test: 'str', lags: 'int | None' = None) -> 'None'
+```
+
+**Example**
+
+```python
+from westata.postestimation.endog_score import endog_score_test
+print('see estat_endogenous for a runnable end-to-end example')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `JohansenResult`
+
+**Stata:** `vecrank / vec johansen`
+
+The Johansen cointegration result: `select_rank()` picks the rank under the requested statistic, `to_frame()` gives the trace and max-eigenvalue tables, and `to_stata_table()` renders the block Stata's `vecrank` prints.
+
+**Signature**
+
+```python
+ws.JohansenResult(trace: 'np.ndarray', trace_critical: 'np.ndarray', maxeig: 'np.ndarray', maxeig_critical: 'np.ndarray', eigenvectors: 'np.ndarray', diagnostics: 'Any' = None, context: 'Any' = None) -> None
+```
+
+**Example**
+
+```python
+r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=1).johansen()
+print(r.to_frame().head(3))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `KpssResult`
+
+**Stata:** `kpss`
+
+The object `kpss` returns: one row per tested lag (`to_frame()`), each with the KPSS statistic and its critical values for the `trend` case that was requested.
+
+**Signature**
+
+```python
+ws.KpssResult(rows: 'tuple[KpssRow, ...]', trend: 'bool', nobs: 'int', critical: 'dict[float, float]', name: 'str' = '', maxlag_explicit: 'bool' = False) -> None
+```
+
+**Example**
+
+```python
+r = ws.kpss(base.y.to_numpy())
+print(r.to_frame().head(3))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `LfitResult`
+
+**Stata:** `estat gof, lfit`
+
+The Hosmer-Lemeshow style goodness-of-fit result: `to_dict()` gives the Pearson chi-square, its p-value and the group count. It is the second object `estat_gof` can return, alongside `GofResult`.
+
+**Signature**
+
+```python
+ws.LfitResult(*, chi2: 'float', pvalue: 'float', df: 'float', patterns: 'int', depvar: 'str' = '', model_label: 'str' = 'logistic', n_obs: 'int' = 0) -> 'None'
+```
+
+**Example**
+
+```python
+fit = ws.Logit.from_formula('yb ~ x1', base).fit()
+print(ws.estat_gof(fit, group=10).to_dict())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `LinkTestResult`
+
+**Stata:** `linktest`
+
+The object `ws.linktest` returns: the hat and hatsq coefficients of the link test (`_hat`, `_hatsq`), their standard errors and the p-value of `_hatsq` -- the term that detects a link misspecification.
+
+**Signature**
+
+```python
+ws.LinkTestResult(t_statistic: 'float', df: 'float', pvalue: 'float', hat_coefficient: 'float', hatsq_coefficient: 'float') -> None
+```
+
+**Example**
+
+```python
+r = ws.linktest(ws.OLS.from_formula('y ~ x1', base).fit())
+print(round(r.pvalue, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `LmarResult`
+
+**Stata:** `varlmar / veclmar`
+
+The Lagrange-multiplier autocorrelation result for a VAR/VECM: `to_frame()` gives one row per tested lag with the LM statistic and p-value.
+
+**Signature**
+
+```python
+ws.LmarResult(rows: 'tuple[LmarRow, ...]') -> None
+```
+
+**Example**
+
+```python
+r = ws.varlmar(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit(), mlag=1)
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `MTEST_METHODS`
+
+**Stata:** `(the mtest() adjustments Stata offers)`
+
+The multiple-testing adjustments `estat hettest, mtest(...)` accepts: bonferroni, holm, sidak and noadjust.
+
+**Example**
+
+```python
+print(ws.MTEST_METHODS)
+```
+
+**Output**
+
+```text
+None
+```
+
+### `MTestResult`
+
+**Stata:** `estat hettest, mtest(...)`
+
+The multiple-testing-adjusted heteroskedasticity test result: `to_dict()` per variable, `to_frame()` as a table, `to_matrix()` for the raw p-value matrix. `MTEST_METHODS` lists the adjustments Stata offers.
+
+**Signature**
+
+```python
+ws.MTestResult(table: 'Any', method: 'str') -> 'None'
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.estat_hettest(fit, mtest='bonferroni')
+print(r.to_dict())
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `MarginsTable`
 
 **Stata:** `margins (table)`
@@ -6859,6 +7287,30 @@ print(ws.margins(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), dydx=['x1','x2'
 None
 ```
 
+### `MoranResult`
+
+**Stata:** `estat moran`
+
+The Moran spatial-autocorrelation test result: `to_dict()` gives the Moran I statistic, the expected value under no autocorrelation, the standard deviation and the p-value.
+
+**Signature**
+
+```python
+ws.MoranResult(statistic: 'float', df: 'float', pvalue: 'float', moran_i: 'float', expected_i: 'float', z: 'float', errorlags: 'int' = 1) -> None
+```
+
+**Example**
+
+```python
+print('MoranResult is returned by estat_moran; see its entry for a runnable example')
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `MultinomialLogit`
 
 **Stata:** `mlogit depvar indepvars, base(#)`
@@ -6874,13 +7326,13 @@ ws.MultinomialLogit(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None
 **`MultinomialLogit.from_formula`**
 
 ```python
-MultinomialLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteBase'"
+MultinomialLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> "'_DiscreteT'"
 ```
 
 **`MultinomialLogit.fit`**
 
 ```python
-MultinomialLogit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Any' = None, *, maxiter: 'int' = 200, **kwargs: 'Any') -> 'Any'
+MultinomialLogit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'Any'
 ```
 
 **Example**
@@ -6895,6 +7347,105 @@ np.round(f.e['ll'], 4)
 
 ```text
 -181.4397
+```
+
+### `MundlakResult`
+
+**Stata:** `estat mundlak`
+
+The Mundlak specification test result: which terms were tested, the chi-square statistic, its degrees of freedom and the p-value. A rejection means the random-effects estimator is inconsistent.
+
+**Signature**
+
+```python
+ws.MundlakResult(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]') -> None
+```
+
+**Example**
+
+```python
+print('MundlakResult is returned by estat_mundlak; see its entry for a runnable example')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `NnmatchResult`
+
+**Stata:** `teffects nnmatch`
+
+The object `teffects_nnmatch` returns: the ATE/ATET `estimate`, its standard error and p-value, the confidence bounds, and the potential-outcome means.
+
+**Signature**
+
+```python
+ws.NnmatchResult(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', metric: 'str' = 'mahalanobis', caliper: 'float' = nan, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan) -> None
+```
+
+**Example**
+
+```python
+r = ws.teffects_nnmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1', 'x2']].to_numpy())
+print(round(r.ate, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `PanelUnitRootResult`
+
+**Stata:** `xtunitroot ips/llc`
+
+The object `XtUnitroot(...).fit()` returns: the statistic that carries the p-value (`name` says which, e.g. 'Z-t-tilde-bar' for IPS), the p-value, and the per-panel detail block in `details`.
+
+**Signature**
+
+```python
+ws.PanelUnitRootResult(statistic: 'float', pvalue: 'float', test: 'str', name: 'str' = '', details: 'Mapping[str, float] | None' = None) -> None
+```
+
+**Example**
+
+```python
+r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()
+print(r.name, round(r.pvalue, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `PortmanteauResult`
+
+**Stata:** `wntestq`
+
+The portmanteau (Ljung-Box / Box-Pierce) result: the Q statistic, its degrees of freedom and p-value, for the lag order that was used.
+
+**Signature**
+
+```python
+ws.PortmanteauResult(q: 'float', df: 'int', pvalue: 'float', lags: 'int', n_gaps: 'int' = 0) -> None
+```
+
+**Example**
+
+```python
+r = ws.wntestq(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
+print(round(r.q, 6))
+```
+
+**Output**
+
+```text
+None
 ```
 
 ### `PraisResult`
@@ -6914,6 +7465,57 @@ ws.PraisResult(**values: 'object') -> 'None'
 ```python
 r = ws.prais(base, 'y ~ x1')
 print(round(r.rho, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `PsmatchResult`
+
+**Stata:** `teffects psmatch`
+
+The object `teffects_psmatch` returns: the ATET estimate with its standard error, p-value and confidence bounds, computed by propensity-score matching.
+
+**Signature**
+
+```python
+ws.PsmatchResult(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', outcome: 'str', caliper: 'float' = nan, treatment_model: 'str' = 'logit', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**Example**
+
+```python
+r = ws.teffects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+print(round(r.ate, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `PwCompareTable`
+
+**Stata:** `pwcompare`
+
+A list of `LincomResult` rows, one per pairwise comparison, that also renders Stata's whole pairwise table. `to_frame()` gives one row per comparison.
+
+**Signature**
+
+```python
+ws.PwCompareTable(rows: 'Sequence[LincomResult]', *, term: 'str' = '', margin_label: 'str' = 'asbalanced', comparison: 'str' = 'Unadjusted') -> 'None'
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
+r = ws.pwcompare(fit, 'firm')
+print(len(r))
 ```
 
 **Output**
@@ -6943,7 +7545,7 @@ RandomEffectsMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: '
 **`RandomEffectsMLE.fit`**
 
 ```python
-RandomEffectsMLE.fit(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'
+RandomEffectsMLE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **Example**
@@ -6982,6 +7584,123 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```
 
+### `RcmResult`
+
+**Stata:** `rcm`
+
+The object `ws.rcm` returns: the `att`, the selected `predictors`, the fitted `coefficients`, the pre/post years, the observed and `predicted` paths and the per-period `effects`.
+
+**Signature**
+
+```python
+ws.RcmResult(att: 'float', unit: 'str', treatment_period: 'float', predictors: 'tuple[str, ...]', coefficients: 'np.ndarray', pre_years: 'np.ndarray', post_years: 'np.ndarray', actual: 'np.ndarray', predicted: 'np.ndarray', method: 'str' = 'forward', criterion: 'str' = 'aicc') -> None
+```
+
+**Example**
+
+```python
+print('RcmResult is returned by ws.rcm; it needs a unit/time panel')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `RdRobustResult`
+
+**Stata:** `rdrobust`
+
+The object `rdrobust` returns: the bias-corrected point estimate, its standard error, z statistic, p-value and confidence bounds, plus the bandwidth that produced them.
+
+**Signature**
+
+```python
+ws.RdRobustResult(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandwidth: 'float', nobs: 'int', nobs_left: 'int', nobs_right: 'int', nobs_effective_left: 'int', nobs_effective_right: 'int', order: 'int', bias_order: 'int', kernel: 'str', coef_covs: 'Any' = None, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**Example**
+
+```python
+r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
+print(round(r.tau, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `RegFResult`
+
+**Stata:** `estat endogenous (regression form)`
+
+The object `endog_regF_test` returns: the regression-based (Wooldridge) robust score statistic, its degrees of freedom and p-value.
+
+**Signature**
+
+```python
+ws.RegFResult(*, statistic: 'float', df_num: 'float', df_denom: 'float') -> 'None'
+```
+
+**Example**
+
+```python
+print('RegFResult is returned by endog_regf_test; see estat_endogenous for the command')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `SUPPORTED_TYPES`
+
+**Stata:** `(the predict types registry)`
+
+The registry mapping a model name onto the `predict` types it supports. `ws.supported_types(name)` is the query function; this dict is the raw table behind it.
+
+**Example**
+
+```python
+print(sorted(ws.SUPPORTED_TYPES)[:4])
+```
+
+**Output**
+
+```text
+None
+```
+
+### `SucestResult`
+
+**Stata:** `suest`
+
+The stacked result `ws.suest` returns: the combined `params`, `cov_params()` across the models, `to_dict()`/`to_frame()`, and `test`/`lincom` that work on the stacked parameter vector.
+
+**Signature**
+
+```python
+ws.SucestResult(params: 'np.ndarray', covariance: 'np.ndarray', param_names: 'list[str]', models: 'int', n_observations: 'int', _df_resid: 'float' = 1.0) -> None
+```
+
+**Example**
+
+```python
+a = ws.OLS.from_formula('y ~ x1', base).fit()
+b = ws.OLS.from_formula('x2 ~ x1', base).fit()
+print(len(ws.suest([a, b]).params))
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `SummarizeResult`
 
 **Stata:** `estat summarize -- summarize of the estimation sample`
@@ -7008,6 +7727,31 @@ Variable
 y         200.0  1.020667   1.447346 -2.752204  4.881985
 x1        200.0  0.057340   1.025868 -2.832134  3.278208
 x2        200.0  0.063540   0.993631 -2.226171  3.259538
+```
+
+### `SummarizeTable`
+
+**Stata:** `summarize`
+
+The table `ws.summarize` returns: one row per variable with `Obs`, `Mean`, `Std. dev.`, `Min` and `Max`. `to_dict()` and `to_frame()` give the numbers; `str()` prints Stata's layout.
+
+**Signature**
+
+```python
+ws.SummarizeTable(rows: 'list[tuple[str, float, float, float, float, float]]') -> None
+```
+
+**Example**
+
+```python
+r = ws.summarize(base, ['y', 'x1'])
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
 ```
 
 ### `Synth2Result`
@@ -7080,6 +7824,356 @@ res.V_matrix
  [0.       0.242489]]
 ```
 
+### `SzroeterResult`
+
+**Stata:** `estat szroeter`
+
+The Szroeter heteroskedasticity test result for a single variable: the statistic, degrees of freedom and p-value, in `to_dict()` form.
+
+**Signature**
+
+```python
+ws.SzroeterResult(variable: 'str', statistic: 'float', pvalue: 'float', adjusted_pvalue: 'float | None' = None) -> None
+```
+
+**Example**
+
+```python
+r = ws.estat_szroeter(ws.OLS.from_formula('y ~ x1', base).fit(), variables=['x1'])
+print(r.to_dict())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `SzroeterTable`
+
+**Stata:** `estat szroeter (several variables)`
+
+The table `estat_szroeter` returns when several variables are tested at once: one row per variable, with `to_frame()` for the numbers.
+
+**Signature**
+
+```python
+ws.SzroeterTable(rows: 'list[SzroeterResult]', method: 'str' = 'noadjust') -> None
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.estat_szroeter(fit, variables=['x1', 'x2'])
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `TefectsRaResult`
+
+**Stata:** `teffects ra`
+
+The object `teffects_ra` returns: the ATE/ATET estimate, its standard error, z statistic, p-value and confidence bounds from regression adjustment.
+
+**Signature**
+
+```python
+ws.TefectsRaResult(ate: 'float', po_0: 'float', po_1: 'float', atet: 'float', nobs: 'int', treated: 'int', estimate: 'float', estimand: 'str', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**Example**
+
+```python
+r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+print(round(r.estimate, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VARResults`
+
+**Stata:** `var`
+
+The fitted VAR: `params` is Stata's equation-by-equation coefficient TABLE (a DataFrame, not a flat vector), `bse`, `sigma_u`, `cov_params()` and `e`, plus `irf()`, `fevd()` and `granger_causality()`. It is not a `StataResults`.
+
+**Signature**
+
+```python
+ws.VARResults(_result: 'Any', names: 'list[str]', lags: 'int', trend: 'str', ml: 'bool' = True) -> None
+```
+
+**Example**
+
+```python
+r = ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit()
+print(r.params.shape)
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VECMResults`
+
+**Stata:** `vec`
+
+The fitted VECM: `alpha` and `beta` blocks, `cov_params()`, `conf_int()`, `summary()` and the underlying statsmodels result. The reported drift differs from Stata's printed `_cons`; see the `VECM` entry.
+
+**Signature**
+
+```python
+ws.VECMResults(raw: 'Any', names: 'list[str]', lags: 'int', coint_rank: 'int', deterministic: 'str', endog: 'Any' = None) -> None
+```
+
+**Example**
+
+```python
+r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit()
+print(r.conf_int().shape)
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VarGrangerResult`
+
+**Stata:** `vargranger`
+
+The Granger-causality table: one row per (caused, causing) pair with the Wald chi-square, its degrees of freedom and p-value. `str()` prints Stata's boxed table.
+
+**Signature**
+
+```python
+ws.VarGrangerResult(rows: 'list[_Row]', equations: 'tuple[str, ...]') -> None
+```
+
+**Example**
+
+```python
+r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+print(len(r.rows))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VarSocResult`
+
+**Stata:** `varsoc`
+
+The lag-order selection table: one row per candidate lag with the AIC, HQIC, SBIC and FPE that Stata prints. `to_frame()` gives the numbers.
+
+**Signature**
+
+```python
+ws.VarSocResult(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = ()) -> None
+```
+
+**Example**
+
+```python
+r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VarStableResult`
+
+**Stata:** `varstable`
+
+The stability check for a fitted VAR: the companion-matrix eigenvalues and whether the process is stable. `to_frame()` gives the eigenvalue table.
+
+**Signature**
+
+```python
+ws.VarStableResult(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
+```
+
+**Example**
+
+```python
+r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VarWleResult`
+
+**Stata:** `varwle`
+
+The Wald lag-exclusion test for a fitted VAR: `by_equation()` returns the per-equation statistics; one row per lag and equation.
+
+**Signature**
+
+```python
+ws.VarWleResult(rows: 'tuple[VarWleRow, ...]', equations: 'tuple[str, ...]') -> None
+```
+
+**Example**
+
+```python
+r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())
+print(len(r.by_equation()))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VecRankResult`
+
+**Stata:** `vecrank`
+
+The cointegration-rank test table: one row per null rank with the trace and max-eigenvalue statistics and their critical values. `to_frame()` gives the numbers.
+
+**Signature**
+
+```python
+ws.VecRankResult(rows: 'tuple[VecRankRow, ...]', nobs: 'int', lags: 'int', equations: 'int', deterministic: 'str' = 'constant', show_max: 'bool' = False) -> None
+```
+
+**Example**
+
+```python
+r = ws.vecrank(base[['y', 'x1']].to_numpy(), lags=2)
+print(r.to_frame().head(2))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `VecStableResult`
+
+**Stata:** `vecstable`
+
+The stability check for a fitted VECM: the companion-matrix eigenvalues and their moduli. `to_frame()` gives the table.
+
+**Signature**
+
+```python
+ws.VecStableResult(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
+```
+
+**Example**
+
+```python
+r = ws.vecstable(ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit())
+print(r.to_frame())
+```
+
+**Output**
+
+```text
+None
+```
+
+### `WeakRobustResult`
+
+**Stata:** `estat weakrobust`
+
+The weak-instrument-robust inference result: the Anderson-Rubin `statistic`, its `df`, the F form and the p-value.
+
+**Signature**
+
+```python
+ws.WeakRobustResult(test: 'str', statistic: 'float', f_statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float') -> None
+```
+
+**Example**
+
+```python
+print('WeakRobustResult is returned by estat_weakrobust; see its entry')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `XtTest0Result`
+
+**Stata:** `xttest0`
+
+The Breusch-Pagan LM test for random effects: `chibar2`, its p-value, and the variance components `var_u`, `var_e`, `var_y`.
+
+**Signature**
+
+```python
+ws.XtTest0Result(chibar2: 'float', pvalue: 'float', var_u: 'float', var_e: 'float', var_y: 'float', nobs: 'int', entities: 'int', periods: 'int', depvar: 'str' = '', entity_name: 'str' = '', time_name: 'str' = '') -> None
+```
+
+**Example**
+
+```python
+fit = ws.RandomEffects.from_formula('y ~ x1', base, entity='firm', time='year').fit()
+r = ws.xttest0(fit)
+print(round(r.chibar2, 6))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `adjust_pvalues`
+
+**Stata:** `(no Stata equivalent -- the mtest() adjustment arithmetic)`
+
+Adjust a vector of p-values for multiple testing, using one of the methods Stata's `mtest()` offers. Returns an array of the same length; `MTEST_METHODS` lists the accepted spellings.
+
+**Signature**
+
+```python
+ws.adjust_pvalues(pvalues: 'Sequence[float]', method: 'str') -> 'np.ndarray'
+```
+
+**Example**
+
+```python
+print(ws.adjust_pvalues([0.01, 0.04, 0.03], 'holm'))
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `dfgls`
 
 **Stata:** `dfgls varname`
@@ -7089,7 +8183,7 @@ DF-GLS (Elliott-Rothenberg-Stock) unit-root test: a GLS-detrended Dickey-Fuller,
 **Signature**
 
 ```python
-ws.dfgls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, notrend: 'bool' = False, name: 'str' = '') -> 'DFGLSResult'
+ws.dfgls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, name: 'str' = '', **legacy: 'Any') -> 'DFGLSResult'
 ```
 
 **Example**
@@ -7139,6 +8233,78 @@ H0: Random walk without drift, d = 0
  Z(t)            -6.706       -3.478       -2.884       -2.574
 --------------------------------------------------------------
 MacKinnon approximate p-value for Z(t) = 0.0000.
+```
+
+### `endog_regf_test`
+
+**Stata:** `estat endogenous (robust regression form)`
+
+The regression-based robust score test for endogeneity, built from an IV fit's structure. It is what `estat endogenous` runs under a robust VCE; `estat_endogenous(result)` is the command-level entry point.
+
+**Signature**
+
+```python
+ws.endog_regf_test(structure: 'dict[str, Any]', response: 'np.ndarray', *, cov_type: 'str' = 'nonrobust', cluster_labels: 'Sequence[Any] | None' = None, tested: 'Sequence[str] | None' = None) -> 'RegFResult'
+```
+
+**Example**
+
+```python
+print('endog_regf_test takes an iv_structure dict; use estat_endogenous on a fitted result')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `endog_score_test`
+
+**Stata:** `estat endogenous (score form)`
+
+The robust score test for endogeneity computed from the residuals. Like `endog_regf_test`, this is the internals of `estat endogenous`; call that command on a fitted IV result instead.
+
+**Signature**
+
+```python
+ws.endog_score_test(structure: 'dict[str, Any]', resid: 'np.ndarray', response: 'np.ndarray', *, hac: 'bool' = False, lags: 'int' = 0, tested: 'Sequence[str] | None' = None) -> 'EndogScoreResult'
+```
+
+**Example**
+
+```python
+print('endog_score_test takes an iv_structure dict; use estat_endogenous on a fitted result')
+```
+
+**Output**
+
+```text
+None
+```
+
+### `estat_ptrends`
+
+**Stata:** `estat ptrends`
+
+The parallel-trends test for a `didregress`/`xtdidregress` fit: it compares the pre-treatment trend of the treated group with the controls and returns the statistic, its degrees of freedom and the p-value.
+
+**Signature**
+
+```python
+ws.estat_ptrends(result: 'Any') -> 'dict[str, float]'
+```
+
+**Example**
+
+```python
+print('estat_ptrends requires a didregress fit; see ws.Didregress for how to build one')
+```
+
+**Output**
+
+```text
+None
 ```
 
 ### `etable_as_stata`
@@ -7267,6 +8433,32 @@ print(ws.kpss(base['y'].to_numpy()))
 None
 ```
 
+### `lincom_as_stata`
+
+**Stata:** `lincom`
+
+The function behind `result.lincom(expression)`: form a linear combination of the coefficients, its standard error, the test statistic and the confidence interval. Use it directly when the expression is built at runtime rather than typed.
+
+**Signature**
+
+```python
+ws.lincom_as_stata(result: 'Any', expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.lincom_as_stata(fit, 'x1 + x2')
+print(round(r.to_dict()['estimate'], 6))
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `pperron`
 
 **Stata:** `pperron y, trend`
@@ -7313,13 +8505,38 @@ Prais-Winsten AR(1) regression: GLS after transforming the data by the estimated
 **Signature**
 
 ```python
-ws.prais(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'
+ws.prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'
 ```
 
 **Example**
 
 ```python
 print(str(ws.prais(base, 'y ~ x1'))[:180])
+```
+
+**Output**
+
+```text
+None
+```
+
+### `prais_winsten`
+
+**Stata:** `(the estimator behind prais; no separate Stata command)`
+
+The Prais-Winsten / Cochrane-Orcutt AR(1) solver on raw arrays: returns the coefficients, the estimated rho, the iteration count and the rho trace. `ws.prais` is the formula-level wrapper around it.
+
+**Signature**
+
+```python
+ws.prais_winsten(exog: 'np.ndarray', endog: 'np.ndarray', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, rho: 'float | None' = None, corc: 'bool' = False) -> 'tuple[np.ndarray, float, int, list[tuple[int, float]]]'
+```
+
+**Example**
+
+```python
+coef, rho, iters, trace = ws.prais_winsten(base.x1.to_numpy()[:, None], base.y.to_numpy())
+print(round(rho, 6), iters)
 ```
 
 **Output**
@@ -7383,6 +8600,32 @@ round(ws.rdrobust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
 ```
 
 **Notes:** The robust (CCT) standard error is not reproduced: `rdrobust_vce` exists only in the compiled lrdrobust.mlib, so se/z/ci are NaN. The assembly step around it IS verified against Stata's own e(V_cl_l)/e(V_cl_r).
+
+### `relabel_cov_type`
+
+**Stata:** `(no Stata equivalent -- an internal bookkeeping method)`
+
+Record the covariance type actually used after the matrix has been replaced. `Areg` fits with a placeholder and then builds the real HC2/HC3 matrix on the full design, so it relabels the result here; a caller reading `result.cov_type` must see what was computed, not the placeholder.
+
+**Signature**
+
+```python
+ws.relabel_cov_type(self, cov_type: 'str') -> 'None'
+```
+
+**Example**
+
+```python
+from westata.protocols import SSC
+fit = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='HC1')
+print(fit.cov_type)
+```
+
+**Output**
+
+```text
+None
+```
 
 ### `render_estimates_table`
 
@@ -7494,6 +8737,30 @@ ws.summarize(base, ['y', 'x1'])
           x1 |        200    .0573402    1.025868  -2.832134   3.278208
 ```
 
+### `supported_types`
+
+**Stata:** `(the predict type list a model accepts)`
+
+The tuples of `predict` kinds a given model supports, e.g. `supported_types('regress')`. Asking for a type outside this list raises rather than silently returning another quantity.
+
+**Signature**
+
+```python
+ws.supported_types(model_name: 'str') -> 'tuple[str, ...]'
+```
+
+**Example**
+
+```python
+print(ws.supported_types('regress'))
+```
+
+**Output**
+
+```text
+None
+```
+
 ### `synth`
 
 **Stata:** `synth y x1 x2, trunit(1) trperiod(2005)`
@@ -7573,7 +8840,7 @@ Covariate balance after a matching fit: each covariate's standardized difference
 **Signature**
 
 ```python
-ws.tebalance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalise_counts: 'bool' = False) -> 'BalanceSummary'
+ws.tebalance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalize_counts: 'bool' = False) -> 'BalanceSummary'
 ```
 
 **Example**
@@ -7687,6 +8954,32 @@ ws.teffects_ra(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand
 
 ```python
 print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)
+```
+
+**Output**
+
+```text
+None
+```
+
+### `test_as_stata`
+
+**Stata:** `test`
+
+The function behind `result.test(...)`: run one or more Wald restrictions and return Stata's `test` output. Each argument is one restriction specification; a comma inside a single string is not a separator.
+
+**Signature**
+
+```python
+ws.test_as_stata(result: 'Any', *specs: 'Any', coef: 'bool' = False) -> 'WaldTest | dict[str, Any]'
+```
+
+**Example**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.test_as_stata(fit, 'x1', 'x2')
+print(r)
 ```
 
 **Output**

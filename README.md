@@ -24,7 +24,7 @@ this in Python, do I get the same numbers Stata would print?*
 
 | | |
 |---|---|
-| Tests | **full suite green (see `pytest -q`)** |
+| Tests | **6322 passed, 3 skipped, 0 failed (see `pytest -q`)** |
 | Commands covered | 96 registry entries |
 | Evidence | **54 × E3**, 28 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
@@ -69,7 +69,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` runs 6257 tests (6254 pass, 3 skip) on the committed tree.
+`python -m pytest -q` runs 6325 tests (6322 pass, 3 skip) on the committed tree.
 The conformance captures (including `synth_features.json`) are committed, so the
 suite needs no Stata licence. Re-running the comparisons against live Stata
 (`retest/`, `docs/collect_comparison.py`) does need one.

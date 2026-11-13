@@ -119,6 +119,8 @@ from scipy import stats
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import ols_coefficients
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["XtGls", "XtIvreg", "XtPcse", "XtUnitroot", "PanelUnitRootResult",
            "SingularSigmaWarning"]
@@ -182,11 +184,10 @@ def _as_2d(value: Any, name: str, nobs: int) -> np.ndarray:
     return array
 
 
-def _ols(X: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """Least squares via QR, so the normal equations never square the conditioning."""
+def _ols(design: np.ndarray, response: np.ndarray) -> np.ndarray:
+    """Delegate to the one least-squares implementation (R6.1)."""
 
-    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
-    return np.asarray(beta, dtype=float)
+    return ols_coefficients(design, response)
 
 
 def _rank_check(X: np.ndarray, names: Sequence[str], command: str) -> None:
@@ -2015,7 +2016,7 @@ def _interpolate(table: dict[int, tuple[float, float]], key: float) -> tuple[flo
 
 
 @dataclass(frozen=True)
-class PanelUnitRootResult:
+class PanelUnitRootResult(ResultSerialisation):
     """A panel unit-root statistic together with its p-value.
 
     Stata's ``xtunitroot`` stores these in ``r()``, not ``e()``: the command is an
@@ -2129,8 +2130,17 @@ class XtUnitroot:
         trend: bool = False,
         noconstant: bool = False,
         demean: bool = False,
-        variable_name: str = "y",
+        variable_name: str | None = None,
     ) -> None:
+        """Matrix-interface constructor.
+
+        ``variable_name`` defaulted to the literal ``"y"`` -- a name from the dataset
+        this estimator was first tried on (R2.4).  A caller building from raw arrays
+        for a series called ``wage`` got a result whose ``variable`` attribute said
+        ``y``: printed in the banner and stored in the return object.  It now defaults
+        to ``None`` and the result reports an empty label rather than a wrong one --
+        ``from_formula`` supplies the real name.
+        """
         self._values = np.asarray(values, dtype=float).reshape(-1)
         self._codes = np.asarray(codes, dtype=int)
         self._sizes = np.asarray(sizes, dtype=int)
@@ -2165,7 +2175,7 @@ class XtUnitroot:
             )
         self._test = key
         self._lags = lags
-        self._name = variable_name
+        self._name = variable_name or ""
 
     @classmethod
     def from_formula(
@@ -2238,8 +2248,17 @@ class XtUnitroot:
         )
 
     # ------------------------------------------------------------------- fit
-    def fit(self, **_ignored: Any) -> PanelUnitRootResult:
-        """Run the requested test and return its statistics."""
+    def fit(self) -> PanelUnitRootResult:
+        """Run the requested test and return its statistics.
+
+        This used to be ``fit(self, **_ignored: Any)``, which accepted ANY keyword and
+        dropped it -- ``fit(cov_type="HC1")``, ``fit(lags=3)`` and
+        ``fit(zzz=[1,2,3])`` all returned a result (R2.6).  A unit-root test has no
+        covariance to select and no estimation knobs, so there is nothing legitimate to
+        accept: the panel unit-root options (``test``, ``lags``, ``trend``,
+        ``noconstant``, ``demean``) live on ``from_formula``, where they select WHICH
+        TEST runs (R2.2).
+        """
 
         if self._test == "ips":
             return self._ips()

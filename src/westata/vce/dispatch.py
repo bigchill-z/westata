@@ -29,6 +29,42 @@ from westata.vce.ssc import resolve_ssc
 SUPPORTED_COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster", "HAC")
 """Canonical ``cov_type`` values understood by :func:`compute_cov`."""
 
+#: Stata's ``vce(robust)`` spelling, per ESTIMATOR FAMILY.
+#:
+#: There is deliberately NO global ``"ROBUST"`` entry in ``_ALIASES`` below.  Stata's
+#: ``vce(robust)`` is a different estimator in each family:
+#:
+#: ==============  =====================  ==========================================
+#: family          canonical value        Stata option
+#: ==============  =====================  ==========================================
+#: regress         ``HC1``                ``vce(robust)`` = n/(n-k) sandwich
+#: ivregress       ``HC0``                ``vce(robust)`` = NO n/(n-k) correction
+#: logit &c.       ``ML_ROBUST``          ``vce(robust)`` = n/(n-1) sandwich
+#: xtreg           ``cluster``            ``vce(robust)`` IS ``vce(cluster panelvar)``
+#: ==============  =====================  ==========================================
+#:
+#: A single global default would therefore be WRONG for every family but one.  It was
+#: ``"ROBUST": "HC1"`` until 2026-11-13, and the cost was that each estimator overrode
+#: it locally -- five copies of an answer that no one could audit, plus a module
+#: (``FEOLS``) that rejected Stata's own spelling outright.
+#:
+#: Now each family names its own target and passes it in through
+#: ``compute_cov(..., robust_as=...)``; a family that forgets is told so loudly
+#: instead of silently receiving HC1.
+ROBUST_AS = {
+    "regress": "HC1",
+    "ivregress": "HC0",
+    "xtreg": "cluster",
+}
+"""Which canonical value ``cov_type="robust"`` means, for the families that route
+through :func:`compute_cov`.
+
+The ML families are deliberately ABSENT: their sandwich needs the observed information
+and the score, which this OLS-shaped entry point cannot see, so they never reach here
+(``estimators/discrete.py`` builds ``ML_ROBUST`` itself).  ``ROBUST_AS["ml"]`` would be
+a promise this module cannot keep, so it is not made.
+"""
+
 _ALIASES = {
     "NONROBUST": "nonrobust",
     "HC0": "HC0",
@@ -40,17 +76,30 @@ _ALIASES = {
     # ``newey``/``vce(hac ...)`` spellings.
     "NEWEY": "HAC",
     "NEWEYWEST": "HAC",
-    # ``robust`` IS THE STATA OPTION NAME, and for `regress, robust` it means HC1. Accepting the
-    # word here keeps a caller from having to remember which numeric spelling each command family
-    # wants -- the deviation the v3 report records at section 4, item (5). Note that the IV family
-    # maps the same word to HC0 instead (Stata's `ivregress ..., vce(robust)` is HC0), and that
-    # override lives in `estimators/iv.py` because the mapping genuinely differs per command.
-    "ROBUST": "HC1",
 }
 
 
-def _normalize_cov_type(cov_type: str) -> str:
+def _normalize_cov_type(cov_type: str, *, robust_as: str | None = None) -> str:
+    """Return the canonical ``cov_type`` or raise ``ValueError``.
+
+    ``robust_as`` is what ``"robust"`` means for the CALLING family (see
+    :data:`ROBUST_AS`).  Passing ``None`` means the family did not declare one, and a
+    ``robust`` request then raises rather than guessing -- the guess is exactly the
+    defect this signature exists to prevent.
+    """
+
     key = str(cov_type).strip().upper()
+    if key == "ROBUST":
+        if robust_as is None:
+            raise ValueError(
+                "cov_type='robust' was not resolved for this estimator family. Stata's "
+                "vce(robust) means a DIFFERENT variance in each family (HC1 for regress, "
+                "HC0 for ivregress, an n/(n-1) sandwich for the ML families, and a "
+                "clustered VCE for xtreg), so this module will not guess. Pass the "
+                "family's canonical value explicitly (see vce.dispatch.ROBUST_AS), or "
+                "call the estimator's own fit(), which resolves it."
+            )
+        return _normalize_cov_type(robust_as)
     try:
         return _ALIASES[key]
     except KeyError:
@@ -114,6 +163,7 @@ def compute_cov(
     weights: np.ndarray | None = None,
     weight_type: str | None = None,
     estimate_model: str | None = None,
+    robust_as: str | None = None,
 ) -> tuple[np.ndarray, float]:
     """Return ``(cov, df_t)`` for the requested variance estimator.
 
@@ -125,7 +175,10 @@ def compute_cov(
         ``n`` residuals aligned with ``X``.
     cov_type:
         ``"nonrobust"``, ``"HC0"``, ``"HC1"``, ``"HC2"``, ``"HC3"`` or
-        ``"cluster"`` (case-insensitive).
+        ``"cluster"`` (case-insensitive).  ``"robust"`` is also accepted, but ONLY
+        when ``robust_as`` says what it means for the calling family (see
+        :data:`ROBUST_AS`): Stata's ``vce(robust)`` is a different estimator per
+        command, so this function will not guess.
     cov_kwds:
         Estimator keyword arguments.  ``{"groups": ...}`` is required for
         ``cov_type="cluster"``; group labels may be integers, strings or a
@@ -189,7 +242,7 @@ def compute_cov(
         )
 
     settings = resolve_ssc(ssc)
-    canonical = _normalize_cov_type(cov_type)
+    canonical = _normalize_cov_type(cov_type, robust_as=robust_as)
     kwds: dict[str, Any] = {} if cov_kwds is None else dict(cov_kwds)
 
     # The correction factors use the *effective* sample size.  For frequency
@@ -225,6 +278,18 @@ def compute_cov(
             )
         cov = (float(rw @ rw) / df_t) * bread
         return cov, df_t
+
+    if canonical == "ML_ROBUST":
+        # The ML sandwich is `n/(n-1) * H^-1 (sum s s') H^-1`, built from the OBSERVED
+        # INFORMATION and the SCORE -- quantities an OLS-shaped call has no access to.
+        # `compute_cov` only ever sees (X, resid), so it cannot produce this matrix and
+        # must not silently substitute HC1.  Each ML family builds it in `discrete.py`.
+        raise ValueError(
+            "cov_type='ML_ROBUST' is the discrete/count ML sandwich, which needs the "
+            "information matrix and the score; compute_cov only receives (X, resid) and "
+            "cannot build it. This value is produced by Logit/Probit/Poisson/ologit "
+            "themselves, not requested from the VCE layer."
+        )
 
     if canonical in ("HC0", "HC1", "HC2", "HC3"):
         cov = cov_hc(

@@ -351,11 +351,30 @@ def test_no_absorbed_columns_is_an_empty_list():
 
 
 # ------------------------------------------------------- 8. error handling
-@pytest.mark.parametrize("cov_type", ["HAC", "twoway", "robust", "bogus"])
+@pytest.mark.parametrize("cov_type", ["HAC", "twoway", "bogus"])
 def test_unknown_cov_type_raises_value_error(cov_type):
     df = _panel()
     with pytest.raises(ValueError, match="cov_type"):
         FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type=cov_type)
+
+
+def test_robust_is_accepted_as_statas_own_spelling():
+    """`reghdfe, robust` IS `HC1`, so `cov_type="robust"` must work (R3.7.0).
+
+    This test used to sit in the *unknown cov_type* parameterisation above, which
+    made westata reject Stata's own syntax and demand the internal name instead.
+    A caller who writes `cov_type="robust"` on every estimator must not have to
+    learn which numeric variant this family happens to call it.
+    """
+
+    df = _panel()
+    spelled = FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type="robust")
+    explicit = FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type="HC1")
+    assert spelled.cov_type == "HC1"
+    assert np.allclose(spelled.bse, explicit.bse), (
+        "cov_type='robust' and cov_type='HC1' must produce the same covariance: "
+        "Stata's reghdfe, robust is HC1"
+    )
 
 
 @pytest.mark.parametrize("cov_type", ["HC2", "HC3"])

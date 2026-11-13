@@ -21,8 +21,19 @@ What the rename covers, and why each part is not a guess:
 
 from __future__ import annotations
 
-#: Parameter names that patsy or this package use for the constant term.
-CONSTANT_SPELLINGS = frozenset({"intercept", "const", "_cons"})
+#: Parameter names that patsy, statsmodels or this package use for the constant term.
+#:
+#: This is the ONE definition (R6.1).  Before it, four different sets were in use and
+#: two of them were wrong in ways that mattered:
+#:
+#: * ``modeltests.py`` listed ``"Intercept"`` (capitalised) in a set it then compared
+#:   against ``name.strip().lower()``, so that entry could never match;
+#: * ``panel_nonlinear.py`` added ``"1"`` -- the intercept is sometimes named ``1``
+#:   there because a formula with an explicit intercept term produces that column.
+#:
+#: Both spellings are folded in here, and every caller lower-cases before comparing
+#: (see :func:`is_constant_name`), so the case bug cannot come back.
+CONSTANT_SPELLINGS = frozenset({"intercept", "intercept_", "const", "_cons", "1"})
 
 #: Separator differences between the two vocabularies.
 PATSY_INTERACTION = ":"
@@ -53,3 +64,24 @@ def stata_display_name(name: str) -> str:
         # which is a separate decision made where that table is drawn.
         return text[1:].replace(PATSY_INTERACTION, STATA_INTERACTION)
     return text.replace(PATSY_INTERACTION, STATA_INTERACTION)
+
+
+def require_iv_structure(result: object, command: str) -> dict:
+    """Return the IV structure of ``result`` or explain why the command needs it.
+
+    Four modules (``estat endogenous``, ``estat firststage``, ``estat overid``,
+    ``estat weakrobust``) each carried their own copy of this check (R6.1).  The four
+    differed only in the command name inside the message, which is exactly the kind of
+    duplication that drifts: one copy would gain a clarification and the other three
+    would not.  The command name is a parameter now.
+    """
+
+    structure = getattr(result, "iv_structure", None)
+    if structure is None:
+        raise NotImplementedError(
+            f"{command} is only defined after an instrumental-variables fit: Stata "
+            f"reaches it through ivregress_estat, and it needs the split between "
+            f"included exogenous regressors, endogenous regressors and excluded "
+            f"instruments; got {getattr(result, 'model_name', None)!r}"
+        )
+    return dict(structure)

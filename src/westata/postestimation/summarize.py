@@ -31,14 +31,14 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 import pandas as pd
+from westata.postestimation.names import is_constant_name
+
+#: The constant-name test lives in `names.py` (R6.1).
+_is_constant = is_constant_name
 
 __all__ = ["SummarizeResult", "estat_summarize"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 def _summary_of_a_non_numeric_column(column: Any) -> dict[str, float]:

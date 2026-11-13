@@ -394,8 +394,8 @@ def dfgls(
     *,
     maxlag: int | None = None,
     trend: bool = True,
-    notrend: bool = False,
     name: str = "",
+    **legacy: Any,
 ) -> DFGLSResult:
     """DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.
 
@@ -410,16 +410,27 @@ def dfgls(
         dfgls lrgnp             lag 10  tau = -1.284   (default, trend)
         dfgls lrgnp, notrend    lag 10  tau = +0.806   (the no-trend case)
 
-    ``trend=False`` or ``notrend=True`` selects the second. With the trend the detrending uses
+    ``trend=False`` selects the second. With the trend the detrending uses
     ``cbar=-13.5`` and subtracts ``b_iota + b_qdtrd*t``; without it, ``cbar=-7`` and only
     ``b_iota``. Both cases reproduce Stata to the printed digit.
 
     ``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)`` (``dfgls.ado:64``).
+
+    ``notrend=`` was REMOVED (R3.1): it and ``trend=`` set the same state, and having two
+    switches made ``notrend=False`` a no-op that nevertheless looked meaningful.  Stata
+    spells the option ``notrend``; the Python argument is the positive ``trend``, and
+    ``notrend=True`` is still accepted for one release as a deprecation shim.
     """
 
-    if notrend:
-        trend = False
-    elif trend is None:
+    if "notrend" in legacy:
+        if legacy["notrend"]:
+            trend = False
+        legacy.pop("notrend")
+    if legacy:
+        raise TypeError(
+            f"dfgls() got unexpected keyword argument(s): {', '.join(sorted(legacy))}"
+        )
+    if trend is None:
         trend = True
 
     values = np.asarray(series, dtype=float).reshape(-1)

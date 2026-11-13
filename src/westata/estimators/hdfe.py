@@ -97,6 +97,13 @@ _COV_ALIASES = {
     "UNROBUST": "nonrobust",
     "HC0": "HC0",
     "HC1": "HC1",
+    # ``reghdfe, robust`` and ``areg ..., vce(robust)`` ARE HC1 -- that is what both
+    # Stata commands compute, and it is what this module's own HC1 path already
+    # produces.  The alias was missing, so the module rejected Stata's own spelling and
+    # demanded the internal name instead.  Accepting it is R3.7.0: a caller who types
+    # `cov_type="robust"` on every estimator should not have to learn which numeric
+    # variant this family happens to call it.
+    "ROBUST": "HC1",
     "CLUSTER": "cluster",
     "CLUSTERED": "cluster",
     "CRV1": "cluster",
@@ -111,7 +118,6 @@ _UNSUPPORTED_COV_TYPES = {
     "not implement it for FEOLS yet",
     "TWOWAY": "westata uses cov_type='cluster' with two cluster variables for "
     "multi-way clustering",
-    "ROBUST": "use cov_type='HC1' (Stata's vce(robust) default)",
 }
 
 # PyFixest accepts weights as a *column name*, so westata materialises them as
@@ -125,8 +131,14 @@ _CLUSTER_COLUMN_PREFIX = "__westata_cluster_"
 _PYFIXEST_SSC_DEFAULTS = {"k_fixef": "nonnested", "G_df": "min"}
 
 
-def _normalize_cov_type(cov_type: str) -> str:
-    """Return the canonical ``cov_type`` or raise ``ValueError``."""
+def _normalize_cov_type(cov_type: str, command: str = "FEOLS") -> str:
+    """Return the canonical ``cov_type`` or raise ``ValueError``.
+
+    ``command`` names the CALLING class in the error message.  It used to be the
+    literal string "FEOLS", so ``Areg(...).fit(cov_type="HC2")`` told the caller
+    "not supported by FEOLS" -- an error that names a class the caller never
+    touched (R3.7.4).
+    """
 
     if not isinstance(cov_type, str):
         raise TypeError(
@@ -136,7 +148,7 @@ def _normalize_cov_type(cov_type: str) -> str:
     key = cov_type.strip().upper()
     if key in _UNSUPPORTED_COV_TYPES:
         raise ValueError(
-            f"cov_type {cov_type!r} is not supported by FEOLS: "
+            f"cov_type {cov_type!r} is not supported by {command}: "
             + _UNSUPPORTED_COV_TYPES[key]
             + ". Supported cov_type values are: "
             + ", ".join(SUPPORTED_COV_TYPES)
@@ -145,7 +157,7 @@ def _normalize_cov_type(cov_type: str) -> str:
         return _COV_ALIASES[key]
     except KeyError:
         raise ValueError(
-            f"Unknown cov_type {cov_type!r} for FEOLS; supported cov_type values "
+            f"Unknown cov_type {cov_type!r} for {command}; supported cov_type values "
             "are: " + ", ".join(SUPPORTED_COV_TYPES)
         ) from None
 
@@ -384,7 +396,7 @@ class FEOLS:
             # Stata's `[pw=w]` is identical to adding vce(robust).
             return "HC1" if (spec is not None and spec.implies_robust) else "nonrobust"
 
-        effective = _normalize_cov_type(cov_type)
+        effective = _normalize_cov_type(cov_type, type(self).__name__)
         if spec is not None and spec.implies_robust and effective == "nonrobust":
             raise ConsistencyError(
                 "pweight implies vce(robust): Stata's 'reghdfe y x [pw=w]' is "
@@ -1680,8 +1692,19 @@ class Areg(FEOLS):
         absorb: Any = None,
         weights: Any = None,
         weight_type: str | None = None,
-        noabsorb: bool = False,
+        absorb_test: bool = True,
+        noabsorb: bool | None = None,
     ) -> None:
+        """``absorb_test=False`` suppresses the absorbed-indicator F test.
+
+        The argument used to be ``noabsorb`` (R3.1).  Stata's ``areg`` has no ``noabsorb``
+        option at all -- the real switch in ``reghdfe`` is ``noabsorbtest`` -- so the
+        name promised to turn off *absorption* while actually turning off only the
+        *test* of it.  ``noabsorb=`` is still accepted for one release, as a deprecation
+        shim, and its value is inverted onto ``absorb_test``.
+        """
+        if noabsorb is not None:
+            absorb_test = not bool(noabsorb)
         if absorb is None:
             raise ValueError(
                 "areg requires absorb=; Stata's syntax is 'areg y x, absorb(varlist)' "
@@ -1694,7 +1717,7 @@ class Areg(FEOLS):
         combined = f"{formula.strip()} | {absorbed}" if "|" not in formula else formula
         # Set BEFORE the super() call: the fit that follows reads it to decide whether to
         # compute the absorbed-indicator F test at all.
-        self._suppress_absorb_test = bool(noabsorb)
+        self._suppress_absorb_test = not bool(absorb_test)
         # ``areg`` reports one FEWER absorbed degree of freedom than ``reghdfe``, because it
         # prints the intercept separately and the constant therefore consumes one of the
         # indicator's degrees of freedom. Measured on the report's areg case (563 counties,
@@ -1723,7 +1746,8 @@ class Areg(FEOLS):
         weights: Any = None,
         weight_type: str | None = None,
         subset: Any = None,
-        noabsorb: bool = False,
+        absorb_test: bool = True,
+        noabsorb: bool | None = None,
     ) -> "Areg":
         """Build from Stata's spelling: ``"y ~ x1 + x2"`` with ``absorb="firm"``."""
 
@@ -1735,6 +1759,7 @@ class Areg(FEOLS):
             absorb=absorb,
             weights=weights,
             weight_type=weight_type,
+            absorb_test=absorb_test,
             noabsorb=noabsorb,
         )
 
@@ -1765,6 +1790,11 @@ class Areg(FEOLS):
             results = super().fit(cov_type="HC1", cov_kwds=cov_kwds, ssc=ssc, level=level)
             results.e["vce"] = requested.lower()
             results.e["vcetype"] = requested
+            # `e()["vce"]` was set but `results.cov_type` kept the PLACEHOLDER "HC1",
+            # so `Areg(...).fit(cov_type="HC2").cov_type` reported HC1 while the numbers
+            # were genuinely HC2 (verified: HC2 bse 0.069765 vs HC1 0.069568).  A caller
+            # labelling a table from `.cov_type` would have called it HC1 (R3.7.2).
+            results.relabel_cov_type(requested)
             return results
 
         self._leverage_cov_type = None

@@ -248,7 +248,8 @@ def _cov_label(cov_type: str | None) -> str:
         return "nonrobust"
     key = str(cov_type).strip().lower()
     if key in _ROBUST_COV_TYPES:
-        return "robust"
+        # ``xtreg``'s vce(robust) IS vce(cluster panelvar) (R3.7.3).
+        return "cluster"
     if key in ("clustered",):
         return "cluster"
     return key.upper() if key.startswith("hc") else key
@@ -532,13 +533,14 @@ class PanelOLS:
         return built
 
     # ------------------------------------------------------------------ fit
-    def fit(
+    def fit(  # type: ignore[override]
         self,
-        entity_effects: bool = True,
-        time_effects: bool = False,
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        *,
+        entity_effects: bool = True,
+        time_effects: bool = False,
     ) -> StataResults:
         """Estimate the model and return a Stata-conformant result object.
 
@@ -1993,18 +1995,19 @@ class RandomEffects(PanelOLS):
 
     def fit(  # type: ignore[override]
         self,
-        entity_effects: bool = False,
-        time_effects: bool = False,
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        *,
+        entity_effects: bool = False,
+        time_effects: bool = False,
     ) -> StataResults:
         return super().fit(
-            entity_effects=entity_effects,
-            time_effects=time_effects,
             cov_type=cov_type,
             cov_kwds=cov_kwds,
             ssc=ssc,
+            entity_effects=entity_effects,
+            time_effects=time_effects,
         )
 
     def _build_model(
@@ -2088,11 +2091,12 @@ class RandomEffectsMLE(RandomEffects):
 
     def fit(  # type: ignore[override]
         self,
-        entity_effects: bool = False,
-        time_effects: bool = False,
         cov_type: str | None = None,
         cov_kwds: Mapping[str, Any] | None = None,
         ssc: SSC | None = None,
+        *,
+        entity_effects: bool = False,
+        time_effects: bool = False,
     ) -> StataResults:
         """Maximum-likelihood random effects (no robust VCE in Stata either)."""
 

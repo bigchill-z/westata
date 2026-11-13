@@ -210,11 +210,22 @@ class XtAbond:
         periods: Any,
         *,
         lags: int = 1,
-        param_names: Sequence[str] = ("L1.y",),
-        exog_names: Sequence[str] = ("x1",),
+        param_names: Sequence[str] | None = None,
+        exog_names: Sequence[str] | None = None,
         system: bool = False,
         model_data: pd.DataFrame | None = None,
     ) -> None:
+        """Matrix-interface constructor.
+
+        ``param_names`` and ``exog_names`` used to default to ``("L1.y",)`` and
+        ``("x1",)`` -- literal column names from the dataset this estimator was first
+        developed against (R2.4).  A caller building from raw arrays for ANY other
+        data got those names on the result: a coefficient table labelled ``L1.y`` for
+        a series that is not ``y``, and an ``x1`` row that does not exist in the data.
+        Both now default to ``None`` and are derived from ``lags`` / the design width,
+        which is the only thing this method can honestly infer.
+        """
+
         self._y = np.asarray(endog, dtype=float).reshape(-1)
         self._X = np.atleast_2d(np.asarray(exog, dtype=float))
         if self._X.shape[0] != self._y.size:
@@ -222,7 +233,22 @@ class XtAbond:
         self._groups = self._codes(groups)
         self._periods = np.asarray(periods).reshape(-1)
         self._lags = int(lags)
+        if param_names is None:
+            # The lagged dependent variable is the only parameter the estimator adds
+            # beyond the supplied design, and its lags come from `lags`.
+            param_names = tuple(f"L{lag}.y" for lag in range(1, self._lags + 1))
         self._lag_names = list(param_names)
+        if exog_names is None:
+            # Derived from the design so a raw-array caller gets names that match THEIR
+            # data.  The strength check (names against the fitted parameter count) is in
+            # `fit` and has always been there; repeating a weaker version here would let
+            # the two disagree about what "consistent" means.
+            # `_X_names()` prefixes "Intercept", so `exog_names` describes the design
+            # WITHOUT its first (constant) column -- that is the convention
+            # `from_formula` relies on and the one `fit` indexes positions against.
+            exog_names = tuple(
+                f"x{position + 1}" for position in range(max(self._X.shape[1] - 1, 0))
+            )
         self._exog_names = list(exog_names)
         self._system = bool(system)
         self._model_data = model_data

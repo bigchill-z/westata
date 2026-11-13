@@ -478,12 +478,18 @@ class OLS:
         if cov_type is None:
             effective_cov_type = "HC1" if (spec is not None and spec.implies_robust) else "nonrobust"
         else:
-            # Store the CANONICAL spelling, not the caller's alias: `cov_type="robust"` means HC1
-            # for `regress`, and the result should say so rather than echo a word that other
-            # command families map differently. The dispatch module owns the alias table.
+            # Store the CANONICAL spelling, not the caller's alias: `cov_type="robust"` means
+            # HC1 for `regress`, and the result should say so rather than echo a word that other
+            # command families map differently.
+            #
+            # `robust_as="HC1"` is REGRESS's own answer, declared here rather than in the
+            # shared alias table.  That table used to carry a global `"ROBUST": "HC1"`, which
+            # was right for this family and wrong for the other three (ivregress is HC0, the
+            # ML families use n/(n-1), xtreg means cluster) -- so every family had to override
+            # it and no single place could answer "what does robust mean here".
             from westata.vce.dispatch import _normalize_cov_type as _canonical
 
-            effective_cov_type = _canonical(str(cov_type))
+            effective_cov_type = _canonical(str(cov_type), robust_as="HC1")
             if (
                 spec is not None
                 and spec.implies_robust

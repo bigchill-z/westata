@@ -612,7 +612,7 @@ class StataResults:
 
         return estat_vce(self, correlation=correlation)
 
-    def estat_gof(self, **kwargs: Any) -> Any:
+    def estat_gof(self, *, y: Any = None, mu: Any = None, group: int | None = None) -> Any:
         """Stata's ``estat gof`` -- Poisson goodness-of-fit tests.
 
         Only defined for ``poisson``: Stata has no ``estat gof`` after ``nbreg``
@@ -622,9 +622,9 @@ class StataResults:
 
         from westata.postestimation.gof import estat_gof
 
-        return estat_gof(self, **kwargs)
+        return estat_gof(self, y=y, mu=mu, group=group)
 
-    def estat_vif(self, **kwargs: Any) -> Any:
+    def estat_vif(self, *, uncentered: bool = False, nosort: bool = False) -> Any:
         """Stata's ``estat vif`` -- variance inflation factors.
 
         Only defined for linear models: the auxiliary regressions are ordinary
@@ -634,9 +634,16 @@ class StataResults:
 
         from westata.postestimation.vif import estat_vif
 
-        return estat_vif(self, **kwargs)
+        return estat_vif(self, uncentered=uncentered, nosort=nosort)
 
-    def estat_hettest(self, **kwargs: Any) -> Any:
+    def estat_hettest(
+        self,
+        *,
+        method: str = 'normal',
+        variables: Sequence[str] | None = None,
+        rhs: bool = False,
+        mtest: str | None = None,
+    ) -> Any:
         """Stata's ``estat hettest`` -- Breusch-Pagan / Cook-Weisberg.
 
         With no ``variables`` the auxiliary regression is on the FITTED VALUES,
@@ -647,9 +654,14 @@ class StataResults:
 
         from westata.postestimation.hettest import estat_hettest
 
-        return estat_hettest(self, **kwargs)
+        return estat_hettest(self, method=method, variables=variables, rhs=rhs, mtest=mtest)
 
-    def suest(self, *others: Any, **kwargs: Any) -> Any:
+    def suest(
+        self,
+        *others: Any,
+        names: Sequence[str] | None = None,
+        cluster: Any = None,
+    ) -> Any:
         """Stata's ``suest`` -- stack this fit with others into one covariance.
 
         Combines the parameter vectors and forms the simultaneous sandwich covariance
@@ -659,7 +671,7 @@ class StataResults:
 
         from westata.postestimation.suest import suest
 
-        return suest((self,) + tuple(others), **kwargs)
+        return suest((self,) + tuple(others), names=names, cluster=cluster)
 
     def linktest(self) -> Any:
         """Stata's ``linktest`` -- Pregibon's link test for a specification error.
@@ -672,7 +684,7 @@ class StataResults:
 
         return linktest(self)
 
-    def estat_moran(self, *args: Any, **kwargs: Any) -> Any:
+    def estat_moran(self, errorlag: Any = None, *, weights: Any = None) -> Any:
         """Stata's ``estat moran`` -- Moran's test for spatial correlation in residuals.
 
         Requires a spatial weighting matrix.  This package has no ``spmatrix`` toolchain,
@@ -682,9 +694,15 @@ class StataResults:
 
         from westata.postestimation.moran import estat_moran
 
-        return estat_moran(self, *args, **kwargs)
+        return estat_moran(self, errorlag, weights=weights)
 
-    def estat_esize(self, **kwargs: Any) -> Any:
+    def estat_esize(
+        self,
+        *,
+        epsilon: bool = False,
+        omega: bool = False,
+        level: float = 0.95,
+    ) -> Any:
         """Stata's ``estat esize`` -- eta/epsilon/omega-squared effect sizes.
 
         ``regress_postestimation.sthlp:599-614`` restricts it to linear models; eta-squared
@@ -693,9 +711,15 @@ class StataResults:
 
         from westata.postestimation.esize import estat_esize
 
-        return estat_esize(self, **kwargs)
+        return estat_esize(self, epsilon=epsilon, omega=omega, level=level)
 
-    def estat_szroeter(self, *args: Any, **kwargs: Any) -> Any:
+    def estat_szroeter(
+        self,
+        variables: Sequence[str] | None = None,
+        *,
+        rhs: bool = False,
+        mtest: str | None = None,
+    ) -> Any:
         """Stata's ``estat szroeter`` -- Szroeter's rank test for heteroskedasticity.
 
         Refuses, like ``szroeter.ado:13-22``, after anything other than ``regress``, and
@@ -704,16 +728,16 @@ class StataResults:
 
         from westata.postestimation.szroeter import estat_szroeter
 
-        return estat_szroeter(self, *args, **kwargs)
+        return estat_szroeter(self, variables, rhs=rhs, mtest=mtest)
 
-    def estat_ovtest(self, **kwargs: Any) -> Any:
+    def estat_ovtest(self, *, rhs: bool = False) -> Any:
         """Stata's ``estat ovtest`` -- Ramsey RESET test for omitted variables."""
 
         from westata.postestimation.ovtest import estat_ovtest
 
-        return estat_ovtest(self, **kwargs)
+        return estat_ovtest(self, rhs=rhs)
 
-    def estat_ic(self, **kwargs: Any) -> Any:
+    def estat_ic(self, *, n: float | None = None, df: float | None = None) -> Any:
         """Stata's ``estat ic`` -- AIC, BIC, AICc and CAIC.
 
         ``df`` defaults to ``rank(V)``, matching ``estimates.ado:977-978``; ``N``
@@ -722,9 +746,9 @@ class StataResults:
 
         from westata.postestimation.ic import estat_ic
 
-        return estat_ic(self, **kwargs)
+        return estat_ic(self, n=n, df=df)
 
-    def estat_dwatson(self, **kwargs: Any) -> Any:
+    def estat_dwatson(self, *, time: str | Any | None = None, delta: float = 1.0) -> Any:
         """Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.
 
         ``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some
@@ -738,9 +762,16 @@ class StataResults:
 
         from westata.postestimation.serial import estat_dwatson
 
-        return estat_dwatson(self, **kwargs)
+        return estat_dwatson(self, time=time, delta=delta)
 
-    def estat_bgodfrey(self, **kwargs: Any) -> Any:
+    def estat_bgodfrey(
+        self,
+        *,
+        lags: int | Sequence[int] = 1,
+        nomiss0: bool = False,
+        time: str | Sequence[Any] | None = None,
+        delta: float = 1.0,
+    ) -> Any:
         """Stata's ``estat bgodfrey`` -- the Breusch-Godfrey LM test for autocorrelation.
 
         The implementation has existed in ``westata.postestimation.bgodfrey`` since round 191
@@ -752,9 +783,15 @@ class StataResults:
 
         from westata.postestimation.bgodfrey import estat_bgodfrey
 
-        return estat_bgodfrey(self, **kwargs)
+        return estat_bgodfrey(self, lags=lags, nomiss0=nomiss0, time=time, delta=delta)
 
-    def estat_corrgram(self, **kwargs: Any) -> Any:
+    def estat_corrgram(
+        self,
+        *,
+        lags: int | None = None,
+        time: str | Any | None = None,
+        delta: float = 1.0,
+    ) -> Any:
         """Stata's ``corrgram`` -- autocorrelations, partial autocorrelations and Q.
 
         Stata spells it ``corrgram`` rather than ``estat corrgram``; the method name follows
@@ -764,16 +801,22 @@ class StataResults:
 
         from westata.postestimation.serial import estat_corrgram
 
-        return estat_corrgram(self, **kwargs)
+        return estat_corrgram(self, lags=lags, time=time, delta=delta)
 
-    def wntestq(self, **kwargs: Any) -> Any:
+    def wntestq(
+        self,
+        *,
+        lags: int | None = None,
+        time: str | Any | None = None,
+        delta: float = 1.0,
+    ) -> Any:
         """Stata's ``wntestq`` -- the Ljung-Box portmanteau Q for white noise."""
 
         from westata.postestimation.serial import wntestq
 
-        return wntestq(self, **kwargs)
+        return wntestq(self, lags=lags, time=time, delta=delta)
 
-    def estat_firststage(self, **kwargs: Any) -> Any:
+    def estat_firststage(self, *, all: bool = False, forcenonrobust: bool = False) -> Any:
         """Stata's ``estat firststage`` -- IV first-stage diagnostics.
 
         Reports each endogenous regressor's first-stage R-squared, adjusted
@@ -784,7 +827,7 @@ class StataResults:
 
         from westata.postestimation.firststage import estat_firststage
 
-        return estat_firststage(self, **kwargs)
+        return estat_firststage(self, all=all, forcenonrobust=forcenonrobust)
 
     def first_stage(self) -> str:
         """Stata's ``ivregress ..., first`` -- the first-stage regression table.
@@ -803,7 +846,7 @@ class StataResults:
 
         return render_first_stage(self)
 
-    def estat_overid(self, **kwargs: Any) -> Any:
+    def estat_overid(self, *, lags: int | None = None, forcenonrobust: bool = False) -> Any:
         """Stata's ``estat overid`` -- overidentification restrictions test.
 
         Reports Sargan (with Basmann's finite-sample variant) for 2SLS/LIML and
@@ -812,9 +855,15 @@ class StataResults:
 
         from westata.postestimation.overid import estat_overid
 
-        return estat_overid(self, **kwargs)
+        return estat_overid(self, lags=lags, forcenonrobust=forcenonrobust)
 
-    def estat_mundlak(self, **kwargs: Any) -> Any:
+    def estat_mundlak(
+        self,
+        *,
+        storer: Any = None,
+        entity: str | None = None,
+        time: str | None = None,
+    ) -> Any:
         """Stata's ``estat mundlak`` -- the Mundlak panel specification test.
 
         Adds the within-group means of the regressors to the random-effects equation and
@@ -825,9 +874,15 @@ class StataResults:
 
         from westata.postestimation.mundlak import estat_mundlak
 
-        return estat_mundlak(self, **kwargs)
+        return estat_mundlak(self, storer=storer, entity=entity, time=time)
 
-    def estat_weakrobust(self, **kwargs: Any) -> Any:
+    def estat_weakrobust(
+        self,
+        *,
+        ar: bool | None = None,
+        clr: bool | None = None,
+        betanull: Any = None,
+    ) -> Any:
         """Stata's ``estat weakrobust`` -- inference robust to weak instruments.
 
         Reports the Anderson-Rubin test, whose distribution does not depend on instrument
@@ -838,21 +893,38 @@ class StataResults:
 
         from westata.postestimation.weakrobust import estat_weakrobust
 
-        return estat_weakrobust(self, **kwargs)
+        return estat_weakrobust(self, ar=ar, clr=clr, betanull=betanull)
 
-    def estat_endogenous(self, **kwargs: Any) -> Any:
+    def estat_endogenous(self, *, lags: int | None = None) -> Any:
         """Stata's ``estat endogenous`` -- Durbin-Wu endogeneity test."""
 
         from westata.postestimation.endogenous import estat_endogenous
 
-        return estat_endogenous(self, **kwargs)
+        return estat_endogenous(self, lags=lags)
 
-    def estat_classification(self, **kwargs: Any) -> Any:
+    def estat_classification(
+        self,
+        *,
+        cutoff: float = 0.5,
+        y: Any = None,
+        probabilities: Any = None,
+    ) -> Any:
         """Stata's ``estat classification`` -- the 2x2 classification table."""
 
         from westata.postestimation.classification import estat_classification
 
-        return estat_classification(self, **kwargs)
+        return estat_classification(self, cutoff=cutoff, y=y, probabilities=probabilities)
+
+    def estat_ptrends(self) -> dict[str, float]:
+        """Stata's ``estat ptrends`` -- the parallel-trends test for DiD.
+
+        Only defined after ``didregress``/``xtdidregress``; see
+        :func:`westata.estimators.did.estat_ptrends`.
+        """
+
+        from westata.estimators.did import estat_ptrends
+
+        return estat_ptrends(self)
 
     def estat_auc(self) -> Any:
         """Stata's ``estat auc`` -- the area under the ROC curve.
@@ -864,19 +936,31 @@ class StataResults:
 
         return estat_auc(self)
 
-    def estat_imtest(self, **kwargs: Any) -> Any:
+    def estat_imtest(self, *, white: bool = False, design: Any = None) -> Any:
         """Stata's ``estat imtest`` -- Cameron & Trivedi's IM-test."""
 
         from westata.postestimation.imtest import estat_imtest
 
-        return estat_imtest(self, **kwargs)
+        return estat_imtest(self, white=white, design=design)
 
-    def estat_summarize(self, **kwargs: Any) -> Any:
+    def estat_summarize(
+        self,
+        *,
+        data: pd.DataFrame | None = None,
+        variables: Sequence[str] | None = None,
+        weights: Any = None,
+        weight_type: str | None = None,
+        cluster: Any = None,
+        cluster_name: str = '',
+        noweights: bool = False,
+        noheader: bool = False,
+        labels: Mapping[str, str] | None = None,
+    ) -> Any:
         """Stata's ``estat summarize`` -- describe the estimation sample."""
 
         from westata.postestimation.summarize import estat_summarize
 
-        return estat_summarize(self, **kwargs)
+        return estat_summarize(self, data=data, variables=variables, weights=weights, weight_type=weight_type, cluster=cluster, cluster_name=cluster_name, noweights=noweights, noheader=noheader, labels=labels)
 
     @property
     def level(self) -> float:
@@ -1006,6 +1090,24 @@ class StataResults:
     @property
     def cov_type(self) -> str:
         return self._cov_type
+
+    def relabel_cov_type(self, cov_type: str) -> None:
+        """Record the covariance type actually used, after replacing the matrix.
+
+        Needed by estimators that fit with a PLACEHOLDER covariance and then rebuild
+        the real one once more information is available: ``Areg`` fits with HC1 to get
+        the estimates, then builds the leverage-based HC2/HC3 matrix on the full dummy
+        design.  Before this method existed the placeholder label survived, so
+        ``Areg(...).fit(cov_type="HC2").cov_type`` reported ``"HC1"`` while the numbers
+        were genuinely HC2 (measured: HC2 bse 0.069765 vs HC1 0.069568) -- a caller
+        labelling a table from ``.cov_type`` would have printed the wrong VCE name.
+
+        Deliberately a named method rather than a settable property: relabelling must
+        be an explicit act of the code that replaced the matrix, not something a caller
+        can do to a finished result.
+        """
+
+        self._cov_type = str(cov_type)
 
     # ------------------------------------------------------------------
     # Stata e() scalars
@@ -1206,7 +1308,7 @@ class StataResults:
     # ------------------------------------------------------------------
     # Postestimation
     # ------------------------------------------------------------------
-    def test(self, *specs: Any, **kwargs: Any) -> Any:
+    def test(self, *specs: Any, coef: bool = False) -> Any:
         """Wald test of linear hypotheses (Stata ``test``).
 
         See :meth:`westata.postestimation.tests.run_wald_test`; this thin
@@ -1216,14 +1318,14 @@ class StataResults:
 
         from westata.postestimation.api import test_as_stata
 
-        return test_as_stata(self, *specs, **kwargs)
+        return test_as_stata(self, *specs, coef=coef)
 
-    def lincom(self, expression: str, **kwargs: Any) -> Any:
+    def lincom(self, expression: str, *, level: float = 0.95, eform: bool = False) -> Any:
         """Linear combination of parameters (Stata ``lincom``)."""
 
         from westata.postestimation.api import lincom_as_stata
 
-        return lincom_as_stata(self, expression, **kwargs)
+        return lincom_as_stata(self, expression, level=level, eform=eform)
 
     def lrtest(self, restricted: Any) -> Any:
         """Likelihood-ratio test against a nested model (Stata `lrtest`)."""
@@ -1232,7 +1334,14 @@ class StataResults:
 
         return lrtest(self, restricted)
 
-    def hausman(self, efficient: Any, **kwargs: Any) -> Any:
+    def hausman(
+        self,
+        efficient: Any,
+        *,
+        constant: bool = False,
+        sigmamore: bool = False,
+        sigmaless: bool = False,
+    ) -> Any:
         """Hausman specification test (Stata `hausman`).
 
         Keyword arguments are forwarded to
@@ -1243,28 +1352,35 @@ class StataResults:
 
         from westata.postestimation.modeltests import hausman
 
-        return hausman(self, efficient, **kwargs)
+        return hausman(self, efficient, constant=constant, sigmamore=sigmamore, sigmaless=sigmaless)
 
-    def contrast(self, term: str, method: str = "r", **kwargs: Any) -> Any:
+    def contrast(
+        self,
+        term: str,
+        method: str = 'r',
+        *,
+        level: float = 0.95,
+        nowald: bool = False,
+    ) -> Any:
         """ANOVA-style contrast of a factor's levels (Stata `contrast`)."""
 
         from westata.postestimation.contrast import contrast
 
-        return contrast(self, term, method, **kwargs)
+        return contrast(self, term, method, level=level, nowald=nowald)
 
-    def pwcompare(self, term: str, **kwargs: Any) -> Any:
+    def pwcompare(self, term: str, *, level: float = 0.95, adjust: str | None = None) -> Any:
         """All pairwise level differences (Stata `pwcompare`)."""
 
         from westata.postestimation.contrast import pwcompare
 
-        return pwcompare(self, term, **kwargs)
+        return pwcompare(self, term, level=level, adjust=adjust)
 
-    def nlcom(self, expression: str, **kwargs: Any) -> Any:
+    def nlcom(self, expression: str, *, level: float = 0.95, eform: bool = False) -> Any:
         """Nonlinear combination of parameters (Stata `nlcom`)."""
 
         from westata.postestimation.nonlinear import nlcom
 
-        return nlcom(self, expression, **kwargs)
+        return nlcom(self, expression, level=level, eform=eform)
 
     def testnl(self, expression: str) -> Any:
         """Nonlinear Wald test (Stata `testnl`)."""
@@ -1273,7 +1389,23 @@ class StataResults:
 
         return testnl(self, expression)
 
-    def margins(self, **kwargs: Any) -> Any:
+    def margins(
+        self,
+        *,
+        dydx: Sequence[str] | str | None = None,
+        eyex: Sequence[str] | str | None = None,
+        dyex: Sequence[str] | str | None = None,
+        eydx: Sequence[str] | str | None = None,
+        at: Mapping[str, Any] | None = None,
+        atmeans: bool = False,
+        over: str | None = None,
+        exog: np.ndarray | None = None,
+        param_names: Sequence[str] | None = None,
+        level: float = 0.95,
+        predict_kind: str | None = None,
+        factor_vars: Sequence[str] | None = None,
+        outcome: int | None = None,
+    ) -> Any:
         """Marginal effects or predictive margins (Stata ``margins``).
 
         The design matrix is taken from :attr:`design_matrix` when the
@@ -1282,9 +1414,18 @@ class StataResults:
 
         from westata.postestimation.margins import margins
 
-        return margins(self, **kwargs)
+        return margins(self, dydx=dydx, eyex=eyex, dyex=dyex, eydx=eydx, at=at, atmeans=atmeans, over=over, exog=exog, param_names=param_names, level=level, predict_kind=predict_kind, factor_vars=factor_vars, outcome=outcome)
 
-    def predict(self, exog: Any = None, kind: str | None = None, **kwargs: Any) -> Any:
+    def predict(
+        self,
+        exog: np.ndarray | None = None,
+        kind: str | None = None,
+        *,
+        lower: float | None = None,
+        upper: float | None = None,
+        outcome: int | None = None,
+        n: int | float | None = None,
+    ) -> Any:
         """Typed prediction (Stata ``predict, <type>``).
 
         Parameters
@@ -1354,13 +1495,13 @@ class StataResults:
                         # is what Stata's ``predict`` does. Without collapsing, a 24-row
                         # titanic fit returned 2201 values (v2 report, section 5.2).
                         _starts = np.concatenate(([0], np.cumsum(_repeats)[:-1]))
-                        _values = np.asarray(predict(self, exog, kind, **kwargs))
+                        _values = np.asarray(predict(self, exog, kind, lower=lower, upper=upper, outcome=outcome, n=n))
                         if _values.ndim == 1:
                             return _values[_starts]
                         return _values[_starts]
         else:
             exog = self._as_design_for_predict(exog)
-        return predict(self, exog, kind, **kwargs)
+        return predict(self, exog, kind, lower=lower, upper=upper, outcome=outcome, n=n)
 
     def _as_design_for_predict(self, exog: Any) -> Any:
         """Turn a caller-supplied ``exog`` into a design matrix, or explain why not.

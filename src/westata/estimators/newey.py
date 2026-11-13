@@ -127,6 +127,56 @@ class NeweyWestResult:
     def __getattr__(self, name: str) -> Any:
         return getattr(self._results, name)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Flat ``{name: value}`` of ``newey``'s scalars (R4.1).
+
+        ``StataResults`` deliberately does not offer ``to_dict`` (R4.1's
+        ``protocol_implementors`` exemption: an estimation result implements the
+        statsmodels surface instead), so this builds the dict from that surface rather
+        than forwarding a method the wrapped object does not have.  ``lag`` is added
+        because it is the one quantity ``newey`` reports that ``regress`` does not.
+        """
+
+        wrapped = self._results
+        payload: dict[str, Any] = {
+            "nobs": int(wrapped.nobs),
+            "df_resid": float(wrapped.df_resid),
+            "df_model": float(wrapped.df_model),
+            "cov_type": str(wrapped.cov_type),
+            "lag": int(self.lag),
+        }
+        for name in ("llf", "rsquared", "rsquared_adj", "fvalue"):
+            value = getattr(wrapped, name, None)
+            # ``newey`` stores no ``e(ll)`` and no ``e(r2)`` -- Stata's ``newey`` does
+            # not report either -- so the property returns NaN.  Emitting NaN here
+            # would look like a measured value that came out missing; omitting the key
+            # says the quantity does not exist for this command.
+            if value is None or (isinstance(value, float) and np.isnan(value)):
+                continue
+            payload[name] = float(value)
+        # ``e()`` carries the Stata scalars (``e(rss)``, ``e(rmse)``, ``e(F)``...) and
+        # is what a reader of the Stata table would look up.
+        for name, value in dict(getattr(wrapped, "e", {}) or {}).items():
+            if isinstance(value, (int, float)) and name not in payload:
+                payload[str(name)] = float(value)
+        return payload
+
+    def to_frame(self) -> Any:
+        """One row per coefficient, in Stata's column order (R4.1)."""
+
+        import pandas as pd
+
+        wrapped = self._results
+        return pd.DataFrame(
+            {
+                "params": np.asarray(wrapped.params, dtype=float),
+                "bse": np.asarray(wrapped.bse, dtype=float),
+                "tvalues": np.asarray(wrapped.tvalues, dtype=float),
+                "pvalues": np.asarray(wrapped.pvalues, dtype=float),
+            },
+            index=list(wrapped.param_names),
+        )
+
     def predict(self, exog: Any = None, kind: str = "xb", **kwargs: Any) -> Any:
         """``predict`` with ``newey_p``'s type list (``newey_p.ado:20``).
 

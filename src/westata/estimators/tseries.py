@@ -49,6 +49,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.results.base import StataResults
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = [
     "ARIMA",
@@ -793,6 +794,43 @@ class VARResults:
             index=self.stata_param_names,
             name="bse",
         )
+
+    @property
+    def df_resid(self) -> float:
+        """Residual degrees of freedom: ``T - k_eq`` per equation."""
+
+        return float(self._result.nobs - self.k_per_equation)
+
+    @property
+    def df_model(self) -> float:
+        """Model degrees of freedom: the regressors in one equation."""
+
+        return float(self.k_per_equation)
+
+    @property
+    def llf(self) -> float:
+        """Log-likelihood of the fitted VAR (statsmodels' Gaussian ``llf``)."""
+
+        return float(self._result.llf)
+
+    @property
+    def rsquared(self) -> float:
+        """R-squared: NOT A SINGLE NUMBER for a VAR.
+
+        statsmodels' VAR result exposes none, because a multi-equation model has one
+        R-squared per equation; Stata's ``var`` likewise reports ``e(r2)`` per equation
+        rather than a scalar, and prints ``R-sq`` in each equation's block.  A scalar
+        here would have to pick an equation or average them, and both are inventions.
+        The per-equation values remain reachable through ``e()``.
+        """
+
+        return float("nan")
+
+    @property
+    def rsquared_adj(self) -> float:
+        """Adjusted R-squared: not a single number for a VAR (see ``rsquared``)."""
+
+        return float("nan")
 
     @property
     def stata_param_names(self) -> list[str]:
@@ -2582,7 +2620,7 @@ class VECM:
             },
         )
 
-    def fit(self, cov_type: str | None = None, **_: Any) -> Any:
+    def fit(self, cov_type: str | None = None) -> Any:
         """Fit the VECM (Stata ``vec``).
 
         Two conventions differ from statsmodels and both are applied here:
@@ -2597,6 +2635,10 @@ class VECM:
 
         The reported drift still differs from Stata's printed ``_cons`` (see the registry
         entry); alpha and its standard errors are the comparable quantities.
+
+        This used to end in ``**_``, so ``fit(maxiter=50)`` or ``fit(bogus=1)`` was
+        accepted and silently dropped (R2.6).  Unknown options now raise ``TypeError``,
+        which is what a caller needs: a typo must not look like a successful fit.
         """
 
         from statsmodels.tsa.vector_ar.vecm import VECM as _SMVECM
@@ -2838,7 +2880,39 @@ class VECMResults:
         return values * float(np.sqrt(self._stata_variance_scale()))
 
     def conf_int(self, alpha: float = 0.05) -> np.ndarray:
-        return np.asarray(self.raw.conf_int(alpha=alpha), dtype=float)
+        """Confidence intervals for the VECM coefficients, stacked like ``params``.
+
+        statsmodels' VECM result exposes NO single ``conf_int()``: the intervals are
+        per block (``conf_int_alpha``, ``conf_int_beta``, ``conf_int_gamma``,
+        ``conf_int_det_coef``).  This method called ``self.raw.conf_int()``, which does
+        not exist, so every call raised ``AttributeError`` -- the wrapper advertised a
+        surface it never provided (R1.5).
+
+        The blocks are stacked in the same order ``params`` uses, so row *i* of the
+        return value belongs to row *i* of ``params``.  Each row is
+        ``[lower, upper]``, matching the statsmodels convention the rest of the package
+        follows.
+        """
+
+        blocks = []
+        for name in ("conf_int_alpha", "conf_int_beta", "conf_int_gamma", "conf_int_det_coef"):
+            accessor = getattr(self.raw, name, None)
+            if accessor is None:
+                continue
+            # statsmodels returns a STRUCTURED array with `lower`/`upper` fields,
+            # not an (n, 2) float matrix, so it has to be unpacked by field name.
+            structured = np.asarray(accessor(alpha=alpha))
+            if structured.dtype.names and {"lower", "upper"} <= set(structured.dtype.names):
+                block = np.column_stack(
+                    [structured["lower"].ravel(), structured["upper"].ravel()]
+                )
+            else:
+                block = np.asarray(structured, dtype=float).reshape(-1, 2)
+            if block.size:
+                blocks.append(block)
+        if not blocks:
+            return np.empty((0, 2), dtype=float)
+        return np.vstack(blocks)
 
     def llf(self) -> float:
         return float(self.raw.llf)
@@ -4153,7 +4227,7 @@ def _dfuller_header(
 
 
 @dataclass
-class UnitRootResult:
+class UnitRootResult(ResultSerialisation):
     """One unit-root test outcome, shaped like Stata's test output."""
 
     test: str

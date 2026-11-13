@@ -104,6 +104,8 @@ from scipy import optimize, special, stats
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import numerical_hessian
+from westata.postestimation.names import CONSTANT_SPELLINGS
 
 __all__ = ["XtLogit", "XtNbreg", "XtPoisson", "XtProbit", "XtTobit"]
 
@@ -114,7 +116,7 @@ _ETA_CLIP = 700.0
 #: Tolerance for "this outcome is at the censoring limit".
 _LIMIT_TOL = 1e-8
 
-_CONSTANT_NAMES = frozenset({"intercept", "const", "_cons", "1"})
+
 
 
 # --------------------------------------------------------------------- helpers
@@ -180,7 +182,7 @@ def _constant_position(names: Sequence[str]) -> int | None:
     """Index of a patsy intercept column, or ``None`` when the model has none."""
 
     for position, name in enumerate(names):
-        if str(name).strip().lower() in _CONSTANT_NAMES:
+        if str(name).strip().lower() in CONSTANT_SPELLINGS:
             return position
     return None
 
@@ -188,34 +190,9 @@ def _constant_position(names: Sequence[str]) -> int | None:
 def _numerical_hessian(
     objective: Callable[[np.ndarray], float], point: np.ndarray, step: float = 1e-5
 ) -> np.ndarray:
-    """Central-difference Hessian with a step scaled to each coordinate."""
+    """Delegate to the shared rule (R6.1); see least_squares.numerical_hessian."""
 
-    point = np.asarray(point, dtype=float)
-    size = point.size
-    hessian = np.zeros((size, size))
-    increments = step * np.maximum(np.abs(point), 1.0)
-    center = objective(point)
-
-    for i in range(size):
-        ei = np.zeros(size)
-        ei[i] = increments[i]
-        for j in range(i, size):
-            ej = np.zeros(size)
-            ej[j] = increments[j]
-            if i == j:
-                value = (
-                    objective(point + ei) - 2 * center + objective(point - ei)
-                ) / increments[i] ** 2
-            else:
-                value = (
-                    objective(point + ei + ej)
-                    - objective(point + ei - ej)
-                    - objective(point - ei + ej)
-                    + objective(point - ei - ej)
-                ) / (4 * increments[i] * increments[j])
-            hessian[i, j] = value
-            hessian[j, i] = value
-    return hessian
+    return numerical_hessian(objective, point, step=step)
 
 
 def _covariance(
@@ -2123,7 +2100,7 @@ class XtNbreg(_PanelBase):
         rows = np.sort(np.concatenate(groups))
         slope_positions = [
             i for i, name in enumerate(names)
-            if str(name).strip().lower() not in _CONSTANT_NAMES
+            if str(name).strip().lower() not in CONSTANT_SPELLINGS
         ]
         statistic, p_value = self._wald(beta, covariance, slope_positions)
         extra: dict[str, Any] = {

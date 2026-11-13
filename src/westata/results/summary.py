@@ -28,6 +28,25 @@ __all__ = ["render_summary"]
 
 _VALID_STYLES = ("statsmodels", "stata")
 
+#: ``cov_type`` values that make Stata report a *pseudo*likelihood rather than a
+#: likelihood (``logit y x, r`` prints "Log pseudolikelihood").
+#:
+#: One constant, because the same membership test had been written out twice (once for
+#: the iteration trace, once for the header block) and the two drifted: adding
+#: ``ML_ROBUST`` -- the label R3.7.2 now stores for ``cov_type="robust"`` on the ML
+#: families -- to only one of them silently reverted the header to "Log likelihood".
+_PSEUDO_LIKELIHOOD_COV_TYPES = frozenset(
+    {
+        "robust",
+        "hc0",
+        "hc1",
+        "cluster",
+        "ml_robust",  # R3.7.2 label for the ML families' Stata vce(robust)
+        "qreg_robust",
+        "systems_robust",
+    }
+)
+
 
 def _ci_label(level: float | None) -> str:
     """Stata's confidence-interval header, sized to the level actually used.
@@ -125,7 +144,67 @@ def _cell(value: float, width: int, digits: int = 7) -> str:
     return f"{_num(value, digits):>{width}}"
 
 
-def _stata_number(value: float, width: int = 9) -> str:
+def stata_number(
+    value: float,
+    width: int = 9,
+    *,
+    precision_cap: int | None = None,
+    fixed_fallback: bool = True,
+    pad_exponent: bool = True,
+) -> str:
+    """Stata's ``%{width}.0g`` -- THE one implementation (R6.1).
+
+    This was called ``_stata_number`` and had four near-copies across the package
+    (``summary.py``, ``summary_stats.py``, ``vecstable.py``, ``first_stage_table.py``),
+    each re-deriving a rule that had already been measured against a live
+    ``display %9.0g``.  Two of the four were subtly different (fixed significant-digit
+    counts instead of the widest-that-fits rule), so the same number could print two
+    ways depending on which table drew it.
+
+    ``precision_cap`` bounds the significant digits; ``vecstable`` needs six for its
+    eigenvalue display, while every other table wants the width to decide.
+    """
+
+    return _stata_number(
+        value,
+        width,
+        precision_cap=precision_cap,
+        fixed_fallback=fixed_fallback,
+        pad_exponent=pad_exponent,
+    )
+
+
+def _two_place_exponent(text: str) -> str:
+    """Give a scientific-notation string TWO mantissa digits, as Stata prints it.
+
+    Measured on `summarize` of a column whose values are tiny:
+
+        3.33e-13    1.00e-12    -1.87e-09
+
+    never a bare `1e-12`. An exact zero is left alone -- Stata prints `0` there, measured separately.
+    """
+
+    if "e" not in text and "E" not in text:
+        return text
+    mantissa, _, exponent = text.partition("e")
+    if not exponent:
+        mantissa, _, exponent = text.partition("E")
+    sign = ""
+    if mantissa.startswith("-"):
+        sign, mantissa = "-", mantissa[1:]
+    whole, _, fraction = mantissa.partition(".")
+    fraction = (fraction + "00")[:2]
+    return f"{sign}{whole}.{fraction}e{exponent}"
+
+
+def _stata_number(
+    value: float,
+    width: int = 9,
+    *,
+    precision_cap: int | None = None,
+    fixed_fallback: bool = True,
+    pad_exponent: bool = True,
+) -> str:
     """Stata's ``%9.0g``: the widest representation that fits, no leading zero.
 
     This is NOT ``%.7g``. Stata picks the precision that fills the field, so the number
@@ -148,7 +227,8 @@ def _stata_number(value: float, width: int = 9) -> str:
         return f"{'.':>{width}}"
 
     text = ""
-    for precision in range(width, 0, -1):
+    top = width if precision_cap is None else min(width, precision_cap)
+    for precision in range(top, 0, -1):
         text = f"%.{precision}g" % value
         # Stata never prints a leading zero: ``.5``, not ``0.5``.
         if text.startswith("0."):
@@ -165,7 +245,7 @@ def _stata_number(value: float, width: int = 9) -> str:
         # that fits the field: for 2.486e-05 that is 7 places -> .0000249 (eight chars),
         # which is exactly Stata's value. Formatting at full precision (.12f) would give
         # .000024861206 -- thirteen chars, too wide, and therefore rejected.
-        if "e" in body:
+        if fixed_fallback and "e" in body:
             best = ""
             for decimals in range(1, 20):
                 fixed = f"{value:.{decimals}f}".rstrip("0").rstrip(".")
@@ -184,6 +264,13 @@ def _stata_number(value: float, width: int = 9) -> str:
             if best:
                 text = best
                 body = best[1:] if best.startswith("-") else best
+        if pad_exponent and "e" in body:
+            # THE EXPONENT IS PADDED BEFORE THE WIDTH TEST.  `%.3g` of 1e-12 is
+            # "1e-12" -- five characters of body -- so it would fit the field and be
+            # returned unpadded, while Stata prints "1.00e-12".  Padding first means the
+            # width check sees what will actually be printed.
+            text = _two_place_exponent(text)
+            body = text[1:] if text.startswith("-") else text
         if len(body) <= width - 1:
             break
     return f"{text:>{width}}"
@@ -906,7 +993,7 @@ def _ml_iteration_head(result: Any) -> list[str]:
     # precision it uses for the banner -- four decimals here (`-1384.7284`), not the five this
     # function used to emit (`-1384.72836`). Both are taken from the result rather than fixed.
     _vce = str(getattr(result, "cov_type", "") or "").lower()
-    _pseudo = _vce in ("robust", "hc0", "hc1", "cluster")
+    _pseudo = _vce in _PSEUDO_LIKELIHOOD_COV_TYPES
     try:
         _digits = 4
         label = "Log pseudolikelihood" if _pseudo else "Log likelihood"
@@ -3074,7 +3161,7 @@ def _stata_summary(result: Any) -> str:
             # prints `Log likelihood = ...`. The same swap appears in the iteration trace. Stata's
             # rule is that a robust/cluster VCE makes the reported value a pseudo-likelihood.
             _vce = str(getattr(result, "cov_type", "") or "").lower()
-            _pseudo = _vce in ("robust", "hc0", "hc1", "cluster")
+            _pseudo = _vce in _PSEUDO_LIKELIHOOD_COV_TYPES
             ml_left.append(
                 ("Log pseudolikelihood = " if _pseudo else "Log likelihood = ")
                 + (("%%.%dg" % _ll_digits) % ll)

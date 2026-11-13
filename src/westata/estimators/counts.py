@@ -67,7 +67,7 @@ Stata reporting notes
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -755,6 +755,9 @@ class _CountBase(_DiscreteBase):
     _last_params: np.ndarray | None = None
 
 
+_ZeroInflatedBaseT = TypeVar("_ZeroInflatedBaseT", bound="_ZeroInflatedBase")
+
+
 class _ZeroInflatedBase(_CountBase):
     """Shared ``from_formula`` handling for the two zero-inflated models."""
 
@@ -787,7 +790,7 @@ class _ZeroInflatedBase(_CountBase):
         inflate: str | None = None,
         subset: Any = None,
         freq_weights: str | None = None,
-    ) -> "_ZeroInflatedBase":
+    ) -> "_ZeroInflatedBaseT":
         """Build the model from a formula (Stata ``zip y x, inflate(z)``).
 
         ``inflate=None`` leaves the mixture switched off entirely, which is the
@@ -933,6 +936,9 @@ class ZeroInflatedNegativeBinomial(_ZeroInflatedBase):
     _two_equation_p = True
 
 
+_TruncatedBaseT = TypeVar("_TruncatedBaseT", bound="_TruncatedBase")
+
+
 class _TruncatedBase(_CountBase):
     """Shared truncation bookkeeping for ``ztp``/``tpoisson``/``tnbreg``."""
 
@@ -996,7 +1002,7 @@ class _TruncatedBase(_CountBase):
         lower: float | None = 1,
         upper: float | None = None,
         subset: Any = None,
-    ) -> "_TruncatedBase":
+    ) -> "_TruncatedBaseT":
         """Build from a formula (Stata ``ztp y x``, ``tpoisson y x, ll(1)``).
 
         This mirrors :meth:`westata.estimators.discrete._DiscreteBase.from_formula`

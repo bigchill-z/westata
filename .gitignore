@@ -45,3 +45,6 @@ p11_msg.txt
 
 # retest intermediate output: regenerated on every run, different bytes each time.
 retest/domains/*/_tmp/
+
+# Local CI environment directory (not part of the source tree)
+_ci_env/

@@ -2,6 +2,54 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之五、2026-11-13 `cov_type` 规范化：三项全部完成
+
+用户目标（原文）：
+
+> 我希望以后 westata 使用 cov_type 也像 Stata 一样只需要设置 robust 就行。
+
+用户对决策 C 的选择（原文）：
+
+> C. 取消 vce/dispatch.py:48 的全局 "ROBUST": "HC1"
+
+**三项已全部实施完毕（2026-11-13）**，实测 12 个估计族的 `cov_type="robust"`
+全部可用，回显规范值：
+
+| 族 | robust 可用 | 回显 |
+|---|---|---|
+| `OLS` / `FEOLS` / `Areg` | ✅ | `HC1` |
+| `IV2SLS` / `IVLIML` / `IVGMM` | ✅ | `HC0` |
+| `Logit`/`Probit`/`Poisson`/`ologit` | ✅ | `ML_ROBUST` |
+| `PanelOLS` / `RandomEffects` | ✅ | `cluster` |
+| `QuantileRegression` | ✅ | `QREG_ROBUST` |
+| `Sureg` | ✅ | `SYSTEMS_ROBUST` |
+
+已修的具体缺陷：
+
+1. **决策 C（用户选①）**：取消 `vce/dispatch.py` 的全局 `"ROBUST": "HC1"`。
+   `_normalize_cov_type("robust")` 现在**抛错**并说明原因；各族通过
+   `robust_as=` 或自己的 `_COV_ALIASES` 声明含义。族表
+   `ROBUST_AS = {"regress": "HC1", "ivregress": "HC0", "xtreg": "cluster"}`
+   显式列出；`ml` 故意不在表内（ML 三明治需信息矩阵，`compute_cov` 做不出来）。
+   新增估计族若忘记声明会立刻报错，而不是静默拿到 HC1。
+2. **决策 A**：新增 `ML_ROBUST` / `QREG_ROBUST` / `SYSTEMS_ROBUST` 三个规范值。
+3. **决策 B**：`PanelOLS` 族的 `robust`/`HC1` 回显 `cluster`。
+4. `FEOLS`/`Areg` 原先**拒绝** `robust` 并要求写 `HC1` → 现在接受，`bse` 与 `HC1`
+   逐位相同（`reghdfe, robust` 本来就是 HC1）。
+5. `Areg` 报错文案写死 `FEOLS` → 现在按 `type(self).__name__` 点名。
+6. `Areg(cov_type="HC2"/"HC3")` 的 `results.cov_type` 停留在占位值 `HC1` →
+   新增 `StataResults.relabel_cov_type`，现在正确显示 `HC2`/`HC3`。
+7. `RobustRegression` **静默吞掉**任何 `cov_type`（`bse` 逐位不变）→ 现在明确拒绝，
+   并说明「Stata 的 `rreg` 没有 `vce()`」。
+8. `Logit` 等 ML 族的 `cov_type="robust"` 曾被 `summary()` 判为「非伪似然」
+   → 抽出 `_PSEUDO_LIKELIHOOD_COV_TYPES` 常量并纳入新标签。
+9. 改标签后**五个后估计模块的字符串判断全部失效**（`estat hettest` 会不再拒绝
+   robust 拟合，打印 Stata 不给的检验）→ 抽出
+   `postestimation/vce_labels.py`（`is_robust`/`is_hac`/`is_clustered`），
+   配 `tests/test_cov_type_labels.py` 31 个用例钉住。
+
+**本文件当前无待用户决策事项。**
+
 ## 〇之四、2026-11-12 0.3.7 发布：已完成（GitHub + PyPI）
 
 | 事项 | 结果 |

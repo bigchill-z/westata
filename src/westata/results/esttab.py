@@ -40,6 +40,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 import numpy as np
+from westata.results.stars import stars
 
 __all__ = ["render_esttab", "etable_as_stata"]
 
@@ -50,17 +51,9 @@ _NAME_WIDTH = 12
 
 
 def _stars(pvalue: float) -> str:
-    """esttab's default: * 5%, ** 1%, *** 0.1%."""
+    """esttab/etable default stars; delegate to results.stars (R6.1)."""
 
-    if not np.isfinite(pvalue):
-        return ""
-    if pvalue < 0.001:
-        return "***"
-    if pvalue < 0.01:
-        return "**"
-    if pvalue < 0.05:
-        return "*"
-    return ""
+    return stars(pvalue)
 
 
 def _cell(text: str, end: int, pieces: list[str]) -> None:

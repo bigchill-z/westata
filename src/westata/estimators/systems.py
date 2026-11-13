@@ -66,6 +66,8 @@ from scipy import stats
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.results.serialisation import ResultSerialisation
+from westata.estimators.least_squares import slope_positions
 
 __all__ = ["Eivreg", "Manova", "ManovaResult", "Mvreg", "Sureg"]
 
@@ -321,6 +323,10 @@ def _resolve_cov_type(
     if key in ("robust", "hc0") and command == "sureg":
         # `reg3.ado` delegates this to `_reg3robust`, whose sandwich is implemented here. The other commands
         # in this file have no such path verified against Stata and stay rejected.
+        #
+        # This stays the INTERNAL marker "robust" because the estimator branches on it
+        # (``if resolved == "robust"``).  The label shown to callers is produced by
+        # ``_cov_type_label`` at the point the result is built (R3.7.2).
         return "robust"
     raise UnsupportedError(
         f"{command}: cov_type={cov_type!r} is not implemented; only the unadjusted "
@@ -328,18 +334,22 @@ def _resolve_cov_type(
     )
 
 
-def _slope_positions(names: Sequence[str]) -> list[int]:
-    """Positions of the non-constant parameters.
+def _cov_type_label(resolved: str) -> str:
+    """The label recorded on the result, in westata's vocabulary (R3.7.2).
 
-    Handles both the bare and the equation-prefixed spellings, e.g. ``_cons``
-    and ``y1:_cons``.
+    ``sureg``'s robust VCE is the cross-equation ``reg3`` sandwich -- neither HC0 nor
+    HC1 -- so ``"robust"`` (the internal marker the estimator branches on) must not
+    reach the result object, where it would look interchangeable with
+    ``OLS(cov_type="robust")`` (which is HC1).
     """
 
-    return [
-        i
-        for i, name in enumerate(names)
-        if str(name).rpartition(":")[2] not in (_CONSTANT_STATA, _CONSTANT_PATSY)
-    ]
+    return "SYSTEMS_ROBUST" if resolved == "robust" else resolved
+
+
+def _slope_positions(names: Sequence[str]) -> list[int]:
+    """Delegate to the shared rule (R6.1); pass only the family differences."""
+
+    return slope_positions(names, split_equation_prefix=True)
 
 
 def _split_terms(text: str) -> list[str]:
@@ -720,7 +730,7 @@ class Sureg:
             df_model=float(total - equations),
             dist="z",
             model_name=self._stata_command,
-            cov_type=resolved,
+            cov_type=_cov_type_label(resolved),
             e=e,
             model_data=self._model_data,
         )
@@ -952,7 +962,7 @@ class Mvreg:
             df_model=float(k - 1),
             dist="t",
             model_name=self._stata_command,
-            cov_type=resolved,
+            cov_type=_cov_type_label(resolved),
             e=e,
             model_data=self._model_data,
         )
@@ -1159,7 +1169,7 @@ class Eivreg:
             df_model=float(len(slopes)),
             dist="t",
             model_name=self._stata_command,
-            cov_type=resolved,
+            cov_type=_cov_type_label(resolved),
             e=e,
             design_matrix=(X, list(self._param_names)),
             model_data=self._model_data,
@@ -1168,7 +1178,7 @@ class Eivreg:
 
 # ---------------------------------------------------------------------- manova
 @dataclass(frozen=True)
-class ManovaResult:
+class ManovaResult(ResultSerialisation):
     """MANOVA statistics for one factor (Stata ``manova``).
 
     ``df`` is Stata's hypothesis degrees of freedom for the factor (``g - 1``),

@@ -179,19 +179,62 @@ def test_package_reexports():
     assert vce.SSC is ProtocolSSC
 
 
-def test_robust_is_an_alias_for_hc1() -> None:
-    """Stata's ``regress, robust`` is HC1, so the word is accepted rather than rejected.
+def test_robust_requires_the_family_to_say_what_it_means() -> None:
+    """There is NO global ``robust`` -> HC1 mapping any more (R3.7.0, decision C).
 
-    The IV family maps the same word to HC0 -- Stata's ``ivregress ..., vce(robust)`` is HC0 --
-    and that override lives in ``estimators/iv.py`` because the mapping genuinely differs by
-    command. Before this, a caller had to remember which numeric spelling each family wanted,
-    which is the deviation the v3 report records at section 4, item (5).
+    Stata's ``vce(robust)`` is a different estimator per command family:
+
+    ==============  =====================
+    family          canonical value
+    ==============  =====================
+    regress         HC1
+    ivregress       HC0
+    logit &c.       ML_ROBUST
+    xtreg           cluster
+    ==============  =====================
+
+    The alias table used to carry a single ``"ROBUST": "HC1"``, which was right for
+    ``regress`` and wrong for the other three.  Every family then overrode it locally,
+    so no single place could answer "what does robust mean here", and ``FEOLS`` ended
+    up rejecting Stata's own spelling outright.
+
+    Now ``compute_cov`` refuses to guess, and the caller passes ``robust_as``.
     """
+
+    import pytest
 
     from westata.vce.dispatch import _normalize_cov_type
 
-    assert _normalize_cov_type("robust") == "HC1"
-    assert _normalize_cov_type("ROBUST") == "HC1"
+    # No family declared: refuse, and say why.
+    with pytest.raises(ValueError, match="not resolved for this estimator family"):
+        _normalize_cov_type("robust")
+    with pytest.raises(ValueError, match="not resolved for this estimator family"):
+        _normalize_cov_type("ROBUST")
+
+    # Declared per family: each gets its own answer.
+    assert _normalize_cov_type("robust", robust_as="HC1") == "HC1"
+    assert _normalize_cov_type("robust", robust_as="HC0") == "HC0"
+    assert _normalize_cov_type("robust", robust_as="cluster") == "cluster"
+    # The declaration is family-specific, so `robust_as="HC1"` is NOT a way to smuggle
+    # a global default back in: the canonical values stay distinct.
+    assert _normalize_cov_type("robust", robust_as="HC0") != "HC1"
+
+
+def test_robust_as_table_covers_only_the_compute_cov_families() -> None:
+    """`ROBUST_AS` must not promise what `compute_cov` cannot build.
+
+    The ML sandwich needs the observed information and the score, which an OLS-shaped
+    ``(X, resid)`` call does not have, so ``ml`` must NOT appear in this table.  If
+    someone adds it, `compute_cov` would have to either raise (confusing) or return an
+    HC1 number under an ML label (wrong).
+    """
+
+    from westata.vce.dispatch import ROBUST_AS
+
+    assert set(ROBUST_AS) == {"regress", "ivregress", "xtreg"}
+    assert "ml" not in ROBUST_AS, (
+        "the ML families build ML_ROBUST in discrete.py; compute_cov cannot produce it"
+    )
 
 
 

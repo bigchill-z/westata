@@ -58,13 +58,16 @@ from typing import Any, Sequence
 import numpy as np
 from scipy import stats
 
+from westata.postestimation.vce_labels import is_robust
+from westata.postestimation.names import is_constant_name
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
+
 __all__ = ["ImTestResult", "estat_imtest"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 class ImTestResult:
@@ -310,7 +313,7 @@ def estat_imtest(
         )
 
     cov_type = str(getattr(result, "cov_type", "nonrobust")).strip().lower()
-    if cov_type in ("hc0", "hc1", "hc2", "hc3", "robust") or "cluster" in cov_type:
+    if is_robust(cov_type):
         raise ValueError(
             "imtest does not support weighted or clustered estimation: "
             f"imtest.ado:18-25 rejects e(wtype) and e(clustvar); got {cov_type}"

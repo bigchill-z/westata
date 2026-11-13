@@ -446,6 +446,22 @@ class ContrastResult(list):
         self.pvalue = float(pvalue)
         self.df_denom = float(df_denom)
 
+    def to_dict(self) -> list[dict[str, Any]]:
+        """One dict per comparison, in table order (R4.1).
+
+        A LIST, like :class:`MarginsTable`: the object is a list of rows, so collapsing
+        them into one dict would hide all but the last.
+        """
+
+        return [row.to_dict() for row in self]
+
+    def to_frame(self) -> Any:
+        """The per-comparison table as a DataFrame (R4.1)."""
+
+        import pandas as pd
+
+        return pd.DataFrame(self.to_dict())
+
     def __str__(self) -> str:
         """Reproduce ``contrast`` exactly::
 
@@ -666,6 +682,18 @@ class PwCompareTable(list):
     contrast ends at 25, the standard error at 36, the lower bound at 50 and the upper
     bound at 62.
     """
+    def to_dict(self) -> list[dict[str, Any]]:
+        """One dict per pairwise contrast, in table order (R4.1)."""
+
+        return [row.to_dict() for row in self]
+
+    def to_frame(self) -> Any:
+        """The pairwise table as a DataFrame, one row per comparison (R4.1)."""
+
+        import pandas as pd
+
+        return pd.DataFrame(self.to_dict())
+
 
     #: Field endings, exclusive, measured from Stata's rows.
     _END_CONTRAST = 25

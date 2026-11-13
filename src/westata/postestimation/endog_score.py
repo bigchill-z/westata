@@ -55,14 +55,14 @@ from typing import Any, Sequence
 
 import numpy as np
 from scipy import stats
+from westata.postestimation.names import is_constant_name
+
+#: The constant-name test lives in `names.py` (R6.1).
+_is_constant = is_constant_name
 
 __all__ = ["EndogScoreResult", "endog_score_test"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 def _ols_residuals(y: np.ndarray, design: np.ndarray) -> np.ndarray:

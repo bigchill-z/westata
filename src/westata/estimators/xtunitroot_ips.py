@@ -31,6 +31,7 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["IpsResult", "im_pesaran_shin"]
 
@@ -74,7 +75,7 @@ _IPS_TILDE_MEAN_VAR: tuple[tuple[float, float, float], ...] = (
 
 
 @dataclass(frozen=True)
-class IpsResult:
+class IpsResult(ResultSerialisation):
     """Result of the Im-Pesaran-Shin test (Stata ``xtunitroot ips``)."""
 
     tbar: float
@@ -178,7 +179,7 @@ def _critical_values(n_groups: int, n_periods: int, *, trend: bool) -> dict[str,
 
 
 def im_pesaran_shin(
-    frame: pd.DataFrame,
+    data: pd.DataFrame,
     *,
     variable: str,
     entity: str,
@@ -202,20 +203,24 @@ def im_pesaran_shin(
     """
 
     for column in (variable, entity, time):
-        if column not in frame.columns:
+        if column not in data.columns:
             raise ConsistencyError(f"xtunitroot ips: column {column!r} not found")
 
-    data = frame[[entity, time, variable]].dropna().sort_values([entity, time])
-    if data.empty:
+    sample = data[[entity, time, variable]].dropna().sort_values([entity, time])
+    if sample.empty:
         raise ConsistencyError("xtunitroot ips: no complete observations")
 
-    codes, _ = pd.factorize(data[entity])
+    # Everything below reads `sample`, the dropna/sorted frame.  It used to read `data`
+    # instead while `sample` was computed and discarded, so a frame with a missing value
+    # in any of the three columns produced misaligned series (and a crash inside
+    # factorize) rather than the documented listwise deletion.
+    codes, _ = pd.factorize(sample[entity])
     codes = np.asarray(codes)
 
-    series = data[variable].to_numpy(dtype=float)
+    series = sample[variable].to_numpy(dtype=float)
     if demean:
         # Stata's demean option subtracts the cross-sectional mean at each period.
-        period_codes, _ = pd.factorize(data[time])
+        period_codes, _ = pd.factorize(sample[time])
         means = np.zeros(period_codes.max() + 1)
         np.add.at(means, np.asarray(period_codes), series)
         counts = np.bincount(np.asarray(period_codes))

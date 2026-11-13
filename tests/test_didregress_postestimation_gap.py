@@ -24,14 +24,17 @@ implementation must produce.
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import westata as ws
 
 #: The five subcommands `didregress_postestimation.sthlp` lists, and only those.
+#: ``estat_ptrends`` is IMPLEMENTED (see its own test below) and has been moved out
+#: of this list -- it was implemented but not exported until 0.3.13, which is why the
+#: absence guard used to cover it.
 POSTESTIMATION_ESTAT = (
     "estat_trendplots",
-    "estat_ptrends",
     "estat_granger",
     "estat_grangerplot",
     "estat_bdecomp",
@@ -45,6 +48,32 @@ def test_the_didregress_estat_entries_are_absent(name: str) -> None:
     assert not hasattr(ws, name), (
         f"{name} now exists -- add a guard against Stata's numbers instead of asserting absence"
     )
+
+
+def test_estat_ptrends_returns_the_linear_trend_test() -> None:
+    """``estat ptrends`` is implemented; pin the shape of what it returns.
+
+    Stata prints ``F(1, n_groups - 1)`` from ONE linear-trend interaction
+    (``estat_ptrends`` docstring shows a live capture: ``F(1, 59) = 0.25``).  This test
+    checks the same structure on a synthetic panel -- one numerator degree of freedom,
+    denominator ``n_groups - 1`` -- so a future change that silently returned a
+    different test is visible.  It is not a Stata-number comparison: the panel here is
+    seeded, not the fixture the capture used.
+    """
+
+    rows = []
+    for unit in range(60):
+        for period in range(1, 16):
+            treated = 1 if (unit < 20 and period >= 8) else 0
+            rows.append((unit, period, treated, float(0.3 * treated + 0.01 * unit)))
+    frame = pd.DataFrame(rows, columns=["unit", "period", "d", "y"])
+
+    fit = ws.Didregress.from_formula("y", "d", frame, group="unit", time="period").fit()
+    reported = ws.estat_ptrends(fit)
+
+    assert reported["df_numerator"] == 1.0, "the test is ONE linear-trend interaction"
+    assert reported["df_denominator"] == 59.0, "Stata uses n_groups - 1"
+    assert 0.0 <= reported["pvalue"] <= 1.0
 
 
 def test_didregress_has_no_test_postestimation_command() -> None:

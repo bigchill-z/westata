@@ -7,6 +7,128 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.13] - 2026-11-14
+
+**This release changes public signatures.** `docs/API_CONVENTIONS.md` now governs the
+public API, and the release brings the code into line with it: 125 recorded deviations
+reduced to 0 unfixed. Everything below is measured; the audit and its evidence are
+committed with the source.
+
+### Breaking - `fit()` takes `cov_type` first
+
+Five classes had a different first positional parameter, so `fit("HC1")` silently
+assigned the string to something else and left `cov_type` at `None`:
+
+```python
+# before
+ws.PanelOLS.from_formula("y ~ x", panel, entity="firm", time="year").fit("HC1")
+# -> cov_type="nonrobust", bse=[0.060844 0.062376]   (the request was ignored)
+# after
+# -> cov_type="cluster",   bse=[0.000409 0.047031]
+```
+
+`PanelOLS`/`RandomEffects`/`RandomEffectsMLE` now take
+`(cov_type, cov_kwds, ssc, *, entity_effects, time_effects)`; `Heckman`/`Etregress`
+take `(cov_type, cov_kwds, ssc, *, method, maxiter, strict)`. **Calls that passed
+`entity_effects` or `method` positionally must switch to keywords.**
+
+### Breaking - `result.cov_type` reports the canonical value, not the caller's word
+
+`cov_type` used to be echoed back as typed. It now names what was computed, because the
+same word means a different estimator in each family:
+
+| call | reports |
+|---|---|
+| `OLS(..., cov_type="robust")` | `HC1` |
+| `IV2SLS(..., cov_type="robust")` | `HC0` |
+| `Logit(..., cov_type="robust")` | `ML_ROBUST` (the `n/(n-1)` sandwich) |
+| `PanelOLS(..., cov_type="robust")` | `cluster` (`xtreg`'s `vce(robust)` *is* `vce(cluster panelvar)`) |
+| `QuantileRegression(..., cov_type="robust")` | `QREG_ROBUST` |
+| `Sureg(..., cov_type="robust")` | `SYSTEMS_ROBUST` |
+
+**If you branch on `result.cov_type == "robust"`, use the predicate instead:**
+
+```python
+from westata.postestimation.vce_labels import is_robust, is_hac, is_clustered
+if is_robust(result.cov_type):
+    ...
+```
+
+### Added - `cov_type="robust"` works everywhere Stata has it
+
+`FEOLS` and `Areg` used to *reject* Stata's own spelling and demand `HC1`; they now accept
+it (it is the same covariance, verified `bse`-identical). `RobustRegression` silently
+ignored any `cov_type`; it now refuses with a reason (`rreg` has no `vce()`). The global
+`"ROBUST": "HC1"` alias is gone: each family declares its own target, so a new estimator
+that forgets raises instead of silently receiving HC1.
+
+### Added - result classes are readable as data
+
+18 result classes had no way to get the numbers out except by parsing the rendered
+table. All public result classes now provide `to_dict()` / `to_frame()` via
+`results/serialisation.py`, and 21 result classes that commands return but never
+exported are now importable (top-level exports: 167 -> 223).
+
+### Added - `estat_*` exists both ways
+
+Six subcommands were method-only (`result.estat_auc()`) and could not be called as
+`ws.estat_auc(result)`. All 21 `estat_*` are now available both ways, and all 29
+`StataResults` postestimation methods expose real signatures instead of `**kwargs`
+(`inspect.signature(result.estat_vif)` now shows the parameters).
+
+### Fixed - `estat_esize` `level` is a fraction
+
+`estat_esize(level=95.0)` was the only percentage `level` in the package. It is now
+`level=0.95`, matching `margins`/`nlcom`/`contrast`. Passing `0.95` to the old code
+computed `(100 - 0.95) / 2 = 49.5%` intervals.
+
+### Fixed - three defects found by the audit
+
+* **`im_pesaran_shin` / `levin_lin_chu` never dropped missing values.** Both computed
+  `sample = data.dropna()` and then read `data` throughout, so the documented listwise
+  deletion did not happen. A 144-row panel with one missing value now reports
+  `observations=131` (correct) instead of using the uncleaned series.
+* **`estat_esize().ci_lower` was always `nan`.** The noncentral-F solve has no root when
+  the observed F is small, and the bracket failure returned `nan`; the correct lower
+  limit is 0 (an effect size of 0), not a missing value.
+* **`modeltests.py` never recognised a constant.** Its set contained capitalised
+  `"Intercept"` and was compared against `name.strip().lower()`, so that entry could
+  never match.
+
+### Changed - naming
+
+`prais`/`im_pesaran_shin`/`levin_lin_chu` take `data` instead of `frame` (R2.3);
+`Didregress`/`RegressionAdjustment`/`IPW`/`NearestNeighbourMatching` gained
+`from_variables(...)` with `from_formula` kept as a deprecation alias (R3.2);
+`Areg(noabsorb=)` became `absorb_test=` (it turns off the absorbed-indicator *test*, not
+absorption); `tebalance_summarize(normalise_counts=)` became `normalize_counts=`;
+`dfgls` lost its `notrend` duplicate of `trend`.
+
+`XtAbond` and `XtUnitroot` no longer default matrix-interface names to `("L1.y",)` /
+`("x1",)` / `"y"` -- literal column names from the dataset they were first tried on.
+
+### Added - `scripts/check_api_conventions.py`
+
+The audit is committed as an executable checker with a `--strict` mode, run in CI:
+
+```bash
+python scripts/check_api_conventions.py            # report
+python scripts/check_api_conventions.py --strict   # non-zero on any unfixed finding
+```
+
+It enforces 20 rules (R1-R6) and is itself tested: every rule must be able to fire on a
+deliberately-wrong synthetic module, and the document's baseline table is compared against
+the checker's real output, so the two cannot drift. Deliberate exceptions are listed in
+one table with a reason each (28 at this release: statsmodels-compatible shapes, the
+linear-algebra layer's `X`, Stata's own `no*` option names, and the deprecation shims).
+
+### Verified
+
+Full suite **6322 passed, 3 skipped, 0 failed**. `python scripts/check_api_conventions.py --strict`
+exits 0. Every source file compiles from its raw bytes.
+
+---
+
 ## [0.3.12] - 2026-11-13
 
 ### Fixed — a robust ML fit reports a *pseudo*likelihood

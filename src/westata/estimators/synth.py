@@ -44,6 +44,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from westata.errors import ConsistencyError, UnsupportedError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["SynthResult", "synth"]
 
@@ -73,7 +74,7 @@ NUMERICALLY_INACTIVE_QP = frozenset({"sigf", "margin", "bound"})
 # Result object -- a frozen dataclass, NOT StataResults (there is no e(b)/e(V))
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
-class SynthResult:
+class SynthResult(ResultSerialisation):
     """Outcome of :func:`synth`.
 
     Field names mirror Stata's ``e()`` matrices verbatim.  Note ``V_matrix``

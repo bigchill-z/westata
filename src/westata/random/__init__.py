@@ -1,4 +1,4 @@
-﻿"""Stata-compatible random number generation."""
+"""Stata-compatible random number generation."""
 
 from westata.random.stata_rng import (
     Mt19937_64,

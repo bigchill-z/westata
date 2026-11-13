@@ -588,7 +588,8 @@ class Didregress:
 
     # ----------------------------------------------------------- construction
     @classmethod
-    def from_formula(
+    @classmethod
+    def from_variables(
         cls,
         outcome: Any,
         treatment: Any,
@@ -601,6 +602,11 @@ class Didregress:
     ) -> "Didregress":
         """Build a model from Stata's ``didregress (y x1) (treated)`` spelling.
 
+        This entry point takes VARIABLE NAMES, not a formula -- there is no ``~`` in
+        Stata's syntax for ``didregress`` -- so it is called ``from_variables`` (R3.2).
+        ``from_formula`` was a name that told the reader to expect a formula and then
+        handed them three separate arguments; it remains as a deprecation alias.
+
         Nothing is estimated until :meth:`fit` is called.
 
         ``subset=`` restricts the estimation sample, matching every other
@@ -611,6 +617,35 @@ class Didregress:
             data = data.loc[subset]
         return cls(
             outcome, treatment, data, group=group, time=time, covariates=covariates
+        )
+
+    @classmethod
+    def from_formula(
+        cls,
+        outcome: Any,
+        treatment: Any,
+        data: pd.DataFrame,
+        *,
+        group: str,
+        time: str,
+        covariates: Any = None,
+        subset: Any = None,
+    ) -> "Didregress":
+        """Deprecated alias of :meth:`from_variables` (R3.2).
+
+        Kept for one release because 186 call sites in this repository use it, and
+        because the name, while wrong, is not dangerous: it takes the same arguments and
+        returns the same model.  It will be removed after the call sites migrate.
+        """
+
+        return cls.from_variables(
+            outcome,
+            treatment,
+            data,
+            group=group,
+            time=time,
+            covariates=covariates,
+            subset=subset,
         )
 
     @staticmethod

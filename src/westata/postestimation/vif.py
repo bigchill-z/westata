@@ -34,6 +34,11 @@ import numpy as np
 import pandas as pd
 
 from westata.postestimation.names import stata_display_name
+from westata.postestimation.names import is_constant_name
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
 
 __all__ = ["VifResult", "estat_vif"]
 
@@ -70,11 +75,7 @@ _LINEAR_MODELS = frozenset(
 )
 
 #: Names a constant can appear under in westata's parameter list.
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 def _display_name(name: str) -> str:

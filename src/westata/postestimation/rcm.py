@@ -46,12 +46,13 @@ from typing import Any, Sequence
 import numpy as np
 
 from westata.errors import ConsistencyError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["RcmResult", "rcm"]
 
 
 @dataclass(frozen=True)
-class RcmResult:
+class RcmResult(ResultSerialisation):
     """Regression control method outcome."""
 
     att: float

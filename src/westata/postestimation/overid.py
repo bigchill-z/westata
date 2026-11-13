@@ -47,13 +47,18 @@ from typing import Any
 import numpy as np
 from scipy import stats
 
+from westata.postestimation import vce_labels
+
+from westata.postestimation.vce_labels import is_robust
+from westata.postestimation.names import is_constant_name, require_iv_structure
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
+
 __all__ = ["OverIdResult", "estat_overid"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
-
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
 
 class OverIdResult:
@@ -184,16 +189,9 @@ class OverIdResult:
 
 
 def _require_iv(result: Any) -> dict[str, Any]:
-    structure = getattr(result, "iv_structure", None)
-    if structure is None:
-        raise NotImplementedError(
-            "estat overid is only defined after an instrumental-variables fit: "
-            "Stata reaches it through ivregress_estat and it needs the split "
-            "between included exogenous regressors and excluded instruments; "
-            f"got {getattr(result, 'model_name', 'an unnamed model')!r} without "
-            "that structure"
-        )
-    return structure
+    """Delegate to the shared check (R6.1); see names.require_iv_structure."""
+
+    return require_iv_structure(result, 'estat overid')
 
 
 def _instrument_names(structure: dict[str, Any]) -> list[str]:
@@ -378,14 +376,14 @@ def estat_overid(
 
     cov_type = str(getattr(result, "cov_type", "nonrobust")).strip().lower()
     resid = np.asarray(result.resid, dtype=float).reshape(-1)
-    is_clustered = "cluster" in cov_type
-    is_hac = "hac" in cov_type or "newey" in cov_type
-    is_robust = cov_type in ("hc0", "hc1", "hc2", "hc3", "robust")
+    is_clustered = vce_labels.is_clustered(cov_type)
+    is_hac = vce_labels.is_hac(cov_type)
+    robust = is_robust(cov_type)
     is_liml = "liml" in model_name
 
     if (
         is_liml
-        and (is_robust or is_hac or is_clustered)
+        and (robust or is_hac or is_clustered)
         and lags is None
         and not forcenonrobust
     ):

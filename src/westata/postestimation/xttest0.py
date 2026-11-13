@@ -39,12 +39,13 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["XtTest0Result", "xttest0"]
 
 
 @dataclass(frozen=True)
-class XtTest0Result:
+class XtTest0Result(ResultSerialisation):
     """``xttest0``: the Breusch-Pagan LM test for random effects."""
 
     chibar2: float

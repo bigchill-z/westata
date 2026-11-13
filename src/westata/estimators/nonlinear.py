@@ -190,6 +190,7 @@ from scipy.linalg import solve_triangular
 from westata.errors import ConsistencyError, ConvergenceError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import numerical_hessian
 
 __all__ = ["Frontier", "Nl", "compile_expression", "frontier_loglike"]
 
@@ -673,57 +674,14 @@ def _numerical_hessian(
     gradient: Callable[[np.ndarray], np.ndarray] | None = None,
     step: float | None = None,
 ) -> np.ndarray:
-    """Central-difference Hessian, of the objective or of its analytic gradient.
+    """Delegate to the shared rule (R6.1).
 
-    ``gradient`` switches the routine to differentiating a *closed-form*
-    gradient.  That matters for the frontier likelihood, which is almost flat
-    along ``sigma_u -> 0``: second-differencing the objective itself loses
-    roughly half its digits to cancellation there, while the gradient is
-    available analytically and its central difference stays first order.  It is
-    the standard way to get a usable observed information out of a flat
-    likelihood without inventing a step size per direction.
+    This module supplies the one capability the other two copies lacked --
+    differentiating a closed-form gradient -- so the shared implementation
+    carries it (``least_squares.numerical_hessian``).
     """
 
-    size = point.size
-    if gradient is not None:
-        steps = (
-            (_HESSIAN_STEP if step is None else float(step))
-            * np.maximum(np.abs(point), 1.0)
-        )
-        hessian = np.empty((size, size), dtype=float)
-        for i in range(size):
-            ei = np.zeros(size)
-            ei[i] = steps[i]
-            hessian[:, i] = (gradient(point + ei) - gradient(point - ei)) / (
-                2.0 * steps[i]
-            )
-        return 0.5 * (hessian + hessian.T)
-
-    hessian = np.zeros((size, size), dtype=float)
-    steps = (_HESSIAN_STEP if step is None else float(step)) * np.maximum(
-        np.abs(point), 1.0
-    )
-    centre = objective(point)
-    for i in range(size):
-        for j in range(i, size):
-            ei = np.zeros(size)
-            ej = np.zeros(size)
-            ei[i] = steps[i]
-            ej[j] = steps[j]
-            if i == j:
-                value = (objective(point + ei) - 2.0 * centre + objective(point - ei)) / (
-                    steps[i] ** 2
-                )
-            else:
-                value = (
-                    objective(point + ei + ej)
-                    - objective(point + ei - ej)
-                    - objective(point - ei + ej)
-                    + objective(point - ei - ej)
-                ) / (4.0 * steps[i] * steps[j])
-            hessian[i, j] = value
-            hessian[j, i] = value
-    return hessian
+    return numerical_hessian(objective, point, gradient=gradient, step=step)
 
 
 def frontier_loglike(

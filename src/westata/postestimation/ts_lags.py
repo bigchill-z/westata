@@ -43,6 +43,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from westata.errors import ConsistencyError
+from westata.postestimation.vce_labels import is_robust
 
 __all__ = [
     "TimeAxis",
@@ -112,23 +113,15 @@ def refuse_clustered_vce(result: Any, command: str) -> None:
 
     Stata tests ``e(vcetype) == "Robust"``, and ``vce(cluster)`` sets exactly that, so a
     clustered fit dies with ``This command does not work after regress, robust`` (r(198)).
-    The check is by NAME, which is why the non-robust spelling ``nonrobust`` has to be
-    excluded explicitly -- a substring test would reject every ordinary fit.
+
+    The membership test and the "not ``nonrobust``" exclusion used to be written out
+    here; both now come from :mod:`westata.postestimation.vce_labels`, because the local
+    copy recognised only the literal strings and would have stopped refusing after the
+    R3.7.2 relabelling (``ML_ROBUST``, ``QREG_ROBUST``, ``SYSTEMS_ROBUST``).
     """
 
     cov_type = str(getattr(result, "cov_type", "") or "").strip().lower()
-    robust_names = {
-        "robust",
-        "cluster",
-        "clustered",
-        "hc0",
-        "hc1",
-        "hc2",
-        "hc3",
-        "hc4",
-        "hc5",
-    }
-    if cov_type in robust_names or ("robust" in cov_type and not cov_type.startswith("non")):
+    if is_robust(cov_type):
         raise ConsistencyError(
             f"{command}: this command does not work after regress, robust "
             "(vce(cluster) is robust in Stata's eyes too, so it is refused as well)"

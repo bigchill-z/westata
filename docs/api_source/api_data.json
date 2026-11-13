@@ -8,9 +8,14 @@
       "module": "westata.estimators.treatreg_effects",
       "docstring": "Augmented inverse-probability weighting (Stata ``teffects aipw``).\n\nCombine the arm-specific outcome regressions with the weighting: the\nregression supplies the prediction and the weights correct its residual::\n\n    y_i(1) = yhat1_i + t_i (y_i - yhat1_i)/p_i\n    y_i(0) = yhat0_i + (1-t_i)(y_i - yhat0_i)/(1-p_i)\n\nThe estimator is doubly robust -- either model may be misspecified without\ndestroying consistency -- which is why the reference value (2.018836) sits\nbetween the regression-adjustment estimate (2.034515) and the pure weighting\nestimate (1.888171).\n\nInfluence functions\n-------------------\n``theta = (beta, b1, b0)`` solves the stacked moments::\n\n    m_i = [ x_i(t_i-p_i),  x_i t_i (y_i - x_i b1),  x_i (1-t_i)(y_i - x_i b0) ]\n\nand the reported means add the augmented outcomes' own variation::\n\n    psi_i = (a_i - A) + (dA/dtheta) psi_theta,i\n\nDropping the coefficient influence functions leaves 0.0641 against Stata's\n0.0625084: the estimated components are negatively correlated with the\naugmented outcome, so omitting them *inflates* the reported error.",
       "signature": "(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' = 'ate') -> 'None'",
-      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'IPW'\"",
+      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'",
       "fit": "(self) -> 'TreatmentEffectResult'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'IPW'\""
+        }
+      ]
     },
     {
       "name": "ARIMA",
@@ -27,10 +32,25 @@
       "kind": "class",
       "module": "westata.estimators.hdfe",
       "docstring": "Linear regression absorbing categorical indicators -- Stata ``areg``.\n\nThis is a DIFFERENT command from ``reghdfe``, not a synonym, and the differences are\nthe reason it needs its own class:\n\n==========================  ====================================================\n``areg``                    ``reghdfe``\n==========================  ====================================================\n``absorb(varlist)`` REQUIRED, ``|`` block in the formula\nbanner \"Linear regression, absorbing indicators\"\n``e(title2)`` = \"Absorbed variable: firm\"\n``e(predict)`` = ``areg_p``  no predict program registered\n``e(marginsnotok)`` = ``Residuals SCore D XBD``\n==========================  ====================================================\n\nAll of those values come from ``tests/conformance/stata_fixtures/areg.json``, which is\na capture of the real command, not from reading prose.\n\nThe ESTIMATION is identical -- ``areg`` and ``reghdfe`` fit the same within model -- so\nthis subclass reuses :class:`FEOLS`'s machinery and overrides only the identity.\n\nParameters\n----------\nformula:\n    ``\"y ~ x1 + x2\"`` alongside the ``absorb=`` keyword, matching Stata's\n    ``areg y x1 x2, absorb(firm)``.  The ``|`` form is also accepted for symmetry with\n    :class:`FEOLS`, but ``absorb=`` is the documented Stata spelling.\ndata:\n    Estimation sample.\nabsorb:\n    One or more categorical variables to absorb, e.g. ``\"firm\"`` or\n    ``(\"firm\", \"year\")``.  Required, as in Stata.",
-      "signature": "(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, noabsorb: 'bool' = False) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None, noabsorb: 'bool' = False) -> \"'Areg'\"",
+      "signature": "(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, absorb_test: 'bool' = True, noabsorb: 'bool | None' = None) -> 'None'",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, absorb: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None, absorb_test: 'bool' = True, noabsorb: 'bool | None' = None) -> \"'Areg'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "AucResult",
+      "kind": "class",
+      "module": "westata.postestimation.auc",
+      "docstring": "The ``estat auc`` output.\n\nAttributes\n----------\narea:\n    The area under the ROC curve.  ``0.5`` means the model ranks no better than\n    chance; ``1.0`` is perfect separation.\nn:\n    The number of observations the curve was built on.",
+      "signature": "(*, area: 'float', n: 'int') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
     },
     {
       "name": "BetweenOLS",
@@ -39,8 +59,23 @@
       "docstring": "Between estimator on entity means (Stata ``xtreg, be``).\n\nThe regression runs on one row per entity, so ``e(N)`` is the number of\ngroup means actually consumed and ``df_r = n_entities - K``.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
-      "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "BgTestResult",
+      "kind": "class",
+      "module": "westata.postestimation.bgodfrey",
+      "docstring": "``estat bgodfrey``: Breusch-Godfrey LM test for autocorrelation.",
+      "signature": "(rows: 'tuple[BgTestRow, ...]', nobs: 'int', n_gaps: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "Bootstrap",
@@ -97,6 +132,44 @@
       "methods": []
     },
     {
+      "name": "ContrastResult",
+      "kind": "class",
+      "module": "westata.postestimation.contrast",
+      "docstring": "Contrasts plus Stata's joint Wald test.\n\n``contrast`` in Stata prints an ANOVA-style block by default::\n\n    Contrasts of marginal linear predictions\n    Margins: asbalanced\n    ------------------------------------------------\n                 |         df           F        P>F\n    -------------+----------------------------------\n           iqgrp |          3        5.90     0.0006\n    ------------------------------------------------\n     Denominator |        751\n\nand only ``contrast ..., nowald`` prints the per-comparison coefficients. The list\nbehaviour is unchanged -- iterating still yields one :class:`LincomResult` per row --\nso existing callers keep working; the joint test is additional information.",
+      "signature": "(rows, *, term, fvalue, df, pvalue, df_denom)",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'list[dict[str, Any]]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "ContrastResults",
+      "kind": "class",
+      "module": "westata.results.ecosystem",
+      "docstring": "A statsmodels-shaped contrast result.\n\n``fvalue``/``tvalue`` and ``f_pvalue``/``pvalue`` are all present because downstream code\nreads whichever one suits its test, and a missing alias raises AttributeError at the call\nsite rather than at ours.",
+      "signature": "(*, statistic: 'float', pvalue: 'float', df_num: 'float', df_resid: 'float', use_t: 'bool', hypotheses: 'Sequence[str]', estimate: 'float', standard_error: 'float', param_names: 'Sequence[str]', distribution: 'str') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "conf_int",
+          "signature": "(self, alpha: 'float' = 0.05) -> 'np.ndarray'"
+        },
+        {
+          "name": "summary",
+          "signature": "(self) -> 'str'"
+        }
+      ]
+    },
+    {
       "name": "ConvergenceError",
       "kind": "class",
       "module": "westata.errors",
@@ -107,6 +180,40 @@
       "methods": []
     },
     {
+      "name": "Correlogram",
+      "kind": "class",
+      "module": "westata.postestimation.serial",
+      "docstring": "``corrgram``: the autocorrelation table with Ljung-Box Q at each lag.",
+      "signature": "(rows: 'tuple[CorrelogramRow, ...]', n_gaps: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "DFGLSResult",
+      "kind": "class",
+      "module": "westata.postestimation.dfgls",
+      "docstring": "``dfgls``: the DF-GLS test across a range of lag orders.",
+      "signature": "(cells: 'tuple[DFGLSCell, ...]', trend: 'bool', variable: 'str' = '') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
       "name": "Didregress",
       "kind": "class",
       "module": "westata.estimators.did",
@@ -114,7 +221,61 @@
       "signature": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'",
       "from_formula": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> \"'Didregress'\"",
       "fit": "(self, cov_type: 'str' = 'cluster') -> 'StataResults'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> \"'Didregress'\""
+        }
+      ]
+    },
+    {
+      "name": "DurbinWatsonResult",
+      "kind": "class",
+      "module": "westata.postestimation.serial",
+      "docstring": "``estat dwatson``: the Durbin-Watson d statistic.\n\nStata prints one line::\n\n    Durbin-Watson d-statistic(  4,    30) =  1.021169\n\nThe first number is the number of parameters EXCLUDING the constant (``e(df_m)``), the\nsecond the sample size.\n\nWith gaps in the sample, ``estat dwatson`` prints ``Number of gaps in sample = N`` on\nits own line first (measured: ``drop if time == 5`` gives ``= 1``, and removing two\nperiods gives ``= 2``), then a blank line, then the statistic.",
+      "signature": "(d: 'float', df: 'float', nobs: 'int', n_gaps: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "EReturn",
+      "kind": "class",
+      "module": "westata.results.stata_return",
+      "docstring": "Mapping of Stata ``e()`` scalars with item and attribute access.",
+      "signature": "(mapping: 'Mapping[str, Any] | None' = None, /, **kwargs: 'Any') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "get",
+          "signature": "(self, key: 'Any', default: 'Any' = None) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "EffectSizeResult",
+      "kind": "class",
+      "module": "westata.postestimation.esize",
+      "docstring": "One effect-size estimate and its confidence interval.\n\nAttributes\n----------\nkind:\n    ``\"eta2\"``, ``\"epsilon2\"`` or ``\"omega2\"``.\nestimate:\n    The point estimate.\nci_lower, ci_upper:\n    Confidence bounds for the eta-squared form, from the noncentral F\n    (``sthlp:610-612``).  ``None`` for epsilon/omega, where the help file documents no\n    interval.\nlevel:\n    Confidence level as a FRACTION (``0.95``), never a percentage (R3.3).",
+      "signature": "(kind: 'str', estimate: 'float', ci_lower: 'float | None' = None, ci_upper: 'float | None' = None, level: 'float' = 0.95) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
     },
     {
       "name": "Eivreg",
@@ -125,6 +286,21 @@
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, reliab: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> \"'Eivreg'\"",
       "fit": "(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "EndogScoreResult",
+      "kind": "class",
+      "module": "westata.postestimation.endog_score",
+      "docstring": "An endogeneity score test.\n\nAttributes\n----------\nstatistic, df, pvalue:\n    The chi-square statistic, its degrees of freedom (the number of\n    endogenous regressors tested) and the upper-tail p-value.\ntest:\n    ``\"robwool\"`` for the robust variant, ``\"acwool\"`` for HAC.\nlags:\n    HAC truncation used for prewhitening; ``None`` for the robust variant.",
+      "signature": "(*, statistic: 'float', df: 'float', test: 'str', lags: 'int | None' = None) -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
     },
     {
       "name": "EndogenousResult",
@@ -148,7 +324,7 @@
       "docstring": "Endogenous treatment regression (Stata ``etregress``), control function.\n\nTreatment equation (probit, full sample)::\n\n    t* = z g + u,   t = 1[t* > 0]\n\nOutcome equation (full sample, unlike :class:`Heckman`)::\n\n    y = x b + d t + e\n\nThe control function adds the first-stage residual\n``t*phi(z g)/Phi(z g) - (1-t)*phi(z g)/(1-Phi(z g))`` to the outcome\nregression, which absorbs the correlation between ``u`` and ``e`` and makes\nthe treatment coefficient ``d`` consistent.\n\nParameters\n----------\nformula:\n    ``\"y ~ x + treat(t ~ z)\"``.  The treatment indicator is added to the\n    outcome equation automatically; naming it there as well\n    (``\"y ~ x + t + treat(t ~ z)\"``) is accepted and does not duplicate it.\n\nNotes\n-----\n``y`` is observed for treated and control units alike, so every row enters\nthe outcome equation -- that is the structural difference from\n:class:`Heckman`, where the outcome is truncated by selection.\n\nStandard errors are the two-step M-estimator sandwich (see the module\ndocstring), not naive OLS standard errors and not Stata's ML ones.",
       "signature": "(outcome: 'np.ndarray', outcome_exog: 'np.ndarray', treatment: 'np.ndarray', treatment_exog: 'np.ndarray', *, outcome_names: 'Sequence[str]', treatment_names: 'Sequence[str]', treated: 'np.ndarray', model_data: 'pd.DataFrame | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> \"'Etregress'\"",
-      "fit": "(self, method: 'str' = 'control', cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'control', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
     {
@@ -178,7 +354,7 @@
       "docstring": "First-difference estimator (Stata ``xtreg, fd``).\n\nPeriods are differenced (``t`` against ``t - 1``, so a missing period is not\nbridged) and the model is fitted without a constant; the patsy intercept is\ntherefore removed before the design matrix reaches linearmodels, which\nrejects constants in first-difference regressions.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
-      "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
     {
@@ -267,7 +443,7 @@
       "docstring": "Heckman sample-selection model (Stata ``heckman``), two-step estimator.\n\nSelection equation (probit, full sample)::\n\n    s* = z g + u,   s = 1[s* > 0]\n\nOutcome equation (observed only where ``s == 1``)::\n\n    y = x b + e\n\nStep 1 estimates ``g`` and forms the inverse Mills ratio\n``lambda = phi(z g)/Phi(z g)``; step 2 regresses ``y`` on ``x`` and\n``lambda`` over the selected rows.\n\nParameters\n----------\nformula:\n    ``\"y ~ x + select(s ~ z)\"``.  The selection indicator must be 0/1 and\n    the selection equation is estimated on the full sample, which is the\n    point of the estimator: a missing ``y`` is what marks a non-selected\n    observation, so ``y`` may be missing off the selected rows.\n\nNotes\n-----\nStandard errors are the two-step M-estimator sandwich: the first stage's\nestimation error is propagated into the second stage, so they are *not*\nnaive OLS standard errors (see the module docstring).  They are also not\nStata's ML standard errors, because these are two-step estimates.",
       "signature": "(outcome: 'np.ndarray', outcome_exog: 'np.ndarray', selection: 'np.ndarray', selection_exog: 'np.ndarray', *, outcome_names: 'Sequence[str]', selection_names: 'Sequence[str]', selected: 'np.ndarray', model_data: 'pd.DataFrame | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> \"'Heckman'\"",
-      "fit": "(self, method: 'str' = 'twostep', cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'twostep', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
     {
@@ -291,9 +467,14 @@
       "module": "westata.estimators.treatreg_effects",
       "docstring": "Inverse-probability weighting (Stata ``teffects ipw``).\n\nFit a logit treatment model and reweight outcomes by the inverse propensity\nscore.  Stata reports the **normalised** (Hajek) weighted means::\n\n    ATE  = mean(t*y/p)/mean(t/p) - mean((1-t)*y/(1-p))/mean((1-t)/(1-p))\n    ATET = mean(t*y)/mean(t)     - mean((1-t)*y*odds)/mean((1-t)*odds)\n\nwith ``odds = p/(1-p)``.  The normalisation is not cosmetic: the\nunnormalised sums give 1.9355 on the reference data where Stata gives\n1.8882, because the estimated propensities do not add up to the arm sizes\nexactly.  The ATET reweights the controls to the treated propensity\ndistribution through the odds, which is why its control mean (1.5641) sits\nabove the ATE's (1.0182).\n\nInfluence functions\n-------------------\nThe estimator is an M-estimator with ``theta = (beta, mu1, mu0)`` solving\n``mean(m_i) = 0`` for::\n\n    m_i = [ x_i (t_i - p_i),  t_i (y_i - mu1)/p_i,  (1-t_i)(y_i-mu0)/(1-p_i) ]\n\nso the ATE standard error comes from the full sandwich.  Treating the\npropensity score as fixed instead reports 0.1216 for ``POmean(0)`` against\nStata's 0.1001317, because the treatment-model error is then ignored.",
       "signature": "(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' = 'ate') -> 'None'",
-      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'IPW'\"",
+      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'",
       "fit": "(self) -> 'TreatmentEffectResult'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'IPW'\""
+        }
+      ]
     },
     {
       "name": "IV2SLS",
@@ -381,7 +562,16 @@
       "signature": "(tbar: 'float', ttildebar: 'float', zt: 'float', zttildebar: 'float', pvalue: 'float', critical: 'dict[str, float]', n_groups: 'int', n_periods: 'int', observations: 'int', mean_t: 'float', var_t: 'float', mean_ttilde: 'float', var_ttilde: 'float') -> None",
       "from_formula": null,
       "fit": null,
-      "methods": []
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "Jackknife",
@@ -394,11 +584,64 @@
       "methods": []
     },
     {
+      "name": "JohansenResult",
+      "kind": "class",
+      "module": "westata.estimators.tseries",
+      "docstring": "Johansen trace / max-eigenvalue statistics with critical values.",
+      "signature": "(trace: 'np.ndarray', trace_critical: 'np.ndarray', maxeig: 'np.ndarray', maxeig_critical: 'np.ndarray', eigenvectors: 'np.ndarray', diagnostics: 'Any' = None, context: 'Any' = None) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "select_rank",
+          "signature": "(self, *, statistic: 'str' = 'trace', level: 'float' = 0.05) -> 'int'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self, *, render_missing: 'bool' = False) -> 'pd.DataFrame'"
+        },
+        {
+          "name": "to_stata_table",
+          "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "KpssResult",
+      "kind": "class",
+      "module": "westata.postestimation.kpss",
+      "docstring": "``kpss``: KPSS test for stationarity, one row per lag order.",
+      "signature": "(rows: 'tuple[KpssRow, ...]', trend: 'bool', nobs: 'int', critical: 'dict[float, float]', name: 'str' = '', maxlag_explicit: 'bool' = False) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
       "name": "LRTestResult",
       "kind": "class",
       "module": "westata.postestimation.modeltests",
       "docstring": "Likelihood-ratio test between a restricted and an unrestricted model.\n\nAttributes\n----------\nstatistic:\n    ``LR = 2 (lnL_unrestricted - lnL_restricted)``.\ndf:\n    ``k_unrestricted - k_restricted``; always positive, because two models\n    with equal parameter counts are refused (Stata ``r(498)``).\npvalue:\n    ``P > chi2(df)``; exactly 1.0 for a negative statistic, as Stata prints.\nll_unrestricted, ll_restricted:\n    The log-likelihoods that produced the statistic, kept so the number can\n    be audited without re-fitting either model.",
       "signature": "(statistic: 'float', df: 'float', pvalue: 'float', ll_unrestricted: 'float', ll_restricted: 'float', restricted_name: 'str' = '', unrestricted_name: 'str' = '') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
+    },
+    {
+      "name": "LfitResult",
+      "kind": "class",
+      "module": "westata.postestimation.gof",
+      "docstring": "Stata's ``estat gof`` after ``logit``/``probit`` -- ``lfit.ado``.\n\nThis is a DIFFERENT test from the Poisson one: ``lfit.ado:44-97`` collapses\nobservations by covariate pattern and forms\n\n    chi2 = sum_j (obs_j - exp_j)^2 / (exp_j (1 - exp_j / w_j))\n\nwith ``df = m - k`` where ``m`` is the number of distinct covariate patterns\nand ``k`` the number of regressors (``lfit.ado:96``:\n``ret scalar df = return(m) - `nvar'``).\n\nAttributes\n----------\nchi2, pvalue:\n    The Pearson statistic and its upper-tail chi-square p-value.\ndf:\n    ``m - k``.\npatterns:\n    ``m``, the number of distinct covariate patterns.",
+      "signature": "(*, chi2: 'float', pvalue: 'float', df: 'float', patterns: 'int', depvar: 'str' = '', model_label: 'str' = 'logistic', n_obs: 'int' = 0) -> 'None'",
       "from_formula": null,
       "fit": null,
       "methods": [
@@ -424,6 +667,21 @@
       ]
     },
     {
+      "name": "LinkTestResult",
+      "kind": "class",
+      "module": "westata.postestimation.linktest",
+      "docstring": "Pregibon's link test.\n\nAttributes\n----------\nt_statistic:\n    ``b[_hatsq] / se[_hatsq]`` from the refitted model (``linktest.ado:131``).\ndf:\n    Residual degrees of freedom of the refit (``linktest.ado:132``).\npvalue:\n    Two-sided ``P > |t|``.\nhat_coefficient, hatsq_coefficient:\n    The two added coefficients.",
+      "signature": "(t_statistic: 'float', df: 'float', pvalue: 'float', hat_coefficient: 'float', hatsq_coefficient: 'float') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
+    },
+    {
       "name": "LlcResult",
       "kind": "class",
       "module": "westata.estimators.xtunitroot_llc",
@@ -431,7 +689,31 @@
       "signature": "(tds: 'float', td: 'float', ttilde: 'float', sbar: 'float', nu_hat: 'float', nu_se: 'float', var_ep: 'float', mu_adj: 'float', sig_adj: 'float', pvalue_tds: 'float', pvalue_td: 'float | None', n_groups: 'int', n_periods: 'int', observations: 'int', adf_lags: 'int', hac_lags: 'int') -> None",
       "from_formula": null,
       "fit": null,
-      "methods": []
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "LmarResult",
+      "kind": "class",
+      "module": "westata.postestimation.varlmar",
+      "docstring": "Lagrange-multiplier test for residual autocorrelation.",
+      "signature": "(rows: 'tuple[LmarRow, ...]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "Logit",
@@ -439,9 +721,39 @@
       "module": "westata.estimators.discrete",
       "docstring": "Logistic regression (Stata ``logit``).\n\nNO INTERCEPT IS ADDED. The design matrix passed to ``Logit(y, X, ...)`` is taken as COMPLETE,\nexactly as statsmodels treats it. Stata's ``logit y x1 x2`` adds a constant for you, so the two\ncalls are not equivalent:\n\n    ws.Logit(y, X, param_names=[\"x1\", \"x2\"])            # no constant -> different model\n    ws.Logit.from_formula(\"y ~ x1 + x2\", frame)         # constant included, matches Stata\n\nGetting this wrong does not raise: it returns a well-formed fit with plausible coefficients\nthat disagree with Stata, which reads as a numerical defect rather than a missing column.\nMeasured on grilic.dta with a median split of lnw:\n\n    array interface, no constant   coef [.002219, -.000498, .052896]\n    Stata `logit hi s expr tenure`  coef [.459083, .158881, .153049], _cons -6.691539\n\nTo keep the array interface and still match Stata, pass a column of ones yourself:\n\n    X = np.column_stack([np.ones(len(frame)), frame[[\"s\", \"expr\", \"tenure\"]]])\n    ws.Logit(y, X, param_names=[\"_cons\", \"s\", \"expr\", \"tenure\"])",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "MTEST_METHODS",
+      "kind": "other",
+      "module": null,
+      "docstring": "Built-in immutable sequence.\n\nIf no argument is given, the constructor returns an empty tuple.\nIf iterable is specified the tuple is initialized from iterable's items.\n\nIf the argument is a tuple, the return value is the same object.",
+      "signature": null
+    },
+    {
+      "name": "MTestResult",
+      "kind": "class",
+      "module": "westata.postestimation.mtest",
+      "docstring": "The per-variable heteroskedasticity tests and their adjusted p-values.\n\nAttributes\n----------\ntable:\n    DataFrame indexed by variable with columns ``chi2``, ``df``, ``p`` and,\n    when an adjustment was applied, ``adjustp``.\nmethod:\n    The adjustment method used, or ``\"noadjust\"``.",
+      "signature": "(table: 'Any', method: 'str') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, dict[str, float]]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        },
+        {
+          "name": "to_matrix",
+          "signature": "(self) -> 'np.ndarray'"
+        }
+      ]
     },
     {
       "name": "Manova",
@@ -473,6 +785,14 @@
         {
           "name": "summary",
           "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -503,6 +823,29 @@
         {
           "name": "render",
           "signature": "(self) -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'list[dict[str, Any]]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "MoranResult",
+      "kind": "class",
+      "module": "westata.postestimation.moran",
+      "docstring": "Moran's I test for spatial correlation.\n\nAttributes\n----------\nstatistic:\n    ``chi2`` -- the squared standardised ``I``, on one degree of freedom.\ndf:\n    Always 1 for a single error lag.\npvalue:\n    ``P > chi2(1)``.\nmoran_i:\n    Moran's ``I`` itself.\nexpected_i:\n    ``E[I] = -1/(n-1)``.\nz:\n    ``(I - E[I]) / sd(I)``.\nerrorlags:\n    How many weighting matrices were combined.",
+      "signature": "(statistic: 'float', df: 'float', pvalue: 'float', moran_i: 'float', expected_i: 'float', z: 'float', errorlags: 'int' = 1) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
         }
       ]
     },
@@ -512,9 +855,24 @@
       "module": "westata.estimators.discrete",
       "docstring": "Multinomial logistic regression (Stata ``mlogit``).\n\nThe base outcome's coefficients are normalised to zero and Stata still PRINTS them, as a\nrow of zeros in ``e(b)``. That detail matters for matching ``e(b)`` exactly and is why the\nparameter vector here has ``levels * predictors`` entries rather than\n``(levels - 1) * predictors``.\n\nReference from a live ``mlogit y land mci, base(1)`` on a 504-observation sample with three\noutcome levels (see tests/test_mlogit.py for the exact fixture and every coefficient), with\n``e(ll) = -491.487956370835`` and the coefficient vector\n\n    1:land 1:mci 1:_cons | 2:land 2:mci 2:_cons | 3:land 3:mci 3:_cons\n       0     0      0    | .00001555 -1.3655805 1.1794885 | ...",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
-      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Any' = None, *, maxiter: 'int' = 200, **kwargs: 'Any') -> 'Any'",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = False) -> 'Any'",
       "methods": []
+    },
+    {
+      "name": "MundlakResult",
+      "kind": "class",
+      "module": "westata.postestimation.mundlak",
+      "docstring": "The Mundlak specification test.\n\nAttributes\n----------\nstatistic:\n    The joint Wald statistic on the group-mean coefficients.\ndf:\n    Number of regressors tested (one per slope).\npvalue:\n    ``P > chi2(df)``.\ntested:\n    Names of the group-mean terms.",
+      "signature": "(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
     },
     {
       "name": "Mvreg",
@@ -532,9 +890,14 @@
       "module": "westata.estimators.treatreg_effects",
       "docstring": "Nearest-neighbour matching (Stata ``teffects nnmatch``).\n\nImpute each observation's counterfactual from the ``nneighbor`` closest\nobservations in the other arm, measured by the **Mahalanobis** distance\nunder the sample covariance of the covariates -- which is what\n``teffects nnmatch`` uses by default and what reproduces its 2.051839\nexactly on the reference data.  Euclidean distance gives 2.046771, about\n0.25% away, so the metric is not a detail.  Matching is with replacement, so\na control may serve several treated units.\n\nStandard errors: an approximation, and labelled as one\n------------------------------------------------------\n``se_method`` on the result reads ``\"Abadie-Imbens approximation\"`` rather\nthan ``\"influence function\"``, because this is the one estimator here whose\nvariance is **not** reproduced exactly.  Stata reports 0.0691114 for the\nfixture; the implementation below gives 0.0706220, a gap of +2.2%.\n\nThe gap lives entirely in the estimated conditional variance\n``sigma^2(X_i)``.  The Abadie-Imbens variance has the form\n\n    V = (1/n^2) sum_i (1 + K_i)^2 sigma^2_i\n\nwhere ``K_i`` counts how often observation ``i`` is reused as a match -- the\nreuse term is the whole point, since a control used many times injects its\nnoise many times.  ``K_i`` is reproduced exactly; ``sigma^2_i`` is estimated\nhere as ``0.5 (y_i - y_j)^2`` with ``j`` the nearest **same-arm** neighbour,\nwhich is the standard matching estimator of the conditional variance.\nSeveral plausible variants bracket Stata's number (0.0691 to 0.0706) without\nsingling out one, and Stata's exact estimator for this term is not publicly\ndocumented to the digit, so the honest move is to report the measured gap\nrather than tune a constant until one sample lines up.\n\nBecause the ATE variance is asymptotic for the effect, the potential-outcome\nmeans have no separate matching variance; their reported standard errors are\nthe effect's error rescaled by the share of the sample each mean covers, and\nthey inherit the same caveat.",
       "signature": "(y: 'Any', treated: 'Any', x: 'Any', *, nneighbor: 'int' = 1, estimand: 'str' = 'ate') -> 'None'",
-      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, nneighbor: 'int' = 1, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'NearestNeighbourMatching'\"",
+      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'",
       "fit": "(self) -> 'TreatmentEffectResult'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, nneighbor: 'int' = 1, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'NearestNeighbourMatching'\""
+        }
+      ]
     },
     {
       "name": "NegativeBinomial",
@@ -542,7 +905,7 @@
       "module": "westata.estimators.discrete",
       "docstring": "Negative binomial regression (Stata ``nbreg``).\n\nstatsmodels parameterises the dispersion as ``alpha`` (``Var = mu +\nalpha*mu^2``), the same as Stata's default ``nbreg`` output.  ``bfgs`` is\nused rather than Newton: the alpha parameter makes the Newton step diverge\nwhen started from the Poisson fit, which is statsmodels' own\n``NegativeBinomial.fit`` default for this reason.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
@@ -552,7 +915,7 @@
       "module": "westata.estimators.discrete",
       "docstring": "Negative binomial regression with a CONSTANT dispersion (Stata ``nbreg, dispersion(constant)``).\n\nNB1 has ``Var = mu (1 + delta)``, so the variance is linear in the mean; Stata's default NB2 has\n``Var = mu + alpha mu^2``. They are different models with different likelihoods, which is why this is a\nseparate class rather than a flag on :class:`NegativeBinomial`.\n\nThe likelihood and score are transcribed from ``nbreg_al.ado`` (lines 19-52), including the\nparameterisation that is easy to miss: the gamma terms involve\n\n    m = exp(xb - lndelta) = mu / delta\n\nnot ``mu``. Using ``mu`` there still converges and reports plausible coefficients -- it just fits a\ndifferent model, and the mismatch only shows up when the likelihood is compared at STAT'S estimates.\n\nVerified on the sweep's own data against a live Stata: coefficients 5.8e-10, ``delta`` 6.0e-10,\nlog-likelihood 2.3e-14.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Any' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, tol: 'float' = 1e-12, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
@@ -572,6 +935,14 @@
         {
           "name": "predict",
           "signature": "(self, exog: 'Any' = None, kind: 'str' = 'xb', **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -584,6 +955,25 @@
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, start: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> \"'Nl'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 200, strict: 'bool' = True) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "NnmatchResult",
+      "kind": "class",
+      "module": "westata.estimators.nnmatch",
+      "docstring": "``teffects nnmatch``: ATET from Mahalanobis nearest-neighbour matching.",
+      "signature": "(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', metric: 'str' = 'mahalanobis', caliper: 'float' = nan, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "OLS",
@@ -601,7 +991,7 @@
       "module": "westata.estimators.discrete",
       "docstring": "Ordered logistic regression (Stata ``ologit``).",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_Ordered'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
@@ -611,7 +1001,7 @@
       "module": "westata.estimators.discrete",
       "docstring": "Ordered probit regression (Stata ``oprobit``).",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_Ordered'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
@@ -662,8 +1052,27 @@
       "docstring": "Fixed-effects panel regression (Stata ``xtreg, fe``).\n\nParameters\n----------\nformula:\n    Two-sided formula in statsmodels/patsy syntax, for example\n    ``\"y ~ x1 + x2\"``.  The constant is implied by patsy exactly as in\n    :class:`westata.estimators.linear.OLS`, so ``e(b)`` includes\n    ``Intercept`` even though the within transformation absorbs it.\n    Drop it with ``\"y ~ x1 + x2 - 1\"`` to follow Stata's ``noconstant``.\ndata:\n    Panel frame.  Either a long frame with the ``entity``/``time`` columns,\n    or a frame already indexed by a two-level ``(entity, time)``\n    ``MultiIndex`` (``entity``/``time`` must then name two of its levels).\nentity, time:\n    Names of the panel dimensions.\n\nNotes\n-----\nRows with missing values are dropped listwise *before* estimation, and the\nretained sample is what ``e(N)`` counts, so ``e(N)`` can be smaller than\n``len(data)`` - the same behaviour as Stata's ``regress``/``xtreg``.\n\nKnown deviations: ``e(df_m)``, ``e(rank)`` and ``e(df_b)`` under clustering\n---------------------------------------------------------------------------\nDeliberate, and approved by the Lead.  Stata's own ``e()`` block disagrees\nwith itself here, so westata does not copy it.\n\nMeasured with StataNow 19.5 on 2026-10-24, 30 entities x 6 periods,\n``xtset id t``::\n\n    command                                  e(df_m) e(df_b) e(rank)  prints\n    xtreg y x1,     fe vce(cluster id)          0      1       1      F(1, 29) = 211.29\n    xtreg y x1 x2,  fe vce(cluster id)          1      2       2      F(2, 29) = 303.80\n    xtreg y x1 x2 z, fe vce(cluster id)         2      3       3      F(3, 29) = 254.47\n\nStata's clustered ``xtreg, fe`` redefines both scalars relative to the\n*reported* model, not to the parameter vector:\n\n* ``e(df_m) = slopes - 1`` (the reported rank minus one),\n* ``e(rank)  = slopes``,\n\nwhile the F it prints and the ``e(p)`` it stores are\n``F(e(df_b), e(df_r))``.  With two slopes, ``e(df_m)`` says 1, ``e(rank)``\nsays 2, and the printed test is ``F(2, 29)``.  Stata also keeps the\nunclustered values in ``e(df_r_mb) = 148`` and ``e(rank_mb) = 3``, which is\nwhat shows the redefinition is deliberate: under clustering both scalars\nshift down by one because Stata counts the *free* parameters of the\nclustered problem (the slopes alone) rather than the model's columns.\n\nwestata reports the parameter vector's own quantities - ``e(df_m)`` = the\nnumber of slopes (2), ``e(rank)`` = ``len(e(b))`` = slopes + 1 (3, the\nconstant included) - plus ``e(df_b)`` = 2.  So against Stata's clustered\nvalues, ``e(df_m)`` is +1 and ``e(rank)`` is +1:\n\n=====================  =========  =========  =======\nquantity               Stata      westata    delta\n=====================  =========  =========  =======\n``e(df_m)`` (2 slopes)       1          2      +1\n``e(rank)``  (2 slopes)      2          3      +1\n``e(df_b)``                  2          2       0\n``e(df_r)``                 29         29       0\n``e(F)``                 303.80     303.80       0  (6.5e-16 relative)\n=====================  =========  =========  =======\n\nCopying Stata's ``e(df_m)`` would make the summary read ``F(1, 29) = 303.80``\n- a degrees-of-freedom label contradicting its own p-value - so a visibly\nwrong *label* is the lesser evil than a wrong *number*.  ``e(rank)`` is kept\nas the honest rank of the fitted model for the same class of reason: it is\nwhat :class:`westata.results.StataResults` and the postestimation machinery\nuse for the size of ``e(b)``/``e(V)``, and shrinking it to Stata's\nclustered-scalar convention would silently change unrelated scalars\n(``aic``/``bic``-style counts, ``/sigma`` handling) that read it.  Changing\neither number is therefore out of scope for a documentation fix; only the\nF statistic has to match, and it does.\n\nThe real fix, if the Lead ever wants bit-for-bit ``e()`` equality, is to\nstore Stata's values and teach :mod:`westata.results.summary` to label F\ntests from ``e(df_b)`` - that needs a file outside this module's ownership.\n\nEverything else about a clustered ``xtreg, fe`` is reproduced, including\n``e(df_r) = G - 1`` (``29`` on that panel, with the model-based ``148`` in\n``e(df_r_mb)``) and the ``N - rank`` denominator Stata uses for\n``e(rmse)``/``e(r2_a)`` under clustering.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
-      "fit": "(self, entity_effects: 'bool' = True, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = True, time_effects: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "PanelUnitRootResult",
+      "kind": "class",
+      "module": "westata.estimators.panel_iv",
+      "docstring": "A panel unit-root statistic together with its p-value.\n\nStata's ``xtunitroot`` stores these in ``r()``, not ``e()``: the command is an\nr-class test, not an estimation.  Returning a ``StataResults`` would mean\ninventing an ``e(b)`` and an ``e(V)`` that Stata never produces, so this small\ndataclass is the honest container.\n\nAttributes\n----------\nstatistic:\n    The statistic carrying the p-value (``Z-t-tilde-bar`` for IPS,\n    ``Adjusted t*`` for LLC).\npvalue:\n    Lower-tail standard-normal p-value of ``statistic``.\ntest:\n    ``\"ips\"`` or ``\"llc\"``.\nname:\n    Stata's label for the reported statistic.\ndetails:\n    The other statistics Stata prints in the same table, so a caller can\n    reproduce the whole table rather than one line of it.",
+      "signature": "(statistic: 'float', pvalue: 'float', test: 'str', name: 'str' = '', details: 'Mapping[str, float] | None' = None) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "ParsedExpressionList",
@@ -696,9 +1105,28 @@
       "module": "westata.estimators.discrete",
       "docstring": "Poisson regression (Stata ``poisson``).\n\nNO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design\nmatrix as complete and what to pass instead.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "PortmanteauResult",
+      "kind": "class",
+      "module": "westata.postestimation.serial",
+      "docstring": "``wntestq``: Ljung-Box portmanteau Q for white noise.",
+      "signature": "(q: 'float', df: 'int', pvalue: 'float', lags: 'int', n_gaps: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "PraisResult",
@@ -720,6 +1148,14 @@
         {
           "name": "summary",
           "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, object]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
         }
       ]
     },
@@ -729,9 +1165,47 @@
       "module": "westata.estimators.discrete",
       "docstring": "Probit regression (Stata ``probit``).\n\nNO INTERCEPT IS ADDED -- see :class:`Logit` for why the array interface treats the design\nmatrix as complete and what to pass instead.",
       "signature": "(endog: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None, freq_weights: 'Any' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_DiscreteT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "PsmatchResult",
+      "kind": "class",
+      "module": "westata.estimators.psmatch",
+      "docstring": "``teffects psmatch``: ATET from propensity-score nearest-neighbour matching.",
+      "signature": "(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', outcome: 'str', caliper: 'float' = nan, treatment_model: 'str' = 'logit', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
+    },
+    {
+      "name": "PwCompareTable",
+      "kind": "class",
+      "module": "westata.postestimation.contrast",
+      "docstring": "A whole ``pwcompare`` table: N pairwise contrasts rendered as ONE Stata table.\n\nSubclasses ``list`` for the same reason :class:`MarginsTable` does -- ``pwcompare``\nhas always returned a plain list of :class:`LincomResult` and callers index, iterate\nand ``len`` it. Subclassing keeps all of that while giving the collection a\n``__str__``, so a call renders a table instead of a list-of-dataclass repr.\n\nReference, from a live ``pwcompare grp`` after ``regress consumption i.grp temp``::\n\n    Pairwise comparisons of marginal linear predictions\n    Margins: asbalanced\n    --------------------------------------------------------------\n                 |                                 Unadjusted\n                 |   Contrast   Std. err.     [95% conf. interval]\n    -------------+------------------------------------------------\n             grp |\n         2 vs 1  |  -.0035617   .0194151     -.0434699    .0363465\n         3 vs 1  |   .0112906   .0194011     -.0285889    .0511701\n         3 vs 2  |   .0148523   .0193778     -.0249792    .0546839\n    --------------------------------------------------------------\n\nMeasured geometry: table lines are 62 characters with the pipe at column 13; the\ncontrast ends at 25, the standard error at 36, the lower bound at 50 and the upper\nbound at 62.",
+      "signature": "(rows: 'Sequence[LincomResult]', *, term: 'str' = '', margin_label: 'str' = 'asbalanced', comparison: 'str' = 'Unadjusted') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "render",
+          "signature": "(self) -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'list[dict[str, Any]]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "QuantileRegression",
@@ -750,7 +1224,7 @@
       "docstring": "Random-effects GLS (Stata ``xtreg, re``).\n\nUses linearmodels' default Swamy-Arora variance-component estimator; the\noptional ``small_sample`` refinement is deliberately left off so that the\nestimator is exactly the documented default.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
-      "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'",
       "methods": []
     },
     {
@@ -760,8 +1234,61 @@
       "docstring": "Random-effects by MAXIMUM LIKELIHOOD (Stata ``xtreg, mle``).\n\n``xtreg, re`` is a GLS estimator that plugs in Swamy-Arora variance components;\n``xtreg, mle`` maximises the same random-effects likelihood over the coefficients AND the\ntwo variance components at once. They are different estimators and give different numbers:\n\n    re   ltlan .565591486884  ltwlab .144184445858  sigma_u .133248446685\n    mle  ltlan .564328798388  ltwlab .140897433220  sigma_u .214109360143\n\n``sigma_u`` differs by 60%, so this cannot be emulated by adjusting the GLS output.\n\nFitted with statsmodels' ``MixedLM`` (ML, not REML -- Stata's ``xtreg, mle`` maximises the\nfull likelihood). Nelder-Mead is used rather than the default because it lands closer to\nStata's optimum on the reference fit: llf 332.8973943565 against 332.8973943543, with\n``ltlan`` agreeing to 1.6e-7 where the default was 9.8e-7 away.\n\nStandard errors come from the inverse of the observed information, which is what Stata\nreports; the reference values agree to about 1e-6.",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'PanelOLS'\"",
-      "fit": "(self, entity_effects: 'bool' = False, time_effects: 'bool' = False, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None) -> 'StataResults'",
+      "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "RcmResult",
+      "kind": "class",
+      "module": "westata.postestimation.rcm",
+      "docstring": "Regression control method outcome.",
+      "signature": "(att: 'float', unit: 'str', treatment_period: 'float', predictors: 'tuple[str, ...]', coefficients: 'np.ndarray', pre_years: 'np.ndarray', post_years: 'np.ndarray', actual: 'np.ndarray', predicted: 'np.ndarray', method: 'str' = 'forward', criterion: 'str' = 'aicc') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "RdRobustResult",
+      "kind": "class",
+      "module": "westata.estimators.rdrobust",
+      "docstring": "``rdrobust``: sharp RD estimate at a cutoff.\n\n``se``/``z``/``pvalue``/``ci`` are ``nan`` when the variance estimator could not be\nreproduced; ``variance_matches_stata`` records which case applies.\n\nWHY THE VARIANCE IS NOT REPRODUCED -- and this one IS a hard boundary, unlike several\nearlier gaps in this codebase that turned out to be recoverable. The point estimate\nmatches Stata exactly (``rdrobust diff border, c(30) h(5) b(8)`` gives tau_cl\n121.297562295 here and 121.297562295 in Stata). The variance is computed inside\n``rdrobust_vce``, which lives ONLY in the compiled Mata library\n``~/ado/plus/l/lrdrobust.mlib`` -- there is no ``.ado``/``.mata`` source for it, unlike\n``rdrobust.ado`` itself, which IS readable at ``~/ado/plus/r/rdrobust.ado`` (1331 lines).\n\nWhat the readable part pins down, verified against Stata's own ``e(V_cl_l)`` /\n``e(V_cl_r)`` (h(5) b(8) on border.dta, cutoff 30)::\n\n    V_cl_l = [[496.94559, 225.18263], [225.18263, 167.66193]]\n    V_cl_r = [[4303.6294, -1188.4335], [-1188.4335, 336.15059]]\n    sqrt((V_cl_l + V_cl_r)[1,1]) = 69.2861818   == Stata se_tau_cl 69.2861819408\n\ni.e. ``se = sqrt((V_l + V_r)[deriv, deriv])`` in zero-based terms -- the Mata code's\n``[deriv+1, deriv+1]``. What is NOT recovered is how V_l/V_r are built from the\nresiduals. The standard CR1 sandwich candidates were tried and all miss on the very\nsection used for the check above (n_left = 5, only a 2-column design):\n\n    w^2 * res^2   ->  38.16     (target 496.95)\n    w   * res^2   -> 240.47\n    w   * res^2 * n -> 1202.33\n\nReporting any of those would be the plausible-but-wrong number this project refuses, so\nthe inferential fields stay NaN and the test suite asserts that they do.",
+      "signature": "(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandwidth: 'float', nobs: 'int', nobs_left: 'int', nobs_right: 'int', nobs_effective_left: 'int', nobs_effective_right: 'int', order: 'int', bias_order: 'int', kernel: 'str', coef_covs: 'Any' = None, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "RegFResult",
+      "kind": "class",
+      "module": "westata.postestimation.endog_regf",
+      "docstring": "Stata's ``regF`` endogeneity test.\n\nAttributes\n----------\nstatistic, df_num, df_denom, pvalue:\n    The F statistic, its two degrees of freedom and the upper-tail p-value.\ntest:\n    Always ``\"regF\"``; present so callers can branch on the same attribute\n    the score results expose.",
+      "signature": "(*, statistic: 'float', df_num: 'float', df_denom: 'float') -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
     },
     {
       "name": "RegressionAdjustment",
@@ -769,9 +1296,14 @@
       "module": "westata.estimators.treatreg_effects",
       "docstring": "Regression adjustment (Stata ``teffects ra``).\n\nFit the outcome model ``y ~ x`` **separately** in each treatment arm, predict\nboth potential outcomes for every observation, and average::\n\n    yhat1 = X @ b1       ATE  = mean(yhat1 - yhat0)\n    yhat0 = X @ b0       ATET = mean over the treated of (yhat1 - yhat0)\n\nwith ``POmean(0) = mean(yhat0)`` and ``POmean(1) = mean(yhat1)`` (taken over\nthe treated for the ATET).  Allowing the slopes to differ by arm is what\nseparates this from a single regression with a treatment dummy, and on the\nreference data it is the difference between 2.0345 and a badly biased number.\n\nInfluence functions\n-------------------\nTwo sources of sampling error matter, and the second is the one that is easy\nto forget.  The residuals ``y - yhat`` are orthogonal to the design within\neach arm, so the usual score terms vanish identically; what remains is the\nerror in the estimated *coefficients*::\n\n    psi_i = (yhat1_i - yhat0_i) - ATE + (u1_i - u0_i)' xbar\n\nwhere ``u_t,i = (X_t'X_t / n)^{-1} x_i t_i e_i`` is the coefficient influence\nfunction of arm ``t``.  Dropping that term reports 0.0018 instead of Stata's\n0.0610149 -- a 33-fold understatement that no point-estimate test would\nnotice.  For the ATET the leading term is divided by ``mean(t)`` and the\ncoefficient influence is evaluated at the treated covariate mean.",
       "signature": "(y: 'Any', treated: 'Any', x: 'Any', *, estimand: 'str' = 'ate') -> 'None'",
-      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'RegressionAdjustment'\"",
+      "from_formula": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwargs: 'Any') -> 'Any'",
       "fit": "(self) -> 'TreatmentEffectResult'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', subset: 'Any' = None) -> \"'RegressionAdjustment'\""
+        }
+      ]
     },
     {
       "name": "RobustRegression",
@@ -794,6 +1326,13 @@
       "methods": []
     },
     {
+      "name": "SUPPORTED_TYPES",
+      "kind": "other",
+      "module": null,
+      "docstring": "dict() -> new empty dictionary\ndict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)",
+      "signature": null
+    },
+    {
       "name": "Sqreg",
       "kind": "class",
       "module": "westata.estimators.quantile_boot",
@@ -802,6 +1341,197 @@
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), subset: 'Any' = None) -> \"'Sqreg'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 200, seed: 'int | None' = None, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
+    },
+    {
+      "name": "StataResults",
+      "kind": "class",
+      "module": "westata.results.base",
+      "docstring": "Estimation results with a statsmodels-compatible API.\n\nParameters\n----------\nparams:\n    Point estimates, length ``k``.\nparam_names:\n    Variable names, length ``k``; used as the index of every coefficient\n    Series.\ncov:\n    Covariance matrix (``k x k``) already including all requested\n    small-sample corrections.\nresid, fittedvalues:\n    Observation-level residuals and fitted values, length ``nobs``.\nnobs, df_resid, df_model:\n    Sample size and degrees of freedom.  ``df_resid`` is the reference\n    distribution's degrees of freedom (for clustered VCE it is ``G - 1``,\n    not necessarily ``nobs - k``).\ndist:\n    ``\"t\"`` for coefficient t tests / t confidence intervals, ``\"z\"`` for\n    normal tests (logit, probit, Poisson, ...).\nmodel_name:\n    Label shown in summaries (``\"OLS\"``, ``\"Logit\"``, ...).\ncov_type:\n    Covariance estimator label recorded for display and auditing.\ne:\n    Optional Stata ``e()`` scalars.  They are merged over the computed\n    defaults ``N``, ``df_m`` and ``df_r`` (an explicit ``e()`` value wins).",
+      "signature": "(*, params: 'np.ndarray', param_names: 'list[str]', cov: 'np.ndarray', resid: 'np.ndarray', fittedvalues: 'np.ndarray', nobs: 'int', df_resid: 'float', df_model: 'float', dist: 'str' = 't', model_name: 'str' = '', cov_type: 'str' = 'nonrobust', e: 'Mapping[str, Any] | None' = None, design_matrix: 'tuple[np.ndarray, list[str]] | None' = None, model_data: 'pd.DataFrame | None' = None, level: 'float | None' = None) -> 'None'",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "conf_int",
+          "signature": "(self, alpha: 'float | None' = None) -> 'pd.DataFrame'"
+        },
+        {
+          "name": "contrast",
+          "signature": "(self, term: 'str', method: 'str' = 'r', *, level: 'float' = 0.95, nowald: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "cov_params",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        {
+          "name": "ereturn_list",
+          "signature": "(self) -> 'str'"
+        },
+        {
+          "name": "estat_auc",
+          "signature": "(self) -> 'Any'"
+        },
+        {
+          "name": "estat_bgodfrey",
+          "signature": "(self, *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'Any'"
+        },
+        {
+          "name": "estat_classification",
+          "signature": "(self, *, cutoff: 'float' = 0.5, y: 'Any' = None, probabilities: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_corrgram",
+          "signature": "(self, *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'"
+        },
+        {
+          "name": "estat_dwatson",
+          "signature": "(self, *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'"
+        },
+        {
+          "name": "estat_endogenous",
+          "signature": "(self, *, lags: 'int | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_esize",
+          "signature": "(self, *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'Any'"
+        },
+        {
+          "name": "estat_firststage",
+          "signature": "(self, *, all: 'bool' = False, forcenonrobust: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "estat_gof",
+          "signature": "(self, *, y: 'Any' = None, mu: 'Any' = None, group: 'int | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_hettest",
+          "signature": "(self, *, method: 'str' = 'normal', variables: 'Sequence[str] | None' = None, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_ic",
+          "signature": "(self, *, n: 'float | None' = None, df: 'float | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_imtest",
+          "signature": "(self, *, white: 'bool' = False, design: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_moran",
+          "signature": "(self, errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_mundlak",
+          "signature": "(self, *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_overid",
+          "signature": "(self, *, lags: 'int | None' = None, forcenonrobust: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "estat_ovtest",
+          "signature": "(self, *, rhs: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "estat_ptrends",
+          "signature": "(self) -> 'dict[str, float]'"
+        },
+        {
+          "name": "estat_summarize",
+          "signature": "(self, *, data: 'pd.DataFrame | None' = None, variables: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, cluster: 'Any' = None, cluster_name: 'str' = '', noweights: 'bool' = False, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_szroeter",
+          "signature": "(self, variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'"
+        },
+        {
+          "name": "estat_vce",
+          "signature": "(self, *, correlation: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "estat_vif",
+          "signature": "(self, *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "estat_weakrobust",
+          "signature": "(self, *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "f_test",
+          "signature": "(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "first_stage",
+          "signature": "(self) -> 'str'"
+        },
+        {
+          "name": "get_influence",
+          "signature": "(self) -> 'Any'"
+        },
+        {
+          "name": "hausman",
+          "signature": "(self, efficient: 'Any', *, constant: 'bool' = False, sigmamore: 'bool' = False, sigmaless: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "lincom",
+          "signature": "(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "linktest",
+          "signature": "(self) -> 'Any'"
+        },
+        {
+          "name": "lrtest",
+          "signature": "(self, restricted: 'Any') -> 'Any'"
+        },
+        {
+          "name": "margins",
+          "signature": "(self, *, dydx: 'Sequence[str] | str | None' = None, eyex: 'Sequence[str] | str | None' = None, dyex: 'Sequence[str] | str | None' = None, eydx: 'Sequence[str] | str | None' = None, at: 'Mapping[str, Any] | None' = None, atmeans: 'bool' = False, over: 'str | None' = None, exog: 'np.ndarray | None' = None, param_names: 'Sequence[str] | None' = None, level: 'float' = 0.95, predict_kind: 'str | None' = None, factor_vars: 'Sequence[str] | None' = None, outcome: 'int | None' = None) -> 'Any'"
+        },
+        {
+          "name": "nlcom",
+          "signature": "(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "predict",
+          "signature": "(self, exog: 'np.ndarray | None' = None, kind: 'str | None' = None, *, lower: 'float | None' = None, upper: 'float | None' = None, outcome: 'int | None' = None, n: 'int | float | None' = None) -> 'Any'"
+        },
+        {
+          "name": "pwcompare",
+          "signature": "(self, term: 'str', *, level: 'float' = 0.95, adjust: 'str | None' = None) -> 'Any'"
+        },
+        {
+          "name": "relabel_cov_type",
+          "signature": "(self, cov_type: 'str') -> 'None'"
+        },
+        {
+          "name": "suest",
+          "signature": "(self, *others: 'Any', names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'Any'"
+        },
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'"
+        },
+        {
+          "name": "t_test",
+          "signature": "(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'"
+        },
+        {
+          "name": "test",
+          "signature": "(self, *specs: 'Any', coef: 'bool' = False) -> 'Any'"
+        },
+        {
+          "name": "testnl",
+          "signature": "(self, expression: 'str') -> 'Any'"
+        },
+        {
+          "name": "wald_test",
+          "signature": "(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'"
+        },
+        {
+          "name": "wntestq",
+          "signature": "(self, *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "StoredResults",
@@ -815,6 +1545,37 @@
         {
           "name": "lookup",
           "signature": "(self, table: 'str', key: 'str') -> 'float'"
+        }
+      ]
+    },
+    {
+      "name": "SucestResult",
+      "kind": "class",
+      "module": "westata.postestimation.suest",
+      "docstring": "The stacked parameter vector and its simultaneous covariance matrix.\n\nAttributes\n----------\nparams:\n    All models' coefficients, concatenated in the order the models were given.\ncovariance:\n    The sandwich covariance, spanning every coefficient.\nparam_names:\n    Model-prefixed names, so a coefficient can be traced back to its equation.\nmodels:\n    How many fits were combined.\nn_observations:\n    Size of the union of the estimation samples.",
+      "signature": "(params: 'np.ndarray', covariance: 'np.ndarray', param_names: 'list[str]', models: 'int', n_observations: 'int', _df_resid: 'float' = 1.0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "cov_params",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        {
+          "name": "lincom",
+          "signature": "(self, expression: 'str', **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "test",
+          "signature": "(self, *specs: 'Any', **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
         }
       ]
     },
@@ -834,6 +1595,25 @@
         {
           "name": "to_frame",
           "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "SummarizeTable",
+      "kind": "class",
+      "module": "westata.postestimation.summary_stats",
+      "docstring": "The ``summarize`` table.",
+      "signature": "(rows: 'list[tuple[str, float, float, float, float, float]]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -993,6 +1773,14 @@
         {
           "name": "summary",
           "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -1008,6 +1796,67 @@
         {
           "name": "summary",
           "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "SzroeterResult",
+      "kind": "class",
+      "module": "westata.postestimation.szroeter",
+      "docstring": "One row of ``estat szroeter``.\n\nAttributes\n----------\nvariable:\n    The regressor or variable tested.\nstatistic:\n    ``Q``, chi-square with one degree of freedom.\npvalue:\n    Upper-tail probability.\nadjusted_pvalue:\n    The multiple-testing adjusted value, when ``mtest`` was requested.",
+      "signature": "(variable: 'str', statistic: 'float', pvalue: 'float', adjusted_pvalue: 'float | None' = None) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
+    },
+    {
+      "name": "SzroeterTable",
+      "kind": "class",
+      "module": "westata.postestimation.szroeter",
+      "docstring": "The multi-variable form: one row per variable plus the adjustment method.",
+      "signature": "(rows: 'list[SzroeterResult]', method: 'str' = 'noadjust') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "TefectsRaResult",
+      "kind": "class",
+      "module": "westata.estimators.teffects_ra",
+      "docstring": "``teffects ra``: regression-adjustment treatment effects.",
+      "signature": "(ate: 'float', po_0: 'float', po_1: 'float', atet: 'float', nobs: 'int', treated: 'int', estimate: 'float', estimand: 'str', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -1031,6 +1880,14 @@
       "fit": null,
       "methods": [
         {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        },
+        {
           "name": "with_header",
           "signature": "(self, *, nobs: 'int', estimator: 'str', outcome_model: 'str', treatment_model: 'str') -> \"'TreatmentEffectResult'\""
         }
@@ -1042,7 +1899,7 @@
       "module": "westata.estimators.counts",
       "docstring": "Negative binomial truncated to ``[lower, upper]`` (Stata ``tnbreg``).",
       "signature": "(endog: 'Any', exog: 'Any', *, lower: 'float | None' = 1, upper: 'float | None' = None, param_names: 'list[str] | None' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> \"'_TruncatedBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> \"'_TruncatedBaseT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": [
         {
@@ -1061,7 +1918,7 @@
       "module": "westata.estimators.counts",
       "docstring": "Poisson truncated to ``[lower, upper]`` (Stata ``ztp`` / ``tpoisson``).\n\n``lower=1`` with no upper limit is the zero-truncated ``ztp``; any other\nlimit is Stata's ``tpoisson``, and ``model_name`` follows suit.",
       "signature": "(endog: 'Any', exog: 'Any', *, lower: 'float | None' = 1, upper: 'float | None' = None, param_names: 'list[str] | None' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> \"'_TruncatedBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = 1, upper: 'float | None' = None, subset: 'Any' = None) -> \"'_TruncatedBaseT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": [
         {
@@ -1092,7 +1949,16 @@
       "signature": "(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '', regression: 'str' = 'c') -> None",
       "from_formula": null,
       "fit": null,
-      "methods": []
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
     },
     {
       "name": "UnsupportedError",
@@ -1120,17 +1986,183 @@
       ]
     },
     {
+      "name": "VARResults",
+      "kind": "class",
+      "module": "westata.estimators.tseries",
+      "docstring": "Wrapper over a fitted VAR with Stata-flavoured accessors.\n\nStata's ``var`` normalises the residual covariance by **T per equation**,\nnot by ``T - k_eq`` where ``k_eq`` is that equation's regressor count.  The\ntwo differ by the factor ``(T - k_eq)/T`` -- 0.98997 for a bivariate VAR(1)\non 299 usable observations (``k_eq = 3``) -- which is exactly the gap the\nretest measured on ``bse``, ``e(Sigma)`` and ``vargranger``.  Every\nStata-facing accessor here applies that factor; ``raw_result`` remains\navailable for the statsmodels convention.",
+      "signature": "(_result: 'Any', names: 'list[str]', lags: 'int', trend: 'str', ml: 'bool' = True) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "estat_ic",
+          "signature": "(self, **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "estat_summarize",
+          "signature": "(self, **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "estat_vce",
+          "signature": "(self, **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "fevd",
+          "signature": "(self, periods: 'int' = 10) -> 'Any'"
+        },
+        {
+          "name": "fevd_table",
+          "signature": "(self, periods: 'int' = 10) -> 'Any'"
+        },
+        {
+          "name": "fevd_table_as_stata",
+          "signature": "(self, periods: 'int' = 10, *, irfname: 'str' = 'var1') -> 'str'"
+        },
+        {
+          "name": "forecast",
+          "signature": "(self, steps: 'int' = 1) -> 'np.ndarray'"
+        },
+        {
+          "name": "granger_causality",
+          "signature": "(self, caused: 'str', causing: 'Sequence[str]', *, statistic: 'str' = 'chi2') -> 'Any'"
+        },
+        {
+          "name": "irf",
+          "signature": "(self, periods: 'int' = 10) -> 'Any'"
+        },
+        {
+          "name": "irf_create",
+          "signature": "(self, path: 'str', *, irfname: 'str' = 'var1', step: 'int' = 10) -> 'Any'"
+        },
+        {
+          "name": "irf_table",
+          "signature": "(self, *, statistic: 'str' = 'oirf', impulse: 'str | int | None' = None, response: 'str | int | None' = None, periods: 'int' = 10, irfname: 'str' = 'var1') -> 'Any'"
+        },
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        }
+      ]
+    },
+    {
       "name": "VECM",
       "kind": "class",
       "module": "westata.estimators.tseries",
       "docstring": "Vector error-correction model (Stata ``vec``).\n\nParameters\n----------\ncoint_rank:\n    Cointegrating rank, from :meth:`johansen` or ``vecrank``.",
       "signature": "(endog: 'Any', *, coint_rank: 'int' = 1, lags: 'int' = 1, deterministic: 'str' = 'co', names: 'Sequence[str] | None' = None) -> 'None'",
       "from_formula": null,
-      "fit": "(self, cov_type: 'str | None' = None, **_: 'Any') -> 'Any'",
+      "fit": "(self, cov_type: 'str | None' = None) -> 'Any'",
       "methods": [
         {
           "name": "johansen",
           "signature": "(self, *, det_order: 'int' = 0, lags: 'int | None' = None, k_ar_diff: 'int | None' = None) -> \"'JohansenResult'\""
+        }
+      ]
+    },
+    {
+      "name": "VECMResults",
+      "kind": "class",
+      "module": "westata.estimators.tseries",
+      "docstring": "Wrapper over a fitted VECM with Stata-flavoured accessors.\n\n``VECM.fit`` used to return statsmodels' object directly, so a ``vec`` fit had NO\n``e()`` at all -- while ``VARResults`` (its sibling) carried the full Stata surface.\nAny postestimation code written generically over ``e()`` therefore worked for ``var``\nand failed for ``vec``.\n\nStata's ``vec`` names things in terms of the VECM representation: ``beta`` is the\ncointegrating vector, ``alpha`` the adjustment speeds, and ``k_ce`` the rank.",
+      "signature": "(raw: 'Any', names: 'list[str]', lags: 'int', coint_rank: 'int', deterministic: 'str', endog: 'Any' = None) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "conf_int",
+          "signature": "(self, alpha: 'float' = 0.05) -> 'np.ndarray'"
+        },
+        {
+          "name": "cov_params",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        {
+          "name": "estat_ic",
+          "signature": "(self, **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "estat_summarize",
+          "signature": "(self, **kwargs: 'Any') -> 'Any'"
+        },
+        {
+          "name": "llf",
+          "signature": "(self) -> 'float'"
+        },
+        {
+          "name": "summary",
+          "signature": "(self, style: 'str' = 'stata') -> 'str'"
+        }
+      ]
+    },
+    {
+      "name": "VarGrangerResult",
+      "kind": "class",
+      "module": "westata.postestimation.vargranger",
+      "docstring": "The ``vargranger`` table.",
+      "signature": "(rows: 'list[_Row]', equations: 'tuple[str, ...]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "VarSocResult",
+      "kind": "class",
+      "module": "westata.postestimation.varsoc",
+      "docstring": "``varsoc``: lag-order selection criteria for a VAR.",
+      "signature": "(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = ()) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "VarStableResult",
+      "kind": "class",
+      "module": "westata.postestimation.varstable",
+      "docstring": "``varstable``: eigenvalues of the companion matrix.",
+      "signature": "(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "VarWleResult",
+      "kind": "class",
+      "module": "westata.postestimation.varwle",
+      "docstring": "``varwle``: Wald tests that each lag's coefficients are jointly zero.",
+      "signature": "(rows: 'tuple[VarWleRow, ...]', equations: 'tuple[str, ...]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "by_equation",
+          "signature": "(self) -> 'dict[str, list[VarWleRow]]'"
+        },
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -1150,6 +2182,36 @@
         {
           "name": "to_frame",
           "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "VecRankResult",
+      "kind": "class",
+      "module": "westata.postestimation.vecrank",
+      "docstring": "``vecrank``: Johansen tests for cointegration.",
+      "signature": "(rows: 'tuple[VecRankRow, ...]', nobs: 'int', lags: 'int', equations: 'int', deterministic: 'str' = 'constant', show_max: 'bool' = False) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "VecStableResult",
+      "kind": "class",
+      "module": "westata.postestimation.vecstable",
+      "docstring": "``vecstable``: eigenvalues of a VECM's companion matrix.",
+      "signature": "(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -1199,6 +2261,21 @@
       ]
     },
     {
+      "name": "WeakRobustResult",
+      "kind": "class",
+      "module": "westata.postestimation.weakrobust",
+      "docstring": "One weak-instrument-robust test.\n\nAttributes\n----------\ntest:\n    ``\"Anderson-Rubin\"``.\nstatistic:\n    The chi-square form of the statistic.\nf_statistic:\n    The F form, which Stata prints alongside it.\ndf, df_denom:\n    Numerator (number of instruments tested) and denominator degrees of freedom.\npvalue:\n    Upper-tail probability of the F form.",
+      "signature": "(test: 'str', statistic: 'float', f_statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, float]'"
+        }
+      ]
+    },
+    {
       "name": "WeightError",
       "kind": "class",
       "module": "westata.errors",
@@ -1233,7 +2310,7 @@
       "kind": "class",
       "module": "westata.estimators.panel_dynamic",
       "docstring": "Arellano-Bond / Blundell-Bond dynamic panel GMM (Stata ``xtabond`` family).",
-      "signature": "(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str]' = ('L1.y',), exog_names: 'Sequence[str]' = ('x1',), system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'",
+      "signature": "(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str] | None' = None, exog_names: 'Sequence[str] | None' = None, system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', lags: 'int' = 1, system: 'bool' = False, subset: 'Any' = None) -> \"'XtAbond'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'",
       "methods": []
@@ -1309,6 +2386,25 @@
       "methods": []
     },
     {
+      "name": "XtTest0Result",
+      "kind": "class",
+      "module": "westata.postestimation.xttest0",
+      "docstring": "``xttest0``: the Breusch-Pagan LM test for random effects.",
+      "signature": "(chibar2: 'float', pvalue: 'float', var_u: 'float', var_e: 'float', var_y: 'float', nobs: 'int', entities: 'int', periods: 'int', depvar: 'str' = '', entity_name: 'str' = '', time_name: 'str' = '') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
       "name": "XtTobit",
       "kind": "class",
       "module": "westata.estimators.panel_nonlinear",
@@ -1323,9 +2419,9 @@
       "kind": "class",
       "module": "westata.estimators.panel_iv",
       "docstring": "Panel unit-root tests (Stata ``xtunitroot ips`` / ``xtunitroot llc``).\n\nBoth are panel-wide Dickey-Fuller procedures, and both match Stata on the\nfixture data because the look-up tables are transcribed rather than re-derived.\n\n``ips`` (Im-Pesaran-Shin; balanced, no lags by default)\n    Per panel, ``Delta y_it`` is regressed on ``y_i,t-1`` and a panel constant,\n    giving ``t_i``.  Stata reports three statistics:\n\n    * ``t-bar = mean(t_i)`` -- exact finite-``N`` tabulated critical values, and\n      no p-value;\n    * ``t-tilde-bar = mean(t_i * s_i / sigma(y_i))``, where ``s_i`` is the ADF\n      residual RMSE -- Stata's small-``T`` variant;\n    * ``Z-t-tilde-bar = sqrt(N)(t-tilde-bar - E)/sqrt(V)`` with ``E`` and ``V``\n      interpolated from IPS (2003) table 3 at ``T`` -- the one with a p-value.\n\n    On the fixture (90 panels x 9 periods) westata reproduces ``t-bar``\n    -2.0685, ``t-tilde-bar`` -1.5727 and ``Z`` -4.2953.\n\n``llc`` (Levin-Lin-Chu; balanced, one ADF lag by default)\n    Stata's default is ``lags(1)`` with a Bartlett kernel whose bandwidth is\n    ``int(3.21 * T^(1/3))`` -- 6 at ``T = 9``, which is why the fixture header\n    prints \"6.00 lags average\".  The adjusted statistic is\n    ``t* = (t - N*Tbar*sbar/Var_ep * se(t) * mu) / sigma`` with ``(mu, sigma)``\n    interpolated from LLC (2002) table 2.  On the fixture westata reproduces\n    ``Unadjusted t = -21.7694`` and ``Adjusted t* = -15.1701``.\n\nBoth tests require a strongly balanced panel with no gaps -- Stata's\nrequirement too (``_xtstrbal``).  An unbalanced panel raises\n:class:`westata.errors.ConsistencyError` rather than silently using whichever\nrows happen to line up.  ``trend``, ``noconstant``, ``demean`` and\ninformation-criterion lag selection raise\n:class:`westata.errors.UnsupportedError`.",
-      "signature": "(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str' = 'y') -> 'None'",
+      "signature": "(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str | None' = None) -> 'None'",
       "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> \"'XtUnitroot'\"",
-      "fit": "(self, **_ignored: 'Any') -> 'PanelUnitRootResult'",
+      "fit": "(self) -> 'PanelUnitRootResult'",
       "methods": []
     },
     {
@@ -1336,7 +2432,12 @@
       "signature": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'",
       "from_formula": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> \"'Didregress'\"",
       "fit": "(self, cov_type: 'str' = 'cluster') -> 'StataResults'",
-      "methods": []
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> \"'Didregress'\""
+        }
+      ]
     },
     {
       "name": "ZeroInflatedNegativeBinomial",
@@ -1344,7 +2445,7 @@
       "module": "westata.estimators.counts",
       "docstring": "Zero-inflated negative binomial, NB2 (Stata ``zinb``).\n\n``alpha`` is estimated as ``/lnalpha``.  Quasi-Newton is used because the\ndispersion parameter makes the Newton step diverge from the Poisson start,\nthe same reason ``nbreg`` uses ``bfgs`` here.",
       "signature": "(endog: 'Any', exog: 'Any', *, inflate_exog: 'Any' = None, inflate_names: 'list[str] | None' = None, param_names: 'list[str] | None' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_ZeroInflatedBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_ZeroInflatedBaseT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": [
         {
@@ -1363,7 +2464,7 @@
       "module": "westata.estimators.counts",
       "docstring": "Zero-inflated Poisson (Stata ``zip``).\n\nWith ``inflate is None`` the model is the plain Poisson regression, fit by\nthe same likelihood, so its coefficients agree with\n:class:`westata.estimators.discrete.Poisson` to optimiser tolerance.",
       "signature": "(endog: 'Any', exog: 'Any', *, inflate_exog: 'Any' = None, inflate_names: 'list[str] | None' = None, param_names: 'list[str] | None' = None) -> 'None'",
-      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_ZeroInflatedBase'\"",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, inflate: 'str | None' = None, subset: 'Any' = None, freq_weights: 'str | None' = None) -> \"'_ZeroInflatedBaseT'\"",
       "fit": "(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'",
       "methods": [
         {
@@ -1375,6 +2476,13 @@
           "signature": "(self) -> 'np.ndarray'"
         }
       ]
+    },
+    {
+      "name": "adjust_pvalues",
+      "kind": "function",
+      "module": "westata.postestimation.mtest",
+      "docstring": "Adjust a family of p-values with Stata's ``_mtest`` methods.\n\nParameters\n----------\npvalues:\n    Raw p-values, one per test.\nmethod:\n    ``\"bonferroni\"``, ``\"holm\"``, ``\"sidak\"`` or ``\"noadjust\"``.\n\nReturns\n-------\nnumpy.ndarray\n    Adjusted p-values in the SAME order as the input.\n\nRaises\n------\nValueError\n    For an unknown method.\n\nNotes\n-----\n``noadjust`` returns the raw values, which is what ``_mtest.ado:212`` does\nwhen no method is requested.",
+      "signature": "(pvalues: 'Sequence[float]', method: 'str') -> 'np.ndarray'"
     },
     {
       "name": "check_time_spacing",
@@ -1394,8 +2502,8 @@
       "name": "dfgls",
       "kind": "function",
       "module": "westata.postestimation.dfgls",
-      "docstring": "DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.\n\n**Stata defaults to a TREND, not to no trend.** ``dfgls.ado:39-46`` sets ``trend=1`` unless\nthe user writes ``notrend``; the earlier version of this function defaulted to ``False`` and\nso implemented Stata's ``notrend`` case while being compared against Stata's default output.\nThat single inverted default is the whole reason rounds 119-123 spent five rounds seeing\ntau +0.806 against Stata's -1.284 and concluding the algorithm was unexplainable.\n\nMeasured on nelson_plosser.dta's lrgnp (both from live Stata):\n\n    dfgls lrgnp             lag 10  tau = -1.284   (default, trend)\n    dfgls lrgnp, notrend    lag 10  tau = +0.806   (the no-trend case)\n\n``trend=False`` or ``notrend=True`` selects the second. With the trend the detrending uses\n``cbar=-13.5`` and subtracts ``b_iota + b_qdtrd*t``; without it, ``cbar=-7`` and only\n``b_iota``. Both cases reproduce Stata to the printed digit.\n\n``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)`` (``dfgls.ado:64``).",
-      "signature": "(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, notrend: 'bool' = False, name: 'str' = '') -> 'DFGLSResult'"
+      "docstring": "DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.\n\n**Stata defaults to a TREND, not to no trend.** ``dfgls.ado:39-46`` sets ``trend=1`` unless\nthe user writes ``notrend``; the earlier version of this function defaulted to ``False`` and\nso implemented Stata's ``notrend`` case while being compared against Stata's default output.\nThat single inverted default is the whole reason rounds 119-123 spent five rounds seeing\ntau +0.806 against Stata's -1.284 and concluding the algorithm was unexplainable.\n\nMeasured on nelson_plosser.dta's lrgnp (both from live Stata):\n\n    dfgls lrgnp             lag 10  tau = -1.284   (default, trend)\n    dfgls lrgnp, notrend    lag 10  tau = +0.806   (the no-trend case)\n\n``trend=False`` selects the second. With the trend the detrending uses\n``cbar=-13.5`` and subtracts ``b_iota + b_qdtrd*t``; without it, ``cbar=-7`` and only\n``b_iota``. Both cases reproduce Stata to the printed digit.\n\n``maxlag=None`` uses Schwert's rule ``int(12*(n/100)**0.25)`` (``dfgls.ado:64``).\n\n``notrend=`` was REMOVED (R3.1): it and ``trend=`` set the same state, and having two\nswitches made ``notrend=False`` a no-op that nevertheless looked meaningful.  Stata\nspells the option ``notrend``; the Python argument is the positive ``trend``, and\n``notrend=True`` is still accepted for one release as a deprecation shim.",
+      "signature": "(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, name: 'str' = '', **legacy: 'Any') -> 'DFGLSResult'"
     },
     {
       "name": "dfuller",
@@ -1403,6 +2511,27 @@
       "module": "westata.estimators.tseries",
       "docstring": "Augmented Dickey-Fuller test, spelled the way Stata spells it.\n\nA thin alias: ``dfuller(y, trend=True)`` is ``unitroot(y, test=\"adf\", regression=\"ct\")``.\nIt exists because ``unitroot`` is not the name a Stata user reaches for, and the option\nmapping is not guessable:\n\n    no option     ->  regression=\"c\"\n    , trend       ->  regression=\"ct\"\n    , noconstant  ->  regression=\"n\"\n\nMeasured against a live Stata on nelson_plosser.dta, where the numbers already matched:\n\n    dfuller lrgnp, trend    Z(t) -2.026     unitroot(..., regression=\"ct\")  -2.0262\n    dfuller d.lrgnp         Z(t) -5.322     unitroot(..., regression=\"c\")   -5.3216\n\n``lags=`` maps to ``maxlag``; Stata's default is zero lags, which is what ``None`` gives.\nPassing ``regression=`` overrides ``trend``.",
       "signature": "(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'"
+    },
+    {
+      "name": "endog_regf_test",
+      "kind": "function",
+      "module": "westata.postestimation.endog_regf",
+      "docstring": "Run ``regF``: the augmented-regression F test for endogeneity.\n\nParameters\n----------\nstructure:\n    The ``iv_structure`` dict (``exog``/``endog``/``instruments`` + names).\nresponse:\n    The dependent variable on the estimation sample.\ncov_type:\n    The VCE to use inside the augmented fit.  ``regF`` is reported for\n    ``robust``, ``cluster`` and ``HAC``; an unadjusted VCE gets Durbin-Wu\n    instead, so this is only called for the others.\ncluster_labels:\n    Required when ``cov_type`` is clustered.\ntested:\n    Endogenous regressors to test.  Stata requires the full set under a\n    robust/cluster/HAC VCE (``ivregress_estat.ado:1070-1076``).\n\nRaises\n------\nValueError\n    When there is no endogenous regressor, when ``tested`` is not the full\n    set, or when a clustered VCE arrives without labels.",
+      "signature": "(structure: 'dict[str, Any]', response: 'np.ndarray', *, cov_type: 'str' = 'nonrobust', cluster_labels: 'Sequence[Any] | None' = None, tested: 'Sequence[str] | None' = None) -> 'RegFResult'"
+    },
+    {
+      "name": "endog_score_test",
+      "kind": "function",
+      "module": "westata.postestimation.endog_score",
+      "docstring": "Run ``robwool`` (robust) or ``acwool`` (HAC).\n\nParameters\n----------\nstructure:\n    The ``iv_structure`` dict with ``exog``/``endog``/``instruments`` and\n    their names.\nresid:\n    The IV residuals of the consistent (2SLS) fit.  The ado refits an OLS for\n    ``uhat``; on the estimation sample that is the same residual series only\n    when ``exog`` spans the same space, so the caller passes the consistent\n    residuals explicitly.\nresponse:\n    The dependent variable, used to rebuild ``uhat`` exactly as the ado does.\nhac:\n    Use the HAC variant (prewhiten the ``rhat`` columns).\nlags:\n    HAC truncation; ignored unless ``hac`` is true.\ntested:\n    Endogenous regressors to test.  Stata refuses a subset under a\n    robust/cluster/HAC VCE (``ivregress_estat.ado:1070-1076``), so a subset\n    longer or shorter than the full list is rejected here too.\n\nRaises\n------\nValueError\n    When ``tested`` is not exactly the full set of endogenous regressors, or\n    when no endogenous regressor is present.",
+      "signature": "(structure: 'dict[str, Any]', resid: 'np.ndarray', response: 'np.ndarray', *, hac: 'bool' = False, lags: 'int' = 0, tested: 'Sequence[str] | None' = None) -> 'EndogScoreResult'"
+    },
+    {
+      "name": "estat_auc",
+      "kind": "function",
+      "module": "westata.postestimation.auc",
+      "docstring": "Area under the ROC curve for a binary-outcome fit.\n\nParameters\n----------\nresult:\n    A fitted ``logit``/``probit`` result.\n\nReturns\n-------\nAucResult\n    ``str(...)`` prints Stata's one-line note; ``.to_dict()`` gives ``r(area)`` /\n    ``r(N)``.",
+      "signature": "(result: 'Any') -> 'AucResult'"
     },
     {
       "name": "estat_bgodfrey",
@@ -1440,6 +2569,13 @@
       "signature": "(result: 'Any', *, lags: 'int | None' = None) -> 'Any'"
     },
     {
+      "name": "estat_esize",
+      "kind": "function",
+      "module": "westata.postestimation.esize",
+      "docstring": "Stata's ``estat esize``.\n\nParameters\n----------\nepsilon:\n    Report epsilon-squared (``sthlp:620-622``).\nomega:\n    Report omega-squared (``sthlp:624-626``).  Mutually exclusive with ``epsilon``\n    (``esize.ado:14``: ``opts_exclusive \"`epsilon' `omega'\"``).\nlevel:\n    Confidence level as a FRACTION (``0.95``), never a percentage (R3.3).\n\n    This used to default to ``95.0``.  Every other ``level`` in the package is a\n    fraction (``margins``, ``nlcom``, ``lincom_as_stata``, ``contrast``), so a\n    caller who passed ``level=0.95`` here got ``(100 - 0.95) / 2 = 49.5%``\n    intervals -- a plausible-looking number, silently wrong.  Verified: the old\n    expression printed ``[49.5% Conf. Interval]``.\n\nRaises\n------\nNotImplementedError\n    When the fit is not ``regress`` or ``anova`` -- ``sthlp:599-601`` restricts it.\nValueError\n    When both ``epsilon`` and ``omega`` are requested.\n\nNotes\n-----\n``regress`` stores ``e(mss)`` and ``e(rss)`` but NOT ``e(tss)``, so the total is\nreconstructed as their sum.  That is an identity for a model with a constant; a\n``noconstant`` fit has no such decomposition, which is why Stata's own total is not\nconsulted here.",
+      "signature": "(result: 'Any', *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'EffectSizeResult'"
+    },
+    {
       "name": "estat_firststage",
       "kind": "function",
       "module": "westata.postestimation.firststage",
@@ -1475,6 +2611,20 @@
       "signature": "(result: 'Any', *, white: 'bool' = False, design: 'Any' = None) -> 'ImTestResult'"
     },
     {
+      "name": "estat_moran",
+      "kind": "function",
+      "module": "westata.postestimation.moran",
+      "docstring": "Stata's ``estat moran``.\n\nParameters\n----------\nerrorlag:\n    One spatial weighting matrix, or a sequence of them for a higher-order test\n    (``sthlp:66-68``: \"``errorlag()`` is required ... repeatable to allow testing of\n    higher-order error lags\").  Repeated matrices are SUMMED, which is how Stata\n    combines several ``spmatrix`` objects into one lag operator.\nweights:\n    Alias for ``errorlag`` -- ``errorlag`` is Stata's option name, ``weights`` reads\n    better in Python.  Supplying both is an error.\n\nRaises\n------\nNotImplementedError\n    When the fit is not a linear regression (``sthlp:44-45``).\nValueError\n    When no weighting matrix is given, when it does not match the estimation sample,\n    or when the statistic is undefined.\n\nNotes\n-----\nSee the module docstring: Stata's own ``r(chi2)`` formula is not locally available\n(the methods section is external and the ado is a compiled builtin), so the reported\nstatistic is the standard randomisation-based Moran test.  Its p-value is exact for\nthe hypothesis \"no spatial correlation\", but it may differ from Stata's number.",
+      "signature": "(result: 'Any', errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'MoranResult'"
+    },
+    {
+      "name": "estat_mundlak",
+      "kind": "function",
+      "module": "westata.postestimation.mundlak",
+      "docstring": "Stata's ``estat mundlak``.\n\nParameters\n----------\nresult:\n    A fit from :class:`westata.RandomEffects` (or any panel estimator that recorded\n    ``panel_entity``).\nstorer:\n    Callback used to fit the augmented equation.  It receives the augmented frame\n    and returns a fitted result.  Highest priority when given.\nentity, time:\n    The panel identifier and time name for the AUGMENTED refit.  Required when\n    ``storer`` is omitted: the fitted result keeps ``panel_entity`` (the coded group\n    labels) but not the column names the estimator's ``from_formula`` needs, so the\n    test cannot rebuild the equation without them.\n\nRaises\n------\nNotImplementedError\n    For a non-panel result.\nValueError\n    When the estimation data or the panel identifier is unavailable, when the model\n    has no slopes to test, or when ``entity``/``time`` are needed but missing.\n\nNotes\n-----\n``sthlp:369-370`` rules out ``absorb()`` and ``vce(hc2)``: the first has no\ngroup-mean interpretation and the second has no likelihood to re-estimate.",
+      "signature": "(result: 'Any', *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'MundlakResult'"
+    },
+    {
       "name": "estat_overid",
       "kind": "function",
       "module": "westata.postestimation.overid",
@@ -1489,11 +2639,25 @@
       "signature": "(result: 'Any', *, rhs: 'bool' = False) -> 'OvTestResult'"
     },
     {
+      "name": "estat_ptrends",
+      "kind": "function",
+      "module": "westata.estimators.did",
+      "docstring": "`estat ptrends` after `didregress`: the parallel-trends test over the pretreatment periods.\n\nStata, on a 60-group / 15-period panel with 20 treated (synthetic, seeded):\n\n    Parallel-trends test (pretreatment time period)\n    H0: Linear trends are parallel\n\n    F(1, 59) =   0.25\n    Prob > F = 0.6182\n\n`F(1, 59)` reads as ONE linear-trend interaction against `n_groups - 1` denominator degrees of\nfreedom. Restricting to the periods before anyone is treated and testing whether the treated\ngroup's linear time trend differs from the controls' is exactly that: a single interaction,\n`treated_indicator * period`, with the group and period effects absorbed by the panel.\n\nTHE FIRST PROTOTYPE FOR THIS FAILED and the reason is worth keeping: putting BOTH the treatment\ndummy and the interaction into the pretreatment subsample makes them collinear -- before\ntreatment begins the dummy is constant within group and the interaction is the dummy times the\nperiod -- so the design is rank deficient. Only the interaction belongs in the design.",
+      "signature": "(result: 'Any') -> 'dict[str, float]'"
+    },
+    {
       "name": "estat_summarize",
       "kind": "function",
       "module": "westata.postestimation.summarize",
       "docstring": "Stata's ``estat summarize``.\n\nParameters\n----------\ndata:\n    The estimation-sample frame.  Defaults to ``result.model_data``; it must\n    be supplied when the estimator did not retain one.\nvariables:\n    Variables to summarize.  Defaults to the response plus the reported\n    regressors.\nweights, weight_type:\n    Optional weights, with the Stata type.  ``fweight`` inflates ``Obs``;\n    ``aweight``/``pweight``/``iweight`` do not (``estat_summ.ado:222-233``).\ncluster, cluster_name:\n    Optional cluster labels; adds the ``Obs per cluster`` block.\n\nRaises\n------\nValueError\n    When the estimation data cannot be resolved, or a named variable is\n    absent.",
       "signature": "(result: 'Any', *, data: 'pd.DataFrame | None' = None, variables: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, cluster: 'Any' = None, cluster_name: 'str' = '', noweights: 'bool' = False, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'SummarizeResult'"
+    },
+    {
+      "name": "estat_szroeter",
+      "kind": "function",
+      "module": "westata.postestimation.szroeter",
+      "docstring": "Stata's ``estat szroeter``.\n\nParameters\n----------\nvariables:\n    Variables to test.  Either this or ``rhs`` must be given\n    (``sthlp:509-510``).\nrhs:\n    Test the regression's own explanatory variables (``sthlp:528-530``).\nmtest:\n    Multiple-testing adjustment: ``bonferroni``, ``holm``, ``sidak`` or\n    ``noadjust`` (``sthlp:533-540``).  Stata always performs multiple testing but\n    adjusts nothing by default.\n\nRaises\n------\nNotImplementedError\n    When the fit is not a linear regression, is weighted, or clustered --\n    ``szroeter.ado:13-21`` refuses all three.\nValueError\n    When neither ``variables`` nor ``rhs`` is given.\n\nNotes\n-----\n``szroeter.ado:13-21``: \"szroeter is only possible after regress\", \"does not allow\nweights\", \"does not allow cluster()\".  Refusing here matches Stata rather than\nsilently computing a statistic whose reference distribution does not apply.",
+      "signature": "(result: 'Any', variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'SzroeterResult | SzroeterTable'"
     },
     {
       "name": "estat_vce",
@@ -1508,6 +2672,13 @@
       "module": "westata.postestimation.vif",
       "docstring": "Stata's ``estat vif`` for a linear fit.\n\nParameters\n----------\nresult:\n    A fitted linear result that retained its design (``design_matrix``).\nuncentered:\n    Do not centre the auxiliary regressions (Stata's ``, uncentered``).\n    Required if the model has no constant, mirroring ``vif.ado``'s refusal.\nnosort:\n    Keep the model's own regressor order instead of sorting by VIF\n    (Stata's ``, nosort``).\n\nReturns\n-------\nVifResult\n\nRaises\n------\nNotImplementedError\n    For a non-linear model, where Stata has no ``estat vif``.\nValueError\n    If the design was not retained, or if a model without a constant is\n    queried without ``uncentered=True``.",
       "signature": "(result: 'Any', *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'VifResult'"
+    },
+    {
+      "name": "estat_weakrobust",
+      "kind": "function",
+      "module": "westata.postestimation.weakrobust",
+      "docstring": "Stata's ``estat weakrobust``.\n\nParameters\n----------\nar:\n    Force the Anderson-Rubin test.  It is also the default for a just-identified\n    model (``sthlp:365-367``).\nclr:\n    Request the conditional likelihood-ratio test.  Accepted so the option is\n    recognised, then refused with the reason -- see the module docstring.\nbetanull:\n    The null hypothesis on the endogenous coefficients\n    (``sthlp:457-485``).  Three accepted forms, matching Stata:\n\n    * a mapping ``{name: value}`` -- coefficients named explicitly, others zero;\n    * a sequence of numbers -- assigned BY POSITION, which is what Stata's\n      ``copy`` suboption means;\n    * ``None`` -- every coefficient is zero, the default.\n\n    A sequence longer or shorter than the number of endogenous regressors is\n    refused, because silently padding or truncating would test a different\n    hypothesis than the caller wrote.\n\nNotes\n-----\n``level`` was REMOVED rather than converted.  It only ever fed Stata's ``ci``\noption, which is not implemented here (it needs the inverted test, not the\nstatistic), so every accepted value was discarded -- a percentage default of\n``95.0`` that no caller could observe.  Deleting a dead parameter is honest;\nretuning its unit would have advertised a feature that does not exist (R3.3, R1.5).\n\n``sthlp:365-373`` makes the DEFAULT depend on identification: Anderson-Rubin when\njust identified, CLR when overidentified.  Since only AR is implemented, an\noveridentified model without ``ar`` refuses rather than silently reporting a\ndifferent test than Stata would.",
+      "signature": "(result: 'Any', *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'WeakRobustResult'"
     },
     {
       "name": "etable_as_stata",
@@ -1535,7 +2706,7 @@
       "kind": "function",
       "module": "westata.estimators.xtunitroot_ips",
       "docstring": "Im-Pesaran-Shin panel unit-root test.\n\nParameters\n----------\ntrend:\n    Include a linear trend in each panel's ADF regression (Stata ``trend``).\ndemean:\n    Remove the cross-sectional mean before running the per-panel regressions\n    (Stata ``demean``), which is the IPS test with cross-sectional means removed.\nlags:\n    Number of lagged differences. ``None`` reproduces Stata's default of none.",
-      "signature": "(frame: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResult'"
+      "signature": "(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResult'"
     },
     {
       "name": "kpss",
@@ -1549,7 +2720,21 @@
       "kind": "function",
       "module": "westata.estimators.xtunitroot_llc",
       "docstring": "Levin-Lin-Chu panel unit-root test.\n\n``constant`` and ``trend`` choose the deterministic specification, matching Stata's\n``noconstant`` and ``trend`` options: neither gives model 1, constant only model 2 (the\ndefault), both model 3.",
-      "signature": "(frame: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResult'"
+      "signature": "(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResult'"
+    },
+    {
+      "name": "lincom_as_stata",
+      "kind": "function",
+      "module": "westata.postestimation.api",
+      "docstring": "Evaluate one linear combination (Stata ``lincom``).\n\nStata moves a bare constant to the right-hand side of the printed\nconstraint and leaves the variance untouched, so\n``lincom 2*weight - 3*foreign + 10`` reports ``14.9369115`` with the same\n``se = 3.2272271`` as ``lincom 2*weight - 3*foreign`` reports for\n``4.9369115``.  The constant is added to the estimate and never enters\n:math:`L V L'`.",
+      "signature": "(result: 'Any', expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'"
+    },
+    {
+      "name": "linktest",
+      "kind": "function",
+      "module": "westata.postestimation.linktest",
+      "docstring": "Stata's ``linktest``.\n\nParameters\n----------\nresult:\n    A fitted result whose linear index is a single ``xb``.\n\nRaises\n------\nNotImplementedError\n    For an estimator ``linktest.ado:52-66`` refuses, or one this package cannot\n    refit.\nValueError\n    When the estimation data was not retained, or the refit cannot produce a\n    ``_hatsq`` coefficient.\n\nNotes\n-----\nThe test is two-sided against a t distribution with the REFIT's residual degrees of\nfreedom -- ``linktest.ado:132`` reads ``e(df_r)`` after the refit, not before.",
+      "signature": "(result: 'Any') -> 'LinkTestResult'"
     },
     {
       "name": "lrtest",
@@ -1604,8 +2789,22 @@
       "name": "prais",
       "kind": "function",
       "module": "westata.estimators.prais",
-      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\n``formula`` is a statsmodels/patsy style spec such as ``\"y ~ x1 + x2\"``. The data must\nalready be in time order through ``frame``'s row order.\n\n``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops\nthe first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in\nboth the coefficients and the estimated rho, so it is a separate estimator, not a\ncosmetic switch.",
-      "signature": "(frame: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'"
+      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\n``formula`` is a statsmodels/patsy style spec such as ``\"y ~ x1 + x2\"``. The data must\nalready be in time order through ``data``'s row order.\n\n``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops\nthe first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in\nboth the coefficients and the estimated rho, so it is a separate estimator, not a\ncosmetic switch.\n\nThe first parameter is named ``data`` rather than ``frame`` (R2.3): every other public\nfunction in the package uses the house name, and this was the only ``regress``-style\nentry point that did not.  Positional calls are unaffected\n(``ws.prais(df, \"y ~ x\")``); this was a keyword-only rename, so\n``prais(frame=df, ...)`` now raises ``TypeError`` naming the new parameter rather\nthan silently accepting a name no other function uses.",
+      "signature": "(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'"
+    },
+    {
+      "name": "prais_winsten",
+      "kind": "function",
+      "module": "westata.estimators.prais",
+      "docstring": "Iterated Prais-Winsten / Cochrane-Orcutt estimate.\n\nReturns ``(coefficients, rho, iterations, trace)``. ``rho`` may be given to run a single pass\ninstead of iterating; the trace is then empty.\n\n``trace`` is the sequence Stata prints as its iteration log, as ``(iteration, rho)`` pairs with\n``Iteration 0`` a literal zero. Reproducing it needs the ado's PASS ORDER, not only its\narithmetic (``prais.ado:172-217``)::\n\n    lastrho = 2 ; rho = 0\n    while abs(rho - lastrho) > tol {\n        lastrho = rho\n        resid = y - X b        <- residual of the PREVIOUS fit (plain OLS on pass 1)\n        rho   = crcar1(resid)  <- the value that gets printed\n        b     = fit AT rho     <- and the value the next pass fits with\n    }\n\n``rho`` is the loop variable and the fit input; the coefficients follow it. Re-seeding ``rho``\nfrom the OLS estimate, or treating the fit and the estimate as one unit, produces\n``0.3895, 0.3975, ...`` where Stata has ``0.4008, 0.4009, ...``.\n\nTwo further conditions are satisfied elsewhere: ``_rho_from_residuals`` is the slope of the\nresidual on its own lag with no constant (``_crcar1.ado:37-42``), and ``_transform_corc`` drops\nthe first row (``prais_e.ado:28-33``).",
+      "signature": "(exog: 'np.ndarray', endog: 'np.ndarray', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, rho: 'float | None' = None, corc: 'bool' = False) -> 'tuple[np.ndarray, float, int, list[tuple[int, float]]]'"
+    },
+    {
+      "name": "predict",
+      "kind": "function",
+      "module": "westata.postestimation.predict",
+      "docstring": "Return a prediction of the requested ``kind`` for ``exog``.\n\nParameters\n----------\nexog:\n    Design matrix to predict at.  Pass the estimation sample for the usual\n    in-sample predictions, or new rows for out-of-sample work.\nkind:\n    One of the types returned by :func:`supported_types`.  ``\"stdp\"`` and\n    ``\"stdf\"`` are the prediction standard errors (``[R] predict``): the\n    standard error of the linear prediction, and of the forecast, which adds\n    the residual variance.\n\n    When ``None`` the type follows Stata's per-model default\n    (:func:`default_predict_kind`): ``xb`` for linear models, ``pr`` for\n    logit/probit/ordinal, ``n`` for count models.  It used to default to ``xb``\n    everywhere, which made a bare ``res.predict()`` return log-odds on a logit --\n    neither Stata's meaning nor statsmodels'.\nlower, upper:\n    Censoring limits, required by the ``tobit`` types ``e`` and ``ystar``.\n    When omitted, ``result.e[\"llopt\"]``/``result.e[\"ulopt\"]`` are used (the older\n    ``lower``/``upper`` spelling is still honoured as a fallback).\noutcome:\n    Ordered models only: which category's probability ``pr`` returns\n    (Stata's ``predict, pr outcome(#k)``).  ``None`` means Stata's default,\n    category 1.",
+      "signature": "(result: 'Any', exog: 'np.ndarray', kind: 'str | None' = None, *, lower: 'float | None' = None, upper: 'float | None' = None, outcome: 'int | None' = None, n: 'int | float | None' = None) -> 'np.ndarray'"
     },
     {
       "name": "pwcompare",
@@ -1643,11 +2842,25 @@
       "signature": "(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None', digits: 'int' = 3, se: 'bool' = True, stars: 'bool' = True, stats: 'Sequence[tuple[str, Any]] | None' = None, stats_digits: 'int' = 3) -> 'str'"
     },
     {
+      "name": "suest",
+      "kind": "function",
+      "module": "westata.postestimation.suest",
+      "docstring": "Stata's ``suest`` -- stack several fits into one simultaneous covariance.\n\nParameters\n----------\nmodels:\n    Two or more fitted linear results, all on the SAME observations.\nnames:\n    Labels for each model; defaults to ``model1``, ``model2``, ...\ncluster:\n    Cluster labels, giving Stata's ``vce(cluster clustvar)`` form\n    (``suest.sthlp:108-109``).  Each observation's stacked score is summed within its\n    cluster before the outer product, so the covariance reflects within-cluster\n    dependence.\n\nRaises\n------\nNotImplementedError\n    When a model cannot produce scores -- a non-linear estimator whose score is not\n    the residual, or one without a design matrix.\nValueError\n    When fewer than two models are given, when their sample sizes differ, when a\n    block is singular, or when the cluster labels do not match the sample.\n\nNotes\n-----\n``suest.sthlp:105-107`` advises estimating the components WITHOUT\n``vce(robust)``/``vce(cluster)``: ``suest`` supplies the robust VCE itself, so a\nrobust component would be doubly corrected. The sandwich built here uses only the\nresiduals and the design, so it is robust regardless of what the components used --\nwhich is exactly why the advice exists.",
+      "signature": "(models: 'Sequence[Any]', *, names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'SucestResult'"
+    },
+    {
       "name": "summarize",
       "kind": "function",
       "module": "westata.postestimation.summary_stats",
       "docstring": "Stata's ``summarize`` over ``data`` (a DataFrame, Series or array).\n\n``variables`` names the columns to report; omitted, every column is included. Missing\nvalues are excluded per variable, exactly as Stata's ``Obs`` column reports the number of\nnon-missing observations.",
       "signature": "(data: 'Any', variables: 'Sequence[str] | None' = None, *, weights: 'Any' = None, detail: 'bool' = False) -> 'Any'"
+    },
+    {
+      "name": "supported_types",
+      "kind": "function",
+      "module": "westata.postestimation.predict",
+      "docstring": "Return the predict types available for ``model_name``.",
+      "signature": "(model_name: 'str') -> 'tuple[str, ...]'"
     },
     {
       "name": "synth",
@@ -1668,7 +2881,7 @@
       "kind": "function",
       "module": "westata.postestimation.tebalance",
       "docstring": "Balance table comparing raw and matched means/variances.\n\n``covariates`` is an ``(n, k)`` array; ``match_weights`` holds the control-side matching\nweights (one per observation, zero for untreated controls that were never used, and zero\nfor all treated rows). ``names`` labels the columns.",
-      "signature": "(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalise_counts: 'bool' = False) -> 'BalanceSummary'"
+      "signature": "(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalize_counts: 'bool' = False) -> 'BalanceSummary'"
     },
     {
       "name": "teffects_nnmatch",
@@ -1690,6 +2903,13 @@
       "module": "westata.estimators.teffects_ra",
       "docstring": "Regression-adjustment treatment effect, as ``teffects ra (y x) (t)``.\n\n``covariates`` is an ``(n, k)`` array; a constant column is prepended unless\n``add_constant`` is False.",
       "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'TefectsRaResult'"
+    },
+    {
+      "name": "test_as_stata",
+      "kind": "function",
+      "module": "westata.postestimation.api",
+      "docstring": "Wald test of one or more linear hypotheses.\n\nParameters\n----------\n*specs:\n    Each argument is a Stata-style hypothesis.  A bare coefficient list\n    (``\"x1 x2\"``) tests that all are zero; an equality chain (``\"x1 = x2\"``)\n    tests that difference.  Multiple specs are tested jointly.\ncoef:\n    Stata's ``coef`` option: also return the constrained estimates\n    ``b_c = b - V R'(RVR')^-1(Rb - r)`` and ``V_c = V - VR'(RVR')^-1 RV``.",
+      "signature": "(result: 'Any', *specs: 'Any', coef: 'bool' = False) -> 'WaldTest | dict[str, Any]'"
     },
     {
       "name": "testnl",
@@ -1786,7 +3006,7 @@
       },
       {
         "name": "contrast",
-        "signature": "(self, term: 'str', method: 'str' = 'r', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, term: 'str', method: 'str' = 'r', *, level: 'float' = 0.95, nowald: 'bool' = False) -> 'Any'",
         "docstring": "ANOVA-style contrast of a factor's levels (Stata `contrast`)."
       },
       {
@@ -1806,87 +3026,92 @@
       },
       {
         "name": "estat_bgodfrey",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'Any'",
         "docstring": "Stata's ``estat bgodfrey`` -- the Breusch-Godfrey LM test for autocorrelation.\n\nThe implementation has existed in ``westata.postestimation.bgodfrey`` since round 191\nbut was only reachable as ``ws.estat_bgodfrey(result)``; ``estat dwatson`` got its\nwiring in round 93 and this one was left behind, so the two serial-correlation\ncommands had different surfaces. Pass ``time=`` for the ``tsset`` axis and\n``lags=``/``nomiss0=`` as in Stata."
       },
       {
         "name": "estat_classification",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, cutoff: 'float' = 0.5, y: 'Any' = None, probabilities: 'Any' = None) -> 'Any'",
         "docstring": "Stata's ``estat classification`` -- the 2x2 classification table."
       },
       {
         "name": "estat_corrgram",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'",
         "docstring": "Stata's ``corrgram`` -- autocorrelations, partial autocorrelations and Q.\n\nStata spells it ``corrgram`` rather than ``estat corrgram``; the method name follows\nthe ``estat_``-prefixed convention the rest of this object uses so that\n``ws.estat_corrgram(...)`` and ``result.estat_corrgram()`` stay symmetrical."
       },
       {
         "name": "estat_dwatson",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'",
         "docstring": "Stata's ``estat dwatson`` -- the Durbin-Watson d statistic.\n\n``westata.postestimation.serial.estat_dwatson`` has existed and matched Stata for some\ntime, but it was never reachable from a fitted result: the report's chapter 7-9 checks\ncall ``result.estat_dwatson()`` and got AttributeError. The implementation was correct,\nthe wiring was missing.\n\nPass ``time=`` to make the differences follow a ``tsset`` axis; without it they follow\nthe row order, which is only the same thing when the sample has no gaps."
       },
       {
         "name": "estat_endogenous",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, lags: 'int | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat endogenous`` -- Durbin-Wu endogeneity test."
       },
       {
         "name": "estat_esize",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'Any'",
         "docstring": "Stata's ``estat esize`` -- eta/epsilon/omega-squared effect sizes.\n\n``regress_postestimation.sthlp:599-614`` restricts it to linear models; eta-squared\nis ``R^2`` and carries a noncentral-F interval."
       },
       {
         "name": "estat_firststage",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, all: 'bool' = False, forcenonrobust: 'bool' = False) -> 'Any'",
         "docstring": "Stata's ``estat firststage`` -- IV first-stage diagnostics.\n\nReports each endogenous regressor's first-stage R-squared, adjusted\nR-squared, partial R-squared and the joint F of the excluded\ninstruments; with more than one endogenous regressor it adds Shea's\npartial R-squared."
       },
       {
         "name": "estat_gof",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, y: 'Any' = None, mu: 'Any' = None, group: 'int | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat gof`` -- Poisson goodness-of-fit tests.\n\nOnly defined for ``poisson``: Stata has no ``estat gof`` after ``nbreg``\n(``nbreg`` sets no ``e(estat_cmd)``), so requesting it there raises\n``NotImplementedError`` rather than returning an invented statistic."
       },
       {
         "name": "estat_hettest",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, method: 'str' = 'normal', variables: 'Sequence[str] | None' = None, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat hettest`` -- Breusch-Pagan / Cook-Weisberg.\n\nWith no ``variables`` the auxiliary regression is on the FITTED VALUES,\nwhich is Stata's no-varlist behaviour; ``rhs=True`` uses every regressor.\nRefuses, like Stata, after a robust or clustered VCE, on pweighted data\nand after a ``noconstant`` fit."
       },
       {
         "name": "estat_ic",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, n: 'float | None' = None, df: 'float | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat ic`` -- AIC, BIC, AICc and CAIC.\n\n``df`` defaults to ``rank(V)``, matching ``estimates.ado:977-978``; ``N``\nis ``e(N_ic)`` when recorded and ``e(N)`` otherwise."
       },
       {
         "name": "estat_imtest",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, white: 'bool' = False, design: 'Any' = None) -> 'Any'",
         "docstring": "Stata's ``estat imtest`` -- Cameron & Trivedi's IM-test."
       },
       {
         "name": "estat_moran",
-        "signature": "(self, *args: 'Any', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'Any'",
         "docstring": "Stata's ``estat moran`` -- Moran's test for spatial correlation in residuals.\n\nRequires a spatial weighting matrix.  This package has no ``spmatrix`` toolchain,\nso the matrix is passed explicitly; see\n:mod:`westata.postestimation.moran` for the caveat about Stata's own statistic."
       },
       {
         "name": "estat_mundlak",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat mundlak`` -- the Mundlak panel specification test.\n\nAdds the within-group means of the regressors to the random-effects equation and\ntests them jointly to zero: ``xtreg_postestimation.sthlp:366-370``.  A rejection\nmeans the unobserved effect is correlated with ``x``, so the random-effects\nestimator is inconsistent."
       },
       {
         "name": "estat_overid",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, lags: 'int | None' = None, forcenonrobust: 'bool' = False) -> 'Any'",
         "docstring": "Stata's ``estat overid`` -- overidentification restrictions test.\n\nReports Sargan (with Basmann's finite-sample variant) for 2SLS/LIML and\nHansen's J for GMM."
       },
       {
         "name": "estat_ovtest",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, rhs: 'bool' = False) -> 'Any'",
         "docstring": "Stata's ``estat ovtest`` -- Ramsey RESET test for omitted variables."
       },
       {
+        "name": "estat_ptrends",
+        "signature": "(self) -> 'dict[str, float]'",
+        "docstring": "Stata's ``estat ptrends`` -- the parallel-trends test for DiD.\n\nOnly defined after ``didregress``/``xtdidregress``; see\n:func:`westata.estimators.did.estat_ptrends`."
+      },
+      {
         "name": "estat_summarize",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, data: 'pd.DataFrame | None' = None, variables: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, cluster: 'Any' = None, cluster_name: 'str' = '', noweights: 'bool' = False, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat summarize`` -- describe the estimation sample."
       },
       {
         "name": "estat_szroeter",
-        "signature": "(self, *args: 'Any', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'",
         "docstring": "Stata's ``estat szroeter`` -- Szroeter's rank test for heteroskedasticity.\n\nRefuses, like ``szroeter.ado:13-22``, after anything other than ``regress``, and\non weighted or clustered fits."
       },
       {
@@ -1896,12 +3121,12 @@
       },
       {
         "name": "estat_vif",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'Any'",
         "docstring": "Stata's ``estat vif`` -- variance inflation factors.\n\nOnly defined for linear models: the auxiliary regressions are ordinary\nleast squares by construction, and Stata reaches the command through\n``regress_estat``."
       },
       {
         "name": "estat_weakrobust",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'Any'",
         "docstring": "Stata's ``estat weakrobust`` -- inference robust to weak instruments.\n\nReports the Anderson-Rubin test, whose distribution does not depend on instrument\nstrength.  The conditional likelihood-ratio test (the overidentified default in\nStata) is refused with its reason; see\n:func:`westata.postestimation.weakrobust.estat_weakrobust`."
       },
       {
@@ -1921,12 +3146,12 @@
       },
       {
         "name": "hausman",
-        "signature": "(self, efficient: 'Any', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, efficient: 'Any', *, constant: 'bool' = False, sigmamore: 'bool' = False, sigmaless: 'bool' = False) -> 'Any'",
         "docstring": "Hausman specification test (Stata `hausman`).\n\nKeyword arguments are forwarded to\n:func:`westata.postestimation.modeltests.hausman`, so the Stata\n``hausman ..., constant`` option is reachable from a result object too:\n``fe.hausman(re, constant=True)``."
       },
       {
         "name": "lincom",
-        "signature": "(self, expression: 'str', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'",
         "docstring": "Linear combination of parameters (Stata ``lincom``)."
       },
       {
@@ -1941,27 +3166,32 @@
       },
       {
         "name": "margins",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, dydx: 'Sequence[str] | str | None' = None, eyex: 'Sequence[str] | str | None' = None, dyex: 'Sequence[str] | str | None' = None, eydx: 'Sequence[str] | str | None' = None, at: 'Mapping[str, Any] | None' = None, atmeans: 'bool' = False, over: 'str | None' = None, exog: 'np.ndarray | None' = None, param_names: 'Sequence[str] | None' = None, level: 'float' = 0.95, predict_kind: 'str | None' = None, factor_vars: 'Sequence[str] | None' = None, outcome: 'int | None' = None) -> 'Any'",
         "docstring": "Marginal effects or predictive margins (Stata ``margins``).\n\nThe design matrix is taken from :attr:`design_matrix` when the\nestimator stored one; otherwise pass ``exog=`` and ``param_names=``."
       },
       {
         "name": "nlcom",
-        "signature": "(self, expression: 'str', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'Any'",
         "docstring": "Nonlinear combination of parameters (Stata `nlcom`)."
       },
       {
         "name": "predict",
-        "signature": "(self, exog: 'Any' = None, kind: 'str | None' = None, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, exog: 'np.ndarray | None' = None, kind: 'str | None' = None, *, lower: 'float | None' = None, upper: 'float | None' = None, outcome: 'int | None' = None, n: 'int | float | None' = None) -> 'Any'",
         "docstring": "Typed prediction (Stata ``predict, <type>``).\n\nParameters\n----------\nexog:\n    Design matrix; defaults to the stored estimation design.\nkind:\n    ``\"xb\"``, ``\"pr\"``, ``\"n\"``, ``\"e\"``, ``\"ystar\"``, ``\"residuals\"``,\n    depending on the model.  ``None`` (the default) means \"whatever Stata\n    assumes\", resolved by\n    :func:`westata.postestimation.predict.default_predict_kind`: ``xb`` for\n    linear models, ``pr`` for logit/probit/ordinal, ``n`` for count models.\n\n    It used to default to ``\"xb\"`` for every estimator, so a bare\n    ``logit_result.predict()`` returned log-odds -- neither Stata's meaning\n    (Stata assumes ``pr`` and says so) nor statsmodels' (``sm.Logit.predict``\n    returns probabilities). Pass ``kind=\"xb\"`` for the old behaviour."
       },
       {
         "name": "pwcompare",
-        "signature": "(self, term: 'str', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, term: 'str', *, level: 'float' = 0.95, adjust: 'str | None' = None) -> 'Any'",
         "docstring": "All pairwise level differences (Stata `pwcompare`)."
       },
       {
+        "name": "relabel_cov_type",
+        "signature": "(self, cov_type: 'str') -> 'None'",
+        "docstring": "Record the covariance type actually used, after replacing the matrix.\n\nNeeded by estimators that fit with a PLACEHOLDER covariance and then rebuild\nthe real one once more information is available: ``Areg`` fits with HC1 to get\nthe estimates, then builds the leverage-based HC2/HC3 matrix on the full dummy\ndesign.  Before this method existed the placeholder label survived, so\n``Areg(...).fit(cov_type=\"HC2\").cov_type`` reported ``\"HC1\"`` while the numbers\nwere genuinely HC2 (measured: HC2 bse 0.069765 vs HC1 0.069568) -- a caller\nlabelling a table from ``.cov_type`` would have printed the wrong VCE name.\n\nDeliberately a named method rather than a settable property: relabelling must\nbe an explicit act of the code that replaced the matrix, not something a caller\ncan do to a finished result."
+      },
+      {
         "name": "suest",
-        "signature": "(self, *others: 'Any', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *others: 'Any', names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'Any'",
         "docstring": "Stata's ``suest`` -- stack this fit with others into one covariance.\n\nCombines the parameter vectors and forms the simultaneous sandwich covariance\nacross models (``suest.sthlp:84-88``).  The models must share an estimation\nsample."
       },
       {
@@ -1976,7 +3206,7 @@
       },
       {
         "name": "test",
-        "signature": "(self, *specs: 'Any', **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *specs: 'Any', coef: 'bool' = False) -> 'Any'",
         "docstring": "Wald test of linear hypotheses (Stata ``test``).\n\nSee :meth:`westata.postestimation.tests.run_wald_test`; this thin\nforwarder exists so the results object owns its own postestimation\nsurface, like a Stata estimation result."
       },
       {
@@ -1991,7 +3221,7 @@
       },
       {
         "name": "wntestq",
-        "signature": "(self, **kwargs: 'Any') -> 'Any'",
+        "signature": "(self, *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Any'",
         "docstring": "Stata's ``wntestq`` -- the Ljung-Box portmanteau Q for white noise."
       }
     ],
@@ -2569,6 +3799,54 @@
       "notes_zh": "几何是推导出来的：14 字符标签槽，之后每个模型 13 列，规则线为 14 + 13*n 个字符、'+' 位于索引 13。名称居中，超过十个字符则缩写。数值在 |v|≥1 时用八位有效数字，否则八位小数。注意 VCE 约定：Stata 的 `regress, r` 是 HC1，`ivregress ..., r` 是 HC0；混合 OLS 与 IV 的表格需要对 OLS 用 cov_type='HC1'、对 IV 用 'HC0'。",
       "example": "ws.render_estimates_table([ws.OLS.from_formula('y ~ x1', base).fit(), ws.OLS.from_formula('y ~ x1 + x2', base).fit()], model_names=['a', 'b'])"
     },
+    "EReturn": {
+      "stata": "ereturn list",
+      "en": "Stata's `e()` block as a dictionary. Results carry their scalars in a plain mapping, and this type makes lookups like `result.e['N']` readable while still behaving as a dict.",
+      "zh": "Stata 的 `e()` 块，表示为字典。结果对象用普通映射承载标量，本类型让 `result.e['N']` 这类取值可读，同时仍按 dict 行为工作。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1', base).fit()\nprint(fit.e['N'], round(fit.e['r2'], 6))"
+    },
+    "MTEST_METHODS": {
+      "stata": "(the mtest() adjustments Stata offers)",
+      "en": "The multiple-testing adjustments `estat hettest, mtest(...)` accepts: bonferroni, holm, sidak and noadjust.",
+      "zh": "`estat hettest, mtest(...)` 接受的多重检验校正：bonferroni、holm、sidak、noadjust。",
+      "example": "print(ws.MTEST_METHODS)"
+    },
+    "SUPPORTED_TYPES": {
+      "stata": "(the predict types registry)",
+      "en": "The registry mapping a model name onto the `predict` types it supports. `ws.supported_types(name)` is the query function; this dict is the raw table behind it.",
+      "zh": "把模型名映射到其支持的 `predict` 类型的登记表。`ws.supported_types(name)` 是查询函数，本字典是其背后的原始表。",
+      "example": "print(sorted(ws.SUPPORTED_TYPES)[:4])"
+    },
+    "adjust_pvalues": {
+      "stata": "(no Stata equivalent -- the mtest() adjustment arithmetic)",
+      "en": "Adjust a vector of p-values for multiple testing, using one of the methods Stata's `mtest()` offers. Returns an array of the same length; `MTEST_METHODS` lists the accepted spellings.",
+      "zh": "对一组 p 值做多重检验校正，方法取 Stata `mtest()` 提供的那些。返回同长度数组；合法拼写见 `MTEST_METHODS`。",
+      "example": "print(ws.adjust_pvalues([0.01, 0.04, 0.03], 'holm'))"
+    },
+    "lincom_as_stata": {
+      "stata": "lincom",
+      "en": "The function behind `result.lincom(expression)`: form a linear combination of the coefficients, its standard error, the test statistic and the confidence interval. Use it directly when the expression is built at runtime rather than typed.",
+      "zh": "`result.lincom(expression)` 背后的函数：构造系数的线性组合，给出标准误、检验统计量与置信区间。当表达式在运行时才生成、而非手写时，直接调用它更方便。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.lincom_as_stata(fit, 'x1 + x2')\nprint(round(r.to_dict()['estimate'], 6))"
+    },
+    "test_as_stata": {
+      "stata": "test",
+      "en": "The function behind `result.test(...)`: run one or more Wald restrictions and return Stata's `test` output. Each argument is one restriction specification; a comma inside a single string is not a separator.",
+      "zh": "`result.test(...)` 背后的函数：跑一条或多条 Wald 约束，返回 Stata `test` 的输出。每个参数是一条约束规格；单个字符串里的逗号不是分隔符。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.test_as_stata(fit, 'x1', 'x2')\nprint(r)"
+    },
+    "supported_types": {
+      "stata": "(the predict type list a model accepts)",
+      "en": "The tuples of `predict` kinds a given model supports, e.g. `supported_types('regress')`. Asking for a type outside this list raises rather than silently returning another quantity.",
+      "zh": "给定模型支持的 `predict` 类型元组，如 `supported_types('regress')`。请求列表之外的类型会报错，而不是静默返回另一个量。",
+      "example": "print(ws.supported_types('regress'))"
+    },
+    "relabel_cov_type": {
+      "stata": "(no Stata equivalent -- an internal bookkeeping method)",
+      "en": "Record the covariance type actually used after the matrix has been replaced. `Areg` fits with a placeholder and then builds the real HC2/HC3 matrix on the full design, so it relabels the result here; a caller reading `result.cov_type` must see what was computed, not the placeholder.",
+      "zh": "在协方差矩阵被替换后，记录实际使用的协方差类型。`Areg` 先用占位矩阵拟合、再在完整设计上重建真正的 HC2/HC3，因此在此处重贴标签；读 `result.cov_type` 的调用者必须看到实际计算的那个，而不是占位值。",
+      "example": "from westata.protocols import SSC\nfit = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='HC1')\nprint(fit.cov_type)"
+    },
     "OLS": {
       "stata": "regress y x1 x2",
       "en": "Ordinary least squares -- Stata's `regress`. Prints coefficients, standard errors, t statistics, p-values and confidence intervals, plus the ANOVA and fit blocks (`N`, `F`, `R²`, adjusted `R²`, root MSE). This is the reference implementation for the linear family: the small-sample correction, the `df_r` convention and the sum-of-squares block follow `[R] regress`, and the estimators that wrap a backend reuse those conventions rather than re-deriving them.",
@@ -2748,6 +4026,42 @@
       "example": "ws.Areg.from_formula('y ~ x1', base, absorb='firm').fit().summary(style='stata')",
       "notes_en": "`absorb=` is required -- without it this is just `regress`. `_cons` is the group-size-weighted average of the absorbed effects; an FE model does not identify a constant separately from them, so only a normalisation fixes it and this is areg's. The clustered covariance uses `K = k_reported + (k_absorb - 1)` in the CR1 factor, whereas `reghdfe` uses `k_reported`: the absorbed levels consume degrees of freedom in areg's convention. That difference is NOT uniform across cluster/absorb pairings, so the correction is applied only when `e(rank)` shows the dummies are not already counted. With multiway clustering the two commands' factors differ in structure rather than by a parameter count, so the covariance is rebuilt on the full design instead of scaled. `noabsorb=True` skips the absorbed-indicator F test (Stata's `noabsorbtest`), leaving `e(F_absorb)`/`e(p_absorb)` absent.",
       "notes_zh": "`absorb=` 是必填项——不给它就等同于 `regress`。`_cons` 是被吸收组效应的**按组容量加权**均值；固定效应模型无法把常数与组效应分开识别，只有归一化能定住它，这里采用的是 areg 的归一化。聚类协方差的 CR1 因子用 `K = k_reported + (k_absorb - 1)`，而 `reghdfe` 用 `k_reported`：在 areg 的口径里被吸收的水平也消耗自由度。这个差别**在聚类维度与吸收维度的不同配对下并不一致**，所以只有 `e(rank)` 显示哑变量尚未计入时才施加修正。多路聚类时两个命令的因子是**结构不同**、不是差一个参数计数，因此在完整设计上重算，而不是缩放。`noabsorb=True` 跳过被吸收指示变量的 F 检验（Stata 的 `noabsorbtest`），此时 `e(F_absorb)`/`e(p_absorb)` 不存在。"
+    },
+    "NnmatchResult": {
+      "stata": "teffects nnmatch",
+      "en": "The object `teffects_nnmatch` returns: the ATE/ATET `estimate`, its standard error and p-value, the confidence bounds, and the potential-outcome means.",
+      "zh": "`teffects_nnmatch` 返回的对象：ATE/ATET 的 `estimate`、标准误与 p 值、置信界，以及潜在结果均值。",
+      "example": "r = ws.teffects_nnmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1', 'x2']].to_numpy())\nprint(round(r.ate, 6))"
+    },
+    "PsmatchResult": {
+      "stata": "teffects psmatch",
+      "en": "The object `teffects_psmatch` returns: the ATET estimate with its standard error, p-value and confidence bounds, computed by propensity-score matching.",
+      "zh": "`teffects_psmatch` 返回的对象：由倾向得分匹配算出的 ATET 估计，含标准误、p 值与置信界。",
+      "example": "r = ws.teffects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())\nprint(round(r.ate, 6))"
+    },
+    "RdRobustResult": {
+      "stata": "rdrobust",
+      "en": "The object `rdrobust` returns: the bias-corrected point estimate, its standard error, z statistic, p-value and confidence bounds, plus the bandwidth that produced them.",
+      "zh": "`rdrobust` 返回的对象：偏差校正后的点估计、标准误、z 统计量、p 值、置信界，以及产生它们的带宽。",
+      "example": "r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)\nprint(round(r.tau, 6))"
+    },
+    "TefectsRaResult": {
+      "stata": "teffects ra",
+      "en": "The object `teffects_ra` returns: the ATE/ATET estimate, its standard error, z statistic, p-value and confidence bounds from regression adjustment.",
+      "zh": "`teffects_ra` 返回的对象：回归调整得到的 ATE/ATET 估计，含标准误、z 统计量、p 值与置信界。",
+      "example": "r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())\nprint(round(r.estimate, 6))"
+    },
+    "prais_winsten": {
+      "stata": "(the estimator behind prais; no separate Stata command)",
+      "en": "The Prais-Winsten / Cochrane-Orcutt AR(1) solver on raw arrays: returns the coefficients, the estimated rho, the iteration count and the rho trace. `ws.prais` is the formula-level wrapper around it.",
+      "zh": "作用于裸数组的 Prais-Winsten / Cochrane-Orcutt AR(1) 求解器：返回系数、估计的 rho、迭代次数与 rho 轨迹。`ws.prais` 是它之上的公式级封装。",
+      "example": "coef, rho, iters, trace = ws.prais_winsten(base.x1.to_numpy()[:, None], base.y.to_numpy())\nprint(round(rho, 6), iters)"
+    },
+    "PanelUnitRootResult": {
+      "stata": "xtunitroot ips/llc",
+      "en": "The object `XtUnitroot(...).fit()` returns: the statistic that carries the p-value (`name` says which, e.g. 'Z-t-tilde-bar' for IPS), the p-value, and the per-panel detail block in `details`.",
+      "zh": "`XtUnitroot(...).fit()` 返回的对象：承载 p 值的统计量（`name` 说明是哪个，IPS 为 'Z-t-tilde-bar'）、p 值，以及 `details` 中的逐面板明细块。",
+      "example": "r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()\nprint(r.name, round(r.pvalue, 6))"
     },
     "Logit": {
       "stata": "logit yb x1 x2",
@@ -3132,6 +4446,24 @@
       "example": "ws.Permute.from_formula('y ~ x1 + x2', base, permute='x1', reps=200, seed=1).fit().e['pvalue_permuted']",
       "notes_en": "The reported covariance is the analytic OLS one, not a permutation-based estimate: `permute` produces a p-value, not a VCE. `permute=` must name an actual regressor in the formula or a `ConsistencyError` lists the regressors that do exist. The random stream is not Stata's, so only the magnitude of the p-value is comparable.",
       "notes_zh": "报告的协方差是解析的 OLS 协方差，而不是基于置换的估计：`permute` 产出的是 p 值，不是 VCE。`permute=` 必须写出公式中真实存在的回归元，否则 `ConsistencyError` 会列出实际可用的回归元。随机流不是 Stata 的，因此只有 p 值的量级可比。"
+    },
+    "JohansenResult": {
+      "stata": "vecrank / vec johansen",
+      "en": "The Johansen cointegration result: `select_rank()` picks the rank under the requested statistic, `to_frame()` gives the trace and max-eigenvalue tables, and `to_stata_table()` renders the block Stata's `vecrank` prints.",
+      "zh": "Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 给出迹统计量与最大特征值表，`to_stata_table()` 渲染 Stata `vecrank` 打印的块。",
+      "example": "r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=1).johansen()\nprint(r.to_frame().head(3))"
+    },
+    "VARResults": {
+      "stata": "var",
+      "en": "The fitted VAR: `params` is Stata's equation-by-equation coefficient TABLE (a DataFrame, not a flat vector), `bse`, `sigma_u`, `cov_params()` and `e`, plus `irf()`, `fevd()` and `granger_causality()`. It is not a `StataResults`.",
+      "zh": "拟合好的 VAR：`params` 是 Stata 的逐方程系数**表**（DataFrame，不是一维向量），另有 `bse`、`sigma_u`、`cov_params()`、`e`，以及 `irf()`、`fevd()`、`granger_causality()`。它不是 `StataResults`。",
+      "example": "r = ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit()\nprint(r.params.shape)"
+    },
+    "VECMResults": {
+      "stata": "vec",
+      "en": "The fitted VECM: `alpha` and `beta` blocks, `cov_params()`, `conf_int()`, `summary()` and the underlying statsmodels result. The reported drift differs from Stata's printed `_cons`; see the `VECM` entry.",
+      "zh": "拟合好的 VECM：`alpha` 与 `beta` 块、`cov_params()`、`conf_int()`、`summary()` 及底层 statsmodels 结果。所报漂移与 Stata 打印的 `_cons` 不同，见 `VECM` 条目。",
+      "example": "r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit()\nprint(r.conf_int().shape)"
     },
     "testnl": {
       "stata": "testnl exp(_b[x1]) = 2",
@@ -3590,6 +4922,216 @@
       "en": "Regression-adjustment treatment effect: fit the outcome model separately in the treated and control groups, then average the predicted difference over the estimand's population (`ate` over everyone, `atet` over the treated). The point estimate is exact; the standard error is not reproduced because the sandwich is computed inside Stata's builtin `gmm`, so se/z/p/ci are NaN.",
       "zh": "回归调整法处理效应：在处理组与对照组分别拟合结果模型，再对估计量的总体平均预测差（`ate` 对所有个体、`atet` 对处理组）。点估计精确；标准误未复现，因为 sandwich 由 Stata 内置 `gmm` 计算，因此 se/z/p/ci 为 NaN。",
       "example": "print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)"
+    },
+    "AucResult": {
+      "stata": "estat auc after logit/probit",
+      "en": "The object `estat_auc` returns: the area under the ROC curve (`area`) and the number of observations it was computed on (`n`). Read the numbers with `to_dict()`; `str()` is not defined because Stata prints a one-line table rather than a block.",
+      "zh": "`estat_auc` 返回的对象：ROC 曲线下面积（`area`）与计算所用的观测数（`n`）。用 `to_dict()` 取数；Stata 打印的是一行式表格而非整块，因此没有定义 `str()`。",
+      "example": "r = ws.estat_auc(ws.Logit.from_formula('yb ~ x1', base).fit())\nprint(round(r.area, 6))"
+    },
+    "BgTestResult": {
+      "stata": "estat bgodfrey",
+      "en": "The object `estat_bgodfrey` returns, one row per tested lag order: `to_frame()` gives the lag, the chi-square statistic and its p-value for each row.",
+      "zh": "`estat_bgodfrey` 返回的对象，每个被检验的滞后阶一行：`to_frame()` 给出每行的滞后阶、卡方统计量与 p 值。",
+      "example": "r = ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1', base).fit(), lags=[1, 2])\nprint(r.to_frame())"
+    },
+    "ContrastResult": {
+      "stata": "contrast",
+      "en": "A list of `LincomResult` rows (one per comparison) that also carries the joint Wald test Stata prints in the ANOVA block: `term`, `fvalue`, `df`, `df_denom` and `pvalue`. `to_frame()` gives the per-comparison table.",
+      "zh": "由 `LincomResult` 组成的列表（每个比较一行），同时携带 Stata 在方差分析块中打印的联合 Wald 检验：`term`、`fvalue`、`df`、`df_denom`、`pvalue`。`to_frame()` 给出逐比较的表格。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()\nr = ws.contrast(fit, 'firm')\nprint(len(r))"
+    },
+    "ContrastResults": {
+      "stata": "statsmodels-style contrast result",
+      "en": "The statsmodels-shaped contrast object the statsmodels compatibility helpers build. It is NOT one of this package's estimation results: it carries `statistic`, `pvalue`, `df_num`, `df_resid`, `hypotheses` and `summary()`, and deliberately exposes no `params`/`bse` vector.",
+      "zh": "statsmodels 兼容层构造的对比结果对象。它**不是**本包的估计结果：携带 `statistic`、`pvalue`、`df_num`、`df_resid`、`hypotheses` 与 `summary()`，且刻意不提供 `params`/`bse` 向量。",
+      "example": "from westata.results.ecosystem import build_contrast\nfit = ws.OLS.from_formula('y ~ x1', base).fit()\nc = build_contrast(fit, 'x1 = 0')\nprint(round(c.pvalue, 6))"
+    },
+    "Correlogram": {
+      "stata": "estat corrgram",
+      "en": "The object `estat_corrgram` returns: one row per lag with the autocorrelation, partial autocorrelation and their Q statistics. `to_frame()` gives the table; `to_dict()` gives one dict per row.",
+      "zh": "`estat_corrgram` 返回的对象：每个滞后阶一行，含自相关、偏自相关及其 Q 统计量。`to_frame()` 给出表格，`to_dict()` 给出每行一个字典。",
+      "example": "r = ws.estat_corrgram(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)\nprint(r.to_frame())"
+    },
+    "DFGLSResult": {
+      "stata": "dfgls",
+      "en": "The object `dfgls` returns: one cell per candidate lag order (`to_frame()` is the table Stata prints), plus `trend` (which deterministic case was run) and `variable`.",
+      "zh": "`dfgls` 返回的对象：每个候选滞后阶一格（`to_frame()` 即 Stata 打印的表格），另有 `trend`（所跑的确定性情形）与 `variable`。",
+      "example": "r = ws.dfgls(base.y.to_numpy())\nprint(r.to_frame().head(3))"
+    },
+    "DurbinWatsonResult": {
+      "stata": "estat dwatson",
+      "en": "The object `estat_dwatson` returns: the Durbin-Watson statistic `d`, its degrees of freedom `df`, the sample size `nobs`, and `n_gaps` (missing periods the time axis had to skip).",
+      "zh": "`estat_dwatson` 返回的对象：Durbin-Watson 统计量 `d`、自由度 `df`、样本量 `nobs`，以及 `n_gaps`（时间轴被迫跳过的缺失期数）。",
+      "example": "r = ws.estat_dwatson(ws.OLS.from_formula('y ~ x1', base).fit())\nprint(round(r.d, 6))"
+    },
+    "EffectSizeResult": {
+      "stata": "estat esize",
+      "en": "The object `estat_esize` returns: `kind` ('eta2'/'epsilon2'/'omega2'), the `estimate`, and for eta-squared the confidence bounds `ci_lower`/`ci_upper` at the requested `level` (a fraction, e.g. 0.95).",
+      "zh": "`estat_esize` 返回的对象：`kind`（'eta2'/'epsilon2'/'omega2'）、`estimate`；对 eta-squared 还有按 `level`（分数，如 0.95）给出的置信界 `ci_lower`/`ci_upper`。",
+      "example": "r = ws.estat_esize(ws.OLS.from_formula('y ~ x1 + x2', base).fit())\nprint(round(r.estimate, 6))"
+    },
+    "EndogScoreResult": {
+      "stata": "estat endogenous (score form)",
+      "en": "The object `endog_score_test` returns. `to_dict()` gives the robust score statistic, its degrees of freedom and p-value; this is the form Stata uses when the VCE is robust or clustered.",
+      "zh": "`endog_score_test` 返回的对象。`to_dict()` 给出稳健得分统计量、自由度与 p 值；这是 Stata 在 VCE 为稳健或聚类时采用的形式。",
+      "example": "from westata.postestimation.endog_score import endog_score_test\nprint('see estat_endogenous for a runnable end-to-end example')"
+    },
+    "KpssResult": {
+      "stata": "kpss",
+      "en": "The object `kpss` returns: one row per tested lag (`to_frame()`), each with the KPSS statistic and its critical values for the `trend` case that was requested.",
+      "zh": "`kpss` 返回的对象：每个被检验的滞后一行（`to_frame()`），每行含 KPSS 统计量与所请求 `trend` 情形下的临界值。",
+      "example": "r = ws.kpss(base.y.to_numpy())\nprint(r.to_frame().head(3))"
+    },
+    "LfitResult": {
+      "stata": "estat gof, lfit",
+      "en": "The Hosmer-Lemeshow style goodness-of-fit result: `to_dict()` gives the Pearson chi-square, its p-value and the group count. It is the second object `estat_gof` can return, alongside `GofResult`.",
+      "zh": "Hosmer-Lemeshow 式拟合优度结果：`to_dict()` 给出 Pearson 卡方、p 值与分组数。它是 `estat_gof` 除 `GofResult` 之外可能返回的第二种对象。",
+      "example": "fit = ws.Logit.from_formula('yb ~ x1', base).fit()\nprint(ws.estat_gof(fit, group=10).to_dict())"
+    },
+    "LinkTestResult": {
+      "stata": "linktest",
+      "en": "The object `ws.linktest` returns: the hat and hatsq coefficients of the link test (`_hat`, `_hatsq`), their standard errors and the p-value of `_hatsq` -- the term that detects a link misspecification.",
+      "zh": "`ws.linktest` 返回的对象：连接检验的 hat 与 hatsq 系数（`_hat`、`_hatsq`）、其标准误，以及 `_hatsq` 的 p 值——用于发现连接函数误设的那一项。",
+      "example": "r = ws.linktest(ws.OLS.from_formula('y ~ x1', base).fit())\nprint(round(r.pvalue, 6))"
+    },
+    "LmarResult": {
+      "stata": "varlmar / veclmar",
+      "en": "The Lagrange-multiplier autocorrelation result for a VAR/VECM: `to_frame()` gives one row per tested lag with the LM statistic and p-value.",
+      "zh": "VAR/VECM 的拉格朗日乘子自相关结果：`to_frame()` 给出每个被检验滞后一行，含 LM 统计量与 p 值。",
+      "example": "r = ws.varlmar(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit(), mlag=1)\nprint(r.to_frame())"
+    },
+    "MTestResult": {
+      "stata": "estat hettest, mtest(...)",
+      "en": "The multiple-testing-adjusted heteroskedasticity test result: `to_dict()` per variable, `to_frame()` as a table, `to_matrix()` for the raw p-value matrix. `MTEST_METHODS` lists the adjustments Stata offers.",
+      "zh": "多重检验校正后的异方差检验结果：逐变量 `to_dict()`、表格 `to_frame()`、原始 p 值矩阵 `to_matrix()`。`MTEST_METHODS` 列出 Stata 提供的校正方法。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.estat_hettest(fit, mtest='bonferroni')\nprint(r.to_dict())"
+    },
+    "MoranResult": {
+      "stata": "estat moran",
+      "en": "The Moran spatial-autocorrelation test result: `to_dict()` gives the Moran I statistic, the expected value under no autocorrelation, the standard deviation and the p-value.",
+      "zh": "Moran 空间自相关检验结果：`to_dict()` 给出 Moran I 统计量、无自相关下的期望值、标准差与 p 值。",
+      "example": "print('MoranResult is returned by estat_moran; see its entry for a runnable example')"
+    },
+    "MundlakResult": {
+      "stata": "estat mundlak",
+      "en": "The Mundlak specification test result: which terms were tested, the chi-square statistic, its degrees of freedom and the p-value. A rejection means the random-effects estimator is inconsistent.",
+      "zh": "Mundlak 设定检验结果：被检验的项、`chibar2` 统计量、其自由度与 `pvalue`。拒绝意味着随机效应估计量不一致。",
+      "example": "print('MundlakResult is returned by estat_mundlak; see its entry for a runnable example')"
+    },
+    "PortmanteauResult": {
+      "stata": "wntestq",
+      "en": "The portmanteau (Ljung-Box / Box-Pierce) result: the Q statistic, its degrees of freedom and p-value, for the lag order that was used.",
+      "zh": "混成（Ljung-Box / Box-Pierce）检验结果：所采用滞后阶下的 `q` 统计量、`df` 自由度与 `pvalue`。",
+      "example": "r = ws.wntestq(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)\nprint(round(r.q, 6))"
+    },
+    "PwCompareTable": {
+      "stata": "pwcompare",
+      "en": "A list of `LincomResult` rows, one per pairwise comparison, that also renders Stata's whole pairwise table. `to_frame()` gives one row per comparison.",
+      "zh": "由 `LincomResult` 组成的列表，每个成对比较一行，并能渲染 Stata 的整张成对比较表。`to_frame()` 给出逐比较的行。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()\nr = ws.pwcompare(fit, 'firm')\nprint(len(r))"
+    },
+    "RegFResult": {
+      "stata": "estat endogenous (regression form)",
+      "en": "The object `endog_regF_test` returns: the regression-based (Wooldridge) robust score statistic, its degrees of freedom and p-value.",
+      "zh": "`endog_regF_test` 返回的对象：基于回归的（Wooldridge）稳健得分统计量、自由度与 p 值。",
+      "example": "print('RegFResult is returned by endog_regf_test; see estat_endogenous for the command')"
+    },
+    "SucestResult": {
+      "stata": "suest",
+      "en": "The stacked result `ws.suest` returns: the combined `params`, `cov_params()` across the models, `to_dict()`/`to_frame()`, and `test`/`lincom` that work on the stacked parameter vector.",
+      "zh": "`ws.suest` 返回的堆叠结果：合并后的 `params`、跨模型的 `cov_params()`、`to_dict()`/`to_frame()`，以及作用于堆叠参数向量的 `test`/`lincom`。",
+      "example": "a = ws.OLS.from_formula('y ~ x1', base).fit()\nb = ws.OLS.from_formula('x2 ~ x1', base).fit()\nprint(len(ws.suest([a, b]).params))"
+    },
+    "SummarizeTable": {
+      "stata": "summarize",
+      "en": "The table `ws.summarize` returns: one row per variable with `Obs`, `Mean`, `Std. dev.`, `Min` and `Max`. `to_dict()` and `to_frame()` give the numbers; `str()` prints Stata's layout.",
+      "zh": "`ws.summarize` 返回的表格：每个变量一行，含 `Obs`、`Mean`、`Std. dev.`、`Min`、`Max`。`to_dict()`/`to_frame()` 取数，`str()` 打印 Stata 版式。",
+      "example": "r = ws.summarize(base, ['y', 'x1'])\nprint(r.to_frame())"
+    },
+    "SzroeterResult": {
+      "stata": "estat szroeter",
+      "en": "The Szroeter heteroskedasticity test result for a single variable: the statistic, degrees of freedom and p-value, in `to_dict()` form.",
+      "zh": "单变量的 Szroeter 异方差检验结果：统计量、自由度与 p 值，以 `to_dict()` 形式给出。",
+      "example": "r = ws.estat_szroeter(ws.OLS.from_formula('y ~ x1', base).fit(), variables=['x1'])\nprint(r.to_dict())"
+    },
+    "SzroeterTable": {
+      "stata": "estat szroeter (several variables)",
+      "en": "The table `estat_szroeter` returns when several variables are tested at once: one row per variable, with `to_frame()` for the numbers.",
+      "zh": "`estat_szroeter` 在同时检验多个变量时返回的表格：每个变量一行，用 `to_frame()` 取数。",
+      "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.estat_szroeter(fit, variables=['x1', 'x2'])\nprint(r.to_frame())"
+    },
+    "VarGrangerResult": {
+      "stata": "vargranger",
+      "en": "The Granger-causality table: one row per (caused, causing) pair with the Wald chi-square, its degrees of freedom and p-value. `str()` prints Stata's boxed table.",
+      "zh": "Granger 因果检验表：每个（被引起、引起）对一行，含 Wald 卡方、自由度与 p 值。`str()` 打印 Stata 的框线表。",
+      "example": "r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())\nprint(len(r.rows))"
+    },
+    "VarSocResult": {
+      "stata": "varsoc",
+      "en": "The lag-order selection table: one row per candidate lag with the AIC, HQIC, SBIC and FPE that Stata prints. `to_frame()` gives the numbers.",
+      "zh": "滞后阶选择表：每个候选滞后一行，含 Stata 打印的 AIC、HQIC、SBIC、FPE。`to_frame()` 取数。",
+      "example": "r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)\nprint(r.to_frame())"
+    },
+    "VarStableResult": {
+      "stata": "varstable",
+      "en": "The stability check for a fitted VAR: the companion-matrix eigenvalues and whether the process is stable. `to_frame()` gives the eigenvalue table.",
+      "zh": "对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。",
+      "example": "r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())\nprint(r.to_frame())"
+    },
+    "VarWleResult": {
+      "stata": "varwle",
+      "en": "The Wald lag-exclusion test for a fitted VAR: `by_equation()` returns the per-equation statistics; one row per lag and equation.",
+      "zh": "对拟合 VAR 的 Wald 滞后排除检验：`by_equation()` 返回逐方程统计量，每个滞后与方程一行。",
+      "example": "r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())\nprint(len(r.by_equation()))"
+    },
+    "VecRankResult": {
+      "stata": "vecrank",
+      "en": "The cointegration-rank test table: one row per null rank with the trace and max-eigenvalue statistics and their critical values. `to_frame()` gives the numbers.",
+      "zh": "协整秩检验表：每个零假设秩一行，含迹统计量、最大特征值统计量及其临界值。`to_frame()` 取数。",
+      "example": "r = ws.vecrank(base[['y', 'x1']].to_numpy(), lags=2)\nprint(r.to_frame().head(2))"
+    },
+    "VecStableResult": {
+      "stata": "vecstable",
+      "en": "The stability check for a fitted VECM: the companion-matrix eigenvalues and their moduli. `to_frame()` gives the table.",
+      "zh": "对拟合 VECM 的稳定性检验：伴随矩阵特征值及其模。`to_frame()` 给出表格。",
+      "example": "r = ws.vecstable(ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit())\nprint(r.to_frame())"
+    },
+    "WeakRobustResult": {
+      "stata": "estat weakrobust",
+      "en": "The weak-instrument-robust inference result: the Anderson-Rubin `statistic`, its `df`, the F form and the p-value.",
+      "zh": "弱工具稳健推断结果：Anderson-Rubin 的 `statistic`、`df`、F 形式以及 p 值。",
+      "example": "print('WeakRobustResult is returned by estat_weakrobust; see its entry')"
+    },
+    "XtTest0Result": {
+      "stata": "xttest0",
+      "en": "The Breusch-Pagan LM test for random effects: `chibar2`, its p-value, and the variance components `var_u`, `var_e`, `var_y`.",
+      "zh": "随机效应的 Breusch-Pagan LM 检验：`chibar2`、其 p 值，以及方差成分 `var_u`、`var_e`、`var_y`。",
+      "example": "fit = ws.RandomEffects.from_formula('y ~ x1', base, entity='firm', time='year').fit()\nr = ws.xttest0(fit)\nprint(round(r.chibar2, 6))"
+    },
+    "endog_regf_test": {
+      "stata": "estat endogenous (robust regression form)",
+      "en": "The regression-based robust score test for endogeneity, built from an IV fit's structure. It is what `estat endogenous` runs under a robust VCE; `estat_endogenous(result)` is the command-level entry point.",
+      "zh": "基于回归的稳健内生性得分检验，由 IV 拟合的结构信息构造。这是 `estat endogenous` 在稳健 VCE 下所跑的形式；命令级入口是 `estat_endogenous(result)`。",
+      "example": "print('endog_regf_test takes an iv_structure dict; use estat_endogenous on a fitted result')"
+    },
+    "endog_score_test": {
+      "stata": "estat endogenous (score form)",
+      "en": "The robust score test for endogeneity computed from the residuals. Like `endog_regf_test`, this is the internals of `estat endogenous`; call that command on a fitted IV result instead.",
+      "zh": "由残差计算的稳健内生性得分检验。与 `endog_regf_test` 一样，这是 `estat endogenous` 的内部实现；请直接对已拟合的 IV 结果调用该命令。",
+      "example": "print('endog_score_test takes an iv_structure dict; use estat_endogenous on a fitted result')"
+    },
+    "estat_ptrends": {
+      "stata": "estat ptrends",
+      "en": "The parallel-trends test for a `didregress`/`xtdidregress` fit: it compares the pre-treatment trend of the treated group with the controls and returns the statistic, its degrees of freedom and the p-value.",
+      "zh": "`didregress`/`xtdidregress` 拟合的平行趋势检验：比较处理组与对照组的处理前趋势，返回统计量、自由度与 p 值。",
+      "example": "print('estat_ptrends requires a didregress fit; see ws.Didregress for how to build one')"
+    },
+    "RcmResult": {
+      "stata": "rcm",
+      "en": "The object `ws.rcm` returns: the `att`, the selected `predictors`, the fitted `coefficients`, the pre/post years, the observed and `predicted` paths and the per-period `effects`.",
+      "zh": "`ws.rcm` 返回的对象：`att`、入选的 `predictors`、拟合的 `coefficients`、前后年份、实际与 `predicted` 路径，以及逐期 `effects`。",
+      "example": "print('RcmResult is returned by ws.rcm; it needs a unit/time panel')"
     },
     "synth": {
       "stata": "synth y x1 x2, trunit(1) trperiod(2005)",

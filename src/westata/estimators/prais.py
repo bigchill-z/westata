@@ -193,6 +193,46 @@ class PraisResult:
         for key, value in values.items():
             setattr(self, f"_{key}", value)
 
+    #: Scalar members exposed by ``to_dict``, in the order ``prais`` prints them.
+    _SERIALISED = (
+        "rho",
+        "nobs",
+        "df_resid",
+        "df_total",
+        "rsquared",
+        "rsquared_adj",
+        "rmse",
+        "fvalue",
+        "dw_original",
+        "dw_transformed",
+        "iterations",
+        "corc",
+    )
+
+    def to_dict(self) -> dict[str, object]:
+        """Flat ``{name: value}`` of the scalar results (R4.1).
+
+        ``params``/``bse``/``tvalues`` are per-coefficient, so they belong in
+        ``to_frame()`` rather than being collapsed into one dict cell.
+        """
+
+        return {name: getattr(self, name, None) for name in self._SERIALISED}
+
+    def to_frame(self) -> pd.DataFrame:
+        """One row per coefficient, in Stata's column order (R4.1)."""
+
+        return pd.DataFrame(
+            {
+                "params": self._params,
+                "bse": self._bse,
+                "tvalues": self._tvalues,
+                "pvalues": self._pvalues,
+                "lower": self._conf_int[:, 0],
+                "upper": self._conf_int[:, 1],
+            },
+            index=self._names,
+        )
+
     @property
     def params(self) -> pd.Series:
         return pd.Series(self._params, index=self._names, name="params")
@@ -260,6 +300,55 @@ class PraisResult:
     @property
     def df_resid(self) -> int:
         return self._df_resid
+
+    @property
+    def df_model(self) -> int:
+        """Model degrees of freedom: the number of slopes (``e(df_m)``).
+
+        ``ResultsProtocol`` requires it and the F line already used the private
+        ``_df_model``, so the value existed without a public name (R4.2).
+        """
+
+        return int(self._df_model)
+
+    @property
+    def e(self) -> dict[str, object]:
+        """Stata's ``e()`` scalars for ``prais`` (R4.2).
+
+        ``prais`` stores the regression block and its AR(1) extras (``e(rho)``,
+        ``e(dw)``, ``e(iterations)``) and, unlike ``regress``, nothing else: there is
+        no ``e(ll)``, no ``e(aic)`` and no ``e(V)``-style matrix of its own.  Building
+        the mapping here keeps that honest -- a reader who asks for ``e(ll)`` gets
+        ``KeyError`` rather than a fabricated number.
+        """
+
+        return {
+            "N": self._nobs,
+            "df_m": int(self._df_model),
+            "df_r": self._df_resid,
+            "r2": self._r2,
+            "r2_a": self._r2_adj,
+            "rmse": self._rmse,
+            "F": self._fvalue,
+            "corc": int(bool(self._corc)),
+            "rho": self._rho,
+            "dw": self._dw_transformed,
+            "dw_original": self._dw_original,
+            "iterations": self._iterations,
+        }
+
+    @property
+    def llf(self) -> float:
+        """Log-likelihood: NOT AVAILABLE for ``prais``.
+
+        ``prais`` is a transformed least-squares fit, and Stata's ``prais`` reports no
+        log-likelihood, no ``e(ll)`` and no information criteria.  ``ResultsProtocol``
+        names the attribute, so it exists -- but it returns ``nan`` and the docstring
+        says why, instead of inventing a Gaussian likelihood for a model Stata never
+        computes one for (R1.5).
+        """
+
+        return float("nan")
 
     @property
     def rho_trace(self) -> tuple[float, ...]:
@@ -537,7 +626,7 @@ class PraisResult:
 
 
 def prais(
-    frame: pd.DataFrame,
+    data: pd.DataFrame,
     formula: str,
     *,
     maxiter: int = 100,
@@ -547,14 +636,22 @@ def prais(
     """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.
 
     ``formula`` is a statsmodels/patsy style spec such as ``"y ~ x1 + x2"``. The data must
-    already be in time order through ``frame``'s row order.
+    already be in time order through ``data``'s row order.
 
     ``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops
     the first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in
     both the coefficients and the estimated rho, so it is a separate estimator, not a
     cosmetic switch.
+
+    The first parameter is named ``data`` rather than ``frame`` (R2.3): every other public
+    function in the package uses the house name, and this was the only ``regress``-style
+    entry point that did not.  Positional calls are unaffected
+    (``ws.prais(df, "y ~ x")``); this was a keyword-only rename, so
+    ``prais(frame=df, ...)`` now raises ``TypeError`` naming the new parameter rather
+    than silently accepting a name no other function uses.
     """
 
+    frame = data
     from westata.formula.factor import build_design
 
     design, names, kept_index = build_design(formula, frame)

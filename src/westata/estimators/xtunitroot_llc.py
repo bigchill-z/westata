@@ -48,6 +48,7 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["LlcResult", "levin_lin_chu"]
 
@@ -103,7 +104,7 @@ _ADJUSTMENT: dict[int, tuple[tuple[float, float, float], ...]] = {
 
 
 @dataclass(frozen=True)
-class LlcResult:
+class LlcResult(ResultSerialisation):
     """Result of the Levin-Lin-Chu test (Stata ``xtunitroot llc``)."""
 
     tds: float
@@ -177,7 +178,7 @@ def _regress(design: np.ndarray, target: np.ndarray) -> tuple[np.ndarray, np.nda
 
 
 def levin_lin_chu(
-    frame: pd.DataFrame,
+    data: pd.DataFrame,
     *,
     variable: str,
     entity: str,
@@ -196,18 +197,21 @@ def levin_lin_chu(
     """
 
     for column in (variable, entity, time):
-        if column not in frame.columns:
+        if column not in data.columns:
             raise ConsistencyError(f"xtunitroot llc: column {column!r} not found")
 
-    data = frame[[entity, time, variable]].dropna().sort_values([entity, time])
-    if data.empty:
+    sample = data[[entity, time, variable]].dropna().sort_values([entity, time])
+    if sample.empty:
         raise ConsistencyError("xtunitroot llc: no complete observations")
 
-    codes = np.asarray(pd.factorize(data[entity])[0])
-    series = data[variable].to_numpy(dtype=float)
+    # Everything below reads `sample`: the dropna/sorted frame.  As in the IPS module,
+    # `sample` used to be computed and then ignored, so missing values were not actually
+    # removed and `codes`/`series` could disagree in length with the documented sample.
+    codes = np.asarray(pd.factorize(sample[entity])[0])
+    series = sample[variable].to_numpy(dtype=float)
 
     if demean:
-        period_codes = np.asarray(pd.factorize(data[time])[0])
+        period_codes = np.asarray(pd.factorize(sample[time])[0])
         sums = np.zeros(period_codes.max() + 1)
         np.add.at(sums, period_codes, series)
         counts = np.bincount(period_codes)

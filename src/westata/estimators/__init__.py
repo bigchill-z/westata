@@ -57,8 +57,14 @@ from westata.estimators.panel_nonlinear import (
     XtProbit,
     XtTobit,
 )
-from westata.estimators.panel_iv import XtGls, XtIvreg, XtPcse, XtUnitroot
-from westata.estimators.did import Didregress, Xtdidregress
+from westata.estimators.panel_iv import (
+    PanelUnitRootResult,
+    XtGls,
+    XtIvreg,
+    XtPcse,
+    XtUnitroot,
+)
+from westata.estimators.did import Didregress, Xtdidregress, estat_ptrends
 from westata.estimators.treatreg_effects import (
     AIPW,
     IPW,
@@ -94,8 +100,11 @@ from westata.estimators.synth2 import Synth2Result, synth2
 from westata.estimators.tseries import (
     ARIMA,
     GARCH,
+    JohansenResult,
     VAR,
+    VARResults,
     VECM,
+    VECMResults,
     UnitRootResult,
     unitroot,
     dfuller,
@@ -103,6 +112,11 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "estat_ptrends",
+    "JohansenResult",
+    "VECMResults",
+    "VARResults",
+    "PanelUnitRootResult",
     "LlcResult",
     "levin_lin_chu",
     "IpsResult",

@@ -32,6 +32,7 @@ from typing import Any
 import numpy as np
 
 from westata.errors import ConsistencyError
+from westata.results.summary import stata_number
 
 __all__ = ["VecStableResult", "vecstable"]
 
@@ -130,15 +131,10 @@ def _modulus_text(value: float) -> str:
     return ("-" if number < 0 else "") + text_value
 
 
-def _stata_number(value: float, digits: int = 6) -> str:
-    """Six significant digits with Stata's leading zero dropped."""
+def _stata_number(value: float, *args: Any, **kwargs: Any) -> str:
+    """Delegate to the one implementation (R6.1); see results.summary.stata_number."""
 
-    text = f"{value:.{digits}g}"
-    if text.startswith("0."):
-        text = text[1:]
-    elif text.startswith("-0."):
-        text = "-" + text[2:]
-    return text
+    return stata_number(value, precision_cap=6)
 
 
 def _format_complex(value: complex) -> str:

@@ -211,7 +211,7 @@ def tebalance_summarize(
     match_weights: Any = None,
     names: list[str] | None = None,
     exact: tuple[str, ...] = (),
-    normalise_counts: bool = False,
+    normalize_counts: bool = False,
 ) -> BalanceSummary:
     """Balance table comparing raw and matched means/variances.
 
@@ -249,7 +249,7 @@ def tebalance_summarize(
     weights = None
     if match_weights is not None:
         weights = np.asarray(match_weights, dtype=float).reshape(-1)
-        if not normalise_counts:
+        if not normalize_counts:
             # MATCHING weights carry a zero for unmatched controls, and the treated keep their own
             # value; multiplying by `control_mask` zeroed the treated side, so the weighted column
             # compared a reweighted control mean against a RAW treated one.
@@ -284,7 +284,7 @@ def tebalance_summarize(
         #
         # Treating the first case as the second produced NaN, because the matching weight vector
         # masks the treated to zero.
-        if weights is not None and normalise_counts:
+        if weights is not None and normalize_counts:
             m1w, v1w = _weighted_mean_variance(series[treated], weights[treated])
             m0w, v0w = _weighted_mean_variance(series[use], weights[use])
         elif weights is not None:
@@ -307,7 +307,7 @@ def tebalance_summarize(
             )
         )
 
-    # `normalise_counts` selects the reporting convention, because the right answer depends on the
+    # `normalize_counts` selects the reporting convention, because the right answer depends on the
     # weighting. Matching weights (psmatch/nnmatch) are raw weighted sums -- one unit per treated
     # observation, split among its nearest controls. IPW/ATET weights are rescaled by Stata so BOTH
     # sides total N/2: after `teffects ipw (re78) (covs), atet` on nsw_dw.dta, 185 treated
@@ -315,7 +315,7 @@ def tebalance_summarize(
     #
     # The caller that built the weights knows which case it is, so this is a flag rather than a
     # rule inferred here. Rounding each half independently would also drop one when N is odd.
-    if weights is not None and normalise_counts:
+    if weights is not None and normalize_counts:
         total_observations = int(treated_mask.sum() + control_mask.sum())
         treated_matched = int(round(total_observations / 2.0))
         control_matched = total_observations - treated_matched

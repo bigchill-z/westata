@@ -47,6 +47,7 @@ from westata.postestimation.ts_lags import (
     refuse_panel_fit,
     resolve_time_axis,
 )
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = [
     "Correlogram",
@@ -105,7 +106,7 @@ def _residuals(result: Any, command: str) -> np.ndarray:
 
 
 @dataclass(frozen=True)
-class DurbinWatsonResult:
+class DurbinWatsonResult(ResultSerialisation):
     """``estat dwatson``: the Durbin-Watson d statistic.
 
     Stata prints one line::
@@ -290,7 +291,7 @@ def _partial_autocorrelations(
 
 
 @dataclass(frozen=True)
-class PortmanteauResult:
+class PortmanteauResult(ResultSerialisation):
     """``wntestq``: Ljung-Box portmanteau Q for white noise."""
 
     q: float
@@ -371,7 +372,7 @@ class CorrelogramRow:
 
 
 @dataclass(frozen=True)
-class Correlogram:
+class Correlogram(ResultSerialisation):
     """``corrgram``: the autocorrelation table with Ljung-Box Q at each lag."""
 
     rows: tuple[CorrelogramRow, ...]

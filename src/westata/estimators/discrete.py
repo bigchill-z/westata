@@ -72,7 +72,7 @@ score is not bit-identical to Stata's -- see ``retest/fix/discrete/FIXES.md``).
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -80,6 +80,7 @@ import pandas as pd
 from westata.errors import ConsistencyError, ConvergenceError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
+from westata.estimators.least_squares import slope_positions
 
 __all__ = [
     "Logit",
@@ -93,6 +94,27 @@ __all__ = [
 #: Accepted ``cov_type`` values.  ``robust``/``cluster`` are Stata's VCEs;
 #: ``HC0``/``HC1`` are statsmodels' (kept for API compatibility).
 _SUPPORTED_COV = ("nonrobust", "robust", "HC0", "HC1", "cluster")
+
+#: What ``results.cov_type`` reports for each accepted value (R3.7.2).
+#:
+#: Stata's ``vce(robust)`` for the ML families is its OWN estimator: the sandwich is
+#: scaled by ``n/(n-1)``, not by ``n/(n-k)`` (HC1) and not left unscaled (HC0).  Storing
+#: the raw string ``"robust"`` made ``Logit(...).cov_type`` read the same as
+#: ``OLS(...).cov_type`` for a fit whose numbers differ, so the label now names the
+#: estimator that was actually computed.
+_COV_TYPE_LABELS = {
+    "nonrobust": "nonrobust",
+    "robust": "ML_ROBUST",
+    "HC0": "HC0",
+    "HC1": "HC1",
+    "cluster": "cluster",
+}
+
+
+def _cov_type_label(canonical: str) -> str:
+    """The canonical value to store on the result object (R3.7.2)."""
+
+    return _COV_TYPE_LABELS.get(canonical, canonical)
 
 
 # --------------------------------------------------------------- VCE helpers
@@ -201,20 +223,9 @@ def _wald_statistic(
 
 
 def _slope_positions(names: list[str]) -> list[int]:
-    """Indices of the structural slope coefficients.
+    """Delegate to the shared rule (R6.1); pass only the family differences."""
 
-    Stata's Wald test under ``vce(robust)``/``vce(cluster)`` covers the
-    regressors of the structural equation, excluding the constant and every
-    auxiliary parameter (``/lnalpha``, ``/cut1``..., ``/sigma``).  Names
-    starting with ``/`` are auxiliary by construction; the constant is spelled
-    ``Intercept`` or ``_cons``.
-    """
-
-    return [
-        position
-        for position, name in enumerate(names)
-        if not name.startswith("/") and name not in ("Intercept", "_cons", "const")
-    ]
+    return slope_positions(names)
 
 
 def _ml_vce_label(cov_type: Any) -> str:
@@ -415,6 +426,9 @@ def _model_test(
     return "LR", statistic, len(positions)
 
 
+_DiscreteT = TypeVar("_DiscreteT", bound="_DiscreteBase")
+
+
 class _DiscreteBase:
     """Shared plumbing for statsmodels-backed ML estimators."""
 
@@ -505,7 +519,7 @@ class _DiscreteBase:
         *,
         subset: Any = None,
         freq_weights: str | None = None,
-    ) -> "_DiscreteBase":
+    ) -> "_DiscreteT":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
@@ -759,7 +773,7 @@ class _DiscreteBase:
             df_model=float(e["df_m"]),
             dist="z",
             model_name=self._stata_command,
-            cov_type=requested,
+            cov_type=_cov_type_label(canonical),
             e=e,
             design_matrix=(self._X, list(names)),
             model_data=self._model_data,
@@ -1999,7 +2013,7 @@ class _Ordered(_DiscreteBase):
         *,
         subset: Any = None,
         freq_weights: str | None = None,
-    ) -> "_Ordered":
+    ) -> "_DiscreteT":
         model = super().from_formula(
             formula, data, subset=subset, freq_weights=freq_weights
         )
@@ -2307,7 +2321,7 @@ class _Ordered(_DiscreteBase):
             df_model=float(df_m),
             dist="z",
             model_name=self._stata_command,
-            cov_type=requested,
+            cov_type=_cov_type_label(canonical),
             e=e,
             design_matrix=(self._X, list(self._param_names)),
             model_data=self._model_data,
@@ -2373,7 +2387,25 @@ class MultinomialLogit(_DiscreteBase):
         )
         self._levels = levels
 
-    def fit(self, cov_type: str | None = None, cov_kwds: Any = None, *, maxiter: int = 200, **kwargs: Any) -> Any:
+    def fit(
+        self,
+        cov_type: str | None = None,
+        cov_kwds: Any = None,
+        *,
+        maxiter: int = 200,
+        strict: bool = False,
+    ) -> Any:
+        """Fit by Newton-Raphson (``mlogit``).
+
+        This used to end in ``**kwargs``, which was accepted and never read (R2.6):
+        ``fit(tol=1e-4)``, ``fit(strict=True)`` and ``fit(start_params=...)`` all
+        returned a fit that honoured none of them.  ``strict`` in particular is
+        implemented on every other ML family here, so a caller could reasonably pass
+        it; silently ignoring a convergence guard is the worst version of this defect.
+        ``strict`` is now real -- the same ``_check_convergence`` every other ML family
+        uses -- and unknown options raise ``TypeError``.
+        """
+
         from statsmodels.discrete.discrete_model import MNLogit as _MNLogit
 
         requested = "nonrobust" if cov_type is None else str(cov_type).strip()
@@ -2389,6 +2421,9 @@ class MultinomialLogit(_DiscreteBase):
         result = model.fit(
             method="newton", maxiter=maxiter, disp=False
         )
+        # Every other ML family here honours `strict`; ignoring it only on `mlogit`
+        # would make the same argument mean different things per command (R2.6).
+        self._check_convergence(result, strict)
 
         # statsmodels estimates (levels - 1) rows; Stata stores `levels` rows with the base
         # row fixed at zero. Rebuild the full vector in Stata's order.

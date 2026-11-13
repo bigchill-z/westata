@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["VarGrangerResult", "vargranger"]
 
@@ -45,7 +46,7 @@ class _Row:
 
 
 @dataclass(frozen=True)
-class VarGrangerResult:
+class VarGrangerResult(ResultSerialisation):
     """The ``vargranger`` table."""
 
     rows: list[_Row]

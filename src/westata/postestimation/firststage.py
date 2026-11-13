@@ -49,17 +49,18 @@ import pandas as pd
 from scipy import stats
 
 from westata.postestimation.stock_yogo import mineig_critical_values
+from westata.postestimation.names import is_constant_name, require_iv_structure
+
+#: The constant-name test lives in `names.py` (R6.1).  It used to be redefined in
+#: eleven modules with four subtly different spellings, one of which could never match.
+_is_constant = is_constant_name
 
 __all__ = ["FirstStageResult", "estat_firststage"]
 
-_CONSTANT_NAMES = frozenset({"intercept", "intercept_", "_cons", "const"})
 
 
-def _is_constant(name: str) -> bool:
-    return str(name).strip().lower() in _CONSTANT_NAMES
 
-
-def _ols(y: np.ndarray, design: np.ndarray) -> tuple[np.ndarray, float]:
+def _fitted_and_r2(y: np.ndarray, design: np.ndarray) -> tuple[np.ndarray, float]:
     """OLS fitted values and R-squared (with an intercept added if absent)."""
 
     if design.size == 0 or design.shape[1] == 0:
@@ -90,7 +91,7 @@ def _residualise(y: np.ndarray, design: np.ndarray) -> np.ndarray:
     design = np.asarray(design, dtype=float)
     if design.size == 0 or design.shape[1] == 0:
         return np.asarray(y, dtype=float) - np.asarray(y, dtype=float).mean()
-    fitted, _ = _ols(y, design)
+    fitted, _ = _fitted_and_r2(y, design)
     return y - fitted
 
 
@@ -534,21 +535,9 @@ def _has_robust_vce(result: Any) -> bool:
 
 
 def _require_iv(result: Any) -> dict[str, Any]:
-    structure = getattr(result, "iv_structure", None)
-    if structure is None:
-        raise NotImplementedError(
-            "estat firststage is only defined after an instrumental-variables "
-            "fit: Stata reaches it through ivregress_estat, and it needs the "
-            "split between included exogenous regressors, endogenous "
-            "regressors and excluded instruments; got "
-            f"{getattr(result, 'model_name', 'an unnamed model')!r} without that "
-            "structure"
-        )
-    if structure["endog"].shape[1] == 0:
-        raise ValueError(
-            "estat firststage: model contains no endogenous variables"
-        )
-    return structure
+    """Delegate to the shared check (R6.1); see names.require_iv_structure."""
+
+    return require_iv_structure(result, 'estat firststage')
 
 
 def estat_firststage(
@@ -623,7 +612,7 @@ def estat_firststage(
         # R-sq / adjusted R-sq of the endogenous regressor on ALL exogenous
         # variables (included + excluded).
         all_exog = np.column_stack([included_matrix, instruments])
-        _, r2 = _ols(target, all_exog)
+        _, r2 = _fitted_and_r2(target, all_exog)
         df_resid_all = nobs - all_exog.shape[1] - 1
         adj_r2 = (
             1.0 - (1.0 - r2) * (nobs - 1) / df_resid_all
@@ -634,7 +623,7 @@ def estat_firststage(
         # Partial R-sq: residualise the endogenous regressor on the included
         # exog, then regress those residuals on the residualised instruments.
         target_residual = _residualise(target, included_matrix)
-        _, partial_r2 = _ols(target_residual, instrument_residuals)
+        _, partial_r2 = _fitted_and_r2(target_residual, instrument_residuals)
 
         # Partial F: joint test of the excluded instruments.  With the
         # residualised construction this is the F of the second auxiliary
@@ -705,7 +694,7 @@ def estat_firststage(
     shea_adj = None
     if endog.shape[1] > 1:
         all_exog = np.column_stack([included_matrix, instruments])
-        vhats = np.column_stack([_ols(endog[:, i], all_exog)[0] for i in range(endog.shape[1])])
+        vhats = np.column_stack([_fitted_and_r2(endog[:, i], all_exog)[0] for i in range(endog.shape[1])])
         shea_values: list[float] = []
         shea_adjusted: list[float] = []
         nexog = included_matrix.shape[1] + 2 * instruments.shape[1]
@@ -722,7 +711,7 @@ def estat_firststage(
             x1bar = _residualise(
                 vhats[:, i], np.column_stack([other_vhats, included_matrix])
             )
-            _, shea_r2 = _ols(x1tilde, x1bar.reshape(-1, 1))
+            _, shea_r2 = _fitted_and_r2(x1tilde, x1bar.reshape(-1, 1))
             shea_values.append(shea_r2)
             if np.isfinite(shea_r2) and nobs > nexog:
                 shea_adjusted.append(

@@ -38,6 +38,7 @@ import pandas as pd
 
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.estimators.synth import SynthResult, synth
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["Synth2Result", "synth2"]
 
@@ -49,7 +50,7 @@ _STATA_MISSING = 8.98846567431158e307
 # Result object -- a frozen dataclass, NOT StataResults (no e(b)/e(V))
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
-class Synth2Result:
+class Synth2Result(ResultSerialisation):
     """Outcome of :func:`synth2`.
 
     Field names mirror Stata's ``e()`` verbatim.  Note ``synth2`` calls

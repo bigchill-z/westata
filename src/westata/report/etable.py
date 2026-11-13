@@ -23,6 +23,7 @@ from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
+from westata.results.stars import stars
 
 __all__ = ["etable", "to_latex", "to_markdown"]
 
@@ -33,15 +34,9 @@ _DEFAULT_STATS: tuple[tuple[str, str], ...] = (
 
 
 def _stars(pvalue: float) -> str:
-    if not np.isfinite(pvalue):
-        return ""
-    if pvalue < 0.001:
-        return "***"
-    if pvalue < 0.01:
-        return "**"
-    if pvalue < 0.05:
-        return "*"
-    return ""
+    """esttab/etable default stars; delegate to results.stars (R6.1)."""
+
+    return stars(pvalue)
 
 
 def _format(value: float, digits: int) -> str:

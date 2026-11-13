@@ -39,12 +39,13 @@ from typing import Any
 import numpy as np
 
 from westata.errors import ConsistencyError
+from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["NnmatchResult", "teffects_nnmatch"]
 
 
 @dataclass(frozen=True)
-class NnmatchResult:
+class NnmatchResult(ResultSerialisation):
     """``teffects nnmatch``: ATET from Mahalanobis nearest-neighbour matching."""
 
     ate: float

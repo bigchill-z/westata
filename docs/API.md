@@ -16,10 +16,10 @@ The examples run against a 200-row frame called `base`, whose columns are `y x1 
 - **Time series, multivariate and panel roots** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
 - **Treatment effects and survey data** — [`Didregress`](#didregress), [`Xtdidregress`](#xtdidregress), [`TreatmentEffectResult`](#treatmenteffectresult), [`IPW`](#ipw), [`AIPW`](#aipw), [`NearestNeighbourMatching`](#nearestneighbourmatching), [`RegressionAdjustment`](#regressionadjustment), [`SurveyDesign`](#surveydesign), [`SvyMean`](#svymean), [`SvyTotal`](#svytotal), [`SvyProportion`](#svyproportion), [`SvyRegress`](#svyregress), [`SvyLogit`](#svylogit)
 - **Resampling** — [`Bootstrap`](#bootstrap), [`Jackknife`](#jackknife), [`Permute`](#permute)
-- **Postestimation functions** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
-- **Working with a fitted result** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
+- **Postestimation functions** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
+- **Working with a fitted result** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **Errors and support types** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **Other names** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+- **Other names** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
 
 ## Robust standard errors: Stata's `robust` versus `HC0`/`HC1`
 
@@ -4727,6 +4727,276 @@ s = ws.normalize_weights(np.array([1.0, 2.0, 3.0, 4.0]), 'fweight')
 
 **Notes:** `effective_n` is what the degrees of freedom use: 10 for this four-row `fweight` example, because each row counts as its weight. That is why `nobs` and `e(N)` diverge under frequency weights.
 
+### `ereturn_list`
+
+**Stata:** `ereturn list`
+
+The four sections of Stata's `ereturn list` for one estimation result: scalars as `e(name) = value`, macros as `e(name) : "text"`, matrices as `e(name) : r x c`, and functions as bare names. WHICH scalars a command publishes is its own decision, and Stata's choice is narrower than the full `e()` dictionary, so the printed block is a faithful subset rather than a dump. The whole block opens with a blank line, as Stata's does.
+
+**Signature**
+
+```python
+ws.ereturn_list(self) -> 'str'
+```
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.ereturn_list()
+```
+
+**Output**
+
+```text
+
+scalars:
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  2
+               e(df_r) =  197
+                  e(F) =  90.99954130641439
+                 e(r2) =  .4802098236178376
+               e(rmse) =  1.048768791147598
+                e(mss) =  200.1836988170982
+                e(rss) =  216.6834475251831
+               e(r2_a) =  .4749327659895922
+                 e(ll) =  -291.7997221200006
+               e(ll_0) =  -357.2327276994888
+               e(rank) =  3
+
+macros:
+              e(title) : "Linear regression"
+          e(marginsok) : "XB default"
+                e(vce) : "ols"
+             e(depvar) : "y"
+                e(cmd) : "regress"
+         e(properties) : "b V"
+            e(predict) : "regres_p"
+              e(model) : "ols"
+          e(estat_cmd) : "regress_estat"
+
+matrices:
+                  e(b) :  1 x 3
+                  e(V) :  3 x 3
+               e(beta) :  1 x 2
+
+functions:
+             e(sample)
+```
+
+### `estat_bgodfrey`
+
+**Stata:** `estat bgodfrey, lags(#)`
+
+Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test. Lags follow the TIME axis, not the row axis: pass `time=` (a column name of the estimation frame, or the period values) to reproduce `tsset` semantics, where a period missing from the sample makes that lag missing rather than pairing the neighbouring rows. Measured on icecream.dta with `time == 5` dropped, Stata's 4.220 against 3.286 by row order. Missing lags are zero-filled by default and kept missing under `nomiss0`. Refused after a robust or clustered VCE, on panel data spanning several units, and on non-`regress` fits, as Stata refuses them (r(198)/r(459)/r(321)).
+
+**Signature**
+
+```python
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
+```
+
+**Example**
+
+```python
+print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `estat_corrgram`
+
+**Stata:** `estat corrgram`
+
+Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.
+
+**Signature**
+
+```python
+ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
+```
+
+**Example**
+
+```python
+print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `estat_dwatson`
+
+**Stata:** `estat dwatson`
+
+Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table. `time=` stands in for `tsset`: across a gap the straddling pair is skipped rather than differenced, and a `Number of gaps in sample = N` line is printed first. Measured on icecream.dta with `time == 5` dropped: .8930395 under `time=`, 1.0868969 by row order.
+
+**Signature**
+
+```python
+ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
+```
+
+**Example**
+
+```python
+print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
+```
+
+**Output**
+
+```text
+None
+```
+
+### `f_test`
+
+**Stata:** `test x1 = 0, x2 = 0 (joint F)`
+
+statsmodels-shaped joint F test on a fitted result. `r_matrix` accepts one or more restriction strings separated by commas (or a sequence); they are parsed by the same Stata constraint grammar as `test`, then reported jointly as F. Returns a `ContrastResults` carrying `statistic`, `pvalue`, `df_num`/`df_denom` and the `fvalue`/`tvalue` aliases. This is the statsmodels-ecosystem surface, not Stata's own `test` method.
+
+**Signature**
+
+```python
+ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'
+```
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.f_test('x1 = 0, x2 = 0')
+```
+
+**Output**
+
+```text
+<F contrast: statistic=90.9995, pvalue=1.02109e-28, df_denom=197>
+```
+
+### `first_stage`
+
+**Stata:** `ivregress 2sls ..., first`
+
+First-stage regression table for an IV fit (Stata `ivregress ..., first`). One block per endogenous regressor, headed "First-stage regressions", giving the F, R-squared, adjusted R-squared and Root MSE of that equation, then its coefficient table with the included exogenous variables and excluded instruments. This is a different output from `estat_firststage`, which prints the DIAGNOSTICS for the same equations; Stata offers both and they are not substitutes, so both are kept.
+
+**Signature**
+
+```python
+ws.first_stage(self) -> 'str'
+```
+
+**Example**
+
+```python
+r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()
+r.first_stage()
+```
+
+**Output**
+
+```text
+First-stage regressions
+-----------------------
+
+                                                        Number of obs =    200
+                                                        F(2, 197)     =  36.02
+                                                        Prob > F      = 0.0000
+                                                        R-squared     = 0.2678
+                                                        Adj R-squared = 0.2603
+                                                        Root MSE      = 0.4139
+
+------------------------------------------------------------------------------
+       treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
+          x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
+       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
+------------------------------------------------------------------------------
+```
+
+### `get_influence`
+
+**Stata:** `(no Stata equivalent -- statsmodels OLSInfluence names)`
+
+Influence measures for a fitted result, named as statsmodels' `OLSInfluence` names them. Returns a dict with `hat_matrix_diag` (leverage), `resid`, `resid_studentized_internal`, `resid_studentized`, `standardized_resid`, `cooks_distance` (array plus observation indices) and `nobs`. Only leverage-based measures are offered: deletion diagnostics would need one re-fit per observation, and returning a plausible-but-wrong array was judged worse than omitting the key.
+
+**Signature**
+
+```python
+ws.get_influence(self) -> 'Any'
+```
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.get_influence()['hat_matrix_diag'][:5]
+```
+
+**Output**
+
+```text
+[0.024179 0.010089 0.005392 0.011287 0.005195]
+```
+
+### `t_test`
+
+**Stata:** `test x1 = 0 (single restriction, t form)`
+
+statsmodels-shaped t test of a single linear restriction. `r_matrix` is one restriction string (or a one-element sequence); `use_t` forces the t form, whose statistic is the square root of the corresponding F. Returns a `ContrastResults` with `statistic`, `pvalue`, `conf_int()` for a single restriction, and the `fvalue`/`tvalue` aliases. For a joint set of restrictions use `f_test` instead.
+
+**Signature**
+
+```python
+ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'
+```
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.t_test('x1 = 0')
+```
+
+**Output**
+
+```text
+<t contrast: statistic=11.5997, pvalue=4.75584e-24, df_denom=197>
+```
+
+### `wntestq`
+
+**Stata:** `wntestq varname, lags(#)`
+
+Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean. The default order is `max(1, min(int(n/2) - 2, 40))` (`ac.ado:71`), independent of any previous regression's parameter count and capped at 40 -- at n = 758 Stata reports chi2(40), not 377. `time=` gives it the `tsset` axis; a gap then drops those pairs from the autocovariance sums and adds a `(note: time series has N gaps)` line.
+
+**Signature**
+
+```python
+ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
+```
+
+**Example**
+
+```python
+print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+```
+
+**Output**
+
+```text
+None
+```
+
 
 ## Working with a fitted result
 
@@ -5478,6 +5748,215 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().conf_int(alpha=0.10)
 Intercept  0.882000  1.128005
 x1         0.720877  0.960412
 x2        -0.635740 -0.388434
+```
+
+### `fitted_series`
+
+**Stata:** `predict yhat, xb -- with the estimation sample's index`
+
+Fitted values as a `pandas.Series` carrying the estimation sample's index and the name `fittedvalues`. This is the labelled counterpart of the plain `fittedvalues` ndarray: replacing that attribute with a Series would break positional access, so the labelled form is a separate name. When the fit did not retain observation labels the index falls back to a `RangeIndex`, which is honest -- the numbers are still there and the labels say only "row i".
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.fitted_series.head()
+```
+
+**Output**
+
+```text
+0    2.524914
+1    0.144945
+2    1.126616
+3    2.107762
+4    0.869349
+Name: fittedvalues, dtype: float64
+```
+
+### `level`
+
+**Stata:** `regress ..., level(90)`
+
+Confidence level used by `conf_int()` and the printed intervals, as a FRACTION (`0.90` for Stata's `level(90)`). Defaults to `0.95`. A model fitted with `level=` records it here, so a result estimated at 90% reports 90% intervals unless a caller passes an explicit `alpha`. Stata's `level(#)` takes a PERCENTAGE; the estimators accept either spelling and normalise, because reading `0.90` as a percentage would silently produce a 0.9% interval whose only symptom is "intervals look too narrow".
+
+**Example**
+
+```python
+ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
+```
+
+**Output**
+
+```text
+              lower     upper
+Intercept  0.836140  1.108573
+x1         0.709618  0.975431
+```
+
+**Notes:** The property returns the fraction; `conf_int()` still accepts an explicit `alpha`, which wins over the recorded level for that call. Only weighted and unweighted estimation are affected -- this is a reporting choice and never changes a coefficient or a standard error.
+
+### `model`
+
+**Stata:** `(no Stata equivalent -- a statsmodels interop shim)`
+
+The fitted model as statsmodels consumers expect it. `statsmodels.stats.anova.anova_lm` reads `res.model` and re-fits from it; without this attribute that call raised AttributeError. The returned `ResultModel` exposes exactly `endog`, `exog`, `exog_names` and a `fit()` that returns this same result -- enough for `anova_lm`'s contract without pretending to BE a statsmodels model. A wider imitation would invite callers to rely on behaviour that is not there.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.model
+```
+
+**Output**
+
+```text
+<ResultModel: 200 obs, 3 params>
+```
+
+### `odds_ratios`
+
+**Stata:** `logit ..., or  (column, not a separate function)`
+
+This name is not an exported function. `logit ..., or` is expressed as `result.summary(style="stata", odds_ratio=True)`, which exponentiates the estimate, its standard error and both interval endpoints and relabels the column `Odds ratio`; z and P>|z| are unchanged because they come from the untransformed scale.
+
+**Example**
+
+```python
+print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', odds_ratio=True)[-400:])
+```
+
+**Output**
+
+```text
+None
+```
+
+### `resid_series`
+
+**Stata:** `predict e, residuals -- with the estimation sample's index`
+
+Residuals as a `pandas.Series` carrying the estimation sample's index and the name `resid`, the labelled counterpart of the plain `resid` ndarray. It exists for statsmodels parity without changing the ndarray's positional behaviour, and falls back to a `RangeIndex` when the fit retained no row labels. See `fitted_series` for the matching fitted values.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.resid_series.head()
+```
+
+**Output**
+
+```text
+0   -0.245449
+1   -0.012850
+2   -1.598986
+3    0.354059
+4    0.682509
+Name: resid, dtype: float64
+```
+
+### `response_name`
+
+**Stata:** `e(depvar)`
+
+Name of the dependent variable, used for titles and column headings. Some estimators set it as an instance attribute and others do not (ARIMA and GARCH were in the second group), so the property falls back to `e(depvar)` -- a macro every fit carries -- giving the same answer as the formula-based estimators. A subclass that assigns `self.response_name` keeps winning, because the instance dictionary is consulted first.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.response_name
+```
+
+**Output**
+
+```text
+y
+```
+
+### `stata_cov_params`
+
+**Stata:** `e(V)`
+
+The covariance matrix permuted by the same ordering as `stata_params`, as a numpy array. It surfaces the same refusal as the names for an ambiguous factor term, so a caller cannot receive a matrix whose rows silently disagree with Stata's. Use this rather than `cov` when the comparison target is Stata's `e(V)`.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+np.round(r.stata_cov_params, 4)
+```
+
+**Output**
+
+```text
+[[ 0.0053  0.     -0.0003]
+ [ 0.      0.0056 -0.0004]
+ [-0.0003 -0.0004  0.0055]]
+```
+
+### `stata_factor_terms`
+
+**Stata:** `i.<var> -- the explicit factor expansion in a varlist`
+
+The factor terms whose Stata `e(b)` spelling cannot be reconstructed, as a sorted list; empty when every coefficient has an unambiguous Stata spelling. Stata expands an explicit `i.foreign` into one row per level plus an explicit zero base row (`0b.foreign`), while this package has a single level column, so there is no one-to-one mapping. A bare binary column is NOT reported here, because Stata names its single row after the variable.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()
+r.stata_factor_terms
+```
+
+**Output**
+
+```text
+['yb']
+```
+
+**Notes:** Non-empty here means `stata_param_names`, `stata_params` and `stata_cov_params` all raise `NotImplementedError` on this result; compare with `params`/`bse`, or encode the factor as dummies and refit.
+
+### `stata_param_names`
+
+**Stata:** `the row names of e(b) as Stata spells and orders them`
+
+Coefficient names in Stata's `e(b)` order and spelling: regressors first, then `_cons` LAST, then auxiliary parameters such as `cut1` or `lnalpha`. `Intercept` becomes `_cons`, a bare factor column takes the variable name without the level, `:` becomes `#`, and a leading `/` is dropped. Raises `NotImplementedError` for an explicit `C(...)` factor, where Stata has one row per level plus a zero base row and no one-to-one mapping exists.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+(r.param_names, r.stata_param_names)
+```
+
+**Output**
+
+```text
+(['Intercept', 'x1', 'x2'], ['x1', 'x2', '_cons'])
+```
+
+### `stata_params`
+
+**Stata:** `e(b)`
+
+The coefficient vector permuted into Stata's `e(b)` order and spelling: `_cons` last instead of first, factor and interaction names rewritten. It is a property, not a method -- write `r.stata_params`, not `r.stata_params()`. The numbers are identical to `params`, only the order and the labels differ, and this is the view to compare against a Stata fixture.
+
+**Example**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.stata_params
+```
+
+**Output**
+
+```text
+x1       0.840645
+x2      -0.512087
+_cons    1.005003
+Name: params, dtype: float64
 ```
 
 
@@ -6662,136 +7141,6 @@ H0: Random walk without drift, d = 0
 MacKinnon approximate p-value for Z(t) = 0.0000.
 ```
 
-### `ereturn_list`
-
-**Stata:** `ereturn list`
-
-The four sections of Stata's `ereturn list` for one estimation result: scalars as `e(name) = value`, macros as `e(name) : "text"`, matrices as `e(name) : r x c`, and functions as bare names. WHICH scalars a command publishes is its own decision, and Stata's choice is narrower than the full `e()` dictionary, so the printed block is a faithful subset rather than a dump. The whole block opens with a blank line, as Stata's does.
-
-**Signature**
-
-```python
-ws.ereturn_list(self) -> 'str'
-```
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.ereturn_list()
-```
-
-**Output**
-
-```text
-
-scalars:
-                  e(N) =  200
-              e(sum_w) =  200
-               e(df_m) =  2
-               e(df_r) =  197
-                  e(F) =  90.99954130641439
-                 e(r2) =  .4802098236178376
-               e(rmse) =  1.048768791147598
-                e(mss) =  200.1836988170982
-                e(rss) =  216.6834475251831
-               e(r2_a) =  .4749327659895922
-                 e(ll) =  -291.7997221200006
-               e(ll_0) =  -357.2327276994888
-               e(rank) =  3
-
-macros:
-              e(title) : "Linear regression"
-          e(marginsok) : "XB default"
-                e(vce) : "ols"
-             e(depvar) : "y"
-                e(cmd) : "regress"
-         e(properties) : "b V"
-            e(predict) : "regres_p"
-              e(model) : "ols"
-          e(estat_cmd) : "regress_estat"
-
-matrices:
-                  e(b) :  1 x 3
-                  e(V) :  3 x 3
-               e(beta) :  1 x 2
-
-functions:
-             e(sample)
-```
-
-### `estat_bgodfrey`
-
-**Stata:** `estat bgodfrey, lags(#)`
-
-Breusch-Godfrey LM test for serial correlation of order `lags`. The test regresses the residuals on the original regressors PLUS the lagged residuals; including the regressors is what makes it valid, and omitting them turns it into a different (invalid) test. Lags follow the TIME axis, not the row axis: pass `time=` (a column name of the estimation frame, or the period values) to reproduce `tsset` semantics, where a period missing from the sample makes that lag missing rather than pairing the neighbouring rows. Measured on icecream.dta with `time == 5` dropped, Stata's 4.220 against 3.286 by row order. Missing lags are zero-filled by default and kept missing under `nomiss0`. Refused after a robust or clustered VCE, on panel data spanning several units, and on non-`regress` fits, as Stata refuses them (r(198)/r(459)/r(321)).
-
-**Signature**
-
-```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
-```
-
-**Example**
-
-```python
-print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
-```
-
-**Output**
-
-```text
-None
-```
-
-### `estat_corrgram`
-
-**Stata:** `estat corrgram`
-
-Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.
-
-**Signature**
-
-```python
-ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
-```
-
-**Example**
-
-```python
-print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))
-```
-
-**Output**
-
-```text
-None
-```
-
-### `estat_dwatson`
-
-**Stata:** `estat dwatson`
-
-Durbin-Watson d statistic for first-order autocorrelation of the residuals. Stata prints it on ONE line as `Durbin–Watson d-statistic(  k,    N) = value` with an EN-DASH in the label and the two counts padded; the value alone is not enough to compare against a printed table. `time=` stands in for `tsset`: across a gap the straddling pair is skipped rather than differenced, and a `Number of gaps in sample = N` line is printed first. Measured on icecream.dta with `time == 5` dropped: .8930395 under `time=`, 1.0868969 by row order.
-
-**Signature**
-
-```python
-ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
-```
-
-**Example**
-
-```python
-print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
-```
-
-**Output**
-
-```text
-None
-```
-
 ### `etable_as_stata`
 
 **Stata:** `esttab m1 m2, se r2 mtitle`
@@ -6835,96 +7184,6 @@ R-sq                0.357           0.480
 --------------------------------------------
 Standard errors in parentheses
 * p<0.05, ** p<0.01, *** p<0.001
-```
-
-### `f_test`
-
-**Stata:** `test x1 = 0, x2 = 0 (joint F)`
-
-statsmodels-shaped joint F test on a fitted result. `r_matrix` accepts one or more restriction strings separated by commas (or a sequence); they are parsed by the same Stata constraint grammar as `test`, then reported jointly as F. Returns a `ContrastResults` carrying `statistic`, `pvalue`, `df_num`/`df_denom` and the `fvalue`/`tvalue` aliases. This is the statsmodels-ecosystem surface, not Stata's own `test` method.
-
-**Signature**
-
-```python
-ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'
-```
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.f_test('x1 = 0, x2 = 0')
-```
-
-**Output**
-
-```text
-<F contrast: statistic=90.9995, pvalue=1.02109e-28, df_denom=197>
-```
-
-### `first_stage`
-
-**Stata:** `ivregress 2sls ..., first`
-
-First-stage regression table for an IV fit (Stata `ivregress ..., first`). One block per endogenous regressor, headed "First-stage regressions", giving the F, R-squared, adjusted R-squared and Root MSE of that equation, then its coefficient table with the included exogenous variables and excluded instruments. This is a different output from `estat_firststage`, which prints the DIAGNOSTICS for the same equations; Stata offers both and they are not substitutes, so both are kept.
-
-**Signature**
-
-```python
-ws.first_stage(self) -> 'str'
-```
-
-**Example**
-
-```python
-r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()
-r.first_stage()
-```
-
-**Output**
-
-```text
-First-stage regressions
------------------------
-
-                                                        Number of obs =    200
-                                                        F(2, 197)     =  36.02
-                                                        Prob > F      = 0.0000
-                                                        R-squared     = 0.2678
-                                                        Adj R-squared = 0.2603
-                                                        Root MSE      = 0.4139
-
-------------------------------------------------------------------------------
-       treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
--------------+----------------------------------------------------------------
-          x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
-          x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
-       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
-------------------------------------------------------------------------------
-```
-
-### `fitted_series`
-
-**Stata:** `predict yhat, xb -- with the estimation sample's index`
-
-Fitted values as a `pandas.Series` carrying the estimation sample's index and the name `fittedvalues`. This is the labelled counterpart of the plain `fittedvalues` ndarray: replacing that attribute with a Series would break positional access, so the labelled form is a separate name. When the fit did not retain observation labels the index falls back to a `RangeIndex`, which is honest -- the numbers are still there and the labels say only "row i".
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.fitted_series.head()
-```
-
-**Output**
-
-```text
-0    2.524914
-1    0.144945
-2    1.126616
-3    2.107762
-4    0.869349
-Name: fittedvalues, dtype: float64
 ```
 
 ### `format_ereturn_list`
@@ -6984,31 +7243,6 @@ functions:
              e(sample)
 ```
 
-### `get_influence`
-
-**Stata:** `(no Stata equivalent -- statsmodels OLSInfluence names)`
-
-Influence measures for a fitted result, named as statsmodels' `OLSInfluence` names them. Returns a dict with `hat_matrix_diag` (leverage), `resid`, `resid_studentized_internal`, `resid_studentized`, `standardized_resid`, `cooks_distance` (array plus observation indices) and `nobs`. Only leverage-based measures are offered: deletion diagnostics would need one re-fit per observation, and returning a plausible-but-wrong array was judged worse than omitting the key.
-
-**Signature**
-
-```python
-ws.get_influence(self) -> 'Any'
-```
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.get_influence()['hat_matrix_diag'][:5]
-```
-
-**Output**
-
-```text
-[0.024179 0.010089 0.005392 0.011287 0.005195]
-```
-
 ### `kpss`
 
 **Stata:** `kpss varname`
@@ -7025,65 +7259,6 @@ ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, nam
 
 ```python
 print(ws.kpss(base['y'].to_numpy()))
-```
-
-**Output**
-
-```text
-None
-```
-
-### `level`
-
-**Stata:** `regress ..., level(90)`
-
-Confidence level used by `conf_int()` and the printed intervals, as a FRACTION (`0.90` for Stata's `level(90)`). Defaults to `0.95`. A model fitted with `level=` records it here, so a result estimated at 90% reports 90% intervals unless a caller passes an explicit `alpha`. Stata's `level(#)` takes a PERCENTAGE; the estimators accept either spelling and normalise, because reading `0.90` as a percentage would silently produce a 0.9% interval whose only symptom is "intervals look too narrow".
-
-**Example**
-
-```python
-ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
-```
-
-**Output**
-
-```text
-              lower     upper
-Intercept  0.836140  1.108573
-x1         0.709618  0.975431
-```
-
-**Notes:** The property returns the fraction; `conf_int()` still accepts an explicit `alpha`, which wins over the recorded level for that call. Only weighted and unweighted estimation are affected -- this is a reporting choice and never changes a coefficient or a standard error.
-
-### `model`
-
-**Stata:** `(no Stata equivalent -- a statsmodels interop shim)`
-
-The fitted model as statsmodels consumers expect it. `statsmodels.stats.anova.anova_lm` reads `res.model` and re-fits from it; without this attribute that call raised AttributeError. The returned `ResultModel` exposes exactly `endog`, `exog`, `exog_names` and a `fit()` that returns this same result -- enough for `anova_lm`'s contract without pretending to BE a statsmodels model. A wider imitation would invite callers to rely on behaviour that is not there.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.model
-```
-
-**Output**
-
-```text
-<ResultModel: 200 obs, 3 params>
-```
-
-### `odds_ratios`
-
-**Stata:** `logit ..., or  (column, not a separate function)`
-
-This name is not an exported function. `logit ..., or` is expressed as `result.summary(style="stata", odds_ratio=True)`, which exponentiates the estimate, its standard error and both interval endpoints and relabels the column `Odds ratio`; z and P>|z| are unchanged because they come from the untransformed scale.
-
-**Example**
-
-```python
-print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', odds_ratio=True)[-400:])
 ```
 
 **Output**
@@ -7291,132 +7466,6 @@ Standard errors in parentheses
 * p<0.05, ** p<0.01, *** p<0.001
 ```
 
-### `resid_series`
-
-**Stata:** `predict e, residuals -- with the estimation sample's index`
-
-Residuals as a `pandas.Series` carrying the estimation sample's index and the name `resid`, the labelled counterpart of the plain `resid` ndarray. It exists for statsmodels parity without changing the ndarray's positional behaviour, and falls back to a `RangeIndex` when the fit retained no row labels. See `fitted_series` for the matching fitted values.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.resid_series.head()
-```
-
-**Output**
-
-```text
-0   -0.245449
-1   -0.012850
-2   -1.598986
-3    0.354059
-4    0.682509
-Name: resid, dtype: float64
-```
-
-### `response_name`
-
-**Stata:** `e(depvar)`
-
-Name of the dependent variable, used for titles and column headings. Some estimators set it as an instance attribute and others do not (ARIMA and GARCH were in the second group), so the property falls back to `e(depvar)` -- a macro every fit carries -- giving the same answer as the formula-based estimators. A subclass that assigns `self.response_name` keeps winning, because the instance dictionary is consulted first.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.response_name
-```
-
-**Output**
-
-```text
-y
-```
-
-### `stata_cov_params`
-
-**Stata:** `e(V)`
-
-The covariance matrix permuted by the same ordering as `stata_params`, as a numpy array. It surfaces the same refusal as the names for an ambiguous factor term, so a caller cannot receive a matrix whose rows silently disagree with Stata's. Use this rather than `cov` when the comparison target is Stata's `e(V)`.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-np.round(r.stata_cov_params, 4)
-```
-
-**Output**
-
-```text
-[[ 0.0053  0.     -0.0003]
- [ 0.      0.0056 -0.0004]
- [-0.0003 -0.0004  0.0055]]
-```
-
-### `stata_factor_terms`
-
-**Stata:** `i.<var> -- the explicit factor expansion in a varlist`
-
-The factor terms whose Stata `e(b)` spelling cannot be reconstructed, as a sorted list; empty when every coefficient has an unambiguous Stata spelling. Stata expands an explicit `i.foreign` into one row per level plus an explicit zero base row (`0b.foreign`), while this package has a single level column, so there is no one-to-one mapping. A bare binary column is NOT reported here, because Stata names its single row after the variable.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()
-r.stata_factor_terms
-```
-
-**Output**
-
-```text
-['yb']
-```
-
-**Notes:** Non-empty here means `stata_param_names`, `stata_params` and `stata_cov_params` all raise `NotImplementedError` on this result; compare with `params`/`bse`, or encode the factor as dummies and refit.
-
-### `stata_param_names`
-
-**Stata:** `the row names of e(b) as Stata spells and orders them`
-
-Coefficient names in Stata's `e(b)` order and spelling: regressors first, then `_cons` LAST, then auxiliary parameters such as `cut1` or `lnalpha`. `Intercept` becomes `_cons`, a bare factor column takes the variable name without the level, `:` becomes `#`, and a leading `/` is dropped. Raises `NotImplementedError` for an explicit `C(...)` factor, where Stata has one row per level plus a zero base row and no one-to-one mapping exists.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-(r.param_names, r.stata_param_names)
-```
-
-**Output**
-
-```text
-(['Intercept', 'x1', 'x2'], ['x1', 'x2', '_cons'])
-```
-
-### `stata_params`
-
-**Stata:** `e(b)`
-
-The coefficient vector permuted into Stata's `e(b)` order and spelling: `_cons` last instead of first, factor and interaction names rewritten. It is a property, not a method -- write `r.stata_params`, not `r.stata_params()`. The numbers are identical to `params`, only the order and the labels differ, and this is the view to compare against a Stata fixture.
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.stata_params
-```
-
-**Output**
-
-```text
-x1       0.840645
-x2      -0.512087
-_cons    1.005003
-Name: params, dtype: float64
-```
-
 ### `summarize`
 
 **Stata:** `summarize varlist`
@@ -7514,31 +7563,6 @@ ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], 
 ```
 
 **Notes:** `synth2.ado:330` calls `ereturn clear` and wipes `synth`'s e(); the Python result surface is synth2's own, plus `synth_result` for the raw fit. `R2` uses the SYNTHETIC outcome's pretreatment deviations as denominator (ado:647, non-standard). Aggregate probability and pointwise p-values INCLUDE the treated unit in the denominator with >= comparisons (ado:441/940/947-949). In-time placebo produces NO mspe/pval. `frame()`/`symbol()` are Stata-specific result-dataset mechanisms, replaced by Synth2Result attributes.
-
-### `t_test`
-
-**Stata:** `test x1 = 0 (single restriction, t form)`
-
-statsmodels-shaped t test of a single linear restriction. `r_matrix` is one restriction string (or a one-element sequence); `use_t` forces the t form, whose statistic is the square root of the corresponding F. Returns a `ContrastResults` with `statistic`, `pvalue`, `conf_int()` for a single restriction, and the `fvalue`/`tvalue` aliases. For a joint set of restrictions use `f_test` instead.
-
-**Signature**
-
-```python
-ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'
-```
-
-**Example**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.t_test('x1 = 0')
-```
-
-**Output**
-
-```text
-<t contrast: statistic=11.5997, pvalue=4.75584e-24, df_denom=197>
-```
 
 ### `tebalance_summarize`
 
@@ -7868,30 +7892,6 @@ ws.vecstable(result: 'Any') -> 'VecStableResult'
 
 ```python
 print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))
-```
-
-**Output**
-
-```text
-None
-```
-
-### `wntestq`
-
-**Stata:** `wntestq varname, lags(#)`
-
-Portmanteau (Ljung-Box) test for white noise: whether the series' autocorrelations up to `lags` are jointly zero. Unlike `estat bgodfrey` it tests the SERIES, not the residuals of a regression, so it takes the values or a result whose residuals you mean. The default order is `max(1, min(int(n/2) - 2, 40))` (`ac.ado:71`), independent of any previous regression's parameter count and capped at 40 -- at n = 758 Stata reports chi2(40), not 377. `time=` gives it the `tsset` axis; a gap then drops those pairs from the autocovariance sums and adds a `(note: time series has N gaps)` line.
-
-**Signature**
-
-```python
-ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
-```
-
-**Example**
-
-```python
-print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
 ```
 
 **Output**

@@ -139,6 +139,35 @@ ws.XtLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
 | `ztp` / `ztnb` | `ZeroInflatedPoisson`, `ZeroInflatedNegativeBinomial` |
 | `tnbreg` | `TruncatedNegativeBinomial` |
 
+**Odds ratios: `logit ..., or`**
+
+Stata's `or` reports exponentiated coefficients. In westata that is the `odds_ratio` keyword on
+`summary`:
+
+```python
+print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit().summary(odds_ratio=True))
+```
+
+The option changes five things and **not** the inference:
+
+| item | without `or` | with `or` |
+|---|---|---|
+| column header | `Coefficient` | `Odds ratio` |
+| estimate | `b` | `exp(b)` |
+| standard error | `se(b)` | `exp(b) * se(b)` |
+| confidence interval | `[b ± z·se]` | exponentiated endpoints |
+| footer | — | `Note: _cons estimates baseline odds.` |
+
+`z` and `P>|z|` are **identical** either way: they come from the untransformed scale, so `or` is a
+presentation change, not a re-test.
+
+The raw values are also available as a property — note it is **not callable**:
+
+```python
+fitted = ws.Logit.from_formula("foreign ~ mpg + weight", df).fit()
+fitted.odds_ratios          # pd.Series, no parentheses
+```
+
 ### Limited dependent variables
 
 | Stata | westata |

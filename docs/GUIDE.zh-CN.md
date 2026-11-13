@@ -134,6 +134,34 @@ ws.XtLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
 | `ztp` / `ztnb` | `ZeroInflatedPoisson`、`ZeroInflatedNegativeBinomial` |
 | `tnbreg` | `TruncatedNegativeBinomial` |
 
+**优势比：`logit ..., or`**
+
+Stata 的 `or` 输出的是指数化后的系数。westata 中对应 `summary` 的 `odds_ratio` 关键字：
+
+```python
+print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit().summary(odds_ratio=True))
+```
+
+该选项改变五处显示，但**不改变推断**：
+
+| 项目 | 不带 `or` | 带 `or` |
+|---|---|---|
+| 列标题 | `Coefficient` | `Odds ratio` |
+| 估计值 | `b` | `exp(b)` |
+| 标准误 | `se(b)` | `exp(b) * se(b)` |
+| 置信区间 | `[b ± z·se]` | 端点同样指数化 |
+| 表尾 | — | `Note: _cons estimates baseline odds.` |
+
+`z` 与 `P>|z|` **两种写法完全相同**：它们来自未变换的尺度，所以 `or` 只是显示层的改变，
+不是重新检验。
+
+原始数值也可通过属性取得——注意它**不是方法，不要加括号**：
+
+```python
+fitted = ws.Logit.from_formula("foreign ~ mpg + weight", df).fit()
+fitted.odds_ratios          # pd.Series，不加括号
+```
+
 ### 受限因变量
 
 | Stata | westata |

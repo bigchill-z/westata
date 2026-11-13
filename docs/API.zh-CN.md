@@ -16,10 +16,10 @@ _westata 版本: 0.3.12 · 生成脚本 `docs/render_api_reference.py`_
 - **时间序列、多元与面板单位根** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
 - **处理效应与调查数据** — [`Didregress`](#didregress), [`Xtdidregress`](#xtdidregress), [`TreatmentEffectResult`](#treatmenteffectresult), [`IPW`](#ipw), [`AIPW`](#aipw), [`NearestNeighbourMatching`](#nearestneighbourmatching), [`RegressionAdjustment`](#regressionadjustment), [`SurveyDesign`](#surveydesign), [`SvyMean`](#svymean), [`SvyTotal`](#svytotal), [`SvyProportion`](#svyproportion), [`SvyRegress`](#svyregress), [`SvyLogit`](#svylogit)
 - **重抽样** — [`Bootstrap`](#bootstrap), [`Jackknife`](#jackknife), [`Permute`](#permute)
-- **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights)
-- **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int)
+- **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
+- **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`etable_as_stata`](#etable_as_stata), [`f_test`](#f_test), [`first_stage`](#first_stage), [`fitted_series`](#fitted_series), [`format_ereturn_list`](#format_ereturn_list), [`get_influence`](#get_influence), [`kpss`](#kpss), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`t_test`](#t_test), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`wntestq`](#wntestq), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`MarginsTable`](#marginstable), [`MultinomialLogit`](#multinomiallogit), [`PraisResult`](#praisresult), [`RandomEffectsMLE`](#randomeffectsmle), [`SummarizeResult`](#summarizeresult), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`pperron`](#pperron), [`prais`](#prais), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -4726,6 +4726,276 @@ s = ws.normalize_weights(np.array([1.0, 2.0, 3.0, 4.0]), 'fweight')
 
 **注意:** `effective_n` 才是自由度所用的量：这个四行 `fweight` 例子里为 10，因为每行按其权重计数。这正是频数权重下 `nobs` 与 `e(N)` 会分岔的原因。
 
+### `ereturn_list`
+
+**Stata 指令:** `ereturn list`
+
+单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : "text"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。
+
+**签名**
+
+```python
+ws.ereturn_list(self) -> 'str'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.ereturn_list()
+```
+
+**输出**
+
+```text
+
+scalars:
+                  e(N) =  200
+              e(sum_w) =  200
+               e(df_m) =  2
+               e(df_r) =  197
+                  e(F) =  90.99954130641439
+                 e(r2) =  .4802098236178376
+               e(rmse) =  1.048768791147598
+                e(mss) =  200.1836988170982
+                e(rss) =  216.6834475251831
+               e(r2_a) =  .4749327659895922
+                 e(ll) =  -291.7997221200006
+               e(ll_0) =  -357.2327276994888
+               e(rank) =  3
+
+macros:
+              e(title) : "Linear regression"
+          e(marginsok) : "XB default"
+                e(vce) : "ols"
+             e(depvar) : "y"
+                e(cmd) : "regress"
+         e(properties) : "b V"
+            e(predict) : "regres_p"
+              e(model) : "ols"
+          e(estat_cmd) : "regress_estat"
+
+matrices:
+                  e(b) :  1 x 3
+                  e(V) :  3 x 3
+               e(beta) :  1 x 2
+
+functions:
+             e(sample)
+```
+
+### `estat_bgodfrey`
+
+**Stata 指令:** `estat bgodfrey, lags(#)`
+
+Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。
+
+**签名**
+
+```python
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
+```
+
+**示例**
+
+```python
+print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `estat_corrgram`
+
+**Stata 指令:** `estat corrgram`
+
+相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。
+
+**签名**
+
+```python
+ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
+```
+
+**示例**
+
+```python
+print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `estat_dwatson`
+
+**Stata 指令:** `estat dwatson`
+
+残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。`time=` 即 `tsset` 的替代：跨缺口的那一对观测被跳过而不是相减，并先打印一行 `Number of gaps in sample = N`。实测 `icecream.dta` 删去 `time == 5` 后：`time=` 下为 .8930395，按行序为 1.0868969。
+
+**签名**
+
+```python
+ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
+```
+
+**示例**
+
+```python
+print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `f_test`
+
+**Stata 指令:** `test x1 = 0, x2 = 0 (joint F)`
+
+已拟合结果上的 statsmodels 风格联合 F 检验。`r_matrix` 接受一个或多个以逗号分隔的约束字符串（或一个序列），按与 `test` 相同的 Stata 约束语法解析后，以 F 统计量联合报告。返回 `ContrastResults`，含 `statistic`、`pvalue`、`df_num`/`df_denom` 以及 `fvalue`/`tvalue` 别名。这是面向 statsmodels 生态的接口，并非 Stata 自身的 `test` 方法。
+
+**签名**
+
+```python
+ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.f_test('x1 = 0, x2 = 0')
+```
+
+**输出**
+
+```text
+<F contrast: statistic=90.9995, pvalue=1.02109e-28, df_denom=197>
+```
+
+### `first_stage`
+
+**Stata 指令:** `ivregress 2sls ..., first`
+
+IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。
+
+**签名**
+
+```python
+ws.first_stage(self) -> 'str'
+```
+
+**示例**
+
+```python
+r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()
+r.first_stage()
+```
+
+**输出**
+
+```text
+First-stage regressions
+-----------------------
+
+                                                        Number of obs =    200
+                                                        F(2, 197)     =  36.02
+                                                        Prob > F      = 0.0000
+                                                        R-squared     = 0.2678
+                                                        Adj R-squared = 0.2603
+                                                        Root MSE      = 0.4139
+
+------------------------------------------------------------------------------
+       treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
+          x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
+       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
+------------------------------------------------------------------------------
+```
+
+### `get_influence`
+
+**Stata 指令:** `(no Stata equivalent -- statsmodels OLSInfluence names)`
+
+已拟合结果的影响度量，命名沿用 statsmodels 的 `OLSInfluence`。返回字典，含 `hat_matrix_diag`（杠杆）、`resid`、`resid_studentized_internal`、`resid_studentized`、`standardized_resid`、`cooks_distance`（数组加观测索引）与 `nobs`。只提供基于杠杆的度量：删除诊断需要逐观测重新拟合，返回「看起来合理但错误」的数组被认为比不提供该键更糟。
+
+**签名**
+
+```python
+ws.get_influence(self) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.get_influence()['hat_matrix_diag'][:5]
+```
+
+**输出**
+
+```text
+[0.024179 0.010089 0.005392 0.011287 0.005195]
+```
+
+### `t_test`
+
+**Stata 指令:** `test x1 = 0 (single restriction, t form)`
+
+单个线性约束的 statsmodels 风格 t 检验。`r_matrix` 是一个约束字符串（或单元素序列）；`use_t` 强制采用 t 形式，其统计量为相应 F 的平方根。返回 `ContrastResults`，含 `statistic`、`pvalue`、单约束可用的 `conf_int()` 以及 `fvalue`/`tvalue` 别名。若要检验多个联合约束，请改用 `f_test`。
+
+**签名**
+
+```python
+ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'
+```
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.t_test('x1 = 0')
+```
+
+**输出**
+
+```text
+<t contrast: statistic=11.5997, pvalue=4.75584e-24, df_denom=197>
+```
+
+### `wntestq`
+
+**Stata 指令:** `wntestq varname, lags(#)`
+
+白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。
+
+**签名**
+
+```python
+ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
+```
+
+**示例**
+
+```python
+print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+```
+
+**输出**
+
+```text
+None
+```
+
 
 ## 已拟合结果对象
 
@@ -5477,6 +5747,215 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().conf_int(alpha=0.10)
 Intercept  0.882000  1.128005
 x1         0.720877  0.960412
 x2        -0.635740 -0.388434
+```
+
+### `fitted_series`
+
+**Stata 指令:** `predict yhat, xb -- with the estimation sample's index`
+
+以 `pandas.Series` 给出的拟合值，带估计样本索引、名称为 `fittedvalues`。它是普通 `fittedvalues` ndarray 的带标签版本：若把后者直接换成 Series 会破坏按位置访问，因此另设此名。当拟合未保留观测标签时，索引退化为 `RangeIndex`——这是诚实的做法：数值仍在，标签只表示「第 i 行」。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.fitted_series.head()
+```
+
+**输出**
+
+```text
+0    2.524914
+1    0.144945
+2    1.126616
+3    2.107762
+4    0.869349
+Name: fittedvalues, dtype: float64
+```
+
+### `level`
+
+**Stata 指令:** `regress ..., level(90)`
+
+`conf_int()` 与打印区间使用的置信水平，以**分数**表示（Stata 的 `level(90)` 对应 `0.90`），默认 `0.95`。用 `level=` 拟合的模型会记录它，因此以 90% 估计的结果默认打印90% 区间，除非调用者显式传入 `alpha`。Stata 的 `level(#)` 收的是**百分数**；各估计器两种写法都接受并归一化——因为把 `0.90` 当百分数解读会悄悄产生 0.9% 的区间，而症状只是「区间看起来太窄」。
+
+**示例**
+
+```python
+ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
+```
+
+**输出**
+
+```text
+              lower     upper
+Intercept  0.836140  1.108573
+x1         0.709618  0.975431
+```
+
+**注意:** 该属性返回分数；`conf_int()` 仍接受显式 `alpha`，那一次调用里它会覆盖已记录的水平。它只影响区间的报告，**不改变任何系数或标准误**。
+
+### `model`
+
+**Stata 指令:** `(no Stata equivalent -- a statsmodels interop shim)`
+
+以 statsmodels 消费者期待的形式给出的已拟合模型。`statsmodels.stats.anova.anova_lm` 会读取 `res.model` 并由其重新拟合；缺少该属性时该调用会抛 AttributeError。返回的 `ResultModel` 只暴露 `endog`、`exog`、`exog_names` 以及返回本结果自身的 `fit()`——足以满足 `anova_lm` 的契约，而不冒充真正的 statsmodels 模型。过度模仿会诱使调用方依赖并不存在的行为。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.model
+```
+
+**输出**
+
+```text
+<ResultModel: 200 obs, 3 params>
+```
+
+### `odds_ratios`
+
+**Stata 指令:** `logit ..., or  (column, not a separate function)`
+
+这不是一个导出的函数。`logit ..., or` 通过 `result.summary(style="stata", odds_ratio=True)` 表达：对估计值、其标准误和两个区间端点取指数，并把列名改为 `Odds ratio`；z 与 P>|z| **不变**，因为它们由原始尺度计算。
+
+**示例**
+
+```python
+print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', odds_ratio=True)[-400:])
+```
+
+**输出**
+
+```text
+None
+```
+
+### `resid_series`
+
+**Stata 指令:** `predict e, residuals -- with the estimation sample's index`
+
+以 `pandas.Series` 给出的残差，带估计样本索引、名称为 `resid`，是普通 `resid` ndarray 的带标签版本。它为兼容 statsmodels 而设，同时不改动 ndarray 的按位置访问行为；拟合未保留行标签时索引退化为 `RangeIndex`。对应的拟合值见 `fitted_series`。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.resid_series.head()
+```
+
+**输出**
+
+```text
+0   -0.245449
+1   -0.012850
+2   -1.598986
+3    0.354059
+4    0.682509
+Name: resid, dtype: float64
+```
+
+### `response_name`
+
+**Stata 指令:** `e(depvar)`
+
+被解释变量名，用于标题与列头。有的估计量把它设为实例属性，有的不设（ARIMA 与 GARCH 属于后者），因此该属性回退到 `e(depvar)`——每个拟合都会携带的宏——从而与基于公式的估计量给出相同答案。子类若赋值 `self.response_name` 仍然优先，因为先查实例字典。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.response_name
+```
+
+**输出**
+
+```text
+y
+```
+
+### `stata_cov_params`
+
+**Stata 指令:** `e(V)`
+
+按与 `stata_params` 相同的顺序重排后的协方差矩阵，为 numpy 数组。对含义不明确的因子项，它抛出与名称访问相同的拒绝，因此调用者不会拿到一个行序与 Stata 静默不一致的矩阵。比较对象是 Stata 的 `e(V)` 时请用它而非 `cov`。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+np.round(r.stata_cov_params, 4)
+```
+
+**输出**
+
+```text
+[[ 0.0053  0.     -0.0003]
+ [ 0.      0.0056 -0.0004]
+ [-0.0003 -0.0004  0.0055]]
+```
+
+### `stata_factor_terms`
+
+**Stata 指令:** `i.<var> -- the explicit factor expansion in a varlist`
+
+无法重建其 Stata `e(b)` 拼写的因子项，为排序后的列表；当每个系数都有明确的 Stata 拼写时为空。Stata 把显式 `i.foreign` 展开为每个水平一行再加一行显式零基准（`0b.foreign`），而本包只有一个水平列，故不存在一一映射。裸二元列不会出现在此，因为 Stata 用变量名为其单独一行命名。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()
+r.stata_factor_terms
+```
+
+**输出**
+
+```text
+['yb']
+```
+
+**注意:** 此处非空意味着该结果上的 `stata_param_names`、`stata_params` 与 `stata_cov_params` 都会抛 `NotImplementedError`；请改用 `params`/`bse` 对比，或把因子编码为哑变量后重新拟合。
+
+### `stata_param_names`
+
+**Stata 指令:** `the row names of e(b) as Stata spells and orders them`
+
+按 Stata 的 `e(b)` 顺序与拼写给出的系数名：先是回归元，然后 `_cons` 在最后，最后是 `cut1` 或 `lnalpha` 等辅助参数。`Intercept` 变为 `_cons`，裸因子列取变量名而省略水平，`:` 变 `#`，前导 `/` 被去掉。对显式 `C(...)` 因子会抛 `NotImplementedError`，因为 Stata 为每个水平给一行再加一行零基准，不存在一一映射。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+(r.param_names, r.stata_param_names)
+```
+
+**输出**
+
+```text
+(['Intercept', 'x1', 'x2'], ['x1', 'x2', '_cons'])
+```
+
+### `stata_params`
+
+**Stata 指令:** `e(b)`
+
+重排为 Stata `e(b)` 顺序与拼写的系数向量：`_cons` 移到末尾而非开头，因子与交互项名称重写。它是属性而非方法——写 `r.stata_params`，不要写 `r.stata_params()`。数值与 `params` 完全相同，只是顺序与标签不同，与 Stata fixture 对比时应用此视图。
+
+**示例**
+
+```python
+r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r.stata_params
+```
+
+**输出**
+
+```text
+x1       0.840645
+x2      -0.512087
+_cons    1.005003
+Name: params, dtype: float64
 ```
 
 
@@ -6661,136 +7140,6 @@ H0: Random walk without drift, d = 0
 MacKinnon approximate p-value for Z(t) = 0.0000.
 ```
 
-### `ereturn_list`
-
-**Stata 指令:** `ereturn list`
-
-单个估计结果对应的 Stata `ereturn list` 四个区块：标量写作 `e(name) = value`，宏写作 `e(name) : "text"`，矩阵写作 `e(name) : r x c`，函数只列名字。某命令公布哪些标量由它自己决定，而 Stata 的选择比完整 `e()` 字典更窄，因此打印的是忠实子集而非全量转储。整段以空行开头，与 Stata 一致。
-
-**签名**
-
-```python
-ws.ereturn_list(self) -> 'str'
-```
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.ereturn_list()
-```
-
-**输出**
-
-```text
-
-scalars:
-                  e(N) =  200
-              e(sum_w) =  200
-               e(df_m) =  2
-               e(df_r) =  197
-                  e(F) =  90.99954130641439
-                 e(r2) =  .4802098236178376
-               e(rmse) =  1.048768791147598
-                e(mss) =  200.1836988170982
-                e(rss) =  216.6834475251831
-               e(r2_a) =  .4749327659895922
-                 e(ll) =  -291.7997221200006
-               e(ll_0) =  -357.2327276994888
-               e(rank) =  3
-
-macros:
-              e(title) : "Linear regression"
-          e(marginsok) : "XB default"
-                e(vce) : "ols"
-             e(depvar) : "y"
-                e(cmd) : "regress"
-         e(properties) : "b V"
-            e(predict) : "regres_p"
-              e(model) : "ols"
-          e(estat_cmd) : "regress_estat"
-
-matrices:
-                  e(b) :  1 x 3
-                  e(V) :  3 x 3
-               e(beta) :  1 x 2
-
-functions:
-             e(sample)
-```
-
-### `estat_bgodfrey`
-
-**Stata 指令:** `estat bgodfrey, lags(#)`
-
-Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。
-
-**签名**
-
-```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
-```
-
-**示例**
-
-```python
-print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `estat_corrgram`
-
-**Stata 指令:** `estat corrgram`
-
-相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。
-
-**签名**
-
-```python
-ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
-```
-
-**示例**
-
-```python
-print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `estat_dwatson`
-
-**Stata 指令:** `estat dwatson`
-
-残差一阶自相关的 Durbin-Watson d 统计量。Stata 把它打在一行里，形如 `Durbin–Watson d-statistic(  k,    N) = value`，标签里是 **en-dash（–）**，两个计数带填充；只给出数值不足以与打印输出比对。`time=` 即 `tsset` 的替代：跨缺口的那一对观测被跳过而不是相减，并先打印一行 `Number of gaps in sample = N`。实测 `icecream.dta` 删去 `time == 5` 后：`time=` 下为 .8930395，按行序为 1.0868969。
-
-**签名**
-
-```python
-ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
-```
-
-**示例**
-
-```python
-print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
-```
-
-**输出**
-
-```text
-None
-```
-
 ### `etable_as_stata`
 
 **Stata 指令:** `esttab m1 m2, se r2 mtitle`
@@ -6834,96 +7183,6 @@ R-sq                0.357           0.480
 --------------------------------------------
 Standard errors in parentheses
 * p<0.05, ** p<0.01, *** p<0.001
-```
-
-### `f_test`
-
-**Stata 指令:** `test x1 = 0, x2 = 0 (joint F)`
-
-已拟合结果上的 statsmodels 风格联合 F 检验。`r_matrix` 接受一个或多个以逗号分隔的约束字符串（或一个序列），按与 `test` 相同的 Stata 约束语法解析后，以 F 统计量联合报告。返回 `ContrastResults`，含 `statistic`、`pvalue`、`df_num`/`df_denom` 以及 `fvalue`/`tvalue` 别名。这是面向 statsmodels 生态的接口，并非 Stata 自身的 `test` 方法。
-
-**签名**
-
-```python
-ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> 'Any'
-```
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.f_test('x1 = 0, x2 = 0')
-```
-
-**输出**
-
-```text
-<F contrast: statistic=90.9995, pvalue=1.02109e-28, df_denom=197>
-```
-
-### `first_stage`
-
-**Stata 指令:** `ivregress 2sls ..., first`
-
-IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。
-
-**签名**
-
-```python
-ws.first_stage(self) -> 'str'
-```
-
-**示例**
-
-```python
-r = ws.IV2SLS.from_formula('ytreat ~ x1 + [treat ~ x3]', base).fit()
-r.first_stage()
-```
-
-**输出**
-
-```text
-First-stage regressions
------------------------
-
-                                                        Number of obs =    200
-                                                        F(2, 197)     =  36.02
-                                                        Prob > F      = 0.0000
-                                                        R-squared     = 0.2678
-                                                        Adj R-squared = 0.2603
-                                                        Root MSE      = 0.4139
-
-------------------------------------------------------------------------------
-       treat | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
--------------+----------------------------------------------------------------
-          x1 |   .0022204   .0291298     0.08   0.939    -.0552258    .0596667
-          x3 |   .2398927   .0287406     8.35   0.000     .1832141    .2965714
-       _cons |   .6613358   .0293962    22.50   0.000     .6033641    .7193075
-------------------------------------------------------------------------------
-```
-
-### `fitted_series`
-
-**Stata 指令:** `predict yhat, xb -- with the estimation sample's index`
-
-以 `pandas.Series` 给出的拟合值，带估计样本索引、名称为 `fittedvalues`。它是普通 `fittedvalues` ndarray 的带标签版本：若把后者直接换成 Series 会破坏按位置访问，因此另设此名。当拟合未保留观测标签时，索引退化为 `RangeIndex`——这是诚实的做法：数值仍在，标签只表示「第 i 行」。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.fitted_series.head()
-```
-
-**输出**
-
-```text
-0    2.524914
-1    0.144945
-2    1.126616
-3    2.107762
-4    0.869349
-Name: fittedvalues, dtype: float64
 ```
 
 ### `format_ereturn_list`
@@ -6983,31 +7242,6 @@ functions:
              e(sample)
 ```
 
-### `get_influence`
-
-**Stata 指令:** `(no Stata equivalent -- statsmodels OLSInfluence names)`
-
-已拟合结果的影响度量，命名沿用 statsmodels 的 `OLSInfluence`。返回字典，含 `hat_matrix_diag`（杠杆）、`resid`、`resid_studentized_internal`、`resid_studentized`、`standardized_resid`、`cooks_distance`（数组加观测索引）与 `nobs`。只提供基于杠杆的度量：删除诊断需要逐观测重新拟合，返回「看起来合理但错误」的数组被认为比不提供该键更糟。
-
-**签名**
-
-```python
-ws.get_influence(self) -> 'Any'
-```
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.get_influence()['hat_matrix_diag'][:5]
-```
-
-**输出**
-
-```text
-[0.024179 0.010089 0.005392 0.011287 0.005195]
-```
-
 ### `kpss`
 
 **Stata 指令:** `kpss varname`
@@ -7024,65 +7258,6 @@ ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, nam
 
 ```python
 print(ws.kpss(base['y'].to_numpy()))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `level`
-
-**Stata 指令:** `regress ..., level(90)`
-
-`conf_int()` 与打印区间使用的置信水平，以**分数**表示（Stata 的 `level(90)` 对应 `0.90`），默认 `0.95`。用 `level=` 拟合的模型会记录它，因此以 90% 估计的结果默认打印90% 区间，除非调用者显式传入 `alpha`。Stata 的 `level(#)` 收的是**百分数**；各估计器两种写法都接受并归一化——因为把 `0.90` 当百分数解读会悄悄产生 0.9% 的区间，而症状只是「区间看起来太窄」。
-
-**示例**
-
-```python
-ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
-```
-
-**输出**
-
-```text
-              lower     upper
-Intercept  0.836140  1.108573
-x1         0.709618  0.975431
-```
-
-**注意:** 该属性返回分数；`conf_int()` 仍接受显式 `alpha`，那一次调用里它会覆盖已记录的水平。它只影响区间的报告，**不改变任何系数或标准误**。
-
-### `model`
-
-**Stata 指令:** `(no Stata equivalent -- a statsmodels interop shim)`
-
-以 statsmodels 消费者期待的形式给出的已拟合模型。`statsmodels.stats.anova.anova_lm` 会读取 `res.model` 并由其重新拟合；缺少该属性时该调用会抛 AttributeError。返回的 `ResultModel` 只暴露 `endog`、`exog`、`exog_names` 以及返回本结果自身的 `fit()`——足以满足 `anova_lm` 的契约，而不冒充真正的 statsmodels 模型。过度模仿会诱使调用方依赖并不存在的行为。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.model
-```
-
-**输出**
-
-```text
-<ResultModel: 200 obs, 3 params>
-```
-
-### `odds_ratios`
-
-**Stata 指令:** `logit ..., or  (column, not a separate function)`
-
-这不是一个导出的函数。`logit ..., or` 通过 `result.summary(style="stata", odds_ratio=True)` 表达：对估计值、其标准误和两个区间端点取指数，并把列名改为 `Odds ratio`；z 与 P>|z| **不变**，因为它们由原始尺度计算。
-
-**示例**
-
-```python
-print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', odds_ratio=True)[-400:])
 ```
 
 **输出**
@@ -7290,132 +7465,6 @@ Standard errors in parentheses
 * p<0.05, ** p<0.01, *** p<0.001
 ```
 
-### `resid_series`
-
-**Stata 指令:** `predict e, residuals -- with the estimation sample's index`
-
-以 `pandas.Series` 给出的残差，带估计样本索引、名称为 `resid`，是普通 `resid` ndarray 的带标签版本。它为兼容 statsmodels 而设，同时不改动 ndarray 的按位置访问行为；拟合未保留行标签时索引退化为 `RangeIndex`。对应的拟合值见 `fitted_series`。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.resid_series.head()
-```
-
-**输出**
-
-```text
-0   -0.245449
-1   -0.012850
-2   -1.598986
-3    0.354059
-4    0.682509
-Name: resid, dtype: float64
-```
-
-### `response_name`
-
-**Stata 指令:** `e(depvar)`
-
-被解释变量名，用于标题与列头。有的估计量把它设为实例属性，有的不设（ARIMA 与 GARCH 属于后者），因此该属性回退到 `e(depvar)`——每个拟合都会携带的宏——从而与基于公式的估计量给出相同答案。子类若赋值 `self.response_name` 仍然优先，因为先查实例字典。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.response_name
-```
-
-**输出**
-
-```text
-y
-```
-
-### `stata_cov_params`
-
-**Stata 指令:** `e(V)`
-
-按与 `stata_params` 相同的顺序重排后的协方差矩阵，为 numpy 数组。对含义不明确的因子项，它抛出与名称访问相同的拒绝，因此调用者不会拿到一个行序与 Stata 静默不一致的矩阵。比较对象是 Stata 的 `e(V)` 时请用它而非 `cov`。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-np.round(r.stata_cov_params, 4)
-```
-
-**输出**
-
-```text
-[[ 0.0053  0.     -0.0003]
- [ 0.      0.0056 -0.0004]
- [-0.0003 -0.0004  0.0055]]
-```
-
-### `stata_factor_terms`
-
-**Stata 指令:** `i.<var> -- the explicit factor expansion in a varlist`
-
-无法重建其 Stata `e(b)` 拼写的因子项，为排序后的列表；当每个系数都有明确的 Stata 拼写时为空。Stata 把显式 `i.foreign` 展开为每个水平一行再加一行显式零基准（`0b.foreign`），而本包只有一个水平列，故不存在一一映射。裸二元列不会出现在此，因为 Stata 用变量名为其单独一行命名。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()
-r.stata_factor_terms
-```
-
-**输出**
-
-```text
-['yb']
-```
-
-**注意:** 此处非空意味着该结果上的 `stata_param_names`、`stata_params` 与 `stata_cov_params` 都会抛 `NotImplementedError`；请改用 `params`/`bse` 对比，或把因子编码为哑变量后重新拟合。
-
-### `stata_param_names`
-
-**Stata 指令:** `the row names of e(b) as Stata spells and orders them`
-
-按 Stata 的 `e(b)` 顺序与拼写给出的系数名：先是回归元，然后 `_cons` 在最后，最后是 `cut1` 或 `lnalpha` 等辅助参数。`Intercept` 变为 `_cons`，裸因子列取变量名而省略水平，`:` 变 `#`，前导 `/` 被去掉。对显式 `C(...)` 因子会抛 `NotImplementedError`，因为 Stata 为每个水平给一行再加一行零基准，不存在一一映射。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-(r.param_names, r.stata_param_names)
-```
-
-**输出**
-
-```text
-(['Intercept', 'x1', 'x2'], ['x1', 'x2', '_cons'])
-```
-
-### `stata_params`
-
-**Stata 指令:** `e(b)`
-
-重排为 Stata `e(b)` 顺序与拼写的系数向量：`_cons` 移到末尾而非开头，因子与交互项名称重写。它是属性而非方法——写 `r.stata_params`，不要写 `r.stata_params()`。数值与 `params` 完全相同，只是顺序与标签不同，与 Stata fixture 对比时应用此视图。
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.stata_params
-```
-
-**输出**
-
-```text
-x1       0.840645
-x2      -0.512087
-_cons    1.005003
-Name: params, dtype: float64
-```
-
 ### `summarize`
 
 **Stata 指令:** `summarize varlist`
@@ -7513,31 +7562,6 @@ ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], 
 ```
 
 **注意:** `synth2.ado:330` 用 `ereturn clear` 清空 `synth` 的 e()，Python 结果面是 synth2 自己的，另附 `synth_result` 保留原始拟合。`R2` 分母是合成值的处理前离差（ado:647，非标准）。聚合概率与逐期 p 值把处理组自身计入分母且用 >= 比较（ado:441/940/947-949）。时间安慰剂不产生 mspe/pval。`frame()`/`symbol()` 是 Stata 特有的结果数据集机制，由 Synth2Result 属性替代。
-
-### `t_test`
-
-**Stata 指令:** `test x1 = 0 (single restriction, t form)`
-
-单个线性约束的 statsmodels 风格 t 检验。`r_matrix` 是一个约束字符串（或单元素序列）；`use_t` 强制采用 t 形式，其统计量为相应 F 的平方根。返回 `ContrastResults`，含 `statistic`、`pvalue`、单约束可用的 `conf_int()` 以及 `fvalue`/`tvalue` 别名。若要检验多个联合约束，请改用 `f_test`。
-
-**签名**
-
-```python
-ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = None) -> 'Any'
-```
-
-**示例**
-
-```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r.t_test('x1 = 0')
-```
-
-**输出**
-
-```text
-<t contrast: statistic=11.5997, pvalue=4.75584e-24, df_denom=197>
-```
 
 ### `tebalance_summarize`
 
@@ -7867,30 +7891,6 @@ ws.vecstable(result: 'Any') -> 'VecStableResult'
 
 ```python
 print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `wntestq`
-
-**Stata 指令:** `wntestq varname, lags(#)`
-
-白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。
-
-**签名**
-
-```python
-ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
-```
-
-**示例**
-
-```python
-print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
 ```
 
 **输出**

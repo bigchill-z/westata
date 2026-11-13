@@ -132,6 +132,14 @@ full = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
 print(ws.etable([base, full], model_names=["基础", "完整"]))
 ```
 
+Stata 的 `logit ..., or` 输出优势比；给 `summary` 传 `odds_ratio=True`：
+
+```python
+# `foreign` is a category in auto.dta, so build an indicator first.
+df["high_mpg"] = (df["mpg"] > df["mpg"].median()).astype(int)
+print(ws.Logit.from_formula("high_mpg ~ weight + C(foreign)", df).fit().summary(odds_ratio=True))
+```
+
 ## 命令覆盖
 
 按族分类。完整清单与逐命令用法见 [docs/GUIDE.md](docs/GUIDE.md)。

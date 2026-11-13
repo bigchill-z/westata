@@ -723,3 +723,50 @@ grep -n 'Number of obs\|Number of lags\|_col' dfuller.ado
 第二步才用构造数据实测，第三步才对拍本包。
 
 相关：`error.md` #27（几何对不上两次就读 .ado）——本条是它在「说明文字」维度的推广。
+
+## 29. 版本号不能按字符串比较
+
+全量测试报 `test_documented_version_matches_pyproject` 失败：
+
+    pyproject 声明 0.3.11，但 PyPI 上已发布 0.3.9
+
+**PyPI 上确实是 0.3.11**，是测试本身错了。
+
+`_pypi_versions()` 用 `sorted(payload.get("releases", {}))` 做**字符串排序**，
+而 `"0.3.9" > "0.3.11"`（因为 `'9' > '1'`），所以 `versions[-1]` 报的是 0.3.9。
+断言又用 `declared >= newest` 直接比字符串，`'0.3.11' >= '0.3.9'` 同样为 False。
+
+**修复**：`_version_key()` 把 `0.3.11` 拆成元组 `(0, 3, 11)` 再比较。
+
+```python
+def _version_key(version):
+    parts = []
+    for piece in str(version).split("."):
+        digits = re.match(r"\d+", piece)
+        parts.append(int(digits.group()) if digits else 0)
+    return tuple(parts)
+```
+
+**教训**：任何形如 `0.3.9` / `0.3.11` 的版本号，**永远不要当字符串排序或比较**。
+补丁号一到两位数就会翻车，而且只在那一个版本上翻，极易被误判成"发布失败"。
+修复时顺带发现 `re` 只在函数内局部导入，需要提到模块级。
+
+## 30. 全量测试耗时会波动 3 倍，不能当卡死处理
+
+同一条全量命令：
+
+| 时间 | 耗时 |
+|---|---|
+| 0.3.10 | 14:33 |
+| 0.3.11 第一次 | 15:03 |
+| 0.3.11 第二次 | **45:51** |
+
+第二次运行到 30 分钟时 CPU 只有 0、单线程 Running、67 线程 Wait——**看起来像卡死**，
+但子进程 CPU 时间仍在增长（1798s -> 2286s），最终正常跑完。
+
+**判断方法**：看 `.venv` 的 python **子进程** CPU 累计时间是否在涨，
+不要看包装进程（`pwsh` 拉起的那个，它 CPU 恒为 0）。
+用 `Get-Process -Id <子进程>` 的 `CPU` 属性前后对比，涨就是在跑。
+
+**教训**：`pytest -q | Select-Object -Last N` 在结束前**没有任何输出**，
+不能靠"没有新输出"判断卡死；必须另查进程状态。

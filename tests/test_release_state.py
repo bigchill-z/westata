@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import urllib.error
 import urllib.request
 
@@ -29,6 +30,20 @@ DOCS = [
 ]
 
 
+def _version_key(version: str) -> tuple[int, ...]:
+    """Sort key for a dotted numeric version, so 0.3.11 outranks 0.3.9.
+
+    Lexicographic ordering puts `"0.3.9"` LAST because `'9' > '1'` character by character, which made
+    `versions[-1]` report 0.3.9 as the newest release while 0.3.11 was already published.
+    """
+
+    parts: list[int] = []
+    for piece in str(version).split("."):
+        digits = re.match(r"\d+", piece)
+        parts.append(int(digits.group()) if digits else 0)
+    return tuple(parts)
+
+
 def _pypi_versions() -> list[str] | None:
     """返回 PyPI 上已发布的版本；网络不可用时返回 None（区别于「没有发布」的空列表）。"""
 
@@ -37,7 +52,7 @@ def _pypi_versions() -> list[str] | None:
             payload = json.load(response)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
         return None
-    return sorted(payload.get("releases", {}))
+    return sorted(payload.get("releases", {}), key=_version_key)
 
 
 def test_install_instructions_match_the_published_state() -> None:
@@ -91,7 +106,7 @@ def test_documented_version_matches_pyproject() -> None:
 
     # 允许 pyproject 领先于已发布版本（开发中），但不允许落后于已发布的最新版本。
     newest = versions[-1]
-    assert declared >= newest, (
+    assert _version_key(declared) >= _version_key(newest), (
         f"pyproject 声明 {declared}，但 PyPI 上已发布 {newest}；"
         f"已发布的版本号不能收回，pyproject 不应落后于它"
     )

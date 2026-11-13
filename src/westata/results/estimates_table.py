@@ -163,6 +163,7 @@ def render_estimates_table(
     star: Sequence[float] | None = None,
     mtitle: bool = False,
     stats: Sequence[str] | None = None,
+    pvalues: bool = False,
 ) -> str:
     """Reproduce ``estimates table m1 m2 ..., b se``.
 
@@ -171,6 +172,11 @@ def render_estimates_table(
 
     ``star`` is Stata's ``star(...)``: a descending triple of p-value thresholds. Passing it changes
     the LAYOUT, not just the cells -- see the measurement notes in the body.
+
+    ``pvalues`` adds Stata's ``p`` row under each coefficient -- four decimal places WITH the
+    leading zero, unlike the coefficient itself. ``estimates table ..., b p`` and ``..., p`` are the
+    same thing (``b`` is always printed), and ``p`` cannot be combined with ``star(...)``: Stata
+    rejects that pair.
 
     ``mtitle`` selects the **``esttab`` shape** instead of the ``estimates table`` one: a header with
     ``(1) (2) ...`` numbers and the model names, no ``Variable |`` gutter, a ``12 + 16*n`` rule and
@@ -196,18 +202,30 @@ def render_estimates_table(
             f"estimates table: {len(names)} names for {len(models)} models"
         )
 
-    if mtitle:
-        # `mtitle` is an `esttab` request, and `esttab` is a DIFFERENT table from `estimates table`:
-        # no "Variable |" gutter, a 12 + 16*n rule and a statistics footer. Serving it from the same
-        # entry point keeps one call site; the two layouts are rendered by separate helpers.
-        return _render_esttab_shape(
-            models,
-            names=names,
-            starred=star is not None,
-            star=star,
-            se=se,
-            stats=stats,
+    # star(...) AND p ARE MUTUALLY EXCLUSIVE in Stata: estimates table ..., b se p
+    # star(...) is an error. Reject it at the entry point so the mtitle branch cannot slip past.
+    if star is not None and pvalues:
+        raise ValueError(
+            "estimates table: star(...) and p cannot be combined; "
+            "Stata's estimates table rejects that pair"
         )
+
+    if mtitle:
+        # `mtitle` selects the `esttab` layout, which is a DIFFERENT table from `estimates table`:
+        # no "Variable |" gutter, a 12 + width*n rule, a statistics footer, and only ONE second row
+        # per coefficient. The full esttab renderer lives in `esttab_render`.
+        from westata.results.esttab_options import EsttabOptions
+        from westata.results.esttab_render import render_esttab_table
+
+        options = EsttabOptions(
+            # esttab accepts exactly one second-row cell; `pvalues` maps to `p`.
+            second_row="p" if pvalues else ("se" if se else "t"),
+            stars=star is not None,
+            star_levels=tuple(star) if star is not None else EsttabOptions().star_levels,
+            stats=tuple(stats) if stats else (),
+            model_titles=tuple(names),
+        )
+        return render_esttab_table(models, names=names, options=options)
 
     # Labels in first-model order, constant last -- Stata's sequence.
     order: list[str] = []
@@ -313,6 +331,22 @@ def render_estimates_table(
                     continue
                 error_row += f"{_number(float(model.bse[match[0]])):>{column_width - 2}}" + " " * 2
             lines.append(error_row)
+        if pvalues and not starred:
+            # STATSPACE: the p row comes AFTER se and uses a DIFFERENT format -- four decimal
+            # places WITH the leading zero ('0.0000'), not the trimmed, leading-zero-dropped style
+            # of the coefficient and standard-error cells. Measured on `..., b se p`:
+            #
+            #     '           s |  .10264304    .09278735    .06078035    .06063623  '
+            #     '             |  .00620988    .00697626    .01895051    .01903397  '
+            #     '             |     0.0000       0.0000       0.0013       0.0014  '
+            p_row = " " * 12 + " |"
+            for model in models:
+                match = [raw for raw in model.params.index if _label(raw) == label]
+                if not match:
+                    p_row += " " * column_width
+                    continue
+                p_row += f"{float(model.pvalues[match[0]]):.4f}".rjust(column_width - 2) + " " * 2
+            lines.append(p_row)
 
     lines.append("-" * rule_length)
     if starred:
@@ -326,8 +360,14 @@ def render_estimates_table(
             for index, level in enumerate(ordered)
         ]
         lines.append(f"{'Legend: ' + '; '.join(pairs):>{rule_length}}")
-    elif se:
-        lines.append(f"{'Legend: b/se':>{rule_length}}")
+    elif se or pvalues:
+        # 'b/se', 'b/p' or 'b/se/p' -- the rows actually printed, in order (`b` is always there).
+        parts = ["b"]
+        if se:
+            parts.append("se")
+        if pvalues:
+            parts.append("p")
+        lines.append(f"{'Legend: ' + '/'.join(parts):>{rule_length}}")
     # Stata right-pads every line, including the last, to the rule width.
     # The leading blank stays empty; every OTHER line is padded to the rule width.
     return "\n".join(

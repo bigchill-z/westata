@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.10 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.11 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -7215,7 +7215,7 @@ round(ws.rdrobust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
 **签名**
 
 ```python
-ws.render_estimates_table(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True, star: 'Sequence[float] | None' = None, mtitle: 'bool' = False, stats: 'Sequence[str] | None' = None) -> 'str'
+ws.render_estimates_table(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None' = None, se: 'bool' = True, star: 'Sequence[float] | None' = None, mtitle: 'bool' = False, stats: 'Sequence[str] | None' = None, pvalues: 'bool' = False) -> 'str'
 ```
 
 **示例**

@@ -119,19 +119,17 @@ def test_the_statistics_footer_carries_n_and_r_squared(models) -> None:
     assert "0.352" in r2_row, r2_row
 
 
-def test_se_false_drops_the_error_rows_and_the_note(models) -> None:
-    rendered = ws.render_estimates_table(
-        [ws.OLS.from_formula("lnw ~ s", pd.read_stata(DATA)).fit()],
-        model_names=["one"],
-        se=False,
-        mtitle=True,
-    )
-    assert "Standard errors in parentheses" not in rendered
-    assert len(rendered.splitlines()) < len(
-        ws.render_estimates_table(
-            [ws.OLS.from_formula("lnw ~ s", pd.read_stata(DATA)).fit()],
-            model_names=["one"],
-            se=True,
-            mtitle=True,
-        ).splitlines()
-    )
+def test_se_false_switches_the_second_row_to_t_statistics(models) -> None:
+    """esttab ..., b alone still prints the t statistic -- measured against live Stata.
+
+    So se=False does NOT shorten the table; it swaps the parentheses note and the values.
+    """
+
+    frame = pd.read_stata(DATA)
+    single = [ws.OLS.from_formula("lnw ~ s", frame).fit()]
+    with_se = ws.render_estimates_table(single, model_names=["one"], se=True, mtitle=True)
+    without_se = ws.render_estimates_table(single, model_names=["one"], se=False, mtitle=True)
+    assert "Standard errors in parentheses" in with_se
+    assert "t statistics in parentheses" in without_se
+    assert "Standard errors in parentheses" not in without_se
+    assert len(with_se.splitlines()) == len(without_se.splitlines())

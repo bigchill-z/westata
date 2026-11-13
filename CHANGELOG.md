@@ -7,6 +7,77 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.11] - 2026-11-13
+
+### Added — `render_estimates_table(..., pvalues=True)`
+
+`estimates table` can print a p-value row, and the renderer could not. Stata's `p` option is now
+supported:
+
+```python
+# Stata: estimates table m1 m2 m3 m4, b se p
+ws.render_estimates_table(fits, model_names=names, se=True, pvalues=True)
+
+# Stata: estimates table m1 m2 m3 m4, b p   (identical: `b` is always printed)
+ws.render_estimates_table(fits, model_names=names, se=False, pvalues=True)
+```
+
+Measured on grilic:
+
+```
+           s |  .10264304    .09278735    .06078035    .06063623
+             |  .00620988    .00697626    .01895051    .01903397
+             |     0.0000       0.0000       0.0013       0.0014
+```
+
+**Three details decide the layout:**
+
+* The p row uses **four decimal places with the leading zero** — `0.0000`, `0.0013` — while the
+  coefficient and standard-error cells above drop the leading zero and trim (`  .00620988`).
+* The p row comes **after** the standard error, never before it.
+* `b p` and `p` are the same request, because `b` is always printed; omitting `se` gives a 20-line
+  table with two lines per coefficient instead of 27 with three.
+
+`p` cannot be combined with `star(...)` — Stata rejects `..., b se p star(...)`, and so does this
+renderer, with a `ValueError` raised at the entry point so the `mtitle` path cannot slip past it.
+
+The legend names the rows actually printed: `Legend: b/se`, `b/p` or `b/se/p`.
+
+### Added — the `esttab` screen option set
+
+`render_estimates_table` could express only `se`/`star`/`mtitle`/`stats`. A new `EsttabOptions` and
+`esttab_render` implement the options that affect the **screen** table, verified option by option
+against live Stata — 13 combinations byte-identical:
+
+| option | result |
+|---|---|
+| `se` / `t` / `p` / `ci` | second row `(0.00638)` / `(16.74)` / `(0.000)` / `[0.0943,0.119]` |
+| `b` alone | **still prints the t statistic** |
+| `nostar` | column width 13 instead of 16 |
+| `brac` | square brackets, and the note says `brackets` |
+| `keep` / `drop` / `order` | row selection and ordering |
+| `rename` / `varlabels` | relabelling |
+| `nocons` | drops the constant |
+| `collabels` / `mtitle` | extra header row / model titles |
+
+**Measured facts that contradict the documentation.** `b t p` prints ONLY `p` — esttab keeps one
+second row and the last option wins, while `b se p` is an error. `star(...)` must pair a symbol with
+a level (`star(* 0.1 ** 0.05 *** 0.01)`); a bare `star(0.1 0.05 0.01)` exits `r(198)`. esttab's
+default thresholds are **5%/1%/0.1%**, not the 10%/5%/1% that `estimates table` takes. `N` prints by
+default and `stats=["r2"]` adds to it. The column width is derived — 16 with stars, 13 without, 26
+for `ci`. `varlabels` suppresses the blank lines between coefficient blocks (21 lines become 18).
+
+**Out of scope, with reasons recorded in `ESTTAB_SPEC.md`:** `notype` (`esttab.ado:409` adds it only
+when a `using` file is written; on screen it exits `r(7)`), `nomargin` (no measured effect on the
+screen table), `margin` (marginal-effects semantics) and every file/LaTeX/HTML export option.
+
+### Verified
+
+All three combinations byte-identical to live Stata: `b se p` (27 lines), `b p` (20), `b se` (20).
+Full suite **6236 passed, 3 skipped**; `test_release_state` passes once this release is on PyPI.
+
+---
+
 ## [0.3.10] - 2026-11-13
 
 ### Added — `render_estimates_table` gains `star(...)`, `mtitle` and `stats`

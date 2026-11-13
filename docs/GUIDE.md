@@ -484,6 +484,26 @@ eight decimals below.
 so a table mixing OLS and IV models needs `cov_type="HC1"` on the OLS fits and `"HC0"` on the IV ones.
 Using HC0 throughout scales every OLS standard error by `sqrt(n/(n-k))`.
 
+
+#### Adding standard errors, p-values or stars
+
+`se`, `pvalues` and `star` select which rows and marks appear; the coefficient `b` is always printed.
+
+```python
+print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True, pvalues=True))
+# Stata: estimates table ..., b se p
+
+print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=False, pvalues=True))
+# Stata: estimates table ..., b p   -- identical, because `b` is always printed
+```
+
+The p row uses **four decimal places with the leading zero** (`0.0000`, `0.0013`), unlike the
+coefficient and standard-error cells, which drop the leading zero and trim. It always follows the
+standard error, and the legend names the rows printed: `Legend: b/se`, `b/p` or `b/se/p`.
+
+`pvalues` and `star` are mutually exclusive — Stata rejects `..., b se p star(...)`, and so does this
+renderer.
+
 ### `estimates table`, `esttab` and their options
 
 `ws.render_estimates_table` serves both Stata layouts from one entry point. They are **different
@@ -522,6 +542,40 @@ print(ws.render_estimates_table(
 starred coefficient reaches further right than the error cell beneath it.
 
 `stats` accepts `N`, `r2`, `r2_a` and `rmse`.
+
+#### `esttab` options for the screen table
+
+Passing `mtitle=True` selects the `esttab` layout, and the rows can be driven by the other esttab
+cells. For the full set, build an `EsttabOptions` and call the renderer directly:
+
+```python
+from westata.results.esttab_options import EsttabOptions
+from westata.results.esttab_render import render_esttab_table
+
+options = EsttabOptions(
+    second_row="p",          # one of se / t / p / ci; `b` alone still prints t
+    stars=True,
+    star_levels=(0.05, 0.01, 0.001),   # esttab's default; NOT estimates table's 0.1/0.05/0.01
+    keep=("s", "expr"),
+    order=("expr", "s"),
+    rename={"s": "Schooling"},
+    stats=("r2",),           # N always prints; this ADDS to it
+)
+print(render_esttab_table(fits, names=names, options=options))
+```
+
+Five measured behaviours that surprise people:
+
+* `b` **alone still prints the t statistic** — leaving out `se` swaps the second row, it does not
+  remove it.
+* `b t p` prints **only `p`**: esttab keeps a single second row and the last option wins. `b se p` is
+  an error.
+* `star(...)` must pair a symbol with a level — `star(* 0.1 ** 0.05 *** 0.01)` works, a bare
+  `star(0.1 0.05 0.01)` exits `r(198)`.
+* The **column width is derived**: 16 with stars, 13 without, 26 for `ci`.
+* `varlabels` **suppresses the blank lines** between coefficient blocks (21 lines become 18).
+
+`notype`, `nomargin` and `margin` are not screen-table options here; see `ESTTAB_SPEC.md` for why.
 
 ### Byte-for-byte table layout
 

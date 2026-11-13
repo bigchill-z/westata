@@ -521,6 +521,38 @@ print(ws.render_estimates_table(
 
 `stats` 接受 `N`、`r2`、`r2_a`、`rmse`。
 
+**esttab 的屏幕表格选项**
+
+`mtitle=True` 会切到 `esttab` 布局，其余 esttab 单元格选项可进一步控制行。要用完整选项集，直接
+构造 `EsttabOptions` 并调用渲染器：
+
+```python
+from westata.results.esttab_options import EsttabOptions
+from westata.results.esttab_render import render_esttab_table
+
+options = EsttabOptions(
+    second_row="p",          # se / t / p / ci 之一；单独 b 仍会打印 t
+    stars=True,
+    star_levels=(0.05, 0.01, 0.001),   # esttab 默认；不是 estimates table 的 0.1/0.05/0.01
+    keep=("s", "expr"),
+    order=("expr", "s"),
+    rename={"s": "Schooling"},
+    stats=("r2",),           # N 总会打印；这里是「追加」
+)
+print(render_esttab_table(fits, names=names, options=options))
+```
+
+五个容易踩的实测行为：
+
+* **单独 `b` 仍会打印 t 值**——省掉 `se` 只是换掉第二行，不是删掉它。
+* `b t p` **只打印 `p`**：esttab 只保留一行第二行，"最后一个胜出"。`b se p` 会报错。
+* `star(...)` 必须符号与阈值配对——`star(* 0.1 ** 0.05 *** 0.01)` 可用，
+  裸写 `star(0.1 0.05 0.01)` 会以 `r(198)` 退出。
+* **列宽是推导的**：带星号 16，不带 13，`ci` 为 26。
+* `varlabels` 会**抑制块间空行**（21 行变 18 行）。
+
+`notype`、`nomargin`、`margin` 不属于本实现的屏幕表格选项，原因见 `ESTTAB_SPEC.md`。
+
 ### 表格布局逐字符一致
 
 上一节比较的是系数**数值**。另一项性质是**打印出的表格本身**：列位置、对齐、

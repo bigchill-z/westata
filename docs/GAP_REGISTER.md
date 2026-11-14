@@ -201,7 +201,7 @@
 | C15-01/02 | `psmatch`/`ra`/`nnmatch` 无方差 | 属实且**有意**：三者 `se`/`p`/CI 均为 NaN，`variance_matches_stata=False`。不猜测 AI-robust 方差 |
 | C14-05 | `vecrank` 只支持 `trend(constant)` | **五个 `trend()` 选项全部实现**，k=2/k=3、trace/max 表逐字节匹配 Stata（第 142–143 轮） |
 | C12-05 | `xtreg, mle` 缺失 | **`RandomEffectsMLE` 已实现**，三个方差分量与 Stata 一致（第 112 轮） |
-| C12-11 | `xtserial` 缺失 | **本环境仍无 ado、Stata 报 r(111)/r(199)，无参照可验证**，保持拒绝 |
+| C12-11 | `xtserial` 缺失 | **已实现**（第 2026-11-14 轮）。此前记「本环境无 ado、无参照可验证」是**环境限制而非能力边界**：`xtserial` 由 Drukker 维护、不在 SSC 上，用 `net install xtserial, from("http://www.stata.com/users/ddrukker")` 装上 v1.1.0 后即取得完整参照。`xtserial.ado` 全body 仅四行（差分回归 → 残差滞后回归 → 检验 lag == -.5）。lin_1992 实测 `r(corr)=-0.192578492734578`、`r(F)=12.511374216982579`、`r(df_r)=27`、`r(p)=0.001484513025783`，本包逐值一致（corr 差 2.7e-10、F 差 8.4e-09），输出块逐字符一致。见 `tests/test_xtserial.py` |
 | C08-05 | `prais, corc` 缺失 | **`corc=` 已实现**，与 Stata 一样在 icecream.dta 上不收敛且 rho 差 0.005%（第 111 轮） |
 | C13-06 | `irf create` / `.irf` 体系缺失 | **OIRF/FEVD/irf_table 数值早已验证**；第 144 轮新增 `irf_create()` 写出 23 列 `.dta`，5 个数值列与 Stata 精确一致。**限制**：`pandas.to_stata` 无法写 `_dta[]` characteristics，故 Stata 的 `irf table` 仍读不了（r(498)），是数值导出而非 drop-in `.irf` set |
 | C18-01/02 | `synth`/`synth2` 整章缺失 | **复核当时**：`synth` 已于 2026-11-09 落地（B 档 / E2，`ws.synth`，六个 `e()` 矩阵对拍 6 份全精度 fixture），而 `synth2` **仍缺**（当时记为图形/placebo 包装器，有意不做）。**后续补齐**：2026-11-11 `synth` 扩展功能全量落地；同日 `synth2` 非图形全部功能落地（E2，对拍 5 份全精度 fixture，见 `docs/superpowers/specs/2026-11-11-synth2-design.md`），现两者仅图形（`figure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()` 不做。原记「受阻于二进制 `.mlib` 中的嵌套优化器」已由 P0 实测证伪：两个 Mata 内核被精确求解、`e(V_matrix)` 可直接导出。详见 §3.6.4 |
@@ -255,7 +255,7 @@
 - Stata 自身的 `mata describe using <mlib>` **只列出函数名与字节数**（`emptymat()` 164 bytes、`normalize()` 500 bytes …），**没有导出源码的选项**；`mata describe` 也只有 `using` 一种形式。
 
 **结论**：A 类不是「再找找源码」的问题，而是**源码根本不存在于安装目录中**。除非有第三方反编译器（本环境没有，且即便有也只是还原字节码语义），否则这些命令不可复现。这把 A 类与 B 类的处理统一了：两者都是**信息不可得**，区别只在于 B 类连参照输出都没有。
-| **B. 本环境无参照** | `xtserial`、`rddensity` | 无 ado、Stata 报 r(111)/r(199)，无法取得任何参照输出 | **不可验证，保持拒绝**，不写猜测实现 |
+| **B. 本环境无参照** | `rddensity`（`xtserial` 已于 2026-11-14 解除：装上 Drukker 的 ado 后取得参照并实现，见 C12-11） | 无 ado、Stata 报 r(111)/r(199)，无法取得任何参照输出 | **不可验证，保持拒绝**，不写猜测实现 |
 | **C. 有明确算法但规模大 / 有意不做** | `rdrobust` 自动带宽、`teffects` AI-robust 方差、`varsoc` 信息准则表 | 五种带宽构造 10–15% 偏离（一种「吻合」证伪为均值假象）；AI 方差见下方核实；`varsoc` 见下方第 177 轮核实 | **已记录原因**，等有明确需求或可验证算法再做 |
 
 **第 177 轮对 `varstable` 的核实**（`C13-04`，布局 0.27 / 数值覆盖 **0.00**）。与实时 Stata 比对，输出 **11/11 行逐字节一致**，包括共轭复根对 `.2258777 ± .6292178i` 的同一个模数 `.668533` 和两句结论。

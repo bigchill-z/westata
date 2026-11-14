@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.16",
+  "westata_version": "0.3.17",
   "exports": [
     {
       "name": "AIPW",
@@ -2511,6 +2511,25 @@
       "methods": []
     },
     {
+      "name": "XtSerialResult",
+      "kind": "class",
+      "module": "westata.postestimation.xtserial",
+      "docstring": "``xtserial``: Wooldridge's test for first-order panel autocorrelation.",
+      "signature": "(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int') -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
       "name": "XtTest0Result",
       "kind": "class",
       "module": "westata.postestimation.xttest0",
@@ -3112,6 +3131,13 @@
       "module": "westata.postestimation.serial",
       "docstring": "Ljung-Box Q, as ``wntestq``.\n\n``corrgram.ado:68`` builds it as\n\n.. math:: Q = n(n+2) \\sum_{k=1}^{p} \\hat\\rho_k^2 / (n-k)\n\n``wntestq.ado:16-24`` takes the default lag count from ``ac``, so it is\n``max(1, min(int(n/2) - 2, 40))`` -- measured: 30 observations give ``chi2(13)``, and\n758 give ``chi2(40)`` rather than the 377 an ``(n-k)//2`` rule would claim. Measured\nnumbers: Q 26.1974, p .0160; with ``lags(10)``: Q 16.3718, p .0895.\n\n``time`` stands in for ``tsset``; see :func:`estat_dwatson`.",
       "signature": "(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'"
+    },
+    {
+      "name": "xtserial",
+      "kind": "function",
+      "module": "westata.postestimation.xtserial",
+      "docstring": "Wooldridge's test for serial correlation in linear panel-data models.\n\n``formula`` is a ``\"y ~ x1 + x2\"`` spec, ``entity`` the panel variable and ``time``\nthe period variable -- what ``xtset`` would declare.  The model is fitted in FIRST\nDIFFERENCES, so ``entity`` and ``time`` must identify consecutive periods.\n\nStata's ``xtserial`` takes a variable list, not a formula; this mirrors the rest of\nthe package's ``from_formula`` convention.  ``, output`` only asks Stata to print the\nfirst-stage regression, which is not reproduced here: it is an ordinary clustered\n``regress`` of the differenced data and is reachable directly with :class:`OLS`.\n\nRaises\n------\nConsistencyError\n    When the panel/time columns are absent, the panel is not usable, or the second\n    stage has too few panels for a Wald test.",
+      "signature": "(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str') -> 'XtSerialResult'"
     },
     {
       "name": "xttest0",
@@ -5299,6 +5325,18 @@
       "en": "The object `ws.rcm` returns: the `att`, the selected `predictors`, the fitted `coefficients`, the pre/post years, the observed and `predicted` paths and the per-period `effects`.",
       "zh": "`ws.rcm` 返回的对象：`att`、入选的 `predictors`、拟合的 `coefficients`、前后年份、实际与 `predicted` 路径，以及逐期 `effects`。",
       "example": "print('RcmResult is returned by ws.rcm; it needs a unit/time panel')"
+    },
+    "xtserial": {
+      "stata": "xtserial (user-written, Drukker)",
+      "en": "Wooldridge's test for serial correlation in linear panel-data models, the user-written `xtserial` of that name. It differences the response and every regressor (no constant, clustered on the panel), regresses those residuals on their own lag the same way, and tests that the lag coefficient equals -0.5 -- because differencing an AR(1) error leaves `rho - 1`, which is -0.5 when there is no serial correlation. `entity` and `time` play the role of `xtset`. The lag runs on the (panel, time) axis, so a missing period makes the difference missing on both sides of the gap. Measured on lin_1992.dta: `corr = -0.192578493`, `F = 12.511374217`, `df_r = 27`, `p = 0.001484513`, against StataNow 19.5.",
+      "zh": "Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，与 StataNow 19.5 一致。",
+      "example": "d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)\nprint(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))"
+    },
+    "XtSerialResult": {
+      "stata": "xtserial",
+      "en": "The Wooldridge panel serial-correlation test: `corr` (the differenced residual's lag coefficient, about -0.5 under the null), `f` and `df`/`df_r` for the Wald test that it equals -0.5, `p`, plus `nobs` (the first-stage sample, which Stata prints) and `n_panels`. `str()` reproduces Stata's three-line block.",
+      "zh": "Wooldridge 面板序列相关检验的结果：`corr` 为差分残差的滞后系数（原假设下约为 -0.5），`f` 与 `df`/`df_r` 是“该系数等于 -0.5”的 Wald 检验，`p` 为其 p 值，`nobs` 是第一阶段的样本量（Stata 打印的那个），`n_panels` 为面板数。`str()` 复现 Stata 的三行输出块。",
+      "example": "d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)\nr = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')\nprint(round(r.f, 6), r.df_r)"
     },
     "synth": {
       "stata": "synth y x1 x2, trunit(1) trperiod(2005)",

@@ -1403,6 +1403,10 @@ def check_r2_estimation_has_class(report: Report) -> None:
         "varsoc",
         "endog_regf_test",
         "endog_score_test",
+        # ``xtserial`` fills only r(corr)/r(F)/r(df)/r(df_r)/r(p) -- there is no e()
+        # block and no coefficient vector, so a ``fit()`` would be an empty shell
+        # (R1.5).  It is an r-class test, the same category as ``dfuller``.
+        "xtserial",
     }
 
     for name in sorted(getattr(ws, "__all__", ())):

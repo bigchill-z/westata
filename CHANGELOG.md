@@ -7,6 +7,51 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] - 2026-11-14
+
+### Added
+* **`ws.xtserial` -- Wooldridge's test for serial correlation in panel data**, the
+  user-written Stata command of that name.
+
+  ```python
+  result = ws.xtserial(df, "ltvfo ~ ltlan + ltwlab + ...", entity="province", time="t")
+  print(result)
+  ```
+
+  ```text
+  Wooldridge test for autocorrelation in panel data
+  H0: no first order autocorrelation
+      F(  1,      27) =     12.511
+             Prob > F =      0.0015
+  ```
+
+  `xtserial` is Drukker's ado (`xtserial.ado` v1.1.0, 22apr2003), distributed
+  outside SSC -- `net install xtserial, from("http://www.stata.com/users/ddrukker")`.
+  Its body is four lines, so this is a transcription: difference the response and
+  every regressor (no constant, clustered on the panel), regress those residuals on
+  their own lag the same way, and test that the lag coefficient equals **-0.5**.
+
+  Two traps, both measured:
+
+  * **`D.` runs on the (panel, time) axis.**  Every panel of `lin_1992.dta` misses
+    `t == 11`, so the difference is missing at `t == 11` *and* `t == 12`: 476 - 56 =
+    420 observations.  Pairing adjacent rows keeps 474 and moves `r(corr)` from
+    -0.19258 to -0.20871.
+  * **The null is -0.5, not 0.**  Differencing an AR(1) error leaves a lag
+    coefficient of `rho - 1`, which is -0.5 when `rho = 0`; testing against zero
+    would always reject.
+
+  Verified against StataNow 19.5: `r(corr) = -0.192578493`, `r(F) = 12.511374217`,
+  `r(df_r) = 27`, `r(p) = 0.001484513` -- matching to 2.7e-10, 8.4e-09, exact and
+  4.5e-12 respectively, with the printed block byte-identical.  Pinned by
+  `tests/test_xtserial.py`.
+
+  This closes gap `C12-11`, which had been recorded as "not verifiable in this
+  environment".  That was an environment limitation, not a capability boundary: the
+  ado was simply not installed and not on SSC.
+
+---
+
 ## [0.3.17] - 2026-11-14
 
 ### Fixed

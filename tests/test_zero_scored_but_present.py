@@ -69,13 +69,16 @@ def test_predict_p_matches_the_manual_link_inverse(logit_fit) -> None:
 def test_the_absent_features_are_still_absent() -> None:
     """Pinned so that 'not implemented' is a checked statement rather than an assumption.
 
-    ``synth`` was removed on 2026-11-09 (B-grade default path) and ``synth2``
-    on 2026-11-11 (non-graphics feature set); both are now covered by their
-    own tests and E2 fixture comparisons.  Only ``xtserial`` remains absent.
+    ``synth`` was removed on 2026-11-09 (B-grade default path), ``synth2`` on
+    2026-11-11 (non-graphics feature set) and ``xtserial`` on 2026-11-14 -- its ado
+    was installable after all, from Drukker's site rather than SSC, so the test now
+    asserts the opposite for it.  Each is covered by its own tests and fixture
+    comparisons.
     """
 
-    for name in ("xtserial",):
-        assert not hasattr(ws, name), f"{name} now exists -- update the report row"
+    # ``xtserial`` used to be listed here as absent.  Recorded as "not verifiable in
+    # this environment", which turned out to be an install step nobody had tried:
+    # net install xtserial, from("http://www.stata.com/users/ddrukker").
+    assert callable(ws.xtserial)
     assert callable(ws.synth)
     assert callable(ws.synth2)
-    assert callable(ws.synth)

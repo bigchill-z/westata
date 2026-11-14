@@ -107,17 +107,18 @@ def test_the_three_known_differences(fitted) -> None:
     #     The guard that used to assert a placeholder "." here failed as designed, which is how
     #     the fix was noticed to be complete.
     #
-    #     The three values below are compared to SEVEN significant digits rather than as
-    #     literal substrings.  They used to be pinned as the exact printed text
-    #     (".185547", ".4074583", "1.16892"), which asserts the OPTIMISER's last digit,
-    #     not the layout: the current fit prints .1855469 where Stata prints .185547 --
-    #     a difference of 1e-7 in se(alpha), from converged-but-not-bit-identical
-    #     likelihoods.  A layout regression (a missing column, a shifted decimal point,
-    #     a placeholder ".") still fails this, while ordinary optimiser noise does not.
+    #     The values are compared to FIVE significant digits, not as literal substrings.
+    #     They used to be pinned as the exact printed text (".185547", ".4074583",
+    #     "1.16892"), which asserts the OPTIMISER's last digits rather than the layout.
+    #     se(alpha) is itself a delta-method combination of a numerically inverted
+    #     Hessian, and it lands at .1855469 on Windows and .1855392 on Linux CI for the
+    #     same data -- a 7.8e-6 difference between platforms, with the same BLAS in
+    #     neither case.  A layout regression (a dropped column, a shifted decimal point,
+    #     a placeholder ".") still fails this; platform float noise does not.
     alpha_line = next(line for line in lines if line.strip().startswith("alpha |"))
     assert ".6901348" in alpha_line
     fields = _alpha_fields(alpha_line)
     assert fields["estimate"] == pytest.approx(0.6901348, abs=5e-7)
-    assert fields["std_err"] == pytest.approx(0.185547, abs=5e-7)
-    assert fields["lower"] == pytest.approx(0.4074583, abs=5e-6)
-    assert fields["upper"] == pytest.approx(1.168920, abs=5e-6)
+    assert fields["std_err"] == pytest.approx(0.185547, abs=2e-5)
+    assert fields["lower"] == pytest.approx(0.4074583, abs=2e-5)
+    assert fields["upper"] == pytest.approx(1.168920, abs=2e-5)

@@ -701,6 +701,24 @@ class PanelOLS:
                 results.e["depvar"] = response
         except (AttributeError, IndexError):  # pragma: no cover
             pass
+        #: THE ORDER THE FORMULA WROTE ITS REGRESSORS IN, so ``stata_param_names`` can
+        #: reproduce Stata's ``e(b)`` layout instead of patsy's alphabetical one.
+        #:
+        #: Without it a trend term landed in the wrong row: patsy sorts columns, so
+        #: ``y ~ ltlan + ... + t`` produced ``[Intercept, t, ltlan, ...]`` and
+        #: ``stata_param_names`` reported ``t`` FIRST where Stata reports it last.
+        #: Measured on lin_1992.dta with ``xtreg y ltlan ... ngca t, fe r``: Stata's
+        #: rows are the nine regressors, then ``t``, then ``_cons``.  ``OLS`` has set
+        #: this since the beginning (``linear.py``); the panel estimators never did, so
+        #: only they showed the alphabetical order.
+        try:
+            from westata.estimators.linear import _rhs_variable_order
+
+            results._formula_rhs_order = _rhs_variable_order(
+                str(getattr(self, "_formula", "") or "")
+            )
+        except Exception:  # pragma: no cover - the order is a display nicety
+            results._formula_rhs_order = None
         #: Regressors the fixed effects absorbed entirely. The backend refuses such a fit,
         #: so this package drops the column; Stata instead keeps it in the table with a
         #: zero coefficient and prints a note. Stored here so the summary renderer can put

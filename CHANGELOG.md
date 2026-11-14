@@ -7,6 +7,38 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [Unreleased] - 2026-11-14
+
+### Fixed
+* **Panel estimators report coefficients in the order the formula wrote them.**
+  patsy alphabetises the design matrix, so a trend term came out in the wrong row:
+
+  ```python
+  ws.PanelOLS.from_formula(
+      "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mipric1 + giprice + mci "
+      "+ ngca + t", d, entity="province", time="t").fit(...)
+  ```
+
+  put `t` FIRST among the slopes, where Stata prints it LAST:
+
+  ```
+  Stata:     ltlan ... ngca, t, _cons
+  westata:   t, ltlan ... ngca, _cons      <- before this fix
+  ```
+
+  The cause was narrow. `OLS` records `_formula_rhs_order` when the model is built
+  (`linear.py`) and `StataResults._stata_order` uses it to reproduce Stata's `e(b)`
+  layout; the panel estimators never set that attribute, so only they fell back to
+  patsy's alphabetical order. A trend is the case that exposes it -- every other
+  regressor in this formula happens to sort after its neighbour, and `t` does not.
+
+  Values were never wrong, only their row order. Verified row by row against
+  StataNow 19.5 (`xtreg ltvfo ltlan ... ngca t, fe r`): the nine regressors, then
+  `t` (.0063068), then `_cons` (2.36174). Pinned by
+  `tests/test_panel_param_order.py`.
+
+---
+
 ## [0.3.19] - 2026-11-14
 
 ### Fixed

@@ -50,14 +50,25 @@
 
 **本文件当前无待用户决策事项。**
 
-## 〇之四、2026-11-12 0.3.7 发布：已完成（GitHub + PyPI）
+## 〇之四、2026-11-14 0.3.15 发布：已完成（GitHub + PyPI）
 
 | 事项 | 结果 |
 |---|---|
-| 版本号 | **0.3.7**（PyPI 上此前最新为 0.3.6，故升号） |
-| GitHub | **已推送** `origin/main`（最终 `dae977e`），annotated tag `v0.3.7` 已推送 |
-| PyPI | **已发布**：<https://pypi.org/project/westata/0.3.7/>，wheel 976453 B 与 sdist 2129735 B 均与本地一致 |
-| 安装验证 | 从 PyPI 下载 wheel 装入干净目录：`__version__` 为 0.3.7、`ts_lags` 存在、`bgodfrey` 4.237/4.487/4.775/5.099、缺口 `dwatson` .8930395 全部正确 |
+| 版本号 | **0.3.15**（PyPI 上此前最新为 0.3.14） |
+| GitHub | **已推送** `origin/main`（`df5358c`），annotated tag `v0.3.15` 已推送 |
+| PyPI | **已发布**：<https://pypi.org/project/westata/0.3.15/>，wheel 1020221 B、sdist 2196625 B |
+| 哈希校验 | PyPI 下载的 wheel SHA256 `f6fdeabd…a83b7e5` 与本地构建**完全一致** |
+| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.15、`se[ltlan]` .1681335、`sigma_e` .105892741、`vcetype` Robust、表内聚类提示行存在，全部与 StataNow 19.5 一致 |
+| 构建方式 | **从 `HEAD` 的干净 worktree 构建**，因为工作区另有未提交的在建功能（类形式、文档），直接打包会误发布 |
+
+**此前 0.3.7 的发布记录**（同样是 GitHub + PyPI 双完成）：
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | 0.3.7（PyPI 上此前最新为 0.3.6） |
+| GitHub | 已推送，tag `v0.3.7` 已推送 |
+| PyPI | 已发布：<https://pypi.org/project/westata/0.3.7/>，wheel 976453 B 与 sdist 2129735 B 均与本地一致 |
+| 安装验证 | `bgodfrey` 4.237/4.487/4.775/5.099、缺口 `dwatson` .8930395 全部正确 |
 
 > 注：合并 `origin/main` 时，远端提交 `3d22b69` 自述其树与本地 `aeb29d7` 逐字节相同
 > （当时 git 传输被阻断，改用 Git Data API 推送）。合并前已用
@@ -86,7 +97,7 @@
 | 明确不做 | 图形（`figure`）、任何推断量；`synth2` 的 placebo/LOO 已于 2026-11-11 单独实现（见 〇之三）；「全部机器精度」不承诺 |
 | 精度口径 | 逐量实测定级，以 6+ 份活体 Stata 捕获为准；不先拍死容差再凑 |
 
-**当前无待用户决策的事项**：0.3.7 的 GitHub 推送与 PyPI 发布均已完成，见上方「〇之四」。
+**当前无待用户决策的事项**：0.3.15（以及此前的 0.3.7）的 GitHub 推送与 PyPI 发布均已完成，见上方「〇之四」。
 
 ---
 

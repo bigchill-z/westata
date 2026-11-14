@@ -7,6 +7,38 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.17] - 2026-11-14
+
+### Fixed
+* **A clustered regression with factor variables no longer fabricates an F.**
+  `reg y x1..x9 i.province, vce(cluster province)` prints, on StataNow 19.5:
+
+  ```
+  F(8, 27)          =          .
+  Prob > F          =          .
+  ```
+
+  Three things were wrong here, and all three were silent:
+
+  1. **`e(F)` is missing** for this model, and the estimate already said so
+     (`NaN`). The renderer, however, rebuilt an F from `R^2` whenever `e(F)` was
+     non-finite and printed `F(36, 27) = 20.19` -- a statistic Stata never shows.
+     The `R^2` identity only holds for the unadjusted VCE, where `e(F)` is always
+     present, so the fallback now applies only when the key was never stored at
+     all (`_e_float_is_missing` separates "absent" from "explicitly missing").
+  2. **The numerator df is 8, not the 36 model columns.** Measured across four
+     models -- 9, 5, 2 and 1 non-factor slopes -- Stata's clustered factor models
+     report `e(df_m) = non-factor slopes - 1` and `e(rank) = non-factor slopes`.
+     The label is recomputed from the parameter names instead of read off
+     `e(df_m)`.
+  3. **The `Prob > F` row still appears**, as `.`; it used to be dropped.
+
+  Coefficients and clustered standard errors were already exact (max |db|
+  4.5e-08, max |dse| 3.1e-08 against Stata); this release fixes only the header.
+  Pinned by `tests/test_clustered_factor_missing_f.py`.
+
+---
+
 ## [0.3.16] - 2026-11-14
 
 ### Added -- class forms for the seven remaining estimation commands

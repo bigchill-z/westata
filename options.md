@@ -2,6 +2,26 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之七、2026-11-14 0.3.20 发布：已完成（GitHub + PyPI）
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | **0.3.20**（PyPI 上此前最新为 0.3.19） |
+| GitHub | 已推送 `origin/main`（`0390c9a`），tag `v0.3.20` 已推送 |
+| PyPI | 已发布：<https://pypi.org/project/westata/0.3.20/>，wheel 1032683 B、sdist 2221969 B |
+| 哈希校验 | PyPI 下载的 wheel SHA256 `c011c113…fd6a718` 与本地构建**完全一致** |
+| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`stata_param_names` 为 `[ltlan … ngca, t, _cons]`，`t` 系数 .0063068 与 Stata 一致 |
+| 构建方式 | 从 `HEAD` 的干净 worktree 构建 |
+
+内容：`PanelOLS` 按**公式书写顺序**报告系数（常数项在最后），与 Stata `e(b)` 一致。
+此前面板估计器未记录 `_formula_rhs_order`，退回 patsy 的字母序，
+导致趋势项 `t` 排在斜率的**第一行**而非最后。数值从未错，只是行序错。
+
+> 注：本轮 `git push` 因 GitHub 连接被重置而失败三次（期间 PyPI 一直可达），
+> 等待约 4 分钟后网络恢复才推送成功。
+
+---
+
 ## 〇之六、2026-11-14 0.3.19 发布：已完成（GitHub + PyPI）
 
 | 事项 | 结果 |

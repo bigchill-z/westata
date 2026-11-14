@@ -2261,6 +2261,58 @@ def _mle_variance_component_se(
                 a0, b0 = _a, _b
     except Exception:  # pragma: no cover - keep the optimiser's answer
         pass
+
+    # NEWTON POLISH.  Nelder-Mead stops about 1e-9 from the exact maximiser, which is
+    # harmless for the reported estimates but NOT for the confidence bounds: they are
+    # exp(log(s) -/+ z se/s), and their seventh decimal moves when sigma moves in the
+    # ninth.  Three Newton steps on the same likelihood bring the gap to ~2e-11 and make
+    # the printed rows stable across a whole range of Hessian steps instead of one
+    # knife-edge value (measured: h from 1.32e-05 to 1.5e-05 all agree once polished,
+    # where unpolished only a narrow window did).
+    try:
+        _p = np.array([a0, b0], dtype=float)
+        _hn = 1e-6
+        _best_ll = -np.inf
+        _best_p = _p.copy()
+        for _ in range(6):
+            _grad = np.zeros(2)
+            for _i in range(2):
+                _e = np.zeros(2)
+                _e[_i] = _hn
+                # Gradient of the log-likelihood (maximising, so ll(p+e) - ll(p-e)).
+                _grad[_i] = (
+                    ll_of_logs(*(_p + _e)) - ll_of_logs(*(_p - _e))
+                ) / (2.0 * _hn)
+            _hn_hess = np.zeros((2, 2))
+            for _i in range(2):
+                for _j in range(2):
+                    _ei = np.zeros(2)
+                    _ei[_i] = _hn
+                    _ej = np.zeros(2)
+                    _ej[_j] = _hn
+                    # Second derivative of the LOG-LIKELIHOOD (negative near a maximum).
+                    _hn_hess[_i, _j] = (
+                        ll_of_logs(*(_p + _ei + _ej))
+                        - ll_of_logs(*(_p + _ei - _ej))
+                        - ll_of_logs(*(_p - _ei + _ej))
+                        + ll_of_logs(*(_p - _ei - _ej))
+                    ) / (4.0 * _hn * _hn)
+            # Newton's method: p_new = p - H^-1 g, with H the (negative) second
+            # derivative of the likelihood.
+            _step = np.linalg.solve(_hn_hess, _grad)
+            _proposal = _p - _step
+            if not np.all(np.isfinite(_proposal)):
+                break
+            # Only accept a step that does not decrease the likelihood.
+            if ll_of_logs(*_proposal) >= ll_of_logs(*_p) - 1e-9:
+                _p = _proposal
+            else:
+                break
+        if np.all(np.isfinite(_p)) and ll_of_logs(*_p) >= ll_of_logs(a0, b0) - 1e-9:
+            a0, b0 = float(_p[0]), float(_p[1])
+    except Exception:  # pragma: no cover - singular Newton system keeps the NM answer
+        pass
+
     refined_sigma_u = float(np.exp(a0))
     refined_sigma_e = float(np.exp(b0))
 

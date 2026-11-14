@@ -7,6 +7,172 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.23] - 2026-11-15
+
+### Added — `ws.xtoverid`, the Sargan-Hansen test of overidentifying restrictions
+
+`xtoverid` is a user-written Stata command (Schaffer & Stillman, 2.1.8), not a base one. After
+`xtreg ..., re` it re-estimates the same equation with the WITHIN DEVIATIONS of every regressor
+added and tests those terms jointly to zero: a rejection means the random-effects estimator is
+inconsistent and fixed effects is preferred.
+
+```python
+re_fit = ws.RandomEffects.from_formula(
+    "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mci + ngca",
+    df, entity="province", time="t",
+).fit()
+print(ws.xtoverid(re_fit))
+```
+
+```
+Test of overidentifying restrictions: fixed vs random effects
+Cross-section time-series model: xtreg re
+Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
+```
+
+`r(j)` / `r(jdf)` / `r(jp)` are `statistic` / `df` / `pvalue`; `to_dict()` names them as Stata does.
+
+Six cases were captured from live StataNow 19.5 and all reproduce:
+
+| case | Stata `r(j)` | westata | agreement |
+|---|---|---|---|
+| full, conventional | 53.285084063390 | 53.285084063564 | 3.3e-12 rel |
+| two regressors | 2.994819604664 | 2.994819604663 | 6.1e-13 abs |
+| three regressors | 7.219781742362 | 7.219781742363 | 5.9e-13 abs |
+| one regressor | 16.877356385723 | 16.877356385726 | 2.5e-12 abs |
+| mci + ngca | 20.755766550808 | 20.755766550808 | 2.9e-13 abs |
+| full, **robust** | 221.225019619060 | 221.225019608326 | 4.9e-11 rel |
+
+**Two details are load-bearing, and both were measured rather than assumed.**
+
+**1. The VCE follows the original fit.** `xtoverid.ado:178-181` mirrors `e(vcetype)` when it
+refits, so the same equation gives `53.285` under the conventional VCE and `221.225` under
+`cov_type="robust"`. That is a 4x difference: a version that always used the model-based VCE would
+pass a "does it run" check while being wrong on every robust fit. `xtreg, re robust` is
+`vce(cluster panelvar)` in this family, so the clustered sandwich carries Stata's
+`G/(G-1)*(N-1)/(N-K)` factor.
+
+**2. The auxiliary equation is quasi-demeaned at the ORIGINAL `e(theta)`.** Every added regressor
+is a within deviation with an identically zero group mean, so it carries no between variation.
+Re-estimating the variance components through `RandomEffects` therefore drifts `sigma_u` from
+`.13324845` to `.09466035` and `theta` from `.81012778` to `.73537079`, landing **4.66 away** on the
+statistic. Stata's own `xtoverid, noisily` prints the ORIGINAL `sigma_u`/`theta`, which is what the
+fixed-theta GLS solve reproduces.
+
+### Refused, not approximated
+
+- `xtreg, fe` / `be` / `fd` — the ado itself refuses them at `:97-104`.
+- `xtivreg` / `xtivreg2` / `xthtaylor` — these need `ivreg2` plus an instrument set this package does
+  not record in the shape the ado reads.
+- weighted fits — `xtoverid.ado:165-168` refuses them outright.
+- `sigma_u == 0` (a degenerate RE fit that collapsed to pooled OLS) — `xtoverid.ado:241-244`.
+- unbalanced panels — they store no single `e(theta)`, only the five `e(thta_*)` percentiles, and
+  picking one would be inventing an estimator.
+
+### Verified
+
+**34 guards** in `tests/test_xtoverid.py`, plus a `registry.yml` entry (E3) and a line in the
+registry-coverage audit's `NO_TABLE` map (the command prints result text, not an estimation table).
+
+### Fixed — CI had been red on every push for nine days
+
+`pyproject.toml` declared `pyfixest>=0.30`, `linearmodels>=6.0` and `arch>=6.0` with **no upper
+bounds**. CI installs whatever is newest on every push, while the development machine kept
+0.60.0 / 7.0 / 8.0. On 2026-11-14 that gap became a cliff: CI resolved pyfixest **0.70.0**,
+pandas **3.1.1**, numpy **2.4.6**, arch **9.0.0**, and the same commit that passed 6428 tests
+locally failed **186 tests plus 68 setup errors** in the cloud.
+
+The whole failure ran on a version skew that no local run could see, so it could not be fixed by
+looking at the red tests alone. Diagnosing it required downloading the three job logs and
+diffing the resolved versions against the local ones.
+
+**Documentation and examples**
+
+- **`Newey` and `Prais` examples** in `docs/api_source/prose_estimators_linear.json` used
+  `r.params[0]`, which pandas 3 turns into a *label* subscript and which therefore raised
+  `KeyError: 0`. They now use `.iloc[0]`.
+
+**Dependency compatibility (the code now reads both old and new pyfixest)**
+
+`estimators/_pyfixest_compat.py` is one version-tolerant door for the fitted-model state
+pyfixest 0.70 moved behind typed components. Every accessor tries the 0.70 component first and
+falls back to the 0.60 private attribute:
+
+| 0.60 private | 0.70 component |
+|---|---|
+| `fit._collin_vars` | `fit.collinearity.dropped_coef_names` |
+| `fit._df_t` / `fit._df_k` | `fit.variance_covariance.df_t` / `.df_k` |
+| `fit._k_fe` | `fit.fixef_counts.n_levels_by_fe` (paired with `model.fixef`) |
+| `fit._na_index` | `fit.sample_info.dropped_row_index` |
+| `fit._vcov` | `fit.variance_covariance.vcov` |
+| `fit._X` | `fit.within_data.design` |
+| `fit._fml` | `fit.model.formula` |
+
+`_k_fe` needed normalisation in both directions: 0.60 held a `Series` indexed
+`__fixed_effect__(<var>)`, 0.70 holds an unnamed tuple of counts, so the helper rebuilds one
+`dict[str, int]` keyed by column name and returns `None` rather than guessing when the two
+shapes cannot be reconciled.
+
+Also fixed, in this order of blast radius:
+
+- **arch 9.0** changed `model.resids(params)` to accept only the *mean* model's parameters,
+  where 8.x took the full vector (`params must be a 1-d array with shape (1,); got shape (4,)`).
+  `tseries._arch_resids` slices by `model.num_params`, which is the mean count in both.
+- **numpy 2.4** rejects `float()` of a non-0-d array. `FirstStageResult` now exposes
+  `df_num_value`/`df_denom_value`/`f_value`/`pvalue_value` scalar views (its arrays stay
+  per-equation for the table), and `_vecm_cointegrating_constant` is annotated `ndarray`
+  because it returns one entry per cointegrating relation rather than the `float` the
+  annotation claimed.
+- **statsmodels 0.15** raises `LinAlgError` out of the Newton iteration where 0.14 returned a
+  fitted-but-unconverged result. `discrete._fit_backend` now retries with BFGS, so the caller
+  keeps the old contract: a result plus the actionable "optimiser did not converge" warning.
+
+**Tests that could only pass on one machine or one library build**
+
+- **242 modules read a dataset from `D:\myCodeProject\test_westata\...`.** 223 guarded it with
+  `pytest.skip` inside a *fixture*, which does not protect a test that reads the file directly;
+  24 tests crashed with `FileNotFoundError` instead of skipping. The guard now lives in
+  `conftest.py` and is decided **per file**, and `tests/datasets.py` resolves the directory from
+  `WESTATA_DATA_DIR` / the author's machine / `tests/data`.
+- **`docs\data\auto.csv` and `tests\data\auto.dta`** were relative literals with Windows
+  separators, valid only when pytest starts in the repository root. Resolved from `__file__`.
+- **`test_api_reference_is_in_sync.py`** aborted with `SystemExit` because `pip install -e .` —
+  exactly what CI runs — *creates* `src/westata.egg-info`, and the collector rejected the
+  directory merely for existing. It now compares the recorded and imported versions and only
+  complains about a genuine mismatch, from `main()` rather than at import time.
+- **`test_var_lags_checker.py`** asserted on a checker that had never run a Stata command: CI
+  has Stata's Python bridge missing, not Stata missing. `ModuleNotFoundError: pystata` now skips.
+- **`test_panel_absorbed_columns.py`** selected 20 counties with
+  `value_counts()[counts >= 10].index[:20]`. Every county is **tied**, so the selection order is
+  implementation-defined and pandas 3 picks a different 20 than pandas 2 — `maize` came out
+  108.04224 instead of Stata's 37.43478. The fixture now sorts before slicing and compares the
+  slope against its own within regression instead of a constant tied to one selection.
+- Last-digit assertions that were really pinning the optimiser (`ereturn list` r², tobit's sixth
+  decimal, xtreg MLE variance components at 5e-9, synth's `X_balance`) now carry tolerances at
+  the precision they actually document, with the reason stated at each site.
+
+**Dependency floors, ceilings and the new job that stops this recurring**
+
+`pyfixest>=0.30,<0.71`, `linearmodels>=6.0,<7.1`, `arch>=6.0,<10`. The ceilings are not
+pessimism: linearmodels **7.1 gives 108.04224** where 7.0 gives Stata's 37.43478 for the same
+call, an upstream change documented in `pyproject.toml`.
+
+`.github/workflows/ci.yml` gains two things. Each job now prints the resolved dependency
+versions, because the nine-day failure had to be reconstructed from a stack trace that named
+no version. And a `latest-deps` job runs the suite with the ceilings stripped, marked
+`continue-on-error`: a breaking upstream release now shows up as a red job on push instead of
+as an undiagnosable regression weeks later. Rewriting `pyproject.toml` itself would be a trap,
+so that job edits a temporary copy.
+
+### Verified
+
+Full suite in a **pandas 3.1.1 / numpy 2.5.4 / pyfixest 0.70.0 / arch 9.0.0 / scipy 1.18.1**
+environment on Python 3.12: `186 failed, 4530 passed, 1626 skipped, 68 errors` before the
+changes, `8 failed, 6490 passed, 21 skipped` after — and all 8 remaining failures reproduce on
+the unmodified commit, i.e. they are older defects, not regressions from this work.
+
+---
+
 ## [0.3.22] - 2026-11-14
 
 ### Added — `summary(theta=True)`, Stata's `xtreg ..., re theta` reporting option

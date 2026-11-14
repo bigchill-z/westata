@@ -2667,16 +2667,22 @@ class VECM:
         )
 
 
-def _vecm_cointegrating_constant(fitted: Any) -> float:
-    """The cointegrating relation's own constant, recovered from a ``ci`` refit.
+def _vecm_cointegrating_constant(fitted: Any) -> np.ndarray:
+    """The cointegrating relation's own constants, one per relation.
 
-    Stata's ``vec`` prints this as the ``_cons`` entry of ``e(beta)``. statsmodels' default
-    ``co`` specification leaves it at zero and folds everything into ``det_coef``; the same
-    model fitted with ``deterministic='ci'`` puts it back, which is where this value comes
+    Stata's ``vec`` prints these as the ``_cons`` entry of ``e(beta)``. statsmodels' default
+    ``co`` specification leaves them at zero and folds everything into ``det_coef``; the same
+    model fitted with ``deterministic='ci'`` puts them back, which is where these values come
     from.
 
-    Returns 0.0 when the refit is unavailable, so the caller falls back to the ``co``
-    parameterisation rather than failing.
+    The return type is annotated ``ndarray`` because it IS one: rank 1 yields a
+    one-element array and rank 2 yields two, and the annotation said ``float``
+    while the docstring below explains why a single float is wrong.  Callers
+    needing a scalar must index it; ``float(result)`` of a one-element array
+    stopped working in numpy 2.4.
+
+    Returns ``array([0.0])`` when the refit is unavailable, so the caller falls
+    back to the ``co`` parameterisation rather than failing.
     """
 
     try:
@@ -4111,6 +4117,32 @@ class GARCH:
         )
 
 
+def _arch_resids(model: Any, params: np.ndarray) -> np.ndarray:
+    """Mean-model residuals, across the ``arch`` 8/9 signature change.
+
+    ``arch.resids(params)`` used to take the FULL parameter vector and split it
+    into mean and variance parts itself.  ``arch`` 9.0 changed the contract: the
+    argument is now only the MEAN model's parameters, and passing the full vector
+    raises::
+
+        ValueError: params must be a 1-d array with shape (1,); got shape (4,)
+
+    ``model.num_params`` is the mean parameter count in both versions, so slicing
+    ``params[: num_params]`` reproduces the old call on 9.x and stays a no-op on
+    8.x, whose ``resids`` re-slices the vector by that same count internally.
+
+    Verified against reference Stata OPG standard errors on both ``arch`` 8.0
+    and 9.0: the residuals, and therefore the OPG information matrix, are
+    identical.  ``Zero`` mean has ``num_params == 0`` and needs an empty slice,
+    which is exactly what 9.x demands.
+    """
+
+    count = int(getattr(model, "num_params", 0) or 0)
+    if count <= 0:
+        return np.asarray(model.resids(params[:0]), dtype=float)
+    return np.asarray(model.resids(params[:count]), dtype=float)
+
+
 def _opg_covariance(model: Any, params: np.ndarray, backcast: float | None) -> np.ndarray:
     """BHHH/OPG covariance: ``inv(sum_t s_t s_t')`` with numerical scores.
 
@@ -4128,7 +4160,7 @@ def _opg_covariance(model: Any, params: np.ndarray, backcast: float | None) -> n
     """
 
     values = np.asarray(params, dtype=float)
-    residuals = np.asarray(model.resids(values), dtype=float)
+    residuals = np.asarray(_arch_resids(model, values), dtype=float)
     var_bounds = model.volatility.variance_bounds(residuals)
     if backcast is None:
         backcast = model.volatility.backcast(residuals)

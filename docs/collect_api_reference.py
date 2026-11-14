@@ -45,14 +45,45 @@ sys.path.insert(0, str(ROOT / "src"))
 # A stale `src/westata.egg-info/PKG-INFO` shadows the installed metadata: with `src`
 # first on `sys.path`, `importlib.metadata.version("westata")` reads that directory, so
 # `ws.__version__` reported the PREVIOUS release and the generated reference silently
-# claimed the wrong version. This bit twice (0.3.13 and 0.3.16), so it is now a hard
-# error rather than a silently-wrong document.
+# claimed the wrong version. This bit twice (0.3.13 and 0.3.16).
+#
+# The check compares the two versions instead of just testing for the directory.  A bare
+# "does it exist?" test was wrong in the other direction: `pip install -e .` -- which is
+# exactly what CI runs -- CREATES `src/westata.egg-info` from the current tree, so its
+# metadata is correct and there is nothing stale to complain about.  CI spent nine days
+# red on two SystemExit failures from this false positive.  Only a genuine mismatch is an
+# error now, and it names the two versions so the message is actionable.
 _EGG_INFO = ROOT / "src" / "westata.egg-info"
-if _EGG_INFO.exists():
+
+
+def _assert_metadata_is_current() -> None:
+    """Refuse to collect when the egg-info metadata contradicts the installed version.
+
+    Called from :func:`main` (a real collection run), NOT at import time.  Import time
+    was the second half of the mistake: the test suite imports this module just to reuse
+    ``_Collector``, which runs examples without ever reading ``__version__``, so a
+    collection-time precondition aborted tests that could not have been affected.
+    """
+
+    if not _EGG_INFO.is_dir():
+        return
+    from importlib.metadata import PackageNotFoundError, version as _dist_version
+
+    try:
+        installed = _dist_version("westata")
+    except PackageNotFoundError:  # pragma: no cover - only without any metadata
+        return
+    try:
+        import westata as _ws
+    except ImportError:  # pragma: no cover - reported by the import below instead
+        return
+    declared = str(getattr(_ws, "__version__", "") or "")
+    if not declared or declared == installed:
+        return
     raise SystemExit(
-        f"{_EGG_INFO} is a stale build artifact and shadows the installed version "
-        f"metadata. Delete it (`rm -rf src/westata.egg-info`) and re-run; the API "
-        f"reference would otherwise record the previous release."
+        f"{_EGG_INFO} records version {installed} while the imported package reports "
+        f"{declared}, so its metadata is stale and the API reference would record the "
+        f"wrong release. Delete it (`rm -rf src/westata.egg-info`) and re-run."
     )
 
 
@@ -383,6 +414,7 @@ def main() -> int:
     if args.check:
         return 1 if _check(_load_prose()) else 0
 
+    _assert_metadata_is_current()
     data = collect()
     data["prose"] = _load_prose()
     OUT.mkdir(parents=True, exist_ok=True)

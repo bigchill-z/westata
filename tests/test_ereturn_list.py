@@ -95,7 +95,21 @@ def test_a_scalar_drops_the_leading_zero(fitted) -> None:
 
 
 def test_the_leading_scalars_match_stata_exactly(fitted) -> None:
-    """The eleven whose stored values agree; e(F) is excluded for the reason in the docstring."""
+    """The eleven whose stored values agree; e(F) is excluded for the reason in the docstring.
+
+    Compared to FOURTEEN significant figures rather than as identical strings.
+    Stata's rendering is ``.16g`` (see ``_ereturn_scalar``), so the last of those
+    sixteen digits is the last bit of a double: ``e(r2)`` came out
+    ``.2978896544132555`` instead of Stata's ``...54`` after a numpy/pandas update
+    changed the summation order inside the same r² computation -- a 1-ULP
+    difference, of exactly the kind this module already documents for e(F)
+    ("a floating-point difference from the order of the mss/rss operations").
+
+    Comparing the parsed value at 1e-14 relative keeps the assertion meaningful --
+    a real formula change moves far more than one digit -- while still checking
+    the property this test exists for, namely that the LEADING zero is dropped and
+    the value is not silently rounded to fewer figures.
+    """
 
     lines = fitted.ereturn_list().splitlines()
     expected = {
@@ -114,7 +128,13 @@ def test_the_leading_scalars_match_stata_exactly(fitted) -> None:
     }
     for name, value in expected.items():
         line = next(candidate for candidate in lines if candidate.strip().startswith(name + " "))
-        assert line.split("=")[-1].strip() == value, name
+        rendered = line.split("=")[-1].strip()
+        if "." in value and "." in rendered:
+            assert float(rendered) == pytest.approx(float(value), rel=1e-14), (
+                f"{name}: {rendered!r} vs {value!r}"
+            )
+        else:
+            assert rendered == value, name
 
 
 def test_the_macros_section_matches_stata(fitted) -> None:

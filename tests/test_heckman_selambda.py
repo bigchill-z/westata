@@ -70,7 +70,11 @@ def test_selambda_equals_the_lambda_standard_error(fitted) -> None:
 
     names = list(fitted.param_names)
     position = names.index("lambda")
-    assert float(fitted.e["selambda"]) == pytest.approx(float(fitted.bse[position]), abs=5e-7)
+    # ``.iloc``: pandas 3 made ``Series[int]`` label-based, so indexing ``bse``
+    # (whose index holds parameter names) by position raises KeyError.
+    assert float(fitted.e["selambda"]) == pytest.approx(
+        float(fitted.bse.iloc[position]), abs=5e-7
+    )
 
 
 def test_selambda_is_not_the_k_beta_entry(fitted) -> None:

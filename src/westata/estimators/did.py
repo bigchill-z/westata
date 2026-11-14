@@ -125,6 +125,7 @@ import numpy as np
 import pandas as pd
 
 from westata.errors import ConsistencyError
+from westata.estimators import _pyfixest_compat as _compat
 from westata.estimators.hdfe import FEOLS
 from westata.protocols import SSC
 from westata.results.base import StataResults
@@ -298,7 +299,7 @@ class _DidFEOLS(FEOLS):
         results = super()._build_results(model, data, cov_type, spec, level)
 
         names = [str(name) for name in model.coef().index]
-        design = np.asarray(model._X, dtype=float)
+        design = _compat.within_design(model)
         if design.ndim != 2 or design.shape[1] != len(names):
             raise ConsistencyError(
                 "didregress: PyFixest returned a within-transformed design of "

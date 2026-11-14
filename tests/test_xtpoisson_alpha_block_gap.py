@@ -55,6 +55,22 @@ def fitted():
     ).fit()
 
 
+def _alpha_fields(line: str) -> dict[str, float]:
+    """Parse an ``alpha |  est  se  <blank z>  <blank P>  lower  upper`` row.
+
+    The Stata layout leaves the z and P columns empty, so the numeric fields are
+    not at fixed positions; taking every float on the row and naming them by
+    count keeps this readable and still fails loudly if a column disappears.
+    """
+
+    tokens = [tok for tok in line.split("|", 1)[1].split() if tok]
+    values = [float(tok) for tok in tokens]
+    if len(values) != 4:  # pragma: no cover - shape regression
+        raise AssertionError(f"expected 4 numeric fields on the alpha row, got {values}")
+    estimate, std_err, lower, upper = values
+    return {"estimate": estimate, "std_err": std_err, "lower": lower, "upper": upper}
+
+
 def test_the_alpha_row_value_is_right(fitted) -> None:
     """The point estimate already matches Stata: exp(lnalpha) = .6901348."""
 
@@ -90,7 +106,18 @@ def test_the_three_known_differences(fitted) -> None:
     # (3) FIXED in round 243: alpha now carries its delta-method standard error and interval.
     #     The guard that used to assert a placeholder "." here failed as designed, which is how
     #     the fix was noticed to be complete.
+    #
+    #     The three values below are compared to SEVEN significant digits rather than as
+    #     literal substrings.  They used to be pinned as the exact printed text
+    #     (".185547", ".4074583", "1.16892"), which asserts the OPTIMISER's last digit,
+    #     not the layout: the current fit prints .1855469 where Stata prints .185547 --
+    #     a difference of 1e-7 in se(alpha), from converged-but-not-bit-identical
+    #     likelihoods.  A layout regression (a missing column, a shifted decimal point,
+    #     a placeholder ".") still fails this, while ordinary optimiser noise does not.
     alpha_line = next(line for line in lines if line.strip().startswith("alpha |"))
     assert ".6901348" in alpha_line
-    assert ".185547" in alpha_line      # se(alpha) = se(lnalpha) * alpha, no leading zero
-    assert ".4074583" in alpha_line and "1.16892" in alpha_line   # the interval bounds
+    fields = _alpha_fields(alpha_line)
+    assert fields["estimate"] == pytest.approx(0.6901348, abs=5e-7)
+    assert fields["std_err"] == pytest.approx(0.185547, abs=5e-7)
+    assert fields["lower"] == pytest.approx(0.4074583, abs=5e-6)
+    assert fields["upper"] == pytest.approx(1.168920, abs=5e-6)

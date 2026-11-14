@@ -139,7 +139,10 @@ def test_the_f_statistic_uses_statats_denominator(strong) -> None:
     )
 
     reported = result.estat_firststage()
-    assert float(reported.df_denom) == pytest.approx(df_denom)
+    # ``df_denom_value`` is the SCALAR view of ``r(df_denom)``.  The attribute
+    # itself is a per-equation array, and ``float(array_of_one)`` stopped working
+    # in numpy 2.4 ("only 0-dimensional arrays can be converted").
+    assert reported.df_denom_value == pytest.approx(df_denom)
     assert _first(reported.f) == pytest.approx(expected, rel=1e-10)
 
 
@@ -160,7 +163,7 @@ def test_the_denominator_is_checked_against_a_second_convention(strong) -> None:
 
     frame, result = strong
     auxiliary_df_resid = float(_first_stage_fit(frame).df_resid)
-    reported = float(result.estat_firststage().df_denom)
+    reported = result.estat_firststage().df_denom_value
 
     assert reported == pytest.approx(auxiliary_df_resid)
     # And the values the OLD formula produced are distinguishable from it.

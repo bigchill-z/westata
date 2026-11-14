@@ -75,6 +75,7 @@ import pyfixest
 from scipy import stats
 
 from westata.data.weights import WeightSpec, normalize_weights
+from westata.estimators import _pyfixest_compat as _compat
 from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.protocols import SSC
 from westata.results.base import StataResults
@@ -596,17 +597,17 @@ class FEOLS:
         # more than one row" reproduced 140432 of 140469 on the report's C12-10 case but
         # lost a further 7 rows when refitted, because singleton removal interacts across
         # the two absorbed dimensions and is applied iteratively.
-        self._dropped_rows = getattr(model, "_na_index", None)
+        self._dropped_rows = _compat.dropped_row_index(model)
         names = [str(name) for name in model.coef().index]
         params = np.asarray(model.coef().to_numpy(), dtype=float)
-        cov = np.asarray(model._vcov, dtype=float)
+        cov = _compat.variance_covariance(model)
         if cov.shape != (len(names), len(names)):
             raise ConsistencyError(
                 "reghdfe: PyFixest returned a covariance matrix of shape "
                 f"{cov.shape} for {len(names)} coefficients"
             )
 
-        absorbed = [str(name) for name in (model._collin_vars or [])]
+        absorbed = _compat.absorbed_regressor_names(model)
         if absorbed:
             warnings.warn(
                 "reghdfe: "
@@ -637,7 +638,7 @@ class FEOLS:
         # `results.df_resid` follows the reference distribution (G - 1 under
         # clustering, matching westata's OLS); the *residual* df used by rmse is
         # normally N - K.
-        df_resid = float(model._df_t)
+        df_resid = _compat.residual_df(model)
         residual_df = float(n_effective - rank)
         # reghdfe's three degree-of-freedom quantities diverge under clustering,
         # and reproducing them requires computing all three:
@@ -1036,7 +1037,7 @@ class FEOLS:
         # table and the caller was never told a named variable had been dropped.
         if absorbed:
             results.omitted_columns = tuple(absorbed)
-            _formula = str(getattr(model, "_fml", "") or "")
+            _formula = str(getattr(getattr(model, "model", None), "formula", "") or "")
             _ordered: list[str] = []
             if "~" in _formula:
                 _rhs = _formula.split("~", 1)[1].split("|", 1)[0]
@@ -1142,7 +1143,7 @@ class FEOLS:
         ``_df_t`` is ``G - 1``, which has nothing to do with ``K``.
         """
 
-        value = getattr(model, "_df_k", None)
+        value = _compat.parameter_count(model)
         if value is None:
             raise ConsistencyError(
                 "reghdfe: PyFixest did not record the degrees-of-freedom count "
@@ -1275,13 +1276,10 @@ class FEOLS:
         ``reghdfe_firm_year.json`` (2) report.
         """
 
-        counts = getattr(model, "_k_fe", None)
+        counts = _compat.fixed_effect_level_counts(model)
         if counts is None:
             return None
-        try:
-            size = int(np.asarray(counts.to_numpy()).size)
-        except (AttributeError, TypeError, ValueError):
-            return None
+        size = len(counts)
         return size if size > 0 else None
 
     @staticmethod
@@ -1293,13 +1291,10 @@ class FEOLS:
         ``e(df_a)`` is that minus the one redundant constant.
         """
 
-        counts = getattr(model, "_k_fe", None)
+        counts = _compat.fixed_effect_level_counts(model)
         if counts is None:
             return None
-        try:
-            total = int(sum(int(value) for value in counts.to_numpy()))
-        except (AttributeError, TypeError, ValueError):
-            return None
+        total = sum(counts.values())
         return total if 0 < total <= nobs else None
 
     def _nested_absorbed_levels(self, model: Any, data: pd.DataFrame) -> int:
@@ -1318,13 +1313,10 @@ class FEOLS:
         if labels is None or len(labels) != len(data):
             return 0
 
-        counts = getattr(model, "_k_fe", None)
+        counts = _compat.fixed_effect_level_counts(model)
         if counts is None:
             return 0
-        try:
-            pairs = list(zip(counts.index, counts.to_numpy()))
-        except (AttributeError, TypeError, ValueError):
-            return 0
+        pairs = list(counts.items())
 
         cluster_values = pd.Series(np.asarray(labels), index=data.index)
         nested = 0
@@ -1365,7 +1357,7 @@ class FEOLS:
         keeps the previous behaviour rather than inventing a number.
         """
 
-        base = getattr(model, "_df_k", None)
+        base = _compat.parameter_count(model)
         if base is None:
             return HDFE._rank(model, nobs)
 
@@ -1377,11 +1369,11 @@ class FEOLS:
         #   one FE  : rank = reported + 30        = 32  (firm absorbs the constant)
         #   two FEs : rank = reported + 30 + 6 - 1 = 37
         # verified against reghdfe's e(r2_a) on both specifications.
-        counts = getattr(model, "_k_fe", None)
+        counts = _compat.fixed_effect_level_counts(model)
         if counts is None:
             return int(round(float(base)))
 
-        total_fe = int(np.sum(np.asarray(counts, dtype=float)))
+        total_fe = sum(counts.values())
         reported = len(model.coef())
         n_effects = len(counts)
         redundancy = max(n_effects - 1, 0)
@@ -1408,9 +1400,10 @@ class FEOLS:
     ) -> np.ndarray:
         """Weights of the observations PyFixest actually used."""
 
-        if spec is None or _WEIGHT_COLUMN not in getattr(model, "_data", pd.DataFrame()):
+        frame = _compat.estimation_frame(model)
+        if spec is None or _WEIGHT_COLUMN not in frame:
             return np.ones(nobs, dtype=float)
-        kept = np.asarray(model._data[_WEIGHT_COLUMN], dtype=float).reshape(-1)
+        kept = np.asarray(frame[_WEIGHT_COLUMN], dtype=float).reshape(-1)
         if kept.size != nobs:
             raise ConsistencyError(
                 "reghdfe: could not align the weights with the estimation "

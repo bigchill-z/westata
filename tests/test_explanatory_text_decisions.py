@@ -13,15 +13,24 @@ Count notes: poisson/nbreg on a non-integer response emit Stata's deterministic 
 import warnings
 
 warnings.filterwarnings("ignore")
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import westata as ws
 
+# Resolved from THIS file rather than from the process's working directory: the
+# literal was ``r"docs\data\auto.csv"``, which only holds when pytest is started
+# from the repository root AND never on Linux, because the separator is a
+# backslash.  That combination is why every test in this module raised
+# FileNotFoundError on CI while passing locally.
+_DOCS_DATA = Path(__file__).resolve().parents[1] / "docs" / "data"
+
 
 def _auto() -> pd.DataFrame:
-    return pd.read_csv(r"docs\data\auto.csv")
+    return pd.read_csv(_DOCS_DATA / "auto.csv")
 
 
 def _noncount(seed: int = 4) -> pd.DataFrame:

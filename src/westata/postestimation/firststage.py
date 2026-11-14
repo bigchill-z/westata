@@ -58,6 +58,31 @@ _is_constant = is_constant_name
 __all__ = ["FirstStageResult", "estat_firststage"]
 
 
+def _as_reported(values: Any) -> Any:
+    """Reduce a one-equation per-equation array to Stata's scalar shape.
+
+    ``ivregress estat firststage`` almost always describes ONE endogenous
+    regressor, and Stata reports ``r(df_denom)`` there as a scalar.  This class
+    stores each quantity as an array so the table and the ``r()`` summary can
+    index it per equation; the scalar-facing properties below (``df_num_value``
+    / ``df_denom_value``) use this helper to present a lone value as a float.
+
+    numpy 2.4 made the reason concrete: ``float(np.array([296.]))`` used to work
+    and now raises
+
+        TypeError: only 0-dimensional arrays can be converted to Python scalars
+
+    so any caller doing ``float(result.df_denom)`` broke on CI only.
+    """
+
+    array = np.asarray(values, dtype=float)
+    if array.ndim == 0:
+        return float(array)
+    if array.size == 1:
+        return float(array.reshape(-1)[0])
+    return array
+
+
 
 
 def _fitted_and_r2(y: np.ndarray, design: np.ndarray) -> tuple[np.ndarray, float]:
@@ -199,6 +224,36 @@ class FirstStageResult:
         """
 
         return (not self.robust_vce) or self.force_nonrobust
+
+    # Stata's ``r(df_num)``/``r(df_denom)``/``r(F)``/``r(p)`` are SCALARS for the
+    # single-endogenous case, which is the overwhelming majority of calls.  The
+    # underlying attributes stay arrays (the table and ``to_dict`` index them per
+    # equation), so these properties are the documented scalar view.  They exist
+    # because ``float(result.df_denom)`` is the natural thing to write and numpy
+    # 2.4 turned it into a TypeError for a one-element array.
+    @property
+    def df_num_value(self) -> float:
+        """The first-stage numerator df as a float (single-endogenous case)."""
+
+        return float(_as_reported(self.df_num))
+
+    @property
+    def df_denom_value(self) -> float:
+        """The first-stage denominator df as a float (single-endogenous case)."""
+
+        return float(_as_reported(self.df_denom))
+
+    @property
+    def f_value(self) -> float:
+        """The joint F statistic as a float (single-endogenous case)."""
+
+        return float(_as_reported(self.f))
+
+    @property
+    def pvalue_value(self) -> float:
+        """The joint F p-value as a float (single-endogenous case)."""
+
+        return float(_as_reported(self.pvalue))
 
     def __str__(self) -> str:
         # ``ivregress_postestimation.sthlp:408-414``: "By default, if the model contains

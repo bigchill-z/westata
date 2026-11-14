@@ -32,6 +32,22 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test,arch]"
 
+      # PRINT the resolved versions. The nine-day red streak was a version skew that
+      # nobody could see: the job log named no version, so "pyfixest 0.70 removed the
+      # attribute" had to be rediscovered from a stack trace. One line of output makes
+      # the next occurrence a five-second diagnosis.
+      - name: Record the resolved dependency versions
+        run: |
+          python -c "
+          import pyfixest, pandas, numpy, arch, statsmodels, linearmodels
+          print(f'pyfixest {pyfixest.__version__}')
+          print(f'pandas {pandas.__version__}')
+          print(f'numpy {numpy.__version__}')
+          print(f'arch {arch.__version__}')
+          print(f'statsmodels {statsmodels.__version__}')
+          print(f'linearmodels {linearmodels.__version__}')
+          " | tee versions.txt
+
       - name: Import check
         run: python -c "import westata; print(westata.__version__)"
 
@@ -84,3 +100,58 @@ jobs:
           /tmp/wheelcheck/bin/python -m pip install --upgrade pip
           /tmp/wheelcheck/bin/python -m pip install dist/*.whl
           /tmp/wheelcheck/bin/python -c "import westata; print('wheel imports:', westata.__version__)"
+
+  # ---------------------------------------------------------------------------
+  # The tests above run against the PINNED dependency ranges, so they answer "does
+  # the code work with the versions we promise?".  They cannot answer "will the next
+  # release of our dependencies break us?" -- and that question is the one that kept
+  # CI red for nine days: pyfixest 0.70 shipped, CI resolved it, and a commit that
+  # passed locally failed 138 tests in the cloud with no local reproduction.
+  #
+  # This job deliberately IGNORES the upper bounds, so a breaking upstream release
+  # shows up as a RED JOB ON PUSH instead of as an undiagnosable regression later.
+  # It is `continue-on-error` because a failure here means "wake up and adapt", not
+  # "this commit is broken" -- blocking merges on it would just teach everyone to
+  # ignore it.
+  # ---------------------------------------------------------------------------
+  latest-deps:
+    name: test (latest un-pinned dependencies)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install with the upper bounds lifted
+        run: |
+          python -m pip install --upgrade pip
+          # Strip the `,<...` ceilings from a throwaway copy of pyproject.toml, then
+          # install from it. Rewriting the real file would be a trap: an accidental
+          # commit would silently un-pin the package for every user.
+          python - <<'PY'
+          import pathlib, re
+          source = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          lifted = re.sub(r'(?<=[0-9]),(?:<|<=)[0-9][^"\n]*', '', source)
+          pathlib.Path("pyproject-latest.toml").write_text(lifted, encoding="utf-8")
+          PY
+          cp pyproject-latest.toml pyproject.toml
+          python -m pip install -e ".[test,arch]"
+
+      - name: Record the resolved dependency versions
+        run: |
+          python -c "
+          import pyfixest, pandas, numpy, arch, statsmodels, linearmodels
+          print(f'pyfixest {pyfixest.__version__}')
+          print(f'pandas {pandas.__version__}')
+          print(f'numpy {numpy.__version__}')
+          print(f'arch {arch.__version__}')
+          print(f'statsmodels {statsmodels.__version__}')
+          print(f'linearmodels {linearmodels.__version__}')
+          "
+
+      - name: Test
+        run: python -m pytest -q -rf --tb=short
+

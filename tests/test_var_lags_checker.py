@@ -35,8 +35,19 @@ def test_the_checker_reports_the_broken_lags_option() -> None:
     except (OSError, subprocess.SubprocessError):  # pragma: no cover - environment issues
         pytest.skip("could not run the checker in this environment")
     output = completed.stdout + completed.stderr
-    if "tsset" in output and "not found" in output:
-        pytest.skip("Stata is not available")
+    # Two ways this checker cannot produce a verdict here, and BOTH must skip:
+    #
+    #   "tsset ... not found"                 -- Stata is not installed.
+    #   "No module named 'pystata'"           -- Stata is installed but the Python
+    #                                            bridge is not, which is what CI hit.
+    #
+    # Only the first was matched, so CI failed with `assert 'lags(2)' in
+    # 'Stata `var` lag handling ... ModuleNotFoundError: No module named
+    # 'pystata''` -- an assertion on a checker that had never run a single Stata
+    # command. A missing dependency is "cannot check here", not "the checker is
+    # wrong".
+    if ("tsset" in output and "not found" in output) or "No module named 'pystata'" in output:
+        pytest.skip("Stata (or its pystata bridge) is not available")
     assert "lags(2)" in output
     assert "BROKEN" in output
     assert "hand-made lag columns" in output

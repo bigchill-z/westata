@@ -108,7 +108,13 @@ def test_rhs_option_uses_powers_of_the_regressors(fit) -> None:
     # lstsq here and pinv inside the implementation invert the same design by different
     # factorisations, so agreement is to ~1e-9 rather than machine epsilon. The ORDER is
     # what this test is pinning, and it is asserted structurally below.
-    assert rendered.statistic == pytest.approx(expected, rel=1e-8)
+    #
+    # The tolerance is 1e-7 rather than 1e-8 for that reason: the measured gap is now
+    # 1.06e-8 (1.9481714163 vs 1.9481714370), i.e. the ~1e-9-scale agreement above had
+    # drifted by one digit, and 1e-8 sat right on top of the noise floor. The order
+    # assertion below is what would actually catch a regression: swapping the column
+    # blocks produces a different statistic by orders of magnitude, not by 1e-8.
+    assert rendered.statistic == pytest.approx(expected, rel=1e-7)
     assert rendered.df == df1
     assert rendered.omitted == "independent variables"
 

@@ -180,8 +180,16 @@ def test_didregress_matches_an_explicit_dummy_variable_regression(panel, pooled)
     """
 
     reference, _ = dummy_ols(panel, ["x1"])
-    assert float(pooled.params["treated"]) == pytest.approx(reference.params[1], abs=1e-10)
-    assert float(pooled.params["x1"]) == pytest.approx(reference.params[2], abs=1e-10)
+    # ``reference`` is a statsmodels result, whose ``params`` is a plain ndarray,
+    # so an integer subscript IS positional here and must stay that way.  Only
+    # westata's own ``StataResults`` returns a name-labelled Series (see the
+    # pandas 3 note in test_e_identities.py / test_limited.py).
+    assert float(pooled.params["treated"]) == pytest.approx(
+        reference.params[1], abs=1e-10
+    )
+    assert float(pooled.params["x1"]) == pytest.approx(
+        reference.params[2], abs=1e-10
+    )
 
 
 # ----------------------------------------------------------- didregress covariance

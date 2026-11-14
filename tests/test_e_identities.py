@@ -424,7 +424,9 @@ def test_intreg_se_sigma_is_the_delta_method() -> None:
 
     result = ws.Intreg.from_formula("lo hi ~ x1", frame).fit()
     e = result.e
-    se_lnsigma = float(result.bse[list(result.param_names).index("/lnsigma")])
+    # ``.iloc`` is required under pandas 3, where ``Series[int]`` is label-based
+    # and the index here holds parameter names, not positions.
+    se_lnsigma = float(result.bse.iloc[list(result.param_names).index("/lnsigma")])
 
     assert "se_sigma" in e
     assert e["se_sigma"] == pytest.approx(e["sigma"] * se_lnsigma, rel=1e-10)

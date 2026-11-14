@@ -654,28 +654,57 @@ def _comparable_names(
 
 
 def _hausman_sigma(result: Any) -> float | None:
-    """``s2`` for ``sigmamore``/``sigmaless``: ``e(sigma)`` or, when missing, ``e(rmse)``.
+    """``s2`` for ``sigmamore``/``sigmaless``, following ``hausman.ado:103-117`` EXACTLY.
 
-    ``hausman.ado:113-116`` spells the fallback out and it is NOT squared:
+    THE SOURCE DEPENDS ON THE COMMAND AND, FOR ``xtreg``, ON THE ESTIMATOR::
 
-        scalar s2_i = e(sigma)
-        if s2_i == . scalar s2_i = e(rmse)
+        if "`e(cmd)'" == "xtreg" {
+            if "`e(model)'" == "fe" || "`e(model)'" == "ml" {
+                scalar `s2_`i'' = e(sigma_e)
+            }
+            else {
+                scalar `s2_`i'' = e(rmse)
+            }
+        }
+        else {
+            scalar `s2_`i'' = e(sigma)
+            if `s2_`i'' == . {
+                scalar `s2_`i'' = e(rmse)
+            }
+        }
 
-    The caller squares the RATIO, so using ``e(rmse)**2`` here squares twice and changes the answer.
+    So for the `xtreg fe` + `xtreg re` comparison, FE contributes ``e(sigma_e)`` and RE contributes
+    ``e(rmse)`` -- two DIFFERENT numbers. Reading ``e(sigma)`` first for both (the previous
+    behaviour) gave RE the same scale as FE and put chi2 at 68.15 where Stata reports 48.49.
+
+    Measured on lin_1992.dta: FE sigma_e = .10624809 (= its rmse), RE sigma_e = .10624809 but
+    RE rmse = .11137819. The 4.8% gap between the RE values is the whole discrepancy.
+
+    The value is NOT squared here: the caller squares the RATIO.
     """
 
     e = getattr(result, "e", None) or {}
-    for key in ("sigma", "rmse"):
-        value = e.get(key)
-        if value is None:
-            continue
-        try:
-            number = float(value)
-        except (TypeError, ValueError):
-            continue
-        if np.isfinite(number) and number != 0.0:
-            return number
-    return None
+    command = str(e.get("cmd") or "").strip().lower()
+    model = str(e.get("model") or "").strip().lower()
+
+    def _pick(*keys: str) -> float | None:
+        for key in keys:
+            value = e.get(key)
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(number) and number != 0.0:
+                return number
+        return None
+
+    if command == "xtreg":
+        if model in ("fe", "ml"):
+            return _pick("sigma_e")
+        return _pick("rmse")
+    return _pick("sigma", "rmse")
 
 
 def _stata_generalised_inverse(matrix: np.ndarray) -> tuple[np.ndarray, int]:

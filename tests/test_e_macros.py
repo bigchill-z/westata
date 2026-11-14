@@ -52,11 +52,13 @@ CASES = {
         lambda f: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z1]", f).fit(),
         "ivregress 2sls",
     ),
+    # MEASURED: Stata stores e(cmd)="xtreg" and e(model)="fe" -- the comma form belongs to
+    # e(model), never to e(cmd). See test_panel_e_model_names_the_estimator below.
     "PanelOLS": (
         lambda f: ws.PanelOLS.from_formula(
             "y ~ x1", f, entity="firm", time="year"
         ).fit(),
-        "xtreg, fe",
+        "xtreg",
     ),
     "QuantileRegression": (
         lambda f: ws.QuantileRegression.from_formula("y ~ x1", f).fit(),
@@ -76,6 +78,26 @@ def test_e_cmd_names_the_stata_command(frame, label) -> None:
     factory, expected = CASES[label]
 
     assert factory(frame).e["cmd"] == expected
+
+
+@pytest.mark.parametrize(
+    "label, estimator, expected",
+    [
+        ("PanelOLS", ws.PanelOLS, "fe"),
+        ("RandomEffects", ws.RandomEffects, "re"),
+        ("BetweenOLS", ws.BetweenOLS, "be"),
+    ],
+)
+def test_panel_e_model_names_the_estimator(frame, label, estimator, expected) -> None:
+    """`xtreg` records the estimator in `e(model)`, which postestimation code branches on.
+
+    Measured: `xtreg y x, fe` -> e(cmd) xtreg / e(model) fe. Without e(model), `hausman` could not
+    tell the two fits apart and used one sigma for both, reporting chi2 = 68.15 instead of 48.49.
+    """
+
+    fitted = estimator.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    assert fitted.e["cmd"] == "xtreg"
+    assert fitted.e["model"] == expected
 
 
 @pytest.mark.parametrize("label", sorted(CASES))

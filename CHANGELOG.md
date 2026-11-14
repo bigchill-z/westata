@@ -7,6 +7,63 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.21] - 2026-11-14
+
+### Fixed — `xttest0` after `xtreg ..., re`: four measured defects
+
+Reported against Stata's `xtreg ..., re` followed by `xttest0`. With the panel variable named the
+same way on both sides the outputs are now byte-identical — 15 lines, zero differences:
+
+```
+Breusch and Pagan Lagrangian multiplier test for random effects
+
+        lny[sid,t] = Xb + u[sid] + e[sid,t]
+
+        Estimated results:
+                         |       Var     SD = sqrt(Var)
+                ---------+-----------------------------
+                     lny |    1.04271       1.021132
+                       e |   .0037374       .0611346
+                       u |    .022464         .14988
+
+        Test: Var(u) = 0
+                             chibar2(01) =  4278.48
+                          Prob > chibar2 =   0.0000
+```
+
+**1. The `e` row was 3.0% high.** It came from within-residuals/(N−n) = `.003851073`, but Stata
+prints `e(sigma_e)² = .0037374` — a scalar the fit already stores. A code comment had claimed
+`e(sigma_e)²` was "2.5% too high" and justified the other route; reading Stata's own
+`display e(sigma_e)^2` showed the two are identical. Both variance rows now come from the fit.
+
+**2. The variance cells were one digit too long.** The block is right-aligned to fixed column ends,
+so Stata uses the most digits that still fit 8 characters; a shared significant-figure count printed
+`.003737434` where Stata has `.0037374`.
+
+**3. The equation line printed placeholders** (`lny[id,t]`). `StataResults` has no `entity_name`
+attribute, and `xtreg` recorded the panel names nowhere on the path `RandomEffects.fit` actually takes
+(it delegates to `PanelOLS.fit`). Stata stores them in `e(ivar)`/`e(tvar)`, which is now done where
+the `e()` block is built.
+
+**4. `xttest0(fit)` refused without `entity=`.** Label discovery tried a hard-coded list
+(`id`/`entity`/`group`/`county`/`firm`/`prov`), so a variable named `province` or `st_abb` was never
+found even though the fit knew the name. `e(ivar)` is now tried first, with the old list as fallback.
+
+The leading blank line Stata prints before the title was also missing.
+
+### Still not implemented
+
+Only the **balanced** panel form. An unbalanced panel raises rather than reporting a number that
+differs from Stata's by about 2.5%; Stata uses a different expression there and substituting the mean
+or harmonic mean of the group sizes did not close the gap.
+
+### Verified
+
+Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
+`tests/test_xttest0_variance_and_names.py`.
+
+---
+
 ## [0.3.20] - 2026-11-14
 
 ### Fixed

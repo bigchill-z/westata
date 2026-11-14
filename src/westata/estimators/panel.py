@@ -643,6 +643,13 @@ class PanelOLS:
             params=params,
         )
 
+        # PANEL VARIABLE NAMES: Stata stores them in e(ivar)/e(tvar) for every xtreg variant, and
+        # postestimation output uses them for its equation line. `StataResults` has no
+        # entity_name attribute, so without this a command like `xttest0` can only print the
+        # placeholders `y[id,t]` even though the caller passed entity="st_abb".
+        e.setdefault("ivar", str(getattr(self, "_entity_name", "") or ""))
+        e.setdefault("tvar", str(getattr(self, "_time_name", "") or ""))
+
         results = StataResults(
             params=params,
             param_names=param_names,
@@ -2277,6 +2284,10 @@ class RandomEffectsMLE(RandomEffects):
                 "cmd": "xtreg",
                 "cmd2": "xtreg",
                 "title": "Random-effects ML regression",
+                # Panel variable names, which Stata also stores in e(ivar)/e(tvar). Postestimation
+                # output (xttest0's equation line) reads them from here.
+                "ivar": str(getattr(self, "_entity_name", "") or ""),
+                "tvar": str(getattr(self, "_time_name", "") or ""),
                 "N": float(nobs),
                 "N_g": float(len(np.unique(groups))),
                 "df_m": float(rank - 1),

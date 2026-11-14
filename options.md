@@ -50,6 +50,25 @@
 
 **本文件当前无待用户决策事项。**
 
+## 〇之五、2026-11-14 0.3.18 发布：已完成（GitHub + PyPI）
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | **0.3.18**（PyPI 上此前最新为 0.3.17） |
+| GitHub | 已推送 `origin/main`（`a6e63e4`），tag `v0.3.18` 已推送 |
+| PyPI | 已发布：<https://pypi.org/project/westata/0.3.18/>，wheel 1031785 B、sdist 2217604 B |
+| 哈希校验 | PyPI 下载的 wheel SHA256 `172df371…fe6c8a` 与本地构建**完全一致** |
+| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.18、`ws.xtserial` 存在、lin_1992 上 `F=12.511374209`、`df_r=27`、`p=0.00148451303` |
+| 构建方式 | 从 `HEAD` 的干净 worktree 构建，避免打包工作区未提交改动 |
+
+**发布前已按工作区规则更新并校对中英文文档**：
+`GUIDE.md` / `GUIDE.zh-CN.md` 新增 `xtserial` 一节（含两个陷阱与可运行示例），
+`API.md` / `API.zh-CN.md` 由生成器重渲染（prose 覆盖 283/283），
+`GAP_REGISTER.md` 的 C12-11 与 B 类清单已更正。指南代码块已通过
+`tests/test_guide.py` 与 `tests/test_docs_zh.py` 的实际执行校验。
+
+---
+
 ## 〇之四、2026-11-14 0.3.15 发布：已完成（GitHub + PyPI）
 
 | 事项 | 结果 |

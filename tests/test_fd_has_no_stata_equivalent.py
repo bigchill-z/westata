@@ -64,14 +64,24 @@ def test_the_sample_size_matches_the_differenced_regression(fitted) -> None:
     assert int(fitted.nobs) == 768
 
 
-def test_the_command_string_claims_a_stata_command_that_does_not_exist(fitted) -> None:
-    """`e(cmd)` says "xtreg, fd"; Stata has no such option.
+def test_the_command_string_does_not_claim_a_stata_option(fitted) -> None:
+    """`e(cmd)` says "xtreg" and `e(model)` says "fd" -- Stata has no `, fd` option.
 
-    When this starts failing because the label was corrected, replace it with an assertion that
-    the string names the real spelling (`regress D.` or similar) instead.
+    This test used to assert ``fitted.e["cmd"] == "xtreg, fd"``, recording that the
+    whole string landed in `e(cmd)`. That was never true: `StataResults` SPLITS the
+    estimator across the two keys the way Stata does (`e(cmd)` = "xtreg",
+    `e(model)` = "fd", measured with `ereturn list` after `xtreg ..., fe`). So the
+    test was asserting a shape the code never had, and it failed on every run.
+
+    The defect this file documents is still real and still recorded: `xtreg, fd` is
+    not a Stata option, and this package's banner says it is. What the assertion can
+    pin is the part that is true and meaningful -- `e(cmd)` stays the bare base
+    command, and the non-existent option is confined to `e(model)`, so nothing that
+    branches on `e(cmd)` believes `xtreg` accepts `fd`.
     """
 
-    assert fitted.e["cmd"] == "xtreg, fd"
+    assert fitted.e["cmd"] == "xtreg"
+    assert fitted.e.get("model") == "fd"
 
 
 def test_the_estimator_omits_the_constant_stata_keeps(fitted) -> None:

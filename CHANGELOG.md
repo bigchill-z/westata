@@ -7,6 +7,35 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.14] - 2026-11-14
+
+### Fixed
+* **`xtreg, fe r`: `e(sigma_e)` no longer inherits the clustered denominator.**
+  `vce(robust)` after `xtreg, fe` is a cluster-robust VCE with the panel as the
+  cluster, and inside that one `e()` block Stata keeps TWO denominators:
+
+  | scalar | formula | lin_1992 |
+  |---|---|---|
+  | `e(rmse)` | `sqrt(rss/(N - rank))` | 0.102779 (466) |
+  | `e(sigma_e)` | `sqrt(rss/e(df_r_mb))` | 0.105893 (439) |
+
+  Sharing one of them is invisible under the conventional VCE, where the two
+  coincide, so the earlier check -- a 30 x 6 panel with two slopes -- could not
+  tell them apart. On `lin_1992.dta` (476 obs, 28 groups, 9 slopes) `sigma_e`
+  came out 0.102779 against Stata's 0.105893, and `rho` moved with it.
+* **A clustered `xtreg` now stores `e(vcetype)`, `e(vce)` and `e(clustvar)`**,
+  as Stata does. Without them the summary dropped Stata's
+  `(Std. err. adjusted for 28 clusters in province)` line and the `Robust`
+  column heading: every number was correct and the table still did not match.
+  Plain `fe` leaves all of them missing, which is also reproduced.
+
+Coefficients and standard errors were already exact to 1e-8 for both `fe` and
+`fe r`; this release is about the scalars and the table around them. Every value
+was captured from StataNow 19.5 on 2026-11-14 and is pinned by
+`tests/test_xtreg_fe_robust_sigma.py`.
+
+---
+
 ## [0.3.13] - 2026-11-14
 
 **This release changes public signatures.** `docs/API_CONVENTIONS.md` now governs the

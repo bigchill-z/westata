@@ -2481,25 +2481,6 @@
       "methods": []
     },
     {
-      "name": "XtOveridResult",
-      "kind": "class",
-      "module": "westata.postestimation.xtoverid",
-      "docstring": "The Sargan-Hansen test of overidentifying restrictions.\n\nAttributes\n----------\nstatistic:\n    ``r(j)`` -- the Sargan-Hansen statistic.\ndf:\n    ``r(jdf)`` -- the number of overidentifying restrictions, i.e. the number of\n    regressors added to the auxiliary equation.\npvalue:\n    ``r(jp)`` -- ``P > chi2(df)``.\ntested:\n    Names of the coefficients the test constrains to zero (Stata's ``( 1) x = 0``\n    lines, one per restriction).\ndescription:\n    What the test compares, as the ado's first printed line spells it.  For\n    ``xtreg, re`` this is ``\"fixed vs random effects\"``.\nmodel:\n    The estimator the test re-estimated, e.g. ``\"xtreg re\"``.",
-      "signature": "(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]', description: 'str' = 'fixed vs random effects', model: 'str' = 'xtreg re') -> None",
-      "from_formula": null,
-      "fit": null,
-      "methods": [
-        {
-          "name": "to_dict",
-          "signature": "(self) -> 'dict[str, float]'"
-        },
-        {
-          "name": "to_frame",
-          "signature": "(self) -> 'pd.DataFrame'"
-        }
-      ]
-    },
-    {
       "name": "XtPcse",
       "kind": "class",
       "module": "westata.estimators.panel_iv",
@@ -3154,13 +3135,6 @@
       "module": "westata.postestimation.serial",
       "docstring": "Ljung-Box Q, as ``wntestq``.\n\n``corrgram.ado:68`` builds it as\n\n.. math:: Q = n(n+2) \\sum_{k=1}^{p} \\hat\\rho_k^2 / (n-k)\n\n``wntestq.ado:16-24`` takes the default lag count from ``ac``, so it is\n``max(1, min(int(n/2) - 2, 40))`` -- measured: 30 observations give ``chi2(13)``, and\n758 give ``chi2(40)`` rather than the 377 an ``(n-k)//2`` rule would claim. Measured\nnumbers: Q 26.1974, p .0160; with ``lags(10)``: Q 16.3718, p .0895.\n\n``time`` stands in for ``tsset``; see :func:`estat_dwatson`.",
       "signature": "(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'"
-    },
-    {
-      "name": "xtoverid",
-      "kind": "function",
-      "module": "westata.postestimation.xtoverid",
-      "docstring": "Stata's ``xtoverid`` -- the Sargan-Hansen test of overidentifying restrictions.\n\nParameters\n----------\nresult:\n    A random-effects panel fit, i.e. :class:`westata.RandomEffects` (``xtreg, re``).\n\nReturns\n-------\nXtOveridResult\n    The statistic, its degrees of freedom, the p-value and the restrictions tested.\n\nRaises\n------\nNotImplementedError\n    For ``xtivreg``/``xtivreg2``/``xthtaylor`` fits, whose branches need ``ivreg2``.\nValueError\n    For a non-panel result, for any ``xtreg`` estimator other than ``re``, or when\n    the estimation data or the panel identifier was not retained.\n\nNotes\n-----\nThe null hypothesis is that the extra moment conditions hold, i.e. that the\nrandom-effects estimator is consistent; a rejection favours the fixed-effects one.\nThe test is therefore a Hausman-type specification test computed through an\nauxiliary regression rather than through the ``V_c - V_e`` difference the\n:func:`westata.postestimation.modeltests.hausman` command uses, which is why the two\ndo not have to agree numerically.\n\n``xtoverid.ado:165-168`` refuses weighted fits outright, and this function does the\nsame: the quasi-demeaning the test relies on is defined for the unweighted GLS\nestimator only.",
-      "signature": "(result: 'Any') -> 'XtOveridResult'"
     },
     {
       "name": "xtserial",
@@ -5367,18 +5341,6 @@
       "en": "The Wooldridge panel serial-correlation test. The five `r()` scalars are `corr` (the differenced residual's lag coefficient, about -0.5 under the null), `f` with `df`/`df_r` for the Wald test that it equals -0.5, and `p`. Also `nobs` (the first-stage sample Stata prints), `n_panels`, and `first_stage` -- the differenced regression itself as a `StataResults` -- plus `first_stage_table()` for its rendered table. `str()` reproduces Stata's three-line test block.",
       "zh": "Wooldridge 面板序列相关检验的结果。五个 `r()` 标量为：`corr`（差分残差的滞后系数，原假设下约为 -0.5）、`f` 与 `df`/`df_r`（“该系数等于 -0.5”的 Wald 检验）以及 `p`。另有 `nobs`（Stata 打印的第一阶段样本量）、`n_panels`，以及 `first_stage`——差分回归本身，类型为 `StataResults`——和 `first_stage_table()`（其渲染后的表格）。`str()` 复现 Stata 的三行检验块。",
       "example": "d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)\nr = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')\nprint(round(r.f, 6), r.df_r)"
-    },
-    "xtoverid": {
-      "stata": "xtoverid (user-written: Schaffer & Stillman)",
-      "en": "The Sargan-Hansen test of overidentifying restrictions, after a random-effects panel fit -- Stata `xtreg ..., re` followed by the user-written `xtoverid` (2.1.8, Schaffer & Stillman). The command re-estimates the same equation with the WITHIN DEVIATIONS of every regressor added, then tests those added terms jointly to zero: a rejection means the random-effects estimator is inconsistent and the fixed-effects one is preferred. Returns an `XtOveridResult` carrying `statistic`, `df` and `pvalue`, which are Stata's `r(j)`, `r(jdf)` and `r(jp)`. The reference distribution is `chi2(df)`, with `df` equal to the number of slopes. Two details are load-bearing: the auxiliary equation is quasi-demeaned at the ORIGINAL `e(theta)` (the added columns have zero group mean, so re-estimating the variance components drifts them), and the VCE follows the original fit's `e(vcetype)` -- the same equation gives 53.285 under the conventional VCE and 221.225 under `cov_type=\"robust\"`. Only the `xtreg, re` branch is implemented; `xtreg, fe` is refused by the ado itself, and the `xtivreg`/`xtivreg2`/`xthtaylor` branches need `ivreg2` and an instrument set this package does not record, so they raise instead of approximating.",
-      "zh": "过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type=\"robust\"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。",
-      "example": "fit = ws.RandomEffects.from_formula(\"y ~ x1 + x2\", base, entity=\"firm\", time=\"year\").fit()\nws.xtoverid(fit).to_dict()"
-    },
-    "XtOveridResult": {
-      "stata": "r(j), r(jdf), r(jp) after xtoverid",
-      "en": "The object `ws.xtoverid` returns. Fields: `statistic` (`r(j)`), `df` (`r(jdf)`, the number of overidentifying restrictions), `pvalue` (`r(jp)`), `tested` (the names of the coefficients constrained to zero), `description` (what the test compares -- \"fixed vs random effects\" for the `xtreg, re` case) and `model` (the estimator that was re-estimated). `str()` reproduces the three lines Stata prints; `to_dict()` gives the three `r()` names and `to_frame()` a one-row DataFrame.",
-      "zh": "`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 \"fixed vs random effects\"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。",
-      "example": "fit = ws.RandomEffects.from_formula(\"y ~ x1\", base, entity=\"firm\", time=\"year\").fit()\nr = ws.xtoverid(fit)\nprint(r.statistic, r.df, r.pvalue)"
     },
     "synth": {
       "stata": "synth y x1 x2, trunit(1) trperiod(2005)",

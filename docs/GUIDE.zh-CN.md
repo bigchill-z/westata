@@ -353,7 +353,8 @@ panel_like = df.assign(
     province=(np.arange(len(df)) % 12) + 1,
     t=(np.arange(len(df)) // 12) + 1,
 )
-print(ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t"))
+result = ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t")
+print(result)
 ```
 
 **差分走在 (面板, 期) 轴上，不是行轴上。** 若某个省缺了某一期，缺口两侧的差分**都是缺失**。
@@ -361,8 +362,19 @@ print(ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t
 `r(corr)` 从 −0.19258 变成 −0.20871。实测对拍：`corr` 差 2.7e-10、`F` 差 8.4e-09、
 `p` 差 4.5e-12，输出块逐字符一致。
 
-Stata 的 `, output` 选项只是把第一阶段那个差分回归打印出来，本包不复现；
-需要时用 `ws.OLS` 自己拟合差分数据即可。
+Stata 的 `, output` 会在检验块之前打印那个一阶差分回归。这个回归**是返回的，不会丢弃**——
+检验本来就要用它的残差，而差分方程本身也是值得看的估计结果：
+
+```python
+print(result.first_stage.summary())   # D.y ~ D.x... 的拟合：聚类、无常数项
+result.first_stage.params             # 系数，按 `d_<变量名>` 索引
+result.first_stage_table()            # 同一张表的字符串形式
+```
+
+`.first_stage` 是普通的 `StataResults`，`params`/`bse`/`e`/`summary()` 都能用。
+只想拿三行检验结果时传 `keep_first_stage=False`。`lin_1992.dta` 实测：
+`.first_stage` 给出 N = 420、`R-squared = 0.5797`、`Root MSE = .11179`、
+`F(9, 27) = 902.61`，且每个系数与聚类标准误与 Stata 的差都在 5e-7 以内。
 
 ```python
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()

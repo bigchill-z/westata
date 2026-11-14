@@ -363,7 +363,8 @@ panel_like = df.assign(
     province=(np.arange(len(df)) % 12) + 1,
     t=(np.arange(len(df)) // 12) + 1,
 )
-print(ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t"))
+result = ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t")
+print(result)
 ```
 
 **The differences run on the (panel, time) axis, not the row axis.** When a period is
@@ -373,8 +374,21 @@ instead keeps 474 and moves `r(corr)` from -0.19258 to -0.20871. Measured agains
 StataNow 19.5: `corr` within 2.7e-10, `F` within 8.4e-09, `p` within 4.5e-12, with the
 printed block byte-identical.
 
-Stata's `, output` prints the first-stage differenced regression; that is not
-reproduced, since it is an ordinary clustered `ws.OLS` fit on the differenced data.
+Stata's `, output` prints the first-stage differenced regression before the test block.
+That regression is **returned, not discarded** -- the test needs its residuals anyway,
+and the differenced equation is an estimate worth reading:
+
+```python
+print(result.first_stage.summary())   # the D.y ~ D.x... fit, clustered, no constant
+result.first_stage.params             # coefficients, indexed by `d_<name>`
+result.first_stage_table()            # the same table as a string
+```
+
+`.first_stage` is an ordinary `StataResults`, so `params`/`bse`/`e`/`summary()` all
+work on it. Pass `keep_first_stage=False` to skip keeping it. Measured on
+`lin_1992.dta`: `.first_stage` gives N = 420, `R-squared = 0.5797`,
+`Root MSE = .11179`, `F(9, 27) = 902.61`, and every coefficient and clustered
+standard error agrees with Stata to within 5e-7.
 
 ```python
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()

@@ -8416,12 +8416,12 @@ None
 
 **Stata 指令:** `xtserial`
 
-Wooldridge 面板序列相关检验的结果：`corr` 为差分残差的滞后系数（原假设下约为 -0.5），`f` 与 `df`/`df_r` 是“该系数等于 -0.5”的 Wald 检验，`p` 为其 p 值，`nobs` 是第一阶段的样本量（Stata 打印的那个），`n_panels` 为面板数。`str()` 复现 Stata 的三行输出块。
+Wooldridge 面板序列相关检验的结果。五个 `r()` 标量为：`corr`（差分残差的滞后系数，原假设下约为 -0.5）、`f` 与 `df`/`df_r`（“该系数等于 -0.5”的 Wald 检验）以及 `p`。另有 `nobs`（Stata 打印的第一阶段样本量）、`n_panels`，以及 `first_stage`——差分回归本身，类型为 `StataResults`——和 `first_stage_table()`（其渲染后的表格）。`str()` 复现 Stata 的三行检验块。
 
 **签名**
 
 ```python
-ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int') -> None
+ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int', first_stage: 'Any' = None) -> None
 ```
 
 **示例**
@@ -9511,12 +9511,12 @@ None
 
 **Stata 指令:** `xtserial (user-written, Drukker)`
 
-Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，与 StataNow 19.5 一致。
+Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。
 
 **签名**
 
 ```python
-ws.xtserial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str') -> 'XtSerialResult'
+ws.xtserial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str', keep_first_stage: 'bool' = True) -> 'XtSerialResult'
 ```
 
 **示例**

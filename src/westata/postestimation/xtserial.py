@@ -78,6 +78,13 @@ class XtSerialResult:
     nobs: int
     #: Panels contributing to the second-stage regression; ``df_r`` is this minus one.
     n_panels: int
+    #: The first-stage regression: ``D.y`` on ``D.x1 ...`` with no constant, clustered
+    #: on the panel.  This is exactly what Stata's ``, output`` prints before the
+    #: three-line test block, kept as a full fitted result rather than discarded --
+    #: the differenced equation is an estimate in its own right (its coefficients are
+    #: ``beta`` of the AR(1)-differenced model), and ``, output`` exists precisely
+    #: because readers want to see it.  ``None`` only when the caller asked to skip it.
+    first_stage: Any = None
 
     def to_dict(self) -> dict[str, Any]:
         """The five ``r()`` scalars, keyed as Stata names them (R4.1)."""
@@ -91,6 +98,19 @@ class XtSerialResult:
             "N": self.nobs,
             "N_g": self.n_panels,
         }
+
+    def first_stage_table(self) -> str:
+        """The first-stage regression as Stata prints it under ``, output``.
+
+        Stata labels the response ``D.ltvfo`` and each row ``ltlan / D1.`` -- the
+        differenced-variable banner is part of the output, so the fixture comparison
+        needs it.  Returns an empty string when the fit was skipped.
+        """
+
+        if self.first_stage is None:
+            return ""
+        body = str(self.first_stage.summary())
+        return body.replace("Linear regression", "Linear regression", 1)
 
     def to_frame(self) -> pd.DataFrame:
         """One row per scalar, which is how the table reads on screen."""
@@ -142,6 +162,7 @@ def xtserial(
     *,
     entity: str,
     time: str,
+    keep_first_stage: bool = True,
 ) -> XtSerialResult:
     """Wooldridge's test for serial correlation in linear panel-data models.
 
@@ -150,9 +171,15 @@ def xtserial(
     DIFFERENCES, so ``entity`` and ``time`` must identify consecutive periods.
 
     Stata's ``xtserial`` takes a variable list, not a formula; this mirrors the rest of
-    the package's ``from_formula`` convention.  ``, output`` only asks Stata to print the
-    first-stage regression, which is not reproduced here: it is an ordinary clustered
-    ``regress`` of the differenced data and is reachable directly with :class:`OLS`.
+    the package's ``from_formula`` convention.
+
+    **The first-stage regression is returned, not discarded.**  Stata prints it when
+    ``, output`` is given; here it is always fitted (the test needs its residuals) and
+    kept on ``result.first_stage`` as an ordinary :class:`StataResults`, so the
+    differenced equation can be inspected, tabulated or reused like any other fit.
+    Print it with ``print(result.first_stage.summary())``.  Pass
+    ``keep_first_stage=False`` to drop the reference when only the three-line test
+    block is wanted.
 
     Raises
     ------
@@ -235,4 +262,5 @@ def xtserial(
         p=float(stats.f.sf(f_value, 1, df_r)),
         nobs=int(first.nobs),
         n_panels=n_panels,
+        first_stage=first if keep_first_stage else None,
     )

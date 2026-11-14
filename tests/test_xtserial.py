@@ -172,3 +172,70 @@ def test_the_test_rejects_autocorrelation_and_accepts_independence() -> None:
     dirty = ws.xtserial(pd.DataFrame(correlated), "y ~ x", entity="id", time="t")
     assert clean.p > dirty.p
     assert dirty.p < 0.01
+
+
+# ------------------------------------------------------- the first-stage regression
+
+#: ``xtserial ..., output`` prints this regression before the test block.  Captured
+#: verbatim from StataNow 19.5: coefficients and clustered standard errors.
+STATA_FIRST_STAGE = {
+    "ltlan": (0.9807158, 0.0926143),
+    "ltwlab": (0.2420082, 0.0734117),
+    "ltpow": (-0.0171023, 0.0747984),
+    "ltfer": (0.2768317, 0.0589799),
+    "hrs": (0.2427773, 0.0372382),
+    "mipric1": (0.0250908, 0.0357935),
+    "giprice": (-0.0157708, 0.0217740),
+    "mci": (0.1314675, 0.1260309),
+    "ngca": (-0.0260777, 0.4846049),
+}
+
+
+def test_the_first_stage_regression_is_returned(result) -> None:
+    """``, output`` exists because the differenced equation is worth looking at.
+
+    It is fitted anyway (the test needs its residuals), so discarding it would throw
+    away a result the user asked about.  Stata prints it under ``, output``; here it is
+    always reachable as ``result.first_stage``.
+    """
+
+    assert result.first_stage is not None
+    assert result.first_stage.nobs == 420
+    assert result.first_stage.cov_type == "cluster"
+    assert result.first_stage.e.get("N_clust") == 28
+    # No constant: ``nocons`` in the ado.
+    assert "Intercept" not in list(result.first_stage.params.index)
+
+
+def test_the_first_stage_matches_stata(result) -> None:
+    first = result.first_stage
+    for name, (coef, se) in STATA_FIRST_STAGE.items():
+        column = f"d_{name}"
+        assert float(first.params[column]) == pytest.approx(coef, abs=5e-7), name
+        assert float(first.bse[column]) == pytest.approx(se, abs=5e-7), name
+
+
+def test_the_first_stage_fit_statistics_match_stata(result) -> None:
+    e = result.first_stage.e
+    assert e["r2"] == pytest.approx(0.5797, abs=5e-5)
+    assert e["rmse"] == pytest.approx(0.11179, abs=5e-6)
+    assert e["F"] == pytest.approx(902.61, abs=5e-3)
+
+
+def test_the_first_stage_can_be_skipped(result) -> None:
+    """``keep_first_stage=False`` keeps the object small without changing the test."""
+
+    skipped = ws.xtserial(
+        _frame(), FORMULA, entity="province", time="t", keep_first_stage=False
+    )
+    assert skipped.first_stage is None
+    assert skipped.first_stage_table() == ""
+    assert skipped.f == pytest.approx(result.f, rel=1e-12)
+    assert skipped.corr == pytest.approx(result.corr, rel=1e-12)
+
+
+def test_the_first_stage_renders_a_table(result) -> None:
+    rendered = result.first_stage_table()
+    assert "Number of obs" in rendered
+    assert "adjusted for 28 clusters in province" in rendered
+    assert "d_ltlan" in rendered

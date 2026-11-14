@@ -8417,12 +8417,12 @@ None
 
 **Stata:** `xtserial`
 
-The Wooldridge panel serial-correlation test: `corr` (the differenced residual's lag coefficient, about -0.5 under the null), `f` and `df`/`df_r` for the Wald test that it equals -0.5, `p`, plus `nobs` (the first-stage sample, which Stata prints) and `n_panels`. `str()` reproduces Stata's three-line block.
+The Wooldridge panel serial-correlation test. The five `r()` scalars are `corr` (the differenced residual's lag coefficient, about -0.5 under the null), `f` with `df`/`df_r` for the Wald test that it equals -0.5, and `p`. Also `nobs` (the first-stage sample Stata prints), `n_panels`, and `first_stage` -- the differenced regression itself as a `StataResults` -- plus `first_stage_table()` for its rendered table. `str()` reproduces Stata's three-line test block.
 
 **Signature**
 
 ```python
-ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int') -> None
+ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int', first_stage: 'Any' = None) -> None
 ```
 
 **Example**
@@ -9512,12 +9512,12 @@ None
 
 **Stata:** `xtserial (user-written, Drukker)`
 
-Wooldridge's test for serial correlation in linear panel-data models, the user-written `xtserial` of that name. It differences the response and every regressor (no constant, clustered on the panel), regresses those residuals on their own lag the same way, and tests that the lag coefficient equals -0.5 -- because differencing an AR(1) error leaves `rho - 1`, which is -0.5 when there is no serial correlation. `entity` and `time` play the role of `xtset`. The lag runs on the (panel, time) axis, so a missing period makes the difference missing on both sides of the gap. Measured on lin_1992.dta: `corr = -0.192578493`, `F = 12.511374217`, `df_r = 27`, `p = 0.001484513`, against StataNow 19.5.
+Wooldridge's test for serial correlation in linear panel-data models, the user-written `xtserial` of that name. It differences the response and every regressor (no constant, clustered on the panel), regresses those residuals on their own lag the same way, and tests that the lag coefficient equals -0.5 -- because differencing an AR(1) error leaves `rho - 1`, which is -0.5 when there is no serial correlation. `entity` and `time` play the role of `xtset`. The lag runs on the (panel, time) axis, so a missing period makes the difference missing on both sides of the gap. The first-stage regression -- what Stata prints under `, output` -- is returned on `.first_stage` as an ordinary `StataResults` rather than discarded; `keep_first_stage=False` drops it. Measured on lin_1992.dta: `corr = -0.192578493`, `F = 12.511374217`, `df_r = 27`, `p = 0.001484513`, and the first stage gives N = 420, `r2 = 0.5797`, `F = 902.61`, against StataNow 19.5.
 
 **Signature**
 
 ```python
-ws.xtserial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str') -> 'XtSerialResult'
+ws.xtserial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str', keep_first_stage: 'bool' = True) -> 'XtSerialResult'
 ```
 
 **Example**

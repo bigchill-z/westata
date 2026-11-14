@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.19",
+  "westata_version": "0.3.22",
   "exports": [
     {
       "name": "AIPW",
@@ -1559,7 +1559,7 @@
         },
         {
           "name": "summary",
-          "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'"
+          "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False, theta: 'bool' = False) -> 'str'"
         },
         {
           "name": "t_test",
@@ -3351,8 +3351,8 @@
       },
       {
         "name": "summary",
-        "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'",
-        "docstring": "Render a text summary.\n\nParameters\n----------\nstyle:\n    ``\"stata\"`` (default) or ``\"statsmodels\"``. The default is Stata's layout because this\n    package exists to reproduce it; pass ``style=\"statsmodels\"`` for the statsmodels table.\nodds_ratio:\n    Exponentiate the coefficients, their standard errors and both interval\n    endpoints, and relabel the column \"Odds ratio\" -- Stata's ``logit ..., or``.\n    z and P>|z| are unaffected, since they come from the untransformed scale.\nfirst:\n    Prepend the first-stage regression, as Stata's ``ivregress ..., first`` does. Only\n    available for results that expose ``first_stage()``; the block is the one that method\n    already renders, which matches Stata line for line."
+        "signature": "(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False, theta: 'bool' = False) -> 'str'",
+        "docstring": "Render a text summary.\n\nParameters\n----------\nstyle:\n    ``\"stata\"`` (default) or ``\"statsmodels\"``. The default is Stata's layout because this\n    package exists to reproduce it; pass ``style=\"statsmodels\"`` for the statsmodels table.\nodds_ratio:\n    Exponentiate the coefficients, their standard errors and both interval\n    endpoints, and relabel the column \"Odds ratio\" -- Stata's ``logit ..., or``.\n    z and P>|z| are unaffected, since they come from the untransformed scale.\nfirst:\n    Prepend the first-stage regression, as Stata's ``ivregress ..., first`` does. Only\n    available for results that expose ``first_stage()``; the block is the one that method\n    already renders, which matches Stata line for line.\ntheta:\n    Stata's ``xtreg ..., re theta`` reporting option (``xtreg.sthlp:109``, ``:380-383``):\n    print the estimated quasi-demeaning factor between the header and the coefficient\n    table. A balanced panel shows one line (``theta        = .81012778``); an unbalanced\n    one shows the five percentiles of ``e(thta_min)`` ... ``e(thta_max)`` in a ruled box,\n    because theta then depends on each entity's own group size.\n\n    Only ``xtreg, re`` accepts it -- Stata answers ``xtreg ..., fe/be/mle theta`` with\n    ``option theta not allowed`` (r(198); measured on StataNow 19.5), so the flag is a\n    no-op on every other fit rather than printing something Stata would refuse. It is\n    also a no-op under ``style=\"statsmodels\"``, which is not Stata's layout."
       },
       {
         "name": "t_test",
@@ -4918,9 +4918,9 @@
     },
     "summary": {
       "stata": "(no Stata equivalent -- renders the estimation table Stata prints)",
-      "en": "Render a text summary of the fit. `style='statsmodels'` (the default) prints the statsmodels-style table, while `style='stata'` prints the layout Stata prints for the same command -- for `regress` the ANOVA and fit block with the coefficient table, for a discrete-choice model the LR chi-square header and z statistics. It RETURNS a string rather than printing, so it displays in a notebook and can also be written to a file unchanged.",
-      "zh": "把拟合结果渲染成文本摘要。`style='statsmodels'`（默认）打印 statsmodels 风格的表格，`style='stata'` 打印同一命令下 Stata 的版式——`regress` 为方差分析与拟合区块加系数表，离散选择模型为 LR 卡方表头与 z 统计量。它**返回**字符串而不是直接打印，因此在 notebook 中会显示，也可以原样写入文件。",
-      "example": "ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')"
+      "en": "Render a text summary of the fit. `style='stata'` (the default) prints the layout Stata prints for the same command -- for `regress` the ANOVA and fit block with the coefficient table, for a discrete-choice model the LR chi-square header and z statistics -- while `style='statsmodels'` prints the statsmodels-style table. It RETURNS a string rather than printing, so it displays in a notebook and can also be written to a file unchanged. `theta=True` is Stata's `xtreg ..., re theta` reporting option: it inserts the estimated quasi-demeaning factor between the panel header and the coefficient table. A balanced panel shows one line (`theta        = .81012778`); an unbalanced one shows the five percentiles of `e(thta_min)` ... `e(thta_max)` in a ruled box, because theta then depends on each entity's own group size and there is no single value to report. Only `xtreg, re` accepts it -- Stata answers `xtreg ..., fe/be/mle theta` with `option theta not allowed` (r(198)) -- so the flag is a no-op on every other fit and under `style='statsmodels'`.",
+      "zh": "渲染拟合的文本摘要。`style='stata'`（默认）打印同一命令在 Stata 中的版式——`regress` 为方差分析加拟合块与系数表，离散选择模型为 LR 卡方表头与 z 统计量；`style='statsmodels'` 则打印 statsmodels 风格的表。它**返回**字符串而不是直接打印，因此在 notebook 中可显示，也能原样写入文件。`theta=True` 是 Stata 的 `xtreg ..., re theta` 报告选项：在面板表头与系数表之间插入估计出的准去均值系数。平衡面板打印一行（`theta        = .81012778`）；不平衡面板则以带横线的方框打印 `e(thta_min)` … `e(thta_max)` 五个百分位，因为此时 theta 取决于各实体自身的组大小，没有单一数值可报。只有 `xtreg, re` 接受它——Stata 对 `xtreg ..., fe/be/mle theta` 报 `option theta not allowed`（r(198)）——因此在其他估计量和 `style='statsmodels'` 下该开关无效果。",
+      "example": "ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(theta=True)"
     },
     "wald_test": {
       "stata": "(no Stata spelling -- Stata expresses the same restriction as 'test x1 = 0')",
@@ -5358,8 +5358,8 @@
     },
     "RandomEffectsMLE": {
       "stata": "xtreg ypanel x1 x2, mle",
-      "en": "Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one.",
-      "zh": "用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。",
+      "en": "Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one. The `e()` block carries Stata's own likelihood scalars: `e(ll)` and `e(ll_0)` (the constant-only fit behind the header's LR chi2), `e(ll_c)` for the POOLED fit and `e(chi2_c) = 2*(e(ll) - e(ll_c))`, which is the `LR test of sigma_u=0` line printed under the variance components; `e(g_min)`/`e(g_avg)`/`e(g_max)` give the `Obs per group` row. Measured on lin_1992.dta against StataNow 19.5: `ll_c = 100.785038`, `chi2_c = 464.224713`, `g_min = g_avg = g_max = 17`.",
+      "zh": "用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。",
       "example": "ws.RandomEffectsMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')"
     },
     "dfuller": {

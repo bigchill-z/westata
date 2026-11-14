@@ -5321,8 +5321,22 @@ def _stata_summary(result: Any) -> str:
         # 'F test that all u_i=0'" -- Stata's own words, not a paraphrase.
         # ``xtreg.sthlp:1098-1100`` documents the keys as "F statistic for test of
         # u_i=0" / "p-value for test of u_i=0".
+        # STATA OMITS THIS ROW UNDER A ROBUST/CLUSTERED VCE. Measured on munnell.dta:
+        #
+        #     xtreg lny lnk1 lnk2, fe                    -> 'F test that all u_i=0: F(47, 766) = 104.52'
+        #     xtreg lny lnk1 lnk2, fe r                  -> NO such row
+        #     xtreg lny lnk1 lnk2, fe vce(cluster sid)   -> NO such row
+        #
+        # The line is the classical F test of the individual effects, which assumes the
+        # homoskedastic model; with a robust VCE Stata simply drops it. The fit still computes
+        # e(F_f) (110.94 under the robust VCE), so testing for finiteness was not enough and the
+        # extra row appeared on every robust panel fit.
+        _vce_label = str(getattr(result, "cov_type", "") or "").strip().lower()
+        _drop_effects_f = _vce_label not in ("", "nonrobust", "unadjusted")
         f_f = _e_float(result, "F_f")
         p_f_test = _e_float(result, "p_f")
+        if _drop_effects_f:
+            f_f = float("nan")
         if np.isfinite(f_f):
             df_a = _e_float(result, "df_a")
             # The rule above the F test is FULL width -- measured, Stata closes the

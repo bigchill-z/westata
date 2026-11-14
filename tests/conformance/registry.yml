@@ -1,12 +1,27 @@
 # Evidence registry for westata conformance claims.
 # Schema: docs/superpowers/specs/2026-10-22-westata-design.md section 11.3.
 #
-# E3 entries are backed by tests/conformance/test_stata_e3.py, which compares
-# against fixtures captured from StataNow 19.5 (MP) through pystata.  The
-# fixtures live in tests/conformance/stata_fixtures/ and can be regenerated with
-# scripts/capture_stata_fixtures.py.  E2 entries are backed by published Stata
-# output transcribed by hand.  E1 entries are implemented from the manual and
-# unit-tested, but have NOT been contrasted with a Stata run.
+# WHAT THE LEVELS MEAN (canonical definition; docs/API_CONVENTIONS.md R7.1 mirrors it).
+#
+#   E3 -- reproducible against a captured Stata run.  Tests/conformance/test_stata_e3.py
+#         replays it from tests/conformance/stata_fixtures/ (regenerable with
+#         scripts/capture_stata_fixtures.py), and the numbers land within the entry's
+#         `tolerance`, usually at machine precision (1e-12 or tighter).
+#   E2 -- contrasted with Stata, but NOT replayable: the reference was transcribed by
+#         hand from published output, or the difference comes from something we cannot
+#         force to agree (an optimiser reaching the same optimum by a different path).
+#         The measured difference is recorded in `notes`.
+#   E1 -- NOT reproducibly contrasted.  Two distinct reasons, and the entry must say
+#         which one it is in `notes`:
+#           (a) no Stata number exists for it -- the formula was transcribed from the
+#               `.ado`/manual and unit-tested against an independent implementation;
+#           (b) a Stata number EXISTS and a difference is recorded, but the gap is not
+#               attributed or not explained well enough to call the result verified
+#               (e.g. a compiled-Mata arithmetic we cannot read).
+#
+# The discriminator is NOT the `sources` type: an `r_crosscheck` source can appear at
+# any level, because having a reference number and agreeing with it are different
+# claims.  What decides is whether the comparison is reproducible AND within tolerance.
 
 - command: regress
   level: E3
@@ -269,9 +284,10 @@
       ref: "heckman y x, select(selected = z) on 1500 observations: Stata y:x 1.965111 (se .0367055), y:_cons 1.026726 (se .0706062), selected:z .8021853 (se .0433423), lambda .2861034"
   verified_by: lead
   date: 2026-10-23
-  notes: "TWO-STEP estimator with the Heckman correction applied to the standard errors (e(se_corrected) = 1). The corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. The correction is validated independently against a 400-rep row bootstrap. e(lambda) follows Stata's definition rho*sigma (verified: .2849988 * 1.003876 = .2861035); westata reports .287883, 0.6% from Stata, and keeps the generated-regressor coefficient in e(lam_coef). rho itself remains a plug-in value rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError."
+  notes: "TWO-STEP estimator with the Heckman correction applied to the standard errors (e(se_corrected) = 1). The corrected SEs land within 3% of Stata's ML SEs: y:x 0.036413 vs .0367055, y:_cons 0.072621 vs .0706062, select:z 0.042623 vs .0433423. The correction is validated independently against a 400-rep row bootstrap. e(lambda) follows Stata's definition rho*sigma (verified: .2849988 * 1.003876 = .2861035); westata reports .287883, 0.6% from Stata, and keeps the generated-regressor coefficient in e(lam_coef). rho itself remains a plug-in value rather than the ML estimate, so it is excluded from the comparison. method='ml' still raises UnsupportedError. E1(b): a Stata reference exists and the 3% SE gap is recorded; the two-step estimator is not the ML estimator Stata's SEs come from, so the gap is expected rather than explained away."
 
-  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md"
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 1 rows; see retest/REPORT.md The corrected standard errors land within 3% of Stata's maximum-likelihood SEs, which is why this is E1(b) and not E2: a Stata reference exists and the gap is recorded, but the two-step estimator is not the ML estimator Stata's SEs come from, so the difference is expected rather than explained away."
+
 - command: etregress
   level: E3
   # retest: after the corrected-VCE fix, coefficients 3.8e-11 and standard errors 2.2e-11 (re-measured 2026-10-24)
@@ -406,8 +422,9 @@
       ref: "xtlogit y x1 x2, pa on a 120x8 panel: Stata x1 0.3007615470018262, x2 -0.2542735657384027, _cons 0.1488733810746218; westata gaps 9.1e-6 / 9.7e-6 / 7.4e-8"
   verified_by: lead
   date: 2026-10-23
-  notes: "Population-averaged GEE with an exchangeable working correlation. GEE is NOT a likelihood, so e(ll) is deliberately ABSENT -- a log-likelihood that does not exist would invite a meaningless comparison. The coefficients are estimable and now verified; the standard errors are not yet diffed."
-  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md"
+  notes: "Population-averaged GEE with an exchangeable working correlation. GEE is NOT a likelihood, so e(ll) is deliberately ABSENT -- a log-likelihood that does not exist would invite a meaningless comparison. The coefficients are estimable and now verified; the standard errors are not yet diffed. E1(b): a Stata reference exists and the coefficient gaps (9.1e-6 / 9.7e-6 / 7.4e-8) are recorded, but GEE is not a likelihood and there is no replayable fixture."
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md E1(b): a Stata reference exists and the coefficient gaps (9.1e-6 / 9.7e-6 / 7.4e-8) are recorded, but GEE is not a likelihood and the pa estimator has no fixture we can replay, so it is not called verified."
+
 - command: xtprobit, re
   level: E2
   # retest: worst tier C over 1 row(s); example 'xtprobit, re' param_rel 6.048194834631303e-07 se_rel 0.0001157064120320072
@@ -489,9 +506,10 @@
       ref: "xtgls y x1, panels(heteroskedastic) on a 100x7 panel: Stata x1 .6798471, _cons 1.431659; westata matches"
   verified_by: lead
   date: 2026-10-23
-  notes: "Feasible GLS with one variance per panel: sigma_i^2 = e_i'e_i / T_i, dividing by T and not T-1, which is the convention that reproduces Stata's e(V). This does NOT reduce to pooled OLS -- an earlier note here claimed it did, which was simply wrong; OLS on the same data gives .753313 / 1.572686 against GLS's .679847 / 1.431659. An earlier version of the conformance test asserted OLS equality and had to be rewritten, because the test was wrong and the estimator was right. panels(correlated) is also implemented for balanced panels; unbalanced data there raises ConsistencyError rather than silently using a different estimator."
+  notes: "Feasible GLS with one variance per panel: sigma_i^2 = e_i'e_i / T_i, dividing by T and not T-1, which is the convention that reproduces Stata's e(V). This does NOT reduce to pooled OLS -- an earlier note here claimed it did, which was simply wrong; OLS on the same data gives .753313 / 1.572686 against GLS's .679847 / 1.431659. An earlier version of the conformance test asserted OLS equality and had to be rewritten, because the test was wrong and the estimator was right. panels(correlated) is also implemented for balanced panels; unbalanced data there raises ConsistencyError rather than silently using a different estimator. E1(b): coefficients were contrasted on one hand-run sample, but no fixture was captured for replay."
 
-  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier E, 3 rows; see retest/REPORT.md E1(b): the coefficients are reported to match on a single hand comparison, but no fixture was captured and the sigma_i^2 convention is the only thing pinned, so the entry stays below E2 rather than claiming a verified status it cannot replay."
+
 - command: xtpcse
   level: E3
   tolerance: 1.0e-4
@@ -601,12 +619,13 @@
       ref: "frontier y x1 x2 on 400 observations: Stata x1 .7813064, x2 .517943, _cons 1.047813"
   verified_by: lead
   date: 2026-10-23
-  notes: "Normal/half-normal stochastic frontier, lnf = ln2 - ln(sigma) + ln(phi(z)) + ln(Phi(-z*lambda)). The tail term uses log_ndtr: computing ln(Phi(z)) directly underflows to -inf for z < -7, which would silently make the likelihood infinite. sigma_u/sigma_v/lambda/gamma are reported in e(). Only distribution(halfnormal) is in scope; truncated and exponential raise UnsupportedError."
+  notes: "Normal/half-normal stochastic frontier, lnf = ln2 - ln(sigma) + ln(phi(z)) + ln(Phi(-z*lambda)). The tail term uses log_ndtr: computing ln(Phi(z)) directly underflows to -inf for z < -7, which would silently make the likelihood infinite. sigma_u/sigma_v/lambda/gamma are reported in e(). Only distribution(halfnormal) is in scope; truncated and exponential raise UnsupportedError. E1(b): coefficients were contrasted on one hand-run sample, but no fixture exists for replay and the half-normal tail term is the likely source of any residual."
 
 
 # --- P11: causal inference ------------------------------------------------
 
-  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md"
+  retest_gap: "independent 386-point sweep graded this E3 -> E1; worst tier D, 1 rows; see retest/REPORT.md E1(b): the coefficients were contrasted on one hand-run sample and are recorded above, but no fixture exists for replay and the half-normal tail term is the piece most likely to differ, so it is not called verified."
+
 - command: teffects ra
   level: E3
   tolerance: 1.0e-4
@@ -650,7 +669,7 @@
       ref: "[CAUSAL] teffects nnmatch Methods and formulas p.12: xi^2_ti = sum_j w_j (y_j - ybar_Psi_i)^2 / (sum_j w_j - 1), and 'By default, teffects nnmatch uses robust standard errors estimated using two matches'"
   verified_by: lead
   date: 2026-10-23
-  notes: "The POINT ESTIMATE is exact (3.6e-15); only the standard error differs, down from 2.2% to 1.59%. Method: the manual was consulted instead of guessing at variance estimators -- something I had failed to do through roughly fifteen earlier attempts, every one of which consisted of trying a different sigma^2(X_i) formula from memory. The manual gives the estimator and, crucially, states the DEFAULT: robust standard errors from TWO matches, i.e. vce(robust, nn(2)). Five variants of the within-arm variance were then measured against Stata rather than argued about: (A) literal (sum w - 1) divisor, se 0.4548; (B) exclude i, var of the two neighbours, 0.10222; (C) include i plus two neighbours, sample variance, 0.10458; (D) the h=1 form 0.5(y_i-y_j)^2, 0.10780; (E) 0.5*C, 0.07395. C is adopted as closest. NOTE ON A LITERAL READING I GOT WRONG: applying '(sum w_j - 1)' with unit weights and h = 2 makes ybar the SUM of the neighbours rather than their mean and inflates the variance about fourfold (variant A). The formula is written for the general weighted case; the unweighted instance needs a plain sample variance. REMAINING 1.59%: _matchnn_estimates is compiled Mata bytecode, so there is no source to read. Its symbol table IS legible (strings on lmataado.mlib yields _matchnn_biasAdjustedMeans, __matchnn_lsfit, _matchnn_indices, _matchnn_neighbors, _matchnn_scaleVariables, _matchnn_estimates), which confirms the algorithm's structure but not its arithmetic. Reaching E3 would need disassembly of Mata bytecode, and the residual may equally be a distance or tie-handling difference. Left at E2 with the number recorded."
+  notes: "The POINT ESTIMATE is exact (3.6e-15); only the standard error differs, down from 2.2% to 1.59%. Method: the manual was consulted instead of guessing at variance estimators -- something I had failed to do through roughly fifteen earlier attempts, every one of which consisted of trying a different sigma^2(X_i) formula from memory. The manual gives the estimator and, crucially, states the DEFAULT: robust standard errors from TWO matches, i.e. vce(robust, nn(2)). Five variants of the within-arm variance were then measured against Stata rather than argued about: (A) literal (sum w - 1) divisor, se 0.4548; (B) exclude i, var of the two neighbours, 0.10222; (C) include i plus two neighbours, sample variance, 0.10458; (D) the h=1 form 0.5(y_i-y_j)^2, 0.10780; (E) 0.5*C, 0.07395. C is adopted as closest. NOTE ON A LITERAL READING I GOT WRONG: applying '(sum w_j - 1)' with unit weights and h = 2 makes ybar the SUM of the neighbours rather than their mean and inflates the variance about fourfold (variant A). The formula is written for the general weighted case; the unweighted instance needs a plain sample variance. REMAINING 1.59%: _matchnn_estimates is compiled Mata bytecode, so there is no source to read. Its symbol table IS legible (strings on lmataado.mlib yields _matchnn_biasAdjustedMeans, __matchnn_lsfit, _matchnn_indices, _matchnn_neighbors, _matchnn_scaleVariables, _matchnn_estimates), which confirms the algorithm's structure but not its arithmetic. Reaching E3 would need disassembly of Mata bytecode, and the residual may equally be a distance or tie-handling difference. Left at E1(b) with the number recorded: a Stata reference exists and the residual is stated, but it is not attributed well enough to call verified."
   retest_gap: "independent 386-point sweep graded this E2 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
 - command: didregress
   level: E3
@@ -793,7 +812,7 @@
       ref: "the permutation stream now comes from the verified MT19937-64 generator"
   verified_by: lead
   date: 2026-10-23
-  notes: "Improved from 'arbitrary numpy stream' to the verified Stata generator, but still E2, for a reason narrower than before. The GENERATOR is now correct -- MT19937-64, verified against Stata's documented reference values and against resampling indices. What is still not reproducible is the SHUFFLE ORDER: Stata permutes through its own internal routine whose call sequence is not documented, so a given seed does not produce the same permutation. Since the p-value depends on the empirical distribution of the permuted statistic rather than on any single permutation, the result is statistically equivalent and its MEANING is now anchored to the right generator -- but a cell-for-cell comparison remains unavailable for an honest reason, not a convenient one. bootstrap was promoted to E3 in the same session precisely because its shuffle order IS documented (bsampl_w.ado) while permute's is not."
+  notes: "Improved from 'arbitrary numpy stream' to the verified Stata generator, and the entry stays at E1(a), for a reason narrower than before. The GENERATOR is now correct -- MT19937-64, verified against Stata's documented reference values and against resampling indices. What is still not reproducible is the SHUFFLE ORDER: Stata permutes through its own internal routine whose call sequence is not documented, so a given seed does not produce the same permutation. Since the p-value depends on the empirical distribution of the permuted statistic rather than on any single permutation, the result is statistically equivalent and its MEANING is now anchored to the right generator -- but a cell-for-cell comparison remains unavailable for an honest reason, not a convenient one. bootstrap was promoted to E3 in the same session precisely because its shuffle order IS documented (bsampl_w.ado) while permute's is not."
   retest_gap: "independent 386-point sweep graded this E2 -> E1; worst tier E, 3 rows; see retest/REPORT.md"
 - command: bootstrap / permute expressions (exp_list)
   level: E2
@@ -1056,7 +1075,8 @@
       ref: "eta2 equals e(r2) to 1e-12; the ordering eta2 > epsilon2 > omega2 follows from the formulas and is asserted"
   verified_by: lead
   date: 2026-10-30
-  notes: "E1, and a caveat worth stating: esize.ado hands the arithmetic to compiled builtins, so the formulas come from the literature the help file cites, NOT from Stata source. The eta2 identity is independently checkable against e(r2) and is exact; the other two rest on the cited formulas. The noncentral-F interval (Smithson 2001) is asserted only for structural properties -- it brackets the estimate, lies in [0,1], widens with the level and narrows with N -- not for a Stata number."
+  notes: "E1, and a caveat worth stating: esize.ado hands the arithmetic to compiled builtins, so the formulas come from the literature the help file cites, NOT from Stata source. The eta2 identity is independently checkable against e(r2) and is exact; the other two rest on the cited formulas. The noncentral-F interval (Smithson 2001) is asserted only for structural properties -- it brackets the estimate, lies in [0,1], widens with the level and narrows with N -- not for a Stata number. E1(a): no Stata number exists for these formulas (esize.ado delegates to compiled builtins)."
+
 - command: estat moran
   level: E1
   tolerance: 1.0e-12
@@ -1078,7 +1098,8 @@
       ref: "AUC is invariant to negating the predictor and to affine transforms of it; a noisier predictor gives a smaller area (both asserted)"
   verified_by: lead
   date: 2026-10-30
-  notes: "E1: not contrasted with a Stata run. The equivalence to the Mann-Whitney statistic is exact and checked; what is NOT checked is Stata's own printed r(area) on a fixture. An earlier test assumed flipping the outcome gives 1-AUC and FAILED: the model REFITS, the coefficient changes sign, the ordering is preserved and the AUC is unchanged (measured coefficient -2.4234). That failure is why the tests use invariance rather than reflection."
+  notes: "E1: not contrasted with a Stata run. The equivalence to the Mann-Whitney statistic is exact and checked; what is NOT checked is Stata's own printed r(area) on a fixture. An earlier test assumed flipping the outcome gives 1-AUC and FAILED: the model REFITS, the coefficient changes sign, the ordering is preserved and the AUC is unchanged (measured coefficient -2.4234). That failure is why the tests use invariance rather than reflection. E1(a): no Stata number exists -- no fixture was captured for r(area)."
+
 - command: estat weakrobust
   level: E1
   tolerance: 1.0e-12
@@ -1089,7 +1110,8 @@
       ref: "test_estat_weakrobust rebuilds the AR statistic as a restricted-versus-unrestricted F from two OLS fits and matches to 1e-10; the statistic collapses to exactly 0 when betanull is set to the estimated value"
   verified_by: lead
   date: 2026-10-30
-  notes: "E1, and only PART of the command: Anderson-Rubin is implemented, CLR is refused. AR is chosen because it is a closed-form restricted F test whose distribution does not depend on instrument strength -- the point of the command -- and whose value at the point estimate is identically zero, which is a checkable identity. CLR needs Moreira's conditional likelihood ratio, obtained by simulating over a nuisance-parameter grid, and Stata's implementation is a compiled builtin with no ado/base source. An overidentified model therefore REFUSES by default rather than running AR under a CLR label -- Stata's default there is CLR, and reporting a different test under that name would be worse than refusing."
+  notes: "E1, and only PART of the command: Anderson-Rubin is implemented, CLR is refused. AR is chosen because it is a closed-form restricted F test whose distribution does not depend on instrument strength -- the point of the command -- and whose value at the point estimate is identically zero, which is a checkable identity. CLR needs Moreira's conditional likelihood ratio, obtained by simulating over a nuisance-parameter grid, and Stata's implementation is a compiled builtin with no ado/base source. An overidentified model therefore REFUSES by default rather than running AR under a CLR label -- Stata's default there is CLR, and reporting a different test under that name would be worse than refusing. E1(a): no Stata number exists for the AR statistic, and CLR is refused."
+
 - command: estat mundlak
   level: E1
   tolerance: 1.0e-12
@@ -1100,7 +1122,7 @@
       ref: "test_estat_mundlak rebuilds the joint Wald statistic from an augmented refit and matches to 1e-10; correlated data rejects below 0.001 while uncorrelated data does not reject at 0.05"
   verified_by: lead
   date: 2026-10-30
-  notes: "E1: no Stata fixture. The test is the standard Mundlak/Augmented-RE form, and the group means are what carry any correlation between the unobserved effect and x, so the joint test IS a test of that correlation. Two API facts surfaced while building it and are worth recording: model_name is Stata's spelling ('xtreg, re'), and panel_entity holds CODED GROUP LABELS rather than a column name -- so entity= and time= must be passed explicitly, because the result object cannot rebuild the augmented formula on its own."
+  notes: "E1: no Stata fixture. The test is the standard Mundlak/Augmented-RE form, and the group means are what carry any correlation between the unobserved effect and x, so the joint test IS a test of that correlation. Two API facts surfaced while building it and are worth recording: model_name is Stata's spelling ('xtreg, re'), and panel_entity holds CODED GROUP LABELS rather than a column name -- so entity= and time= must be passed explicitly, because the result object cannot rebuild the augmented formula on its own. E1(a): no Stata fixture exists for the Mundlak test."
 
 - command: estat hettest
   level: E3

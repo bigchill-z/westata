@@ -891,6 +891,41 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 
 ---
 
+## 7.5 证据等级（E1/E2/E3）——与数值契约的关系
+
+本规范管**接口层**；数值层面的"像不像 Stata"由 `tests/conformance/registry.yml`
+的 97 条证据登记记录。两者的接口在**等级定义**上，而这份定义此前只存在于
+`registry.yml` 的注释里，没有任何文档或测试校验它自洽。
+
+### 7.5.1 三个等级
+
+| 等级 | 判据 | 典型形态 |
+|---|---|---|
+| **E3** | 可**复现**地对拍过，且落在该条目的 `tolerance` 内 | 有 `stata_fixtures/` 里的捕获文件，`test_stata_e3.py` 逐次重放；通常 1e-12 或更紧 |
+| **E2** | 与 Stata 对比过，但**不可复现** | 参考值来自手抄的公开输出；或差异来自无法强制一致的东西（如优化器路径不同）|
+| **E1** | **未**建立可复现的对拍。必须写清是哪一种： | |
+| | **E1(a)** 根本不存在 Stata 数值 | 公式抄自 `.ado`/手册，用独立实现做单测（`estat szroeter`、`estat auc`）|
+| | **E1(b)** 有 Stata 数值、差异也记录了，但未归因或未解释到可称"已验证" | 编译为 Mata 字节码无法阅读的算术（`teffects nnmatch`）|
+
+### 7.5.2 一条反直觉的事实：`sources` 类型不能推断等级
+
+`r_crosscheck`（有 Stata 参考值）可以出现在**任何**等级上——`E1` 里就有 8 条带它。
+**有参考值与"对上了"是两个不同的断言**，这也是把 `r_crosscheck` 当作 E3 判据会错的原因。
+
+### 7.5.3 曾经存在的两处自相矛盾
+
+- `teffects nnmatch` 的 `level: E1`，`notes` 结尾却写「Left at E2」
+- `permute` 的 `level: E1`，`notes` 却写「still E2」
+
+都是降级时只改了 `level`、忘了改叙述。结构校验（字段、类型、容差为正）看不见这类问题，
+所以新增了 `tests/conformance/test_registry_consistency.py`：校验
+
+1. `notes` 自述的等级必须等于 `level`；
+2. 每条 `E1` 必须写明是 (a) 还是 (b)；
+3. 每条 `E3` 必须有 `tolerance`，且 `notes` 不得承认"未对拍"。
+
+**"结构合法"不等于"内容自洽"**——这是本轮最值得记下的一条。
+
 ## 8. 迁移路线（按风险排序，不按文件顺序）
 
 阶段划分的依据是**错误后果**，不是改动量：会算错数的先修，只是难看的后修。

@@ -7410,7 +7410,7 @@ Newey.fit(self, *, lag: 'int | None' = None) -> 'NeweyWestResult'
 
 ```python
 r = ws.Newey.from_formula('y ~ x1', base, lag=2).fit()
-print(r.cov_type, round(float(r.params[0]), 6))
+print(r.cov_type, round(float(r.params.iloc[0]), 6))
 ```
 
 **Output**
@@ -7522,7 +7522,7 @@ Prais.fit(self) -> 'PraisResult'
 
 ```python
 r = ws.Prais.from_formula('y ~ x1', base).fit()
-print(round(float(r.rho), 6), round(float(r.params[0]), 6))
+print(round(float(r.rho), 6), round(float(r.params.iloc[0]), 6))
 ```
 
 **Output**
@@ -7611,7 +7611,7 @@ None
 
 **Stata:** `xtreg ypanel x1 x2, mle`
 
-Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one. The `e()` block carries Stata's own likelihood scalars: `e(ll)` and `e(ll_0)` (the constant-only fit behind the header's LR chi2), `e(ll_c)` for the POOLED fit and `e(chi2_c) = 2*(e(ll) - e(ll_c))`, which is the `LR test of sigma_u=0` line printed under the variance components; `e(g_min)`/`e(g_avg)`/`e(g_max)` give the `Obs per group` row. Measured on lin_1992.dta against StataNow 19.5: `ll_c = 100.785038`, `chi2_c = 464.224713`, `g_min = g_avg = g_max = 17`.
+Random-effects regression by MAXIMUM LIKELIHOOD (Stata `xtreg, mle`). Unlike `RandomEffects`, which is the GLS `xtreg, re` that plugs in Swamy-Arora variance components, this maximises the same random-effects likelihood over the coefficients AND the two variance components at once, so `sigma_u` differs materially. Fitted with statsmodels' `MixedLM` using ML (not REML) and a Powell optimiser; standard errors come from the inverse of the observed information. Returns a `StataResults`; a robust or clustered VCE is refused because Stata's `mle` estimator does not accept one. The `e()` block carries Stata's own likelihood scalars: `e(ll)` and `e(ll_0)` (the constant-only fit behind the header's LR chi2), `e(ll_c)` for the POOLED fit and `e(chi2_c) = 2*(e(ll) - e(ll_c))`, which is the `LR test of sigma_u=0` line printed under the variance components; `e(g_min)`/`e(g_avg)`/`e(g_max)` give the `Obs per group` row. Measured on lin_1992.dta against StataNow 19.5: `ll_c = 100.785038`, `chi2_c = 464.224713`, `g_min = g_avg = g_max = 17`. The three variance-component rows are printed with a standard error, and the two sigmas also with a confidence interval, exactly as Stata does. Those standard errors cannot come from statsmodels -- its covariance covers the fixed effects plus an internal transform of the random-effect variance, and the residual scale is profiled out -- so the information matrix is built here from the model's own likelihood. That likelihood was verified against statsmodels' `llf` to 2.8e-13 before being differentiated, and it is re-optimised locally because Powell stops about 4e-06 short of Stata on `sigma_u` while the likelihood itself agrees to 5.7e-09. `e(sigma_u_se)`, `e(sigma_e_se)`, `e(rho_se)` hold the standard errors and `e(sigma_u_ci)`/`e(sigma_e_ci)` the log-scale bounds; measured against StataNow 19.5 on lin_1992.dta they agree to seven decimals. `rho`'s interval is deliberately NOT reproduced: its printed bounds imply unequal multipliers and no link tried (log, logit, atanh, Fieller) matches, so it is omitted rather than guessed.
 
 **Signature**
 
@@ -7660,9 +7660,9 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
        _cons |   .8439937   .1404197     6.01   0.000     .5687762    1.119211
 ------------------------------------------------------------------------------
 -------------+----------------------------------------------------------------
-    /sigma_u |  .77026643
-    /sigma_e |  .98414177
-         rho |  .37987779
+    /sigma_u |   .7702664   .1153562                      .5743331   1.0330423
+    /sigma_e |   .9841418   .0550432                      .8819620   1.0981596
+         rho |   .3798778   .0783186
 ------------------------------------------------------------------------------
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```

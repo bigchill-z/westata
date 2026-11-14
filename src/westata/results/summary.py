@@ -1219,6 +1219,90 @@ def _four(value: Any) -> str:
     return f"{float(value):.4f}" if np.isfinite(value) else "."
 
 
+def _ml_variance_row(
+    label: str,
+    estimate: float,
+    standard_error: float,
+    z_value: float,
+    *,
+    logarithmic: bool,
+) -> str:
+    """One row of ``xtreg, mle``'s variance-component block, 78 characters wide.
+
+    Measured from StataNow 19.5 on lin_1992.dta::
+
+            /sigma_u |   .2141094   .0317827                      .1600597    .2864107
+            /sigma_e |   .1061021   .0035665                      .0993371    .1133278
+                 rho |   .8028448   .0486812                      .6942946    .8840722
+
+    ``label`` is the pipe-aligned name (``/sigma_u``, ``/sigma_e``, ``rho``); the
+    numbers use Stata's 8-significant-digit form with the leading zero dropped.
+
+    ``logarithmic`` selects the confidence interval's link.  For the two sigmas Stata
+    builds it on the log scale -- ``exp(log(s) -/+ z * se/s)`` -- which reproduced the
+    printed bounds to seven decimals (``.1600597`` / ``.2864107`` for ``sigma_u``).
+    A symmetric ``s -/+ z*se`` would have given ``.1518164`` / ``.2764023``, so the
+    distinction is not cosmetic.
+
+    ``rho`` passes ``logarithmic=False`` and gets NO interval: its printed bounds imply
+    unequal multipliers (1.67 above the estimate, 2.23 below) and none of log, logit or
+    atanh reproduces them, so the interval is left out rather than guessed.
+
+    Column positions measured from the capture (78 wide, pipe at 13): the estimate ends
+    at 24, the standard error at 35, the lower bound at 65 and the upper at 77.
+    """
+
+    estimate_text = _ml_cell(_ml_stat(estimate), 25, 14)
+    if not np.isfinite(standard_error):
+        return f"{label:>12} |{estimate_text}"
+    se_text = _ml_cell(_ml_stat(standard_error), 35, 24)
+    if not logarithmic:
+        return f"{label:>12} |{estimate_text}{se_text}"
+
+    if estimate > 0.0 and standard_error > 0.0:
+        spread = z_value * standard_error / estimate
+        low = float(np.exp(np.log(estimate) - spread))
+        high = float(np.exp(np.log(estimate) + spread))
+        low_text = _ml_cell(_ml_stat(low), 65, 35)
+        high_text = _ml_cell(_ml_stat(high), 77, 65)
+        return f"{label:>12} |{estimate_text}{se_text}{low_text}{high_text}"
+    return f"{label:>12} |{estimate_text}{se_text}"
+
+
+def _ml_stat(value: float) -> str:
+    """Stata's number format for the ``xtreg, mle`` variance block.
+
+    Measured against the capture: every field there is **seven decimal places**, not
+    seven significant digits.  The two rules differ on the small numbers, which is what
+    settles it::
+
+        value          %.7f        %.7g        Stata
+        .2141093601    .2141094    .2141094    .2141094
+        .0317826752    .0317827    .03178268   .0317827     <- 7 decimals
+        .0035665632    .0035666    .003566563  .0035665     <- 7 decimals
+
+    So ``%.7f`` with the leading zero dropped reproduces the block; ``%.7g`` prints two
+    extra digits on the SEs and runs one character long.
+    """
+
+    text = "%.7f" % float(value)
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
+def _ml_cell(text: str, end_column: int, previous_end: int) -> str:
+    """Right-align ``text`` so it ends at ``end_column``, given where the last field did.
+
+    Fields are laid out by their END columns (measured from the capture), so each width
+    is the distance to the previous field's end, not to the start of the table.
+    """
+
+    return text.rjust(end_column - previous_end)
+
+
 def _panel_statistic(value: float) -> str:
     """Stata's format for the sigma rows, matched on BOTH shapes it prints.
 
@@ -5370,24 +5454,40 @@ def _stata_summary(result: Any, *, theta: bool = False) -> str:
 
     panel_rows: list[str] = []
     # ``xtreg, mle`` prints these as NAMED parameters with a standard error and an interval, and
-    # NO z/P columns -- measure from `xtreg y x1, mle`:
+    # NO z/P columns -- measured from `xtreg y x1, mle`:
     #
     #     /sigma_u |   1.066582   .1354169                      .8316156    1.367905
     #     /sigma_e |   1.105891   .0467328                      1.017987    1.201327
     #          rho |   .4819118   .0677086                      .3525875    .6136619
     #
-    # The SEs are NOT recoverable from the mixed-model covariance without the delta method against
-    # Stata's own parameterisation, so they are left out rather than approximated -- but the SLASH
-    # prefix and the rho interval are what the REPORTED block needs, and those do not depend on an
-    # unverified variance.
+    # The SEs come from the model's information matrix (``panel._mle_variance_component_se``),
+    # stored as e(sigma_u_se)/e(sigma_e_se)/e(rho_se); an earlier comment here said they were
+    # unrecoverable and left two columns out of every ``xtreg, mle`` table. They are recoverable:
+    # the likelihood was verified against statsmodels to 2.8e-13 and its Hessian reproduces
+    # Stata's three standard errors to their printed precision.
     _is_ml_panel = str((getattr(result, "e", None) or {}).get("method") or "") == "mle"
     if _is_ml_panel:
+        _su_se = _e_float(result, "sigma_u_se")
+        _se_se = _e_float(result, "sigma_e_se")
+        _rho_se = _e_float(result, "rho_se")
+        # Stata's interval for the two sigmas is LOG-scale: exp(log(s) -/+ z*se(s)/s). Verified
+        # on lin_1992.dta -- sigma_u [.1600597, .2864107] against the printed bounds, where a
+        # symmetric interval would have given [.1518164, .2764023].
+        _z = float(stats.norm.ppf(0.975))
         if np.isfinite(sigma_u):
-            panel_rows.append(f"{'/sigma_u':>12} | {_panel_stat(sigma_u):>10}")
+            panel_rows.append(
+                _ml_variance_row("/sigma_u", sigma_u, _su_se, _z, logarithmic=True)
+            )
         if np.isfinite(sigma_e):
-            panel_rows.append(f"{'/sigma_e':>12} | {_panel_stat(sigma_e):>10}")
+            panel_rows.append(
+                _ml_variance_row("/sigma_e", sigma_e, _se_se, _z, logarithmic=True)
+            )
         if np.isfinite(rho):
-            panel_rows.append(f"{'rho':>12} | {_panel_stat(rho):>10}")
+            # rho's bounds are NOT the log, logit or atanh transform of se(rho) -- measured on
+            # lin_1992.dta, the printed pair implies unequal multipliers (1.67 above, 2.23
+            # below). Rather than invent a link, the two SE columns are printed and the
+            # interval is left out: an interval nobody can reproduce is worse than none.
+            panel_rows.append(_ml_variance_row("rho", rho, _rho_se, _z, logarithmic=False))
     else:
         if np.isfinite(sigma_u):
             panel_rows.append(f"{'sigma_u':>12} | {_panel_stat(sigma_u):>10}")

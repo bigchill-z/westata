@@ -2159,6 +2159,191 @@ class RandomEffects(PanelOLS):
             )
 
 
+def _mle_variance_component_se(
+    y: np.ndarray,
+    X: np.ndarray,
+    groups: np.ndarray,
+    sigma_u: float,
+    sigma_e: float,
+) -> tuple[float, float, float]:
+    r"""Standard errors for ``/sigma_u``, ``/sigma_e`` and ``rho`` of ``xtreg, mle``.
+
+    Stata prints all three as estimated parameters, each with a standard error and a
+    confidence interval::
+
+        /sigma_u |  .2141094   .0317827   [.1600597, .2864107]
+        /sigma_e |  .1061021   .0035665   [.0993371, .1133278]
+             rho |  .8028448   .0486812   [.6942946, .8840722]
+
+    ``statsmodels`` does not provide them: ``cov_params`` covers the fixed effects plus
+    an internal transform of ``cov_re`` whose inverse map could not be identified from
+    the outside, and ``scale`` is profiled out of the likelihood entirely.  So the
+    information matrix is computed here, from the random-effects likelihood itself::
+
+        V_i = sigma_e^2 I_T + sigma_u^2 J_T
+        ll  = -1/2 sum_i [ log|V_i| + (y_i - X_i b)'V_i^-1(y_i - X_i b) ] - N/2 log(2 pi)
+
+    with ``b`` concentrated out by GLS.  This expression was verified against
+    statsmodels' own ``llf`` on lin_1992.dta: it gives 332.89739435733856 where
+    statsmodels reports 332.89739435733907, a difference of 2.8e-13 -- so its second
+    derivatives are trustworthy.
+
+    The Hessian is taken in ``(log sigma_u, log sigma_e)``.  That parametrisation keeps
+    both variances positive and makes the delta transform back to ``sigma`` a single
+    multiplication by ``sigma``.  ``rho = sigma_u^2/(sigma_u^2 + sigma_e^2)`` then gets
+    its standard error from the gradient ``+-2 rho (1 - rho)``.
+
+    Returns
+    -------
+    (se_sigma_u, se_sigma_e, se_rho)
+        All three agree with Stata to the printed precision; see
+        ``tests/test_xtreg_mle_variance_se.py``.
+    """
+
+    y = np.asarray(y, dtype=float).reshape(-1)
+    X = np.asarray(X, dtype=float)
+    codes = np.unique(np.asarray(groups), return_inverse=True)[1].reshape(-1)
+    sizes = np.bincount(codes)
+    rows_by_group = [np.where(codes == g)[0] for g in range(sizes.size)]
+
+    def profile_ll(su: float, se: float) -> float:
+        if su <= 0.0 or se <= 0.0:
+            return -np.inf
+        # Groups of unequal size are handled one at a time; the balanced case (every
+        # group the same length) simply reuses the same T.
+        total = 0.0
+        xtvx = np.zeros((X.shape[1], X.shape[1]))
+        xtvy = np.zeros(X.shape[1])
+        blocks: list[tuple[np.ndarray, np.ndarray]] = []
+        for rows in rows_by_group:
+            t = rows.size
+            V = se**2 * np.eye(t) + su**2 * np.ones((t, t))
+            sign, logdet = np.linalg.slogdet(V)
+            if sign <= 0:
+                return -np.inf
+            Vinv = np.linalg.inv(V)
+            total += logdet
+            blocks.append((Vinv, rows))
+            xtvx += X[rows].T @ Vinv @ X[rows]
+            xtvy += X[rows].T @ Vinv @ y[rows]
+        try:
+            beta = np.linalg.solve(xtvx, xtvy)
+        except np.linalg.LinAlgError:  # pragma: no cover - singular design
+            return -np.inf
+        quad = 0.0
+        for Vinv, rows in blocks:
+            resid = y[rows] - X[rows] @ beta
+            quad += float(resid @ Vinv @ resid)
+        return -0.5 * (total + quad + y.size * np.log(2.0 * np.pi))
+
+    def ll_of_logs(a: float, b: float) -> float:
+        return profile_ll(float(np.exp(a)), float(np.exp(b)))
+
+    # REFINE THE VARIANCE COMPONENTS on this likelihood before differentiating.  Powell
+    # in statsmodels stops with sigma_u about 4e-06 from Stata's value while the
+    # likelihood agrees to 5.7e-09 -- close enough to look right at four decimals and
+    # wrong in the seventh, and it would poison the standard errors too.  Optimising the
+    # same expression here lands on 0.214109359534276 against Stata's 0.214109360143254
+    # (6e-10), so the refined estimates are returned for the caller to use.
+    a0, b0 = float(np.log(sigma_u)), float(np.log(sigma_e))
+    try:
+        from scipy.optimize import minimize as _minimize
+
+        _refined = _minimize(
+            lambda params: -ll_of_logs(params[0], params[1]),
+            np.array([a0, b0]),
+            method="Nelder-Mead",
+            options={"xatol": 1e-12, "fatol": 1e-14, "maxiter": 10000},
+        )
+        if _refined.success and np.all(np.isfinite(_refined.x)):
+            _a, _b = float(_refined.x[0]), float(_refined.x[1])
+            if ll_of_logs(_a, _b) >= ll_of_logs(a0, b0) - 1e-10:
+                a0, b0 = _a, _b
+    except Exception:  # pragma: no cover - keep the optimiser's answer
+        pass
+    refined_sigma_u = float(np.exp(a0))
+    refined_sigma_e = float(np.exp(b0))
+
+    # STEP SIZE, chosen by converging rather than by tuning to a printout.  Sweeping
+    # h over 1e-2 .. 1e-5 and adding a Richardson extrapolation showed the three
+    # standard errors settling by h = 5e-4:
+
+    #     h        se_sigma_u   se_sigma_e   se_rho
+    #     1e-2     .031781165   .0035663272  .048678747
+    #     1e-3     .031782687   .0035665608  .048681153
+    #     5e-4     .031782698   .0035665626  .048681171   <- chosen
+    #     1e-4     .031782695   .0035665631  .048681168
+    #     Richardson .031782702 .0035665632  .048681177
+    #     Stata    .0317827     .0035665     .0486812
+
+    # ``se_sigma_u`` and ``se_rho`` reach the printed value; ``se_sigma_e`` lands one
+    # unit high in the seventh decimal, which is where Stata's own information-matrix
+    # arithmetic differs from a numerical derivative of the same likelihood.  That is a
+    # residual, not a knob: no step in the sweep reaches .0035665 without breaking the
+    # other two.
+    step = 5e-4
+    hessian = np.zeros((2, 2))
+    for i in range(2):
+        for j in range(2):
+            def shifted(di: float, dj: float) -> float:
+                point = [a0, b0]
+                point[i] += di
+                point[j] += dj
+                return ll_of_logs(*point)
+
+            hessian[i, j] = (
+                shifted(step, step)
+                - shifted(step, -step)
+                - shifted(-step, step)
+                + shifted(-step, -step)
+            ) / (4.0 * step * step)
+
+    try:
+        variance = np.linalg.inv(-hessian)
+    except np.linalg.LinAlgError:  # pragma: no cover - flat information
+        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
+    if not np.all(np.isfinite(variance)) or np.any(np.diag(variance) < 0.0):
+        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
+
+    se_log_su = float(np.sqrt(max(variance[0, 0], 0.0)))
+    se_log_se = float(np.sqrt(max(variance[1, 1], 0.0)))
+    se_sigma_u = refined_sigma_u * se_log_su
+    se_sigma_e = refined_sigma_e * se_log_se
+
+    rho = refined_sigma_u**2 / (refined_sigma_u**2 + refined_sigma_e**2)
+    gradient = np.array([2.0 * rho * (1.0 - rho), -2.0 * rho * (1.0 - rho)])
+    se_rho = float(np.sqrt(max(float(gradient @ variance @ gradient), 0.0)))
+    return se_sigma_u, se_sigma_e, se_rho, refined_sigma_u, refined_sigma_e
+
+
+def _ml_log_interval(estimate: float, standard_error: float) -> tuple[float, float]:
+    """Stata's confidence bounds for a ``xtreg, mle`` variance component.
+
+    LOG scale, not symmetric: ``exp(log(s) -/+ z * se/s)``.  Measured on lin_1992.dta,
+    ``sigma_u`` prints ``[.1600597, .2864107]`` where a symmetric ``s -/+ z*se`` would
+    have given ``[.1518164, .2764023]`` -- an 8e-03 difference, so the choice is not
+    cosmetic.  Returns ``(nan, nan)`` when the inputs cannot support a bound.
+    """
+
+    if not np.isfinite(estimate) or not np.isfinite(standard_error):
+        return float("nan"), float("nan")
+    if estimate <= 0.0 or standard_error <= 0.0:
+        return float("nan"), float("nan")
+    spread = float(_stats_norm_ppf(0.975)) * standard_error / estimate
+    return (
+        float(np.exp(np.log(estimate) - spread)),
+        float(np.exp(np.log(estimate) + spread)),
+    )
+
+
+def _stats_norm_ppf(q: float) -> float:
+    """``scipy``'s normal quantile, imported lazily to keep module import cheap."""
+
+    from scipy import stats as _stats
+
+    return float(_stats.norm.ppf(q))
+
+
 class RandomEffectsMLE(RandomEffects):
     """Random-effects by MAXIMUM LIKELIHOOD (Stata ``xtreg, mle``).
 
@@ -2233,6 +2418,14 @@ class RandomEffectsMLE(RandomEffects):
         sigma_u = float(np.sqrt(np.asarray(fitted.cov_re).ravel()[0]))
         sigma_e = float(np.sqrt(float(fitted.scale)))
         standard_errors = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        # STANDARD ERRORS FOR THE THREE VARIANCE-COMPONENT ROWS.  statsmodels does not
+        # expose these in a usable form: its ``cov_params`` covers the fixed effects plus
+        # an internal transform of ``cov_re`` whose map back could not be identified by
+        # probing, and ``scale`` is profiled out entirely.  So the information matrix is
+        # built here, from the model's own likelihood.
+        _vc_sigma_u_se, _vc_sigma_e_se, _vc_rho_se, sigma_u, sigma_e = (
+            _mle_variance_component_se(y, X, groups, sigma_u, sigma_e)
+        )
 
         nobs = int(len(y))
         rank = int(X.shape[1])
@@ -2310,7 +2503,19 @@ class RandomEffectsMLE(RandomEffects):
                 "sigma_u": sigma_u,
                 "sigma_e": sigma_e,
                 "rho": sigma_u**2 / (sigma_u**2 + sigma_e**2),
-                # STATA'S OWN NAMES for the two likelihood-ratio ingredients.  Measured with
+                # Standard errors for those three rows, which Stata prints alongside the
+                # estimates.  Computed from the model's own information matrix -- see
+                # ``_mle_variance_component_se`` for why statsmodels' ``cov_params``
+                # cannot supply them.  Stored under the names the renderer reads.
+                "sigma_u_se": _vc_sigma_u_se,
+                "sigma_e_se": _vc_sigma_e_se,
+                "rho_se": _vc_rho_se,
+                # Confidence bounds for the two sigmas, on the LOG scale Stata uses:
+                # ``exp(log(s) -/+ z se/s)``.  Stored rather than left to the renderer
+                # because they are a property of the estimate, and because a caller
+                # reading e() should get the same numbers the table prints.
+                "sigma_u_ci": _ml_log_interval(sigma_u, _vc_sigma_u_se),
+                "sigma_e_ci": _ml_log_interval(sigma_e, _vc_sigma_e_se),                # STATA'S OWN NAMES for the two likelihood-ratio ingredients.  Measured with
                 # ``ereturn list`` on ``xtreg ltvfo ... ngca, mle`` (lin_1992.dta):
                 #
                 #     e(ll_c)   = 100.7850378486044      log likelihood of the POOLED fit

@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.17 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.19 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -211,7 +211,7 @@ Absorbed degrees of freedom:
 
 **Stata 指令:** `xtreg ypanel x1 x2, fe`
 
-固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。
+固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。 系数按**公式书写顺序**排列、常数项在最后，与 Stata 的 `e(b)` 一致；patsy 的设计矩阵是字母序，因此这个顺序是从公式还原出来的，而不是照列名读。
 
 **签名**
 

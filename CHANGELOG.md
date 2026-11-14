@@ -7,7 +7,7 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
-## [Unreleased] - 2026-11-14
+## [0.3.20] - 2026-11-14
 
 ### Fixed
 * **Panel estimators report coefficients in the order the formula wrote them.**

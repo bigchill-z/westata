@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.17",
+  "westata_version": "0.3.19",
   "exports": [
     {
       "name": "AIPW",
@@ -4034,8 +4034,8 @@
     },
     "PanelOLS": {
       "stata": "xtreg ypanel x1 x2, fe",
-      "en": "Fixed-effects panel regression -- Stata's `xtreg, fe`. `fit(entity_effects=True)` is the default. The formula implies a constant exactly as in `OLS`, so `e(b)` includes `Intercept` even though the within transformation absorbs it; write `'ypanel ~ x1 + x2 - 1'` to follow Stata's `noconstant`. Rows with missing values are dropped listwise before estimation, so `e(N)` can be smaller than `len(data)`, and the summary prints the `sigma_u`/`sigma_e`/`rho` block and the F test that all `u_i` are zero.",
-      "zh": "固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。",
+      "en": "Fixed-effects panel regression -- Stata's `xtreg, fe`. `fit(entity_effects=True)` is the default. The formula implies a constant exactly as in `OLS`, so `e(b)` includes `Intercept` even though the within transformation absorbs it; write `'ypanel ~ x1 + x2 - 1'` to follow Stata's `noconstant`. Rows with missing values are dropped listwise before estimation, so `e(N)` can be smaller than `len(data)`, and the summary prints the `sigma_u`/`sigma_e`/`rho` block and the F test that all `u_i` are zero. Coefficients are reported in the order the FORMULA wrote them, with the constant last, as Stata lays out `e(b)`; patsy alphabetises its design matrix, so this is restored from the formula rather than read off the columns.",
+      "zh": "固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。 系数按**公式书写顺序**排列、常数项在最后，与 Stata 的 `e(b)` 一致；patsy 的设计矩阵是字母序，因此这个顺序是从公式还原出来的，而不是照列名读。",
       "example": "ws.PanelOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')",
       "notes_en": "One deliberate deviation, documented on the class: under `cov_type='cluster'`, westata stores `e(df_m)` as the number of slopes and `e(rank)` as `len(e(b))`, where clustered Stata stores both one lower (the class docstring records the StataNow 19.5 measurements). `e(F)`, `e(df_b)` and `e(df_r)` do agree -- only those two labels differ, and copying Stata's would print an F label that contradicts the p-value beside it.",
       "notes_zh": "类文档中记录了一处刻意偏离：在 `cov_type='cluster'` 下，westata 把 `e(df_m)` 存为斜率个数、把 `e(rank)` 存为 `len(e(b))`，而聚类下的 Stata 两个值都小一（类文档字符串载有 StataNow 19.5 的实测数据）。`e(F)`、`e(df_b)` 与 `e(df_r)` 是一致的——只有这两个标签不同；若照抄 Stata，打印出的 F 标签会与其旁的 p 值自相矛盾。"

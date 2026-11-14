@@ -246,7 +246,254 @@ def _parse_placebo(spec: str, trperiod: float, all_periods: list[float],
 # --------------------------------------------------------------------------- #
 # Public estimator
 # --------------------------------------------------------------------------- #
+class Synth2:
+    """``synth2`` -- synthetic control with the placebo / leave-one-out machinery.
+
+    Class form of :func:`westata.synth2` (R2.7).  Stata passes the variables as options,
+    so construction goes through :meth:`from_variables` (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``synth2`` reports placebo-based inference, not a
+    ``vce()`` switch (R1.5).
+    """
+
+    model_name = "synth2"
+
+    def __init__(
+        self,
+        data: Any,
+        unit: str,
+        time: str,
+        depvar: str,
+        predictors: Sequence[str],
+        trunit: Any,
+        trperiod: float,
+        counit: Sequence[Any] | None = None,
+        ctrlunit: Sequence[Any] | None = None,
+        preperiod: Sequence[float] | None = None,
+        postperiod: Sequence[float] | None = None,
+        xperiod: Sequence[float] | None = None,
+        mspeperiod: Sequence[float] | None = None,
+        customV: Sequence[float] | None = None,
+        nested: bool = False,
+        allopt: bool = False,
+        margin: float = 0.005,
+        maxiter: int = 1000,
+        sigf: int = 12,
+        bound: float = 10,
+        placebo: str | None = None,
+        loo: bool = False,
+        figure: bool = False,
+        nofigure: bool = False,
+        savegraph: str | None = None,
+        symbol: int = 1,
+        frame: str | None = None,
+        show: int | None = None,
+    ) -> None:
+        self._data = data
+        self.unit = unit
+        self.time = time
+        self.depvar = depvar
+        self.predictors = predictors
+        self.trunit = trunit
+        self.trperiod = trperiod
+        self.counit = counit
+        self.ctrlunit = ctrlunit
+        self.preperiod = preperiod
+        self.postperiod = postperiod
+        self.xperiod = xperiod
+        self.mspeperiod = mspeperiod
+        self.customV = customV
+        self.nested = nested
+        self.allopt = allopt
+        self.margin = margin
+        self.maxiter = maxiter
+        self.sigf = sigf
+        self.bound = bound
+        self.placebo = placebo
+        self.loo = loo
+        self.figure = figure
+        self.nofigure = nofigure
+        self.savegraph = savegraph
+        self.symbol = symbol
+        self.frame = frame
+        self.show = show
+
+    @classmethod
+    def from_variables(
+        cls,
+        data: Any,
+        *,
+        unit: str,
+        time: str,
+        depvar: str,
+        predictors: Sequence[str],
+        trunit: Any,
+        trperiod: float,
+        counit: Sequence[Any] | None = None,
+        ctrlunit: Sequence[Any] | None = None,
+        preperiod: Sequence[float] | None = None,
+        postperiod: Sequence[float] | None = None,
+        xperiod: Sequence[float] | None = None,
+        mspeperiod: Sequence[float] | None = None,
+        customV: Sequence[float] | None = None,
+        nested: bool = False,
+        allopt: bool = False,
+        margin: float = 0.005,
+        maxiter: int = 1000,
+        sigf: int = 12,
+        bound: float = 10,
+        placebo: str | None = None,
+        loo: bool = False,
+        figure: bool = False,
+        nofigure: bool = False,
+        savegraph: str | None = None,
+        symbol: int = 1,
+        frame: str | None = None,
+        show: int | None = None,
+    ) -> "Synth2":
+        """Build from a frame and column names -- Stata's ``synth2`` syntax."""
+
+        table = data
+        columns = [depvar, *list(predictors)]
+        missing = [name for name in columns if name not in table.columns]
+        if missing:
+            raise ConsistencyError(f"synth2: column(s) {missing} not found in data")
+        return cls(
+            table,
+            unit,
+            time,
+            depvar,
+            predictors,
+            trunit,
+            trperiod,
+            counit=counit,
+            ctrlunit=ctrlunit,
+            preperiod=preperiod,
+            postperiod=postperiod,
+            xperiod=xperiod,
+            mspeperiod=mspeperiod,
+            customV=customV,
+            nested=nested,
+            allopt=allopt,
+            margin=margin,
+            maxiter=maxiter,
+            sigf=sigf,
+            bound=bound,
+            placebo=placebo,
+            loo=loo,
+            figure=figure,
+            nofigure=nofigure,
+            savegraph=savegraph,
+            symbol=symbol,
+            frame=frame,
+            show=show,
+        )
+
+    def fit(self) -> Synth2Result:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _synth2_impl(
+            self._data,
+            unit=self.unit,
+            time=self.time,
+            depvar=self.depvar,
+            predictors=self.predictors,
+            trunit=self.trunit,
+            trperiod=self.trperiod,
+            counit=self.counit,
+            ctrlunit=self.ctrlunit,
+            preperiod=self.preperiod,
+            postperiod=self.postperiod,
+            xperiod=self.xperiod,
+            mspeperiod=self.mspeperiod,
+            customV=self.customV,
+            nested=self.nested,
+            allopt=self.allopt,
+            margin=self.margin,
+            maxiter=self.maxiter,
+            sigf=self.sigf,
+            bound=self.bound,
+            placebo=self.placebo,
+            loo=self.loo,
+            figure=self.figure,
+            nofigure=self.nofigure,
+            savegraph=self.savegraph,
+            symbol=self.symbol,
+            frame=self.frame,
+            show=self.show,
+        )
+
+
 def synth2(
+    data: Any,
+    *,
+    unit: str,
+    time: str,
+    depvar: str,
+    predictors: Sequence[str],
+    trunit: Any,
+    trperiod: float,
+    counit: Sequence[Any] | None = None,
+    ctrlunit: Sequence[Any] | None = None,
+    preperiod: Sequence[float] | None = None,
+    postperiod: Sequence[float] | None = None,
+    xperiod: Sequence[float] | None = None,
+    mspeperiod: Sequence[float] | None = None,
+    customV: Sequence[float] | None = None,
+    nested: bool = False,
+    allopt: bool = False,
+    margin: float = 0.005,
+    maxiter: int = 1000,
+    sigf: int = 12,
+    bound: float = 10,
+    placebo: str | None = None,
+    loo: bool = False,
+    # Graphics-only options: accepted as keywords so the error is explicit.
+    figure: bool = False,
+    nofigure: bool = False,
+    savegraph: str | None = None,
+    symbol: int = 1,
+    frame: str | None = None,
+    show: int | None = None,
+    **unsupported: Any,
+) -> Synth2Result:
+
+    """Fit Stata's ``synth2`` -- thin wrapper over :class:`westata.Synth2`."""
+
+    return _synth2_impl(
+        data,
+        unit=unit,
+        time=time,
+        depvar=depvar,
+        predictors=predictors,
+        trunit=trunit,
+        trperiod=trperiod,
+        counit=counit,
+        ctrlunit=ctrlunit,
+        preperiod=preperiod,
+        postperiod=postperiod,
+        xperiod=xperiod,
+        mspeperiod=mspeperiod,
+        customV=customV,
+        nested=nested,
+        allopt=allopt,
+        margin=margin,
+        maxiter=maxiter,
+        sigf=sigf,
+        bound=bound,
+        placebo=placebo,
+        loo=loo,
+        figure=figure,
+        nofigure=nofigure,
+        savegraph=savegraph,
+        symbol=symbol,
+        frame=frame,
+        show=show,
+        **unsupported,
+    )
+
+
+def _synth2_impl(
     data: Any,
     *,
     unit: str,

@@ -283,9 +283,26 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 命令没有 `vce()` 选项，方差就是估计量本身，加一个 `cov_type` 参数等于承诺一个
 不存在的选择。
 
-**待处理**（同为 e-class 估计器但仍只有函数形式，未纳入本轮）：
-`synth`、`synth2`、`rcm`、`rdrobust`、`teffects_ra`、`teffects_psmatch`、
-`teffects_nnmatch`。它们返回的都不是 `StataResults`，改造成本高于 `newey`/`prais`。
+**已全部完成**（2026-11-14）：`synth`、`synth2`、`rcm`、`rdrobust`、
+`teffects_ra`、`teffects_psmatch`、`teffects_nnmatch` 都补上了 `from_variables`
+类形式，待办表已清空。
+
+**这两类命令用的是不同的构造入口，这一点必须分清**：
+
+| 命令形态 | 构造入口 | 例 |
+|---|---|---|
+| Stata 用公式 | `from_formula(formula, data, *, ...)` | `OLS`、`newey`、`prais` |
+| Stata 用变量列表 | `from_variables(outcome, ..., data, *, ...)` | `synth`、`rdrobust`、`teffects ra` |
+
+`teffects ra (y x) (treat)` 是变量列表，写成 `from_formula` 就是 R3.2 要消除的
+"名字骗人"。
+
+**一个必须记下来的教训：R2.7 的判据一开始是错的**。它用
+`issubclass(result_class, StataResults)` 区分估计与检验，但**没有任何结果类继承
+`StataResults`**——`NeweyWestResult`、`SynthResult`、`UnitRootResult` 都是独立
+dataclass。于是规则对一切命令都不触发，`--strict` 照样 exit 0。真正需要的是
+Stata 的 `e()`/`r()` 语义，那无法从代码推导，只能在 `TEST_COMMANDS` 里写下来。
+**「0 findings」必须先证明规则能触发**，否则它只说明规则没看那些地方。
 
 ### R3.2 `from_formula` 的前两个位置参数固定
 

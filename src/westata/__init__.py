@@ -10,6 +10,12 @@ from westata.expressions.explist import (
     parse_exp_list,
 )
 from westata.estimators import (
+    Synth2,
+    Synth,
+    Rdrobust,
+    TeffectsNnmatch,
+    TeffectsPsmatch,
+    TeffectsRa,
     Prais,
     Newey,
     estat_ptrends,
@@ -198,6 +204,7 @@ from westata.postestimation import (
     suest,
     endog_regf_test,
     endog_score_test,
+    Rcm,
     estat_vce,
     estat_vif,
     hausman,
@@ -238,6 +245,13 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "Rcm",
+    "Synth2",
+    "Synth",
+    "Rdrobust",
+    "TeffectsNnmatch",
+    "TeffectsPsmatch",
+    "TeffectsRa",
     "Prais",
     "Newey",
     "estat_ptrends",

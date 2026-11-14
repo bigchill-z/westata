@@ -7,6 +7,55 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.16] - 2026-11-14
+
+### Added -- class forms for the seven remaining estimation commands
+
+`newey`/`prais` got class forms in 0.3.14 (R2.7). Seven estimation commands were
+still reachable only as bare functions, so the same operation took a construction
+step in 40 families and none in these:
+
+```python
+ws.Synth.from_variables(data, unit="id", time="t", depvar="y",
+                        predictors=["x1"], trunit=1, trperiod=12).fit()
+ws.Synth2.from_variables(...)                        # same options plus placebo/loo
+ws.Rcm.from_variables("y", data, predictors=["x1"], unit="id", time="t",
+                      treated_unit=1, treatment_period=12).fit()
+ws.Rdrobust.from_variables("y", "running", data, bandwidth=0.5).fit()
+ws.TeffectsRa.from_variables("y", "d", data, covariates=["x1"]).fit()
+ws.TeffectsPsmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
+ws.TeffectsNnmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
+```
+
+Every function keeps working unchanged and delegates to the one implementation, so
+the two entry points cannot drift -- 21 tests in
+`tests/test_estimator_class_forms_extra.py` assert they return identical numbers.
+
+**These use `from_variables`, not `from_formula`.** Stata spells them with a
+variable list (`teffects ra (y x) (treat)`, `synth y x, unit() trunit()`), so a
+`from_formula` entry point would lie about what it accepts -- the defect R3.2
+removes. `fit()` also takes no `cov_type` in any of the seven: none has a `vce()`
+option, so the variance is part of the estimator (R1.5).
+
+### Fixed -- checker rule R2.7 never fired
+
+R2.7 required e-class estimation commands to have a class form, and decided
+"e-class" by `issubclass(result_class, StataResults)`. **No result class inherits
+`StataResults`** -- `NeweyWestResult`, `SynthResult`, `UnitRootResult` are all
+standalone dataclasses -- so the rule matched nothing and reported 0 findings
+while four rounds of work went unchecked. `--strict` exited 0 throughout.
+
+The distinction it needs is Stata's `e()`/`r()`, which cannot be derived from the
+code, so it is now written down as `TEST_COMMANDS`. Verified by deleting a class
+and watching the rule report it; that check is what should have accompanied the
+rule from the start.
+
+Verified: 6375 passed, 3 skipped, 0 failed (before the version bump; the single
+`test_runtime_version_matches_pyproject` failure was the stale editable metadata
+from 0.3.15 and is resolved by reinstalling). `--strict` exits 0.
+
+---
+
 ## [0.3.15] - 2026-11-14
 
 ### Fixed

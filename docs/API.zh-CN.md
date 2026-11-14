@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.14 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.16 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -19,7 +19,7 @@ _westata 版本: 0.3.14 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -7657,6 +7657,36 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```
 
+### `Rcm`
+
+**Stata 指令:** `rcm depvar predictors, unit() time() trunit() trperiod()`
+
+回归控制法（HCW 风格）：对处理单位拟合处理前模型、外推反事实，给出 `att` 与入选预测变量。`method` 选择前向/后向搜索，`criterion` 选择信息准则。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.Rcm(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'None'
+```
+
+**`Rcm.fit`**
+
+```python
+Rcm.fit(self) -> 'RcmResult'
+```
+
+**示例**
+
+```python
+print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUIDE')
+```
+
+**输出**
+
+```text
+None
+```
+
 ### `RcmResult`
 
 **Stata 指令:** `rcm`
@@ -7698,6 +7728,37 @@ ws.RdRobustResult(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandwi
 ```python
 r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
 print(round(r.tau, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `Rdrobust`
+
+**Stata 指令:** `rdrobust depvar running`
+
+局部多项式断点回归估计：`tau` 是 `cutoff` 处的偏差校正跳跃，`se` 为其稳健标准误，另含两侧有效样本量。可显式给 `bandwidth`（MSE 最优带宽未实现，会明确报错）。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.Rdrobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'None'
+```
+
+**`Rdrobust.fit`**
+
+```python
+Rdrobust.fit(self) -> 'RdRobustResult'
+```
+
+**示例**
+
+```python
+r = ws.Rdrobust.from_variables('y', 'x1', base, bandwidth=0.5).fit()
+print(round(float(r.tau), 6))
 ```
 
 **输出**
@@ -7819,6 +7880,67 @@ ws.SummarizeTable(rows: 'list[tuple[str, float, float, float, float, float]]') -
 ```python
 r = ws.summarize(base, ['y', 'x1'])
 print(r.to_frame())
+```
+
+**输出**
+
+```text
+None
+```
+
+### `Synth`
+
+**Stata 指令:** `synth depvar predictors, unit() time() trunit() trperiod()`
+
+合成控制法：在处理前构造与处理单位匹配的供体权重，再给出处理后缺口与 `RMSPE`。优化器选项（`margin`、`sigf`、`bound`、`nested`、`allopt`）对应 `synth.ado`；纯图形选项会报错而非静默忽略。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.Synth(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False) -> 'None'
+```
+
+**`Synth.fit`**
+
+```python
+Synth.fit(self) -> 'SynthResult'
+```
+
+**示例**
+
+```python
+panel = base.assign(unit=base.firm, period=base.year)
+print('Synth 需要平衡面板与 trunit/trperiod；见 GUIDE 的完整示例')
+```
+
+**输出**
+
+```text
+None
+```
+
+### `Synth2`
+
+**Stata 指令:** `synth2 depvar predictors, unit() time() trunit() trperiod()`
+
+`synth2` v2.1.0 的合成控制：估计本身委托给 `synth`，额外选项（`placebo`、`loo`、`ctrlunit`、`preperiod`、`postperiod`）驱动推断块。frame/图形选项按设计规格明确拒绝。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.Synth2(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None) -> 'None'
+```
+
+**`Synth2.fit`**
+
+```python
+Synth2.fit(self) -> 'Synth2Result'
+```
+
+**示例**
+
+```python
+print('Synth2 需要平衡面板与 trunit/trperiod；见 GUIDE 的完整示例')
 ```
 
 **输出**
@@ -7965,6 +8087,99 @@ ws.TefectsRaResult(ate: 'float', po_0: 'float', po_1: 'float', atet: 'float', no
 ```python
 r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
 print(round(r.estimate, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `TeffectsNnmatch`
+
+**Stata 指令:** `teffects nnmatch (depvar) (treatment) (covariates)`
+
+按马氏距离做最近邻匹配，带 Abadie-Imbens 式偏差校正。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.TeffectsNnmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'None'
+```
+
+**`TeffectsNnmatch.fit`**
+
+```python
+TeffectsNnmatch.fit(self) -> 'NnmatchResult'
+```
+
+**示例**
+
+```python
+r = ws.TeffectsNnmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1', 'x2']).fit()
+print(round(float(r.ate), 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `TeffectsPsmatch`
+
+**Stata 指令:** `teffects psmatch (depvar) (treatment) (covariates)`
+
+倾向得分匹配（ATET）：倾向得分来自处理变量对协变量（含截距）的 logit。第 k 小距离处的并列会**全部**纳入，因此实际匹配数可能超过 `nneighbor`。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.TeffectsPsmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'None'
+```
+
+**`TeffectsPsmatch.fit`**
+
+```python
+TeffectsPsmatch.fit(self) -> 'PsmatchResult'
+```
+
+**示例**
+
+```python
+r = ws.TeffectsPsmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
+print(round(float(r.ate), 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `TeffectsRa`
+
+**Stata 指令:** `teffects ra (depvar covariates) (treatment)`
+
+回归调整处理效应：每个处理臂拟合一条结果方程，将反事实在样本上平均。返回 `ate`/`atet`、潜在结果均值（`po_0`、`po_1`）与标准误；`estimand="atet"` 切到处理组效应。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.TeffectsRa(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'None'
+```
+
+**`TeffectsRa.fit`**
+
+```python
+TeffectsRa.fit(self) -> 'TefectsRaResult'
+```
+
+**示例**
+
+```python
+r = ws.TeffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
+print(round(float(r.ate), 6))
 ```
 
 **输出**

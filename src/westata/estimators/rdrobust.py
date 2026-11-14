@@ -38,9 +38,10 @@ with a number that is nearly right.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
@@ -316,7 +317,119 @@ def _side_variance(
     return float(e1 @ inverse @ middle @ inverse @ e1)
 
 
+class Rdrobust:
+    """``rdrobust depvar running`` -- local-polynomial RD estimate.
+
+    Class form of :func:`westata.rdrobust` (R2.7).  Stata's command takes two variable
+    names plus options, so construction goes through :meth:`from_variables` (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``rdrobust`` has a fixed robust bias-corrected
+    variance, not a ``vce()`` switch (R1.5).
+    """
+
+    model_name = "rdrobust"
+
+    def __init__(
+        self,
+        response: Any,
+        running: Any,
+        *,
+        cutoff: float = 0.0,
+        bandwidth: float | None = None,
+        bias_bandwidth: float | None = None,
+        order: int = 1,
+        bias_order: int = 2,
+        kernel: str = "triangular",
+        covs: Any = None,
+    ) -> None:
+        self.response = response
+        self.running = running
+        self.cutoff = cutoff
+        self.bandwidth = bandwidth
+        self.bias_bandwidth = bias_bandwidth
+        self.order = order
+        self.bias_order = bias_order
+        self.kernel = kernel
+        self.covs = covs
+
+    @classmethod
+    def from_variables(
+        cls,
+        outcome: str,
+        running: str,
+        data: pd.DataFrame,
+        *,
+        cutoff: float = 0.0,
+        bandwidth: float | None = None,
+        bias_bandwidth: float | None = None,
+        order: int = 1,
+        bias_order: int = 2,
+        kernel: str = "triangular",
+        covariates: Sequence[str] | None = None,
+    ) -> "Rdrobust":
+        """Build from a frame and column names."""
+
+        frame = data
+        missing = [name for name in [outcome, running] if name not in frame.columns]
+        if missing:
+            raise ConsistencyError(f"rdrobust: column(s) {missing} not found in data")
+        covs = frame[list(covariates)].to_numpy(dtype=float) if covariates else None
+        return cls(
+            frame[outcome].to_numpy(dtype=float),
+            frame[running].to_numpy(dtype=float),
+            cutoff=cutoff,
+            bandwidth=bandwidth,
+            bias_bandwidth=bias_bandwidth,
+            order=order,
+            bias_order=bias_order,
+            kernel=kernel,
+            covs=covs,
+        )
+
+    def fit(self) -> RdRobustResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _rdrobust_impl(
+            self.response,
+            self.running,
+            cutoff=self.cutoff,
+            bandwidth=self.bandwidth,
+            bias_bandwidth=self.bias_bandwidth,
+            order=self.order,
+            bias_order=self.bias_order,
+            kernel=self.kernel,
+            covs=self.covs,
+        )
+
+
 def rdrobust(
+    response: Any,
+    running: Any,
+    *,
+    cutoff: float = 0.0,
+    bandwidth: float | None = None,
+    bias_bandwidth: float | None = None,
+    order: int = 1,
+    bias_order: int = 2,
+    kernel: str = "triangular",
+    covs: Any = None,
+) -> RdRobustResult:
+    """Fit Stata's ``rdrobust`` -- thin wrapper over :class:`westata.Rdrobust`."""
+
+    return _rdrobust_impl(
+        response,
+        running,
+        cutoff=cutoff,
+        bandwidth=bandwidth,
+        bias_bandwidth=bias_bandwidth,
+        order=order,
+        bias_order=bias_order,
+        kernel=kernel,
+        covs=covs,
+    )
+
+
+def _rdrobust_impl(
     response: Any,
     running: Any,
     *,

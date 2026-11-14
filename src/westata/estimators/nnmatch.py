@@ -34,9 +34,10 @@ one, which is what Stata reports as "no matches".
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
@@ -70,7 +71,101 @@ class NnmatchResult(ResultSerialisation):
         return self.ate
 
 
+class TeffectsNnmatch:
+    """``teffects nnmatch (depvar) (treatment) (covariates)`` -- nearest neighbour.
+
+    Class form of :func:`westata.teffects_nnmatch` (R2.7).  Construction takes column
+    names through :meth:`from_variables`, matching Stata's variable-list syntax (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option.
+    """
+
+    model_name = "teffects_nnmatch"
+
+    def __init__(
+        self,
+        response: Any,
+        treatment: Any,
+        covariates: Any,
+        *,
+        nneighbor: int = 1,
+        caliper: float | None = None,
+        tie_tolerance: float = 1e-10,
+    ) -> None:
+        self.response = response
+        self.treatment = treatment
+        self.covariates = covariates
+        self.nneighbor = nneighbor
+        self.caliper = caliper
+        self.tie_tolerance = tie_tolerance
+
+    @classmethod
+    def from_variables(
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        *,
+        covariates: Sequence[str] | None = None,
+        nneighbor: int = 1,
+        caliper: float | None = None,
+        tie_tolerance: float = 1e-10,
+    ) -> "TeffectsNnmatch":
+        """Build from a frame and column names."""
+
+        frame = data
+        missing = [name for name in [outcome, treatment] if name not in frame.columns]
+        if missing:
+            raise ConsistencyError(
+                f"teffects nnmatch: column(s) {missing} not found in data"
+            )
+        covariate_frame = (
+            frame[list(covariates)] if covariates else frame[[outcome]].iloc[:, :0]
+        )
+        return cls(
+            frame[outcome].to_numpy(dtype=float),
+            frame[treatment].to_numpy(),
+            covariate_frame.to_numpy(dtype=float),
+            nneighbor=nneighbor,
+            caliper=caliper,
+            tie_tolerance=tie_tolerance,
+        )
+
+    def fit(self) -> NnmatchResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _teffects_nnmatch_impl(
+            self.response,
+            self.treatment,
+            self.covariates,
+            nneighbor=self.nneighbor,
+            caliper=self.caliper,
+            tie_tolerance=self.tie_tolerance,
+        )
+
+
 def teffects_nnmatch(
+    response: Any,
+    treatment: Any,
+    covariates: Any,
+    *,
+    nneighbor: int = 1,
+    caliper: float | None = None,
+    tie_tolerance: float = 1e-10,
+) -> NnmatchResult:
+    """Fit Stata's ``teffects nnmatch`` -- thin wrapper over :class:`TeffectsNnmatch`."""
+
+    return _teffects_nnmatch_impl(
+        response,
+        treatment,
+        covariates,
+        nneighbor=nneighbor,
+        caliper=caliper,
+        tie_tolerance=tie_tolerance,
+    )
+
+
+def _teffects_nnmatch_impl(
     response: Any,
     treatment: Any,
     covariates: Any,

@@ -232,5 +232,35 @@
   "en": "Class form of `ws.prais` (R2.7): the Prais-Winsten / Cochrane-Orcutt AR(1) estimator. `corc` selects the Cochrane-Orcutt transform (drops the first observation instead of scaling it by sqrt(1-rho^2)) and is a MODEL option, so it belongs to construction. `fit()` takes no `cov_type` -- Stata's `prais` has no `vce()` option. NOTE THE ORDER: `Prais(data, formula)` keeps the function's positional order, which is the reverse of every other `from_formula`; use `Prais.from_formula(formula, data)` for the standard order.",
   "zh": "`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。",
   "example": "r = ws.Prais.from_formula('y ~ x1', base).fit()\nprint(round(float(r.rho), 6), round(float(r.params[0]), 6))"
+ },
+ "TeffectsRa": {
+  "stata": "teffects ra (depvar covariates) (treatment)",
+  "en": "Regression-adjustment treatment effects: one outcome regression per arm, counterfactuals averaged over the sample. Returns `ate`/`atet`, the potential-outcome means (`po_0`, `po_1`), and standard errors; `estimand=\"atet\"` switches to the treated-population effect. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+  "zh": "回归调整处理效应：每个处理臂拟合一条结果方程，将反事实在样本上平均。返回 `ate`/`atet`、潜在结果均值（`po_0`、`po_1`）与标准误；`estimand=\"atet\"` 切到处理组效应。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+  "example": "r = ws.TeffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()\nprint(round(float(r.ate), 6))"
+ },
+ "TeffectsPsmatch": {
+  "stata": "teffects psmatch (depvar) (treatment) (covariates)",
+  "en": "Propensity-score matching (ATET): the propensity comes from a logit of the treatment on the covariates with an intercept. Ties at the k-th smallest distance are ALL included, so the realised match count can exceed `nneighbor`. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+  "zh": "倾向得分匹配（ATET）：倾向得分来自处理变量对协变量（含截距）的 logit。第 k 小距离处的并列会**全部**纳入，因此实际匹配数可能超过 `nneighbor`。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+  "example": "r = ws.TeffectsPsmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()\nprint(round(float(r.ate), 6))"
+ },
+ "TeffectsNnmatch": {
+  "stata": "teffects nnmatch (depvar) (treatment) (covariates)",
+  "en": "Nearest-neighbour matching on Mahalanobis distance, with an Abadie-Imbens style bias correction. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+  "zh": "按马氏距离做最近邻匹配，带 Abadie-Imbens 式偏差校正。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+  "example": "r = ws.TeffectsNnmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1', 'x2']).fit()\nprint(round(float(r.ate), 6))"
+ },
+ "Rdrobust": {
+  "stata": "rdrobust depvar running",
+  "en": "Local-polynomial regression-discontinuity estimate: `tau` is the bias-corrected jump at `cutoff`, `se` its robust standard error, plus the effective sample sizes per side. `bandwidth` may be given explicitly (MSE-optimal selection is not implemented and says so). `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+  "zh": "局部多项式断点回归估计：`tau` 是 `cutoff` 处的偏差校正跳跃，`se` 为其稳健标准误，另含两侧有效样本量。可显式给 `bandwidth`（MSE 最优带宽未实现，会明确报错）。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+  "example": "r = ws.Rdrobust.from_variables('y', 'x1', base, bandwidth=0.5).fit()\nprint(round(float(r.tau), 6))"
+ },
+ "Rcm": {
+  "stata": "rcm depvar predictors, unit() time() trunit() trperiod()",
+  "en": "Regression control method (HCW-style): fits a pre-treatment model for the treated unit, predicts the counterfactual, and reports `att` with the selected predictor set. `method` chooses the forward/backward search, `criterion` the information criterion. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+  "zh": "回归控制法（HCW 风格）：对处理单位拟合处理前模型、外推反事实，给出 `att` 与入选预测变量。`method` 选择前向/后向搜索，`criterion` 选择信息准则。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+  "example": "print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUIDE')"
  }
 }

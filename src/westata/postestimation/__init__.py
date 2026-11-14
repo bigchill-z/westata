@@ -23,7 +23,7 @@ from westata.postestimation.margins import MarginsResult, MarginsTable, margins
 from westata.postestimation.predict import SUPPORTED_TYPES, predict, supported_types
 from westata.postestimation.vargranger import VarGrangerResult, vargranger
 from westata.postestimation.ereturn import format_ereturn_list, standardized_coefficients
-from westata.postestimation.rcm import RcmResult, rcm
+from westata.postestimation.rcm import Rcm, RcmResult, rcm
 from westata.postestimation.tebalance import (
     BalanceRow,
     BalanceSummary,
@@ -83,6 +83,7 @@ from westata.postestimation.szroeter import SzroeterResult, SzroeterTable, estat
 from westata.postestimation.weakrobust import WeakRobustResult, estat_weakrobust
 
 __all__ = [
+    "Rcm",
     "endog_score_test",
     "endog_regf_test",
     "tebalance_summarize",

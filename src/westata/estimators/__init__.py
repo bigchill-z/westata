@@ -45,10 +45,10 @@ from westata.estimators.limited import (
 from westata.estimators.linear import OLS
 from westata.estimators.newey import Newey, NeweyWestResult, check_time_spacing, newey
 from westata.estimators.prais import Prais, PraisResult, prais, prais_winsten
-from westata.estimators.rdrobust import RdRobustResult, rdrobust
-from westata.estimators.teffects_ra import TefectsRaResult, teffects_ra
-from westata.estimators.psmatch import PsmatchResult, teffects_psmatch
-from westata.estimators.nnmatch import NnmatchResult, teffects_nnmatch
+from westata.estimators.rdrobust import RdRobustResult, Rdrobust, rdrobust
+from westata.estimators.teffects_ra import TefectsRaResult, TeffectsRa, teffects_ra
+from westata.estimators.psmatch import PsmatchResult, TeffectsPsmatch, teffects_psmatch
+from westata.estimators.nnmatch import NnmatchResult, TeffectsNnmatch, teffects_nnmatch
 from westata.estimators.panel_dynamic import XtAbond
 from westata.estimators.panel_nonlinear import (
     XtLogit,
@@ -95,8 +95,8 @@ from westata.estimators.panel import (
     RandomEffects,
 )
 from westata.estimators.tobit import Tobit
-from westata.estimators.synth import SynthResult, synth
-from westata.estimators.synth2 import Synth2Result, synth2
+from westata.estimators.synth import Synth, SynthResult, synth
+from westata.estimators.synth2 import Synth2, Synth2Result, synth2
 from westata.estimators.tseries import (
     ARIMA,
     GARCH,
@@ -112,6 +112,12 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "Synth2",
+    "Synth",
+    "Rdrobust",
+    "TeffectsNnmatch",
+    "TeffectsPsmatch",
+    "TeffectsRa",
     "Prais",
     "Newey",
     "estat_ptrends",

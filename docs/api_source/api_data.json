@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.14",
+  "westata_version": "0.3.16",
   "exports": [
     {
       "name": "AIPW",
@@ -1258,6 +1258,21 @@
       "methods": []
     },
     {
+      "name": "Rcm",
+      "kind": "class",
+      "module": "westata.postestimation.rcm",
+      "docstring": "``rcm depvar predictors, unit() time() trunit() trperiod()`` -- regression control.\n\nClass form of :func:`westata.rcm` (R2.7).  Stata passes variable names as options, so\nconstruction goes through :meth:`from_variables` (R3.2).\n\n``fit()`` takes no ``cov_type``: ``rcm`` reports a fixed placebo-based inference, not\na ``vce()`` switch (R1.5).",
+      "signature": "(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'RcmResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', data: 'pd.DataFrame', *, predictors: 'Sequence[str] | None' = None, unit: 'str', time: 'str', treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> \"'Rcm'\""
+        }
+      ]
+    },
+    {
       "name": "RcmResult",
       "kind": "class",
       "module": "westata.postestimation.rcm",
@@ -1292,6 +1307,21 @@
         {
           "name": "to_frame",
           "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "Rdrobust",
+      "kind": "class",
+      "module": "westata.estimators.rdrobust",
+      "docstring": "``rdrobust depvar running`` -- local-polynomial RD estimate.\n\nClass form of :func:`westata.rdrobust` (R2.7).  Stata's command takes two variable\nnames plus options, so construction goes through :meth:`from_variables` (R3.2).\n\n``fit()`` takes no ``cov_type``: ``rdrobust`` has a fixed robust bias-corrected\nvariance, not a ``vce()`` switch (R1.5).",
+      "signature": "(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'RdRobustResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', running: 'str', data: 'pd.DataFrame', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covariates: 'Sequence[str] | None' = None) -> \"'Rdrobust'\""
         }
       ]
     },
@@ -1782,6 +1812,36 @@
       ]
     },
     {
+      "name": "Synth",
+      "kind": "class",
+      "module": "westata.estimators.synth",
+      "docstring": "``synth depvar predictors, unit() time() trunit() trperiod()``.\n\nClass form of :func:`westata.synth` (R2.7).  Stata passes every variable as an\noption, so construction goes through :meth:`from_variables` rather than\n``from_formula`` (R3.2).\n\n``fit()`` takes no ``cov_type``: ``synth`` reports permutation-style inference from\nthe placebo distribution, not a ``vce()`` switch (R1.5).",
+      "signature": "(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'SynthResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False) -> \"'Synth'\""
+        }
+      ]
+    },
+    {
+      "name": "Synth2",
+      "kind": "class",
+      "module": "westata.estimators.synth2",
+      "docstring": "``synth2`` -- synthetic control with the placebo / leave-one-out machinery.\n\nClass form of :func:`westata.synth2` (R2.7).  Stata passes the variables as options,\nso construction goes through :meth:`from_variables` (R3.2).\n\n``fit()`` takes no ``cov_type``: ``synth2`` reports placebo-based inference, not a\n``vce()`` switch (R1.5).",
+      "signature": "(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'Synth2Result'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None) -> \"'Synth2'\""
+        }
+      ]
+    },
+    {
       "name": "Synth2Result",
       "kind": "class",
       "module": "westata.estimators.synth2",
@@ -1877,6 +1937,51 @@
         {
           "name": "to_frame",
           "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "TeffectsNnmatch",
+      "kind": "class",
+      "module": "westata.estimators.nnmatch",
+      "docstring": "``teffects nnmatch (depvar) (treatment) (covariates)`` -- nearest neighbour.\n\nClass form of :func:`westata.teffects_nnmatch` (R2.7).  Construction takes column\nnames through :meth:`from_variables`, matching Stata's variable-list syntax (R3.2).\n\n``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option.",
+      "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'NnmatchResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> \"'TeffectsNnmatch'\""
+        }
+      ]
+    },
+    {
+      "name": "TeffectsPsmatch",
+      "kind": "class",
+      "module": "westata.estimators.psmatch",
+      "docstring": "``teffects psmatch (depvar) (treatment) (covariates)`` -- propensity matching.\n\nClass form of :func:`westata.teffects_psmatch` (R2.7).  Stata writes this subcommand\nwith a VARIABLE LIST, so construction goes through :meth:`from_variables` rather than\n``from_formula`` (R3.2).\n\n``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option.",
+      "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'PsmatchResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, caliper: 'float | None' = None) -> \"'TeffectsPsmatch'\""
+        }
+      ]
+    },
+    {
+      "name": "TeffectsRa",
+      "kind": "class",
+      "module": "westata.estimators.teffects_ra",
+      "docstring": "``teffects ra (depvar covariates) (treatment)`` -- regression adjustment.\n\nClass form of :func:`westata.teffects_ra` (R2.7).  Stata writes this subcommand with\na VARIABLE LIST, not a formula::\n\n    teffects ra (y age educ) (treat)\n\nso construction takes the variable names through :meth:`from_variables`, matching\nthe other non-formula families (``Didregress``, ``RegressionAdjustment``); calling\nit ``from_formula`` would be the \"name lies\" defect R3.2 removes.\n\n``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option, and the\ninfluence-function variance is part of the estimator (R1.5).",
+      "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'None'",
+      "from_formula": null,
+      "fit": "(self) -> 'TefectsRaResult'",
+      "methods": [
+        {
+          "name": "from_variables",
+          "signature": "(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', *, covariates: 'Sequence[str] | None' = None, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> \"'TeffectsRa'\""
         }
       ]
     },
@@ -2837,14 +2942,14 @@
       "name": "rcm",
       "kind": "function",
       "module": "westata.postestimation.rcm",
-      "docstring": "Regression control method for one treated unit.\n\n``response``/``predictors``/``unit``/``time`` are equal-length sequences describing a\nbalanced panel: the outcome, the candidate control variables, the unit identifier and the\nperiod. ``treated_unit`` names the unit receiving treatment at ``treatment_period``.\n\n``selected`` may name the control units to use directly (this reproduces Stata exactly when\nthe same set is chosen). Left as ``None``, a forward search is run on the pre-period by the\n``criterion``.",
+      "docstring": "Fit Stata's ``rcm`` -- thin wrapper over :class:`westata.Rcm`.",
       "signature": "(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'RcmResult'"
     },
     {
       "name": "rdrobust",
       "kind": "function",
       "module": "westata.estimators.rdrobust",
-      "docstring": "Sharp RD estimate at ``cutoff``.\n\nBandwidth selection is not implemented: pass ``bandwidth`` explicitly, or the default\n``None`` raises rather than silently choosing one. Stata's MSE-optimal selector is a\nseparate, considerably larger piece of work.",
+      "docstring": "Fit Stata's ``rdrobust`` -- thin wrapper over :class:`westata.Rdrobust`.",
       "signature": "(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResult'"
     },
     {
@@ -2886,14 +2991,14 @@
       "name": "synth",
       "kind": "function",
       "module": "westata.estimators.synth",
-      "docstring": "Fit a synthetic control (Stata ``synth``), extended feature set.\n\nImplements Stata's default path plus ``unitnames()``, per-predictor\n``var(period)`` windows, ``keep()``, the four optimiser settings and an\nalgorithm-equivalent ``nested`` / ``allopt`` outer V search.  Graphics and\n``synth2``'s placebo/LOO remain out of scope.\n\nEvidence grading is per quantity and MEASURED, never assumed: see\n``tests/conformance/registry.yml``.  ``nested``/``allopt`` and RMSPE cannot\nbe bit-identical to Stata (closed-source ``ml`` optimiser + rank-deficient\nQP + non-deterministic C++ plugin); they are E2 by construction.",
+      "docstring": "Fit Stata's ``synth`` -- thin wrapper over :class:`westata.Synth`.",
       "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'"
     },
     {
       "name": "synth2",
       "kind": "function",
       "module": "westata.estimators.synth2",
-      "docstring": "Fit Stata ``synth2``'s NON-GRAPHICS feature set.\n\nAll optimisation is delegated to :func:`westata.synth`.  See the module\ndocstring and ``docs/superpowers/specs/2026-11-11-synth2-design.md`` for\nthe per-quantity evidence grading and the exact ado formulas.",
+      "docstring": "Fit Stata's ``synth2`` -- thin wrapper over :class:`westata.Synth2`.",
       "signature": "(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None, **unsupported: 'Any') -> 'Synth2Result'"
     },
     {
@@ -2907,21 +3012,21 @@
       "name": "teffects_nnmatch",
       "kind": "function",
       "module": "westata.estimators.nnmatch",
-      "docstring": "ATET by Mahalanobis-distance nearest-neighbour matching.\n\n``caliper`` caps the distance a match may have; ``None`` means no cap (Stata's default).\n``tie_tolerance`` is the absolute distance within which two controls count as equally near.",
+      "docstring": "Fit Stata's ``teffects nnmatch`` -- thin wrapper over :class:`TeffectsNnmatch`.",
       "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'NnmatchResult'"
     },
     {
       "name": "teffects_psmatch",
       "kind": "function",
       "module": "westata.estimators.psmatch",
-      "docstring": "ATET by propensity-score matching, as ``teffects psmatch ..., atet``.\n\n``covariates`` is an ``(n, k)`` array. The propensity score comes from a logit of\n``treatment`` on those covariates with an intercept, which is what Stata's treatment\nmodel does by default (verified: the logit coefficients agree to 1e-7).\n\n``nneighbor`` is Stata's ``nn()``; ties at the k-th smallest distance are ALL included,\nso the realised number of matches can exceed it.\n\n``tie_tolerance`` is the absolute propensity-score difference still counted as a tie. It\nmust be TIGHT. The old 1e-6 default lumped two controls 0.0011575908 and 0.00115824\napart -- a difference of 6e-7 -- into one tie for treated unit 2, which reported four\nmatches where Stata uses three. Measured across nn(1) to nn(5) on nsw_dw::\n\n    tolerance   matches Stata\n    1e-6        4 of 5      (nn(3) gives 2412.8207 against 2397.636)\n    1e-9        5 of 5\n    1e-12       5 of 5\n    0           5 of 5\n\n1e-9 separates distinct distances while still absorbing the logit's own numerical noise,\nwhich is far below that scale.\n\n``caliper`` is Stata's ``caliper(#)``: a control further than # in propensity-score\ndistance is ineligible, and a treated unit with nothing inside the caliper is dropped\nfrom the estimate (Stata reports those as \"no matches\"). ``None`` means no cap, which is\nthe default.\n\nThe AI-robust standard error is NOT computed (see the module docstring), so the\ninferential fields stay NaN.",
+      "docstring": "Fit Stata's ``teffects psmatch`` -- thin wrapper over :class:`TeffectsPsmatch`.",
       "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'PsmatchResult'"
     },
     {
       "name": "teffects_ra",
       "kind": "function",
       "module": "westata.estimators.teffects_ra",
-      "docstring": "Regression-adjustment treatment effect, as ``teffects ra (y x) (t)``.\n\n``covariates`` is an ``(n, k)`` array; a constant column is prepended unless\n``add_constant`` is False.",
+      "docstring": "Fit Stata's ``teffects ra`` -- thin wrapper over :class:`westata.TeffectsRa`.",
       "signature": "(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'TefectsRaResult'"
     },
     {
@@ -4094,6 +4199,36 @@
       "en": "Class form of `ws.prais` (R2.7): the Prais-Winsten / Cochrane-Orcutt AR(1) estimator. `corc` selects the Cochrane-Orcutt transform (drops the first observation instead of scaling it by sqrt(1-rho^2)) and is a MODEL option, so it belongs to construction. `fit()` takes no `cov_type` -- Stata's `prais` has no `vce()` option. NOTE THE ORDER: `Prais(data, formula)` keeps the function's positional order, which is the reverse of every other `from_formula`; use `Prais.from_formula(formula, data)` for the standard order.",
       "zh": "`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。",
       "example": "r = ws.Prais.from_formula('y ~ x1', base).fit()\nprint(round(float(r.rho), 6), round(float(r.params[0]), 6))"
+    },
+    "TeffectsRa": {
+      "stata": "teffects ra (depvar covariates) (treatment)",
+      "en": "Regression-adjustment treatment effects: one outcome regression per arm, counterfactuals averaged over the sample. Returns `ate`/`atet`, the potential-outcome means (`po_0`, `po_1`), and standard errors; `estimand=\"atet\"` switches to the treated-population effect. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "回归调整处理效应：每个处理臂拟合一条结果方程，将反事实在样本上平均。返回 `ate`/`atet`、潜在结果均值（`po_0`、`po_1`）与标准误；`estimand=\"atet\"` 切到处理组效应。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "r = ws.TeffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()\nprint(round(float(r.ate), 6))"
+    },
+    "TeffectsPsmatch": {
+      "stata": "teffects psmatch (depvar) (treatment) (covariates)",
+      "en": "Propensity-score matching (ATET): the propensity comes from a logit of the treatment on the covariates with an intercept. Ties at the k-th smallest distance are ALL included, so the realised match count can exceed `nneighbor`. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "倾向得分匹配（ATET）：倾向得分来自处理变量对协变量（含截距）的 logit。第 k 小距离处的并列会**全部**纳入，因此实际匹配数可能超过 `nneighbor`。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "r = ws.TeffectsPsmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()\nprint(round(float(r.ate), 6))"
+    },
+    "TeffectsNnmatch": {
+      "stata": "teffects nnmatch (depvar) (treatment) (covariates)",
+      "en": "Nearest-neighbour matching on Mahalanobis distance, with an Abadie-Imbens style bias correction. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "按马氏距离做最近邻匹配，带 Abadie-Imbens 式偏差校正。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "r = ws.TeffectsNnmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1', 'x2']).fit()\nprint(round(float(r.ate), 6))"
+    },
+    "Rdrobust": {
+      "stata": "rdrobust depvar running",
+      "en": "Local-polynomial regression-discontinuity estimate: `tau` is the bias-corrected jump at `cutoff`, `se` its robust standard error, plus the effective sample sizes per side. `bandwidth` may be given explicitly (MSE-optimal selection is not implemented and says so). `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "局部多项式断点回归估计：`tau` 是 `cutoff` 处的偏差校正跳跃，`se` 为其稳健标准误，另含两侧有效样本量。可显式给 `bandwidth`（MSE 最优带宽未实现，会明确报错）。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "r = ws.Rdrobust.from_variables('y', 'x1', base, bandwidth=0.5).fit()\nprint(round(float(r.tau), 6))"
+    },
+    "Rcm": {
+      "stata": "rcm depvar predictors, unit() time() trunit() trperiod()",
+      "en": "Regression control method (HCW-style): fits a pre-treatment model for the treated unit, predicts the counterfactual, and reports `att` with the selected predictor set. `method` chooses the forward/backward search, `criterion` the information criterion. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "回归控制法（HCW 风格）：对处理单位拟合处理前模型、外推反事实，给出 `att` 与入选预测变量。`method` 选择前向/后向搜索，`criterion` 选择信息准则。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUIDE')"
     },
     "Logit": {
       "stata": "logit yb x1 x2",
@@ -5276,6 +5411,18 @@
       "en": "Frozen dataclass holding the outcome of `synth2`. Field names mirror Stata's `e()` verbatim: scalars `N/T/T0/T1/K/J/rmse/r2/att`, matrices `bal` (K x 6), `U_wt`, `V_wt`, `mspe` (in-space placebo only), `pval` (in-space placebo only), trajectories `Y_treated`/`Y_synthetic`/`time_index` with a `gap` property, placebo fields (`placebo_probability`, `placebo_removed`, `mspe_names`, `time_placebo`), LOO envelopes (`loo_min`/`loo_max`/`loo_effect_min`/`loo_effect_max`/`loo_n_runs`), and audit fields (`synth_result`, `method`, `numerically_inactive`). `summary()` renders a compact Stata-style report. It is NOT a `StataResults`: no `params`, `bse`, `cov_params` or `df_resid` are fabricated. The 6 `bal` columns are `Vweight, Treated, ValueSyntheticControl, BiasSyntheticControl, ValueAverageControl, BiasAverageControl`; `Bias% = (Value/Treated - 1)*100` (ado:181).",
       "zh": "保存 `synth2` 结果的冻结 dataclass（`synth` 的 e() 已被清空）。字段逐字对应 Stata 的 `e()`：标量 `N/T/T0/T1/K/J/rmse/r2/att`，矩阵 `bal`（K x 6）、`U_wt`、`V_wt`、`mspe`（仅空间安慰剂）、`pval`（仅空间安慰剂），轨迹 `Y_treated`/`Y_synthetic`/`time_index` 及 `gap` 属性，安慰剂字段（`placebo_probability`、`placebo_removed`、`mspe_names`、`time_placebo`），留一包络（`loo_min`/`loo_max`/`loo_effect_min`/`loo_effect_max`/`loo_n_runs`），以及审计字段（`synth_result`、`method`、`numerically_inactive`）。`summary()` 渲染紧凑的 Stata 风格报表。它不是 `StataResults`：不伪造 `params`、`bse`、`cov_params`、`df_resid`。`bal` 的 6 列为 `Vweight, Treated, ValueSyntheticControl, BiasSyntheticControl, ValueAverageControl, BiasAverageControl`；`Bias% = (Value/Treated - 1)*100`（ado:181）。",
       "example": "units = [1, 2, 3, 4, 5]\nyears = np.arange(1997, 2006)\nu = np.repeat(units, len(years))\nt = np.tile(years, len(units))\nrng = np.random.default_rng(0)\nx1 = 0.5 * u + rng.normal(size=len(u))\nx2 = 0.2 * u + rng.normal(size=len(u))\ny = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))\npanel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})\nres = ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)\nres.bal"
+    },
+    "Synth": {
+      "stata": "synth depvar predictors, unit() time() trunit() trperiod()",
+      "en": "Synthetic control: builds a weighted donor pool matching the treated unit before treatment, then reports the post-treatment gap and `RMSPE`. The optional optimiser switches (`margin`, `sigf`, `bound`, `nested`, `allopt`) map onto `synth.ado`; graphics-only options raise instead of being silently ignored. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "合成控制法：在处理前构造与处理单位匹配的供体权重，再给出处理后缺口与 `RMSPE`。优化器选项（`margin`、`sigf`、`bound`、`nested`、`allopt`）对应 `synth.ado`；纯图形选项会报错而非静默忽略。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "panel = base.assign(unit=base.firm, period=base.year)\nprint('Synth 需要平衡面板与 trunit/trperiod；见 GUIDE 的完整示例')"
+    },
+    "Synth2": {
+      "stata": "synth2 depvar predictors, unit() time() trunit() trperiod()",
+      "en": "Synthetic control with the placebo and leave-one-out machinery of `synth2` v2.1.0: the estimation itself is delegated to `synth`, and the extra options (`placebo`, `loo`, `ctrlunit`, `preperiod`, `postperiod`) drive the inference blocks. Frame/graphics options are refused explicitly, as documented in its design spec. `fit()` accepts no `cov_type`: Stata's command has no `vce()` option, so the variance is part of the estimator. Construction goes through `from_variables(...)` rather than `from_formula(...)`, because Stata spells these commands with a variable list (R2.7, R3.2).",
+      "zh": "`synth2` v2.1.0 的合成控制：估计本身委托给 `synth`，额外选项（`placebo`、`loo`、`ctrlunit`、`preperiod`、`postperiod`）驱动推断块。frame/图形选项按设计规格明确拒绝。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。",
+      "example": "print('Synth2 需要平衡面板与 trunit/trperiod；见 GUIDE 的完整示例')"
     }
   }
 }

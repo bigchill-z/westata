@@ -729,7 +729,275 @@ def _build_matrices(
 # --------------------------------------------------------------------------- #
 # Public estimator
 # --------------------------------------------------------------------------- #
+class Synth:
+    """``synth depvar predictors, unit() time() trunit() trperiod()``.
+
+    Class form of :func:`westata.synth` (R2.7).  Stata passes every variable as an
+    option, so construction goes through :meth:`from_variables` rather than
+    ``from_formula`` (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``synth`` reports permutation-style inference from
+    the placebo distribution, not a ``vce()`` switch (R1.5).
+    """
+
+    model_name = "synth"
+
+    def __init__(
+        self,
+        data: Any,
+        unit: str,
+        time: str,
+        depvar: str,
+        predictors: Sequence[str],
+        trunit: Any,
+        trperiod: float,
+        counit: Sequence[Any] | None = None,
+        xperiod: Sequence[float] | None = None,
+        mspeperiod: Sequence[float] | None = None,
+        resultsperiod: Sequence[float] | None = None,
+        customV: Sequence[float] | None = None,
+        unitnames: str | None = None,
+        margin: float = _MARGIN,
+        maxiter: int = _MAXITER,
+        sigf: int = _SIGF,
+        bound: float = _BOUND,
+        nested: bool = False,
+        allopt: bool = False,
+        technique: str | None = None,
+        iterate: int | None = None,
+        nrtolerance: float | None = None,
+        nonrtolerance: bool = False,
+        difficult: bool = False,
+        search: str | None = None,
+        trace: bool = False,
+        keep: str | None = None,
+        replace: bool = False,
+        figure: bool = False,
+        placebo: bool = False,
+    ) -> None:
+        self._data = data
+        self.unit = unit
+        self.time = time
+        self.depvar = depvar
+        self.predictors = predictors
+        self.trunit = trunit
+        self.trperiod = trperiod
+        self.counit = counit
+        self.xperiod = xperiod
+        self.mspeperiod = mspeperiod
+        self.resultsperiod = resultsperiod
+        self.customV = customV
+        self.unitnames = unitnames
+        self.margin = margin
+        self.maxiter = maxiter
+        self.sigf = sigf
+        self.bound = bound
+        self.nested = nested
+        self.allopt = allopt
+        self.technique = technique
+        self.iterate = iterate
+        self.nrtolerance = nrtolerance
+        self.nonrtolerance = nonrtolerance
+        self.difficult = difficult
+        self.search = search
+        self.trace = trace
+        self.keep = keep
+        self.replace = replace
+        self.figure = figure
+        self.placebo = placebo
+
+    @classmethod
+    def from_variables(
+        cls,
+        data: Any,
+        *,
+        unit: str,
+        time: str,
+        depvar: str,
+        predictors: Sequence[str],
+        trunit: Any,
+        trperiod: float,
+        counit: Sequence[Any] | None = None,
+        xperiod: Sequence[float] | None = None,
+        mspeperiod: Sequence[float] | None = None,
+        resultsperiod: Sequence[float] | None = None,
+        customV: Sequence[float] | None = None,
+        unitnames: str | None = None,
+        margin: float = _MARGIN,
+        maxiter: int = _MAXITER,
+        sigf: int = _SIGF,
+        bound: float = _BOUND,
+        nested: bool = False,
+        allopt: bool = False,
+        technique: str | None = None,
+        iterate: int | None = None,
+        nrtolerance: float | None = None,
+        nonrtolerance: bool = False,
+        difficult: bool = False,
+        search: str | None = None,
+        trace: bool = False,
+        keep: str | None = None,
+        replace: bool = False,
+        figure: bool = False,
+        placebo: bool = False,
+    ) -> "Synth":
+        """Build from a frame and column names -- Stata's ``synth`` syntax."""
+
+        frame = data
+        columns = [depvar, *list(predictors)]
+        missing = [name for name in columns if name not in frame.columns]
+        if missing:
+            raise ConsistencyError(f"synth: column(s) {missing} not found in data")
+        return cls(
+            frame,
+            unit,
+            time,
+            depvar,
+            predictors,
+            trunit,
+            trperiod,
+            counit=counit,
+            xperiod=xperiod,
+            mspeperiod=mspeperiod,
+            resultsperiod=resultsperiod,
+            customV=customV,
+            unitnames=unitnames,
+            margin=margin,
+            maxiter=maxiter,
+            sigf=sigf,
+            bound=bound,
+            nested=nested,
+            allopt=allopt,
+            technique=technique,
+            iterate=iterate,
+            nrtolerance=nrtolerance,
+            nonrtolerance=nonrtolerance,
+            difficult=difficult,
+            search=search,
+            trace=trace,
+            keep=keep,
+            replace=replace,
+            figure=figure,
+            placebo=placebo,
+        )
+
+    def fit(self) -> SynthResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _synth_impl(
+            self._data,
+            unit=getattr(self, 'unit'),
+            time=getattr(self, 'time'),
+            depvar=getattr(self, 'depvar'),
+            predictors=getattr(self, 'predictors'),
+            trunit=getattr(self, 'trunit'),
+            trperiod=getattr(self, 'trperiod'),
+            counit=getattr(self, 'counit'),
+            xperiod=getattr(self, 'xperiod'),
+            mspeperiod=getattr(self, 'mspeperiod'),
+            resultsperiod=getattr(self, 'resultsperiod'),
+            customV=getattr(self, 'customV'),
+            unitnames=getattr(self, 'unitnames'),
+            margin=getattr(self, 'margin'),
+            maxiter=getattr(self, 'maxiter'),
+            sigf=getattr(self, 'sigf'),
+            bound=getattr(self, 'bound'),
+            nested=getattr(self, 'nested'),
+            allopt=getattr(self, 'allopt'),
+            technique=getattr(self, 'technique'),
+            iterate=getattr(self, 'iterate'),
+            nrtolerance=getattr(self, 'nrtolerance'),
+            nonrtolerance=getattr(self, 'nonrtolerance'),
+            difficult=getattr(self, 'difficult'),
+            search=getattr(self, 'search'),
+            trace=getattr(self, 'trace'),
+            keep=getattr(self, 'keep'),
+            replace=getattr(self, 'replace'),
+            figure=getattr(self, 'figure'),
+            placebo=getattr(self, 'placebo'),
+        )
+
+
 def synth(
+    data: Any,
+    *,
+    unit: str,
+    time: str,
+    depvar: str,
+    predictors: Sequence[str],
+    trunit: Any,
+    trperiod: float,
+    counit: Sequence[Any] | None = None,
+    xperiod: Sequence[float] | None = None,
+    mspeperiod: Sequence[float] | None = None,
+    resultsperiod: Sequence[float] | None = None,
+    customV: Sequence[float] | None = None,
+    unitnames: str | None = None,
+    # Optimiser settings (synth.ado:35-38; the 2014 help file's 0.05/7 is stale)
+    margin: float = _MARGIN,
+    maxiter: int = _MAXITER,
+    sigf: int = _SIGF,
+    bound: float = _BOUND,
+    # Outer V search (algorithm-equivalent, NOT bit-identical to Stata's ml)
+    nested: bool = False,
+    allopt: bool = False,
+    # `ml maximize` options accepted by Stata via `*`/mlopts (synth.ado:41,434).
+    # They are validated and RECORDED.  iterate() maps faithfully to the outer
+    # optimiser's iteration budget; technique() is recorded but cannot change
+    # our single Powell-based outer algorithm (documented, not faked).
+    technique: str | None = None,
+    iterate: int | None = None,
+    nrtolerance: float | None = None,
+    nonrtolerance: bool = False,
+    difficult: bool = False,
+    search: str | None = None,
+    trace: bool = False,
+    # Results dataset (NOT a graph)
+    keep: str | None = None,
+    replace: bool = False,
+    # Deliberately refused: graphics and synth2's placebo machinery
+    figure: bool = False,
+    placebo: bool = False,
+    **unsupported: Any,
+) -> SynthResult:
+    """Fit Stata's ``synth`` -- thin wrapper over :class:`westata.Synth`."""
+
+    return _synth_impl(
+        data,
+        unit=unit,
+        time=time,
+        depvar=depvar,
+        predictors=predictors,
+        trunit=trunit,
+        trperiod=trperiod,
+        counit=counit,
+        xperiod=xperiod,
+        mspeperiod=mspeperiod,
+        resultsperiod=resultsperiod,
+        customV=customV,
+        unitnames=unitnames,
+        margin=margin,
+        maxiter=maxiter,
+        sigf=sigf,
+        bound=bound,
+        nested=nested,
+        allopt=allopt,
+        technique=technique,
+        iterate=iterate,
+        nrtolerance=nrtolerance,
+        nonrtolerance=nonrtolerance,
+        difficult=difficult,
+        search=search,
+        trace=trace,
+        keep=keep,
+        replace=replace,
+        figure=figure,
+        placebo=placebo,
+        **unsupported,
+    )
+
+
+def _synth_impl(
     data: Any,
     *,
     unit: str,

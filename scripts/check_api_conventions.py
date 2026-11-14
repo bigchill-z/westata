@@ -1377,18 +1377,33 @@ def check_r2_estimation_has_class(report: Report) -> None:
 
     #: e-class estimation commands that are still function-only.  Removing a name from
     #: here is how the R2.7 backlog gets worked off.
-    AWAITING_CLASS_FORM = {
-        "synth",
-        "synth2",
-        "rcm",
-        "rdrobust",
-        "teffects_ra",
-        "teffects_psmatch",
-        "teffects_nnmatch",
-    }
+    #: Empty: the R2.7 backlog was worked off in one pass -- `synth`, `synth2`, `rcm`,
+    #: `rdrobust` and the three `teffects_*` subcommands now all ship a class form.
+    #: Keep the set: a future estimation command that cannot justify a class adds itself
+    #: here with a reason, rather than escaping the rule silently.
+    AWAITING_CLASS_FORM: set[str] = set()
 
     #: Commands that take a previously fitted result -- postestimation, not estimation.
     POSTESTIMATION_FIRST_PARAMS = {"result", "fitted", "models", "consistent", "unrestricted"}
+
+    #: TEST commands: Stata fills only `r()`, so a bare function is the honest shape and
+    #: a `fit()` would be an empty shell (R1.5).  This list cannot be derived from the
+    #: code -- `StataResults` is not the discriminator (NO result class inherits it; see
+    #: `docs/API_CONVENTIONS.md`), and both kinds return small dataclasses.  It is Stata's
+    #: `e()`/`r()` distinction, which has to be written down.
+    TEST_COMMANDS = {
+        "dfgls",
+        "dfuller",
+        "pperron",
+        "kpss",
+        "unitroot",
+        "im_pesaran_shin",
+        "levin_lin_chu",
+        "vecrank",
+        "varsoc",
+        "endog_regf_test",
+        "endog_score_test",
+    }
 
     for name in sorted(getattr(ws, "__all__", ())):
         function = getattr(ws, name, None)
@@ -1403,25 +1418,7 @@ def check_r2_estimation_has_class(report: Report) -> None:
         annotation = str(_inspect.signature(function).return_annotation).strip("'\"")
         if "Result" not in annotation:
             continue
-        if name in AWAITING_CLASS_FORM:
-            continue
-        # DECIDE BY WHAT STATA STORES.  An estimation command fills `e(b)`/`e(V)`, so its
-        # result is a `StataResults`; a test command (`dfuller`, `kpss`, `vecrank`,
-        # `varsoc`, `xtunitroot`) fills only `r()`, and its result is a small dataclass.
-        # Requiring `fit()` from a test command would force a shell that returns nothing
-        # a caller can use (R1.5).
-        result_classes = [
-            getattr(ws, candidate, None)
-            for candidate in (
-                annotation.replace(" | ", " ").replace("'", "").split()
-            )
-        ]
-        result_classes = [
-            klass for klass in result_classes if isinstance(klass, type)
-        ]
-        if not any(
-            issubclass(klass, ws.StataResults) for klass in result_classes
-        ):
+        if name in TEST_COMMANDS:
             continue
         # The class may be spelled `Newey` for `newey`, `Prais` for `prais`; try the
         # capitalised spelling rather than assuming one.
@@ -1434,13 +1431,15 @@ def check_r2_estimation_has_class(report: Report) -> None:
             _inspect.isclass(getattr(ws, candidate, None)) for candidate in candidates
         ):
             continue
+        awaiting = name in AWAITING_CLASS_FORM
         report.add(
             Finding(
                 "R2.7",
                 name,
                 f"`{name}` is an estimation command (it returns a fitted result) but has "
-                f"no class form; add `<Class>.from_formula(...).fit()` and keep "
-                f"`ws.{name}(...)` as a thin wrapper (R2.7)",
+                f"no class form; add `<Class>.from_variables(...).fit()` and keep "
+                f"`ws.{name}(...)` as a thin wrapper (R2.7)"
+                + (" [registered in AWAITING_CLASS_FORM]" if awaiting else ""),
             )
         )
 

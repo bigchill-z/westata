@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
@@ -124,7 +125,132 @@ def _fit(design: np.ndarray, target: np.ndarray) -> np.ndarray:
     return coefficients
 
 
+class Rcm:
+    """``rcm depvar predictors, unit() time() trunit() trperiod()`` -- regression control.
+
+    Class form of :func:`westata.rcm` (R2.7).  Stata passes variable names as options, so
+    construction goes through :meth:`from_variables` (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``rcm`` reports a fixed placebo-based inference, not
+    a ``vce()`` switch (R1.5).
+    """
+
+    model_name = "rcm"
+
+    def __init__(
+        self,
+        response: Any,
+        predictors: Any,
+        unit: Any,
+        time: Any,
+        *,
+        treated_unit: Any,
+        treatment_period: float,
+        method: str = "forward",
+        criterion: str = "aicc",
+        selected: Sequence[Any] | None = None,
+        max_predictors: int | None = None,
+    ) -> None:
+        self.response = response
+        self.predictors = predictors
+        self.unit = unit
+        self.time = time
+        self.treated_unit = treated_unit
+        self.treatment_period = treatment_period
+        self.method = method
+        self.criterion = criterion
+        self.selected = selected
+        self.max_predictors = max_predictors
+
+    @classmethod
+    def from_variables(
+        cls,
+        outcome: str,
+        data: pd.DataFrame,
+        *,
+        predictors: Sequence[str] | None = None,
+        unit: str,
+        time: str,
+        treated_unit: Any,
+        treatment_period: float,
+        method: str = "forward",
+        criterion: str = "aicc",
+        selected: Sequence[Any] | None = None,
+        max_predictors: int | None = None,
+    ) -> "Rcm":
+        """Build from a frame and column names."""
+
+        frame = data
+        missing = [
+            name
+            for name in [outcome, unit, time, *(predictors or ())]
+            if name not in frame.columns
+        ]
+        if missing:
+            raise ConsistencyError(f"rcm: column(s) {missing} not found in data")
+        predictor_frame = (
+            frame[list(predictors)] if predictors else frame[[outcome]].iloc[:, :0]
+        )
+        return cls(
+            frame[outcome].to_numpy(dtype=float),
+            predictor_frame.to_numpy(dtype=float),
+            frame[unit].to_numpy(),
+            frame[time].to_numpy(),
+            treated_unit=treated_unit,
+            treatment_period=treatment_period,
+            method=method,
+            criterion=criterion,
+            selected=selected,
+            max_predictors=max_predictors,
+        )
+
+    def fit(self) -> RcmResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _rcm_impl(
+            self.response,
+            self.predictors,
+            self.unit,
+            self.time,
+            treated_unit=self.treated_unit,
+            treatment_period=self.treatment_period,
+            method=self.method,
+            criterion=self.criterion,
+            selected=self.selected,
+            max_predictors=self.max_predictors,
+        )
+
+
 def rcm(
+    response: Any,
+    predictors: Any,
+    unit: Any,
+    time: Any,
+    *,
+    treated_unit: Any,
+    treatment_period: float,
+    method: str = "forward",
+    criterion: str = "aicc",
+    selected: Sequence[Any] | None = None,
+    max_predictors: int | None = None,
+) -> RcmResult:
+    """Fit Stata's ``rcm`` -- thin wrapper over :class:`westata.Rcm`."""
+
+    return _rcm_impl(
+        response,
+        predictors,
+        unit,
+        time,
+        treated_unit=treated_unit,
+        treatment_period=treatment_period,
+        method=method,
+        criterion=criterion,
+        selected=selected,
+        max_predictors=max_predictors,
+    )
+
+
+def _rcm_impl(
     response: Any,
     predictors: Any,
     unit: Any,

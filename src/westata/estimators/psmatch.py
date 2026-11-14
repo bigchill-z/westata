@@ -65,9 +65,10 @@ problem: the formula is known, it is the implementation that is not written.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
 from westata.errors import ConsistencyError
 
@@ -181,7 +182,108 @@ class PsmatchResult:
         return "\n".join(lines)
 
 
+class TeffectsPsmatch:
+    """``teffects psmatch (depvar) (treatment) (covariates)`` -- propensity matching.
+
+    Class form of :func:`westata.teffects_psmatch` (R2.7).  Stata writes this subcommand
+    with a VARIABLE LIST, so construction goes through :meth:`from_variables` rather than
+    ``from_formula`` (R3.2).
+
+    ``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option.
+    """
+
+    model_name = "teffects_psmatch"
+
+    def __init__(
+        self,
+        response: Any,
+        treatment: Any,
+        covariates: Any,
+        *,
+        nneighbor: int = 1,
+        tie_tolerance: float = 1e-09,
+        outcome: str = "",
+        caliper: float | None = None,
+    ) -> None:
+        self.response = response
+        self.treatment = treatment
+        self.covariates = covariates
+        self.nneighbor = nneighbor
+        self.tie_tolerance = tie_tolerance
+        self.outcome = outcome
+        self.caliper = caliper
+
+    @classmethod
+    def from_variables(
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        *,
+        covariates: Sequence[str] | None = None,
+        nneighbor: int = 1,
+        tie_tolerance: float = 1e-09,
+        caliper: float | None = None,
+    ) -> "TeffectsPsmatch":
+        """Build from a frame and column names."""
+
+        frame = data
+        missing = [name for name in [outcome, treatment] if name not in frame.columns]
+        if missing:
+            raise ConsistencyError(
+                f"teffects psmatch: column(s) {missing} not found in data"
+            )
+        covariate_frame = (
+            frame[list(covariates)] if covariates else frame[[outcome]].iloc[:, :0]
+        )
+        return cls(
+            frame[outcome].to_numpy(dtype=float),
+            frame[treatment].to_numpy(),
+            covariate_frame.to_numpy(dtype=float),
+            nneighbor=nneighbor,
+            tie_tolerance=tie_tolerance,
+            outcome="",
+            caliper=caliper,
+        )
+
+    def fit(self) -> PsmatchResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _teffects_psmatch_impl(
+            self.response,
+            self.treatment,
+            self.covariates,
+            nneighbor=self.nneighbor,
+            tie_tolerance=self.tie_tolerance,
+            outcome=self.outcome,
+            caliper=self.caliper,
+        )
+
+
 def teffects_psmatch(
+    response: Any,
+    treatment: Any,
+    covariates: Any,
+    *,
+    nneighbor: int = 1,
+    tie_tolerance: float = 1e-9,
+    outcome: str = "",
+    caliper: float | None = None,
+) -> PsmatchResult:
+    """Fit Stata's ``teffects psmatch`` -- thin wrapper over :class:`TeffectsPsmatch`."""
+
+    return _teffects_psmatch_impl(
+        response,
+        treatment,
+        covariates,
+        nneighbor=nneighbor,
+        tie_tolerance=tie_tolerance,
+        outcome=outcome,
+        caliper=caliper,
+    )
+
+
+def _teffects_psmatch_impl(
     response: Any,
     treatment: Any,
     covariates: Any,

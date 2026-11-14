@@ -42,6 +42,20 @@ warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+# A stale `src/westata.egg-info/PKG-INFO` shadows the installed metadata: with `src`
+# first on `sys.path`, `importlib.metadata.version("westata")` reads that directory, so
+# `ws.__version__` reported the PREVIOUS release and the generated reference silently
+# claimed the wrong version. This bit twice (0.3.13 and 0.3.16), so it is now a hard
+# error rather than a silently-wrong document.
+_EGG_INFO = ROOT / "src" / "westata.egg-info"
+if _EGG_INFO.exists():
+    raise SystemExit(
+        f"{_EGG_INFO} is a stale build artifact and shadows the installed version "
+        f"metadata. Delete it (`rm -rf src/westata.egg-info`) and re-run; the API "
+        f"reference would otherwise record the previous release."
+    )
+
+
 import westata as ws  # noqa: E402
 
 OUT = ROOT / "docs" / "api_source"

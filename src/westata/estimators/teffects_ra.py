@@ -71,6 +71,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.results.serialisation import ResultSerialisation
@@ -120,7 +121,100 @@ class TefectsRaResult(ResultSerialisation):
         return "\n".join(lines)
 
 
+class TeffectsRa:
+    """``teffects ra (depvar covariates) (treatment)`` -- regression adjustment.
+
+    Class form of :func:`westata.teffects_ra` (R2.7).  Stata writes this subcommand with
+    a VARIABLE LIST, not a formula::
+
+        teffects ra (y age educ) (treat)
+
+    so construction takes the variable names through :meth:`from_variables`, matching
+    the other non-formula families (``Didregress``, ``RegressionAdjustment``); calling
+    it ``from_formula`` would be the "name lies" defect R3.2 removes.
+
+    ``fit()`` takes no ``cov_type``: ``teffects`` has no ``vce()`` option, and the
+    influence-function variance is part of the estimator (R1.5).
+    """
+
+    model_name = "teffects_ra"
+
+    def __init__(
+        self,
+        response: Any,
+        treatment: Any,
+        covariates: Any,
+        *,
+        estimand: str = "ate",
+        add_constant: bool = True,
+    ) -> None:
+        self.response = response
+        self.treatment = treatment
+        self.covariates = covariates
+        self.estimand = estimand
+        self.add_constant = add_constant
+
+    @classmethod
+    def from_variables(
+        cls,
+        outcome: str,
+        treatment: str,
+        data: pd.DataFrame,
+        *,
+        covariates: Sequence[str] | None = None,
+        estimand: str = "ate",
+        add_constant: bool = True,
+    ) -> "TeffectsRa":
+        """Build from a frame and column names -- ``teffects ra (y x) (t)``."""
+
+        frame = data
+        columns = [outcome, treatment] if covariates is None else [outcome, treatment, *covariates]
+        missing = [name for name in columns if name not in frame.columns]
+        if missing:
+            raise ConsistencyError(
+                f"teffects ra: column(s) {missing} not found in data"
+            )
+        covariate_frame = frame[list(covariates)] if covariates else frame[[outcome]].iloc[:, :0]
+        return cls(
+            frame[outcome].to_numpy(dtype=float),
+            frame[treatment].to_numpy(),
+            covariate_frame.to_numpy(dtype=float),
+            estimand=estimand,
+            add_constant=add_constant,
+        )
+
+    def fit(self) -> TefectsRaResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _teffects_ra_impl(
+            self.response,
+            self.treatment,
+            self.covariates,
+            estimand=self.estimand,
+            add_constant=self.add_constant,
+        )
+
+
 def teffects_ra(
+    response: Any,
+    treatment: Any,
+    covariates: Any,
+    *,
+    estimand: str = "ate",
+    add_constant: bool = True,
+) -> TefectsRaResult:
+    """Fit Stata's ``teffects ra`` -- thin wrapper over :class:`westata.TeffectsRa`."""
+
+    return _teffects_ra_impl(
+        response,
+        treatment,
+        covariates,
+        estimand=estimand,
+        add_constant=add_constant,
+    )
+
+
+def _teffects_ra_impl(
     response: Any,
     treatment: Any,
     covariates: Any,

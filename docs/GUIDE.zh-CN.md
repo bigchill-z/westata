@@ -267,6 +267,13 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 | `vargranger` | `vargranger(fitted)` |
 | `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
 | `newey` | `Newey.from_formula(formula, data, lag=...)` / `newey(formula, data, lag=...)` |
+| `synth` | `Synth.from_variables(data, unit=…, time=…, depvar=…, predictors=[…], trunit=…, trperiod=…)` |
+| `synth2` | `Synth2.from_variables(…)`，选项同上 |
+| `rcm` | `Rcm.from_variables(outcome, data, predictors=[…], unit=…, time=…, treated_unit=…, treatment_period=…)` |
+| `rdrobust` | `Rdrobust.from_variables(outcome, running, data, *, bandwidth=…)` |
+| `teffects ra` | `TeffectsRa.from_variables(outcome, treatment, data, covariates=[…])` |
+| `teffects psmatch` | `TeffectsPsmatch.from_variables(…)` |
+| `teffects nnmatch` | `TeffectsNnmatch.from_variables(…)` |
 
 ```python
 values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)

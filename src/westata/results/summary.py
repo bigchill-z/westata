@@ -132,6 +132,58 @@ def _e_float(result: Any, key: str) -> float:
     return _as_float(value)
 
 
+def _e_float_is_missing(result: Any, key: str) -> bool:
+    """Whether ``e(key)`` exists but is NOT a finite number (Stata's ``.``).
+
+    Distinguishing "absent" from "explicitly missing" matters: an absent key means the
+    estimator never published the scalar, so a renderer may reconstruct it; an explicit
+    ``.`` is a decision the estimator already made, and overriding it changes what the
+    table claims, not merely how it looks.
+    """
+
+    e = getattr(result, "e", None)
+    if e is None:
+        return False
+    try:
+        if key not in e:
+            return False
+        value = e[key]
+    except (TypeError, ValueError):
+        return False
+    return not np.isfinite(_as_float(value))
+
+
+def _stata_f_test_df(result: Any) -> float:
+    """The numerator df Stata prints in a clustered ``F(df_m, df_r)`` label.
+
+    Stata excludes FACTOR (indicator) regressors from the joint test in this case, so
+    ``e(df_m)`` (which counts every column) is not what the label shows.  Measured on
+    lin_1992.dta with ``reg ltvfo ltlan ... i.province, vce(cluster province)``::
+
+        e(df_m) = 36    e(rank) = 9    printed "F(8, 27) = ."
+
+    -- 8 is the non-factor slope count (9 regressors listed, of which the model keeps 9
+    slopes; the constant accounts for the rest).  Recompute it from the parameter names
+    rather than storing another Stata scalar: the factor columns are exactly the ones
+    spelled ``C(...)`` or ``<var>[T.<level>]``.
+    """
+
+    names = [str(name) for name in getattr(result, "param_names", ()) or ()]
+    if not names:
+        return _e_float(result, "df_m")
+    factor = 0
+    slopes = 0
+    for name in names:
+        if name.lower() in {"intercept", "_cons", "const"}:
+            continue
+        slopes += 1
+        if name.startswith("C(") or "[T." in name:
+            factor += 1
+    if factor == 0:
+        return _e_float(result, "df_m")
+    return float(slopes - factor)
+
+
 def _num(value: float, digits: int = 7) -> str:
     """Format a number the way Stata prints scalars (``.`` when missing)."""
 
@@ -1703,7 +1755,16 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
         "Between"
     )
     _wald_value = _e_float(result, "chi2")
-    if np.isfinite(fvalue) or (_uses_wald and np.isfinite(_wald_value)):
+    # An EXPLICITLY MISSING e(F) still gets its row: Stata prints
+    # "F(8, 27) = ." for a clustered regression with factor variables rather than
+    # dropping the test, and the label there counts only the NON-factor regressors.
+    # Silently omitting the row would look like an intercept-only fit.
+    _f_published_but_missing = _e_float_is_missing(result, "F")
+    if (
+        np.isfinite(fvalue)
+        or (_uses_wald and np.isfinite(_wald_value))
+        or (_f_published_but_missing and not _uses_wald)
+    ):
         if _uses_wald:
             _test_label = f"Wald chi2({_df_label(df_model)})"
             # THE WALD STATISTIC IS e(chi2), NOT e(F). They differ by df_m: on munnell.dta
@@ -2077,11 +2138,26 @@ def _stata_summary(result: Any) -> str:
             rmse = float(np.sqrt(np.dot(resid, resid) / df_resid))
 
     fvalue = _e_float(result, "F")
-    if not np.isfinite(fvalue) and np.isfinite(rsquared) and df_model > 0 and df_resid > 0:
-        if rsquared >= 1.0:
-            fvalue = float("inf")
-        else:
-            fvalue = float((rsquared / df_model) / ((1.0 - rsquared) / df_resid))
+    # DO NOT INVENT AN F WHEN THE ESTIMATOR LEFT IT MISSING.  Stata stores
+    # ``e(F) = .`` for a CLUSTERED regression that carries factor variables, and
+    # prints "F(df_m, df_r) = ." -- measured on lin_1992.dta:
+    #
+    #   reg y ltlan ... i.province, vce(cluster province)   F(8, 27)  = .
+    #   reg y ltlan ... province,   vce(cluster province)   F(10, 27) = 97.44
+    #   reg y ltlan ... i.province                          F(36,439) = 328.23
+    #
+    # The estimator already decided this; recomputing an F from R^2 here put
+    # "F(36, 27) = 20.19" on screen where Stata shows ".".  The R^2 identity is
+    # only valid for the unadjusted VCE, and there ``e(F)`` is always present, so
+    # the fallback is not needed at all.
+    if not np.isfinite(fvalue) and not _e_float_is_missing(result, "F"):
+        # The key was absent rather than explicitly missing: keep the historical
+        # reconstruction for results that never stored e(F).
+        if np.isfinite(rsquared) and df_model > 0 and df_resid > 0:
+            if rsquared >= 1.0:
+                fvalue = float("inf")
+            else:
+                fvalue = float((rsquared / df_model) / ((1.0 - rsquared) / df_resid))
 
     p_f = _e_float(result, "p_F")
     if not np.isfinite(p_f) and np.isfinite(fvalue) and df_model > 0 and df_resid > 0:
@@ -2890,7 +2966,7 @@ def _stata_summary(result: Any) -> str:
             _rows: list[tuple[str, str]] = [
                 ("Number of obs", f"{nobs:,.0f}" if np.isfinite(nobs) else ".")
             ]
-            if np.isfinite(fvalue):
+            if np.isfinite(fvalue) or _e_float_is_missing(result, "F"):
                 # ``rreg`` pads the degrees of freedom ("F(  1,        98)") the same way
                 # ``newey`` does; a plain regress prints "F(5, 752)".
                 if str(getattr(result, "model_name", "") or "") == "rreg":
@@ -2899,8 +2975,17 @@ def _stata_summary(result: Any) -> str:
                         int(round(df_resid)),
                     )
                 else:
-                    _f_label = f"F({_df_label(df_model)}, {_df_label(df_resid)})"
-                _rows.append((_f_label, _fixed(fvalue, 2)))
+                    # A CLUSTERED regression WITH FACTOR VARIABLES counts only the
+                    # non-factor regressors in this label and reports "." as the value.
+                    # Measured on lin_1992.dta with ``reg y ltlan ... i.province,
+                    # vce(cluster province)``: "F(8, 27) = .", where 8 is the number of
+                    # non-factor slopes and 27 is G-1.  e(df_m) itself says 36 there, so
+                    # the label cannot be read off e(df_m) in this one case.
+                    _f_df = df_model
+                    if _e_float_is_missing(result, "F"):
+                        _f_df = _stata_f_test_df(result)
+                    _f_label = f"F({_df_label(_f_df)}, {_df_label(df_resid)})"
+                _rows.append((_f_label, _fixed(fvalue, 2) if np.isfinite(fvalue) else "."))
             if np.isfinite(p_f):
                 _rows.append(("Prob > F", _fixed(p_f, 4)))
             # ``rreg`` prints ONLY Number of obs / F / Prob > F. Measured: no R-squared

@@ -2,6 +2,26 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之六、2026-11-14 0.3.19 发布：已完成（GitHub + PyPI）
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | **0.3.19**（PyPI 上此前最新为 0.3.18） |
+| GitHub | 已推送 `origin/main`（`4ce11cf`），tag `v0.3.19` 已推送 |
+| PyPI | 已发布：<https://pypi.org/project/westata/0.3.19/>，wheel 1032326 B、sdist 2220001 B |
+| 哈希校验 | PyPI 下载的 wheel SHA256 `00fbc9b4…廬1c` 与本地构建**完全一致** |
+| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.19、检验 `F=12.511374209`、`.first_stage.nobs=420`、`d_ltlan=0.9807158` |
+| 构建方式 | 从 `HEAD` 的干净 worktree 构建 |
+
+内容：`ws.xtserial` 返回一阶差分回归（Stata `, output` 打印的那个），
+放在 `result.first_stage`（普通 `StataResults`），系数按 `d_<变量名>` 索引；
+`first_stage_table()` 返回渲染后的表，`keep_first_stage=False` 可不保留。
+对拍 StataNow 19.5：N=420、`R2=0.5797`、`RMSE=.11179`、`F(9,27)=902.61`，
+九个系数与聚类标准误最大差 4.7e-08。中英文 GUIDE 与 API 文档均已更正（
+此前写的「不复现」是错的）。
+
+---
+
 ## 〇之五、2026-11-13 `cov_type` 规范化：三项全部完成
 
 用户目标（原文）：

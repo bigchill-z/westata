@@ -7409,7 +7409,7 @@ Newey.fit(self, *, lag: 'int | None' = None) -> 'NeweyWestResult'
 
 ```python
 r = ws.Newey.from_formula('y ~ x1', base, lag=2).fit()
-print(r.cov_type, round(float(r.params[0]), 6))
+print(r.cov_type, round(float(r.params.iloc[0]), 6))
 ```
 
 **输出**
@@ -7521,7 +7521,7 @@ Prais.fit(self) -> 'PraisResult'
 
 ```python
 r = ws.Prais.from_formula('y ~ x1', base).fit()
-print(round(float(r.rho), 6), round(float(r.params[0]), 6))
+print(round(float(r.rho), 6), round(float(r.params.iloc[0]), 6))
 ```
 
 **输出**
@@ -7610,7 +7610,7 @@ None
 
 **Stata 指令:** `xtreg ypanel x1 x2, mle`
 
-用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。
+用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。 三个方差成分行都带标准误，两个 sigma 还带置信区间，与 Stata 一致。这些标准误无法从 statsmodels 取得——它的协方差只覆盖固定效应加上随机效应方差的一个内部变换，而残差尺度 是被 profile 掉的——因此这里从模型自身的似然构造信息阵。该似然在求导之前已与 statsmodels 的 `llf` 校验到 2.8e-13；由于 Powell 在 `sigma_u` 上比 Stata 早停约 4e-06（而似然本身只差 5.7e-09），这里又本地重优化了一次。`e(sigma_u_se)`、`e(sigma_e_se)`、`e(rho_se)` 存标准误，`e(sigma_u_ci)`/`e(sigma_e_ci)` 存对数尺度的区间界限；对照 StataNow 19.5 在 lin_1992.dta 上实测，七位小数一致。`rho` 的区间**刻意不复现**：它打印的界限意味着上下两侧乘数不等，而 log、logit、atanh、Fieller 都无法复现，故省略而不猜测。
 
 **签名**
 
@@ -7659,9 +7659,9 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
        _cons |   .8439937   .1404197     6.01   0.000     .5687762    1.119211
 ------------------------------------------------------------------------------
 -------------+----------------------------------------------------------------
-    /sigma_u |  .77026643
-    /sigma_e |  .98414177
-         rho |  .37987779
+    /sigma_u |   .7702664   .1153562                      .5743331   1.0330423
+    /sigma_e |   .9841418   .0550432                      .8819620   1.0981596
+         rho |   .3798778   .0783186
 ------------------------------------------------------------------------------
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```

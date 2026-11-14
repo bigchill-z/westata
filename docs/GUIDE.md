@@ -272,7 +272,8 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 | `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`, `varlmar`, `varstable`, `varwle` |
 | `veclmar` / `vecstable` | `veclmar`, `vecstable` |
 | `vargranger` | `vargranger(fitted)` |
-| `prais` | `prais(frame, formula)` |
+| `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
+| `newey` | `Newey.from_formula(formula, data, lag=...)` / `newey(formula, data, lag=...)` |
 
 ```python
 values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
@@ -300,6 +301,22 @@ Stata's `e(b)` does — `consumption ~ temp + price + income` prints `temp, pric
 ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
 ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
 ```
+
+`prais` and `newey` are estimation commands, so they also have the class form every other
+estimator uses (R2.7). The function stays available and returns the same numbers:
+
+```python
+ws.Prais.from_formula("price ~ mpg + weight", df).fit()
+ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
+```
+
+> **Argument order, and why `fit()` has no `cov_type`.** `Prais(data, formula)` keeps the
+> function's positional order, which is the reverse of every other `from_formula` — 52 call
+> sites pass `ws.prais(frame, FORMULA)` positionally, and swapping the two would not raise,
+> it would try to parse the frame as a formula. Use `Prais.from_formula(formula, data)` for
+> the standard order. Neither `fit()` accepts `cov_type`: Stata's `prais` and `newey` have no
+> `vce()` option, so the variance is part of the estimator, and offering a `cov_type` would
+> promise a choice that cannot be honoured.
 
 
 ### Post-estimation

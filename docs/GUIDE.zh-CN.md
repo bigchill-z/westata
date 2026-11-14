@@ -265,7 +265,8 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 | `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`、`varlmar`、`varstable`、`varwle` |
 | `veclmar` / `vecstable` | `veclmar`、`vecstable` |
 | `vargranger` | `vargranger(fitted)` |
-| `prais` | `prais(frame, formula)` |
+| `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
+| `newey` | `Newey.from_formula(formula, data, lag=...)` / `newey(formula, data, lag=...)` |
 
 ```python
 values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
@@ -293,6 +294,21 @@ ws.vecrank(values, lags=1)
 ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
 ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
 ```
+
+`prais` 与 `newey` 是估计命令，因此也提供与其它估计器一致的类形式（R2.7）。
+函数形式保留，数字完全相同：
+
+```python
+ws.Prais.from_formula("price ~ mpg + weight", df).fit()
+ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
+```
+
+> **参数顺序，以及 `fit()` 为什么没有 `cov_type`。** `Prais(data, formula)` 沿用函数的
+> 位置顺序，与本包其它 `from_formula` **相反**——已有 52 处按位置传
+> `ws.prais(frame, FORMULA)`，若交换两者不会报错，而会把 DataFrame 当成公式去解析。
+> 要标准顺序请用 `Prais.from_formula(formula, data)`。两者的 `fit()` 都**不接受
+> `cov_type`**：Stata 的 `prais` 与 `newey` 没有 `vce()` 选项，方差是估计量的一部分，
+> 提供一个 `cov_type` 参数等于承诺一个无法兑现的选择。
 
 ### 后估计
 

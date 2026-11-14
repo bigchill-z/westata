@@ -220,5 +220,17 @@
   "en": "The object `XtUnitroot(...).fit()` returns: the statistic that carries the p-value (`name` says which, e.g. 'Z-t-tilde-bar' for IPS), the p-value, and the per-panel detail block in `details`.",
   "zh": "`XtUnitroot(...).fit()` 返回的对象：承载 p 值的统计量（`name` 说明是哪个，IPS 为 'Z-t-tilde-bar'）、p 值，以及 `details` 中的逐面板明细块。",
   "example": "r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()\nprint(r.name, round(r.pvalue, 6))"
+ },
+ "Newey": {
+  "stata": "newey depvar indepvars, lag(#) [noconstant] [aw=...]",
+  "en": "Class form of `ws.newey` (R2.7): an OLS fit whose VCE is the Newey-West HAC sum. `lag` is a required MODEL option, so it belongs to construction, not to `fit()`. `fit()` takes no `cov_type` -- Stata's `newey` has no `vce()` option, the HAC variance IS the estimator. Use `Newey.from_formula(formula, data, lag=...)` for the standard argument order, or `Newey(data, formula, lag=...)` to match the function's positional order. `ws.newey(...)` remains as a thin wrapper over the same implementation.",
+  "zh": "`ws.newey` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey(...)` 保留为同一实现的薄包装。",
+  "example": "r = ws.Newey.from_formula('y ~ x1', base, lag=2).fit()\nprint(r.cov_type, round(float(r.params[0]), 6))"
+ },
+ "Prais": {
+  "stata": "prais depvar indepvars [, corc]",
+  "en": "Class form of `ws.prais` (R2.7): the Prais-Winsten / Cochrane-Orcutt AR(1) estimator. `corc` selects the Cochrane-Orcutt transform (drops the first observation instead of scaling it by sqrt(1-rho^2)) and is a MODEL option, so it belongs to construction. `fit()` takes no `cov_type` -- Stata's `prais` has no `vce()` option. NOTE THE ORDER: `Prais(data, formula)` keeps the function's positional order, which is the reverse of every other `from_formula`; use `Prais.from_formula(formula, data)` for the standard order.",
+  "zh": "`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。",
+  "example": "r = ws.Prais.from_formula('y ~ x1', base).fit()\nprint(round(float(r.rho), 6), round(float(r.params[0]), 6))"
  }
 }

@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.12",
+  "westata_version": "0.3.13",
   "exports": [
     {
       "name": "AIPW",
@@ -920,6 +920,16 @@
       "methods": []
     },
     {
+      "name": "Newey",
+      "kind": "class",
+      "module": "westata.estimators.newey",
+      "docstring": "``newey depvar indepvars, lag(#)`` -- OLS with a HAC (Newey-West) VCE.\n\nThe class form of :func:`westata.newey`, provided so that an estimation command can\nbe used the same way as every other one in the package::\n\n    ws.Newey.from_formula(\"y ~ x1 + x2\", data, lag=1).fit()\n    ws.newey(\"y ~ x1 + x2\", data, lag=1)      # the same fit, still supported\n\nWhy this is a class at all (R2.7): ``newey`` is an ESTIMATION command -- it consumes\nraw data -- not a post-estimation command.  Before this, it was one of 19 estimation\ncommands reachable only as a bare function, so the same operation had a construction\nstep in some families (``ws.OLS.from_formula(...).fit()``) and none in others.  The\nfunction remains as a thin wrapper; there is exactly one implementation.\n\n``lag`` is REQUIRED and belongs to the model, not to ``fit()``: it selects the\nestimator (how many autocovariances enter the HAC sum), and Stata declares it a\nrequired option with no default (``newey.ado:15``, ``newey.sthlp:55``).\n\n``fit()`` takes NO ``cov_type``.  That is deliberate, not an oversight: Stata's\n``newey`` has no ``vce()`` option at all -- the HAC variance IS the estimator -- so\naccepting one here would be an interface that promises a choice that does not exist\n(R2.1, R1.5).",
+      "signature": "(data: 'pd.DataFrame', formula: 'str', *, lag: 'int', time: 'Any' = None, force: 'bool' = False, noconstant: 'bool' = False, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' = None, force: 'bool' = False, noconstant: 'bool' = False, weights: 'Any' = None, weight_type: 'str | None' = None) -> \"'Newey'\"",
+      "fit": "(self, *, lag: 'int | None' = None) -> 'NeweyWestResult'",
+      "methods": []
+    },
+    {
       "name": "NeweyWestResult",
       "kind": "class",
       "module": "westata.estimators.newey",
@@ -1127,6 +1137,16 @@
           "signature": "(self) -> 'Any'"
         }
       ]
+    },
+    {
+      "name": "Prais",
+      "kind": "class",
+      "module": "westata.estimators.prais",
+      "docstring": "``prais depvar indepvars, [corc]`` -- Prais-Winsten / Cochrane-Orcutt AR(1).\n\nThe class form of :func:`westata.prais`, so an estimation command can be used the same\nway as every other one in the package (R2.7)::\n\n    ws.Prais.from_formula(\"y ~ x\", data).fit()\n    ws.Prais(data, \"y ~ x\").fit()          # same construction, function order kept\n    ws.prais(data, \"y ~ x\")                # the documented function, still supported\n\nNOTE THE POSITIONAL ORDER.  ``Prais(data, formula)`` keeps the FUNCTION's order, which\nis the reverse of every ``from_formula`` in the package.  That is deliberate: 52 call\nsites pass ``ws.prais(frame, FORMULA)`` positionally, and swapping the two would not\nraise -- ``data`` and ``formula`` are both positional, so a swapped call would try to\nparse the frame as a formula and fail with an error that names neither.  Use\n:meth:`from_formula` for the standard ``(formula, data)`` order.\n\n``fit()`` takes NO ``cov_type``: Stata's ``prais`` has no ``vce()`` option, and the\nAR(1)-transformed least squares is the estimator itself (R2.1, R1.5).",
+      "signature": "(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'None'",
+      "from_formula": "(formula: 'str', data: 'pd.DataFrame', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> \"'Prais'\"",
+      "fit": "(self) -> 'PraisResult'",
+      "methods": []
     },
     {
       "name": "PraisResult",
@@ -2754,7 +2774,7 @@
       "name": "newey",
       "kind": "function",
       "module": "westata.estimators.newey",
-      "docstring": "Fit ``newey depvar indepvars, lag(#)``.\n\nParameters\n----------\nformula:\n    Patsy-style formula for the right-hand side, e.g. ``\"y ~ x1 + x2\"``.\ndata:\n    The estimation frame.\nlag:\n    Required truncation.  ``newey.ado:24-27`` rejects a negative value.\ntime:\n    The time variable.  ``newey`` needs ``tsset``; passing the column here\n    plays that role and enables the ``Checkt`` validation.\nforce:\n    Allow irregularly spaced time values (``newey.ado:78-81``).\nnoconstant:\n    Suppress the intercept (``newey.ado:44-58``).  Stata rejects\n    ``noconstant`` with no regressors.\nweights, weight_type:\n    Only ``aweight`` is allowed (``newey.ado:15``: ``[aw/]``).\n\nRaises\n------\nValueError\n    For a negative ``lag``, a missing ``lag``, irregular spacing without\n    ``force``, or a spacing interval greater than 1.\nNotImplementedError\n    For weight types other than ``aweight``.\n\nNotes\n-----\nThe ``e()`` collection is rewritten to ``newey``'s own list.  Keys that\n``regress`` stores but ``newey`` does not (``r2``, ``rss``, ``mss``,\n``rmse``, ``sigma``, ``ll``, ...) are REMOVED rather than left in place --\na plain ``mat post`` never creates them.",
+      "docstring": "Fit ``newey depvar indepvars, lag(#)``.\n\nThin wrapper over :class:`westata.Newey` -- the class is the implementation, this\nfunction keeps the documented ``(formula, data, *, ...)`` call working (R2.7).",
       "signature": "(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' = None, force: 'bool' = False, noconstant: 'bool' = False, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'NeweyWestResult'"
     },
     {
@@ -2789,7 +2809,7 @@
       "name": "prais",
       "kind": "function",
       "module": "westata.estimators.prais",
-      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\n``formula`` is a statsmodels/patsy style spec such as ``\"y ~ x1 + x2\"``. The data must\nalready be in time order through ``data``'s row order.\n\n``corc=True`` is Stata's ``prais ..., corc``: the Cochrane-Orcutt transform, which drops\nthe first observation instead of scaling it by ``sqrt(1 - rho^2)``. The two differ in\nboth the coefficients and the estimated rho, so it is a separate estimator, not a\ncosmetic switch.\n\nThe first parameter is named ``data`` rather than ``frame`` (R2.3): every other public\nfunction in the package uses the house name, and this was the only ``regress``-style\nentry point that did not.  Positional calls are unaffected\n(``ws.prais(df, \"y ~ x\")``); this was a keyword-only rename, so\n``prais(frame=df, ...)`` now raises ``TypeError`` naming the new parameter rather\nthan silently accepting a name no other function uses.",
+      "docstring": "Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.\n\nThin wrapper over :class:`westata.Prais` -- the class is the implementation; this\nfunction keeps the documented ``(data, formula, *, ...)`` call working (R2.7).",
       "signature": "(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'"
     },
     {
@@ -4062,6 +4082,18 @@
       "en": "The object `XtUnitroot(...).fit()` returns: the statistic that carries the p-value (`name` says which, e.g. 'Z-t-tilde-bar' for IPS), the p-value, and the per-panel detail block in `details`.",
       "zh": "`XtUnitroot(...).fit()` 返回的对象：承载 p 值的统计量（`name` 说明是哪个，IPS 为 'Z-t-tilde-bar'）、p 值，以及 `details` 中的逐面板明细块。",
       "example": "r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()\nprint(r.name, round(r.pvalue, 6))"
+    },
+    "Newey": {
+      "stata": "newey depvar indepvars, lag(#) [noconstant] [aw=...]",
+      "en": "Class form of `ws.newey` (R2.7): an OLS fit whose VCE is the Newey-West HAC sum. `lag` is a required MODEL option, so it belongs to construction, not to `fit()`. `fit()` takes no `cov_type` -- Stata's `newey` has no `vce()` option, the HAC variance IS the estimator. Use `Newey.from_formula(formula, data, lag=...)` for the standard argument order, or `Newey(data, formula, lag=...)` to match the function's positional order. `ws.newey(...)` remains as a thin wrapper over the same implementation.",
+      "zh": "`ws.newey` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey(...)` 保留为同一实现的薄包装。",
+      "example": "r = ws.Newey.from_formula('y ~ x1', base, lag=2).fit()\nprint(r.cov_type, round(float(r.params[0]), 6))"
+    },
+    "Prais": {
+      "stata": "prais depvar indepvars [, corc]",
+      "en": "Class form of `ws.prais` (R2.7): the Prais-Winsten / Cochrane-Orcutt AR(1) estimator. `corc` selects the Cochrane-Orcutt transform (drops the first observation instead of scaling it by sqrt(1-rho^2)) and is a MODEL option, so it belongs to construction. `fit()` takes no `cov_type` -- Stata's `prais` has no `vce()` option. NOTE THE ORDER: `Prais(data, formula)` keeps the function's positional order, which is the reverse of every other `from_formula`; use `Prais.from_formula(formula, data)` for the standard order.",
+      "zh": "`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。",
+      "example": "r = ws.Prais.from_formula('y ~ x1', base).fit()\nprint(round(float(r.rho), 6), round(float(r.params[0]), 6))"
     },
     "Logit": {
       "stata": "logit yb x1 x2",

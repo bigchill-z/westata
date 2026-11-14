@@ -298,6 +298,12 @@ def test_cov_type_family_table_covers_every_estimator() -> None:
         "RandomEffectsMLE",
         "BetweenOLS",
         "FirstDifferenceOLS",
+        # `newey` and `prais` have a class form (R2.7) but their `fit()` deliberately
+        # takes no `cov_type`: Stata's commands have no `vce()` option -- the HAC /
+        # AR(1) variance IS the estimator -- so accepting one would promise a choice
+        # that does not exist (R1.5). See their class docstrings.
+        "Newey",
+        "Prais",
     }
 
     missing = sorted(estimable - covered - exempt)

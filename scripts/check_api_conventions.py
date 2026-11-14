@@ -1357,8 +1357,97 @@ def check_r3_cov_echo_case(report: Report) -> None:
             )
 
 
+def check_r2_estimation_has_class(report: Report) -> None:
+    """R2.7 -- every e-class estimation command must have a class form.
+
+    Decided by what Stata stores, not by style: an ESTIMATION command produces ``e(b)``
+    and ``e(V)``, so it gets a ``fit()``; a TEST command (``dfuller``, ``kpss``,
+    ``vecrank`` ...) produces only ``r()`` scalars, so a bare function is the honest
+    shape.  ``newey`` and ``prais`` were estimation commands reachable only as functions
+    -- the same operation had a construction step in 40 families and none in these two.
+
+    The list below is the set of e-class commands still awaiting a class form.  It is
+    an explicit, shrinking list rather than a silent allow-all: a NEW estimation
+    command has to either ship a class or be added here with a reason.
+    """
+
+    import inspect as _inspect
+
+    import westata as ws
+
+    #: e-class estimation commands that are still function-only.  Removing a name from
+    #: here is how the R2.7 backlog gets worked off.
+    AWAITING_CLASS_FORM = {
+        "synth",
+        "synth2",
+        "rcm",
+        "rdrobust",
+        "teffects_ra",
+        "teffects_psmatch",
+        "teffects_nnmatch",
+    }
+
+    #: Commands that take a previously fitted result -- postestimation, not estimation.
+    POSTESTIMATION_FIRST_PARAMS = {"result", "fitted", "models", "consistent", "unrestricted"}
+
+    for name in sorted(getattr(ws, "__all__", ())):
+        function = getattr(ws, name, None)
+        if not _inspect.isfunction(function):
+            continue
+        try:
+            parameters = list(_inspect.signature(function).parameters)
+        except (ValueError, TypeError):
+            continue
+        if not parameters or parameters[0] in POSTESTIMATION_FIRST_PARAMS:
+            continue
+        annotation = str(_inspect.signature(function).return_annotation).strip("'\"")
+        if "Result" not in annotation:
+            continue
+        if name in AWAITING_CLASS_FORM:
+            continue
+        # DECIDE BY WHAT STATA STORES.  An estimation command fills `e(b)`/`e(V)`, so its
+        # result is a `StataResults`; a test command (`dfuller`, `kpss`, `vecrank`,
+        # `varsoc`, `xtunitroot`) fills only `r()`, and its result is a small dataclass.
+        # Requiring `fit()` from a test command would force a shell that returns nothing
+        # a caller can use (R1.5).
+        result_classes = [
+            getattr(ws, candidate, None)
+            for candidate in (
+                annotation.replace(" | ", " ").replace("'", "").split()
+            )
+        ]
+        result_classes = [
+            klass for klass in result_classes if isinstance(klass, type)
+        ]
+        if not any(
+            issubclass(klass, ws.StataResults) for klass in result_classes
+        ):
+            continue
+        # The class may be spelled `Newey` for `newey`, `Prais` for `prais`; try the
+        # capitalised spelling rather than assuming one.
+        candidates = {
+            name.replace("_", " ").title().replace(" ", ""),
+            name.capitalize(),
+            name.title().replace("_", ""),
+        }
+        if any(
+            _inspect.isclass(getattr(ws, candidate, None)) for candidate in candidates
+        ):
+            continue
+        report.add(
+            Finding(
+                "R2.7",
+                name,
+                f"`{name}` is an estimation command (it returns a fitted result) but has "
+                f"no class form; add `<Class>.from_formula(...).fit()` and keep "
+                f"`ws.{name}(...)` as a thin wrapper (R2.7)",
+            )
+        )
+
+
 CHECKS = {
     "R2": check_r2,
+    "R2.7": check_r2_estimation_has_class,
     "R3": check_r3,
     "R3.7": check_r3_cov_type,
     "R3.7.3": check_r3_cov_type_panel_hc1,

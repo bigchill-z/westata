@@ -10,6 +10,8 @@ from westata.expressions.explist import (
     parse_exp_list,
 )
 from westata.estimators import (
+    Prais,
+    Newey,
     estat_ptrends,
     NnmatchResult,
     PsmatchResult,
@@ -236,6 +238,8 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "Prais",
+    "Newey",
     "estat_ptrends",
     "endog_score_test",
     "endog_regf_test",

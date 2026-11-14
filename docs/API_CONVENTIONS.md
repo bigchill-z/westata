@@ -256,6 +256,37 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 本包的真实语义是「关闭被吸收变量的 F 检验」（对应 `reghdfe` 的 `noabsorbtest`）。
 一个叫 `noabsorb` 的参数会让人以为它在关闭*吸收*，实际它关闭的是*检验*。
 
+### R2.7 估计命令必须有类形式；检验命令（r-class）不需要
+
+**判据不是"它是不是函数"，而是"Stata 里它返回 e() 还是 r()"**：
+
+| 类别 | Stata 资产 | 本包形态 | 例 |
+|---|---|---|---|
+| 估计命令 | `e(b)`/`e(V)` | 类 + `from_formula(...).fit()` | `OLS`、`PanelOLS`、`newey`→`Newey` |
+| 检验命令 | 只有 `r()` 统计量 | 函数（直接返回结果） | `dfuller`、`kpss`、`vecrank`、`estat_*` |
+
+理由：`fit()` 的语义是"跑出 `params`/`bse`"，检验命令没有这两样，硬造一个
+`fit()` 只是空壳（R1.5）。相反，`newey`/`prais` 在 Stata 里是**估计**命令
+（`newey y x, lag(1)` 输出系数表），却是全包 19 个估计命令里仅有的两个"只能当
+函数调"的——同一件事在别处是 `ws.OLS.from_formula(...).fit()`，在这里是
+`ws.newey(...)`，构造步骤有无不一。
+
+**规则**：
+
+1. e-class 估计命令提供类形式，`from_formula(formula, data, *, ...)` 遵循 R3.2；
+2. 原函数保留为薄包装（不是第二份实现），这样旧调用不受影响；
+3. 构造函数的位置参数顺序**可以沿用函数原有顺序**（`Prais(data, formula)`），
+   因为已有调用大量按位置传参；此时**必须**提供 `from_formula` 作为标准顺序入口，
+   并在类 docstring 里写明两者相反。
+
+**已验证的例外**：`newey` 与 `prais` 的 `fit()` **不接受 `cov_type`**——Stata 的这两个
+命令没有 `vce()` 选项，方差就是估计量本身，加一个 `cov_type` 参数等于承诺一个
+不存在的选择。
+
+**待处理**（同为 e-class 估计器但仍只有函数形式，未纳入本轮）：
+`synth`、`synth2`、`rcm`、`rdrobust`、`teffects_ra`、`teffects_psmatch`、
+`teffects_nnmatch`。它们返回的都不是 `StataResults`，改造成本高于 `newey`/`prais`。
+
 ### R3.2 `from_formula` 的前两个位置参数固定
 
 `(formula, data)`，此外无第三个位置参数。多方程用 `(equations, data)`
@@ -1045,6 +1076,7 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 | R2.4 | ⚠️ 部分 | 默认值已改为 `None` 并按数据推导；"这个默认值是否绑定到特定数据集"仍需人工判断 |
 | R2.5 | ✅ | 是 |
 | R2.6 | ✅（按「是否转发」判定） | 近似 |
+| R2.7 | ✅（按返回类型是否继承 `StataResults` 判定；检验命令自动豁免） | 是 |
 | R3.1 | ✅ | 是 |
 | R3.2 | ✅ | 是 |
 | R3.3 | ✅（按默认值区间判定） | 近似 |

@@ -29,6 +29,76 @@ from westata.errors import ConsistencyError, ConvergenceError
 __all__ = ["PraisResult", "prais", "prais_winsten"]
 
 
+class Prais:
+    """``prais depvar indepvars, [corc]`` -- Prais-Winsten / Cochrane-Orcutt AR(1).
+
+    The class form of :func:`westata.prais`, so an estimation command can be used the same
+    way as every other one in the package (R2.7)::
+
+        ws.Prais.from_formula("y ~ x", data).fit()
+        ws.Prais(data, "y ~ x").fit()          # same construction, function order kept
+        ws.prais(data, "y ~ x")                # the documented function, still supported
+
+    NOTE THE POSITIONAL ORDER.  ``Prais(data, formula)`` keeps the FUNCTION's order, which
+    is the reverse of every ``from_formula`` in the package.  That is deliberate: 52 call
+    sites pass ``ws.prais(frame, FORMULA)`` positionally, and swapping the two would not
+    raise -- ``data`` and ``formula`` are both positional, so a swapped call would try to
+    parse the frame as a formula and fail with an error that names neither.  Use
+    :meth:`from_formula` for the standard ``(formula, data)`` order.
+
+    ``fit()`` takes NO ``cov_type``: Stata's ``prais`` has no ``vce()`` option, and the
+    AR(1)-transformed least squares is the estimator itself (R2.1, R1.5).
+    """
+
+    model_name = "prais"
+
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        formula: str,
+        *,
+        maxiter: int = 100,
+        tolerance: float = 1e-6,
+        corc: bool = False,
+    ) -> None:
+        self._data = data
+        self.formula = formula
+        self.maxiter = maxiter
+        self.tolerance = tolerance
+        self.corc = corc
+
+    @classmethod
+    def from_formula(
+        cls,
+        formula: str,
+        data: pd.DataFrame,
+        *,
+        maxiter: int = 100,
+        tolerance: float = 1e-6,
+        corc: bool = False,
+    ) -> "Prais":
+        """Construct with the standard ``(formula, data, *, ...)`` order (R3.2)."""
+
+        return cls(
+            data,
+            formula,
+            maxiter=maxiter,
+            tolerance=tolerance,
+            corc=corc,
+        )
+
+    def fit(self) -> PraisResult:
+        """Estimate.  No ``cov_type`` -- see the class docstring."""
+
+        return _prais_impl(
+            self._data,
+            self.formula,
+            maxiter=self.maxiter,
+            tolerance=self.tolerance,
+            corc=self.corc,
+        )
+
+
 def _rho_from_residuals(resid: np.ndarray) -> float:
     """AR(1) coefficient from a residual series: ``sum e_t e_{t-1} / sum e_{t-1}^2``."""
 
@@ -626,6 +696,23 @@ class PraisResult:
 
 
 def prais(
+    data: pd.DataFrame,
+    formula: str,
+    *,
+    maxiter: int = 100,
+    tolerance: float = 1e-6,
+    corc: bool = False,
+) -> PraisResult:
+    """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.
+
+    Thin wrapper over :class:`westata.Prais` -- the class is the implementation; this
+    function keeps the documented ``(data, formula, *, ...)`` call working (R2.7).
+    """
+
+    return _prais_impl(data, formula, maxiter=maxiter, tolerance=tolerance, corc=corc)
+
+
+def _prais_impl(
     data: pd.DataFrame,
     formula: str,
     *,

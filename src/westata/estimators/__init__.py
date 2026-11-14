@@ -43,8 +43,8 @@ from westata.estimators.limited import (
     Truncreg,
 )
 from westata.estimators.linear import OLS
-from westata.estimators.newey import NeweyWestResult, check_time_spacing, newey
-from westata.estimators.prais import PraisResult, prais, prais_winsten
+from westata.estimators.newey import Newey, NeweyWestResult, check_time_spacing, newey
+from westata.estimators.prais import Prais, PraisResult, prais, prais_winsten
 from westata.estimators.rdrobust import RdRobustResult, rdrobust
 from westata.estimators.teffects_ra import TefectsRaResult, teffects_ra
 from westata.estimators.psmatch import PsmatchResult, teffects_psmatch
@@ -112,6 +112,8 @@ from westata.estimators.tseries import (
 )
 
 __all__ = [
+    "Prais",
+    "Newey",
     "estat_ptrends",
     "JohansenResult",
     "VECMResults",

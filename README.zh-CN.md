@@ -221,7 +221,7 @@ src/westata/
   postestimation/   test / lincom / margins / predict
   conformance/      证据注册表的读取与校验
   results/          统一的结果对象
-tests/              6325 个测试（6322 通过、3 跳过）；conformance 捕获（含 synth/synth2 fixtures）均已提交，无需 Stata 授权即可重放
+tests/              6401 个测试（6396 通过、5 跳过）；conformance 捕获（含 synth/synth2 fixtures）均已提交，无需 Stata 授权即可重放
 retest/             对真实 Stata 的复测（需要授权）
 docs/               GUIDE.md、对照数据、生成脚本
 ```

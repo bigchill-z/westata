@@ -177,6 +177,57 @@ ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
+**`xttest0` —— 随机效应的 Breusch-Pagan LM 检验**
+
+随机效应拟合之后，`ws.xttest0(result)` 复现 Stata 的 `xttest0`：
+
+```python
+# 12 entities x 6 periods: xttest0 requires a balanced panel.
+panel = df.head(72).copy()
+panel["sid"] = (panel.index // 6) + 1
+panel["year"] = (panel.index % 6) + 1
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(ws.xttest0(re_fit))
+```
+
+面板变量取自拟合结果自身的 `e(ivar)`，因此**无需传 `entity=`**；只在需要覆盖时才传。输出的
+方程行会写出该变量名，与 Stata 一致。
+
+**只实现了平衡面板**。非平衡面板会报错，而不是给出一个与 Stata 相差几个百分点的统计量。
+
+**`xtreg ..., re theta` —— 输出准去均值系数**
+
+Stata 的 `theta` 是**报告**选项，不是估计选项：它只改变打印内容，不改变估计结果。westata 里对应
+`summary` 的 `theta` 关键字：
+
+```python
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(re_fit.summary(theta=True))
+```
+
+平衡面板在拟合块与系数表之间打印一行，与 Stata 完全一致：
+
+```
+theta        = .81012778
+```
+
+非平衡面板则在带横线的方框里打印各实体 theta 的五个百分位——因为此时 theta 取决于每个实体自身的
+组大小，没有单一数值可报：
+
+```
+------------------- theta --------------------
+  min      5%       median        95%      max
+0.8150   0.8204     0.8204     0.8204   0.8204
+```
+
+不加该开关也能随时取到底层标量：`e(theta)`，或五个 `e(thta_*)` 键（两种形式互斥）。该开关对
+`xtreg, fe` / `be` / `mle` **不起作用**——Stata 对它们报 `option theta not allowed`（r(198)）
+——在 `style='statsmodels'` 下同样不起作用。
+
 ### 哪个 `cov_type` 对应 Stata 的 `, r`
 
 稳健 VCE 的缩放因子**因命令而异**，字母 `r` 并不能唯一确定它：

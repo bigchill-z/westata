@@ -69,7 +69,7 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e ".[test]"
 ```
 
-`python -m pytest -q` runs 6325 tests (6322 pass, 3 skip) on the committed tree.
+`python -m pytest -q` runs 6401 tests (6396 pass, 5 skip) on the committed tree.
 The conformance captures (including `synth_features.json`) are committed, so the
 suite needs no Stata licence. Re-running the comparisons against live Stata
 (`retest/`, `docs/collect_comparison.py`) does need one.

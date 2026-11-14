@@ -183,6 +183,59 @@ ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
+**`xttest0` — the Breusch-Pagan LM test for random effects**
+
+After a random-effects fit, `ws.xttest0(result)` reproduces Stata's `xttest0`:
+
+```python
+# 12 entities x 6 periods: xttest0 requires a balanced panel.
+panel = df.head(72).copy()
+panel["sid"] = (panel.index // 6) + 1
+panel["year"] = (panel.index % 6) + 1
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(ws.xttest0(re_fit))
+```
+
+The panel variable is taken from the fit's own `e(ivar)`, so no `entity=` argument is needed; pass
+one only to override. The output names that variable in its equation line, as Stata does.
+
+Only the **balanced** panel form is implemented. An unbalanced panel raises rather than reporting a
+statistic that would differ from Stata's by a few percent.
+
+**`xtreg ..., re theta` — report the quasi-demeaning factor**
+
+Stata's `theta` is a REPORTING option, not an estimation one: it changes what is printed, not what is
+estimated. In westata it is the `theta` keyword on `summary`:
+
+```python
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(re_fit.summary(theta=True))
+```
+
+A balanced panel prints one line between the fit block and the coefficient table, exactly as Stata
+does:
+
+```
+theta        = .81012778
+```
+
+An unbalanced panel prints the five percentiles of the per-entity theta in a ruled box, because theta
+then depends on each entity's own group size and there is no single value to report:
+
+```
+------------------- theta --------------------
+  min      5%       median        95%      max
+0.8150   0.8204     0.8204     0.8204   0.8204
+```
+
+The underlying scalars are always available without the flag, as `e(theta)` or the five `e(thta_*)`
+keys (the two forms are mutually exclusive). The flag is a **no-op** on `xtreg, fe` / `be` / `mle`,
+where Stata answers `option theta not allowed` (r(198)), and under `style='statsmodels'`.
+
 ### Which `cov_type` matches Stata's `, r`
 
 The robust VCE scale factor **differs by command**, and the letter `r` does not identify it:

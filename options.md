@@ -2,6 +2,26 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
+
+| 事项 | 结果 |
+|---|---|
+| 版本号 | **0.3.22**（PyPI 上此前最新为 0.3.21） |
+| PyPI | 已发布：<https://pypi.org/project/westata/0.3.22/>，wheel 1036314 B、sdist 2254445 B |
+| 哈希校验 | PyPI 上的 wheel SHA256 `6cdf462941ac8107…` 与本地构建**完全一致**；sdist `06f2c93433aa4206…` 亦一致 |
+| 安装验证 | 从 PyPI 取 wheel 装入干净 venv：`__version__` = 0.3.22，`theta        = .81012778` 与 Stata 逐字节一致，不平衡面板方框与 `fe`/`mle` 无操作均通过 |
+| 全量测试 | **6434 passed, 3 skipped, 0 failed** |
+| GitHub | **未推送**（用户只要求推 PyPI） |
+
+内容：`summary(theta=True)`，即 Stata 的 `xtreg ..., re theta` 报告选项。
+
+**需要你决策的一项**：这一版的提交目前只在工作区，尚未 commit。工作区里同时存在另一个会话的未提交改动
+（`src/westata/estimators/did.py`、`hdfe.py`、`tseries.py`、`_pyfixest_compat.py` 等），
+两者混在一起。要我单独提交本次改动（只含 CHANGELOG/README/pyproject/summary.py/base.py/prose 与新增测试），
+还是等你先把另一会话的工作收尾再一起提交？
+
+---
+
 ## 〇之七、2026-11-14 0.3.20 发布：已完成（GitHub + PyPI）
 
 | 事项 | 结果 |

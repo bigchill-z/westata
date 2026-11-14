@@ -7,7 +7,7 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
-## [Unreleased] - 2026-11-14
+## [0.3.18] - 2026-11-14
 
 ### Added
 * **`ws.xtserial` -- Wooldridge's test for serial correlation in panel data**, the

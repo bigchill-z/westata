@@ -331,6 +331,38 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 | `esttab` / `outreg2` | `ws.etable([...])` |
 | `summarize` | `ws.summarize(frame, ["y", "x1"])` |
 | `ereturn list` | `format_ereturn_list(res)` |
+| `xtserial` | `ws.xtserial(data, "y ~ x1 + x2", entity=..., time=...)` |
+
+### `xtserial`：面板序列相关（Wooldridge 检验）
+
+`xtserial` **不是 Stata 自带命令，也不在 SSC 上**，它由 Drukker 维护：
+
+```stata
+net install xtserial, from("http://www.stata.com/users/ddrukker")
+```
+
+它的主体只有四行，做的是：对**因变量与每一个回归元**做一阶差分（无常数项、按面板聚类），
+把残差再对其自身滞后做同样的回归，然后检验滞后系数是否等于 **−0.5**。
+用 −0.5 而不是 0，是因为对 AR(1) 误差差分后系数是 `rho − 1`，没有序列相关时正好是 −0.5；
+若对着 0 检验，任何数据都会「显著」。
+
+```python
+# 上面的数字来自 lin_1992.dta（province × t）；指南的 df 是 auto.csv，
+# 这里用它造一个合成面板，行为完全一样。
+panel_like = df.assign(
+    province=(np.arange(len(df)) % 12) + 1,
+    t=(np.arange(len(df)) // 12) + 1,
+)
+print(ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t"))
+```
+
+**差分走在 (面板, 期) 轴上，不是行轴上。** 若某个省缺了某一期，缺口两侧的差分**都是缺失**。
+`lin_1992.dta` 每个省都缺 `t == 11`，因此样本是 476 − 56 = **420**；按行序配对会留下 474 行，
+`r(corr)` 从 −0.19258 变成 −0.20871。实测对拍：`corr` 差 2.7e-10、`F` 差 8.4e-09、
+`p` 差 4.5e-12，输出块逐字符一致。
+
+Stata 的 `, output` 选项只是把第一阶段那个差分回归打印出来，本包不复现；
+需要时用 `ws.OLS` 自己拟合差分数据即可。
 
 ```python
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()

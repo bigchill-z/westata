@@ -340,6 +340,41 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 | `ereturn list` | `format_ereturn_list(res)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
+| `xtserial` | `ws.xtserial(data, "y ~ x1 + x2", entity=..., time=...)` |
+
+### `xtserial`: the Wooldridge panel serial-correlation test
+
+`xtserial` is **not a Stata built-in and is not on SSC**; it is Drukker's package:
+
+```stata
+net install xtserial, from("http://www.stata.com/users/ddrukker")
+```
+
+Its body is four lines: difference the response **and every regressor** (no constant,
+clustered on the panel), regress those residuals on their own lag the same way, then
+test whether the lag coefficient equals **-0.5**. The null is -0.5 rather than 0
+because differencing an AR(1) error leaves `rho - 1`, which is -0.5 when there is no
+serial correlation; testing against zero would reject on any data.
+
+```python
+# The numbers above come from `lin_1992.dta` (province x t); the guide's `df` is
+# auto.csv, so the example builds a synthetic panel from it. The behaviour is the same.
+panel_like = df.assign(
+    province=(np.arange(len(df)) % 12) + 1,
+    t=(np.arange(len(df)) // 12) + 1,
+)
+print(ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t"))
+```
+
+**The differences run on the (panel, time) axis, not the row axis.** When a period is
+missing, the difference is missing on BOTH sides of the gap. Every panel of
+`lin_1992.dta` misses `t == 11`, so the sample is 476 - 56 = **420**; pairing rows
+instead keeps 474 and moves `r(corr)` from -0.19258 to -0.20871. Measured against
+StataNow 19.5: `corr` within 2.7e-10, `F` within 8.4e-09, `p` within 4.5e-12, with the
+printed block byte-identical.
+
+Stata's `, output` prints the first-stage differenced regression; that is not
+reproduced, since it is an ordinary clustered `ws.OLS` fit on the differenced data.
 
 ```python
 res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()

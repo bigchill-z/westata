@@ -156,16 +156,19 @@ def _e_float_is_missing(result: Any, key: str) -> bool:
 def _stata_f_test_df(result: Any) -> float:
     """The numerator df Stata prints in a clustered ``F(df_m, df_r)`` label.
 
-    Stata excludes FACTOR (indicator) regressors from the joint test in this case, so
-    ``e(df_m)`` (which counts every column) is not what the label shows.  Measured on
-    lin_1992.dta with ``reg ltvfo ltlan ... i.province, vce(cluster province)``::
+    Stata excludes FACTOR (indicator) regressors from the joint test in this case, and
+    then also shuffles its own degrees of freedom.  Measured on lin_1992.dta, all with
+    ``vce(cluster province)`` and ``i.province`` (27 dummies):
 
-        e(df_m) = 36    e(rank) = 9    printed "F(8, 27) = ."
+        non-factor slopes   e(df_m)   e(rank)   printed
+        9                   8         9         F(8, 27)
+        5                   4         5         F(4, 27)
+        2                   1         2         F(1, 27)
+        1                   0         1         F(0, 27)
 
-    -- 8 is the non-factor slope count (9 regressors listed, of which the model keeps 9
-    slopes; the constant accounts for the rest).  Recompute it from the parameter names
-    rather than storing another Stata scalar: the factor columns are exactly the ones
-    spelled ``C(...)`` or ``<var>[T.<level>]``.
+    So ``e(df_m)`` counts the NON-FACTOR slopes minus one and ``e(rank)`` counts them
+    including the constant.  That is the same "free parameters of the clustered problem"
+    convention the ``xtreg`` module documents, not a count of model columns.
     """
 
     names = [str(name) for name in getattr(result, "param_names", ()) or ()]
@@ -181,7 +184,7 @@ def _stata_f_test_df(result: Any) -> float:
             factor += 1
     if factor == 0:
         return _e_float(result, "df_m")
-    return float(slopes - factor)
+    return float(max(slopes - factor - 1, 0))
 
 
 def _num(value: float, digits: int = 7) -> str:
@@ -2988,6 +2991,10 @@ def _stata_summary(result: Any) -> str:
                 _rows.append((_f_label, _fixed(fvalue, 2) if np.isfinite(fvalue) else "."))
             if np.isfinite(p_f):
                 _rows.append(("Prob > F", _fixed(p_f, 4)))
+            elif _e_float_is_missing(result, "F"):
+                # Stata prints the pair together. Measured on the same clustered
+                # factor model: "F(8, 27)  = ." then "Prob > F   = .".
+                _rows.append(("Prob > F", "."))
             # ``rreg`` prints ONLY Number of obs / F / Prob > F. Measured: no R-squared
             # and no Root MSE, unlike a vce(robust) regress which shows both.
             _is_rreg = str(getattr(result, "model_name", "") or "") == "rreg"

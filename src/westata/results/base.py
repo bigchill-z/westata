@@ -1161,7 +1161,20 @@ class StataResults:
         if "cmd" not in self._e:
             model_name = str(getattr(self, "_model_name", "") or "")
             if model_name:
-                self._e["cmd"] = model_name
+                # STATA SPLITS THE ESTIMATOR ACROSS TWO KEYS. `xtreg, fe` stores
+                # e(cmd)="xtreg" and e(model)="fe"; writing the whole "xtreg, fe" string into
+                # e(cmd) left e(model) absent, and code that branches on the pair -- hausman's
+                # sigma scaling is the one that surfaced this -- then took the wrong path.
+                # Measured with `ereturn list` on `xtreg ltvfo ..., fe`: e(cmd) xtreg /
+                # e(model) fe.
+                if "," in model_name:
+                    head, _, tail = model_name.partition(",")
+                    self._e["cmd"] = head.strip()
+                    option = tail.strip().split()[0] if tail.strip() else ""
+                    if option:
+                        self._e.setdefault("model", option)
+                else:
+                    self._e["cmd"] = model_name
         if "properties" not in self._e:
             # ``regress.sthlp:439`` and ``logit.sthlp:279`` (and the others) all
             # document e(properties) as ``b V`` -- a CONSTANT, not a per-command

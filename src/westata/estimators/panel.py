@@ -384,6 +384,13 @@ class PanelOLS:
     ``e(df_r) = G - 1`` (``29`` on that panel, with the model-based ``148`` in
     ``e(df_r_mb)``) and the ``N - rank`` denominator Stata uses for
     ``e(rmse)``/``e(r2_a)`` under clustering.
+
+    ``e(sigma_e)`` is the EXCEPTION inside that same block: it keeps the model-based
+    denominator (``e(df_r_mb)``), so it does NOT move with the VCE.  Measured on
+    lin_1992.dta (476 obs, 28 groups, 9 slopes): ``fe r`` prints ``e(rmse) = 0.102779``
+    (``rss/466``) directly above ``e(sigma_e) = 0.105893`` (``rss/439``).  Reusing the
+    clustered denominator put ``sigma_e`` at 0.102779 and dragged ``rho`` with it --
+    see the note at the ``_sigma_divisor`` assignment.
     """
 
     _stata_command = "xtreg, fe"
@@ -626,6 +633,7 @@ class PanelOLS:
             df_model=df_model,
             df_resid=df_resid,
             scalar_df=scalar_df,
+            model_df=model_df,
             df_b=df_b,
             rank=rank,
             n_clust=n_clust,
@@ -1272,6 +1280,7 @@ class PanelOLS:
         df_resid: float,
         df_b: float,
         scalar_df: float | None = None,
+        model_df: float | None = None,
         rank: int,
         n_clust: int | None,
         response: pd.Series | None = None,
@@ -1381,6 +1390,35 @@ class PanelOLS:
                 e["p"] = float(stats.chi2.sf(chi2, df_model))
         if n_clust is not None:
             e["N_clust"] = n_clust
+            # ``e(vcetype)``/``e(clustvar)``: Stata stores BOTH on a clustered ``xtreg``.
+            # Measured on lin_1992.dta with ``xtreg ..., fe r``:
+            #
+            #     e(vcetype) = Robust      e(clustvar) = province      e(N_clust) = 28
+            #     e(vce)     = cluster
+            #
+            # while plain ``fe`` leaves all of them missing.  ``e(vce)`` is the key the
+            # summary renderer tests before printing the adjusted-for note, so without it
+            # the table lost Stata's ``(Std. err. adjusted for 28 clusters in province)``
+            # line; ``e(vcetype)`` is what prints the ``Robust`` column heading.  Both
+            # used to be absent, so the numbers were right and the table still differed.
+            # ``robust after xtreg, fe`` IS this cluster VCE -- that is why vcetype reads
+            # "Robust" rather than "Cluster".
+            e["vcetype"] = "Robust"
+            e["vce"] = "cluster"
+            _cluster_name = ""
+            for _key in ("_cluster_names", "clustvar"):
+                _candidate = e.get(_key)
+                if isinstance(_candidate, str) and _candidate:
+                    _cluster_name = _candidate
+                    break
+                if isinstance(_candidate, (list, tuple)) and _candidate:
+                    _cluster_name = str(_candidate[0])
+                    break
+            if not _cluster_name:
+                _cluster_name = str(getattr(self, "_entity", "") or "")
+            if _cluster_name:
+                e["clustvar"] = _cluster_name
+                e.setdefault("_cluster_names", _cluster_name)
 
         # e(ll_0): the Gaussian likelihood of the intercept-only model, using
         # the centred total.  Same construction as westata.OLS, which was
@@ -1445,6 +1483,7 @@ class PanelOLS:
                     nobs=nobs,
                     n_entities=n_entities,
                     scalar_df=scalar_df,
+                    model_df=model_df,
                     design=design,
                     params=params,
                 )
@@ -1462,6 +1501,7 @@ class PanelOLS:
         nobs: int,
         n_entities: int,
         scalar_df: float,
+        model_df: float | None = None,
         design: tuple[pd.DataFrame, list[str]] | None = None,
         params: np.ndarray | None = None,
     ) -> dict[str, Any]:
@@ -1695,9 +1735,28 @@ class PanelOLS:
         #
         # sqrt(within_rss / (N - N_g - K + 1)): the +1 restores the intercept that
         # within-differencing removes.
+        #
+        # ``sigma_e`` DOES NOT FOLLOW ``e(rmse)`` WHEN THE VCE IS CLUSTERED.  Stata keeps two
+        # different denominators and reports both on the same table:
+        #
+        #     e(rmse)    = sqrt(rss / (N - rank))          <- N=476, rank=9 -> 466
+        #     e(sigma_e) = sqrt(rss / e(df_r_mb))          <- df_r_mb=439
+        #
+        # Measured on lin_1992.dta (476 obs, 28 groups, 9 slopes, ``fe r``):
+        # ``rss = 4.922626715453045``, ``e(rmse) = 0.102779261734083`` (so 4.9226/466) and
+        # ``e(sigma_e) = 0.105892741490381`` (so 4.9226/439) -- two distinct numbers printed
+        # one above the other in the same table, and ``rss/e(df_r_mb)`` reproduces the second
+        # exactly.  With the conventional VCE the two coincide (``fe`` alone gives 439 for
+        # both), which is why reusing ``scalar_df`` looked right: the earlier check ran a
+        # 30x6 panel with two slopes where the two denominators happen to agree closely
+        # enough to have passed for a match.
+        #
+        # ``model_df`` is Stata's ``e(df_r_mb)`` -- the model-based residual degrees of
+        # freedom, untouched by the clustering adjustment.
         _sigma_divisor = (
             float(nobs)
             if self._random_effects_decomposition and nobs and nobs > 0
+            else float(model_df) if model_df and model_df > 0
             else float(scalar_df) if scalar_df else 0.0
         )
         _sigma_within = (

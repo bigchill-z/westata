@@ -7,6 +7,62 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.22] - 2026-11-14
+
+### Added — `summary(theta=True)`, Stata's `xtreg ..., re theta` reporting option
+
+`xtreg.sthlp:109` lists `theta` under the Reporting options ("report theta") and `:380-383` says what
+it does: *"the output should include the estimated value of theta used in combining the between and
+fixed estimators. For balanced data, this is a constant, and for unbalanced data, a summary of the
+values is presented in the header of the output."* That option is now reachable:
+
+```python
+res = ws.RandomEffects.from_formula(
+    "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mci + ngca",
+    df, entity="province", time="t",
+).fit(cov_type="robust")
+print(res.summary(theta=True))
+```
+
+Balanced panels print one line, byte-identical to Stata's (`lin_1992.dta`, 476 obs, 28 provinces):
+
+```
+                                                Wald chi2(7)      =    2452.50
+corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
+theta        = .81012778
+```
+
+Unbalanced panels print the five percentiles in a 46-wide ruled box, also byte-identical (the same
+file with one observation dropped):
+
+```
+------------------- theta --------------------
+  min      5%       median        95%      max
+0.8150   0.8204     0.8204     0.8204   0.8204
+```
+
+**The flag is a no-op everywhere else, deliberately.** Probed on StataNow 19.5: `xtreg ..., fe
+theta`, `be theta` and `mle theta` all answer `option theta not allowed` (r(198)), and the ado sources
+agree — `xtreg_re.ado` parses `THeta` in the estimator and in its `Display` subprogram, while
+`xtreg_fe.ado`, `xtreg_be.ado` and `xtreg_ml.ado` contain the string `theta` zero times. A flag that
+printed a block for those fits would be showing a table Stata would have refused to produce. `xtreg,
+mle` is the trap: its banner starts with "Random-effects" and it stores variance components like the
+GLS fit, so the estimator test excludes it explicitly rather than by the banner alone.
+
+The flag is also a no-op under `style='statsmodels'`, which is not Stata's layout.
+
+### Changed — the `summary` prose said `style='statsmodels'` was the default
+
+It has been `'stata'` for several releases; the English and Chinese reference now say so.
+
+### Verified
+
+Full suite **6434 passed, 3 skipped, 0 failed**, with 17 new guards in
+`tests/test_xtreg_re_theta_option.py`. The two shapes above were captured from live StataNow 19.5
+runs (`StataMP-64.exe -b do`) and compared byte for byte, not transcribed from the help file.
+
+---
+
 ## [0.3.21] - 2026-11-14
 
 ### Fixed — `xttest0` after `xtreg ..., re`: four measured defects

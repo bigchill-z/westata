@@ -1699,6 +1699,7 @@ class StataResults:
         *,
         odds_ratio: bool = False,
         first: bool = False,
+        theta: bool = False,
     ) -> str:
         """Render a text summary.
 
@@ -1715,6 +1716,17 @@ class StataResults:
             Prepend the first-stage regression, as Stata's ``ivregress ..., first`` does. Only
             available for results that expose ``first_stage()``; the block is the one that method
             already renders, which matches Stata line for line.
+        theta:
+            Stata's ``xtreg ..., re theta`` reporting option (``xtreg.sthlp:109``, ``:380-383``):
+            print the estimated quasi-demeaning factor between the header and the coefficient
+            table. A balanced panel shows one line (``theta        = .81012778``); an unbalanced
+            one shows the five percentiles of ``e(thta_min)`` ... ``e(thta_max)`` in a ruled box,
+            because theta then depends on each entity's own group size.
+
+            Only ``xtreg, re`` accepts it -- Stata answers ``xtreg ..., fe/be/mle theta`` with
+            ``option theta not allowed`` (r(198); measured on StataNow 19.5), so the flag is a
+            no-op on every other fit rather than printing something Stata would refuse. It is
+            also a no-op under ``style="statsmodels"``, which is not Stata's layout.
         """
 
         if first:
@@ -1725,7 +1737,7 @@ class StataResults:
                     "Stata's `first` option exists on ivregress/ivreg2 only."
                 )
             body = (
-                render_summary(self, style)
+                render_summary(self, style, theta=theta)
                 if not odds_ratio
                 else self._odds_ratio_summary(style)
             )
@@ -1745,7 +1757,7 @@ class StataResults:
             return f"\n{renderer()}\n\n\n{_body}"
         if odds_ratio:
             return self._odds_ratio_summary(style)
-        return render_summary(self, style)
+        return render_summary(self, style, theta=theta)
 
     def ereturn_list(self) -> str:
         """Stata's ``ereturn list`` -- the four sections of one estimation result.

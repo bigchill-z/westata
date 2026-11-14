@@ -68,7 +68,7 @@ def _ci_label(level: float | None) -> str:
     return f"[{rendered}% conf. interval]"
 
 
-def render_summary(result: Any, style: str = "stata") -> str:
+def render_summary(result: Any, style: str = "stata", *, theta: bool = False) -> str:
     """Render ``result`` in the requested style.
 
     Parameters
@@ -79,11 +79,17 @@ def render_summary(result: Any, style: str = "stata") -> str:
     style:
         ``"stata"`` (default) or ``"statsmodels"``.  Case is ignored. Stata's layout is the default
         because reproducing it is this package's purpose; ask for the other one explicitly.
+    theta:
+        Stata's ``xtreg ..., re theta`` reporting option: prepend the theta block to the panel
+        header.  Silently ignored for every other estimator, because Stata REFUSES the option
+        anywhere else rather than printing something different (see
+        :func:`_xtreg_theta_lines`).  Ignored for ``style="statsmodels"`` as well: the flag names
+        a Stata reporting option and that layout is not Stata's.
     """
 
     normalized = _normalize_style(style)
     if normalized == "stata":
-        text = _stata_summary(result)
+        text = _stata_summary(result, theta=theta)
         # Stata prefixes the table with one note per absorbed regressor, e.g.
         #   note: canal omitted because of collinearity.
         # and the header follows immediately - no blank line between. The rendered table
@@ -1213,6 +1219,43 @@ def _four(value: Any) -> str:
     return f"{float(value):.4f}" if np.isfinite(value) else "."
 
 
+def _panel_statistic(value: float) -> str:
+    """Stata's format for the sigma rows, matched on BOTH shapes it prints.
+
+    Measured on munnell.dta, where the three rows take two different forms:
+
+        xtreg ..., fe   sigma_u |   .1071126      <- 7 significant digits
+                        sigma_e |  .03882161      <- 8
+        xtreg ..., re   sigma_u |  .08186287      <- 8
+                        sigma_e |  .03882161      <- 8
+
+    So neither `%.8g` nor `.8f` reproduces both:
+
+        value        %.8g         .8f          Stata
+        .107112604   0.1071126    0.10711260   .1071126
+        .081862869   0.081862869  0.08186287   .08186287
+        .038821609   0.038821609   .03882161   .03882161
+
+    The rule Stata follows is EIGHT SIGNIFICANT DIGITS COUNTED FROM THE FIRST NON-ZERO OF THE
+    DECIMAL STRING -- which is `%.8g` except that %.8g does not count the leading zero, so
+    0.081862869 keeps nine digits. `.8f` counts decimal places instead, which overshoots for
+    0.107112604. Taking `%.8g` and then re-rounding a "0.xxx" result to eight decimal places
+    reproduces all three.
+    """
+
+    text = "%.8g" % value
+    # %.8g counts the leading zero as a significant digit, so a value below 0.1 keeps nine
+    # digits (`0.081862869`). Stata counts eight digits INSIDE the fraction, so those need
+    # eight decimal places instead. Values at or above 0.1 are already right.
+    if abs(value) < 0.1:
+        text = "%.8f" % value
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
 def _stata_abbreviated(name: str) -> str:
     """Stata's six-character display name: first four characters, ``~``, last one.
 
@@ -1844,6 +1887,107 @@ def _xtreg_header_block(result: Any, nobs: int) -> list[str]:
     return lines
 
 
+def _xtreg_theta_lines(result: Any) -> list[str]:
+    """Stata's ``xtreg ..., re theta`` reporting block.
+
+    ``xtreg.sthlp:109`` lists ``theta`` under {syntab:Reporting} -- "report theta" -- and
+    ``:380-383`` defines it: "the output should include the estimated value of theta used in
+    combining the between and fixed estimators.  For balanced data, this is a constant, and
+    for unbalanced data, a summary of the values is presented in the header of the output."
+
+    ONLY ``xtreg, re`` accepts it.  Probed on StataNow 19.5 with ``lin_1992.dta``::
+
+        xtreg ltvfo ..., fe  theta   ->  option theta not allowed   (r(198))
+        xtreg ltvfo ..., be  theta   ->  option theta not allowed   (r(198))
+        xtreg ltvfo ..., mle theta   ->  option theta not allowed   (r(198))
+
+    which matches ``ado/base/x``: ``xtreg_re.ado`` parses ``THeta`` in both the estimator and
+    its ``Display`` subprogram, while ``xtreg_fe.ado``/``xtreg_be.ado``/``xtreg_ml.ado``
+    contain the string ``theta`` ZERO times.  So the caller must gate on the estimator, and
+    this function returns an empty list for anything that is not a random-effects fit rather
+    than printing a block Stata would have refused to produce.
+
+    The block sits between the ``Prob > chi2`` row and the coefficient table, and takes two
+    shapes (``xtreg_re.ado:535-547``):
+
+    balanced -- one line, ``e(theta)``::
+
+        theta        = .81012778
+
+    unbalanced -- a ruled box over the five percentiles (``e(thta_min)`` ... ``e(thta_max)``)::
+
+        ------------------- theta --------------------
+          min      5%       median        95%      max
+        0.8150   0.8204     0.8204     0.8204   0.8204
+
+    The two are MUTUALLY EXCLUSIVE, keyed on ``e(Tcon)`` exactly as the ado keys them; a fit
+    that stores neither is left blank rather than guessed at.
+    """
+
+    e = getattr(result, "e", None) or {}
+    name = str(getattr(result, "model_name", "") or "")
+    title = str(e.get("title") or "").strip()
+
+    # `xtreg, re` identifies itself by the banner "Random-effects GLS regression" (or by the
+    # model name). `xtreg, mle` ALSO titles itself "Random-effects ..." and stores an
+    # e(theta)-shaped quantity of its own, but Stata refuses `theta` there -- measured above --
+    # so the MLE variant is excluded explicitly rather than by the title alone.
+    _is_re = (title.startswith("Random-effects") or name.endswith(", re")) and (
+        "mle" not in name.lower()
+    ) and not title.lower().startswith("random-effects ml")
+    if not _is_re:
+        return []
+
+    _tcon = e.get("Tcon")
+    if _tcon is None:
+        return []
+    try:
+        _balanced = bool(float(_tcon) != 0.0)
+    except (TypeError, ValueError):
+        return []
+
+    if _balanced:
+        theta = _e_float(result, "theta")
+        if not np.isfinite(theta):
+            return []
+        # `di in gr "theta" _col(14) "= " in ye e(theta)`: "theta" then pad to column 14, then
+        # "= ", then the value in Stata's default `display` format. Measured:
+        #   .8101277812964918  ->  .81012778   (EIGHT significant digits, leading zero dropped)
+        #   .08101277812964918 ->  .08101278   (still eight, NOT ten -- so it is %.8g rather
+        #                                       than the sigma rows' eight-decimal rule)
+        #   1.2345678901234    ->  1.2345679
+        _text = "%.8g" % theta
+        if _text.startswith("0."):
+            _text = _text[1:]
+        elif _text.startswith("-0."):
+            _text = "-" + _text[2:]
+        return [f"{'theta':<13}= {_text}"]
+
+    # Unbalanced: the ruled box. The rules are 19 and 20 characters around " theta ", so the
+    # header is 49 wide -- measured on lin_1992 with one observation dropped.
+    _values = [
+        _e_float(result, key)
+        for key in ("thta_min", "thta_5", "thta_50", "thta_95", "thta_max")
+    ]
+    if not all(np.isfinite(value) for value in _values):
+        return []
+    # Values print with FOUR decimals and no leading zero (`%6.4f`/`%9.4f`/... in the ado,
+    # which Stata renders as "0.8150"); the leading zero is KEPT inside this block, unlike
+    # everywhere else in the table.
+    _cells = "".join(
+        f"{value:>{width}.4f}" for value, width in zip(_values, (6, 9, 11, 11, 9))
+    )
+    # The label row is NOT the same grid as the value row: measured on the live capture,
+    # labels end at 5 / 13 / 26 / 37 / 46 while the values end at 6 / 15 / 26 / 37 / 46.
+    # Built from those measured end columns so the header lines up with the numbers under it.
+    _labels = "  min      5%       median        95%      max"
+    return [
+        f"{'-' * 19} theta {'-' * 20}",
+        _labels,
+        _cells,
+    ]
+
+
 def _fmt_group_size(value: Any) -> str:
     """Group sizes print as integers, but the AVERAGE carries one decimal (``6.0``)."""
 
@@ -2126,7 +2270,7 @@ def _cluster_combinations(result: Any) -> list[str] | None:
     return lines
 
 
-def _stata_summary(result: Any) -> str:
+def _stata_summary(result: Any, *, theta: bool = False) -> str:
     nobs = int(result.nobs)
     df_resid = float(result.df_resid)
     df_model = float(result.df_model)
@@ -2535,6 +2679,19 @@ def _stata_summary(result: Any) -> str:
         # Neither a rule NOR a trailing blank: the code path below appends one blank line
         # and then the rule before the coefficient header.
         lines = list(_xtreg_header_block(result, nobs))
+        # ``xtreg, re theta`` inserts the theta reporting block between the header's last
+        # row (``Prob > chi2``) and the coefficient table.  Measured on lin_1992::
+
+        #                                                 Wald chi2(7)      =    2452.50
+        #   corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
+        #   theta        = .81012778
+        #   <blank>
+        #   ------------------------------------------------------------------------------
+
+        # The helper returns [] for every estimator Stata would REFUSE ``theta`` on, so an
+        # xtreg, fe / be / mle summary is byte-identical with and without the flag.
+        if theta:
+            lines.extend(_xtreg_theta_lines(result))
         # Everything appended before this point described a header that is not being
         # printed; the panel block replaces it wholesale.
     elif str(getattr(result, "model_name", "") or "") == "mvreg":
@@ -5209,40 +5366,7 @@ def _stata_summary(result: Any) -> str:
     # Measured from ``xtreg y x1, fe``: ".34868505" / ".8853381" / ".13428387" -- four
     # decimals short of what %.8g gives, so the coefficient formatter is the wrong one
     # here. No leading zero, as everywhere else in Stata's output.
-    def _panel_stat(value: float) -> str:
-        """Stata's format for the sigma rows, matched on BOTH shapes it prints.
-
-        Measured on munnell.dta, where the three rows take two different forms:
-
-            xtreg ..., fe   sigma_u |   .1071126      <- 7 significant digits
-                            sigma_e |  .03882161      <- 8
-            xtreg ..., re   sigma_u |  .08186287      <- 8
-                            sigma_e |  .03882161      <- 8
-
-        So neither `%.8g` nor `.8f` reproduces both:
-
-            value        %.8g         .8f          Stata
-            .107112604   0.1071126    0.10711260   .1071126
-            .081862869   0.081862869  0.08186287   .08186287
-            .038821609   0.038821609  0.03882161   .03882161
-
-        The rule Stata follows is EIGHT SIGNIFICANT DIGITS COUNTED FROM THE FIRST NON-ZERO OF THE
-        DECIMAL STRING -- which is `%.8g` except that %.8g does not count the leading zero, so
-        0.081862869 keeps nine digits. `.8f` counts decimal places instead, which overshoots for
-        0.107112604. Taking `%.8g` and then re-rounding a "0.xxx" result to eight decimal places
-        reproduces all three.
-        """
-        text = "%.8g" % value
-        # %.8g counts the leading zero as a significant digit, so a value below 0.1 keeps nine
-        # digits (`0.081862869`). Stata counts eight digits INSIDE the fraction, so those need
-        # eight decimal places instead. Values at or above 0.1 are already right.
-        if abs(value) < 0.1:
-            text = "%.8f" % value
-        if text.startswith("0."):
-            text = text[1:]
-        elif text.startswith("-0."):
-            text = "-" + text[2:]
-        return text
+    _panel_stat = _panel_statistic
 
     panel_rows: list[str] = []
     # ``xtreg, mle`` prints these as NAMED parameters with a standard error and an interval, and

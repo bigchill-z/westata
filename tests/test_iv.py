@@ -261,10 +261,17 @@ def test_clusters_align_on_index_after_listwise_deletion():
         cov_type="cluster", cov_kwds={"clusters": df["g"]}
     )
     surviving = df.dropna(subset=["y", "x", "x2", "z1", "z2"])
+    # The REFERENCE is built on the surviving rows only.  It used to be built from
+    # the frame WITH the NaNs still in it, which worked while formulaic let them
+    # through and now raises "`z1` contains null values after evaluation".  Filtering
+    # the reference is also the more faithful comparison: westata drops those rows by
+    # listwise deletion, so the reference must describe the same sample -- passing
+    # the clusters already filtered but the exog unfiltered was inconsistent, and
+    # only the backend's leniency hid it.
     ref = _reference(
         LMIV2SLS,
         OVER,
-        df,
+        surviving,
         cov_type="clustered",
         clusters=surviving["g"],
         debiased=False,

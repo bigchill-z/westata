@@ -142,6 +142,7 @@ Known deviations from Stata
 
 from __future__ import annotations
 
+import re
 import warnings
 from typing import Any, Mapping, Sequence
 
@@ -216,6 +217,29 @@ def _ensure_intercept(formula: str) -> str:
         return formula
 
     return f"{lhs}~ 1 + {stripped} {instrument_block}".rstrip()
+
+
+def _drop_missing_used_columns(formula: str, data: pd.DataFrame) -> pd.DataFrame:
+    """Listwise-delete rows with a missing value in any column the formula names.
+
+    Stata's ``ivregress`` drops an observation when any variable in the equation is
+    missing, and this package's contract is that the estimated sample and
+    ``cov_kwds['clusters']`` cover the same rows.  That used to be delegated to
+    ``linearmodels.iv.from_formula``, which filtered nulls AFTER parsing; formulaic
+    now refuses to parse a frame containing them ("`z1` contains null values after
+    evaluation"), so the deletion has to happen before the call.
+
+    Only columns actually mentioned in the formula are considered: dropping a row
+    because of an unrelated column would change the sample Stata would use.  The
+    check is deliberately conservative -- an unparseable formula is returned
+    unchanged and linearmodels reports the real error.
+    """
+
+    tokens = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", formula))
+    used = [name for name in data.columns if str(name) in tokens]
+    if not used:
+        return data
+    return data.dropna(subset=used)
 
 
 def _reject_unsupported_kwargs(kwargs: Mapping[str, Any]) -> None:
@@ -539,6 +563,21 @@ class IV2SLS:
         # Add it here so the same formula produces the same parameters in both,
         # instead of silently returning one coefficient fewer.
         formula = _ensure_intercept(formula)
+
+        # DROP the rows this formula needs before handing the frame to formulaic.
+        #
+        # The docstring above promised "rows with missing values are dropped by
+        # linearmodels", and that was true while formulaic passed nulls through to be
+        # filtered later. It now raises first:
+        #
+        #     ValueError: `z1` contains null values after evaluation.
+        #
+        # so a frame with one NaN anywhere in the used columns failed at PARSE time and
+        # the deletion never happened. Doing it here keeps the documented sample --
+        # listwise deletion over exactly the columns the formula touches -- and keeps
+        # `cov_kwds['clusters']` aligned with the fitted rows, which is what the
+        # caller-visible contract of this method is about.
+        data = _drop_missing_used_columns(formula, data)
 
         try:
             parsed = _LMIV2SLS.from_formula(formula, data)

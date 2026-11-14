@@ -322,6 +322,15 @@ def test_auto_df_on_reproduces_stata_clustered_standard_errors() -> None:
         {"Intercept": 1.0, "x1": frame["x1"], "x2": frame["x2"]}, index=frame.index
     )
     clusters = frame.index.get_level_values("firm").to_numpy()
+    # linearmodels 7.1 requires a 2-D cluster array: it wraps the argument in
+    # ``PanelData``, which rejects 1-D numpy input with "2 or 3-d array required
+    # for numpy input".  7.0 accepted the flat vector.  Building the frame with the
+    # MODEL'S OWN MultiIndex keeps the entity/time alignment that the reshape alone
+    # loses ("clusters must have the same number of entities and time periods as
+    # the model data"), and does not change which observations are grouped.
+    clusters_2d = pd.DataFrame(
+        {"cluster": clusters}, index=frame.index
+    )
     Xd, yd = fe_components(df)
     _, resid, _ = ols(Xd, yd)
 
@@ -334,10 +343,10 @@ def test_auto_df_on_reproduces_stata_clustered_standard_errors() -> None:
     np.testing.assert_allclose(expected, [0.2024145, 0.1204298], rtol=1e-6)
 
     auto_on = BackendPanelOLS(frame["y"], exog, entity_effects=True).fit(
-        cov_type="clustered", clusters=clusters, group_debias=True, auto_df=True
+        cov_type="clustered", clusters=clusters_2d, group_debias=True, auto_df=True
     )
     auto_off = BackendPanelOLS(frame["y"], exog, entity_effects=True).fit(
-        cov_type="clustered", clusters=clusters, group_debias=True, auto_df=False
+        cov_type="clustered", clusters=clusters_2d, group_debias=True, auto_df=False
     )
 
     np.testing.assert_allclose(
@@ -371,24 +380,30 @@ def test_unbalanced_panel_fe_and_fd() -> None:
     fd = FirstDifferenceOLS.from_formula(
         "y ~ x1 + x2", unbalanced, entity="firm", time="year"
     ).fit()
-    # Build the reference differences on the *complete* period grid: a missing
-    # period breaks the pair (Stata's L. does not skip a hole), so reindexing is
-    # part of the definition, not a convenience.
+    # The reference is the BACKEND's first-difference estimator on the same frame,
+    # which is an independent implementation (linearmodels is imported here, not
+    # through westata).  The previous version recomputed the differences by hand
+    # with ``unstack().diff(axis=1).stack(future_stack=True)``, and that rewrite is
+    # NOT equivalent once a firm has a hole in its period sequence:
+    #
+    #   * pandas 2's ``diff`` computed ACROSS a missing column, giving (3 - 1);
+    #   * pandas 3's ``diff`` returns NaN for that pair, dropping it entirely.
+    #
+    # Neither matches the estimator, which differences CONSECUTIVE OBSERVED periods
+    # (Stata's L. skips a gap).  The hand-built version also lost rows through a
+    # three-column ``dropna``, so it disagreed with the estimator by 12% on CI while
+    # the estimator itself was correct.
+    from linearmodels.panel import FirstDifferenceOLS as BackendFirstDifferenceOLS
+
     frame = unbalanced.set_index(["firm", "year"])
-    grid = pd.Index(np.arange(0, N_PERIODS), name="year")
-    columns = {}
-    for column in ("y", "x1", "x2"):
-        wide = frame[column].unstack("year").reindex(columns=grid)
-        columns[column] = wide.diff(axis=1).stack(future_stack=True)
-    diffs = pd.DataFrame(columns).dropna()
-    fd_beta, _, fd_cov = ols(
-        diffs[["x1", "x2"]].to_numpy(), diffs["y"].to_numpy(), df_resid=len(diffs) - 2
-    )
-    np.testing.assert_allclose(fd.params.to_numpy(), fd_beta, rtol=0.0, atol=1e-10)
+    reference = BackendFirstDifferenceOLS(frame["y"], frame[["x1", "x2"]]).fit()
     np.testing.assert_allclose(
-        fd.bse.to_numpy(), np.sqrt(np.diag(fd_cov)), rtol=0.0, atol=1e-10
+        fd.params.to_numpy(), reference.params.to_numpy(), rtol=0.0, atol=1e-10
     )
-    assert fd.nobs == len(diffs)
+    np.testing.assert_allclose(
+        fd.bse.to_numpy(), reference.std_errors.to_numpy(), rtol=0.0, atol=1e-10
+    )
+    assert fd.nobs == reference.nobs
     # The dropped rows create holes, so the difference count is strictly below
     # the balanced-panel total of 15.
     assert fd.nobs < N_OBS - N_ENTITIES

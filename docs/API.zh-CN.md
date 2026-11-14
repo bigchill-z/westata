@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.22 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.23 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -19,7 +19,7 @@ _westata 版本: 0.3.22 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtSerialResult`](#xtserialresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtserial`](#xtserial), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -4383,8 +4383,8 @@ re.estat_mundlak(entity='firm', time='year')
 Mundlak specification test
 H0: x1, x2 jointly zero (nu uncorrelated with x)
 
-  chi2(2) =    1.6529
-  Prob > chi2 =    0.4376
+  chi2(2) =    1.5996
+  Prob > chi2 =    0.4494
 ```
 
 **注意:** 系数与标准误来自对增广方程的重新估计，而非原拟合，因此该检验不是 Hausman 统计量的重新标度。
@@ -7610,7 +7610,7 @@ None
 
 **Stata 指令:** `xtreg ypanel x1 x2, mle`
 
-用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。 三个方差成分行都带标准误，两个 sigma 还带置信区间，与 Stata 一致。这些标准误无法从 statsmodels 取得——它的协方差只覆盖固定效应加上随机效应方差的一个内部变换，而残差尺度 是被 profile 掉的——因此这里从模型自身的似然构造信息阵。该似然在求导之前已与 statsmodels 的 `llf` 校验到 2.8e-13；由于 Powell 在 `sigma_u` 上比 Stata 早停约 4e-06（而似然本身只差 5.7e-09），这里又本地重优化了一次。`e(sigma_u_se)`、`e(sigma_e_se)`、`e(rho_se)` 存标准误，`e(sigma_u_ci)`/`e(sigma_e_ci)` 存对数尺度的区间界限；对照 StataNow 19.5 在 lin_1992.dta 上实测，七位小数一致。`rho` 的区间**刻意不复现**：它打印的界限意味着上下两侧乘数不等，而 log、logit、atanh、Fieller 都无法复现，故省略而不猜测。
+用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。 三个方差成分行都带标准误，两个 sigma 还带置信区间，与 Stata 一致。这些标准误无法从 statsmodels 取得——它的协方差只覆盖固定效应加上随机效应方差的一个内部变换，而残差尺度 是被 profile 掉的——因此这里从模型自身的似然构造信息阵。该似然在求导之前已与 statsmodels 的 `llf` 校验到 2.8e-13；由于 Powell 在 `sigma_u` 上比 Stata 早停约 4e-06（而似然本身只差 5.7e-09），这里又本地重优化了一次。`e(sigma_u_se)`、`e(sigma_e_se)`、`e(rho_se)` 存标准误，`e(sigma_u_ci)`/`e(sigma_e_ci)` 存对数尺度的区间界限；对照 StataNow 19.5 在 lin_1992.dta 上实测，七位小数一致。`rho` 的区间**刻意不复现**：它打印的界限意味着上下两侧乘数不等，而 log、logit、atanh、Fieller 都无法复现，故省略而不猜测。 信息阵在**方差尺度**（sigma_u^2、sigma_e^2）上构造，这与 Baltagi 对随机效应模型的处理以及 Stata 的 `vce(oim)` 一致。若改成在对数尺度上对集中似然求导，var(sigma_e) 与 Stata 的 `e(V)` 会差 1.3e-05 且换任何步长都修不好；换回方差尺度后同样的导数落在 2e-06 以内，表中两行 `/sigma_` 与 Stata **逐字符相同**，含置信区间端点。 `rho` 的标准误是唯一在打印末位仍有差异的量（.0486811 对 .0486812，相差 8.8e-08，舍入边界在 .04868115）：在 4e-5 到 3e-6 之间扫描步长，没有任何取值能同时满足三项的打印结果，故如实记作数值微分残差而不去凑。
 
 **签名**
 
@@ -7659,9 +7659,9 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
        _cons |   .8439937   .1404197     6.01   0.000     .5687762    1.119211
 ------------------------------------------------------------------------------
 -------------+----------------------------------------------------------------
-    /sigma_u |   .7702664   .1153562                      .5743331   1.0330423
-    /sigma_e |   .9841418   .0550432                      .8819620   1.0981596
-         rho |   .3798778   .0783186
+    /sigma_u |   .7702664   .1153563                      .5743330   1.0330425
+    /sigma_e |   .9841418   .0550432                      .8819619   1.0981597
+         rho |   .3798778   .0783187
 ------------------------------------------------------------------------------
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```
@@ -8413,6 +8413,32 @@ ws.WeakRobustResult(test: 'str', statistic: 'float', f_statistic: 'float', df: '
 
 ```python
 print('WeakRobustResult is returned by estat_weakrobust; see its entry')
+```
+
+**输出**
+
+```text
+None
+```
+
+### `XtOveridResult`
+
+**Stata 指令:** `r(j), r(jdf), r(jp) after xtoverid`
+
+`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 "fixed vs random effects"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。
+
+**签名**
+
+```python
+ws.XtOveridResult(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]', description: 'str' = 'fixed vs random effects', model: 'str' = 'xtreg re') -> None
+```
+
+**示例**
+
+```python
+fit = ws.RandomEffects.from_formula("y ~ x1", base, entity="firm", time="year").fit()
+r = ws.xtoverid(fit)
+print(r.statistic, r.df, r.pvalue)
 ```
 
 **输出**
@@ -9514,6 +9540,31 @@ print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, n
 
 ```text
 None
+```
+
+### `xtoverid`
+
+**Stata 指令:** `xtoverid (user-written: Schaffer & Stillman)`
+
+过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type="robust"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。
+
+**签名**
+
+```python
+ws.xtoverid(result: 'Any') -> 'XtOveridResult'
+```
+
+**示例**
+
+```python
+fit = ws.RandomEffects.from_formula("y ~ x1 + x2", base, entity="firm", time="year").fit()
+ws.xtoverid(fit).to_dict()
+```
+
+**输出**
+
+```text
+{'j': 1.184508111992374, 'jp': 0.5530792071413253, 'jdf': 2.0}
 ```
 
 ### `xtserial`

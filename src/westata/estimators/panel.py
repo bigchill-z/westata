@@ -2236,6 +2236,9 @@ class RandomEffectsMLE(RandomEffects):
 
         nobs = int(len(y))
         rank = int(X.shape[1])
+        # Group sizes, for e(g_min)/e(g_avg)/e(g_max) -- Stata's "Obs per group" row.
+        groups_sizes = np.bincount(np.asarray(groups).astype(int)).astype(float)
+        groups_sizes = groups_sizes[groups_sizes > 0]
         df_resid = float(nobs - rank)
         # ``e(ll_0)``: the log likelihood of the CONSTANT-ONLY random-effects fit. Stata reports
         # the model test as LR chi2 = 2*(ll - ll_0), and without this macro the header printed no
@@ -2307,14 +2310,31 @@ class RandomEffectsMLE(RandomEffects):
                 "sigma_u": sigma_u,
                 "sigma_e": sigma_e,
                 "rho": sigma_u**2 / (sigma_u**2 + sigma_e**2),
+                # STATA'S OWN NAMES for the two likelihood-ratio ingredients.  Measured with
+                # ``ereturn list`` on ``xtreg ltvfo ... ngca, mle`` (lin_1992.dta):
+                #
+                #     e(ll_c)   = 100.7850378486044      log likelihood of the POOLED fit
+                #     e(chi2_c) = 464.2247130113532      2*(e(ll) - e(ll_c))
+                #
+                # ``e(chi2_c)`` is what the table prints as "LR test of sigma_u=0:
+                # chibar2(01) = 464.22".  This package stored the same pooled likelihood under
+                # the private key ``ll_pooled``, so a Stata-porting script reading
+                # ``e["chi2_c"]`` found nothing and the row could not be rendered at all.
+                # Both spellings are kept: the private one is read internally, the Stata one
+                # is the contract.
+                "ll_c": ll_pooled,
+                "chi2_c": float(2.0 * (float(fitted.llf) - ll_pooled))
+                if np.isfinite(ll_pooled)
+                else float("nan"),
+                # ``Obs per group: min/avg/max``.  Stata stores these as e(g_min)/e(g_avg)/
+                # e(g_max) (17/17/17 here) and prints them in the design block; without them
+                # the three cells rendered as bare ".".
+                "g_min": float(min(groups_sizes)) if groups_sizes.size else float("nan"),
+                "g_avg": float(np.mean(groups_sizes)) if groups_sizes.size else float("nan"),
+                "g_max": float(max(groups_sizes)) if groups_sizes.size else float("nan"),
                 "method": "mle",
                 "vcetype": "",
                 "depvar": self._formula.split("~", 1)[0].strip(),
-                # `xtreg, mle` prints "Group variable: sid" and "Time variable: t", read from
-                # e(ivar)/e(tvar). Without them the design block rendered a bare "." -- the
-                # renderer looks these up in e(), not on the object (v3 report).
-                "ivar": str(getattr(self, "_entity_name", "") or ""),
-                "tvar": str(getattr(self, "_time_name", "") or ""),
             },
             level=95.0,
         )

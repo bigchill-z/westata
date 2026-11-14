@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.19 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.22 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -414,7 +414,7 @@ ws.FirstDifferenceOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time
 
 ```text
 
-Group variable: .                                 Number of groups =      40
+Group variable: firm                              Number of groups =      40
                                                                 Obs per group:
                                                                     min =       5
                                                                     avg =       5
@@ -5639,37 +5639,46 @@ ws.Logit.from_formula('yb ~ x1 + x2', base).fit().predict(kind='pr')[:6]
 
 **Stata 指令:** `(no Stata equivalent -- renders the estimation table Stata prints)`
 
-把拟合结果渲染成文本摘要。`style='statsmodels'`（默认）打印 statsmodels 风格的表格，`style='stata'` 打印同一命令下 Stata 的版式——`regress` 为方差分析与拟合区块加系数表，离散选择模型为 LR 卡方表头与 z 统计量。它**返回**字符串而不是直接打印，因此在 notebook 中会显示，也可以原样写入文件。
+渲染拟合的文本摘要。`style='stata'`（默认）打印同一命令在 Stata 中的版式——`regress` 为方差分析加拟合块与系数表，离散选择模型为 LR 卡方表头与 z 统计量；`style='statsmodels'` 则打印 statsmodels 风格的表。它**返回**字符串而不是直接打印，因此在 notebook 中可显示，也能原样写入文件。`theta=True` 是 Stata 的 `xtreg ..., re theta` 报告选项：在面板表头与系数表之间插入估计出的准去均值系数。平衡面板打印一行（`theta        = .81012778`）；不平衡面板则以带横线的方框打印 `e(thta_min)` … `e(thta_max)` 五个百分位，因为此时 theta 取决于各实体自身的组大小，没有单一数值可报。只有 `xtreg, re` 接受它——Stata 对 `xtreg ..., fe/be/mle theta` 报 `option theta not allowed`（r(198)）——因此在其他估计量和 `style='statsmodels'` 下该开关无效果。
 
 **签名**
 
 ```python
-ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False) -> 'str'
+ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: 'bool' = False, theta: 'bool' = False) -> 'str'
 ```
 
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
+ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(theta=True)
 ```
 
 **输出**
 
 ```text
 
-      Source |       SS           df       MS      Number of obs   =       200
--------------+----------------------------------   F(2, 197)       =     91.00
-       Model |  200.183699         2  100.091849   Prob > F        =    0.0000
-    Residual |  216.683448       197  1.09991598   R-squared       =    0.4802
--------------+----------------------------------   Adj R-squared   =    0.4749
-       Total |  416.867146       199  2.09480978   Root MSE        =    1.0488
+Random-effects GLS regression                   Number of obs     =        200
+Group variable: firm                            Number of groups  =         40
+
+R-squared:                                      Obs per group:
+     Within  = 0.3669                                         min =          5
+     Between = 0.2363                                         avg =        5.0
+     Overall = 0.2957                                         max =          5
+
+                                                Wald chi2(2)      =     101.64
+corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
+theta        = .50990203
 
 ------------------------------------------------------------------------------
-           y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+      ypanel | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
 -------------+----------------------------------------------------------------
-          x1 |   .8406445   .0724711    11.60   0.000     .6977258    .9835633
-          x2 |   -.512087   .0748223    -6.84   0.000    -.6596425   -.3645315
-       _cons |   1.005003   .0744285    13.50   0.000     .8582236    1.151781
+          x1 |   .7277599    .073114     9.95   0.000     .5844592    .8710606
+          x2 |   -.119745   .0784768    -1.53   0.127    -.2735566    .0340667
+       _cons |   .8440041   .1428722     5.91   0.000     .5639798    1.124028
+-------------+----------------------------------------------------------------
+     sigma_u |  .78751004
+     sigma_e |  .99008668
+         rho |  .38750008   (fraction of variance due to u_i)
 ------------------------------------------------------------------------------
 ```
 
@@ -7601,7 +7610,7 @@ None
 
 **Stata 指令:** `xtreg ypanel x1 x2, mle`
 
-用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。
+用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。
 
 **签名**
 
@@ -7635,9 +7644,9 @@ Random-effects ML regression                         Number of obs    =    200
 Group variable: firm                                 Number of groups =     40
 
 Random effects u_i ~ Gaussian                        Obs per group:
-                                                                  min =      .
-                                                                  avg =      .
-                                                                  max =      .
+                                                                  min =      5
+                                                                  avg =    5.0
+                                                                  max =      5
 
                                                      LR chi2(2)       =  82.25
 Log likelihood = -308.62872                          Prob > chi2      = 0.0000

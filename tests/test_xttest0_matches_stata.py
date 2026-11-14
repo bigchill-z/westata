@@ -60,8 +60,25 @@ def test_the_test_reports_a_chi_bar_squared_not_a_chi2(panel, random_effects) ->
     assert "chibar2" in rendered
 
 
-def test_it_refuses_without_the_entity_labels(random_effects) -> None:
-    """The grouping vector is not on the result, so guessing it would be a silent error."""
+def test_it_finds_the_entity_labels_from_e_ivar(random_effects) -> None:
+    """No `entity=` needed: the fit records the panel variable in e(ivar).
 
+    Measured on munnell.dta: `RandomEffects.from_formula(..., entity="sid").fit()` stores
+    e(ivar)="sid", so `xttest0(fit)` resolves the labels instead of failing with
+    "needs the entity labels". The user hit exactly this -- their call passed no entity= and used a
+    variable name (`province`) that the old hard-coded candidate list did not contain.
+    """
+
+    rendered = str(ws.xttest0(random_effects))
+    assert "Breusch and Pagan" in rendered
+    # The equation line names the recorded panel variable, not a placeholder.
+    assert "[sid,t] = Xb + u[sid]" in rendered, rendered
+
+
+def test_it_still_refuses_when_the_recorded_name_is_missing(random_effects) -> None:
+    """A recorded e(ivar) whose column is absent from model_data must raise, not guess."""
+
+    # e is a read-only property, so pass an explicit entity= that the frame does not contain:
+    # the resulting label/residual length mismatch must raise rather than silently truncate.
     with pytest.raises(Exception):
-        ws.xttest0(random_effects)
+        ws.xttest0(random_effects, entity=random_effects.model_data["sid"].iloc[:-5])

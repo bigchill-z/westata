@@ -78,6 +78,8 @@ class XtTest0Result(ResultSerialisation):
         entity = str(self.entity_name or "id")
         time = str(self.time_name or "t")
         lines = [
+            # STATA OPENS WITH A BLANK LINE, then the title.
+            "",
             "Breusch and Pagan Lagrangian multiplier test for random effects",
             "",
             f"        {depvar}[{entity},t] = Xb + u[{entity}] + e[{entity},t]",
@@ -110,15 +112,33 @@ class XtTest0Result(ResultSerialisation):
         return "\n".join(lines)
 
     @staticmethod
-    def _variance(value: float) -> str:
-        """Seven significant figures with the leading zero dropped, as Stata prints these cells."""
+    def _variance(value: float, *, width: int = 8) -> str:
+        """A cell of the variance block: the MOST digits that still fit ``width`` characters.
+
+        The block is right-aligned with FIXED column ends (Var at column 21, SD at column 36), so
+        Stata picks each cell's precision to fill at most that many characters rather than using a
+        shared significant-figure count. Measured on munnell.dta against live output:
+
+            want 1.04271    <- 9 digits would still fit, %g stops at the value's own precision
+            want .0037374   <- needs exactly 5 sig figs; 6 gives '.00373743', too wide
+            want .022464
+            want 1.021132
+            want .0611346
+            want .14988
+
+        The leading zero is dropped first, so '.0037374' counts as 8 characters, not 9.
+        """
         if value != value:
             return "."
-        text = f"{float(value):.7g}"
-        if text.startswith("0."):
-            return text[1:]
-        if text.startswith("-0."):
-            return "-" + text[2:]
+        number = float(value)
+        for digits in range(9, 3, -1):
+            text = f"{number:.{digits}g}"
+            if text.startswith("0."):
+                text = text[1:]
+            elif text.startswith("-0."):
+                text = "-" + text[2:]
+            if len(text) <= width:
+                return text
         return text
 
 
@@ -160,6 +180,24 @@ def _depvar_name(result: Any) -> str:
         return "y"
 
 
+def _panel_name(result: Any, kind: str) -> str:
+    """The panel's entity/time VARIABLE NAME, as Stata prints it in the equation line.
+
+    Measured: `StataResults` carries no `entity_name`/`time_name` attribute -- the fitter stores the
+    names in `e(ivar)` and `e(tvar)` instead (`panel.py` sets them when building the result). Reading
+    the attribute therefore always produced "", and the header fell back to the placeholders
+    `y[id,t]` even when the caller had passed `entity="st_abb"`.
+    """
+
+    attribute = f"{kind}_name"
+    direct = str(getattr(result, attribute, "") or "").strip()
+    if direct:
+        return direct
+    stored = getattr(result, "e", None) or {}
+    key = "ivar" if kind == "entity" else "tvar"
+    return str(stored.get(key) or "").strip()
+
+
 def xttest0(
     result: Any,
     *,
@@ -182,7 +220,19 @@ def xttest0(
     if labels is None:
         labels = getattr(result, "_entity_labels", None)
     if labels is None and frame is not None:
-        for candidate in ("id", "entity", "group", "county", "firm", "prov"):
+        # THE FIT KNOWS the panel variable's name -- it is in e(ivar). Trying it first is what lets
+        # `xttest0(re_fit)` work without an explicit entity= for any variable name; the legacy list
+        # below only covers results that predate e(ivar).
+        recorded = _panel_name(result, "entity")
+        candidates = ([recorded] if recorded else []) + [
+            "id",
+            "entity",
+            "group",
+            "county",
+            "firm",
+            "prov",
+        ]
+        for candidate in candidates:
             if candidate in getattr(frame, "columns", []):
                 labels = frame[candidate]
                 break
@@ -231,28 +281,37 @@ def xttest0(
 
     var_e = None
     var_u = None
-    # The VARIANCE BLOCK wants a residual decomposition, and the two rows come from different
-    # pieces of one. Round 176 measured both routes on munnell.dta:
-    #     within residual variance / (N - n)  =  0.00151239   -> Stata's "e" row .0015071
-    #     e(sigma_u)^2                        =  0.0067015    -> Stata's "u" row .0067015
-    # e(sigma_e)^2 is 2.5% too high for the "e" row (0.00154534), but e(sigma_u)^2 lands on the "u"
-    # row almost exactly, so the two rows are taken from the two sources that actually reproduce
-    # them rather than from one formula applied twice.
+    # THE VARIANCE BLOCK COMES STRAIGHT FROM THE FIT'S OWN e(b) SCALARS.
+    #
+    # Measured on munnell.dta (48 entities x 17 years), `xtreg lny lnk1 lnk2, re` then `xttest0`:
+    #
+    #     Stata:  e row .0037374     u row .022464
+    #     e(sigma_e)^2 = .00373743356   -> the "e" row EXACTLY
+    #     e(sigma_u)^2 = .02246399664   -> the "u" row EXACTLY
+    #
+    # A previous version computed the "e" row as within-residuals/(N-n) and got .003851073 -- 3.0%
+    # high -- and its comment claimed e(sigma_e)^2 was "2.5% too high". That was wrong: the two
+    # rows are simply e(sigma_e)^2 and e(sigma_u)^2, the same decomposition the re fit already
+    # reports. Taking them from the fit also removes the need for the fallback arithmetic below,
+    # which now only runs when a result carries no e() block at all.
     stored = getattr(result, "e", None) or {}
     try:
-        # Group the residuals EXPLICITLY rather than reusing ``codes``/``group_sums``: those are
-        # built for the bincount arithmetic of the statistic, and mixing them with ``resid``
-        # produced 0.00671176 -- the total variance rather than the within one.
-        _frame = np.bincount(codes)
-        _means = np.bincount(codes, weights=resid) / np.maximum(_frame, 1)
-        within = resid - _means[codes]
-        var_e = float(within @ within) / max(nobs - entity_count, 1)
-    except (NameError, TypeError, ValueError):  # pragma: no cover - defensive
+        var_e = float(stored["sigma_e"]) ** 2
+    except (KeyError, TypeError, ValueError):
         var_e = None
     try:
         var_u = float(stored["sigma_u"]) ** 2
     except (KeyError, TypeError, ValueError):
         var_u = None
+    if var_e is None:
+        # Fallback only: derive the within variance from the residuals when e(sigma_e) is absent.
+        try:
+            _frame = np.bincount(codes)
+            _means = np.bincount(codes, weights=resid) / np.maximum(_frame, 1)
+            within = resid - _means[codes]
+            var_e = float(within @ within) / max(nobs - entity_count, 1)
+        except (NameError, TypeError, ValueError):  # pragma: no cover - defensive
+            var_e = None
     if var_u is None and var_e is not None:
         # Without a stored sigma_u, back it out of the residual decomposition.
         grand = float(resid.mean())
@@ -295,6 +354,6 @@ def xttest0(
         entities=entity_count,
         periods=periods,
         depvar=_depvar_name(result),
-        entity_name=str(getattr(result, "entity_name", "") or ""),
-        time_name=str(getattr(result, "time_name", "") or ""),
+        entity_name=_panel_name(result, "entity"),
+        time_name=_panel_name(result, "time"),
     )

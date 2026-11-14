@@ -7,6 +7,28 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.19] - 2026-11-14
+
+### Fixed
+* **`ws.xtserial` now returns the first-stage differenced regression.**  Stata's
+  `, output` prints that regression before the three-line test block, and this
+  package computed it and then discarded it -- wasteful, since the test needs those
+  residuals, and unhelpful, since the differenced equation is an estimate in its own
+  right.  It is now available as `result.first_stage` (an ordinary `StataResults`, so
+  `params`/`bse`/`e`/`summary()` all work), with `result.first_stage_table()` for the
+  rendered table.  `keep_first_stage=False` omits it.
+
+  Coefficients are indexed `d_<name>`, because the fit is on differences.
+
+  Verified against StataNow 19.5 on `lin_1992.dta`: N = 420, `R-squared = 0.5797`,
+  `Root MSE = .11179`, `F(9, 27) = 902.61`, and all nine coefficients and clustered
+  standard errors agree to within 4.7e-08.
+
+  The English and Chinese guides previously said this was "not reproduced"; both are
+  corrected.
+
+---
+
 ## [0.3.18] - 2026-11-14
 
 ### Added

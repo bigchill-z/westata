@@ -385,6 +385,21 @@ Stata 的语义。**
 报错信息必须**明确说"该命令尚未实现 robust，不是不支持"**，并给出可用的替代，
 不能像现在这样让用户以为是自己写错了。这是诚实性问题（§0 总原则）。
 
+#### R3.7.6 同一输入必须在所有族回显**同一个规范拼写**
+
+规范值是共享词汇（R3.6），因此 `result.cov_type` 在 `OLS` 与 `Logit` 上必须是同一个
+字符串。实测违反过一处：`discrete.py` 的标签映射表用大写键 `"HC1"`，而上游
+`_canonical_cov` 返回的已经是小写 `"hc1"`，查表落空后直接把小写值透传——
+
+```python
+ws.OLS(..., cov_type="HC1").fit().cov_type     # 'HC1'
+ws.Logit(..., cov_type="HC1").fit().cov_type   # 'hc1'   <- 修复前
+```
+
+**这个缺陷只有跨族对比才看得见**：单独看 `Logit` 的输出，`'hc1'` 并不刺眼。
+校验器 `check_r3_cov_echo_case` 因此把 `HC1` 在 5 个族里逐一比对
+（`PanelOLS` 例外，它按 R3.7.3 必须回显 `cluster`）。
+
 #### 实施顺序（回答"以后只用 robust"）
 
 1. **立刻（纯别名，零风险）**：`FEOLS`/`Areg` 接受 `robust`→`HC1`；

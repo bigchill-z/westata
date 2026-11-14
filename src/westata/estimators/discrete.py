@@ -102,11 +102,18 @@ _SUPPORTED_COV = ("nonrobust", "robust", "HC0", "HC1", "cluster")
 #: the raw string ``"robust"`` made ``Logit(...).cov_type`` read the same as
 #: ``OLS(...).cov_type`` for a fit whose numbers differ, so the label now names the
 #: estimator that was actually computed.
+#:
+#: Keyed by LOWERCASE, because `_canonical_cov` lowercases before returning.  Keying it
+#: with ``"HC1"`` made the lookup miss for every caller (the canonical value arrives as
+#: ``"hc1"``), so the label fell through as the lowercase string -- ``Logit(...,
+#: cov_type="HC1").cov_type`` read ``'hc1'`` while every other family reported
+#: ``'HC1'``.  Caught by comparing the echo across families rather than by looking at
+#: one of them.
 _COV_TYPE_LABELS = {
     "nonrobust": "nonrobust",
     "robust": "ML_ROBUST",
-    "HC0": "HC0",
-    "HC1": "HC1",
+    "hc0": "HC0",
+    "hc1": "HC1",
     "cluster": "cluster",
 }
 
@@ -114,7 +121,7 @@ _COV_TYPE_LABELS = {
 def _cov_type_label(canonical: str) -> str:
     """The canonical value to store on the result object (R3.7.2)."""
 
-    return _COV_TYPE_LABELS.get(canonical, canonical)
+    return _COV_TYPE_LABELS.get(str(canonical).strip().lower(), canonical)
 
 
 # --------------------------------------------------------------- VCE helpers

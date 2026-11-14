@@ -1281,11 +1281,88 @@ def check_r3_cov_type_panel_hc1(report: Report) -> None:
             )
 
 
+def check_r3_cov_echo_case(report: Report) -> None:
+    """R3.7.6 -- ``cov_type="HC1"`` must echo ``"HC1"`` in EVERY family.
+
+    The canonical spellings are shared vocabulary (R3.6): a caller who reads
+    ``result.cov_type`` gets the same string from ``OLS`` and from ``Logit``.  They did
+    not: ``discrete.py`` keyed its label map with ``"HC1"`` while the value arriving
+    from ``_canonical_cov`` was already lowercased, so the lookup missed and the
+    lowercase string fell through.  ``Logit(..., cov_type="HC1").cov_type == "hc1"``
+    while ``OLS(...) == "HC1"``.
+
+    Only comparing ACROSS families finds this; looking at one family's output looks
+    correct either way.
+    """
+
+    import numpy as np
+    import pandas as pd
+
+    import westata as ws
+
+    rng = np.random.default_rng(20260114)
+    frame = pd.DataFrame(
+        {
+            "y": rng.normal(size=240),
+            "x": rng.normal(size=240),
+            "w": rng.normal(size=240),
+            "yb": (rng.normal(size=240) > 0).astype(int),
+            "firm": np.repeat(np.arange(24), 10),
+            "year": np.tile(np.arange(1, 11), 24),
+        }
+    )
+    frame["z"] = frame["x"] * 0.6 + rng.normal(size=240)
+
+    builders = {
+        "OLS": lambda: ws.OLS.from_formula("y ~ x", frame).fit(cov_type="HC1"),
+        "IV2SLS": lambda: ws.IV2SLS.from_formula("y ~ [x ~ z]", frame).fit(cov_type="HC1"),
+        "Logit": lambda: ws.Logit.from_formula("yb ~ x + w", frame).fit(cov_type="HC1"),
+        "Poisson": lambda: ws.Poisson.from_formula("yb ~ x + w", frame).fit(cov_type="HC1"),
+        "PanelOLS": lambda: ws.PanelOLS.from_formula(
+            "y ~ x", frame, entity="firm", time="year"
+        ).fit(cov_type="HC1"),
+    }
+
+    for family, build in builders.items():
+        try:
+            result = build()
+        except Exception as exc:  # noqa: BLE001
+            report.add(
+                Finding("R3.7.6", family, f"`{family}(cov_type='HC1')` raised {type(exc).__name__}: {exc}")
+            )
+            continue
+        reported = getattr(result, "cov_type", None)
+        # `panel` correctly reports `cluster` (xtreg's HC1 IS a clustered VCE, R3.7.3);
+        # every other family must use the SHARED spelling of the value it computed.
+        if family == "PanelOLS":
+            if str(reported) != "cluster":
+                report.add(
+                    Finding(
+                        "R3.7.6",
+                        f"{family}.cov_type",
+                        f"`{family}(cov_type='HC1')` reports {reported!r}; it computes "
+                        f"vce(cluster panelvar) and must say `cluster` (R3.7.3)",
+                    )
+                )
+            continue
+        if str(reported) != "HC1":
+            report.add(
+                Finding(
+                    "R3.7.6",
+                    f"{family}.cov_type",
+                    f"`{family}(cov_type='HC1')` reports {reported!r}; the shared "
+                    f"spelling is `HC1` -- a family-specific case or fallthrough makes "
+                    f"`result.cov_type` unusable for comparisons (R3.6)",
+                )
+            )
+
+
 CHECKS = {
     "R2": check_r2,
     "R3": check_r3,
     "R3.7": check_r3_cov_type,
     "R3.7.3": check_r3_cov_type_panel_hc1,
+    "R3.7.6": check_r3_cov_echo_case,
     "R4": check_r4,
     "R5": check_r5,
     "R6": check_r6,

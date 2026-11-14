@@ -7,6 +7,37 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.15] - 2026-11-14
+
+### Fixed
+* **`PanelOLS.fit(cov_type="cluster", ...)` no longer depends on the installed
+  `linearmodels` version.** The documented call
+
+  ```python
+  ws.PanelOLS.from_formula(formula, df, entity="province", time="t").fit(
+      cov_type="cluster", cov_kwds={"groups": df["province"]})
+  ```
+
+  raised `ValueError: 2 or 3-d array required for numpy input` under
+  `linearmodels` 7.0 while working under 7.1, on identical `westata` source. The
+  two versions validate the label argument in opposite directions:
+
+  | passed | 7.0 | 7.1 |
+  |---|---|---|
+  | bare 1-D array | rejected | accepted |
+  | `(n, 1)` block | accepted | rejected |
+
+  Only a `pandas.Series` carrying the panel `MultiIndex` reaches `PanelData`'s
+  labelled branch, which both accept. `_as_cluster_block` now emits that form, so
+  one code path serves every supported dependency instead of pinning one of them.
+
+  This was the failure mode worth noting: the numbers were never wrong, the call
+  simply refused to run, and only on the older dependency. Verified on both --
+  7.0 (system Python) and 7.1 (project venv) return SE `.1681335` for `ltlan` and
+  `sigma_e` `.10589274`, matching StataNow 19.5 on `lin_1992.dta`.
+
+---
+
 ## [0.3.14] - 2026-11-14
 
 ### Fixed

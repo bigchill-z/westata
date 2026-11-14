@@ -197,3 +197,52 @@ def test_the_table_prints_statas_cluster_note_and_robust_heading(frame) -> None:
     plain = str(_fit(frame, "nonrobust").summary())
     assert "adjusted for" not in plain
     assert "Robust" not in plain
+
+
+# ------------------------------------------------- cross-version linearmodels
+
+
+def test_a_cluster_series_works_on_every_supported_linearmodels(frame) -> None:
+    """``cov_kwds={"groups": df["entity"]}`` must not depend on the 7.0/7.1 split.
+
+    The two supported versions validate cluster labels differently, measured on
+    2026-11-14 with identical westata source:
+
+        7.0  rejects a bare 1-D array   ("2 or 3-d array required for numpy input")
+        7.1  rejects an (n, 1) block    ("clusters must have the same number of
+                                         entities and time periods")
+
+    Only a ``Series`` carrying the panel MultiIndex satisfies both, which is what
+    ``_as_cluster_block`` now emits.  This test asserts the shape actually handed to
+    the backend, so it pins the CONTRACT rather than whichever version happens to be
+    installed.
+    """
+
+    from westata.estimators.panel import _as_cluster_block
+
+    frame["pid"] = frame["province"]
+    model = ws.PanelOLS.from_formula(
+        f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
+    )
+    _, labels, n_clust = model._resolve_cov("cluster", {"groups": frame["pid"]})
+    assert n_clust == 28
+    block = _as_cluster_block(labels, model._kept_index)
+    assert isinstance(block, pd.Series), "a labelled Series is the version-independent form"
+    assert block.index.equals(model._kept_index)
+    assert block.size == labels.size == 476
+
+
+def test_a_plain_array_of_labels_is_still_a_blind_cluster(frame) -> None:
+    """Passing the labels instead of the Series must give the SAME standard errors."""
+
+    frame["pid"] = frame["province"]
+    formula = f"{Y} ~ " + " + ".join(XS)
+    as_series = ws.PanelOLS.from_formula(formula, frame, entity="pid", time="t").fit(
+        cov_type="cluster", cov_kwds={"groups": frame["pid"]}
+    )
+    as_array = ws.PanelOLS.from_formula(formula, frame, entity="pid", time="t").fit(
+        cov_type="cluster", cov_kwds={"groups": frame["pid"].to_numpy()}
+    )
+    assert float(as_array.bse["ltlan"]) == pytest.approx(
+        float(as_series.bse["ltlan"]), rel=1e-12
+    )

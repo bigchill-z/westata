@@ -959,7 +959,16 @@ class PanelOLS:
         extra = self._extra_fit_kwargs(model)
         kwargs.update(extra)
         if backend_cov == "clustered":
-            kwargs["clusters"] = clusters
+            # ``linearmodels`` wants the cluster labels as a 2-D ``(n, 1)`` block: its
+            # ``reformat_clusters`` feeds them straight into ``PanelData(...)``, whose
+            # numpy branch raises "2 or 3-d array required for numpy input" for a 1-D
+            # array.  linearmodels 7.0 enforces that strictly; 7.1 appears to reshape
+            # internally, which is why a 1-D array works there.  Relying on that
+            # difference made the same call succeed under one dependency version and
+            # fail under another -- ``cov_kwds={"groups": df["entity"]}`` raised
+            # ValueError on 7.0 while every number it would have produced was fine.
+            # Reshaping here removes the version dependency instead of pinning it.
+            kwargs["clusters"] = _as_cluster_block(clusters, self._kept_index)
             # ``group_debias`` adds Stata's G/(G-1) factor on top of the
             # observation-based correction -> exactly CR1.
             kwargs["group_debias"] = bool(settings.cluster_adj)
@@ -2551,6 +2560,35 @@ def _panel_frame(data: pd.DataFrame, *, entity: str, time: str, command: str) ->
     if frame.index.nlevels < 3:
         return frame
     return frame.droplevel(list(range(2, frame.index.nlevels)))
+
+
+def _as_cluster_block(clusters: Any, index: Any = None) -> Any:
+    """Present cluster labels to ``linearmodels`` in the shape IT requires.
+
+    The two supported dependency versions disagree about what a valid input looks
+    like, measured on 2026-11-14 with the same ``westata`` source:
+
+    ============  ==========================  =========================================
+    linearmodels  form accepted               a bare 1-D array
+    ============  ==========================  =========================================
+    7.0           ``(n, 1)`` 2-D block        ``ValueError: 2 or 3-d array required``
+    7.1           a labelled ``Series``       ``(n, 1)`` fails the entity/period check
+    ============  ==========================  =========================================
+
+    Both versions handle a ``pandas.Series`` carrying the panel's MultiIndex, because
+    ``PanelData`` then takes its labelled branch and never looks at the numpy shape.
+    That is the only form this function emits, so the caller does not depend on which
+    version is installed.
+    """
+
+    if clusters is None:
+        return None
+    values = np.asarray(clusters)
+    if values.ndim == 2 and values.shape[1] == 1:
+        values = values.ravel()
+    if index is not None and len(index) == values.size:
+        return pd.Series(values, index=index, name="cov.cluster")
+    return values.reshape(-1, 1)
 
 
 def _cluster_labels(

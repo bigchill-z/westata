@@ -34,6 +34,41 @@ Coefficients and standard errors were already exact to 1e-8 for both `fe` and
 was captured from StataNow 19.5 on 2026-11-14 and is pinned by
 `tests/test_xtreg_fe_robust_sigma.py`.
 
+### Added -- `newey` and `prais` have the class form every other estimator has
+
+Both are e-class estimation commands, but they were the only two reachable
+exclusively as bare functions: the same operation took a construction step in 40
+families (`ws.OLS.from_formula(...).fit()`) and none in these two (`ws.newey(...)`).
+
+```python
+ws.Newey.from_formula("y ~ x1", data, lag=2).fit()
+ws.newey("y ~ x1", data, lag=2)      # same numbers, still supported
+
+ws.Prais.from_formula("y ~ x", data).fit()
+ws.prais(data, "y ~ x")              # same numbers, still supported
+```
+
+The function stays as a thin wrapper over the one implementation, so the two entry
+points cannot drift -- eleven tests in `tests/test_estimator_class_forms.py` assert
+they agree bit-for-bit.
+
+Three decisions worth knowing:
+
+* **Neither `fit()` accepts `cov_type`.** Stata's `newey`/`prais` have no `vce()`
+  option; the HAC / AR(1)-transformed variance IS the estimator, so a `cov_type`
+  parameter would promise a choice that cannot be honoured.
+* **`lag` and `corc` are model options** and live on construction, not on `fit()`.
+* **`Prais(data, formula)` keeps the function's reversed order.** 52 call sites pass
+  `ws.prais(frame, FORMULA)` positionally; swapping the two would not raise, it would
+  try to parse the frame as a formula. `Prais.from_formula(formula, data)` provides
+  the standard order.
+
+`docs/API_CONVENTIONS.md` gains R2.7, which decides by what Stata stores rather than
+by style: a command returning `StataResults` (e-class, fills `e(b)`/`e(V)`) needs a
+class form; a test command returning only `r()` (`dfuller`, `kpss`, `vecrank`)
+correctly stays function-only. The rule carries a shrinking backlog of the seven
+causal estimators still awaiting the same treatment.
+
 ---
 
 ## [0.3.13] - 2026-11-14

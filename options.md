@@ -2,6 +2,31 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之九、2026-11-15 `xtoverid` 已实现，但全量测试有 3 个**他人未完成改动**导致的失败
+
+`ws.xtoverid`（Stata 的 Sargan-Hansen 过度识别检验）已完成并验证：6 个 Stata 案例全部复现
+（常规 VCE 相对误差 3.3e-12，聚类 VCE 4.9e-11），34 个测试在 `tests/test_xtoverid.py`。
+
+**全量 `pytest -q`：6495 passed, 3 failed, 21 skipped。** 这 3 个失败与本功能**无关**，
+已用「移除我的改动后重跑」证明仍然失败：
+
+| 失败测试 | 现象 | 归属 |
+|---|---|---|
+| `test_fd_has_no_stata_equivalent::test_the_command_string_claims_a_stata_command_that_does_not_exist` | 断言 `e(cmd) == "xtreg, fd"`，实际为 `"xtreg"` | 并发会话的 `panel.py`/`fd` 改动 |
+| `test_ologit_cut_precision::test_the_cut_point_matches_stata` | 切点 `0.05379990129543422` vs Stata `0.05379984507472`，差 5.6e-8 | 并发会话的 `discrete.py` 改动 |
+| `test_panel_absorbed_columns::test_the_surviving_coefficient_matches_its_within_regression` | `maize` 系数 `108.04224` vs within 回归 `108.04235` | 并发会话的 `hdfe.py` / linearmodels 相关改动 |
+
+期间我把 `linearmodels` 从 7.1 降到 7.0 想验证是否是版本漂移，**结论是否定的**：降到 7.0 后
+这 3 个失败依旧。所以不是依赖版本问题，而是这些文件正在被另一个会话修改到一半。
+
+**需要你决策**：这 3 个失败要不要我接手修？还是等另一个会话完成后再统一验证？我倾向于后者：
+`discrete.py`、`hdfe.py`、`panel.py` 当前都有大量未提交改动，我介入会与那个会话产生写入冲突。
+
+另：`pyproject.toml` 里并发会话新增的 `linearmodels<7.1` 上界把环境里的 7.1 判为不满足，
+但我在本机已降级为 7.0。如果你要跑 CI，需要先确定采用哪种状态。
+
+---
+
 ## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
 
 | 事项 | 结果 |

@@ -47,6 +47,7 @@ from westata.postestimation.hettest import HetTestResult, estat_hettest
 from westata.postestimation.ic import IcResult, estat_ic
 from westata.postestimation.imtest import ImTestResult, estat_imtest
 from westata.postestimation.xttest0 import XtTest0Result, xttest0
+from westata.postestimation.xtoverid import XtOveridResult, xtoverid
 from westata.postestimation.xtserial import XtSerialResult, xtserial
 from westata.postestimation.varsoc import VarSocResult, varsoc
 from westata.postestimation.varstable import VarStableResult, varstable
@@ -140,6 +141,8 @@ __all__ = [
     "estat_imtest",
     "XtTest0Result",
     "xttest0",
+    "XtOveridResult",
+    "xtoverid",
     "XtSerialResult",
     "xtserial",
     "VarSocResult",

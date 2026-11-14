@@ -236,6 +236,42 @@ The underlying scalars are always available without the flag, as `e(theta)` or t
 keys (the two forms are mutually exclusive). The flag is a **no-op** on `xtreg, fe` / `be` / `mle`,
 where Stata answers `option theta not allowed` (r(198)), and under `style='statsmodels'`.
 
+**`xtoverid` — the Sargan-Hansen test of overidentifying restrictions**
+
+Stata's `xtoverid` is a user-written command (Schaffer & Stillman), not a base one. After a
+random-effects fit it asks whether the extra moment conditions that the RE estimator uses hold; a
+rejection means RE is inconsistent and fixed effects is preferred.
+
+```python
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(ws.xtoverid(re_fit))
+```
+
+```
+Test of overidentifying restrictions: fixed vs random effects
+Cross-section time-series model: xtreg re
+Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
+```
+
+`r(j)`, `r(jdf)` and `r(jp)` are `result.statistic`, `result.df` and `result.pvalue`, and
+`to_dict()` names them the way Stata does. Two things are load-bearing and both are measured:
+
+- the **VCE follows the original fit**. The same equation gives `53.285` under the conventional
+  VCE and `221.225` under `cov_type="robust"` — a 4x difference, not a rounding one. `xtoverid.ado`
+  mirrors `e(vcetype)` when it refits, and so does this implementation.
+- the auxiliary equation is quasi-demeaned at the **original `e(theta)`**. Every added regressor is
+  a within deviation with a zero group mean, so it carries no between variation; re-estimating the
+  variance components instead drifts `sigma_u` from `.1332` to `.0947` and lands 4.66 away on the
+  statistic. Stata's own `xtoverid, noisily` prints the original `sigma_u`/`theta`, which is what
+  the fixed-theta solve reproduces.
+
+Only the `xtreg, re` branch is implemented: `xtreg, fe` is refused by the ado itself, and the
+`xtivreg`/`xtivreg2`/`xthtaylor` branches need `ivreg2` plus an instrument set this package does not
+record, so they raise rather than approximate. Unbalanced panels are refused too — they store no
+single `e(theta)`, only the five percentiles, and choosing one would be inventing an estimator.
+
 ### Which `cov_type` matches Stata's `, r`
 
 The robust VCE scale factor **differs by command**, and the letter `r` does not identify it:

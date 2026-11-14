@@ -72,6 +72,12 @@ NO_TABLE = {
     # against. Its numbers and its layout are both pinned instead, against a captured
     # Stata log, in tests/test_estat_imtest.py (test_output_layout_matches_stata).
     "estat imtest": "prints fixed-format result text, not an estimation table",
+    # xtoverid (user-written, ado/plus) prints THREE lines of result text -- the test
+    # description, the model line and the Sargan-Hansen statistic -- and returns r(j)/
+    # r(jdf)/r(jp). No estimation table, so a TABLE-layout sweep has nothing to compare.
+    # Its numbers, its printed block and every refusal are pinned in tests/test_xtoverid.py
+    # against six live StataNow 19.5 captures (rel 3.3e-12 conventional, 4.9e-11 clustered).
+    "xtoverid": "prints result text, not an estimation table; six Stata captures verified",
     # r-class tests: the package returns a statistic, not a table, by design.
     "xtunitroot ips": "r-class test: returns PanelUnitRootResult (no table); stats verified",
     "xtunitroot llc": "r-class test: returns PanelUnitRootResult (no table); stats verified",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "westata"
-version = "0.3.22"
+version = "0.3.23"
 description = "Stata-conformant econometrics with a statsmodels-style API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,8 +27,30 @@ dependencies = [
     # Required at import time: `estimators/hdfe.py` imports pyfixest at module level because `reghdfe` is a
     # conformance layer over it, and `estimators/iv.py` imports linearmodels the same way for `ivregress`.
     # Both were missing from this list, and the resulting wheel installed cleanly and then failed on import.
-    "pyfixest>=0.30",
-    "linearmodels>=6.0",
+    #
+    # UPPER BOUNDS, and why they are here rather than "pip will resolve it":
+    # CI installed `pyfixest>=0.30` as 0.70.0 the day 0.70.0 shipped, and 0.70.0 deleted
+    # the 0.60 private attributes this package reads (`fit._collin_vars`, `fit._df_t`,
+    # `fit._k_fe`, `fit._na_index`, ...). The same commit passed locally on 0.60.0 and
+    # failed 138 tests plus 68 setup errors in CI. `estimators/_pyfixest_compat.py` now
+    # reads BOTH shapes, so 0.70 is supported -- but an unbounded range means the NEXT
+    # breaking release silently turns CI red again with no local reproduction, which is
+    # the failure mode these bounds exist to stop. Raise a bound only after the suite has
+    # run green against that version (see the `latest-deps` job in .github/workflows/ci.yml,
+    # which is where new versions are discovered instead of on push).
+    "pyfixest>=0.30,<0.71",
+    # UPPER BOUND AT 7.1: linearmodels 7.1 changes the fixed-effects estimate for a
+    # balanced-versus-unbalanced entity effect. Measured on ``cao_chen.dta``
+    # (20 counties x up to 262 years, `rug_after ~ maize` with entity effects):
+    # 7.0 gives maize = 37.43478 (the value Stata's `xtreg, fe` reports) and 7.1
+    # gives 108.04224 from the SAME data and the same call into ``PanelOLS``.
+    # Calling linearmodels directly reproduces both, so the change is upstream and
+    # not in westata's adapter. Since westata's entire purpose is reproducing
+    # Stata's numbers, shipping a release whose `xtreg, fe` disagrees with Stata by
+    # 3x is not acceptable; the ceiling holds until the upstream behaviour is
+    # understood. `tests/test_panel_absorbed_columns.py` pins the Stata value and
+    # will fail loudly if the bound is ever lifted without re-verification.
+    "linearmodels>=6.0,<7.1",
     # Required by `conformance/registry.py`, which is imported from the package's normal surface.
     "pyyaml>=6",
 ]
@@ -37,7 +59,10 @@ dependencies = [
 test = ["pytest>=7"]
 # `arch` is imported INSIDE functions in `estimators/tseries.py`, so it is only needed for the ARCH/GARCH
 # commands. Keeping it optional avoids forcing a large dependency on users who never run those models.
-arch = ["arch>=6.0"]
+# The bound covers the 9.0 signature change (`model.resids(params)` now takes only the MEAN
+# parameters); `estimators/tseries.py::_arch_resids` adapts both, but a future release could
+# change it again, so the ceiling keeps a known-good contract.
+arch = ["arch>=6.0,<10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

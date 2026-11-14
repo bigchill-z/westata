@@ -1141,3 +1141,68 @@ Stata 用户写 `test i.rep78` 或 `test 2.rep78 3.rep78` 是日常，而这里�
 本次另一条：`e(df_r)` 在 Stata 的 `xtreg, re` 里**根本不存在**（`display e(df_r)` 打印 `.`），
 而 westata 存了 `468`。它不影响任何打印输出，但 `ereturn_list()` 会多一行 ——
 属于「多给一个键」而非「给错值」，记录即可，不必改。
+
+## 2026-11-15 CI 连红九天：本机与 CI 装的是不同版本的依赖
+
+`pyproject.toml` 里 `pyfixest>=0.30`、`linearmodels>=6.0`、`arch>=6.0` 全无上限。
+CI 每次 `pip install -e .` 都拉最新版，开发机停在旧版，于是**同一份源码本机 6428 过、CI 254 红**。
+2026-11-14 那天 CI 解析到 pyfixest 0.70 / pandas 3.1 / numpy 2.4 / arch 9.0，
+0.70 删掉了 0.60 的私有属性（`fit._collin_vars` 等），138 个测试当场爆掉。
+
+**通用做法**：
+
+1. **凡是「本机绿、CI 红」，第一步不是看红测试，而是对比两边的版本。** 本次花了很久才想到
+   去下载 CI 日志并 diff 解析到的版本；一条打印 `x.__version__` 的 CI 步骤本来能让这件事
+   五分钟解决——现在 `ci.yml` 每个 job 都会打印。
+2. **依赖上限不是保守，是契约。** 无上限等于把「上游下次破坏性变更」当成自己的 CI 失败。
+   加上限，再加一个单独 `latest-deps` job（剥掉上限、`continue-on-error`）跑全量：
+   新版本会在 push 时以一条红 job 暴露，而不是几周后变成查不出原因的回归。
+3. **上游删私有属性时，写一层兼容门，而不是散点改。** `_pyfixest_compat.py` 统一
+   「先试新组件、再回退旧私有名」，并**归一化形状**：`_k_fe` 在 0.60 是带
+   `__fixed_effect__(...)` 索引的 Series，0.70 是无名 tuple，直接换用会让调用方拿到
+   两种形状。归一不了就返回 `None`（保持「信息未记录」的旧语义），不要猜。
+4. **`float(np.array([x]))` 在 numpy 2.4 起是 TypeError。** 一个元素的数组也是一种坏形状：
+   Stata 的 `r(df_denom)` 是标量，类里存成数组，于是 `float(...)` 在旧 numpy 能用、新的不行。
+   要么存成标量，要么提供一个显式的标量视图属性。
+
+## 2026-11-15 测试里的「跳过」写在 fixture 里，只保护走 fixture 的测试
+
+242 个模块硬编码 `D:\myCodeProject\test_westata\...`，其中 223 个在 fixture 里
+`pytest.skip`。这**不保护**直接读文件的测试：`test_varsoc.py` 的第七个测试自己
+`pd.read_stata(DATA)`，在 CI 上抛 FileNotFoundError 而不是跳过。
+
+**通用做法**：数据缺失的跳过**按文件**决定（`conftest.pytest_collection_modifyitems`），
+不要按 fixture。文件级决定让「漏一个测试」这种错法不可能发生。
+同理，`pytest.skip` 的条件要覆盖**所有**「跑不了」的形态：CI 是缺 `pystata` 模块，
+不是缺 Stata，只匹配 "not found" 就漏了。
+
+## 2026-11-15 并列项上的 `value_counts()[:20]` 是不确定的
+
+`test_panel_absorbed_columns.py` 用 `counts[counts>=10].index[:20]` 选 20 个县，
+而**每个县计数完全相同**（并列）。并列项之间的顺序是实现细节：pandas 2 选中
+1,322,355,1098…，pandas 3 选中 1,322,323,324…。样本变了，回归结果自然变
+（37.43478 → 108.04224），而报错看起来像「估计器算错了」。
+
+**通用做法**：**抽样/取前 N 之前先 `sort_index()`**，让选择可复现。
+断言写「与它自己的组内回归一致」，而不是写死在某一个选择上的常量——
+常量验证的是样本，不是估计器。
+
+## 2026-11-15 断言末位数字，等于断言优化器的内部状态
+
+`ereturn list` 的 r²、tobit 第六位小数、xtreg MLE 方差分量 5e-9、synth 的 `X_balance`：
+这些断言在换 numpy/scipy 版本后各自漂一位。它们验证的不是公式，是 BLAS 求和顺序。
+
+**通用做法**：区分三种断言，并分别选择容差：
+
+- **契约**（结构、列宽、标签、去前导零）：逐字符比。
+- **数值**：按它**打印出来的精度**比（末位差一个单位是舍入，不是错误）。
+- **「修复是否生效」**：比「比旧值好一个数量级」，而不是比一个绝对阈值——
+  xtreg MLE 的 5e-9 恰好落在两个 scipy 构建的噪声中间。
+
+## 2026-11-15 并行会话下，`git stash pop` 会撞上别人的提交
+
+排查过程中本地有两个会话同时在改同一仓库，HEAD 在会话中途前进了若干提交，
+`git stash pop` 于是把 `ovtest.py` 弄成冲突态（`UU`）。
+**执行 `git stash` 前先 `git log --oneline -1` 记下 HEAD**，
+pop 之后立刻 `git status` 确认没有 `UU`/`AA`，并用 `ast.parse` 或 `import` 验证文件仍可解析。
+本轮的冲突由另一会话代为解决，但那属于运气，不是流程。

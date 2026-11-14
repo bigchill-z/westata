@@ -34,6 +34,31 @@ from westata.estimators.tseries import _vecm_cointegrating_constant
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
 
+def _entry(matrix, row: int, column: int) -> float:
+    """One scalar cell of a covariance matrix, however it is shaped.
+
+    ``cov_params()`` returns an ndarray whose ``[i, j]`` can come back as a
+    one-element array rather than a scalar; ``float()`` of that stopped being
+    allowed in numpy 2.4, so the value is flattened first.
+    """
+
+    return float(np.asarray(matrix)[row, column].reshape(-1)[0])
+
+
+def _vecm_constant(fitted) -> float:
+    """The rank-1 cointegrating constant as a plain float.
+
+    ``_vecm_cointegrating_constant`` returns one entry PER RELATION, so for this
+    single-relation model it is a ``(1,)`` array.  ``float(array_of_one)`` stopped
+    being allowed in numpy 2.4, and ``array**2`` silently propagated the array
+    into the arithmetic below, so the unwrapping happens here once.
+    """
+
+    values = np.asarray(_vecm_cointegrating_constant(fitted), dtype=float).reshape(-1)
+    assert values.size == 1, f"expected a single cointegrating relation, got {values.size}"
+    return float(values[0])
+
+
 @pytest.fixture(scope="module")
 def fitted():
     try:
@@ -47,7 +72,7 @@ def fitted():
 def test_the_cointegrating_constant_is_recoverable(fitted) -> None:
     """A ``ci`` refit exposes what the default ``co`` specification folds away."""
 
-    c_ce = _vecm_cointegrating_constant(fitted)
+    c_ce = _vecm_constant(fitted)
     assert c_ce == pytest.approx(-0.00666336, abs=2e-6)
     # The default specification really does keep it at zero.
     assert float(np.asarray(fitted.raw.const_coint, dtype=float).ravel()[0]) == 0.0
@@ -56,7 +81,7 @@ def test_the_cointegrating_constant_is_recoverable(fitted) -> None:
 def test_the_constant_standard_errors_match_stata(fitted) -> None:
     """These DO reproduce exactly, so they are asserted."""
 
-    c_ce = _vecm_cointegrating_constant(fitted)
+    c_ce = _vecm_constant(fitted)
     alpha = np.asarray(fitted.raw.alpha, dtype=float).ravel()
     det = np.asarray(fitted.raw.det_coef, dtype=float).ravel()
     covariance = fitted.cov_params()
@@ -64,10 +89,14 @@ def test_the_constant_standard_errors_match_stata(fitted) -> None:
     expected = []
     for index in range(2):
         det_index = 8 + index
+        # ``float(...)`` on a covariance ENTRY: newer numpy returns the cell as a
+        # (1, 1) array from some indexings, and ``float`` of a non-0-d array now
+        # raises "only 0-dimensional arrays can be converted".  Flattening first
+        # takes the single value either way without changing the arithmetic.
         variance = (
-            float(covariance[det_index, det_index])
-            + c_ce**2 * float(covariance[index, index])
-            - 2.0 * c_ce * float(covariance[det_index, index])
+            _entry(covariance, det_index, det_index)
+            + c_ce**2 * _entry(covariance, index, index)
+            - 2.0 * c_ce * _entry(covariance, det_index, index)
         )
         expected.append(float(np.sqrt(max(variance, 0.0))))
         _ = alpha[index], det[index]
@@ -79,7 +108,7 @@ def test_the_constant_standard_errors_match_stata(fitted) -> None:
 def test_the_second_constant_reproduces_stata(fitted) -> None:
     """Far from zero, so the transform is checkable here without sign ambiguity."""
 
-    c_ce = _vecm_cointegrating_constant(fitted)
+    c_ce = _vecm_constant(fitted)
     alpha = np.asarray(fitted.raw.alpha, dtype=float).ravel()
     det = np.asarray(fitted.raw.det_coef, dtype=float).ravel()
     constant = float(det[1]) - float(alpha[1]) * c_ce
@@ -93,7 +122,7 @@ def test_the_first_constant_is_near_zero_not_wrong(fitted) -> None:
     than the sign of a number that is indistinguishable from zero at this tolerance.
     """
 
-    c_ce = _vecm_cointegrating_constant(fitted)
+    c_ce = _vecm_constant(fitted)
     alpha = np.asarray(fitted.raw.alpha, dtype=float).ravel()
     det = np.asarray(fitted.raw.det_coef, dtype=float).ravel()
     constant = float(det[0]) - float(alpha[0]) * c_ce

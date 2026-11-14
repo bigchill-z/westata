@@ -35,7 +35,14 @@ def test_the_classical_f_matches_stat_as_sixteen_digits(frame) -> None:
     """From a live `regress lnw s expr`: 160.1647735969879704."""
 
     fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
-    assert float(fitted.e["F"]) == 160.1647735969879704
+    # "Sixteen digits" is asserted to MACHINE PRECISION, not as bit equality.
+    # ``==`` compared the last representable bit, and the value moved from
+    # ...8797 to ...8798 when numpy/pandas changed the order of the same
+    # summations -- a 1-ULP difference in a number that is itself a ratio of two
+    # floating-point sums.  rel=1e-15 is still stricter than the 3e-15 / 6e-14
+    # agreement this module's docstring records as the noise floor, so a real
+    # formula change (a mean-square vs Wald mix-up) still fails it.
+    assert float(fitted.e["F"]) == pytest.approx(160.1647735969879704, rel=1e-15)
 
 
 def test_it_equals_the_mean_square_ratio(frame) -> None:

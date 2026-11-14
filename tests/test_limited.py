@@ -350,7 +350,9 @@ def test_intreg_reports_lnsigma_like_stata():
     assert float(result.e["sigma"]) > 0
     assert "lnsigma" not in result.e
     # The stored parameter IS ln(sigma).
-    assert float(result.params[names.index("/lnsigma")]) == pytest.approx(
+    # ``.iloc`` because pandas 3 made ``Series[int]`` label-based; the index
+    # holds parameter names such as "/lnsigma", so a bare integer raises KeyError.
+    assert float(result.params.iloc[names.index("/lnsigma")]) == pytest.approx(
         np.log(float(result.e["sigma"])), rel=1e-12
     )
 

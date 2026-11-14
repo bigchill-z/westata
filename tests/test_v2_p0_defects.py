@@ -76,7 +76,9 @@ def test_panel_clustered_se_matches_stata(lin, as_frame: bool) -> None:
     )
     names = [str(name) for name in fitted.params.index]
     for variable, expected in STATA_CLUSTERED_SE.items():
-        got = float(fitted.bse[names.index(variable)])
+        # ``.iloc``: pandas 3 made ``Series[int]`` label-based, so a positional
+        # integer raises KeyError against a name-labelled index.
+        got = float(fitted.bse.iloc[names.index(variable)])
         assert got == pytest.approx(expected, rel=1e-10), variable
 
 
@@ -86,7 +88,7 @@ def test_panel_robust_se_also_matches_stata(lin) -> None:
     model = ws.PanelOLS.from_formula(PANEL_FORMULA, lin, entity="province", time="year")
     fitted = model.fit(entity_effects=True, cov_type="robust")
     names = [str(name) for name in fitted.params.index]
-    got = float(fitted.bse[names.index("ltlan")])
+    got = float(fitted.bse.iloc[names.index("ltlan")])
     assert got == pytest.approx(STATA_CLUSTERED_SE["ltlan"], rel=1e-10)
 
 

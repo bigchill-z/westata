@@ -40,20 +40,33 @@ def paired():
     return ours, theirs
 
 
+def _scalar(value) -> float:
+    """``float()`` that also accepts a one-element array.
+
+    statsmodels returns ``tvalue``/``pvalue`` as a ``(1, 1)`` ndarray from
+    ``t_test`` while westata returns a plain float.  ``float(array)`` used to
+    accept that and numpy 2.4 rejects it, so the test failed on CI only.  Stata's
+    own contract here is a scalar, so flattening first is correct rather than a
+    workaround.
+    """
+
+    return float(np.asarray(value, dtype=float).reshape(-1)[0])
+
+
 def test_t_test_matches_statsmodels(paired) -> None:
     ours, theirs = paired
     mine = ours.t_test("x1=0")
     reference = theirs.t_test("x1=0")
-    assert float(mine.tvalue) == pytest.approx(float(reference.tvalue), rel=1e-12)
-    assert float(mine.pvalue) == pytest.approx(float(reference.pvalue), rel=1e-9)
+    assert _scalar(mine.tvalue) == pytest.approx(_scalar(reference.tvalue), rel=1e-12)
+    assert _scalar(mine.pvalue) == pytest.approx(_scalar(reference.pvalue), rel=1e-9)
 
 
 def test_f_test_matches_statsmodels(paired) -> None:
     ours, theirs = paired
     mine = ours.f_test("x1=0, x2=0")
     reference = theirs.f_test("x1=0, x2=0")
-    assert float(mine.fvalue) == pytest.approx(float(reference.fvalue), rel=1e-12)
-    assert float(mine.pvalue) == pytest.approx(float(reference.pvalue), rel=1e-9)
+    assert _scalar(mine.fvalue) == pytest.approx(_scalar(reference.fvalue), rel=1e-12)
+    assert _scalar(mine.pvalue) == pytest.approx(_scalar(reference.pvalue), rel=1e-9)
 
 
 def test_a_single_restriction_reports_t_and_f_aliases(paired) -> None:

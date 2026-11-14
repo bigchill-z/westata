@@ -665,7 +665,31 @@ class _DiscreteBase:
             # tightest setting that both converges and reaches the B tier the
             # BRIEF asks of optimiser-bound estimates.
             fit_kwargs["gtol"] = 1e-7
-        return model.fit(**fit_kwargs)
+        try:
+            return model.fit(**fit_kwargs)
+        except np.linalg.LinAlgError:
+            # statsmodels 0.15 raises ``LinAlgError("Singular matrix")`` out of
+            # the Newton iteration when the Hessian stops being invertible.
+            # 0.14 surfaced the same situation as a ``HessianInversionWarning``
+            # plus a fitted-but-unconverged result, which `_check_convergence`
+            # then turned into the actionable "optimiser did not converge"
+            # warning.  Letting the raw numpy exception escape is WORSE than
+            # either: it names no command, no parameters and no remedy, and it
+            # turned three `zip` tests red on CI only (the failure depends on the
+            # installed statsmodels version, not on our data).
+            #
+            # Retrying with a quasi-Newton optimiser keeps the old contract --
+            # always return a result, and let `_check_convergence` decide whether
+            # to warn or, under ``strict=True``, raise ``ConvergenceError``.
+            # ``bfgs`` is used rather than ``nm`` because it needs no Hessian at
+            # all and is the optimiser most count models are already fitted with.
+            if self._optimizer != "newton":  # pragma: no cover - defensive
+                raise
+            fallback = dict(fit_kwargs)
+            fallback.pop("tol", None)
+            fallback["method"] = "bfgs"
+            fallback["gtol"] = 1e-7
+            return model.fit(**fallback)
 
     def _check_convergence(self, result: Any, strict: bool) -> None:
         converged = bool(getattr(result, "mle_retvals", {}).get("converged", True))

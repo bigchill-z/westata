@@ -26,12 +26,18 @@ digit. No code change was needed here -- only the measurement was wrong.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 import westata as ws
 
-AUTO = r"tests\data\auto.dta"
+# ``AUTO`` is resolved from this file, not from the process's working directory:
+# the literal was ``r"tests\data\auto.dta"``, which only resolves when pytest is
+# started from the repository root and never on Linux (backslash separator).
+AUTO = str(Path(__file__).resolve().parents[1] / "tests" / "data" / "auto.dta")
 
 #: Captured from `tobit mpg weight fgn, ll(0) nolog` -- 19 lines, no iteration log.
 STATA_BLOCK = [
@@ -78,6 +84,51 @@ def tobit(frame):
     return ws.Tobit.from_formula("mpg ~ weight + fgn", frame, lower=0.0).fit()
 
 
+#: A printed number, with its sign, optional leading-dot form and trailing stars.
+_NUMBER = re.compile(r"-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+
+
+def _line_differences(expected: str, actual: str) -> list[str]:
+    """Differences between two rendered table lines, tolerating the last digit.
+
+    Walks both lines token by token.  Numbers are compared to the precision they
+    were printed at (so ``.4509973`` and ``.4509974`` agree -- they are the same
+    estimate rounded two ways), while every other character and every label must
+    match exactly.  Returns a list of human-readable differences; empty means the
+    lines agree.
+    """
+
+    expected_numbers = _NUMBER.findall(expected)
+    actual_numbers = _NUMBER.findall(actual)
+    if len(expected_numbers) != len(actual_numbers):
+        return [f"field count {len(actual_numbers)} != {len(expected_numbers)}"]
+
+    problems: list[str] = []
+    for want, got in zip(expected_numbers, actual_numbers):
+        if want == got:
+            continue
+        # Tolerance is ONE unit in the last printed place (not half of it): the
+        # estimate itself shifts by ~7e-8 between numpy/scipy builds, which is
+        # enough to round -3.7510555 the other way. Anything larger than a single
+        # last-digit flip is a real disagreement.
+        if abs(float(got) - float(want)) > 1.01 * 10 ** (-_decimals(want)):
+            problems.append(f"{got} != {want}")
+
+    # The non-numeric skeleton must be identical: same words, same widths, same
+    # symbols. Rounding cannot excuse a moved column or a renamed label.
+    if _NUMBER.sub("#", expected) != _NUMBER.sub("#", actual):
+        problems.append(f"skeleton {actual!r} != {expected!r}")
+    return problems
+
+
+def _decimals(printed: str) -> int:
+    """How many decimals a printed number carries (0 when it has none)."""
+
+    if "." not in printed:
+        return 0
+    return len(printed.split(".", 1)[1])
+
+
 def test_it_is_nineteen_lines(tobit) -> None:
     """The count that matches Stata once its iteration log is excluded."""
 
@@ -85,10 +136,26 @@ def test_it_is_nineteen_lines(tobit) -> None:
 
 
 def test_every_line_matches_stata(tobit) -> None:
+    """Line for line, to the printed digits -- with last-digit rounding tolerated.
+
+    The comparison used to be ``theirs == ours`` on the raw strings, which asserts
+    the SIXTH decimal of a maximum-likelihood estimate.  That is not a contract the
+    optimiser can keep: the same data and the same likelihood converge to
+    ``fgn = -1.6500290397`` on one numpy/scipy and ``-1.6500291058`` on another --
+    a 7e-8 difference that rounds the confidence bound to ``.4509974`` instead of
+    ``.4509973`` and the lower bound to ``-3.751055`` instead of ``-3.751056``.
+
+    Every other digit still has to match exactly, so the table's structure, column
+    widths, labels and five-digit agreement with Stata are all still pinned. The
+    helper below compares each numeric field at its printed precision and each
+    non-numeric character exactly.
+    """
+
     mine = str(tobit.summary(style="stata")).splitlines()
     assert len(mine) == len(STATA_BLOCK)
     for index, (theirs, ours) in enumerate(zip(STATA_BLOCK, mine)):
-        assert theirs == ours, f"line {index}: {theirs!r} != {ours!r}"
+        problems = _line_differences(theirs, ours)
+        assert not problems, f"line {index}: {problems} in {ours!r}"
 
 
 def test_no_iteration_log_leaks_into_the_summary(tobit) -> None:

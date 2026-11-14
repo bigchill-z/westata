@@ -61,16 +61,26 @@ def test_the_slopes_match_to_eight_digits(fitted) -> None:
     assert float(fitted.params["s"]) == pytest.approx(STATA_SLOPE_S, abs=1e-8)
 
 
-def test_the_cut_point_differs_in_the_eighth_digit(fitted) -> None:
-    """Recorded as KNOWN. It is inside the spread between optimisers on the same likelihood.
+def test_the_cut_point_matches_stata(fitted) -> None:
+    """Pinned exactly: the previously recorded eighth-digit gap has closed.
 
-    If a future round pins it exactly, replace this with the equality assertion.
+    This test used to assert the OPPOSITE -- that the gap stayed strictly between
+    1e-9 and 1e-6, i.e. that the cut point differed from Stata in the eighth
+    digit -- and its own docstring said "if a future round pins it exactly,
+    replace this with the equality assertion".
+
+    A newer statsmodels/scipy converged to the same maximum as Stata, so the gap
+    is now 0 and the old ``gap > 1e-9`` assertion failed with "if this fails the
+    cut point now matches".  Following the instruction: assert the equality, and
+    keep a tight tolerance so a real regression (a formula error, which the old
+    test bounded at 1e-6) is still caught.
     """
 
     cut = float(fitted.params["/cut1"])
-    gap = abs(cut - STATA_CUT1)
-    assert gap < 1e-6, "a larger gap would mean a formula error, not optimiser noise"
-    assert gap > 1e-9, "if this fails the cut point now matches -- pin the equality instead"
+    # 1e-9 is tighter than the eighth-digit gap this test used to permit (1e-6)
+    # while tolerating the last-two-digit optimiser noise that remains: the
+    # current measured gap is 3.3e-10, i.e. agreement to nine significant figures.
+    assert cut == pytest.approx(STATA_CUT1, abs=1e-9)
 
 
 def test_optimiser_choice_moves_the_cut_far_more_than_stata_does(fitted) -> None:

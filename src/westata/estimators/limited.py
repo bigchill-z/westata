@@ -133,6 +133,18 @@ from westata.formula.factor import build_design
 from westata.results.base import StataResults
 from westata.estimators.least_squares import slope_positions
 
+#: ``numpy.linalg.LinAlgWarning`` is not part of the public ``np.linalg`` namespace in
+#: every numpy release, so a bare reference raises ``AttributeError`` -- and it did so
+#: inside an ``except`` tuple, which is evaluated only once a fit attempt has FAILED,
+#: i.e. exactly when the fallback chain runs. Fall back to a private Warning subclass
+#: (which nothing raises) so the tuple stays usable and the original failure propagates
+#: normally instead of being replaced by an AttributeError.
+_LINALG_WARNING: type[Warning] = getattr(
+    np.linalg,
+    "LinAlgWarning",
+    type("_NoLinAlgWarning", (Warning,), {}),
+)
+
 __all__ = ["Etregress", "Heckman", "Intreg", "Truncreg"]
 
 
@@ -359,7 +371,13 @@ class _SelfLikelihoodModel(GenericLikelihoodModel):
                 warnings.simplefilter("ignore")
                 try:
                     candidate = GenericLikelihoodModel.fit(self, **attempt)
-                except (ValueError, np.linalg.LinAlgError, np.linalg.LinAlgWarning):
+                # ``np.linalg.LinAlgWarning`` was removed from numpy's public
+                # ``linalg`` namespace, so naming it in this tuple raised
+                # ``AttributeError: module 'numpy.linalg' has no attribute
+                # 'LinAlgWarning'`` the moment an attempt FAILED -- i.e. exactly
+                # when the fallback chain was needed. It is referenced through
+                # ``getattr`` so the tuple works whether or not the name exists.
+                except (ValueError, np.linalg.LinAlgError, _LINALG_WARNING):
                     continue
             if not np.all(np.isfinite(np.asarray(candidate.params, dtype=float))):
                 continue

@@ -94,16 +94,23 @@ def test_the_surviving_coefficient_matches_its_within_regression(panel_slice) ->
         "rug_after ~ maize + prerebel", panel_slice, entity="county", time="year"
     ).fit()
 
-    grouped = panel_slice.groupby("county")
-    y_within = panel_slice["rug_after"] - grouped["rug_after"].transform("mean")
-    x_within = panel_slice["maize"] - grouped["maize"].transform("mean")
+    # Compute the reference in FLOAT64.  ``cao_chen.dta`` stores these columns as
+    # float32, and subtracting a float32 group mean in float32 loses ~1e-6 relative
+    # precision: hand(32) gives 108.04235077 where both the estimator and hand(64)
+    # give 108.04224272.  The estimator computes in float64, so the reference must
+    # too -- otherwise this compares two precisions and calls the difference a
+    # defect.  Measured: float64 hand reference reproduces the estimator to 1e-15,
+    # which is why the tolerance below can stay at machine precision.
+    sample = panel_slice.copy()
+    sample["rug_after"] = sample["rug_after"].astype("float64")
+    sample["maize"] = sample["maize"].astype("float64")
+
+    grouped = sample.groupby("county")
+    y_within = sample["rug_after"] - grouped["rug_after"].transform("mean")
+    x_within = sample["maize"] - grouped["maize"].transform("mean")
     within = float((x_within @ y_within) / (x_within @ x_within))
 
-    # MEASURED relative gap on this sample: 1.0e-6 (108.04224272 against 108.04235077). The
-    # reference demeans with a plain groupby mean while the estimator demeans inside the backend
-    # (alternating projections), so the two cannot agree to the 1e-10 the old assertion demanded --
-    # that tolerance was smaller than the reference computation's own error.
-    assert float(result.params["maize"]) == pytest.approx(within, rel=1e-5)
+    assert float(result.params["maize"]) == pytest.approx(within, rel=1e-10)
 
 
 def test_hausman_reports_a_usable_result_after_an_absorbed_column(panel_slice) -> None:

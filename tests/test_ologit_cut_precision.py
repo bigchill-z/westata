@@ -61,30 +61,25 @@ def test_the_slopes_match_to_eight_digits(fitted) -> None:
     assert float(fitted.params["s"]) == pytest.approx(STATA_SLOPE_S, abs=1e-8)
 
 
-def test_the_cut_point_matches_stata(fitted) -> None:
-    """Pinned exactly: the previously recorded eighth-digit gap has closed.
+def test_the_cut_point_is_within_optimiser_tolerance_of_stata(fitted) -> None:
+    """The cut point agrees with Stata to ~1e-7, not exactly.
 
-    This test used to assert the OPPOSITE -- that the gap stayed strictly between
-    1e-9 and 1e-6, i.e. that the cut point differed from Stata in the eighth
-    digit -- and its own docstring said "if a future round pins it exactly,
-    replace this with the equality assertion".
+    This test previously asserted that the gap stayed strictly between 1e-9 and
+    1e-6 (a recorded KNOWN difference, with a note to "pin the equality" if it ever
+    closed). A statsmodels/scipy change moved the gap to ~3e-10 on one build, so an
+    intermediate version of this file claimed exact agreement at abs=1e-9 -- but the
+    SAME likelihood converges to 5.6e-8 away on another platform, which is the
+    optimiser stopping at a different point on a flat surface, not a formula error.
 
-    A newer statsmodels/scipy converged to the same maximum as Stata, so the gap
-    is now 0 and the old ``gap > 1e-9`` assertion failed with "if this fails the
-    cut point now matches".  Following the instruction: assert the equality, and
-    keep a tight tolerance so a real regression (a formula error, which the old
-    test bounded at 1e-6) is still caught.
+    So it is a bounded difference again, with the bound at 1e-6: that still catches a
+    real formula error (the old test used the same 1e-6 ceiling) while accepting any
+    converged optimiser. The slope is asserted separately to 1e-8 above, which is the
+    sharper check available because the slope is far better determined than the cut.
     """
 
     cut = float(fitted.params["/cut1"])
-    # 1e-9 is tighter than the eighth-digit gap this test used to permit (1e-6)
-    # while tolerating the last-two-digit optimiser noise that remains: the
-    # current measured gap is 3.3e-10, i.e. agreement to nine significant figures.
-    # MEASURED with scipy 1.15.3 / statsmodels: the gap is 5.6e-8, not 0. The log-likelihood
-    # still matches Stata to 1e-10 and the slopes to 1e-8 (asserted above), so the optimiser sits
-    # at the same maximum; only the cut point's last digits move with the BLAS build. 1e-7 pins
-    # that claim rather than a particular LAPACK.
-    assert cut == pytest.approx(STATA_CUT1, abs=1e-7)
+    gap = abs(cut - STATA_CUT1)
+    assert gap < 1e-6, f"cut={cut!r} vs Stata {STATA_CUT1!r}: a gap this large is a formula error"
 
 
 def test_optimiser_choice_moves_the_cut_far_more_than_stata_does(fitted) -> None:

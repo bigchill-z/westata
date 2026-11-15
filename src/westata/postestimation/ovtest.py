@@ -459,29 +459,40 @@ def estat_ovtest(
     _dropped_powers: list[str] = []
     _dropped_regressors: list[str] = []
 
-    # STATA BUILDS THE TWO BLOCKS IN THIS ORDER AND SO MUST THIS: ``ovtest.ado:420`` is
-    # ``_regress lhs zlist rhs``, powers first, and whatever the earlier columns already
-    # span is the one dropped. `_span_dependent` is that rule, applied to each block in
-    # turn.
-    _dependent_powers = _span_dependent(_design_columns[0], columns)
-    for _position, (_label, _column) in enumerate(zip(omitted_labels, columns)):
-        if _position in _dependent_powers:
-            _dropped_powers.append(_label)
-            continue
-        _tested.append(len(_design_columns))
-        _design_columns.append(_column[:, None])
-
+    # THE OMISSION IS DECIDED OVER THE WHOLE AUXILIARY DESIGN, IN ONE PASS. ``ovtest.ado:166``
+    # (the path a fit without factor variables takes) and ``:420`` both build ONE ``_regress``
+    # whose columns are the powers followed by the user's regressors, so a power is judged
+    # against everything before it -- not against the constant alone.
+    #
+    # Splitting the test into "powers against the constant" then "regressors against the
+    # powers" asked the wrong question twice: a column can look independent against the
+    # constant alone and only become redundant once its neighbours are in the basis.
+    #
+    # A NOTE ON WHAT THIS DOES *NOT* FIX.  On a Mincer fit (``lnwage ~ educ exper exper2``
+    # with ``exper2 = exper^2``, n = 500) this implementation drops ``exper2`` and
+    # ``exper2^2`` and reports ``F(8, 489) = 3547.92``.  Stata's DEFAULT instead drops
+    # ``exper^2`` and ``exper2^2`` and reports ``F(7, 489) = 0.51``.  Running Stata with its
+    # internal column reordering turned off (``set tol r 0``) reproduces THIS output exactly,
+    # ``F(8, 489) = 3547.92``, which is what pins the difference down: the gap is Stata's
+    # pre-sweep reordering (see docs and options.md), not the omission rule below.
     _regressor_columns = [
         matrix[:, j] for j in range(matrix.shape[1]) if j != _constant_index
     ]
     _regressor_names = [
         str(names[j]) for j in range(matrix.shape[1]) if j != _constant_index
     ]
-    _dependent_regressors = _span_dependent(
-        np.column_stack(_design_columns), _regressor_columns
+    _dependent = _span_dependent(
+        _design_columns[0], list(columns) + _regressor_columns
     )
+    _n_powers = len(columns)
+    for _position, (_label, _column) in enumerate(zip(omitted_labels, columns)):
+        if _position in _dependent:
+            _dropped_powers.append(_label)
+            continue
+        _tested.append(len(_design_columns))
+        _design_columns.append(_column[:, None])
     for _position, _column in enumerate(_regressor_columns):
-        if _position in _dependent_regressors:
+        if (_n_powers + _position) in _dependent:
             _dropped_regressors.append(_regressor_names[_position])
             continue
         _design_columns.append(_column[:, None])

@@ -156,6 +156,55 @@ westata（HEAD 与当前版一致）：`F(6, 293) = 1.5409`，`dropped=('x1', 'x
 在 X'X 上实现 sweep + 按数值稳定性重排，并用 `set tol r 0` 作为对照验证
 （那条路径下包内行为已经一致，可以直接作为回归测试）。
 
+### 第 4 轮（2026-11-15 深夜）：用 `set tol r 0` 做对照，定位到「重排」这一步
+
+**关键实验**：同一个 `lnwage ~ educ exper exper2`（`exper2 = exper^2`，n=500），
+`ovtest, rhs` 在两种模式下跑：
+
+    set tol r 0（关闭内部重排）:
+        note: exper2 omitted because of collinearity.
+        note: exper2^2 omitted because of collinearity.
+        F(8, 489) = 3547.92
+
+    默认（开启重排）:
+        note: exper^2 omitted because of collinearity.
+        note: exper2^2 omitted because of collinearity.
+        F(7, 489) =   0.51
+
+**westata 当前输出是 `F(8, 489) = 3547.92`，与 `set tol r 0` 那一行逐位相同。**
+
+这改变了问题的性质：**丢弃规则本身是对的**（与 Stata 关闭重排时完全一致），
+缺的只是 Stata 默认的**预扫掠列重排**。
+
+**已排除：重排不是任何单一统计量的排序。** 在同一设计阵上试了 7 种稳定性键、
+各取升/降序，共 14 种扫掠顺序：
+
+| 排序键 | 结果 |
+|---|---|
+| norm（升/降）、centred norm、sd、\|mean\|、kurtosis 升序 | `{exper2, exper2^2}`（即 tol-r-0 的答案） |
+| skewness 降序、kurtosis 降序 | `{exper2, exper^4}`（接近但不对） |
+| **Stata 默认** | **`{exper^2, exper2^2}`** |
+
+**另一个已确认的事实**：`ovtest, rhs` 对没有因子变量的模型**不走 `Do_FV_Reg`**，
+而走 `ovtest.ado:73-191` 的旧路径（`r(fvops)=0` 已实测确认）。旧路径的 `_regress`
+调用在 `:166`，幂次用 `gen float`（非 double）生成，`rhs` 是被 `replace` 原位缩放后的
+用户变量。忠实复现这条路径可以精确得到 `df=7, F=.50871542`。
+
+### 当前状态与建议
+
+- 代码库的丢弃规则**已经正确**（单次整体判断，提交 `e48b4e14`）
+- 差的是重排，且它不是简单排序能复现的
+- **建议**：如果要做，正确路径是去 Stata 的 Mata/编译层找 `_regress` 的 sweep 实现，
+  或者用大量（≥20 个）不同设计的 Stata 捕获反推置换算法；靠单一案例调排序键已被
+  证明走不通（14 种全试过）
+
+### 对用户的实际影响（已量化）
+
+实测 9 个场景：
+- 无精确多项式关系（普通回归、含指示变量、仅高度相关）→ `df` 一致，F 相差 ≤ 7e-06
+- 存在精确多项式关系（`x` 与 `x^2` 同时入模，如明瑟方程的 `exper`/`exper2`）→
+  `df` 多 1，F 值可差数千倍（本例 3547.92 vs 0.51）
+
 ## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
 
 | 事项 | 结果 |

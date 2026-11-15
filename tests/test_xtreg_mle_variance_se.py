@@ -218,22 +218,21 @@ def test_rho_se_is_within_one_printed_unit(fit) -> None:
     printed = None
     for line in str(fit.summary()).splitlines():
         if line.startswith("         rho"):
-            printed = line.split()[-1]
+            # Tokens are: 'rho', '|', estimate, standard error, then the two interval bounds when
+            # printed. Take the SE by POSITION so the assertion does not depend on the interval.
+            printed = line.split()[3]
             break
     assert printed is not None
     assert printed in (".0486811", ".0486812"), printed
     assert fit.e["rho_se"] == pytest.approx(0.0486812, abs=9e-8)
 
 
-def test_rho_interval_is_omitted_rather_than_guessed(fit) -> None:
-    """rho gets its estimate and SE, no interval.
+def test_rho_interval_uses_the_probit_scale(fit) -> None:
+    """rho's interval comes from the probit link, per `xtreg_ml.ado:329-332`.
 
-    Stata prints ``rho | .8028448 .0486812 ... .6942946 .8840722``.  Those bounds are
-    2.23 SE below the estimate and 1.67 SE above -- not symmetric, so a link is
-    involved, and none of log, logit, atanh, Fieller, or composing the two sigma
-    endpoints reproduces them.  Printing an interval that cannot be reproduced would
-    be worse than printing none, which is what an earlier version of this file said
-    about ALL THREE rows before the standard errors turned out to be recoverable.
+    An earlier version printed no interval, having tried log, logit, atanh and Fieller. The bounds
+    are asymmetric (2.23 SE below, 1.67 above) precisely BECAUSE the link is `Phi^-1`: rho is a
+    delta-method function of both variance components and Stata asks for `ci(probit)`.
     """
 
     row = next(
@@ -242,12 +241,11 @@ def test_rho_interval_is_omitted_rather_than_guessed(fit) -> None:
         if line.startswith("         rho")
     )
     assert "rho" in row
-    # Estimate and SE are there...
     assert ".8028448" in row
     assert ".0486811" in row or ".0486812" in row
-    # ...and no interval is invented.
-    field_count = len(row[14:].split())
-    assert field_count == 2, row
+    # The two bounds Stata prints for this fit.
+    assert ".6942946" in row, row
+    assert ".8840722" in row, row
 
 
 def test_an_unbalanced_panel_still_gets_standard_errors() -> None:

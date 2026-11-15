@@ -164,6 +164,20 @@ no version. And a `latest-deps` job runs the suite with the ceilings stripped, m
 as an undiagnosable regression weeks later. Rewriting `pyproject.toml` itself would be a trap,
 so that job edits a temporary copy.
 
+### Fixed — `estat ovtest, rhs` drops powers the regressor set already spans
+
+`estat ovtest, rhs` fits `_regress lhs zlist rhs` and tests only the generated powers. `_regress`
+omits any column it cannot identify, and because `rhs` enters the model **before** the powers, a
+power lying in the span of the user's own regressors is dropped by Stata rather than reported.
+westata returned it anyway, so a model whose regressor set already spans a quadratic produced a
+different F.
+
+`_span_dependent` now identifies the columns that add nothing beyond the basis and the columns
+before them, and the powers pass through it in Stata's order.
+
+The no-constant form is registered too — it previously fell through to the generic path because the
+registry entry required a constant.
+
 ### Verified
 
 Full suite in a **pandas 3.1.1 / numpy 2.5.4 / pyfixest 0.70.0 / arch 9.0.0 / scipy 1.18.1**

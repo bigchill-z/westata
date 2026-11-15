@@ -74,11 +74,38 @@ def test_stata_summary_labels():
         assert token in text
 
 
-def test_rank_deficient_raises_consistency_error():
+def test_rank_deficient_drops_a_column_instead_of_refusing():
+    """A duplicated regressor is OMITTED, not an error.
+
+    Measured from ``regress y x1 x1_copy`` on StataNow 19.5 with ``x1_copy = x1``:
+
+        note: x1_copy omitted because of collinearity.
+                  x1 |   1.918702   .0987423    19.43   0.000
+             x1_copy |          0  (omitted)
+        e(rank) = 2   e(df_m) = 1
+
+    The omitted column keeps a zero coefficient and zero variance, and drops out of
+    ``e(rank)``/``e(df_m)``.  This used to raise ConsistencyError, which made an ordinary
+    Stata specification unusable here.
+    """
+
     df = _data()
     df["x1_copy"] = df["x1"]
-    with pytest.raises(ConsistencyError):
-        OLS.from_formula("y ~ x1 + x1_copy", df).fit()
+    result = OLS.from_formula("y ~ x1 + x1_copy", df).fit()
+
+    # The RIGHTMOST of the identical pair is the one omitted (positional sweep).
+    assert float(result.params["x1_copy"]) == 0.0
+    assert float(result.bse["x1_copy"]) == 0.0
+    assert float(result.params["x1"]) != 0.0
+
+    # It is counted out of the model degrees of freedom, as Stata does.
+    assert result.df_model == 1.0
+    assert result.e["rank"] == 2.0
+
+    # ...and named in Stata's note.
+    assert "x1_copy" in tuple(getattr(result, "omitted_columns", ()))
+    rendered = str(result.summary(style="stata"))
+    assert "note: x1_copy omitted because of collinearity." in rendered
 
 
 def test_weights_require_weight_type():

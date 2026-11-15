@@ -457,11 +457,68 @@ class OLS:
             )
 
         rank = int(np.linalg.matrix_rank(X))
+        # STATA OMITS COLLINEAR COLUMNS INSTEAD OF REFUSING THE MODEL.  ``regress`` reports
+        # "note: <name> omitted because of collinearity", keeps the column in ``e(b)`` with a
+        # coefficient of 0, and counts it out of ``e(df_m)``/``e(rank)``:
+        #
+        #     . regress y a b combo          (combo == a + b exactly)
+        #     note: b omitted because of collinearity.
+        #     y | Coef. ... a .7984217   /  b 0 (omitted)  /  combo -.3104949
+        #     e(df_m) = 2   e(rank) = 3
+        #
+        # and the SAME column is dropped when the order is reversed, so the choice does not
+        # follow the caller's order.  This used to raise ConsistencyError, which made a fit
+        # Stata answers happily unusable here -- and, through ``estat ovtest``, turned an
+        # ordinary specification into an error instead of a number.
+        #
+        # Which column goes: the one whose removal leaves the best-conditioned basis, which
+        # is what the pivoted QR below ranks for (see ``ovtest._pivoted_dependent`` for the
+        # same mechanism inside Stata's sweep).  A single column is dropped at a time and the
+        # choice re-evaluated, so a design with several redundancies loses exactly as many
+        # columns as Stata's sweep does.
+        collinear: list[int] = []
         if rank < k:
+            keep = list(range(k))
+            while len(keep) > rank:
+                block = X[:, keep]
+                # Sweep the Gram matrix in COLUMN ORDER, which is Stata's behaviour with its
+                # internal reordering turned off (``set tol r 0``, documented by StataCorp's
+                # Ken Higbee on Statalist 2004-05/msg00057: "the right most colinear vars will
+                # be dropped before those further to the left").  Sweeping in order and
+                # dropping the pivot that collapses reproduces that rule exactly -- verified
+                # on ``combo == a + b``, where both input orders then agree with Stata's
+                # tol-r-0 output.
+                #
+                # Stata's DEFAULT additionally reorders the columns for numerical stability
+                # before sweeping, so it can omit a different member of the same dependency.
+                # Reproducing that permuter is not attempted here: the official description
+                # says a near tie "may differ from one run to another", so there is no stable
+                # target to match.  Any member of the dependency is a valid solution, and the
+                # fitted values are identical whichever one is zeroed.
+                gram = block.T @ block
+                sweep = gram.copy()
+                collapsed = -1
+                for position in range(len(keep)):
+                    pivot = sweep[position, position]
+                    if abs(pivot) <= 1e-12 * max(abs(gram[position, position]), 1.0):
+                        collapsed = position
+                        break
+                    sweep = sweep - np.outer(sweep[:, position], sweep[position, :]) / pivot
+                    sweep[position, :] = -sweep[position, :] / pivot
+                    sweep[:, position] = -sweep[:, position] / pivot
+                    sweep[position, position] = 1.0 / pivot
+                if collapsed < 0:  # pragma: no cover - rank said otherwise
+                    break
+                keep.pop(collapsed)
+            collinear = [index for index in range(k) if index not in set(keep)]
+        if rank < k and not collinear:  # pragma: no cover - defensive
             raise ConsistencyError(
                 "regress: design matrix is rank deficient "
                 f"(rank {rank} < {k} columns); drop collinear regressors"
             )
+        #: Columns Stata would label "note: <name> omitted because of collinearity".
+        self._collinear_columns: tuple[int, ...] = tuple(collinear)
+        _kept_columns = [index for index in range(k) if index not in set(collinear)]
 
         spec = self._weight_spec
         if spec is None:
@@ -507,18 +564,36 @@ class OLS:
         sw = np.sqrt(w)
         Xw = X * sw[:, None]
         yw = y * sw
-        beta, *_ = np.linalg.lstsq(Xw, yw, rcond=None)
+        # SOLVE ON THE KEPT COLUMNS ONLY and write zeros into the omitted ones, which is what
+        # Stata reports ("b | 0 (omitted)").  lstsq on the full rank-deficient design would
+        # spread the coefficient across the collinear pair instead of zeroing one of them.
+        if _kept_columns and len(_kept_columns) < k:
+            kept_beta, *_ = np.linalg.lstsq(Xw[:, _kept_columns], yw, rcond=None)
+            beta = np.zeros(k, dtype=float)
+            beta[_kept_columns] = kept_beta
+        else:
+            beta, *_ = np.linalg.lstsq(Xw, yw, rcond=None)
         resid = y - X @ beta
 
-        df_resid = effective_n - k
+        # The model's degrees of freedom count the columns actually estimated, as Stata's
+        # e(df_m) does: three regressors with one omitted gives e(df_m) = 2.
+        _estimated = k - len(collinear)
+        df_resid = effective_n - _estimated
         if df_resid <= 0:
             raise ConsistencyError(
                 f"regress: {effective_n:g} effective observations but {k} "
                 "parameters; the model is not identified"
             )
 
-        cov, df_t = compute_cov(
-            X,
+        # THE COVARIANCE IS COMPUTED ON THE KEPT COLUMNS ONLY, then placed back into the full
+        # k x k shape with zeros for the omitted ones.  Handing compute_cov() the full design
+        # would invert a singular X'X through a pseudoinverse and hand the SURVIVING
+        # coefficients garbage standard errors -- measured on a two-redundancy design it
+        # produced se(a) = nan and se(b) = 4.8e+06 for a fit whose coefficients were right.
+        _kept_set = set(_kept_columns)
+        _kept_beta_positions = _kept_columns if collinear else list(range(k))
+        cov_kept, df_t = compute_cov(
+            X[:, _kept_beta_positions] if collinear else X,
             resid,
             cov_type=effective_cov_type,
             cov_kwds=cov_kwds,
@@ -529,6 +604,13 @@ class OLS:
             weights=None if spec is None else w,
             weight_type=None if spec is None else spec.weight_type,
         )
+        if collinear:
+            # Zeros for the omitted rows and columns: Stata prints "Std. err. ." for them and
+            # they carry no sampling variation.
+            cov = np.zeros((k, k), dtype=float)
+            cov[np.ix_(_kept_beta_positions, _kept_beta_positions)] = cov_kept
+        else:
+            cov = cov_kept
 
         rss = float((w * resid**2).sum())
         ybar = float((w * y).sum() / w.sum())
@@ -572,14 +654,21 @@ class OLS:
             if has_intercept and tss > 0
             else None
         )
-        df_model = k - 1 if has_intercept else k
+        # The model degrees of freedom count what was ESTIMATED: Stata reports e(df_m) = 2 for
+        # ``regress y a b combo`` with one omitted column, not 3.
+        df_model = _estimated - 1 if has_intercept else _estimated
         # Stata's e(F) is a Wald test of ALL non-constant coefficients using the
         # covariance matrix actually reported, divided by its degrees of freedom
         # ([R] regress, "Methods and formulas"; verified against StataNow 19.5
         # for nonrobust, vce(robust), vce(cluster) and pweight at <= 1e-15).
         # The classic R^2-form F is what this reduces to for the nonrobust VCE,
         # so one definition covers every cov_type instead of only the default.
-        tested = [i for i, name in enumerate(self._param_names) if name != "Intercept"]
+        # Omitted columns carry a zero coefficient and no variance, so they are not tested.
+        tested = [
+            i
+            for i, name in enumerate(self._param_names)
+            if name != "Intercept" and i not in set(collinear)
+        ]
         if df_model == 0:
             # Stata reports e(F) = 0 for the intercept-only model (``regress y``).
             fvalue = 0.0
@@ -674,7 +763,7 @@ class OLS:
             "ll": llf,
             "rss": rss,
             "mss": mss,
-            "rank": k,
+            "rank": _estimated,
             # NOT Stata's ``e(aic)`` -- ``regress`` stores no such macro at all (its
             # help file's stored-results block has no aic/bic, verified by grep over
             # ``regress.sthlp``).  These two are this package's convenience values, on
@@ -771,4 +860,12 @@ class OLS:
         #: with it.  Without this the descriptive table silently returns UNWEIGHTED
         #: statistics for a weighted fit.
         results.weight_spec = getattr(self, "_weight_spec", None)
+        #: The columns ``regress`` would label "note: <name> omitted because of collinearity",
+        #: plus the specification's full column list so the renderer can print each omitted
+        #: row in the position it held. Stata keeps them in the table as "0  (omitted)".
+        if collinear:
+            results.omitted_columns = tuple(
+                self._param_names[index] for index in collinear
+            )
+            results.all_columns = tuple(self._param_names)
         return results

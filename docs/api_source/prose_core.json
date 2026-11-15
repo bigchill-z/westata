@@ -380,8 +380,8 @@
  },
  "OvTestResult": {
   "stata": "estat ovtest",
-  "en": "Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given.",
-  "zh": "Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。",
+  "en": "Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given. Also `dropped`: the auxiliary-regression columns the fit could not identify, in Stata's own order (the user's regressor BEFORE the generated power), one per `note: <name> omitted because of collinearity.` line printed above the table. It is empty on the default path, which cannot duplicate a regressor.",
+  "zh": "Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。 另有 `dropped`：辅助回归无法识别的列，按 Stata 自己的顺序排列（用户变量在生成的幂次之前），每项对应表格上方一行 `note: <name> omitted because of collinearity.`；默认路径不会产生它，因为单个拟合值向量不可能与某个回归元重复。",
   "example": "ws.estat_ovtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
  "EndogenousResult": {

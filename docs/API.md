@@ -4144,7 +4144,7 @@ ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 
 **Stata:** `estat ovtest`
 
-Ramsey's RESET test for omitted variables (Stata `estat ovtest`). By default the auxiliary regression adds the second, third and fourth powers of the fitted values RESCALED to [0, 1]; the rescaling is not cosmetic -- the fourth power of a fitted value in the hundreds makes the auxiliary design ill-conditioned, and dropping it changes the statistic. The test is the joint F on those three added terms. `rhs=True` takes Stata's alternative path and uses powers of the right-hand-side variables, where an indicator regressor contributes only its own level. Reachable as `ws.estat_ovtest(result)` or `result.estat_ovtest()`.
+Ramsey's RESET test for omitted variables (Stata `estat ovtest`). By default the auxiliary regression adds the second, third and fourth powers of the fitted values RESCALED to [0, 1]; the rescaling is not cosmetic -- the fourth power of a fitted value in the hundreds makes the auxiliary design ill-conditioned, and dropping it changes the statistic. The test is the joint F on those three added terms. `rhs=True` takes Stata's alternative path and uses powers of the right-hand-side variables, where an indicator regressor contributes only its own level. Reachable as `ws.estat_ovtest(result)` or `result.estat_ovtest()`. A model fitted WITHOUT a constant is refused on both paths: `ovtest.ado:7` is `_isfit cons anovaok`, so Stata answers `not appropriate after regress, nocons` (r(301)) for `reg y x1 x2, noconstant` followed by `estat ovtest`. That is a precondition rather than an option check, and skipping it is dangerous: the unguarded default path returned `F(3, 195) = 64.86, p = 3.9e-29` for a fit Stata refuses to test. (`estat imtest` does accept a noconstant fit, so the rule is specific to the tests that presuppose a constant.)
 
 **Signature**
 
@@ -6593,7 +6593,7 @@ Cameron & Trivedi's decomposition of IM-test
 
 **Stata:** `estat ovtest`
 
-Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given.
+Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given. Also `dropped`: the auxiliary-regression columns the fit could not identify, in Stata's own order (the user's regressor BEFORE the generated power), one per `note: <name> omitted because of collinearity.` line printed above the table. It is empty on the default path, which cannot duplicate a regressor.
 
 **Signature**
 

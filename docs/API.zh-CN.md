@@ -4143,7 +4143,7 @@ ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 
 **Stata 指令:** `estat ovtest`
 
-Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助回归加入**重标度到 [0, 1]** 的拟合值的二、三、四次幂；重标度并非装饰——量级上百的拟合值的四次幂会让辅助设计矩阵病态，去掉它会改变统计量。检验是这三个新增项的联合 F。`rhs=True` 走 Stata 的另一条路径，改用右端变量的幂，其中示性变量只贡献自身水平。可调用为 `ws.estat_ovtest(result)` 或 `result.estat_ovtest()`。
+Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助回归加入**重标度到 [0, 1]** 的拟合值的二、三、四次幂；重标度并非装饰——量级上百的拟合值的四次幂会让辅助设计矩阵病态，去掉它会改变统计量。检验是这三个新增项的联合 F。`rhs=True` 走 Stata 的另一条路径，改用右端变量的幂，其中示性变量只贡献自身水平。可调用为 `ws.estat_ovtest(result)` 或 `result.estat_ovtest()`。 **不带常数项**的拟合两条路径都会拒绝：`ovtest.ado:7` 第一行就是 `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答 `not appropriate after regress, nocons`（r(301)）。这是先决条件而非选项检查，漏掉它很危险：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回 `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而接受 `noconstant` 拟合，所以这条规则只属于以常数项为前提的那些检验。）
 
 **签名**
 
@@ -6592,7 +6592,7 @@ Cameron & Trivedi's decomposition of IM-test
 
 **Stata 指令:** `estat ovtest`
 
-Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。
+Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。 另有 `dropped`：辅助回归无法识别的列，按 Stata 自己的顺序排列（用户变量在生成的幂次之前），每项对应表格上方一行 `note: <name> omitted because of collinearity.`；默认路径不会产生它，因为单个拟合值向量不可能与某个回归元重复。
 
 **签名**
 

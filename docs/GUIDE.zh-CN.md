@@ -518,6 +518,12 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
   | 不按该顺序 | `F(10, 741) = 1.27` | `0.2421` |
 
   报告的 `df` 数的是**存活的幂次**个数，不是辅助回归的参数个数。
+* **不带常数项的拟合会被拒绝**，两条路径都拒。`ovtest.ado:7` 第一行就是
+  `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答
+  `not appropriate after regress, nocons`（r(301)）。这是**先决条件**而非选项检查，漏掉它
+  不只是不整洁：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回
+  `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而**接受** `noconstant` 拟合，
+  所以这条规则只属于那些以常数项为前提的检验。）
 
 ```python
 # lnw/expr2 属于 grilic.dta；本指南的 df 是 auto.csv，故示例改用其中的连续变量。

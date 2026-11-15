@@ -72,6 +72,13 @@ NO_TABLE = {
     # against. Its numbers and its layout are both pinned instead, against a captured
     # Stata log, in tests/test_estat_imtest.py (test_output_layout_matches_stata).
     "estat imtest": "prints fixed-format result text, not an estimation table",
+    # estat ovtest prints the RESET header block plus a two-line F/Prob table whose label
+    # column is not padded at all ("F(3, 23) =   3.08"), so the generic TABLE-layout sweep
+    # has nothing to align against. Its numbers, its printed block, its collinearity notes
+    # and every refusal (including r(301) after a noconstant fit) are pinned instead in
+    # tests/test_estat_ovtest.py + the five test_ovtest_* modules, against live StataNow
+    # 19.5 captures on grilic.dta and auto.dta.
+    "estat ovtest": "prints result text, not an estimation table; Stata captures verified",
     # xtoverid (user-written, ado/plus) prints THREE lines of result text -- the test
     # description, the model line and the Sargan-Hansen statistic -- and returns r(j)/
     # r(jdf)/r(jp). No estimation table, so a TABLE-layout sweep has nothing to compare.

@@ -25,8 +25,8 @@ this in Python, do I get the same numbers Stata would print?*
 | | |
 |---|---|
 | Tests | **6434 passed, 3 skipped, 0 failed (see `pytest -q`)** |
-| Commands covered | 98 registry entries |
-| Evidence | **55 × E3**, 28 × E2, 15 × E1 |
+| Commands covered | 99 registry entries |
+| Evidence | **56 × E3**, 28 × E2, 15 × E1 |
 | Independent sweep | 386 comparison points against live Stata (`retest/`) |
 
 Verified against **StataNow 19.5 (MP)** through `pystata`; the captures are

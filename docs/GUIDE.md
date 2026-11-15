@@ -615,6 +615,12 @@ Two details decide the numbers and neither is guessable from the output:
   | without that ordering | `F(10, 741) = 1.27` | `0.2421` |
 
   The reported `df` counts the surviving **powers**, not the parameters of the auxiliary regression.
+* **A model fitted without a constant is refused**, on both paths. `ovtest.ado:7` runs
+  `_isfit cons anovaok`, so Stata answers `not appropriate after regress, nocons` (r(301)) for
+  `reg y x1 x2, noconstant` + `estat ovtest`. This is a precondition, not an option check — and
+  skipping it is dangerous rather than merely untidy: an unguarded default path returned
+  `F(3, 195) = 64.86, p = 3.9e-29` on a fit Stata will not even test. (`estat imtest` *does* accept
+  a noconstant fit, so the rule is specific to the tests that presuppose a constant.)
 
 ```python
 # `lnw`/`expr2` belong to grilic.dta; the guide's `df` is auto.csv, so the example uses

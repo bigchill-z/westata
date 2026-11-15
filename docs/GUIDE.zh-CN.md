@@ -260,6 +260,24 @@ Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
 依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。非平衡面板同样拒绝——它没有单一
 `e(theta)`，只有五个百分位，任选其一都是在发明估计量。
 
+**xtreg, mle 的方差成分区块**
+
+`RandomEffectsMLE` 复现 Stata 的 `xtreg ..., mle`。在系数表之下打印 `/sigma_u`、`/sigma_e` 与
+`rho`，每行都带置信区间：
+
+```python
+panel = df.head(72).copy()
+panel["sid"] = (panel.index // 6) + 1
+panel["year"] = (panel.index % 6) + 1
+res = ws.RandomEffectsMLE.from_formula("price ~ mpg + weight", panel,
+                                       entity="sid", time="year").fit()
+print(res.summary())
+```
+
+两个 sigma 的区间建在**对数尺度**上；`rho` 的区间建在 **probit 尺度**上，因为 Stata 是用
+`diparm sigma_u sigma_e, ci(probit)` 生成的。该区间**故意不对称**——在参考数据上，下界距估计值
+2.23 个标准误，上界只有 1.67 个——所以看似合理的对称写法 `rho ± z·se` 是错的。
+
 ### 哪个 `cov_type` 对应 Stata 的 `, r`
 
 稳健 VCE 的缩放因子**因命令而异**，字母 `r` 并不能唯一确定它：

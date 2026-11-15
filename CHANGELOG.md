@@ -7,6 +7,58 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.24] - 2026-11-15
+
+### Fixed — `xtreg, mle` prints `rho`'s confidence interval
+
+`rho` carried its estimate and standard error but no interval, while Stata prints four numbers:
+
+```
+         rho |   .8028448   .0486812                      .6942946    .8840722
+```
+
+The renderer's own comment recorded why it had been left out: the bounds sit **2.23 standard errors
+below** the estimate and only **1.67 above**, so a symmetric interval is impossible, and log, logit,
+atanh and Fieller had all been tried without reproducing them.
+
+The missing piece was the scale, and `xtreg_ml.ado:329-332` says so directly:
+
+```stata
+est hidden local diparm3 sigma_u sigma_e, label(rho)                       /*
+    */ func(@1^2/(@1^2+@2^2))                                             /*
+    */ der( 2*@1*(@2/(@1^2+@2^2))^2 -2*@2*(@1/(@1^2+@2^2))^2 )            /*
+    */ ci(probit)
+```
+
+Two consequences, and both are required:
+
+* `rho` is a delta-method function of **both** variance components, evaluated at `(sigma_u, sigma_e)`
+  with their 2×2 covariance — computing it from `se(rho)` alone drops the covariance term and cannot
+  work.
+* `ci(probit)` builds the z-interval on `Φ⁻¹(rho)` and maps it back through `Φ`. That is what produces
+  the asymmetry.
+
+The bounds now reproduce Stata's `.6942946` / `.8840722` to the last printed digit.
+
+`_ml_variance_row` gained a `link` argument (`"log"` for the two sigmas, `"probit"` for `rho`) and an
+optional pair of ready-made bounds, so a caller with its own two-parameter transform can supply them
+without reimplementing the column layout.
+
+### Known remaining difference
+
+`se(rho)` prints `.0486811` against Stata's `.0486812`. The cause is `sigma_u` differing in its ninth
+significant digit (`0.21410935846590` against `0.21410936014325`), a convergence residual rather than
+a formula difference. It is deliberately not papered over by loosening a tolerance.
+
+### Verified
+
+Full suite **6474 passed, 21 skipped, 1 failed** — the single failure being the known `xtreg, re`
+`e(rmse)` gap recorded in `error.md` #34, which is out of scope here.
+
+Five new guards in `tests/test_xtreg_mle_rho_interval.py`.
+
+---
+
 ## [0.3.23] - 2026-11-15
 
 ### Added — `ws.xtoverid`, the Sargan-Hansen test of overidentifying restrictions

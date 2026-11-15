@@ -2500,23 +2500,6 @@ def _mle_variance_component_se(
     se_rho = float(np.sqrt(max(float(_grad @ _sigma_var_cov @ _grad), 0.0)))
     return se_sigma_u, se_sigma_e, se_rho, refined_sigma_u, refined_sigma_e
 
-    try:
-        variance = np.linalg.inv(-hessian)
-    except np.linalg.LinAlgError:  # pragma: no cover - flat information
-        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
-    if not np.all(np.isfinite(variance)) or np.any(np.diag(variance) < 0.0):
-        return float("nan"), float("nan"), float("nan"), refined_sigma_u, refined_sigma_e
-
-    se_log_su = float(np.sqrt(max(variance[0, 0], 0.0)))
-    se_log_se = float(np.sqrt(max(variance[1, 1], 0.0)))
-    se_sigma_u = refined_sigma_u * se_log_su
-    se_sigma_e = refined_sigma_e * se_log_se
-
-    rho = refined_sigma_u**2 / (refined_sigma_u**2 + refined_sigma_e**2)
-    gradient = np.array([2.0 * rho * (1.0 - rho), -2.0 * rho * (1.0 - rho)])
-    se_rho = float(np.sqrt(max(float(gradient @ variance @ gradient), 0.0)))
-    return se_sigma_u, se_sigma_e, se_rho, refined_sigma_u, refined_sigma_e
-
 
 def _ml_log_interval(estimate: float, standard_error: float) -> tuple[float, float]:
     """Stata's confidence bounds for a ``xtreg, mle`` variance component.

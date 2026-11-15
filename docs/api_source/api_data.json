@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.25",
+  "westata_version": "0.3.26",
   "exports": [
     {
       "name": "AIPW",
@@ -2441,6 +2441,25 @@
       "methods": []
     },
     {
+      "name": "XtDesResult",
+      "kind": "class",
+      "module": "westata.panel_description",
+      "docstring": "``xtdes``: the panel's shape, its T distribution and its observation patterns.",
+      "signature": "(entity: 'str', time: 'str', entities: 'int', periods: 'int', nobs: 'int', first_entity: 'Any' = None, second_entity: 'Any' = None, last_entity: 'Any' = None, first_time: 'Any' = None, second_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, span: 'int' = 0, size_quantiles: 'dict[str, float]' = <factory>, patterns: 'list[tuple[str, int]]' = <factory>) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
       "name": "XtGls",
       "kind": "class",
       "module": "westata.estimators.panel_iv",
@@ -2549,6 +2568,44 @@
         {
           "name": "to_frame",
           "signature": "(self) -> 'pd.DataFrame'"
+        }
+      ]
+    },
+    {
+      "name": "XtSetResult",
+      "kind": "class",
+      "module": "westata.panel_description",
+      "docstring": "``xtset``: confirm the panel structure and summarise it.",
+      "signature": "(entity: 'str', time: 'str', balance: 'str', first_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, gapped: 'bool' = False, entities: 'int' = 0, periods: 'int' = 0, nobs: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
+        }
+      ]
+    },
+    {
+      "name": "XtSumResult",
+      "kind": "class",
+      "module": "westata.panel_description",
+      "docstring": "``xtsum``: overall / between / within decomposition of the listed variables.",
+      "signature": "(entity: 'str', time: 'str', variables: 'list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]]' = <factory>, nobs: 'int' = 0, entities: 'int' = 0, periods: 'int' = 0) -> None",
+      "from_formula": null,
+      "fit": null,
+      "methods": [
+        {
+          "name": "to_dict",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        {
+          "name": "to_frame",
+          "signature": "(self) -> 'Any'"
         }
       ]
     },
@@ -2939,6 +2996,13 @@
       "signature": "(weights: 'Any', weight_type: 'str') -> 'WeightSpec'"
     },
     {
+      "name": "panel_description",
+      "kind": "other",
+      "module": null,
+      "docstring": "Panel bookkeeping: Stata's ``xtset``, ``xtdes`` and ``xtsum``.\n\nThese three describe a panel rather than estimate anything. Every layout here was measured from\nStataNow 19.5 on two fixtures -- a balanced 48 x 17 panel and an unbalanced one with a hole -- rather\nthan guessed.\n\n``xtset pid year`` (balanced)::\n\n    Panel variable: pid (strongly balanced)\n     Time variable: year, 1970 to 1986\n             Delta: 1 unit\n\n``xtset id t`` (unbalanced)::\n\n    Panel variable: id (unbalanced)\n     Time variable: t, 2001 to 2005\n             Delta: 1 unit\n\nwith an interior hole the time line becomes::\n\n     Time variable: t, 1 to 5, but with a gap\n\n``xtdes`` (balanced)::\n\n         pid:  1, 2, ..., 48                                     n =         48\n        year:  1970, 1971, ..., 1986                             T =         17\n               Delta(year) = 1 unit\n               Span(year)  = 17 periods\n               (pid*year uniquely identifies each observation)\n\n    Distribution of T_i:   min      5%     25%       50%       75%     95%     max\n                            17      17      17        17        17      17      17\n\n         Freq.  Percent    Cum. |  Pattern\n     ---------------------------+-------------------\n           48    100.00  100.00 |  11111111111111111\n     ---------------------------+-------------------\n           48    100.00         |  XXXXXXXXXXXXXXXXX\n\n``xtsum y k1``::\n\n    Variable         |      Mean   Std. dev.       Min        Max |    Observations\n    -----------------+--------------------------------------------+----------------\n    y        overall |  61014.32    69973.9       4354     464550 |     N =     816\n             between |             69484.36   5472.118   350056.9 |     n =      48\n             within  |             12769.31  -25109.56   175507.4 |     T =      17",
+      "signature": null
+    },
+    {
       "name": "parse_exp_list",
       "kind": "function",
       "module": "westata.expressions.explist",
@@ -3156,6 +3220,13 @@
       "signature": "(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'"
     },
     {
+      "name": "xtdes",
+      "kind": "function",
+      "module": "westata.panel_description",
+      "docstring": "Stata's ``xtdes``: describe the shape of a panel.",
+      "signature": "(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtDesResult'"
+    },
+    {
       "name": "xtoverid",
       "kind": "function",
       "module": "westata.postestimation.xtoverid",
@@ -3168,6 +3239,20 @@
       "module": "westata.postestimation.xtserial",
       "docstring": "Wooldridge's test for serial correlation in linear panel-data models.\n\n``formula`` is a ``\"y ~ x1 + x2\"`` spec, ``entity`` the panel variable and ``time``\nthe period variable -- what ``xtset`` would declare.  The model is fitted in FIRST\nDIFFERENCES, so ``entity`` and ``time`` must identify consecutive periods.\n\nStata's ``xtserial`` takes a variable list, not a formula; this mirrors the rest of\nthe package's ``from_formula`` convention.\n\n**The first-stage regression is returned, not discarded.**  Stata prints it when\n``, output`` is given; here it is always fitted (the test needs its residuals) and\nkept on ``result.first_stage`` as an ordinary :class:`StataResults`, so the\ndifferenced equation can be inspected, tabulated or reused like any other fit.\nPrint it with ``print(result.first_stage.summary())``.  Pass\n``keep_first_stage=False`` to drop the reference when only the three-line test\nblock is wanted.\n\nRaises\n------\nConsistencyError\n    When the panel/time columns are absent, the panel is not usable, or the second\n    stage has too few panels for a Wald test.",
       "signature": "(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str', keep_first_stage: 'bool' = True) -> 'XtSerialResult'"
+    },
+    {
+      "name": "xtset",
+      "kind": "function",
+      "module": "westata.panel_description",
+      "docstring": "Stata's ``xtset panelvar timevar``.\n\nValidates that the pair identifies the observations, then reports the balance, the time range and\nthe spacing -- the three things Stata prints and every ``xt`` estimator relies on.",
+      "signature": "(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtSetResult'"
+    },
+    {
+      "name": "xtsum",
+      "kind": "function",
+      "module": "westata.panel_description",
+      "docstring": "Stata's ``xtsum``: decompose each variable into overall, between and within variation.\n\n``overall`` uses every observation; ``between`` uses the per-entity means (``n`` of them);\n``within`` uses deviations from those means, rescaled so its standard deviation is comparable\n(Stata multiplies by ``sqrt(T/(T-1))``).",
+      "signature": "(data: 'pd.DataFrame', variables: 'Sequence[str]', *, entity: 'str', time: 'str') -> 'XtSumResult'"
     },
     {
       "name": "xttest0",
@@ -4687,6 +4772,48 @@
       "en": "The fitted VECM: `alpha` and `beta` blocks, `cov_params()`, `conf_int()`, `summary()` and the underlying statsmodels result. The reported drift differs from Stata's printed `_cons`; see the `VECM` entry.",
       "zh": "拟合好的 VECM：`alpha` 与 `beta` 块、`cov_params()`、`conf_int()`、`summary()` 及底层 statsmodels 结果。所报漂移与 Stata 打印的 `_cons` 不同，见 `VECM` 条目。",
       "example": "r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit()\nprint(r.conf_int().shape)"
+    },
+    "panel_description": {
+      "stata": "xtset panelvar timevar  /  xtdes  /  xtsum varlist",
+      "en": "Panel bookkeeping: validate the entity/time pair and describe the panel's shape. Every layout in this module was measured character by character from StataNow 19.5 on two fixtures -- a balanced 48 x 17 panel and an unbalanced one with an interior hole.",
+      "zh": "面板簿记：`xtset` 校验实体/时间变量对，`xtdes` 与 `xtsum` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtdes(panel, entity=\"pid\", time=\"year\")"
+    },
+    "xtset": {
+      "stata": "xtset pid year",
+      "en": "Confirm the panel structure and summarise it: the balance, the time range and the spacing. A hole inside an entity's range appends ', but with a gap'. Raises `ConsistencyError` when a column is missing or the pair does not identify the observations.",
+      "zh": "`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtset(panel, entity=\"pid\", time=\"year\")"
+    },
+    "xtdes": {
+      "stata": "xtdes",
+      "en": "Describe the panel: the entity and time ranges with `n` and `T`, the delta and span, the distribution of the per-entity counts, and the observation-pattern table where `1` marks a present period and `.` a missing one.",
+      "zh": "`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtdes(panel, entity=\"pid\", time=\"year\")"
+    },
+    "xtsum": {
+      "stata": "xtsum y k1",
+      "en": "Decompose each variable into its overall, between and within components. The within standard deviation is the plain sample sd of the deviations (`ddof=1`), and the within min/max are those deviations shifted back by the grand mean.",
+      "zh": "`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtsum(panel, [\"y\"], entity=\"pid\", time=\"year\")"
+    },
+    "XtSetResult": {
+      "stata": "xtset pid year",
+      "en": "Result of `xtset`: the balance label, time range, delta and the panel dimensions.",
+      "zh": "`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtset(panel, entity=\"pid\", time=\"year\")\nprint(result.balance)"
+    },
+    "XtDesResult": {
+      "stata": "xtdes",
+      "en": "Result of `xtdes`: the entity/time ranges, the `T_i` quantiles, the observation patterns and their frequencies.",
+      "zh": "`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtdes(panel, entity=\"pid\", time=\"year\")\nprint(result.patterns)"
+    },
+    "XtSumResult": {
+      "stata": "xtsum y k1",
+      "en": "Result of `xtsum`: one entry per variable holding its overall, between and within mean/sd/min/max.",
+      "zh": "`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。",
+      "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtsum(panel, [\"y\"], entity=\"pid\", time=\"year\")\nprint(result.variables[0][3][\"sd\"])"
     },
     "testnl": {
       "stata": "testnl exp(_b[x1]) = 2",

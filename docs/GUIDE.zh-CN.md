@@ -126,6 +126,40 @@ fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm"
 print(fit.e["rmse"], fit.e["sigma_e"])
 ```
 
+
+**描述面板：`xtset`、`xtdes` 与 `xtsum`**
+
+`xtset` 校验「实体×时间」能否唯一标识观测，并打印 Stata 的形态信息，包括面板是否强平衡、是否有实体
+跳过了某一期：
+
+```python
+ws.xtset(pdata, entity="firm", time="year")
+# Panel variable: pid (strongly balanced)
+#  Time variable: year, 1970 to 1986
+#          Delta: 1 unit
+```
+
+`xtdes` 进一步给出实体与时间范围及 `n`/`T`、`Delta` 与 `Span`、各实体观测数的分布，以及观测模式表
+——其中 `1` 表示该期存在、`.` 表示缺失：
+
+```python
+ws.xtdes(pdata, entity="firm", time="year")
+```
+
+`xtsum` 把每个变量拆成 overall / between / within 三个成分。有三处容易弄错，均已实测确认：
+
+* within 标准差就是离差（deviation）的样本标准差（`ddof=1`）；若再乘 `sqrt(T/(T-1))`（别处使用的
+  尺度还原）会得到不同的数；
+* within 的 min/max 是离差加回**总均值**后的值，不是原始离差；
+* 行标签在 8 列内左对齐，因此 `within` 带两个尾随空格、`between` 只带一个。
+
+```python
+ws.xtsum(pdata, ["price", "mpg"], entity="firm", time="year")
+```
+
+三者都会在列不存在、或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`，而不是在有重复键的
+数据上静默估计。
+
 ### 面板
 
 | Stata | westata |

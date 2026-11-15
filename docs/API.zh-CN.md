@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.25 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.26 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -19,7 +19,7 @@ _westata 版本: 0.3.25 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtDesResult`](#xtdesresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtSetResult`](#xtsetresult), [`XtSumResult`](#xtsumresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`panel_description`](#panel_description), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtdes`](#xtdes), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xtset`](#xtset), [`xtsum`](#xtsum), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -8421,6 +8421,35 @@ print('WeakRobustResult is returned by estat_weakrobust; see its entry')
 None
 ```
 
+### `XtDesResult`
+
+**Stata 指令:** `xtdes`
+
+`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。
+
+**签名**
+
+```python
+ws.XtDesResult(entity: 'str', time: 'str', entities: 'int', periods: 'int', nobs: 'int', first_entity: 'Any' = None, second_entity: 'Any' = None, last_entity: 'Any' = None, first_time: 'Any' = None, second_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, span: 'int' = 0, size_quantiles: 'dict[str, float]' = <factory>, patterns: 'list[tuple[str, int]]' = <factory>) -> None
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtdes(panel, entity="pid", time="year")
+print(result.patterns)
+```
+
+**输出**
+
+```text
+None
+```
+
 ### `XtOveridResult`
 
 **Stata 指令:** `r(j), r(jdf), r(jp) after xtoverid`
@@ -8465,6 +8494,64 @@ ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float',
 d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
 r = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')
 print(round(r.f, 6), r.df_r)
+```
+
+**输出**
+
+```text
+None
+```
+
+### `XtSetResult`
+
+**Stata 指令:** `xtset pid year`
+
+`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。
+
+**签名**
+
+```python
+ws.XtSetResult(entity: 'str', time: 'str', balance: 'str', first_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, gapped: 'bool' = False, entities: 'int' = 0, periods: 'int' = 0, nobs: 'int' = 0) -> None
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtset(panel, entity="pid", time="year")
+print(result.balance)
+```
+
+**输出**
+
+```text
+None
+```
+
+### `XtSumResult`
+
+**Stata 指令:** `xtsum y k1`
+
+`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。
+
+**签名**
+
+```python
+ws.XtSumResult(entity: 'str', time: 'str', variables: 'list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]]' = <factory>, nobs: 'int' = 0, entities: 'int' = 0, periods: 'int' = 0) -> None
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtsum(panel, ["y"], entity="pid", time="year")
+print(result.variables[0][3]["sd"])
 ```
 
 **输出**
@@ -8806,6 +8893,42 @@ print(round(r.to_dict()['estimate'], 6))
 
 ```text
 None
+```
+
+### `panel_description`
+
+**Stata 指令:** `xtset panelvar timevar  /  xtdes  /  xtsum varlist`
+
+面板簿记：`xtset` 校验实体/时间变量对，`xtdes` 与 `xtsum` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtdes(panel, entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+     pid:  1, 2, ..., 2                                      n =          2
+    year:  1, 2, ..., 2                                      T =          2
+           Delta(year) = 1 unit
+           Span(year)  = 2 periods
+           (pid*year uniquely identifies each observation)
+
+Distribution of T_i:   min      5%     25%       50%       75%     95%     max
+                         2       2       2         2         2       2       2
+
+     Freq.  Percent    Cum. |  Pattern
+ ---------------------------+---------
+        2    100.00  100.00 |  11
+ ---------------------------+---------
+        2    100.00         |  XX
 ```
 
 ### `pperron`
@@ -9542,6 +9665,48 @@ print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, n
 None
 ```
 
+### `xtdes`
+
+**Stata 指令:** `xtdes`
+
+`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。
+
+**签名**
+
+```python
+ws.xtdes(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtDesResult'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtdes(panel, entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+     pid:  1, 2, ..., 2                                      n =          2
+    year:  1, 2, ..., 2                                      T =          2
+           Delta(year) = 1 unit
+           Span(year)  = 2 periods
+           (pid*year uniquely identifies each observation)
+
+Distribution of T_i:   min      5%     25%       50%       75%     95%     max
+                         2       2       2         2         2       2       2
+
+     Freq.  Percent    Cum. |  Pattern
+ ---------------------------+---------
+        2    100.00  100.00 |  11
+ ---------------------------+---------
+        2    100.00         |  XX
+```
+
 ### `xtoverid`
 
 **Stata 指令:** `xtoverid (user-written: Schaffer & Stillman)`
@@ -9590,6 +9755,70 @@ print(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))
 
 ```text
 None
+```
+
+### `xtset`
+
+**Stata 指令:** `xtset pid year`
+
+`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。
+
+**签名**
+
+```python
+ws.xtset(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtSetResult'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtset(panel, entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+Panel variable: pid (strongly balanced)
+ Time variable: year, 1 to 2
+         Delta: 1 unit
+```
+
+### `xtsum`
+
+**Stata 指令:** `xtsum y k1`
+
+`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。
+
+**签名**
+
+```python
+ws.xtsum(data: 'pd.DataFrame', variables: 'Sequence[str]', *, entity: 'str', time: 'str') -> 'XtSumResult'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtsum(panel, ["y"], entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+y        overall |       2.5   1.290994          1          4 |     N =       4
+         between |             1.414214        1.5        3.5 |     n =       2
+         within  |             .5773503          2          3 |     T =       2
 ```
 
 ### `xttest0`

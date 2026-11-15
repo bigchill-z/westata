@@ -1407,6 +1407,14 @@ def check_r2_estimation_has_class(report: Report) -> None:
         # block and no coefficient vector, so a ``fit()`` would be an empty shell
         # (R1.5).  It is an r-class test, the same category as ``dfuller``.
         "xtserial",
+        # PANEL DESCRIPTIONS, not estimation. `xtset` stores e(ivar)/e(tvar) and nothing else;
+        # `xtdes` and `xtsum` fill no coefficient vector at all -- they summarise data that is
+        # already there. Their results are dataclasses carrying the printed layout, so a
+        # `.from_formula().fit()` form would exist only to satisfy the shape of the rule while
+        # adding a construction step that means nothing for a description (R1.5).
+        "xtset",
+        "xtdes",
+        "xtsum",
     }
 
     for name in sorted(getattr(ws, "__all__", ())):

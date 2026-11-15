@@ -7,6 +7,77 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.26] - 2026-11-15
+
+### Added — `xtset`, `xtdes` and `xtsum`
+
+Stata's three panel-description commands, each reproducing the printed block character for
+character:
+
+```python
+ws.xtset(panel, entity="pid", time="year")
+ws.xtdes(panel, entity="pid", time="year")
+ws.xtsum(panel, ["y", "k1"], entity="pid", time="year")
+```
+
+```
+Panel variable: pid (strongly balanced)
+ Time variable: year, 1970 to 1986
+         Delta: 1 unit
+```
+
+```
+     pid:  1, 2, ..., 48                                     n =         48
+    year:  1970, 1971, ..., 1986                             T =         17
+           Delta(year) = 1 unit
+           Span(year)  = 17 periods
+           (pid*year uniquely identifies each observation)
+
+Distribution of T_i:   min      5%     25%       50%       75%     95%     max
+                        17      17      17        17        17      17      17
+
+     Freq.  Percent    Cum. |  Pattern
+ ---------------------------+-------------------
+       48    100.00  100.00 |  11111111111111111
+ ---------------------------+-------------------
+       48    100.00         |  XXXXXXXXXXXXXXXXX
+```
+
+```
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+y        overall |  61014.32    69973.9       4354     464550 |     N =     816
+         between |             69484.36   5472.118   350056.9 |     n =      48
+         within  |             12769.31  -25109.56   175507.4 |     T =      17
+```
+
+### Details that were measured, not assumed
+
+Four of these were wrong on the first attempt and only character-level comparison settled them:
+
+| detail | what it actually is |
+|---|---|
+| `xtsum` within sd | the plain sample sd of the deviations (`ddof=1`). Multiplying by `sqrt(T/(T-1))` — the rescaling used elsewhere — gives a different number |
+| `xtsum` within min/max | the deviations **shifted back by the grand mean**; the raw deviations span `-86123.88 .. 114493.12` where Stata prints `-25109.56 .. 175507.4` |
+| `xtsum` numbers | **seven** significant figures with the leading zero dropped |
+| `xtsum` row label | **left**-aligned in 8 columns, which is why `within` carries two trailing spaces and `between` one |
+| `xtdes` pattern rule | `max(9, span + 2)` dashes — measured across spans 4, 5 and 17 |
+| `xtset` gap | a hole **inside one entity's range**, not inside the union of observed periods. A panel where one entity covers `1..5` and another skips `3` still prints `, but with a gap` |
+
+### API-rule compliance
+
+`xtset` / `xtdes` / `xtsum` are **r-class descriptions**, not estimation commands: they store no
+coefficient vector, so they are registered alongside `xtserial` in the R2.7 allow-list rather than
+given an empty `.from_formula().fit()` shell. Their three result classes are exported at the package
+root so callers can name the type they receive (R5.2).
+
+### Verified
+
+18 new tests in `tests/test_panel_description.py`, two of them comparing the whole printed block line
+by line against captured Stata output. Full suite **6519 passed, 21 skipped**.
+
+---
+
 ## [0.3.25] - 2026-11-15
 
 ### Fixed — `xtreg, re`'s `e(rmse)` came from the wrong regression

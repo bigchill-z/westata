@@ -131,6 +131,43 @@ fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm"
 print(fit.e["rmse"], fit.e["sigma_e"])
 ```
 
+
+**Describing a panel: `xtset`, `xtdes` and `xtsum`**
+
+`xtset` validates that the entity/time pair identifies the observations and reports the shape Stata
+prints, including whether the panel is strongly balanced and whether any entity skips a period:
+
+```python
+ws.xtset(pdata, entity="firm", time="year")
+# Panel variable: pid (strongly balanced)
+#  Time variable: year, 1970 to 1986
+#          Delta: 1 unit
+```
+
+`xtdes` adds the resource: the entity and time ranges with `n`/`T`, the `Delta` and `Span`, the
+distribution of the per-entity counts, and the observation-pattern table where `1` means the period
+is present and `.` means it is missing:
+
+```python
+ws.xtdes(pdata, entity="firm", time="year")
+```
+
+`xtsum` splits each variable into its overall, between and within components. Three details are easy
+to get wrong and were measured rather than assumed:
+
+* the within standard deviation is the plain sample sd of the deviations (`ddof=1`); multiplying by
+  `sqrt(T/(T-1))` -- the rescaling used elsewhere -- gives a different number;
+* the within min/max are the deviations shifted back by the **grand** mean, not the raw deviations;
+* the row label is left-aligned in 8 columns, so `within` carries two trailing spaces and `between`
+  one.
+
+```python
+ws.xtsum(pdata, ["price", "mpg"], entity="firm", time="year")
+```
+
+All three raise `ConsistencyError` when a column is absent or when the pair does not identify the
+observations, rather than silently estimating on duplicates.
+
 ### Panel data
 
 | Stata | westata |

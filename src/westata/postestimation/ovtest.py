@@ -165,6 +165,50 @@ def _rescale(values: np.ndarray) -> tuple[np.ndarray, bool]:
     return (values - low) / (high - low), False
 
 
+def _span_dependent(basis: np.ndarray, columns: Sequence[np.ndarray]) -> set[int]:
+    """Indices among ``columns`` that add nothing beyond ``basis`` and the columns before them.
+
+    This is ``_regress``'s omission rule, applied left to right: a column is dropped when the
+    columns before it already span it.  Which block that is asked of matters, and
+    ``ovtest.ado:166,420`` fixes the order as ``_regress lhs zlist rhs`` -- the GENERATED
+    POWERS enter first and the user's regressors after them.
+
+    Measured on grilic where the user added ``expr2 = expr^2``: the powers are laid down first,
+    then ``expr2`` cannot be identified against them and Stata's note names it, while its own
+    ``expr2^2`` was dropped earlier against ``expr^2``.  Handing this helper the finished model
+    instead (powers weighed against the regressors) drops ``expr^`` and answers
+    ``F(10, 741) = 1.27`` where Stata reports ``F(11, 741) = 1.73``.  Testing all twelve powers
+    with no omission handling at all produced ``F(12, 739) = 1.9e+26``: the auxiliary design is
+    singular (condition number 2e10) and the Wald form inverts it.
+
+    The test is exact dependence, compared against the candidate's own magnitude, because the
+    genuine duplicate here matches to the last bit while a merely-nearby column differs by 4.7e-08.
+    """
+
+    dependent: set[int] = set()
+    accepted = [basis]
+    for index, column in enumerate(columns):
+        current = np.column_stack(accepted)
+        scale = float(np.abs(column).max())
+        if scale == 0.0:
+            dependent.add(index)
+            continue
+        coefficients, *_ = np.linalg.lstsq(current, column, rcond=None)
+        residual = column - current @ coefficients
+        # A POWER IS DROPPED WHEN IT IS A POLYNOMIAL OF WHAT IS ALREADY IN THE MODEL, which is
+        # not the same as being numerically equal to one column. `expr^2`, after Stata's
+        # rescaling to [0, 1], is exactly a quadratic in the raw `expr`, so it lies in the span
+        # of (1, expr, expr2) however different the two columns look -- the projection residual
+        # is 4.7e-08 on a unit scale, i.e. rounding error, whereas an independent power leaves a
+        # residual of order 1e-2. The threshold therefore sits far above machine epsilon and far
+        # below any genuinely new direction.
+        if float(np.abs(residual).max()) <= 1e-6 * scale:
+            dependent.add(index)
+        else:
+            accepted.append(column[:, None])
+    return dependent
+
+
 def _fit_and_test(
     y: np.ndarray, design: np.ndarray, tested: Sequence[int]
 ) -> tuple[float, float, float]:
@@ -227,8 +271,11 @@ def estat_ovtest(
     Raises
     ------
     ValueError
-        When the design was not retained, when every regressor is an indicator
-        (so no powers exist), or when the auxiliary fit has no residual df.
+        When the design was not retained, when the fit has no constant (Stata's
+        ``not appropriate after regress, nocons``, r(301), which
+        ``ovtest.ado:7`` makes a precondition on both paths), when every
+        regressor is an indicator (so no powers exist), or when the auxiliary
+        fit has no residual df.
     """
 
     design = getattr(result, "design_matrix", None)
@@ -279,6 +326,33 @@ def estat_ovtest(
     matrix_raw, raw_names = design
     matrix = np.asarray(matrix_raw, dtype=float)
     names = [str(name) for name in raw_names]
+
+    # ``estat ovtest`` after ``regress, noconstant`` is r(301), "not appropriate
+    # after regress, nocons", on EVERY path -- measured on a live StataNow 19.5
+    # run, both with and without ``, rhs``:
+    #
+    #     . reg y x1 x2, noconstant
+    #     . estat ovtest
+    #     not appropriate after regress, nocons
+    #     r(301);
+    #
+    # The ado says so in its first executable line, before it looks at any
+    # option: ``ovtest.ado:7`` is ``_isfit cons anovaok``, whose ``cons`` check
+    # is exactly this refusal. (For contrast, ``estat imtest`` accepts a
+    # noconstant fit -- measured -- so this is not a blanket rule for the
+    # ``estat`` family.)
+    #
+    # The default path is the dangerous one. It rescaled the fitted values and
+    # returned F(3, 195) = 64.86, p = 3.9e-29 on a model Stata refuses outright:
+    # a catastrophic rejection, not a near miss. `estat hettest` already carries
+    # this guard; ovtest was missing it.
+    if names and not any(_is_constant(name) for name in names):
+        raise ValueError(
+            "estat ovtest is not appropriate after a noconstant fit: Stata "
+            "reports 'not appropriate after regress, nocons' (r(301)) because "
+            "ovtest.ado:7 calls `_isfit cons`, which refuses a model fitted "
+            "without a constant."
+        )
 
     resid = np.asarray(result.resid, dtype=float).reshape(-1)
     nobs = resid.size
@@ -366,35 +440,49 @@ def estat_ovtest(
     #
     # `test zlist` then tests only the powers, so the reported df counts 11 while the auxiliary
     # regression carries 17 parameters.
-    _design_columns = [matrix[:, [0]]]
+    #: The model's own constant is the BASE of the auxiliary design. Lifting it by
+    #: POSITION would be wrong: a design whose constant is not first would then be
+    #: entered twice (once as the base, once by the regressor loop) while a real
+    #: regressor at column 0 was silently swallowed.
+    _constant_index = next(
+        (j for j, name in enumerate(names) if _is_constant(name)), None
+    )
+    if _constant_index is None:  # pragma: no cover - the guard above refuses this
+        raise ValueError(
+            "estat ovtest, rhs: the design carries no constant column, but "
+            "ovtest.ado:7 refuses such a fit before it reaches this branch"
+        )
+    _design_columns: list[np.ndarray] = [matrix[:, [_constant_index]]]
     _tested: list[int] = []
     #: Columns `_regress` cannot identify, in the order it meets them. Stata prints one
     #: "note: <name> omitted because of collinearity." line per entry, above the table.
-    _dropped_regressors: list[str] = []
     _dropped_powers: list[str] = []
-    for _label, _column in zip(omitted_labels, columns):
-        _current = np.column_stack(_design_columns)
-        _scale = float(np.abs(_column).max())
-        if _scale == 0.0:
-            _dropped.append(_label)
-            continue
-        _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
-        _residual = _column - _current @ _coef
-        if float(np.abs(_residual).max()) <= 1e-6 * _scale:
+    _dropped_regressors: list[str] = []
+
+    # STATA BUILDS THE TWO BLOCKS IN THIS ORDER AND SO MUST THIS: ``ovtest.ado:420`` is
+    # ``_regress lhs zlist rhs``, powers first, and whatever the earlier columns already
+    # span is the one dropped. `_span_dependent` is that rule, applied to each block in
+    # turn.
+    _dependent_powers = _span_dependent(_design_columns[0], columns)
+    for _position, (_label, _column) in enumerate(zip(omitted_labels, columns)):
+        if _position in _dependent_powers:
             _dropped_powers.append(_label)
             continue
         _tested.append(len(_design_columns))
         _design_columns.append(_column[:, None])
-    for _index in range(1, matrix.shape[1]):
-        _column = matrix[:, _index]
-        _current = np.column_stack(_design_columns)
-        _scale = float(np.abs(_column).max())
-        if _scale == 0.0:
-            continue
-        _coef, *_ = np.linalg.lstsq(_current, _column, rcond=None)
-        _residual = _column - _current @ _coef
-        if float(np.abs(_residual).max()) <= 1e-6 * _scale:
-            _dropped_regressors.append(str(names[_index]))
+
+    _regressor_columns = [
+        matrix[:, j] for j in range(matrix.shape[1]) if j != _constant_index
+    ]
+    _regressor_names = [
+        str(names[j]) for j in range(matrix.shape[1]) if j != _constant_index
+    ]
+    _dependent_regressors = _span_dependent(
+        np.column_stack(_design_columns), _regressor_columns
+    )
+    for _position, _column in enumerate(_regressor_columns):
+        if _position in _dependent_regressors:
+            _dropped_regressors.append(_regressor_names[_position])
             continue
         _design_columns.append(_column[:, None])
     # STATA LISTS THE USER'S REGRESSORS BEFORE THE POWERS in its notes, even though the powers

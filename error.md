@@ -1206,3 +1206,75 @@ CI 每次 `pip install -e .` 都拉最新版，开发机停在旧版，于是**�
 **执行 `git stash` 前先 `git log --oneline -1` 记下 HEAD**，
 pop 之后立刻 `git status` 确认没有 `UU`/`AA`，并用 `ast.parse` 或 `import` 验证文件仍可解析。
 本轮的冲突由另一会话代为解决，但那属于运气，不是流程。
+
+## 2026-11-15 半成品代码能被 `ast.parse` 通过，但一执行就 `UnboundLocalError`
+
+`ovtest.py` 里有一处写到一半的循环：
+
+```python
+_dropped_regressors: list[str] = []
+_dropped_powers: list[str] = []
+for _label, _column in zip(omitted_labels, columns):
+    ...
+    if _scale == 0.0:
+        _dropped.append(_label)      # ← _dropped 在 40 行之后才被赋值
+```
+
+`_dropped` 的赋值在 476 行（`_dropped = _dropped_regressors + _dropped_powers`），
+用在 448 行。Python 把**整个函数体**里的 `_dropped` 判定为局部变量，所以这行不是
+「引用未定义的名字（NameError）」，而是 `UnboundLocalError`——而且只在真有一个
+全零幂次列时才触发，正常数据上永远走不到。
+
+**为什么没被发现**：`ast.parse` 通过、`import` 通过、41 个 ovtest 测试全通过；
+死代码路径没人构造。**语法正确 ≠ 语义正确**。
+
+**通用做法**：
+
+1. 提交前对改动过的模块跑一次**全函数符号绑定检查**，而不只是 `ast.parse`：
+   ```python
+   import ast
+   # 找出函数内 Store 的位置晚于 Load 的名字
+   ```
+   本次就是用这个方法在一次 AST 遍历里定位的（`_dropped` store@449 / load@421）。
+2. 新写的分支必须配一个**能走到它**的测试。`_scale == 0.0` 这条分支至今没有测试，
+   所以它才会带病存活——写这段时我以为「Stata 不会产生全零幂次列」，
+   但那份保险代码本身不该是坏的。
+3. 看到 `xxx: list[str] = []` 之后紧跟 `xxx.append(...)`，先确认 `xxx` 是**这个**
+   变量名。`_dropped_regressors` / `_dropped_powers` / `_dropped` 三个近名变量并存
+   是这次失误的直接土壤。
+
+## 2026-11-15 「没有守卫」比「算错了」危险一个量级：`ovtest` 在 `noconstant` 上给出五星级拒绝
+
+`estat ovtest` 缺一条先决条件检查（`ovtest.ado:7` 的 `_isfit cons`）。后果不是数值偏差：
+
+| | 值 |
+|---|---|
+| Stata | `not appropriate after regress, nocons` / r(301)，**拒绝执行** |
+| westata（修复前）| `F(3, 195) = 64.86, p = 3.9e-29` |
+
+数据里没有任何设定问题，却得到一个 p 小于 1e-28 的拒绝。这类输出的危险在于它
+**完全正常**：量级对、格式对、有 p 值、能进论文。相比之下「算错第三位小数」至少
+会被对拍发现。
+
+**通用做法**：
+
+1. **适用性检查要和数值计算分开测**：每个 `estat_*` 至少要有「Stata 拒绝、我们也
+   必须拒绝」的用例，而不是只测「能算出数」。
+2. **拿真实 Stata 跑拒绝路径**，不要从文档推断。本次实跑确认：`ovtest` 两条路径都拒，
+   而 `imtest` **接受** `noconstant`——若按「`estat` 家族统一规则」猜，就会把 `imtest`
+   也错误地拒掉。
+3. 同族里已实现过同一守卫的，直接照抄：`hettest.py` 早就有 `not appropriate after a
+   noconstant fit`，`ovtest` 漏了。**同一族里的一条规则只实现一半，等于给后来者埋雷。**
+
+## 2026-11-15 docs 数字是注册表的派生值，改注册表必须连带改 README
+
+给 `registry.yml` 加一条 `estat ovtest`，E3 从 55 变 56、条目从 98 变 99，
+`tests/test_docs_zh.py::test_chinese_readme_numbers_match_the_measured_data` 立刻红。
+这不是文档过时，而是**文档正确地拒绝了不同步的数字**。
+
+**通用做法**：凡是 README/文档里写的「N 条注册」「N × E3」这类计数，都是注册表的
+派生值。改注册表时对 `README.md`、`README.zh-CN.md` 与所有 `docs/*.md` 做一次
+`grep` 替换，然后跑文档守卫——它会替你验算。
+
+另：用 Python 读写带 BOM 的 `README.md` 会引入或丢掉 BOM，
+`encoding='utf-8-sig'` 读、写回时用 `utf-8`，否则 diff 里会多出一行无关的 BOM 变化。

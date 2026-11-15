@@ -228,6 +228,38 @@ theta        = .81012778
 `xtreg, fe` / `be` / `mle` **不起作用**——Stata 对它们报 `option theta not allowed`（r(198)）
 ——在 `style='statsmodels'` 下同样不起作用。
 
+**`xtoverid` —— 过度识别约束的 Sargan-Hansen 检验**
+
+Stata 的 `xtoverid` 是用户自编命令（Schaffer & Stillman），不在 base 中。随机效应拟合之后，它
+检验 RE 估计量所用的额外矩条件是否成立；拒绝意味着 RE 不一致、应改用固定效应。
+
+```python
+re_fit = ws.RandomEffects.from_formula(
+    "price ~ mpg + weight", panel, entity="sid", time="year"
+).fit()
+print(ws.xtoverid(re_fit))
+```
+
+```
+Test of overidentifying restrictions: fixed vs random effects
+Cross-section time-series model: xtreg re
+Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
+```
+
+`r(j)`、`r(jdf)`、`r(jp)` 即 `result.statistic`、`result.df`、`result.pvalue`，
+`to_dict()` 按 Stata 的名字给出。两点是关键，且都经过实测：
+
+- **VCE 跟随原拟合**。同一方程在同方差 VCE 下为 `53.285`，在 `cov_type="robust"` 下为
+  `221.225`——差 4 倍，不是舍入。`xtoverid.ado` 重估时会镜像 `e(vcetype)`，本实现同样如此。
+- 辅助方程用**原始 `e(theta)`** 做准去均值。新增的每个回归元都是组均值恒为零的组内离差，
+  不含任何组间变异；若改为重新估计方差成分，`sigma_u` 会从 `.1332` 漂到 `.0947`，
+  统计量偏差 4.66。Stata 自己的 `xtoverid, noisily` 打印的就是原始 `sigma_u`/`theta`，
+  固定 theta 求解才能复现。
+
+仅实现 `xtreg, re` 分支：`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支
+依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。非平衡面板同样拒绝——它没有单一
+`e(theta)`，只有五个百分位，任选其一都是在发明估计量。
+
 ### 哪个 `cov_type` 对应 Stata 的 `, r`
 
 稳健 VCE 的缩放因子**因命令而异**，字母 `r` 并不能唯一确定它：
@@ -486,6 +518,12 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
   | 不按该顺序 | `F(10, 741) = 1.27` | `0.2421` |
 
   报告的 `df` 数的是**存活的幂次**个数，不是辅助回归的参数个数。
+* **不带常数项的拟合会被拒绝**，两条路径都拒。`ovtest.ado:7` 第一行就是
+  `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答
+  `not appropriate after regress, nocons`（r(301)）。这是**先决条件**而非选项检查，漏掉它
+  不只是不整洁：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回
+  `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而**接受** `noconstant` 拟合，
+  所以这条规则只属于那些以常数项为前提的检验。）
 
 ```python
 # lnw/expr2 属于 grilic.dta；本指南的 df 是 auto.csv，故示例改用其中的连续变量。

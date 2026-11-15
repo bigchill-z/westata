@@ -2,6 +2,57 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之十、2026-11-15 `estat ovtest, rhs`：**用户变量本身就是某幂次的多项式**时，df 与 Stata 不符（既有缺陷，未修）
+
+这是在补 `ovtest` 的 `noconstant` 守卫时**顺带发现**的一处既有缺陷，**不是本轮引入的**：
+我用 `git show HEAD:...ovtest.py` 加载了提交版与当前版逐案对比，12 个案例全部 `SAME`，
+所以修复它属于另一件事，按项目规则先记录、不擅自扩大改动范围。
+
+### 现象
+
+Stata 实跑（StataNow 19.5，n=300，seed 11，`x1sq = x1^2`）：
+
+```
+. reg y x1 x1sq
+. estat ovtest, rhs
+note: x1^2 omitted because of collinearity.
+note: x1^3 omitted because of collinearity.
+F(4, 293) =   1.58          Prob > F = 0.1809
+```
+
+westata（HEAD 与当前版一致）：`F(6, 293) = 1.5409`，`dropped=('x1', 'x1sq')`。
+
+**差的是 df（4 vs 6），不是数值精度。** 也就是说：Stata 丢弃的是两个**幂次**并保留用户的
+`x1`，westata 丢弃的是**两个用户变量**、把幂次全留下了。
+
+对照 grilic 的真实重复列案例（`expr2 = expr^2`，模型里还有 `s`/`tenure`/`smsa`/`rns`）：
+两边完全一致（`F(11, 741) = 1.7312`，notes `expr2` + `expr2^2`）。所以缺陷只在
+**模型里除该变量外几乎别无他物**时暴露。
+
+### 已排除的解释
+
+| 猜测 | 实测 |
+|---|---|
+| float32 精度导致 Stata 判共线 | 否。设计阵 double/float32 的 rank 都是 7，cond≈1.2e3，`_span_dependent` 在 1e-6/1e-4 容差下都不丢列 |
+| 幂次取自未缩放的原值 | 否。`ovtest.ado` 是 `replace` 原位缩放后再 `gen z2 = x*x`，与包内做法一致 |
+| 只是我们的 `_span_dependent` 容差问题 | 否。Stata 侧 `reg y t2 t3 t4 u2 u3 u4 tt uu` 确实丢 `t2 t3`（见 `probe5.log`），是**真实的列序依赖**：`tt`/`uu` 进入后，`t2` 变成 `{1,t3,t4,u2,u3,u4,tt,uu}` 的线性组合 |
+
+最后一行是关键：Stata 的 `_regress` 丢弃结果**依赖于它自己已接受的列集合**，而 `tt`/`uu`
+的进入又反过来使 `t2` 变得可表示——这是一个我目前还没能逐列复现的顺序效应。
+
+### 需要你决策
+
+1. **先记录、不修**（我的建议）：该缺陷只在「用户变量恰是另一变量的多项式且模型近乎只有
+   它」时触发，真实数据上极罕见；而修它需要逐列复现 Stata `_regress` 的接受顺序，
+   属于独立一轮工作，且会改动已通过 Stata 对拍的 `duplicate` 用例。
+2. **立即修**：我可以继续逆向 `_regress` 的列接受顺序，但需要再造 3–5 个 Stata 捕获来确认，
+   而不是靠推测。
+
+我不会在没有 Stata 证据的情况下「凑」一个能同时满足两个案例的启发式规则——那正是本项目
+在 `docs/TESTING_SOP.md` 里明令禁止的失效方式。
+
+---
+
 ## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
 
 | 事项 | 结果 |

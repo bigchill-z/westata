@@ -104,7 +104,7 @@
 | `wntestq` | ✅ 已实现 | `result.wntestq()` / `ws.wntestq(...)`；`Q = n(n+2)Σρ̂²/(n-k)`，默认阶数同样取自 `ac.ado:71` 的 `max(1, min(int(n/2)-2, 40))`（旧实现的 `(n-k)//2` 已修正为 40 上限）。接受结果对象或裸数值序列。icecream 实测 `Q 26.1974 / chi2(13)`（默认）与 `Q 16.3718 / p .0895`（`lags(10)`） |
 | `estat vif` | ✅ 已实现（线性模型） | `result.estat_vif()`；公式抄自 `vif.ado`，支持 `uncentered`/`nosort`；无常数模型与非线性模型按 Stata 行为拒绝 |
 | `estat hettest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_hettest()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`。**无变量列表 = 拟合值**（`hettest.ado:110-115`），不是“全部回归元”——这曾是与 Stata 不一致的根因；`rhs=True` 才是全部 `e(b)` 回归元。`variables` 按**原始数据变量名**解析（`rep78` 是原始 1-5 列，df=1），否则按设计列名。估计权重被辅助回归复用（`fweight`/`iweight` 的 `e(N)=sum(w)`）。robust/cluster VCE、pweight 与 `noconstant` 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29；单回归元时按 `hettest.ado:126-128` 静默丢弃。90 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/hettest_auto.json`） |
-| `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_ovtest()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True` |
+| `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_ovtest()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True`。**`noconstant` 拟合按 Stata 拒绝**（`ovtest.ado:7` 的 `_isfit cons` → r(301)"not appropriate after regress, nocons"）；此前默认路径会对这种拟合返回 `F(3,195)=64.86, p=3.9e-29`，即对一个 Stata 根本不肯跑的检验给出五星级拒绝。累计 7 个测试模块、6 批 Stata 实跑对照 |
 | `estat firststage` | ✅ 已实现 | `result.estat_firststage()`；列定义抄自 `ivregress_estat.ado`，含 Shea's partial R²（多内生变量时）。**`r(mineig)` 与 `r(mineigcv)` 已实现**（Cragg-Donald 最小特征值 + Stock-Yogo 三张表逐字抄录），见 §8.20.48 |
 | `estat overid` | ✅ 已实现 | `result.estat_overid()`；Sargan + Basmann（2SLS/LIML）、Hansen J（GMM）、**Wooldridge score（稳健/HAC）**；辅助回归须用**全部工具**（含外生）。LIML 在稳健/HAC 下按 Stata 拒绝，见 §8.20.14、§8.20.30、§8.20.46 |
 | `estat endogenous` | ✅ 已实现（全内生变量） | `result.estat_endogenous()`；Durbin + Wu-Hausman、**robwool/acwool（稳健/HAC）**、**regF（增广回归，解锁 cluster）**。LIML 拒绝、GMM 的 C 统计量未实现（有阻塞证据），见 §8.20.15、§8.20.35、§8.20.36、§8.20.47 |
@@ -1410,6 +1410,31 @@ westata 抛 `ValueError` 并给出同一提示。
 | `, rhs` | F(6,65) = 1.9481714166 | 同 | 1e-10 |
 | 含遗漏二次项 | p ≈ 0 | p = 0.000000 | ✓ 拒绝 |
 | 设定正确 | — | p = 0.141204 | ✓ 不拒绝 |
+
+#### `noconstant` 拟合必须拒绝（2026-11-15 补）
+
+`ovtest.ado:7` 第一行可执行语句就是 `_isfit cons anovaok`，`cons` 检查即"模型必须带常数项"。
+StataNow 19.5 实跑（两条路径都试过）：
+
+```
+. reg y x1 x2, noconstant
+. estat ovtest
+not appropriate after regress, nocons
+r(301);
+
+. estat ovtest, rhs
+not appropriate after regress, nocons
+r(301);
+```
+
+westata 原先**两条路径都不拦**，默认路径在 n=200 的合成数据上返回
+`F(3, 195) = 64.86, p = 3.9e-29`——数据本身没有任何设定问题，却得到一个五星级拒绝。
+
+这是本项目里最危险的一类失效：**数值有限、量级正常、看起来完全可信**，只有和 Stata 对照
+才会发现它测的根本不是一个被允许的检验。
+
+对照：`estat imtest` **接受** `noconstant` 拟合（同样实测），所以这不是 `estat` 家族的
+统一规则，而是 `ovtest` 自身的先决条件；`estat hettest` 早就带了这条守卫，漏的是 `ovtest`。
 
 ---
 

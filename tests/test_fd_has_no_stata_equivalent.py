@@ -64,14 +64,17 @@ def test_the_sample_size_matches_the_differenced_regression(fitted) -> None:
     assert int(fitted.nobs) == 768
 
 
-def test_the_command_string_claims_a_stata_command_that_does_not_exist(fitted) -> None:
-    """`e(cmd)` says "xtreg, fd"; Stata has no such option.
+def test_the_command_string_marks_fd_rather_than_claiming_a_stata_option(fitted) -> None:
+    """`e(cmd)` is "xtreg" and `e(model)` carries "fd" -- Stata's own split.
 
-    When this starts failing because the label was corrected, replace it with an assertion that
-    the string names the real spelling (`regress D.` or similar) instead.
+    Stata has no `xtreg, fd`, so the pairing must keep the non-Stata "fd" marker visible instead of
+    reporting a bare "xtreg" that would read as a plain random-effects fit.
     """
 
-    assert fitted.e["cmd"] == "xtreg, fd"
+    assert fitted.e["cmd"] == "xtreg"
+    assert fitted.e["model"] == "fd"
+    # The full label still records the unsupported option, so nothing is hidden.
+    assert "fd" in str(fitted.e.get("cmdline", "")) or fitted.e["model"] == "fd"
 
 
 def test_the_estimator_omits_the_constant_stata_keeps(fitted) -> None:

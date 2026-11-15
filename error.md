@@ -1279,9 +1279,10 @@ for _label, _column in zip(omitted_labels, columns):
 另：用 Python 读写带 BOM 的 `README.md` 会引入或丢掉 BOM，
 `encoding='utf-8-sig'` 读、写回时用 `utf-8`，否则 diff 里会多出一行无关的 BOM 变化。
 
-## 34. `xtreg, re` 的 e(rmse) 仍未对齐：查到的确切事实与已排除的假设
+## 34. `xtreg, re` 的 e(rmse)：根因是「第二次内部回归」，已修复
 
-**状态：未修复，用户选择暂不处理（选项 C）。** 记录在此，避免后续重复踩同一批弯路。
+**状态：已修复（0.3.25）。** 根因找到后一次改对，下面的「已排除假设」保留下来，因为它们解释了
+为什么前 3 轮公式推断全部失败。
 
 失败测试：`tests/test_xtreg_re_sigma_e.py::test_sigma_e_is_not_derived_from_rmse`
 `e(rmse)` 比 Stata 低 1.01%（`9472.927238` vs `9570.035363`）。
@@ -1338,3 +1339,42 @@ by `ivar': gen double `tv' = cond(`dup',sum(``i''[_n-1])/(_n-1),``i'')
 本轮在这上面花了约 40 分钟做了 **3 轮推断**（去均值三种变体全错）。规则「两次猜不出来就停手读源码」
 应当更严格执行：**第一次数值不匹配时就该去复现数据变换，而不是换公式试**。
 数值反推出的 DF 不是整数，本身就是「残差平方和不同」的确凿信号，出现就该立刻转向数据流排查。
+
+### 最终根因与修复
+
+`xtreg_re.ado:277-299` 的**第二次 `_regress`**：
+
+```stata
+by ivar: replace x = x - thetav*x[_N] if !dup     // x[_N] 是组均值行
+drop if dup
+gen double cons = 1 - thetav
+_regress varlist cons, hascons
+scalar rmse = e(rmse)
+```
+
+所以 `e(rmse)` 是**对 quasi-demeaned 数据、用完整展开设计（含年份虚拟变量）**跑出来的回归的 rmse，
+不是 RE 模型自身残差的 rmse。
+
+**两个把前 3 轮推断全部带偏的细节：**
+
+1. **年份虚拟变量必须留在去均值回归里。** 只对连续回归量去均值得到 `10096.69`——这正是我之前手工复现
+   时反复得到的那个数。
+2. **`hascons` 保留 `cons = 1 - theta` 列但不另加截距**，因此秩与分母是 `799` 而非直觉上的 `798`。
+
+在 Stata 里带 `i.year` 重放该回归：`rss = 73085290324.19`，`df = 798`，
+`rmse = 9570.0353629102` —— 与 `xtreg, re` 报告的完全一致。
+
+**实现方式**：`_stata_scalars` 末尾（theta 与 sigma 都已在作用域内）覆写 `out["rmse"]`，
+仅对 `xtreg, re` 生效。`fe`/`be` 的 rmse 公式不变，实测仍与 Stata 一致
+（`5035.6356610104` / `8206.9664237721`）。
+
+**验证**：全量测试 6480 passed，0 failed。
+
+### 这轮真正奏效的方法
+
+按 #34 原文的结论执行——**不再猜公式，而是让 Stata 自己报告中间量**：先用 `ereturn list` 拿全部
+scalar，再在 Stata 里**逐步重放数据变换**并逐个比对 `e(rmse)`/`e(df_r)`/`e(rss)`。
+一次重放就命中（`hascons + i.year` → 9570.0353629102）。
+
+对比之下，前 3 轮共约 40 分钟花在「换一个公式再试」上，全部失败。
+**教训：数值对不上时，先复现数据流，不要换公式。**

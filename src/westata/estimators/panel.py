@@ -1909,6 +1909,9 @@ class PanelOLS:
                         np.sqrt(t_bar * sigma_u**2 + sigma_e**2)
                     )
                     out["theta"] = theta
+                    # Keep theta on the fitter: the quasi-demeaned rmse below runs in this same
+                    # call, before e() exists, so it cannot read out["theta"].
+                    self._theta_used = float(theta)
                 else:
                     per_entity_theta = 1.0 - sigma_e / np.sqrt(
                         panel_sizes * sigma_u**2 + sigma_e**2
@@ -1982,6 +1985,19 @@ class PanelOLS:
                             out["p_f"] = float(
                                 stats.f.sf(f_f, df_a, scalar_df)
                             )
+
+        # `xtreg, re` REPLACES rmse with the SECOND internal regression's value
+        # (`xtreg_re.ado:298-299`): quasi-demeaned data, full expanded design, `hascons`.
+        # MEASURED on munnell.dta: that replay gives 9570.0353629102 over df 798 with
+        # rss 73085290324.19 -- exactly Stata's value. The plain residual rss gives 9472.93, 1.01%
+        # low. The year dummies must stay in the demeaned regression; dropping them gives 10096.69.
+        if str(getattr(self, "_stata_command", "")) == "xtreg, re":
+            _re_rmse = self._quasi_demeaned_rmse(
+                params, response, design, resid, nobs
+            )
+            if _re_rmse is not None:
+                out["rmse"] = _re_rmse
+
         return out
 
 
@@ -2157,6 +2173,72 @@ class RandomEffects(PanelOLS):
                 "Stata option for this estimator; xtreg's re/be/fd estimators do "
                 "not absorb fixed effects (use PanelOLS, i.e. xtreg, fe)"
             )
+    def _quasi_demeaned_rmse(
+        self,
+        params: "np.ndarray",
+        response: "pd.Series | None",
+        design: "tuple[object, list[str]] | None",
+        resid: "np.ndarray",
+        nobs: int,
+    ) -> "float | None":
+        """`xtreg, re`'s e(rmse): the rmse of the SECOND internal regression.
+
+        See the long note at the assignment site. theta is derived here from the variance components
+        rather than read from `e()`, because `_stata_scalars` is still BUILDING that dict when this
+        runs.
+
+        Returns None when a piece is unavailable, so the caller keeps its previous formula rather
+        than reporting a silently different number.
+        """
+
+        if response is None or design is None:
+            return None
+
+        # THE FITTER'S OWN theta. Deriving it from between-group variance gives 9295.72 instead of
+        # 9570.04 -- close in spirit, wrong in the fifth digit -- because the MLE's sigma_u is not
+        # the moment estimator. `_fit` already computed the exact value.
+        theta = float(getattr(self, "_theta_used", float("nan")))
+        if not np.isfinite(theta):
+            return None
+
+        frame = design[0]
+        matrix = (
+            np.asarray(frame.to_numpy(dtype=float), dtype=float)
+            if hasattr(frame, "to_numpy")
+            else np.asarray(frame, dtype=float)
+        )
+        values = np.asarray(response, dtype=float).reshape(-1)
+        if matrix.ndim != 2 or matrix.shape[0] != values.size or values.size != nobs:
+            return None
+
+        labels = self._data.index.get_level_values(self._entity)
+        codes, _ = pd.factorize(labels)
+        codes = np.asarray(codes)
+        if codes.size != values.size or (codes < 0).any():
+            return None
+
+        groups = int(codes.max()) + 1
+        counts = np.bincount(codes, minlength=groups).astype(float)
+
+        def demean(column: "np.ndarray") -> "np.ndarray":
+            totals = np.bincount(codes, weights=column, minlength=groups)
+            means = totals / np.maximum(counts, 1.0)
+            return column - theta * means[codes]
+
+        y_star = demean(values)
+        x_star = np.column_stack(
+            [demean(matrix[:, column]) for column in range(matrix.shape[1])]
+        )
+        cons = np.full(values.size, 1.0 - theta)
+        design_star = np.column_stack([cons, x_star])
+
+        beta, *_ = np.linalg.lstsq(design_star, y_star, rcond=None)
+        resid = y_star - design_star @ beta
+        rank = int(np.linalg.matrix_rank(design_star))
+        df_resid = values.size - rank
+        if df_resid <= 0:
+            return None
+        return float(np.sqrt(float(resid @ resid) / df_resid))
 
 
 def _mle_variance_component_se(
@@ -2454,6 +2536,8 @@ def _ml_log_interval(estimate: float, standard_error: float) -> tuple[float, flo
         float(np.exp(np.log(estimate) - spread)),
         float(np.exp(np.log(estimate) + spread)),
     )
+
+
 
 
 def _stats_norm_ppf(q: float) -> float:

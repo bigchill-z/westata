@@ -69,8 +69,17 @@ def test_the_regressor_precedes_the_power() -> None:
 
 def test_a_blank_line_follows_the_notes() -> None:
     lines = _lines(DUPLICATE, rhs=True)
-    assert lines[2] == "", lines[:4]
-    assert lines[3] == "Ramsey RESET test for omitted variables"
+    # Stata's notes come first, then the blank line, then the table header. A "warning:" line
+    # may sit between them when the auxiliary design carries an exact tie (this fixture does:
+    # expr2 = expr^2 makes expr2^2 and expr^4 the same vector once the exper powers are in the
+    # basis), so the check is on what follows the notes rather than on a fixed index.
+    notes = [line for line in lines if line.startswith("note:")]
+    assert notes, lines[:4]
+    remainder = lines[len(notes):]
+    if remainder and remainder[0].startswith("warning:"):
+        remainder = remainder[1:]
+    assert remainder[0] == "", remainder[:3]
+    assert remainder[1] == "Ramsey RESET test for omitted variables"
 
 
 def test_the_table_begins_where_it_did_before() -> None:

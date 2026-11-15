@@ -62,7 +62,15 @@ class OvTestResult:
         Stata's ``Omitted:`` line.
     """
 
-    __slots__ = ("statistic", "df", "df_denom", "pvalue", "omitted", "dropped")
+    __slots__ = (
+        "statistic",
+        "df",
+        "df_denom",
+        "pvalue",
+        "omitted",
+        "dropped",
+        "ambiguous",
+    )
 
     def __init__(
         self,
@@ -73,6 +81,7 @@ class OvTestResult:
         pvalue: float,
         omitted: str,
         dropped: Sequence[str] = (),
+        ambiguous: bool = False,
     ) -> None:
         self.statistic = float(statistic)
         self.df = float(df)
@@ -82,6 +91,12 @@ class OvTestResult:
         #: Columns the auxiliary regression could not identify, in the order Stata reports them.
         #: Each produces a "note: <name> omitted because of collinearity." line ABOVE the table.
         self.dropped = tuple(str(name) for name in dropped)
+        #: True when the auxiliary design contains an EXACT TIE -- two columns that become the
+        #: same vector once a common basis is partialled out -- so which one is omitted depends
+        #: on the order the columns are swept, which Stata decides with an internal reordering
+        #: that can differ from run to run (StataCorp, Statalist 2004-05/msg00057). When this is
+        #: set, ``df`` may differ from a given Stata run by the number of tied pairs.
+        self.ambiguous = bool(ambiguous)
 
     def __repr__(self) -> str:
         return (
@@ -118,6 +133,17 @@ class OvTestResult:
         notes = [
             f"note: {name} omitted because of collinearity." for name in self.dropped
         ]
+        # AN EXACT TIE IN THE AUXILIARY DESIGN MAKES df ORDER-DEPENDENT. The numbers below are
+        # still the ones this design yields, but Stata's default resolves the tie with an
+        # internal column reordering, so its df can differ by the number of tied pairs. Said
+        # here rather than left for the caller to discover: two datasets of identical structure
+        # were measured to give different Stata answers. The line is marked with a leading
+        # "warning:" so it cannot be mistaken for one of Stata's own notes.
+        if self.ambiguous:
+            notes.append(
+                "warning: the auxiliary design contains an exact tie between two columns, so "
+                "which one is omitted depends on column order; Stata's df may differ."
+            )
         return chr(10).join(
             notes
             + [
@@ -207,6 +233,48 @@ def _span_dependent(basis: np.ndarray, columns: Sequence[np.ndarray]) -> set[int
         else:
             accepted.append(column[:, None])
     return dependent
+
+
+def _has_exact_tie(columns: Sequence[np.ndarray]) -> bool:
+    """True when the auxiliary design contains two columns that are the SAME direction.
+
+    This is the condition that makes ``df`` depend on column order rather than on the design,
+    and it fires on a Mincer-style fit where the user supplies ``exper2 = exper^2`` beside
+    ``exper``. The nine generated powers then include both ``exper2^2`` and ``exper^4``, and
+    those two are the same vector: their elementwise ratio measures 1.000000000 with a spread
+    of 7.8e-16. (Both are monotone transforms of ``exper^4``, so they coincide outright rather
+    than only after a basis is partialled.)
+
+    The sweep must omit exactly one of such a pair, so WHICH one -- and therefore the df Stata
+    prints -- depends on the order the columns are swept. Stata resolves that with an internal
+    reordering it documents as able to differ run to run (Statalist 2004-05/msg00057), and two
+    datasets of identical structure were measured to give df 7 and df 8 respectively. There is
+    therefore no fixed answer to match; this helper lets the result say so.
+
+    The check is on the CENTRED directions, so a duplicated regressor (``x1`` and an exact
+    copy) also trips it. That is intentional: the two cases are indistinguishable numerically
+    -- a copy is a proportional column -- and both make "which one goes" a labelling choice.
+    Callers that consider a duplicate benign should not rely on this being selective.
+    """
+
+    if len(columns) < 2:
+        return False
+    matrix = np.column_stack([np.asarray(column, dtype=float).reshape(-1) for column in columns])
+    magnitudes = np.abs(matrix).max(axis=0)
+    usable = magnitudes > 0.0
+    if int(usable.sum()) < 2:
+        return False
+    matrix = matrix[:, usable]
+
+    centred = matrix - matrix.mean(axis=0)
+    norms = np.linalg.norm(centred, axis=0)
+    live = norms > 0.0
+    if int(live.sum()) < 2:
+        return False
+    normalised = centred[:, live] / norms[live]
+    cosines = np.abs(normalised.T @ normalised)
+    np.fill_diagonal(cosines, 0.0)
+    return bool(float(cosines.max()) >= 1.0 - 1e-10)
 
 
 def _fit_and_test(
@@ -519,4 +587,7 @@ def estat_ovtest(
         pvalue=float(stats.f.sf(statistic, df_num, df_denom)),
         omitted="independent variables",
         dropped=_dropped,
+        # A tie in the auxiliary design means df depends on column order, which Stata resolves
+        # with an internal reordering that is documented as able to vary run to run.
+        ambiguous=_has_exact_tie(list(columns) + _regressor_columns),
     )

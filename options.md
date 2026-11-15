@@ -341,6 +341,48 @@ double 下两者一致到 1e-16，塌陷的是 `exper^2` 而不是 `exper2`。
 并用 `df = 幂次数 − 关系数` 作为验收标准逐案例检查。8 个案例的 Stata 值已记录在上表，
 可直接作为回归测试基准。
 
+### 第 8 轮（2026-11-16）：拿到 Stata 的 note 原文，**与 sweep 读数矛盾**
+
+上一轮只看了 `df`，这轮把 note 行抓下来了。`estat ovtest, rhs` 在 8 个 double 案例上的原文：
+
+| 案例 | Stata 的 note | df |
+|---|---|---|
+| `y ~ x + xsq` | `x`、`x^3` | 5 |
+| `y ~ x + xsq + z` | `x`、`x^3` | 8 |
+| `y ~ x + xsq + z + w` | `x`、`x^3` | 11 |
+| `y ~ xsq + x` | `x`、`x^3` | 5 |
+| `y ~ x + xcu` | **只有 `x^3`** | 5 |
+| `y ~ x + xsq + z + zsq` | `x`、`z`、`x^3`、`z^3` | 10 |
+| `y ~ x + z + zsq` | `z`、`z^3` | 8 |
+| `y ~ x + xsq + grp` | `x`、`x^3` | 5 |
+
+**规律很整齐**：每个多项式关系丢「被复制的那个变量」+「原变量的三次幂」（`cube_only`
+例外，它只丢 `x^3`，因为 `xcu = x^3` 本身就是那个三次项）。
+
+**但这条与 sweep 读数直接冲突，尚未解决：**
+
+用 `{_cons, p2, p3, p4, q2, q3, q4, x, xsq}`（Stata 的确切 zlist 顺序）做 sweep，
+两种常量位置都测过，**塌陷的只有 `x` 和 `xsq` 两个回归量，六个幂次一个都不塌**：
+
+    constant first:  x ratio 1.07e-14 COLLAPSE ;  xsq ratio 9.86e-14 COLLAPSE
+    constant last :  xsq ratio 6.40e-14 COLLAPSE ; _cons ratio 2.80e-15 COLLAPSE
+
+而 Stata 说它丢了 `x^3`。矛盾点在于：`x^3` 对 `{1, x, xsq}` 的残差实测是 **1.2e-01**，
+数学上不可能被张成（三次项不能由 {1, x, x²} 线性表示）。
+
+**因此有一个前提是错的。** 可能是：
+
+1. Stata 的 `cklab` 标号与我的假设错位（`x^3` 实际指 `z3` 之外的东西）
+2. `ovtest` 内部的 `_regress` 用的不是我以为的那套列
+3. 我手工复现的 zlist 与 `ovtest.ado` 实际构造的 zlist 不同
+
+**未做**：这一轮尝试用手工 `_regress` 打印各幂次 `_se` 来定位，但实验设计失败
+（`yh` 被完全解释，所有 `_se` 都是 0），没有结论。`ovtest.py` 未改动，79 项测试通过。
+
+**下一步必须先解决这个矛盾**，否则按任何公式实现都是在拟合一个错误的中间模型：
+正确的做法是不再做手工复现，而是从 `ovtest.ado` 的 `cklab` 与 `_regress` 的 `e(b)`
+列名直接对齐（即用 `estat ovtest, rhs` 后 `matrix list e(b)` 打印幂次的实际列名与顺序）。
+
 ## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
 
 | 事项 | 结果 |

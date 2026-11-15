@@ -1278,3 +1278,63 @@ for _label, _column in zip(omitted_labels, columns):
 
 另：用 Python 读写带 BOM 的 `README.md` 会引入或丢掉 BOM，
 `encoding='utf-8-sig'` 读、写回时用 `utf-8`，否则 diff 里会多出一行无关的 BOM 变化。
+
+## 34. `xtreg, re` 的 e(rmse) 仍未对齐：查到的确切事实与已排除的假设
+
+**状态：未修复，用户选择暂不处理（选项 C）。** 记录在此，避免后续重复踩同一批弯路。
+
+失败测试：`tests/test_xtreg_re_sigma_e.py::test_sigma_e_is_not_derived_from_rmse`
+`e(rmse)` 比 Stata 低 1.01%（`9472.927238` vs `9570.035363`）。
+
+### 已确认的事实（Stata 实测，munnell.dta, `y ~ k1 + C(year)`）
+
+| 命令 | `e(rmse)` | `e(sigma_e)` |
+|---|---|---|
+| `xtreg, fe` | `9567.7548814077` | `9567.7548814077` |
+| `xtreg, re` | `9570.0353629102` | `9567.7548814077` |
+
+- `sigma_e` **两端完全一致** → within 回归与残差都对，问题只在 `rmse`
+- `(rmse/sigma_e)^2 = 1.000476758301`，比任何常见 DF 比值都小
+
+### 源码给出两条不同来源
+
+`xtreg_re.ado`：
+
+- 第 338 行 `est scalar sigma_e = \`s_e'`，而 `s_e = sqrt(e(sse)/e(df_t))`（第 128 行）——来自 within
+- 第 298–299 行：先 `_regress varlist cons, ...`，再 `scalar \`rmse' = e(rmse)`——来自**另一个回归**
+- 第 341 行 `est scalar rmse = \`rmse'`
+
+### 已排除的假设（都试过，都不对）
+
+| 假设 | 结果 |
+|---|---|
+| 原始残差 `rss/(N-K)` = `798` | `9472.93`（就是现在的错值）|
+| quasi-demean 后无常数回归 | `10096.69` |
+| quasi-demean 后加 `1-theta` 常数 | `10098.08` |
+| 原始残差换分母 `768` | `9656.17`（接近但不精确）|
+| 各种 DF 比值（`N/(N-1)`、`(N-Ng)/(N-Ng-1)` 等）| 均不匹配 |
+| 反推所需 DF | `781.89` / `797.62` **都不是整数** → rss 本身不同 |
+
+### 下一步该怎么做（不是继续猜）
+
+`xtreg_re.ado:167-183` 有一段**改变数据形状**的操作：
+
+```stata
+by ivar: gen byte `dup' = cond(_n==_N,2,1)
+expand `dup'
+sort `ivar' `dup'
+by `ivar': replace `dup'=cond(_n<_N,0,1)
+by `ivar': gen double `tv' = cond(`dup',sum(``i''[_n-1])/(_n-1),``i'')
+```
+
+它**先 `expand` 复制每组一行**（用来存组均值），之后 `_regress` 跑在含这些额外行的数据上，
+`e(N)` 仍报原始的 816。我手工做 quasi-demean 时没有这套结构，所以 rss 对不上。
+
+正确做法是**逐行复现 167–299 的完整数据操作**（含 expand/dup/by 累积），再用 `trace` 或中间
+`display` 确认每一步的 rss，而不是在最终数值上反推。
+
+### 教训
+
+本轮在这上面花了约 40 分钟做了 **3 轮推断**（去均值三种变体全错）。规则「两次猜不出来就停手读源码」
+应当更严格执行：**第一次数值不匹配时就该去复现数据变换，而不是换公式试**。
+数值反推出的 DF 不是整数，本身就是「残差平方和不同」的确凿信号，出现就该立刻转向数据流排查。

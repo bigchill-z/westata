@@ -600,6 +600,14 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
   不只是不整洁：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回
   `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而**接受** `noconstant` 拟合，
   所以这条规则只属于那些以常数项为前提的检验。）
+* **若某个自变量恰是另一个的精确多项式，`df` 会变得依赖列序**，而这是本包唯一无法与 Stata
+  对齐的情形。`exper` 旁边放 `exper2 = exper**2` 时，辅助设计阵里有两列方向相同，丢哪一列
+  会改变 `df`。此时 `OvTestResult.ambiguous` 为 `True`，打印块里带一行 warning；普通模型不会
+  触发。Stata 实测：关掉内部列重排（`set tol r 0`）后其输出与本包完全一致；但开启时丢哪一列
+  既取决于数值，也取决于变量的**存储精度**——仅 `recast double` 就让 Stata 在完全相同的数字上
+  从 `df = 8, F = 3525.13` 变成 `df = 7, F = 1.06`。十一轮实测排除了逐列精确相关、各种容差的
+  累加 sweep、pivoted QR、贪心最小对角元、回溯消除以及七种列排序；它们都给出合法的极大无关组，
+  只是不是 Stata 那一个。`_regress` 是编译内建命令，无可读源码，其选列规则只能由 StataCorp 提供。
 
 ```python
 # lnw/expr2 属于 grilic.dta；本指南的 df 是 auto.csv，故示例改用其中的连续变量。

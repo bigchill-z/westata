@@ -7,6 +7,43 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.27] - 2026-11-16
+
+### Added — `estat ovtest, rhs` reports an exact tie in the auxiliary design
+
+When a regressor is an exact polynomial of another -- `exper2 = exper^2` beside `exper`, as in
+a Mincer wage equation -- the auxiliary regression contains two columns that are the same
+direction, so the number of omitted columns depends on the order the columns are swept.
+`OvTestResult` now carries an `ambiguous` flag, and the printed block says so:
+
+```text
+warning: the auxiliary design contains an exact tie between two columns, so which one is
+omitted depends on column order; Stata's df may differ.
+```
+
+The numbers are still the ones this design yields; the flag exists so a reader is not misled
+when they differ from Stata's. Ordinary models never trip it.
+
+**What is known, and what is not.** Measured on StataNow 19.5: with Stata's internal column
+reordering disabled (`set tol r 0`) its output matches this package's exactly. With the
+reordering on, which column Stata omits cannot be predicted from the design. The choice
+depends on variable STORAGE PRECISION as well: on one dataset the six generated powers were
+`float` when created in memory and `double` when read from a `.dta` file, and `recast double`
+alone moved Stata from `df = 8, F = 3525.13` to `df = 7, F = 1.06` on identical numbers.
+Given a fixed dataset Stata is deterministic (six consecutive runs, identical output).
+
+Eleven rounds of measurement excluded exact per-column correlation, cumulative sweeps at every
+tolerance, pivoted QR with and without the constant, greedy diagonal elimination, backward
+elimination, and seven column orderings in both directions. All produce a valid maximal
+independent set -- just not Stata's. `_regress` is a compiled built-in with no `.ado` or `.mo`
+source, so its selection rule is not readable from outside. Reproducing it would need
+StataCorp's implementation.
+
+Diffed against the published 0.3.26, which was packaged before this work landed and therefore
+does not carry the flag.
+
+---
+
 ## [0.3.26] - 2026-11-15
 
 ### Added — `xtset`, `xtdes` and `xtsum`

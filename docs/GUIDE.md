@@ -700,6 +700,18 @@ Two details decide the numbers and neither is guessable from the output:
   skipping it is dangerous rather than merely untidy: an unguarded default path returned
   `F(3, 195) = 64.86, p = 3.9e-29` on a fit Stata will not even test. (`estat imtest` *does* accept
   a noconstant fit, so the rule is specific to the tests that presuppose a constant.)
+* **A regressor that is an exact polynomial of another makes `df` order-dependent**, and this is
+  the one case the package cannot reconcile with Stata. With `exper2 = exper**2` beside `exper`
+  the auxiliary design holds two columns of the same direction, and which one is omitted changes
+  `df`. `OvTestResult.ambiguous` is `True` there and the printed block carries a warning; ordinary
+  models never trip it. Measured on StataNow 19.5: turning Stata's internal column reordering off
+  (`set tol r 0`) reproduces this package's output exactly, but with it on the omitted column
+  depends on variable **storage precision** as well as the values — `recast double` alone moved
+  Stata from `df = 8, F = 3525.13` to `df = 7, F = 1.06` on identical numbers. Eleven rounds of
+  measurement excluded exact per-column correlation, cumulative sweeps at every tolerance,
+  pivoted QR, greedy diagonal elimination, backward elimination and seven column orderings; all
+  give a valid maximal independent set, just not Stata's. `_regress` is a compiled built-in with
+  no readable source, so its selection rule would have to come from StataCorp.
 
 ```python
 # `lnw`/`expr2` belong to grilic.dta; the guide's `df` is auto.csv, so the example uses

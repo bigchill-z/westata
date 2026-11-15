@@ -53,6 +53,63 @@ westata（HEAD 与当前版一致）：`F(6, 293) = 1.5409`，`dropped=('x1', 'x
 
 ---
 
+### 第 2 轮追查（2026-11-15 晚）：机制已查明一半，仍无法复现
+
+**已查明（逐行读 `ovtest.ado:288-457`，非推测）：**
+
+- `varlist` 取自 `e(b)` 的列名去掉 `_cons`，因此 `y ~ x + xsq` 的 varlist 是 `x xsq` 两个。
+- 循环对**每个** varlist 成员生成三个幂次，所以辅助回归有 **6 个幂次**、不是 3 个：
+
+      zlist = x^2 x^3 x^4  xsq^2 xsq^3 xsq^4
+      rhs   = x(缩放后)  xsq(缩放后)
+
+- `ovtest.ado:420` 是 `_regress lhs zlist rhs`，`:421` 是 `test zlist`，所以 `df = test zlist` 的自由度。
+- `:431-437` 的 note 来自 `_se[ck]==0` 判断，与丢弃是同一件事。
+
+**Stata 的实测（忠实复现，`df_m=6`）：**
+
+    note: p2 omitted because of collinearity.     <- x^3
+    note: xs omitted because of collinearity.     <- x
+    kept: p1 o.p2 p3 p4 p5 p6 o.xs qs _cons
+    test zlist df = 5
+
+**为什么位置式规则（现有 `_span_dependent`）做不到：**
+
+9 列设计（常量 + 6 幂 + 2 回归量）的奇异值是
+`21.6, 5.9, 4.0, 1.43, 0.32, 0.22, 0.025, 1.3e-15, 4.1e-16`——后两个是机器零，秩 7。
+
+但**逐列看**，每一列的残差都是 1e-1 量级，没有一列是自己前面那些列的精确组合。
+冗余只在“整组”层面出现（`xsq` 的幂完全落在 `x` 的幂张成的空间里）。
+所以按“该列 vs 之前各列”的精确相关判断，一个都不会丢——这正是现在得 `df=6` 的原因。
+
+**试过并失败的复现方式（都有实测数据）：**
+
+| 方式 | 丢的列 | df |
+|---|---|---|
+| 现有逐列精确相关 | `x`, `xsq` | 6 |
+| 先 rhs 后 zlist | `x^2`, `xsq^2` | 4 |
+| 整体 `matrix_rank` 增量 | `x`, `xsq` | 6 |
+| 带主元 QR（含常量一起选） | `x^2`, `x^3` | 7→拒2 |
+| 带主元 QR（常量先消去） | `x^2`, `x^3` | 6 |
+| **Stata 实际** | **`x`, `x^3`** | **5** |
+
+（“带主元 QR（含常量一起选）”曾一度让 `df` 变成 4，是偏移算错，不是收敛。）
+
+**结论：Stata 的 `_regress` 用的不是 LAPACK 的列主元 QR，而是它自己的 sweep 算子，
+主元选择规则不同。** 用 scipy 的 `qr(pivoting=True)` 无论怎样调整，拒掉的都是
+`{x^2, x^3}`，而 Stata 拒的是 `{x, x^3}`——两者都是合法的极大无关组，但 df 相差 1。
+
+**我没有提交任何改动**：`ovtest.py` 已回退到 HEAD（`df=6`，25 项 ovtest 测试通过）。
+把 QR 版本留下会把一个“更接近但仍旧不对”的行为固化进仓库，比现状更糟。
+
+### 下一步要么做的两件事（任一）
+
+1. **读 Stata 的 sweep 实现**：`_regress` 是编译的，但它调用的是 `_regress_mata` 或
+   内部 C 例程；若能找到 Stata 手册里对 collinearity tolerance 的说明（`set matsize`、
+   `set tolerance`），可直接拿到规则。
+2. **再造 3–5 个 Stata 捕获**：改变 varlist 里两个变量的先后、改变是否精确多项式、
+   改变样本量，用足够多的样本点反推主元规则，而不是靠单个案例猜。
+
 ## 〇之八、2026-11-15 0.3.22 发布：**仅 PyPI**（未推 GitHub）
 
 | 事项 | 结果 |

@@ -1,6 +1,6 @@
 {
   "generated_by": "docs/collect_api_reference.py",
-  "westata_version": "0.3.23",
+  "westata_version": "0.3.24",
   "exports": [
     {
       "name": "AIPW",
@@ -2802,7 +2802,7 @@
       "name": "estat_ovtest",
       "kind": "function",
       "module": "westata.postestimation.ovtest",
-      "docstring": "Stata's ``estat ovtest`` (Ramsey RESET).\n\nParameters\n----------\nresult:\n    A fitted linear result that retained its design and residuals.\nrhs:\n    Stata's ``, rhs``: test powers of the right-hand-side variables instead\n    of powers of the fitted values.\n\nRaises\n------\nValueError\n    When the design was not retained, when every regressor is an indicator\n    (so no powers exist), or when the auxiliary fit has no residual df.",
+      "docstring": "Stata's ``estat ovtest`` (Ramsey RESET).\n\nParameters\n----------\nresult:\n    A fitted linear result that retained its design and residuals.\nrhs:\n    Stata's ``, rhs``: test powers of the right-hand-side variables instead\n    of powers of the fitted values.\n\nRaises\n------\nValueError\n    When the design was not retained, when the fit has no constant (Stata's\n    ``not appropriate after regress, nocons``, r(301), which\n    ``ovtest.ado:7`` makes a precondition on both paths), when every\n    regressor is an indicator (so no powers exist), or when the auxiliary\n    fit has no residual df.",
       "signature": "(result: 'Any', *, rhs: 'bool' = False) -> 'OvTestResult'"
     },
     {

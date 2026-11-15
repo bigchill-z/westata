@@ -272,6 +272,25 @@ Only the `xtreg, re` branch is implemented: `xtreg, fe` is refused by the ado it
 record, so they raise rather than approximate. Unbalanced panels are refused too — they store no
 single `e(theta)`, only the five percentiles, and choosing one would be inventing an estimator.
 
+**The variance-component block of xtreg, mle**
+
+`RandomEffectsMLE` reproduces Stata's `xtreg ..., mle`. Below the coefficient table it prints
+`/sigma_u`, `/sigma_e` and `rho`, each with a confidence interval:
+
+```python
+panel = df.head(72).copy()
+panel["sid"] = (panel.index // 6) + 1
+panel["year"] = (panel.index % 6) + 1
+res = ws.RandomEffectsMLE.from_formula("price ~ mpg + weight", panel,
+                                       entity="sid", time="year").fit()
+print(res.summary())
+```
+
+The two sigmas take their interval on the log scale; `rho` takes it on the **probit** scale, because
+Stata builds it as `diparm sigma_u sigma_e, ci(probit)`. That interval is deliberately asymmetric —
+on the reference data it sits 2.23 standard errors below the estimate and 1.67 above — so a symmetric
+`rho ± z·se` is wrong even though it looks plausible.
+
 ### Which `cov_type` matches Stata's `, r`
 
 The robust VCE scale factor **differs by command**, and the letter `r` does not identify it:

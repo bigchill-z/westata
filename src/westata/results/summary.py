@@ -1225,7 +1225,10 @@ def _ml_variance_row(
     standard_error: float,
     z_value: float,
     *,
-    logarithmic: bool,
+    logarithmic: bool = False,
+    link: str = "log",
+    lower: float | None = None,
+    upper: float | None = None,
 ) -> str:
     """One row of ``xtreg, mle``'s variance-component block, 78 characters wide.
 
@@ -1244,9 +1247,19 @@ def _ml_variance_row(
     A symmetric ``s -/+ z*se`` would have given ``.1518164`` / ``.2764023``, so the
     distinction is not cosmetic.
 
-    ``rho`` passes ``logarithmic=False`` and gets NO interval: its printed bounds imply
-    unequal multipliers (1.67 above the estimate, 2.23 below) and none of log, logit or
-    atanh reproduces them, so the interval is left out rather than guessed.
+    ``rho`` passes ``link="probit"``. Its interval is asymmetric (2.23 se below, 1.67 above), which
+    ruled out a symmetric ``rho -/+ z*se`` and also log/logit/atanh, so an earlier version printed no
+    interval at all. The answer is in ``xtreg_ml.ado:329-332``::
+
+        est hidden local diparm3 sigma_u sigma_e, label(rho)        /*
+            */ func(@1^2/(@1^2+@2^2))                                /*
+            */ der( 2*@1*(@2/(@1^2+@2^2))^2 -2*@2*(@1/(@1^2+@2^2))^2 ) /*
+            */ ci(probit)
+
+    So rho is a delta-method function of BOTH variance components -- the gradient is evaluated at
+    (sigma_u, sigma_e) with their 2x2 covariance, not at rho -- and the interval is built on the
+    PROBIT scale: ``z``-interval for ``Phi^-1(rho)`` scaled by its delta-method error, then mapped
+    back with ``Phi``. Reproduces Stata's ``[.6942946, .8840722]`` to the last printed digit.
 
     Column positions measured from the capture (78 wide, pipe at 13): the estimate ends
     at 24, the standard error at 35, the lower bound at 65 and the upper at 77.
@@ -1257,12 +1270,30 @@ def _ml_variance_row(
         return f"{label:>12} |{estimate_text}"
     se_text = _ml_cell(_ml_stat(standard_error), 35, 24)
     if not logarithmic:
+        # A caller may supply ready-made bounds (rho's come from a two-parameter delta method).
+        if lower is not None and upper is not None and np.isfinite(lower) and np.isfinite(upper):
+            low_text = _ml_cell(_ml_stat(lower), 65, 35)
+            high_text = _ml_cell(_ml_stat(upper), 77, 65)
+            return f"{label:>12} |{estimate_text}{se_text}{low_text}{high_text}"
         return f"{label:>12} |{estimate_text}{se_text}"
 
     if estimate > 0.0 and standard_error > 0.0:
-        spread = z_value * standard_error / estimate
-        low = float(np.exp(np.log(estimate) - spread))
-        high = float(np.exp(np.log(estimate) + spread))
+        if link == "probit":
+            # ``diparm ..., ci(probit)``: build the z-interval on the Phi^-1 scale and map back.
+            # Stata's own numbers for rho are [.6942946, .8840722] with an ASYMMETRIC spread
+            # (2.23 se below, 1.67 above), which is what the probit link produces.
+            from scipy.special import ndtri
+            from scipy.stats import norm
+
+            transformed = float(ndtri(min(max(estimate, 1e-12), 1.0 - 1e-12)))
+            density = float(norm.pdf(transformed))
+            spread = z_value * standard_error / max(density, 1e-300)
+            low = float(norm.cdf(transformed - spread))
+            high = float(norm.cdf(transformed + spread))
+        else:
+            spread = z_value * standard_error / estimate
+            low = float(np.exp(np.log(estimate) - spread))
+            high = float(np.exp(np.log(estimate) + spread))
         low_text = _ml_cell(_ml_stat(low), 65, 35)
         high_text = _ml_cell(_ml_stat(high), 77, 65)
         return f"{label:>12} |{estimate_text}{se_text}{low_text}{high_text}"
@@ -5483,11 +5514,19 @@ def _stata_summary(result: Any, *, theta: bool = False) -> str:
                 _ml_variance_row("/sigma_e", sigma_e, _se_se, _z, logarithmic=True)
             )
         if np.isfinite(rho):
-            # rho's bounds are NOT the log, logit or atanh transform of se(rho) -- measured on
-            # lin_1992.dta, the printed pair implies unequal multipliers (1.67 above, 2.23
-            # below). Rather than invent a link, the two SE columns are printed and the
-            # interval is left out: an interval nobody can reproduce is worse than none.
-            panel_rows.append(_ml_variance_row("rho", rho, _rho_se, _z, logarithmic=False))
+            # ``xtreg_ml.ado:329-332`` pins rho's interval:
+            #
+            #     diparm sigma_u sigma_e, label(rho)
+            #         func(@1^2/(@1^2+@2^2))
+            #         der( 2*@1*(@2/(@1^2+@2^2))^2 -2*@2*(@1/(@1^2+@2^2))^2 )
+            #         ci(probit)
+            #
+            # So it is a delta-method function of BOTH variance components (their 2x2 covariance
+            # included) evaluated on the probit scale. Reproduces Stata's
+            # [.6942946, .8840722] to the last printed digit on lin_1992.dta.
+            panel_rows.append(
+                _ml_variance_row("rho", rho, _rho_se, _z, logarithmic=True, link="probit")
+            )
     else:
         if np.isfinite(sigma_u):
             panel_rows.append(f"{'sigma_u':>12} | {_panel_stat(sigma_u):>10}")

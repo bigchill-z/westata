@@ -7,6 +7,58 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.25] - 2026-11-15
+
+### Fixed — `xtreg, re`'s `e(rmse)` came from the wrong regression
+
+`e(rmse)` reported `9472.93` where Stata gives `9570.04` — a 1.01% gap open since 0.3.20 and recorded
+in `error.md` #34. Three earlier rounds of formula-guessing had all failed.
+
+`xtreg_re.ado:277-299` shows what Stata actually does:
+
+```stata
+by ivar: replace x = x - thetav*x[_N] if !dup     // x[_N] is the group MEAN row
+drop if dup
+gen double cons = 1 - thetav
+_regress varlist cons, hascons
+scalar rmse = e(rmse)
+```
+
+The reported `rmse` is therefore the rmse of a regression on **quasi-demeaned data over the full
+expanded design — year dummies included** — not of the random-effects model's own residuals.
+
+Two details sent every earlier attempt down the wrong path:
+
+* **Omitting the year dummies** yields `10096.69`. Only the continuous regressors were being demeaned.
+* **`hascons`** keeps the `cons = 1 - theta` column without adding a separate intercept, so the rank
+  and the divisor are `799`, not the `798` a naive count suggests.
+
+Replaying that regression inside Stata reproduces the value exactly: `rss = 73085290324.19` over
+`df = 798`, `rmse = 9570.0353629102`.
+
+| model | westata | Stata |
+|---|---|---|
+| `xtreg, re` (`y ~ k1 + C(year)`) | `9570.0353629102` | `9570.0353629102` |
+| `xtreg, re` (`y ~ k1 + k2`) | `5820.737960` | `5820.7379599524` |
+| `xtreg, fe` (`y ~ k1 + k2`) | `5035.635661` | `5035.6356610104` |
+| `xtreg, be` (`y ~ k1 + k2`) | `8206.966424` | `8206.9664237721` |
+
+`fe` and `be` keep their own formulas, unchanged.
+
+### The method that worked
+
+Earlier rounds compared **formulas**. This round replayed the **data transformation** inside Stata and
+read its own intermediates (`ereturn list`, `e(rss)`, `e(df_r)`), which located the answer on the first
+replay. Recorded in `error.md` #34 as the general rule: when a number disagrees, reproduce the data
+flow before trying another formula.
+
+### Verified
+
+Full suite **6480 passed, 21 skipped, 0 failed** — the first fully green run. 7 new guards in
+`tests/test_xtreg_re_rmse_source.py`.
+
+---
+
 ## [0.3.24] - 2026-11-15
 
 ### Fixed — `xtreg, mle` prints `rho`'s confidence interval

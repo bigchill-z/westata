@@ -108,6 +108,29 @@ ws.IV2SLS.from_formula("y_iv ~ w + [x_endog ~ z1 + z2]", sim).fit()
 ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
 ```
 
+**Where `xtreg, re`'s `e(rmse)` comes from**
+
+Two different scalars: `e(rmse)` and `e(sigma_e)`. Neither is the random-effects model's own
+residual rmse:
+
+| scalar | source |
+|---|---|
+| `e(sigma_e)` | the WITHIN regression's rmse, `sqrt(sse/df_t)` (`xtreg_re.ado:128`) |
+| `e(rmse)` | a second `_regress` on quasi-demeaned data over the full design, `xtreg_re.ado:298` |
+
+The second fit demeans every right-hand variable by `x - theta·mean_i(x)`, keeps the **year dummies**,
+appends `cons = 1 - theta`, and runs under `hascons`. Dropping the year dummies from that demeaned
+regression gives `10096.69` instead of `9570.04` — the trap that made this value wrong for five
+releases in westata. On `y ~ k1 + C(year)` the two now agree to the last digit:
+
+```python
+pdata = df.head(72).copy()
+pdata["firm"] = (pdata.index // 6) + 1
+pdata["year"] = (pdata.index % 6) + 1
+fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
+print(fit.e["rmse"], fit.e["sigma_e"])
+```
+
 ### Panel data
 
 | Stata | westata |
@@ -256,7 +279,7 @@ Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
 ```
 
 `r(j)`, `r(jdf)` and `r(jp)` are `result.statistic`, `result.df` and `result.pvalue`, and
-`to_dict()` names them the way Stata does. Two things are load-bearing and both are measured:
+The `to_dict()` method names them the way Stata does. Two things are load-bearing and both are measured:
 
 - the **VCE follows the original fit**. The same equation gives `53.285` under the conventional
   VCE and `221.225` under `cov_type="robust"` — a 4x difference, not a rounding one. `xtoverid.ado`

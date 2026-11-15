@@ -102,6 +102,30 @@ sim = pd.read_csv("docs/data/sim.csv")
 ws.IV2SLS.from_formula("y_iv ~ w + [x_endog ~ z1 + z2]", sim).fit()
 ```
 
+
+
+**`xtreg, re` 的 `e(rmse)` 从何而来**
+
+`e(rmse)` 与 `e(sigma_e)` 是**两个不同的量**，且都不是随机效应模型自身残差的 rmse：
+
+| 标量 | 来源 |
+|---|---|
+| `e(sigma_e)` | within 回归的 rmse，`sqrt(sse/df_t)`（`xtreg_re.ado:128`）|
+| `e(rmse)` | 对 quasi-demeaned 数据用完整设计跑的**第二次** `_regress`（`xtreg_re.ado:298`）|
+
+第二次拟合把每个右侧变量去均值为 `x - theta*mean_i(x)`，**保留年份虚拟变量**，追加
+`cons = 1 - theta`，并在 `hascons` 下运行。若从该去均值回归中拿掉年份虚拟变量，会得到
+`10096.69` 而不是 `9570.04`——这正是 westata 算错五个版本的陷阱。对 `y ~ k1 + C(year)`，
+两者现在逐位一致：
+
+```python
+pdata = df.head(72).copy()
+pdata["firm"] = (pdata.index // 6) + 1
+pdata["year"] = (pdata.index % 6) + 1
+fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
+print(fit.e["rmse"], fit.e["sigma_e"])
+```
+
 ### 面板
 
 | Stata | westata |

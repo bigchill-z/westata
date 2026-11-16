@@ -454,6 +454,7 @@ class Correlogram(ResultSerialisation):
                 if self.n_gaps == 1
                 else f"(note: time series has {self.n_gaps} gaps)"
             )
+            lines.append("")
         lines.extend(
             [
                 " " * 42 + "-1" + " " * 7 + "0" + " " * 7 + "1 -1" + " " * 7 + "0" + " " * 7 + "1",
@@ -484,7 +485,18 @@ class Correlogram(ResultSerialisation):
             paint(canvas, row.pac, centre_pac)
             line = (head.ljust(42) + "".join(canvas)[42:])[:width]
             lines.append(line.ljust(width))
-        return "\n".join(lines)
+        # Stata wraps the whole block in blank lines: the capture has a blank line before the
+        # '-1  0  1' scale row and another after the last lag row. Without them the table body is
+        # byte-identical but the block does not start and end where Stata's does, which shows up as
+        # a one-line offset when the output is diffed against a Stata log.
+        # MEASURED both ways. Without a gap the block OPENS with a blank line; with one the note
+        # comes first and the blank follows it. Either way exactly one blank separates the top of
+        # the block from the '-1  0  1' scale row, and one closes it.
+        if not self.n_gaps:
+            framed = [""] + lines
+        else:
+            framed = lines
+        return "\n".join(framed + [""])
 
 
 def estat_corrgram(

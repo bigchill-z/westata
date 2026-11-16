@@ -7,6 +7,52 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.28] - 2026-11-16
+
+### Fixed — `corrgram`'s block framing
+
+`corrgram` was already available as `ws.estat_corrgram`, and its table body was byte-identical to
+Stata: every AC/PAC/Q/Prob>Q value, both bar charts, all 79-column lines. What differed was the
+**framing** — where the block starts and ends. That is invisible when reading the output and only
+shows up when it is diffed against a real Stata log.
+
+Both shapes, measured from StataNow 19.5:
+
+| no gap | one interior gap |
+|---|---|
+| `''` | `'(note: time series has 1 gap)'` |
+| `'            -1  0  1 ...'` | `''` |
+| `' LAG    AC   PAC ...'` | `'            -1  0  1 ...'` |
+| `'---...'` | `' LAG    AC   PAC ...'` |
+| *(rows)* | `'---...'` |
+| `''` | *(rows)* |
+| | `''` |
+
+So the block opens with a blank line when there is no gap; with a gap the note comes **first** and the
+blank sits between the note and the scale row. A single blank closes it either way.
+
+Both are now reproduced exactly — 13 lines byte-identical without a gap, 8 with one:
+
+```python
+fit = ws.OLS.from_formula("y ~ 1", frame).fit()
+print(ws.estat_corrgram(fit, lags=8, time="t"))
+```
+
+### Verified
+
+8 new guards in `tests/test_corrgram_framing.py`, two of which run the equivalent command in live
+Stata and compare the whole block line by line (with and without a gap).
+
+Full suite **6508 passed, 21 skipped**.
+
+### Known degenerate case, not papered over
+
+A perfectly linear series makes the lag-1 partial autocorrelation hit exactly `1.0`, where Stata
+prints `.`. That is a property of the data rather than of the layout, so the gapped fixture uses
+random values; the degenerate case is recorded here rather than silently matched.
+
+---
+
 ## [0.3.27] - 2026-11-16
 
 ### Added — `estat ovtest, rhs` reports an exact tie in the auxiliary design

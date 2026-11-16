@@ -249,6 +249,12 @@ def ssc(**kwargs: object) -> SSC:
 
 
 __all__ = [
+    "Varbasic",
+    "varbasic",
+    "irf_table",
+    "IrfResult",
+    "IrFTable",
+    "ImpulseResponse",
     "XtSetResult",
     "XtDesResult",
     "XtSumResult",
@@ -520,6 +526,14 @@ from westata.estimators import VARResults
 from westata.estimators import VECMResults
 from westata.postestimation import VarGrangerResult
 from westata.postestimation import WeakRobustResult
+from westata.varbasic import (
+    ImpulseResponse,
+    Varbasic,
+    IrFTable,
+    IrfResult,
+    irf_table,
+    varbasic,
+)
 from westata.panel_description import (
     XtDesResult,
     XtSetResult,

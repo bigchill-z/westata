@@ -455,6 +455,36 @@ values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=flo
 ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
 ws.vecrank(values, lags=1)
 ```
+
+**`varbasic` and `irf table`**
+
+`varbasic` fits a VAR and registers an impulse-response function. Two things about it surprise
+people coming from `var`:
+
+* **`varbasic ..., irf` prints only the estimation block.** The responses are registered but not
+  shown; `irf_table` is the second command that reveals them, which is exactly Stata's split between
+  `varbasic` and `irf table irf`.
+* **`lags(p)` keeps only lag `p`**, not the range `1..p`. `lags(2)` therefore has two coefficients
+  (`L2` and the constant), and its response is exactly zero on every step that is not a multiple of
+  two.
+
+```python
+vdata = df.head(40).copy()
+vdata["t"] = range(1, 41)
+vdata["dlny"] = np.log(vdata["price"]).diff()
+fit = ws.varbasic(vdata, "dlny", lags=1, time="t")
+print(fit)                 # the estimation block
+print(ws.irf_table(fit))   # the responses
+```
+
+`keep` is Stata's `if` condition. Pass the **full** frame with it rather than pre-filtering: Stata
+builds the lag over the complete time axis (`_qsur.ado:54` marks out the lag on the whole sample), so
+filtering first turns the first retained observation's regressor into a missing value and shifts every
+estimate.
+
+The bands are delta-method bands with Stata's `/T` covariance normalisation, and the numbers use
+Stata's `%10.0g` format — below `1e-5` they switch to scientific notation.
+
 ### `prais` and its `corc` option
 
 `corc=True` is a **different table**, not only a different estimate: it drops the transformed

@@ -7,6 +7,79 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.29] - 2026-11-16
+
+### Added — `varbasic` and `irf table`
+
+Stata's VAR estimation that registers an impulse-response function, plus the second command that
+reveals it:
+
+```python
+frame["lny"] = np.log(frame["y"])
+frame["dlny"] = frame["lny"].diff()
+
+fit = ws.varbasic(frame, "dlny", lags=1, time="year", keep=frame["year"] < 2013)
+print(fit)                 # the estimation block
+print(ws.irf_table(fit))   # the responses
+```
+
+```
+    Step |      irf       Lower       Upper
+---------+-----------------------------------
+       0 |        1           1           1
+       1 |  .536273     .248498     .824048
+       2 |  .287588    -.021063      .59624
+       3 |  .154226    -.094057     .402508
+       8 |   .00684    -.022525     .036206
+```
+
+The block is byte-identical to Stata for the command above and for `lags(2)`, `lags(3)`, and two
+other `if` conditions.
+
+### Two behaviours that surprise, both measured
+
+| fact | consequence |
+|---|---|
+| `varbasic ..., irf` prints **only** the estimation block | the responses are registered in `r()` but shown by `irf table irf`, so `irf_table` is a separate call |
+| `lags(p)` keeps **only** lag p, not `1..p` | `lags(2)` has two coefficients (`L2`, `_cons`), and its response is exactly zero on every odd step |
+
+`varbasic.ado:47` passes its `lags()` straight to `var`, which is why `lags(2)` means `var ..., lags(2)`.
+
+### Five details that needed measurement
+
+| detail | what it actually is |
+|---|---|
+| covariance normalisation | `/T`, not `/(T-k)`. `/(T-k)` gives `se = 0.1514890` against Stata's `0.1468267` |
+| shock scale | a **unit** shock (step 0 is exactly 1); multiplying by the Cholesky factor gives `.0208` |
+| information criteria | the parameter count is the VAR's own coefficient count (2 here), not `k*rows + k(k+1)/2`. The wrong count gave AIC `-4.724918` instead of `-4.78552445` |
+| FPE | `det(Sigma) * (N+k)/(N-k)`, not `* (N+k)/N` |
+| number format | Stata's `%10.0g`: below `1e-5` the format switches to science (`1.2e-06`) |
+
+### `if` conditions: the lag is built before the filter
+
+`_qsur.ado:54` marks out `l(lags).(varlist)` over the **whole** sample, then restricts. Passing a
+pre-filtered frame instead turns the first retained observation's regressor into a missing value:
+
+| construction | L1 | N |
+|---|---|---|
+| lag on the pre-filtered frame | `.502390` | 28 |
+| lag on the full sample (Stata) | `.528017` | 29 |
+
+Hence `keep=` takes a mask over the **full** frame rather than expecting the caller to slice first.
+
+### API
+
+`Varbasic(...).fit()` is the class form required by R2.7; `varbasic(...)` remains a thin wrapper.
+`keep` is a boolean mask over the full frame.
+
+### Verified
+
+11 new tests in `tests/test_varbasic_irf.py`, one of which runs `irf table irf` in live Stata and
+compares all 20 lines byte for byte. GUIDE.md and GUIDE.zh-CN.md gained a section on the two
+commands; API prose coverage is 298/298.
+
+---
+
 ## [0.3.28] - 2026-11-16
 
 ### Fixed — `corrgram`'s block framing

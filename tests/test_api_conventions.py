@@ -311,6 +311,10 @@ def test_cov_type_family_table_covers_every_estimator() -> None:
         "TeffectsRa",  # influence-function variance
         "TeffectsPsmatch",
         "TeffectsNnmatch",
+        # `varbasic` has no `vce()` option in Stata and its impulse-response bands are built from
+        # the ML residual covariance by construction (`xtreg_re`-style /T normalisation, measured).
+        # Accepting a `cov_type` would promise a choice the IRF cannot honour.
+        "Varbasic",
     }
 
     missing = sorted(estimable - covered - exempt)

@@ -375,6 +375,32 @@ print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit(cov_type="robust")
 | `bsqreg` | `Bsqreg` |
 | `rreg` | `RobustRegression` |
 
+
+**`varbasic` 与 `irf table`**
+
+`varbasic` 估计 VAR 并登记脉冲响应函数。有两点会让从 `var` 过来的人意外：
+
+* **`varbasic ..., irf` 只打印估计块。** 响应会被登记但不显示；`irf_table` 是揭示它的第二条命令，
+  这正是 Stata 在 `varbasic` 与 `irf table irf` 之间的分工。
+* **`lags(p)` 只保留滞后 `p` 期**，不是 `1..p` 区间。因此 `lags(2)` 只有两个系数（`L2` 与常数项），
+  其响应在所有非 2 倍数步上恒为 0。
+
+```python
+vdata = df.head(40).copy()
+vdata["t"] = range(1, 41)
+vdata["dlny"] = np.log(vdata["price"]).diff()
+fit = ws.varbasic(vdata, "dlny", lags=1, time="t")
+print(fit)                 # the estimation block
+print(ws.irf_table(fit))   # the responses
+```
+
+`keep` 对应 Stata 的 `if` 条件。请传入**完整**数据框而非预先过滤：Stata 在完整时间轴上构造滞后
+（`_qsur.ado:54` 在全样本上标记滞后），先过滤会让保留下来的首个观测的回归量变成缺失值，
+从而改变全部估计结果。
+
+置信区间为 delta 法区间，使用 Stata 的 `/T` 协方差归一化；数字格式为 Stata 的 `%10.0g`——
+小于 `1e-5` 时改用科学计数法。
+
 ### 方程组
 
 | Stata | westata |

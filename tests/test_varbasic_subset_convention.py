@@ -53,13 +53,16 @@ def test_tail_slicing_in_pandas_matches_stata(panel) -> None:
     assert ws.irf_table(fitted).responses[0].values[1] == pytest.approx(0.536273, abs=1e-6)
 
 
-def test_head_slicing_warns_instead_of_being_silent(panel) -> None:
-    """`year>=1985` cuts the head: the sample is one smaller, and the caller is told."""
+def test_head_slicing_gives_the_prefiltered_sample(panel) -> None:
+    """`year>=1985` cuts the head: the sample follows pandas, not Stata, and nothing warns."""
 
     sliced = panel[panel["year"] >= 1985].reset_index(drop=True)
-    with pytest.warns(UserWarning, match="no usable lag"):
-        fitted = ws.varbasic(sliced, "dlny", lags=1, time="year")
-    assert fitted.nobs == 28
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        by_slice = ws.varbasic(sliced, "dlny", lags=1, time="year")
+    by_subset = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] >= 1985)
+    assert by_slice.nobs == by_subset.nobs == 28
+    assert not [w for w in caught if "no usable lag" in str(w.message)]
 
 
 def test_tail_slicing_does_not_warn(panel) -> None:
@@ -71,12 +74,14 @@ def test_tail_slicing_does_not_warn(panel) -> None:
 
 
 # ---------------------------------------------------------------- subset= keeps the row
-def test_subset_keeps_the_head_row(panel) -> None:
-    """The full frame plus a mask builds the lag before filtering, so N stays 29."""
+def test_subset_matches_loc_exactly(panel) -> None:
+    """R3.4: the mask is applied as `data.loc[subset]`, so N follows the frame, not Stata."""
 
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] >= 1985)
-    assert fitted.nobs == 29
-    assert ws.irf_table(fitted).responses[0].values[1] == pytest.approx(0.528017, abs=1e-6)
+    mask = panel["year"] >= 1985
+    by_subset = ws.varbasic(panel, "dlny", lags=1, time="year", subset=mask)
+    manual = ws.varbasic(panel.loc[mask].reset_index(drop=True), "dlny", lags=1, time="year")
+    assert by_subset.nobs == manual.nobs == 28
+    assert by_subset.ll == manual.ll
 
 
 def test_subset_selects_the_same_rows_for_a_tail_cut(panel) -> None:
@@ -104,10 +109,12 @@ def test_the_parameter_is_called_subset() -> None:
     assert "subset" in inspect.signature(ws.Varbasic.__init__).parameters
 
 
-def test_the_frame_is_named_once() -> None:
+def test_the_frame_is_named_data() -> None:
+    """R2.3: the DataFrame parameter is `data` throughout the package."""
+
     names = list(inspect.signature(ws.varbasic).parameters)
-    assert names[0] == "series"
-    assert "data" not in names and "frame" not in names
+    assert names[0] == "data"
+    assert "series" not in names and "frame" not in names
 
 
 def test_subset_matches_the_other_estimators(panel) -> None:

@@ -2357,7 +2357,7 @@
       "kind": "class",
       "module": "westata.varbasic",
       "docstring": "Class form of :func:`varbasic`, following the package's estimator convention.\n\n``VarBasic(frame, \"dlny\", lags=1, time=\"year\").fit()`` is the same computation as\n``varbasic(frame, \"dlny\", lags=1, time=\"year\")``. The function stays as a thin wrapper because\nStata's ``varbasic`` is itself a one-line command, and callers coming from ``ws.xttest0(...)``\nstyle expect the bare call to work.",
-      "signature": "(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: \"'Any | None'\" = None) -> 'None'",
+      "signature": "(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: \"'Any | None'\" = None) -> 'None'",
       "from_formula": null,
       "fit": "(self) -> 'IrfResult'",
       "methods": []
@@ -3238,8 +3238,8 @@
       "name": "varbasic",
       "kind": "function",
       "module": "westata.varbasic",
-      "docstring": "Stata's ``varbasic``: fit a VAR(p) and register an IRF.\n\n``time`` names the time variable; when given, the reported sample range uses its values.\n``varbasic`` itself prints only the estimation block -- the responses need :func:`irf_table`,\nwhich is also what Stata requires.\n\nEveryday filtering belongs in pandas: slice the frame and pass it in, exactly as with any other\nestimator here.\n\nONE CASE DIFFERS FROM STATa, and only this one: a condition that cuts the HEAD of the series.\nStata builds the lag over the complete time axis and only then restricts the sample\n(`_qsur.ado:54`), so a retained first row may look back past the boundary. A pre-sliced frame has\nnothing there, so that row's regressor is missing and the sample shrinks by one -- measured on\ngdp_china.dta with ``year>=1985``: Stata reports ``.528017`` over 29 observations, the pre-sliced\nframe gives ``.502390`` over 28. Cutting the TAIL (``year<2013``) is unaffected.\n\n``subset`` exists for exactly that case: pass the FULL frame plus a boolean mask and the lag is\nbuilt before the filter. It is also the package-wide spelling for Stata's ``if``/``in``\n(``OLS``, ``Logit``, ``Poisson``, ``FEOLS``), so the two paths share one name.",
-      "signature": "(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: \"'Any | None'\" = None) -> 'IrfResult'"
+      "docstring": "Stata's ``varbasic``: fit a VAR(p) and register an IRF.\n\n``time`` names the time variable; when given, the reported sample range uses its values.\n``varbasic`` itself prints only the estimation block -- the responses need :func:`irf_table`,\nwhich is also what Stata requires.\n\nFiltering is pandas' job: slice the frame and pass it in. ``subset`` follows R3.4 -- it is applied\nas ``data.loc[subset]`` BEFORE anything is estimated, so it agrees with pre-filtering the frame.\n\nThat means a head-cutting condition reproduces Stata only up to the rows pandas keeps: Stata\nbuilds the lag over the complete time axis (`_qsur.ado:54`), so ``if year>=1985`` keeps 29\nobservations there, while a frame sliced at 1985 has no value for 1985's lag and yields 28. If a\nseries is available before the slice, slice only the TAIL (or pass the full frame and accept the\nsmaller sample) -- matching Stata's head-cut sample is the caller's decision, not a hidden one.",
+      "signature": "(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: \"'Any | None'\" = None) -> 'IrfResult'"
     },
     {
       "name": "vargranger",
@@ -5718,8 +5718,8 @@
     },
     "varbasic": {
       "stata": "varbasic dlny, lags(1) irf",
-      "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filter with pandas as usual; use `subset` only when the condition cuts the HEAD of the series, because Stata builds the lag over the complete time axis and a retained first row may look back past the boundary.",
-      "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。照常用 pandas 筛选即可；只有当条件**截头**时才用 `subset`，因为 Stata 在完整时间轴上构造滞后，保留下来的首行可能需要回看边界之外。",
+      "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filtering is pandas' job; `subset` follows R3.4 and is applied as `data.loc[subset]` before estimation, so the sample is whatever the frame holds.",
+      "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。",
       "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')"
     },
     "irf_table": {
@@ -5730,8 +5730,8 @@
     },
     "Varbasic": {
       "stata": "varbasic dlny, lags(1) irf",
-      "en": "Class form of `varbasic`: `Varbasic(frame, 'dlny').fit()` equals `varbasic(...)`, including the `subset` mask for a head-cutting condition.",
-      "zh": "`varbasic` 的类形式：`Varbasic(frame, 'dlny').fit()` 与 `varbasic(...)` 等价，同样支持用 `subset` 表达截头的条件。",
+      "en": "Class form of `varbasic`: `Varbasic(data, 'dlny').fit()` equals `varbasic(data, 'dlny')`, including `subset`.",
+      "zh": "`varbasic` 的类形式：`Varbasic(data, 'dlny').fit()` 与 `varbasic(data, 'dlny')` 等价，同样支持 `subset`。",
       "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.Varbasic(frame, 'dlny', lags=1, time='t').fit()"
     },
     "IrfResult": {

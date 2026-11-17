@@ -829,13 +829,13 @@ README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后
 | R3.3 `level` 单位不一 | 0 | 0 | 0 | ✅ 阶段一 |
 | R3.7 `robust` 未规范化或未拒绝 | 0 | 0 | 0 | ✅ 已完成 |
 | R4.1 结果类缺 `to_dict`/`to_frame` | 4 | 4 | 0 | ✅ 阶段二 |
-| R4.2 估计结果不满足 `ResultsProtocol` | 3 | 3 | 0 | ✅ 阶段二 |
+| R4.2 估计结果不满足 `ResultsProtocol` | 4 | 4 | 0 | ✅ 阶段二 |
 | R4.3 `conf_int` 返回不是 DataFrame | 2 | 2 | 0 | ✅ 阶段二（全例外） |
 | R5.1 `__all__` 名不副实 | 0 | 0 | 0 | ✅ 阶段二 |
 | R5.2 子包导出未上浮 | 0 | 0 | 0 | ✅ 阶段二 |
 | R5.3 BOM | 0 | 0 | 0 | ✅ 阶段二 |
 | R6.1 helper 重复 ≥3 | **0** | 0 | 0 | ✅ 阶段四 |
-| **合计** | **28** | **28** | **0** | |
+| **合计** | **29** | **29** | **0** | |
 
 **阶段一（会算错数/静默失效）与阶段二（可用性）已完成。** 关键实测：
 
@@ -862,7 +862,7 @@ README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后
 「已登记例外」= `scripts/check_api_conventions.py` 的 `ALLOWED` 表，每条例外都写明
 依据：R2.5 的 12 条（线性代数层的 `X`/`Xw`/`resid` 8 条 + statsmodels 形状的 `R` 4 条）、
 R3.2 的 1 条（多方程构造 `Sureg(equations, data)`）、
-R4.1 的 4 条与 R4.2/R4.3 的 4 条（`ContrastResults`/`VECMResults`/`VARResults` 是
+R4.1 的 4 条与 R4.2/R4.3 的 5 条（`ContrastResults`/`VECMResults`/`VARResults`/`IrfResult` 是
 statsmodels 兼容层，`StoredResults` 是 `e()`/`r()` 标量映射）。
 例外不是豁免通道：新增例外必须在本文件对应规则下说明理由，
 `tests/test_api_conventions.py::test_allowed_table_entries_name_a_rule_that_exists`

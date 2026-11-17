@@ -8448,12 +8448,12 @@ None
 
 **Stata:** `varbasic dlny, lags(1) irf`
 
-Class form of `varbasic`: `Varbasic(frame, 'dlny').fit()` equals `varbasic(...)`, including the `subset` mask for a head-cutting condition.
+Class form of `varbasic`: `Varbasic(data, 'dlny').fit()` equals `varbasic(data, 'dlny')`, including `subset`.
 
 **Signature**
 
 ```python
-ws.Varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
+ws.Varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
 ```
 
 **`Varbasic.fit`**
@@ -9630,12 +9630,12 @@ None
 
 **Stata:** `varbasic dlny, lags(1) irf`
 
-Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filter with pandas as usual; use `subset` only when the condition cuts the HEAD of the series, because Stata builds the lag over the complete time axis and a retained first row may look back past the boundary.
+Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filtering is pandas' job; `subset` follows R3.4 and is applied as `data.loc[subset]` before estimation, so the sample is whatever the frame holds.
 
 **Signature**
 
 ```python
-ws.varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
+ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
 ```
 
 **Example**

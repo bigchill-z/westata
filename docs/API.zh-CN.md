@@ -8447,12 +8447,12 @@ None
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
-`varbasic` 的类形式：`Varbasic(frame, 'dlny').fit()` 与 `varbasic(...)` 等价，同样支持用 `subset` 表达截头的条件。
+`varbasic` 的类形式：`Varbasic(data, 'dlny').fit()` 与 `varbasic(data, 'dlny')` 等价，同样支持 `subset`。
 
 **签名**
 
 ```python
-ws.Varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
+ws.Varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
 ```
 
 **`Varbasic.fit`**
@@ -9629,12 +9629,12 @@ None
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
-估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。照常用 pandas 筛选即可；只有当条件**截头**时才用 `subset`，因为 Stata 在完整时间轴上构造滞后，保留下来的首行可能需要回看边界之外。
+估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。
 
 **签名**
 
 ```python
-ws.varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
+ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
 ```
 
 **示例**

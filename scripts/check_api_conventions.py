@@ -62,6 +62,11 @@ ALLOWED: dict[tuple[str, str], str] = {
     # accessor and test relies on.  A multi-equation model has no single coefficient
     # vector, so the protocol -- written for single-equation fits -- does not apply.
     ("R4.2", "VARResults"): "multi-equation: params is Stata's table, not a flat vector",
+    # R4.2: same reasoning as VARResults, one layer over. `IrfResult` carries the VAR's coefficients
+    # plus the residual covariance the impulse responses are built from, not a single-equation fit --
+    # there is no `rsquared`/`df_model` to report, and `conf_int` belongs to the IRF bands
+    # (`irf_table`), which is where Stata puts them too.
+    ("R4.2", "IrfResult"): "VAR container: its interval surface is the IRF table, not conf_int",
     # R2.5: the linear-algebra layer speaks mathematical notation on purpose.
     ("R2.5", "statsmodels_wald_test.R"): "statsmodels shape argument",
     ("R2.5", "run_wald_test.R"): "statsmodels shape argument",

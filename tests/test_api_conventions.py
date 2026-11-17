@@ -38,10 +38,10 @@ import check_api_conventions as conventions  # noqa: E402
 
 #: The number of findings the 0.3.11 tree produces. Raise it only with a document
 #: change that explains why the new deviation is acceptable in the meantime.
-BASELINE_FINDINGS = 28
+BASELINE_FINDINGS = 29
 
 #: Findings the checker knowingly accepts, and which ``--strict`` will not fail on.
-BASELINE_ALLOWED = 28
+BASELINE_ALLOWED = 29
 
 #: The number that actually has to reach zero. This is the number that matters:
 #: ``BASELINE_FINDINGS`` can grow by adding documented exceptions, this cannot.

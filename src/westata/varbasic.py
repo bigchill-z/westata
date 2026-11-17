@@ -47,15 +47,15 @@ __all__ = ["ImpulseResponse", "IrFTable", "IrfResult", "Varbasic", "varbasic", "
 
 
 # ---------------------------------------------------------------- helpers
-def _prepared(series: pd.DataFrame, variables: Sequence[str], lags: int) -> tuple[np.ndarray, int]:
+def _prepared(data: pd.DataFrame, variables: Sequence[str], lags: int) -> tuple[np.ndarray, int]:
     """The estimation sample after lags, as an (n, k) float array."""
 
     for name in variables:
-        if name not in series.columns:
+        if name not in data.columns:
             raise ConsistencyError(
-                f"varbasic: variable {name!r} not found; available columns: {list(series.columns)}"
+                f"varbasic: variable {name!r} not found; available columns: {list(data.columns)}"
             )
-    frame = series[list(variables)].dropna()
+    frame = data[list(variables)].dropna()
     if len(frame) <= lags:
         raise ConsistencyError(
             f"varbasic: only {len(frame)} complete observations for lags({lags})"
@@ -153,6 +153,48 @@ class IrfResult(ResultSerialisation):
     #: The estimated regressor matrix, needed to rebuild each equation's coefficient covariance.
     design: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
 
+    # ---------------------------------------------------------------- R4 result surface
+    @property
+    def params(self) -> "np.ndarray":
+        """The VAR coefficients, flattened in Stata's (regressor, equation) order."""
+
+        return np.asarray(self.coefficients, dtype=float).ravel()
+
+    @property
+    def bse(self) -> "np.ndarray":
+        """Standard errors of those coefficients, from sigma/T and (X'X)^-1.
+
+        Stata normalises the residual covariance by T, not T-k -- see the module docstring.
+        """
+
+        sigma = np.asarray(self.sigma, dtype=float)
+        design = np.asarray(self.design, dtype=float)
+        xtx_inv = np.linalg.pinv(design.T @ design)
+        # Each column of `coefficients` is one equation; its own variance drives its own errors.
+        diagonal = np.diag(sigma)
+        per_equation = [
+            np.sqrt(max(diagonal[column], 0.0) * np.diag(xtx_inv))
+            for column in range(np.asarray(self.coefficients).shape[1])
+        ]
+        return np.concatenate(per_equation)
+
+    @property
+    def e(self) -> "dict[str, float]":
+        """The scalars Stata stores in ``e()``, under their own names."""
+
+        return {
+            "N": float(self.nobs),
+            "k": float(self.parms[0]) if self.parms else 0.0,
+            "k_eq": float(len(self.names)),
+            "ll": self.ll,
+            "aic": self.aic,
+            "hqic": self.hqic,
+            "sbic": self.sbic,
+            "fpe": self.fpe,
+            "det_sigma": self.det_sigma,
+            "lag": float(self.lags),
+        }
+
     def __str__(self) -> str:
         """Stata's ``varbasic`` block, measured on gdp_china.dta."""
 
@@ -198,7 +240,7 @@ class Varbasic:
 
     def __init__(
         self,
-        series: pd.DataFrame,
+        data: pd.DataFrame,
         variables: Sequence[str] | str,
         *,
         lags: int = 1,
@@ -206,7 +248,7 @@ class Varbasic:
         time: str | None = None,
         subset: "Any | None" = None,
     ) -> None:
-        self._series = series
+        self._data = data
         self._variables = variables
         self._lags = lags
         self._trend = trend
@@ -217,7 +259,7 @@ class Varbasic:
         """Estimate the VAR and register the IRF (the responses need :func:`irf_table`)."""
 
         return varbasic(
-            self._series,
+            self._data,
             self._variables,
             lags=self._lags,
             trend=self._trend,
@@ -227,7 +269,7 @@ class Varbasic:
 
 
 def varbasic(
-    series: pd.DataFrame,
+    data: pd.DataFrame,
     variables: Sequence[str] | str,
     *,
     lags: int = 1,
@@ -241,34 +283,41 @@ def varbasic(
     ``varbasic`` itself prints only the estimation block -- the responses need :func:`irf_table`,
     which is also what Stata requires.
 
-    Everyday filtering belongs in pandas: slice the frame and pass it in, exactly as with any other
-    estimator here.
+    Filtering is pandas' job: slice the frame and pass it in. ``subset`` follows R3.4 -- it is applied
+    as ``data.loc[subset]`` BEFORE anything is estimated, so it agrees with pre-filtering the frame.
 
-    ONE CASE DIFFERS FROM STATa, and only this one: a condition that cuts the HEAD of the series.
-    Stata builds the lag over the complete time axis and only then restricts the sample
-    (`_qsur.ado:54`), so a retained first row may look back past the boundary. A pre-sliced frame has
-    nothing there, so that row's regressor is missing and the sample shrinks by one -- measured on
-    gdp_china.dta with ``year>=1985``: Stata reports ``.528017`` over 29 observations, the pre-sliced
-    frame gives ``.502390`` over 28. Cutting the TAIL (``year<2013``) is unaffected.
-
-    ``subset`` exists for exactly that case: pass the FULL frame plus a boolean mask and the lag is
-    built before the filter. It is also the package-wide spelling for Stata's ``if``/``in``
-    (``OLS``, ``Logit``, ``Poisson``, ``FEOLS``), so the two paths share one name.
+    That means a head-cutting condition reproduces Stata only up to the rows pandas keeps: Stata
+    builds the lag over the complete time axis (`_qsur.ado:54`), so ``if year>=1985`` keeps 29
+    observations there, while a frame sliced at 1985 has no value for 1985's lag and yields 28. If a
+    series is available before the slice, slice only the TAIL (or pass the full frame and accept the
+    smaller sample) -- matching Stata's head-cut sample is the caller's decision, not a hidden one.
     """
 
     names = [variables] if isinstance(variables, str) else list(variables)
     if not names:
         raise ConsistencyError("varbasic: at least one variable is required")
 
-    for name in names:
-        if name not in series.columns:
+    # R3.4: `subset` is applied to the FRAME, before the lag is built, so `varbasic(data, subset=m)`
+    # and `varbasic(data.loc[m], ...)` cannot disagree.
+    if subset is not None:
+        try:
+            data = data.loc[subset]
+        except (KeyError, IndexError) as exc:
             raise ConsistencyError(
-                f"varbasic: variable {name!r} not found; available columns: {list(series.columns)}"
+                f"varbasic: `subset` does not align with the frame's index ({exc})"
+            ) from None
+        if data.empty:
+            raise ConsistencyError("varbasic: `subset` selects no rows")
+
+    for name in names:
+        if name not in data.columns:
+            raise ConsistencyError(
+                f"varbasic: variable {name!r} not found; available columns: {list(data.columns)}"
             )
 
     # Build the engine's view of the data over EVERY row, so a retained row's lag can reach back
     # before the `if` condition. `_qsur.ado:54` marks out l(lags).(varlist) on the full sample.
-    raw = series[list(names)].to_numpy(dtype=float)
+    raw = data[list(names)].to_numpy(dtype=float)
     n_rows = raw.shape[0]
     if n_rows <= lags:
         raise ConsistencyError(
@@ -283,32 +332,11 @@ def varbasic(
     if trend == "c":
         design = np.column_stack([np.ones((n_rows, 1)), lagged])
 
-    # A row is usable when its lag and its response are both present ...
+    # A row is usable when its lag and its response are both present.
     usable = ~np.isnan(lagged).any(axis=1) & ~np.isnan(response).any(axis=1)
-    # ... and, when `subset` is given, when Stata's `if` accepts the RESPONSE row.
-    if subset is not None:
-        mask = pd.Series(subset, index=series.index).fillna(False).astype(bool).to_numpy()
-        usable &= mask
 
     if not usable.any():
-        raise ConsistencyError("varbasic: no usable observations after applying `subset`")
-
-    # A pre-sliced frame from the MIDDLE of a series loses its first `lags` rows to a missing
-    # regressor, where Stata would have kept them by reaching back past the slice. Warn instead of
-    # returning a quietly smaller sample. Detectable from the data alone: the first row has a usable
-    # response but no usable lag, and `subset` was not used.
-    if subset is None and not usable[0] and not np.isnan(response[0]).any():
-        import warnings as _warnings
-
-        _warnings.warn(
-            "varbasic: the first row has no usable lag, so the sample is "
-            f"{int(usable.sum())} instead of {int((~np.isnan(response).any(axis=1)).sum())}. "
-            "This happens when the frame was sliced at the HEAD of the series: Stata builds the lag "
-            "over the complete time axis, so pass the full frame with `subset=<mask>` to keep that "
-            "row. Cutting the tail is unaffected.",
-            UserWarning,
-            stacklevel=2,
-        )
+        raise ConsistencyError("varbasic: no usable observations")
 
     design = design[usable]
     response = response[usable]
@@ -371,8 +399,8 @@ def varbasic(
     sigma_se = sigma * np.sqrt(2.0 / n)
 
     first = last = None
-    if time is not None and time in series.columns:
-        kept = series[list(names) + [time]].dropna()
+    if time is not None and time in data.columns:
+        kept = data[list(names) + [time]].dropna()
         if len(kept) > lags:
             ordered = kept.sort_values(time)
             first = ordered[time].iloc[lags]

@@ -7,6 +7,52 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.31] - 2026-11-17
+
+### Fixed — `varbasic` now follows the package conventions
+
+Two rules were being broken, both found by reading `docs/API_CONVENTIONS.md` rather than by a test.
+
+**R2.3 — the DataFrame parameter is `data`.** It was `series`, which is not a spelling this package
+uses anywhere else.
+
+```python
+ws.varbasic(data, "dlny", lags=1, time="year")          # now
+```
+
+**R3.4 — `subset=` must equal `data.loc[subset]`.** The previous version deliberately did the
+opposite: it built the lag over the complete time axis and only then filtered, which made `subset=`
+disagree with pre-filtering the frame. That reproduced Stata's head-cut behaviour, and the decision
+here is to **not** reproduce it — sample selection belongs to pandas:
+
+| `if year>=1985` | N | response at step 1 |
+|---|---|---|
+| Stata | 29 | `.528017` |
+| westata (slice or `subset=`) | 28 | `.502390` |
+
+`subset` is now applied as `data.loc[subset]` before any estimation, so the two paths cannot differ.
+Cutting the tail (`year<2013`) matches Stata either way.
+
+### Also fixed: a coverage gap that made the compliance tests look green
+
+`varbasic` was not in `test_subset_is_uniform.py`'s `BUILDERS`, so its 26 tests passed without
+covering this estimator at all. It is now included, and passes (29 tests, up from 26).
+
+To make that possible `IrfResult` gained the three handles every other fit exposes — `params`, `bse`
+and `e` (`e["N"]`, `e["ll"]`, ...) — which is what R4 asks of a result object and what the uniformity
+tests compare. `IrfResult` is exempted from R4.2 for the same reason `VARResults` already is: it is a
+multi-equation container, its interval surface is the IRF table rather than `conf_int`, and there is
+no single-equation `rsquared`/`df_model` to report. The documented baseline moves 28 → 29 accordingly.
+
+### Verified
+
+`tests/test_subset_is_uniform.py` (29), `tests/test_varbasic_irf.py`, and
+`tests/test_varbasic_subset_convention.py` all pass; the API checker reports **29 findings, 29 allowed,
+0 to fix**. GUIDE.md and GUIDE.zh-CN.md now state the 28-versus-29 difference openly instead of
+presenting the Stata figure as the target.
+
+---
+
 ## [0.3.30] - 2026-11-17
 
 ### Changed — `varbasic` takes `subset=`, not `keep=`

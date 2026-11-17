@@ -124,17 +124,20 @@ def test_lags_two_coefficient_matches_stata(panel) -> None:
 
 
 # ---------------------------------------------------------------- the `if` condition
-def test_keep_builds_the_lag_before_filtering(panel) -> None:
-    """`if year>=1985` keeps N=29, not 28.
+def test_subset_equals_prefiltering_the_frame(panel) -> None:
+    """R3.4: `subset=` is `data.loc[mask]` before anything is estimated, so the two agree.
 
-    Pre-filtering the frame would drop 1985's regressor to a missing value and shift the estimate
-    from Stata's .528017 to .502390. `_qsur.ado:54` marks out the lag over the full sample.
+    A head cut therefore yields 28 observations here, not Stata's 29 -- Stata builds the lag over the
+    complete time axis (`_qsur.ado:54`) and this package deliberately does not reproduce that, leaving
+    the sample choice to pandas.
     """
 
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] >= 1985)
-    assert fitted.nobs == 29
-    values = ws.irf_table(fitted).responses[0].values
-    assert values[1] == pytest.approx(0.528017, abs=1e-6)
+    by_subset = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] >= 1985)
+    prefiltered = ws.varbasic(
+        panel[panel["year"] >= 1985].reset_index(drop=True), "dlny", lags=1, time="year"
+    )
+    assert by_subset.nobs == prefiltered.nobs == 28
+    assert by_subset.ll == prefiltered.ll
 
 
 def test_keep_selecting_nothing_raises(panel) -> None:

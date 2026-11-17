@@ -108,6 +108,14 @@ BUILDERS = {
             "y ~ x", frame, entity="firm", time="year"
         ).fit(),
     ),
+    # `varbasic` takes a variable list, not a formula, and its result exposes the VAR coefficients
+    # rather than a `params`/`bse` pair -- adapt_model below maps it onto the same shape.
+    "varbasic": (
+        lambda frame, mask=None: ws.varbasic(
+            frame, "y", lags=1, **({} if mask is None else {"subset": mask})
+        ),
+        lambda frame: ws.varbasic(frame, "y", lags=1),
+    ),
 }
 
 

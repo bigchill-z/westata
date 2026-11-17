@@ -477,19 +477,20 @@ print(fit)                 # the estimation block
 print(ws.irf_table(fit))   # the responses
 ```
 
-Filtering belongs in pandas: slice the frame and pass it in, as with any other estimator here — with
-one exception. A condition that cuts the **head** of the series needs `subset=` instead, because Stata
-builds the lag over the complete time axis (`_qsur.ado:54`) and a retained first row may look back
-past the boundary. A pre-sliced frame has nothing there, so that row is lost:
+Filtering is pandas' job: slice the frame and pass it in. `subset` follows the package rule (R3.4) —
+it is applied as `data.loc[subset]` **before** anything is estimated, so it always agrees with
+pre-filtering the frame.
+
+One consequence worth knowing: Stata builds the lag over the complete time axis (`_qsur.ado:54`), so a
+condition that cuts the **head** of the series keeps one more observation there than it does here.
+This package deliberately does not reproduce that — the sample is whatever pandas hands over:
 
 | `if year>=1985` | N | response at step 1 |
 |---|---|---|
 | Stata | 29 | `.528017` |
-| pandas pre-slice (warns) | 28 | `.502390` |
-| `subset=` on the full frame | 29 | `.528017` |
+| westata, sliced or `subset=` | 28 | `.502390` |
 
-`subset` is also the package-wide spelling for Stata's `if`/`in` (`OLS`, `Logit`, `Poisson`,
-`FEOLS`). Cutting the tail (`year<2013`) is unaffected, so ordinary slicing is fine there.
+Cutting the tail (`year<2013`) matches Stata either way.
 
 The bands are delta-method bands with Stata's `/T` covariance normalisation, and the numbers use
 Stata's `%10.0g` format — below `1e-5` they switch to scientific notation.

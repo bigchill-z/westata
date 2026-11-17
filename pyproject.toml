@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "westata"
-version = "0.3.32"
+version = "0.3.33"
 description = "Stata-conformant econometrics with a statsmodels-style API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -63,6 +63,9 @@ test = ["pytest>=7"]
 # parameters); `estimators/tseries.py::_arch_resids` adapts both, but a future release could
 # change it again, so the ceiling keeps a known-good contract.
 arch = ["arch>=6.0,<10"]
+# IrFTable.plot() imports matplotlib INSIDE the method, so a user who never plots needs nothing.
+# Same reasoning as the arch extra above: a large dependency is not forced on everyone.
+plot = ["matplotlib>=3.5"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

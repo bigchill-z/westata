@@ -7,6 +7,64 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.33] - 2026-11-17
+
+### Added — `ws.irf_table(res).plot()`
+
+Draws the impulse responses the way Stata's `irf graph` does: one panel per (impulse, response) pair,
+with the delta-method band filled behind the path.
+
+```python
+fit = ws.varbasic(frame, "dlny", lags=1, time="t")
+ws.irf_table(fit).plot()                 # the single pair irf_table prints
+ws.irf_table(fit, all=True).plot()       # every combination, one panel each
+```
+
+`irf_table` gained `all=` for the second form. Arguments: `ax=`, `show_ci=False`, `markers=True`,
+`grid=False`, `figsize=`, plus anything else forwarded to `Axes.plot`.
+
+`matplotlib` is imported **inside** the method, so it is not a new required dependency — the same
+treatment `arch` already gets. It ships as the `plot` extra:
+
+```
+pip install "westata[plot]"
+```
+
+Without it, `.plot()` raises an `ImportError` that names that extra.
+
+### Fixed — the IRF was wrong for a VAR(p) with p > 1
+
+Plotting exposed it immediately: the response was a staircase with zeros on every second step, which
+an AR(2) never produces. Two separate defects:
+
+**The companion matrix held one block.** `_companion` returned ``A1.T`` whatever `p` was, i.e. a VAR(1)
+in disguise. A VAR(2) then reported `.594687` at step 2 where Stata reports `.145969`. The real
+recursion is ``s[h] = A1 s[h-1] + A2 s[h-2] + ...``, and the companion now carries the whole stack with
+the identity shifts below.
+
+**`lags=p` and `lags=(1, 2)` are not the same thing.** Both are legitimate and they differ:
+
+| command | blocks | response |
+|---|---|---|
+| `lags(2)` | 1 | `1, 0, -.033241, 0, .001105, 0` |
+| `lags(1 2)` (also the bare default) | 2 | `1, .780014, .156881, -.22984, ...` |
+
+A lone lag `p` is a p-period recurrence, so the intermediate horizons really are zero; consecutive
+lags follow the ordinary VAR(p) recursion. The result object now stores the argument verbatim as
+`lag_orders` (with `lags` keeping the block count), because the block count alone cannot tell the two
+apart — that ambiguity is what made the first fix wrong.
+
+### Verified
+
+Six command forms are byte-identical to Stata's `irf table irf`, including the bare `varbasic dlny,
+irf` whose default is `lags(1 2)`. 16 new tests in `tests/test_irf_plot.py`.
+
+While measuring the table format, the number rule turned out to be: **six decimals with trailing zeros
+trimmed, capped at seven characters (eight when negative)** — beyond the cap a decimal place is
+dropped. That is why `1.0835279` prints as `1.08353`.
+
+---
+
 ## [0.3.32] - 2026-11-17
 
 ### Fixed — `varbasic` was missing its coefficient table

@@ -495,6 +495,24 @@ Cutting the tail (`year<2013`) matches Stata either way.
 The bands are delta-method bands with Stata's `/T` covariance normalisation, and the numbers use
 Stata's `%10.0g` format — below `1e-5` they switch to scientific notation.
 
+
+**Plotting the responses: `irf_table(...).plot()`**
+
+`varbasic` registers the impulse responses; `irf_table` tabulates them; `plot()` draws them. One panel
+per (impulse, response) pair, with the delta-method band filled behind the path.
+
+```python
+fit = ws.varbasic(vdata, "dlny", lags=1, time="t")
+ws.irf_table(fit).plot()                    # one pair
+ws.irf_table(fit, all=True).plot()          # every combination, one panel each
+```
+
+`matplotlib` is imported inside the method, so it is not required unless you plot. Install it with
+`pip install "westata[plot]"`; without it the call raises an `ImportError` naming that extra.
+
+Useful arguments: `ax=` to draw into an axis you already own, `show_ci=False` for the path alone,
+`markers=True`, `grid=False`, and `figsize=(w, h)`. Every other keyword goes to `Axes.plot`.
+
 ### `prais` and its `corc` option
 
 `corc=True` is a **different table**, not only a different estimate: it drops the transformed

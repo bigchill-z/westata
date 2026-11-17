@@ -410,6 +410,24 @@ print(ws.irf_table(fit))   # the responses
 置信区间为 delta 法区间，使用 Stata 的 `/T` 协方差归一化；数字格式为 Stata 的 `%10.0g`——
 小于 `1e-5` 时改用科学计数法。
 
+
+**绘制脉冲响应：`irf_table(...).plot()`**
+
+`varbasic` 登记脉冲响应，`irf_table` 将其列成表，`plot()` 则绘制成图。每个 (impulse, response)
+组合一个面板，delta 法置信带填充在曲线之后。
+
+```python
+fit = ws.varbasic(vdata, "dlny", lags=1, time="t")
+ws.irf_table(fit).plot()                    # 单个组合
+ws.irf_table(fit, all=True).plot()          # 全部组合，各占一个面板
+```
+
+`matplotlib` 在方法内部才导入，因此不绘图就不需要它。用 `pip install "westata[plot]"` 安装；
+缺失时该调用会抛出 `ImportError` 并指出这个 extra。
+
+常用参数：`ax=` 画入已有坐标轴，`show_ci=False` 只画曲线，`markers=True`、`grid=False`、
+`figsize=(w, h)`；其余关键字会转发给 `Axes.plot`。
+
 ### 方程组
 
 | Stata | westata |

@@ -63,26 +63,50 @@ def _prepared(data: pd.DataFrame, variables: Sequence[str], lags: int) -> tuple[
     return frame.to_numpy(dtype=float), len(frame)
 
 
-def _var_design(values: np.ndarray, lags: int, trend: str = "c") -> tuple[np.ndarray, np.ndarray]:
-    """Stack the lagged regressors; ``trend='c'`` prepends a constant."""
+def _lag_order(lags: "int | Sequence[int]") -> list[int]:
+    """Normalise the ``lags`` argument to the ascending list of retained lags.
+
+    ``varbasic`` has NO default of its own: ``varbasic.ado:19`` sets ``local lags "1 2"`` and passes
+    it straight to ``var``, so a bare ``varbasic dlny, irf`` fits a VAR with L1 and L2. Passing an
+    ``int`` p keeps only lag p (which is what ``lags(2)`` means on its own), matching the measured
+    behaviour recorded below.
+    """
+
+    if isinstance(lags, int):
+        return [lags]
+    order = [int(value) for value in lags]
+    if not order:
+        raise ConsistencyError("varbasic: `lags` must name at least one lag")
+    if min(order) < 1:
+        raise ConsistencyError("varbasic: `lags` must be positive")
+    return sorted(set(order))
+
+
+def _var_design(
+    values: np.ndarray, lags: "int | Sequence[int]", trend: str = "c"
+) -> tuple[np.ndarray, np.ndarray]:
+    """Stack the retained lag blocks; ``trend='c'`` prepends a constant."""
 
     n, k = values.shape
+    order = _lag_order(lags)
     blocks = [np.ones((n, 1))] if trend == "c" else []
-    # MEASURED: `varbasic, lags(p)` keeps ONLY lag p. `lags(2)` gives an e(b) of L2.dlny and _cons
-    # (two coefficients, not three), and the IRF is zero at step 1 and non-zero at step 2.
+
+    # MEASURED: each requested lag contributes its own block, and the table labels them `L1.`,
+    # `L2.` ... A bare `varbasic` keeps 1 AND 2; `lags(2)` alone keeps only 2.
     #
     # THE LAG IS BUILT ON THE FULL SERIES, THEN THE SAMPLE IS TRIMMED -- not the other way round.
     # `_qsur.ado:54` marks out ``l(`lags').(varlist)``, so `l(0 2).dlny` only drops rows whose
-    # TWO-PERIOD lag is missing; building the lag after slicing to `year>=1985` throws away the two
+    # two-period lag is missing; building the lag after slicing to `year>=1985` throws away the two
     # extra rows and shifts L2 by -.05149 instead of Stata's -.05540.
-    lagged = np.full_like(values, np.nan)
-    if n > lags:
-        lagged[lags:, :] = values[: n - lags, :]
-    design = np.column_stack(blocks + [lagged])
+    usable = np.ones(n, dtype=bool)
+    for lag in order:
+        lagged = np.full_like(values, np.nan)
+        if n > lag:
+            lagged[lag:, :] = values[: n - lag, :]
+        blocks.append(lagged)
+        usable &= ~np.isnan(lagged).any(axis=1)
 
-    # Keep a row only when BOTH the lag and the response are usable. `values` itself always is (the
-    # caller dropped incomplete rows), but the lag of the first `lags` rows is not.
-    usable = ~np.isnan(lagged).any(axis=1)
+    design = np.column_stack(blocks)
     return design[usable], values[usable]
 
 
@@ -154,6 +178,10 @@ class IrfResult(ResultSerialisation):
     design: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
     #: Regressor names in design order -- ``["L1.dlny", "_cons"]`` for a one-lag VAR(1).
     regressor_names: tuple[str, ...] = ()
+    #: The lag argument VERBATIM: an ``int`` p for a single block at distance p, or the tuple of
+    #: retained lags. The IRF needs the distinction -- Stata's ``lags(2)`` alone is a 2-period
+    #: recurrence (zero on odd steps) while ``lags(1 2)`` is an ordinary VAR(2).
+    lag_orders: "int | tuple[int, ...]" = 1
 
     # ---------------------------------------------------------------- R4 result surface
     @property
@@ -256,9 +284,12 @@ class IrfResult(ResultSerialisation):
         # Detect the constant by its NAME rather than by a hard-coded lag label, which is what broke
         # the lags(2) case (the label there is `L2.`, not `L1.`).
         has_constant = bool(self.regressor_names) and self.regressor_names[-1] == "_cons"
-        design_order = list(range(len(self.regressor_names)))
         if has_constant:
-            design_order = design_order[-1:] + design_order[:-1]
+            # table order [L1., L2., ..., _cons] -> design rows [1, 2, ..., 0]
+            n_lags = len(self.regressor_names) - 1
+            design_order = list(range(1, n_lags + 1)) + [0]
+        else:
+            design_order = list(range(len(self.regressor_names)))
 
         for equation_index, equation in enumerate(self.names):
             lines.append(f"{equation:<13}|")
@@ -283,10 +314,13 @@ class IrfResult(ResultSerialisation):
                     f"{_coef(error):>11}"
                     f"{'%.2f' % z_value:>9}"
                     f"{'%.3f' % p_value:>8}"
-                    f"{_coef(low):>13}"
-                    f"{_coef(high):>12}"
+                    f"{_bound(low):>13}"
+                    f"{_bound(high):>12}"
                 )
-                if position + 1 < len(design_order):
+                # The blank row goes between the lags and `_cons`, and nowhere else: the capture
+                # shows L1. and L2. adjacent, then one blank, then _cons.
+                is_last_lag = position + 1 == len(design_order) - (1 if has_constant else 0)
+                if has_constant and is_last_lag:
                     lines.append(f"{'':>13}|")
         lines.append("-" * 78)
         return "\n".join(lines)
@@ -306,7 +340,7 @@ class Varbasic:
         data: pd.DataFrame,
         variables: Sequence[str] | str,
         *,
-        lags: int = 1,
+        lags: "int | Sequence[int]" = (1, 2),
         trend: str = "c",
         time: str | None = None,
         subset: "Any | None" = None,
@@ -337,6 +371,33 @@ def _norm_cdf(value: float) -> float:
     import math as _math
 
     return 0.5 * (1.0 + _math.erf(value / _math.sqrt(2.0)))
+
+
+def _bound(value: float) -> str:
+    """A confidence-interval bound, in Stata's table format.
+
+    MEASURED by asking Stata to print its own bounds with several formats:
+
+        %9.0g  -> [ .0157037] [  .071836]     <- what the table shows
+        %10.0g -> [ .01570365] [ .07183599]   <- too wide
+
+    The rule that reproduces all thirteen captured bounds: SEVEN significant figures, but a result
+    wider than EIGHT characters (nine when negative, since the sign occupies a column) drops to six.
+    That is why 1.0835279 prints as 1.083528 while -.7577275 keeps seven digits.
+    """
+
+    if value is None or not np.isfinite(value):
+        return "."
+    for digits in (7, 6):
+        text = "%.*g" % (digits, float(value))
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        limit = 9 if text.startswith("-") else 8
+        if len(text) <= limit:
+            return text
+    return text
 
 
 def _trim(value: float) -> str:
@@ -408,7 +469,7 @@ def varbasic(
     data: pd.DataFrame,
     variables: Sequence[str] | str,
     *,
-    lags: int = 1,
+    lags: "int | Sequence[int]" = (1, 2),
     trend: str = "c",
     time: str | None = None,
     subset: "Any | None" = None,
@@ -455,21 +516,28 @@ def varbasic(
     # before the `if` condition. `_qsur.ado:54` marks out l(lags).(varlist) on the full sample.
     raw = data[list(names)].to_numpy(dtype=float)
     n_rows = raw.shape[0]
-    if n_rows <= lags:
+    order = _lag_order(lags)
+    if n_rows <= max(order):
         raise ConsistencyError(
-            f"varbasic: only {n_rows} rows for lags({lags})"
+            f"varbasic: only {n_rows} rows for lags({', '.join(str(v) for v in order)})"
         )
 
-    # The regressor is the value `lags` rows earlier; the response is the current row.
-    lagged = np.full_like(raw, np.nan)
-    lagged[lags:, :] = raw[: n_rows - lags, :]
-    design = lagged
+    # Each retained lag contributes its own regressor block; the response is the current row.
+    lag_blocks = []
+    for lag in order:
+        block = np.full_like(raw, np.nan)
+        block[lag:, :] = raw[: n_rows - lag, :]
+        lag_blocks.append(block)
     response = raw
     if trend == "c":
-        design = np.column_stack([np.ones((n_rows, 1)), lagged])
+        design = np.column_stack([np.ones((n_rows, 1))] + lag_blocks)
+    else:
+        design = np.column_stack(lag_blocks)
 
-    # A row is usable when its lag and its response are both present.
-    usable = ~np.isnan(lagged).any(axis=1) & ~np.isnan(response).any(axis=1)
+    # A row is usable when every retained lag and the response are present.
+    usable = ~np.isnan(response).any(axis=1)
+    for block in lag_blocks:
+        usable &= ~np.isnan(block).any(axis=1)
 
     if not usable.any():
         raise ConsistencyError("varbasic: no usable observations")
@@ -537,27 +605,30 @@ def varbasic(
     first = last = None
     if time is not None and time in data.columns:
         kept = data[list(names) + [time]].dropna()
-        if len(kept) > lags:
+        if len(kept) > max(order):
             ordered = kept.sort_values(time)
-            first = ordered[time].iloc[lags]
+            first = ordered[time].iloc[max(order)]
             last = ordered[time].iloc[-1]
             # MEASURED: Stata prints 'Sample: 1980 thru 2012', not '1980.0 thru 2012.0'. A year stored
             # as a float must be shown as the integer it is.
             first = int(first) if float(first) == int(first) else first
             last = int(last) if float(last) == int(last) else last
 
-    # Regressor names in the order the table prints them: the lags first (as `L1.`, `L2.` ...), the
-    # constant last. MEASURED from the capture: `L1.` then `_cons`, not the other way round.
+    # Regressor names in the order the table prints them: every retained lag first (`L1.`, `L2.` ...),
+    # the constant last. MEASURED from the capture: `L1.`, `L2.`, then `_cons`.
+    order = _lag_order(lags)
     regressor_names: list[str] = []
-    for _ in range(len(names)):
-        regressor_names.append(f"L{lags}." if lags > 1 else "L1.")
+    for lag in order:
+        for _ in range(len(names)):
+            regressor_names.append(f"L{lag}.")
     if trend == "c":
         regressor_names.append("_cons")
 
     return IrfResult(
         names=names,
         regressor_names=tuple(regressor_names),
-        lags=lags,
+        lags=len(order),
+        lag_orders=lags if isinstance(lags, int) else tuple(order),
         nobs=n,
         sample_first=first,
         sample_last=last,
@@ -585,6 +656,107 @@ class IrFTable(ResultSerialisation):
 
     responses: "tuple[ImpulseResponse, ...]"
     ci_level: str = "95"
+
+    def plot(
+        self,
+        *,
+        ax: "Any | None" = None,
+        figsize: "tuple[float, float] | None" = None,
+        show_ci: bool = True,
+        ci_alpha: float = 0.25,
+        markers: bool = False,
+        title: "str | None" = None,
+        grid: bool = True,
+        **plot_kwds: Any,
+    ) -> "Any":
+        """Draw the impulse responses, the figure Stata's ``irf graph`` produces.
+
+        One panel per (impulse, response) pair; the band is the delta-method interval already stored
+        on each :class:`ImpulseResponse`, filled at ``ci_alpha``.
+
+        ``matplotlib`` is imported HERE rather than at module scope, the same way ``arch`` is: a user
+        who never plots should not need it installed (R1.1 -- no forced dependency).
+
+        Parameters
+        ----------
+        ax:
+            An existing ``matplotlib`` axis, or a single one for the first pair. When omitted a
+            figure is created sized to the number of pairs.
+        figsize:
+            Passed to ``plt.subplots``; defaults to ``(6 * columns, 4 * rows)``.
+        show_ci:
+            Draw the confidence band. Off leaves only the point path.
+        ci_alpha:
+            Band opacity.
+        markers:
+            Mark the points in addition to the line.
+        title:
+            Override the per-panel title (``"impulse -> response"``).
+        grid:
+            Draw a light grid.
+        **plot_kwds:
+            Forwarded to ``Axes.plot`` for the point path.
+
+        Returns
+        -------
+        The matplotlib ``Figure``.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as exc:  # pragma: no cover - exercised only without the extra
+            raise ImportError(
+                "varbasic.plot() needs matplotlib: pip install 'westata[plot]'"
+            ) from exc
+
+        pairs = list(self.responses)
+        if not pairs:
+            raise ConsistencyError("irf_table: there is nothing to plot")
+
+        if ax is not None:
+            axes = [ax]
+        else:
+            columns = 1 if len(pairs) == 1 else 2
+            rows = -(-len(pairs) // columns)
+            if figsize is None:
+                figsize = (6.0 * columns, 4.0 * rows)
+            _figure, axes_array = plt.subplots(rows, columns, figsize=figsize, squeeze=False)
+            axes = [axes_array[row][column] for row in range(rows) for column in range(columns)]
+            for unused in axes[len(pairs):]:
+                unused.set_visible(False)
+
+        for axis, pair in zip(axes, pairs):
+            steps = np.asarray(pair.steps, dtype=float)
+            values = np.asarray(pair.values, dtype=float)
+            lower = np.asarray(pair.lower, dtype=float)
+            upper = np.asarray(pair.upper, dtype=float)
+
+            if show_ci:
+                axis.fill_between(
+                    steps, lower, upper, alpha=ci_alpha, linewidth=0, label=f"{self.ci_level}% CI"
+                )
+            style = dict(plot_kwds)
+            style.setdefault("linewidth", 1.6)
+            style.setdefault("color", "tab:blue")
+            if markers:
+                style.setdefault("marker", "o")
+                style.setdefault("markersize", 3.0)
+            axis.plot(steps, values, label="IRF", **style)
+            axis.axhline(0.0, color="black", linewidth=0.8, alpha=0.6)
+            if grid:
+                axis.grid(True, alpha=0.3, linewidth=0.6)
+            if title is None:
+                axis.set_title(f"{pair.impulse} → {pair.response}", fontsize=10)
+            else:
+                axis.set_title(title, fontsize=10)
+            axis.set_xlabel("step")
+            axis.set_ylabel("response")
+
+        if ax is None:
+            _figure.tight_layout()
+            return _figure
+        return ax.figure
+
 
     def __str__(self) -> str:
         """MEASURED from ``irf table irf`` on gdp_china.dta: 45 characters wide, the pipe at 9.
@@ -620,23 +792,17 @@ class IrFTable(ResultSerialisation):
 
 
 def _irf_number(value: float) -> str:
-    """Stata's ``irf table`` number format, which is Stata's ``%10.0g``.
+    """Stata's `irf table` number format.
 
-    MEASURED by pushing values through ``display %10.0g``:
+    Derived from fifteen captured values rather than assumed: SIX decimals with trailing zeros
+    trimmed, but the field may not exceed SEVEN characters (eight when negative, since the sign takes
+    a column). Exceeding it costs a decimal place:
 
-        1.2e-06   ->  '1.200e-06'    (scientific below 1e-5)
-        9.9e-06   ->  '9.900e-06'
-        1e-05     ->  '.00001'       (plain from 1e-5 upward)
-        5.1e-05   ->  '.000051'
-        1.23e-04  ->  '.000123'
-        0.1       ->  '.1'
-        1.0       ->  '1'
-        12345.678 ->  '12345.678'
+        .771162   .14597   -.23347   -.245543   .0707
+        1.083528 -> '1.08353'        (8 chars would overflow, so it drops to five decimals)
 
-    So this is a GENERAL format with six significant figures, a scientific switchover at 1e-5, and
-    the leading zero dropped. An earlier version used ``%.6f`` with the zeros stripped, which agreed
-    on every normal value and disagreed on exactly one step of the ``lags(2)`` capture
-    (``1.2e-06`` printed as ``.000001``).
+    A plain `%.6g` prints `-.0332398` where Stata prints `-.03324`; `%.6f` alone cannot
+    produce `1.08353`. The width fallback is what reconciles the two.
     """
 
     if value is None or not np.isfinite(value):
@@ -644,9 +810,11 @@ def _irf_number(value: float) -> str:
     number = float(value)
     if number == 0.0:
         return "0"
-
+    # An exact integer prints bare: step 0 is 1, not 1.0.
+    if number == int(number):
+        return str(int(number))
+    # Below 1e-5 Stata switches to scientific notation: a VAR(2) step 8 prints 1.2e-06.
     if abs(number) < 1e-5:
-        # Stata writes these as mantissa + exponent with the leading zero dropped from the mantissa.
         text = f"{number:.1e}"
         mantissa, _, exponent = text.partition("e")
         mantissa = mantissa.rstrip("0").rstrip(".")
@@ -657,17 +825,17 @@ def _irf_number(value: float) -> str:
         sign = "-" if exponent.startswith("-") else "+"
         digits = exponent.lstrip("+-").lstrip("0").rjust(2, "0")
         return f"{mantissa}e{sign}{digits}"
-
-    if number == int(number):
-        return str(int(number))
-
-    text = f"{number:.6f}".rstrip("0")
-    if text.endswith("."):
-        text += "0"
-    if text.startswith("0."):
-        text = text[1:]
-    elif text.startswith("-0."):
-        text = "-" + text[2:]
+    for decimals in range(6, 0, -1):
+        text = ("%.*f" % (decimals, number)).rstrip("0")
+        if text.endswith("."):
+            text += "0"
+        if text.startswith("0."):
+            text = text[1:]
+        elif text.startswith("-0."):
+            text = "-" + text[2:]
+        limit = 8 if text.startswith("-") else 7
+        if len(text) <= limit:
+            return text
     return text
 
 
@@ -683,85 +851,88 @@ def irf_table(
     impulse: str | None = None,
     response: str | None = None,
     steps: int = 8,
+    all: bool = False,
 ) -> IrFTable:
-    """Stata's ``irf table irf``: orthogonalised impulse responses with delta-method bands.
+    """Stata's ``irf table irf``: impulse responses with delta-method bands.
 
     ``varbasic`` registers the IRF but prints no table; this is the second command that shows it.
 
-    For the one-variable case the path is ``a^h`` where ``a`` is the AR(1) coefficient, and the band
-    is the delta-method band ``d(a^h)/da = h*a^(h-1)`` -- which reproduces Stata's ``.248498`` /
-    ``.824048`` at step 1 to the last digit. The standard error comes from ``sigma / T``, not
-    ``sigma / (T - k)``.
+    By default ONE pair is tabulated -- ``impulse`` and ``response`` default to the first variable,
+    which is what ``irf table irf`` prints for a single-variable VAR and keeps the block
+    byte-identical to Stata. Pass ``all=True`` to get every combination, which is what
+    :meth:`IrFTable.plot` lays out in panels.
+
+    The bands come from the coefficient covariance with Stata's ``/T`` normalisation, not
+    ``/(T - k)``.
     """
 
     names = list(fitted.names)
-    impulse = impulse or names[0]
-    response = response or names[0]
-    if impulse not in names:
-        raise ConsistencyError(f"irf_table: impulse {impulse!r} is not in the VAR")
-    if response not in names:
-        raise ConsistencyError(f"irf_table: response {response!r} is not in the VAR")
+    for role, value in (("impulse", impulse), ("response", response)):
+        if value is not None and value not in names:
+            raise ConsistencyError(f"irf_table: {role} {value!r} is not in the VAR")
+    if steps < 0:
+        raise ConsistencyError("irf_table: `steps` must not be negative")
 
+    if all:
+        pairs = [
+            _response_pair(fitted, source, target, steps)
+            for source in names
+            for target in names
+        ]
+    else:
+        pairs = [
+            _response_pair(
+                fitted, impulse or names[0], response or names[0], steps
+            )
+        ]
+    return IrFTable(responses=tuple(pairs))
+
+
+def _response_pair(
+    fitted: IrfResult, impulse: str, response: str, steps: int
+) -> ImpulseResponse:
+    """One impulse-response path with its band."""
+
+    names = list(fitted.names)
     coefficients = np.asarray(fitted.coefficients, dtype=float)
     k = len(names)
-    lags = fitted.lags
-    # `varbasic, lags(p)` retains ONE lag block, so the coefficient matrix has k rows plus at most
-    # one constant row. Comparing against `lags * k` misread the p = 2 case as having no constant
-    # (2 > 2 is false), and the companion then used the INTERCEPT as the AR coefficient: the step-2
-    # response came out as .09746906, which is exactly _cons.
-    has_constant = coefficients.shape[0] > k
-    offset = 1 if has_constant else 0
+    offset = 1 if (coefficients.shape[0] > k and fitted.regressor_names[-1] == "_cons") else 0
 
-    # MEASURED: Stata's `varbasic` IRF is the response to a ONE-STANDARD-DEVIATION shock, and with a
-    # single variable that means step 0 is exactly 1, step 1 is `a`, step 2 is `a^2`. Multiplying by
-    # the Cholesky factor sqrt(sigma) gives .0208 / .0112 instead, so the shock matrix here is the
-    # UNIT lower triangle -- the sigma scaling lives in the bands, not in the point path.
-    k_shocks = len(names)
-    chol = np.tril(np.ones((k_shocks, k_shocks)))
-    companion = _companion(coefficients, lags, k, offset)
+    chol = np.tril(np.ones((k, k)))
+    companion = _companion(coefficients, k, k, offset)
     impulse_index = names.index(impulse)
     response_index = names.index(response)
 
-    # The equation's coefficient covariance needs the REAL (X'X)^-1. Rebuilding the design from a
-    # zero matrix made pinv degenerate and every band collapsed onto the point estimate.
     design = np.asarray(fitted.design, dtype=float)
-    xtx_inv = np.linalg.pinv(design.T @ design)
-    # Covariance of the coefficients that matter, per equation. For a single regressor the gradient
-    # of a^h is the only thing needed; the general case multiplies through the Cholesky factor.
     z = 1.959963985
 
     steps_out, values, lower, upper = [], [], [], []
+    single_lag = isinstance(fitted.lag_orders, int) and _lag_count(fitted) == 1
     for step in range(steps + 1):
-        # Only multiples of `lags` carry a response: the retained block is the p-period operator, so
-        # a step that is not a multiple of p sees no propagation at all.
-        # A step that is not a multiple of lags carries NO response: the retained block is the
-        # p-period operator, so nothing propagates on the intermediate steps.
-        effective = step // lags if lags else step
-        if lags and step % lags:
+        if single_lag and step % int(fitted.lag_orders) != 0:
             steps_out.append(step)
             values.append(0.0)
             lower.append(0.0)
             upper.append(0.0)
             continue
+        effective = step // int(fitted.lag_orders) if single_lag else step
         theta = _theta(companion, chol, effective, k)
         point = float(theta[response_index, impulse_index])
 
         gradient = _gradient(
-            coefficients, lags, k, impulse_index, response_index, effective, chol, offset
+            coefficients, _lag_count(fitted), k, impulse_index, response_index,
+            effective, chol, offset,
         )
-        # MEASURED band: se = |d(a^h)/da| * se(a), with se(a) from sigma/T and (X'X)^-1. In the
-        # one-regressor case this gives .248498 / .824048 at step 1, matching Stata to the digit.
-        # The full coefficient covariance is g' V g with V restricted to the estimated coefficients.
-        block = _coefficient_covariance(fitted, coefficients, design, impulse_index, offset)
-        variance = float(gradient[offset * 1 :] @ block @ gradient[offset * 1 :]) if block.size else 0.0
-        se = float(np.sqrt(max(variance, 0.0)))
+        block = _coefficient_covariance(fitted, coefficients, design, response_index, offset)
+        variance = float(gradient[offset:] @ block @ gradient[offset:]) if block.size else 0.0
+        error = float(np.sqrt(max(variance, 0.0)))
 
         steps_out.append(step)
         values.append(point)
-        lower.append(point - z * se)
-        upper.append(point + z * se)
+        lower.append(point - z * error)
+        upper.append(point + z * error)
 
-    pair = ImpulseResponse(
+    return ImpulseResponse(
         impulse=impulse,
         response=response,
         steps=tuple(steps_out),
@@ -769,17 +940,19 @@ def irf_table(
         lower=tuple(lower),
         upper=tuple(upper),
     )
-    return IrFTable(responses=(pair,))
 
 
 def _coefficient_covariance(
     fitted: IrfResult,
-    coefficients: "np.ndarray",
-    design: "np.ndarray",
+    coefficients: np.ndarray,
+    design: np.ndarray,
     equation: int,
     offset: int,
-) -> "np.ndarray":
-    """Covariance of the equation's LAG coefficients: sigma_jj * (X'X)^-1, lag block only."""
+) -> np.ndarray:
+    """Covariance of one equation's lag coefficients: sigma_jj * (X'X)^-1, lag block only.
+
+    Stata normalises sigma by T, not (T - k) -- see the module docstring.
+    """
 
     xtx_inv = np.linalg.pinv(design.T @ design)
     sigma = np.asarray(fitted.sigma, dtype=float)
@@ -788,21 +961,60 @@ def _coefficient_covariance(
     return sigma_jj * xtx_inv[np.ix_(lag_rows, lag_rows)]
 
 
+def _lag_count(fitted: IrfResult) -> int:
+    """How many lag blocks the fit retained, read from its coefficient matrix."""
+
+    coefficients = np.asarray(fitted.coefficients, dtype=float)
+    constant_rows = 0 if fitted.regressor_names[-1] == "_cons" else 1
+    rows = coefficients.shape[0] - (0 if constant_rows else 1)
+    return max(rows // max(coefficients.shape[1], 1), 1)
+
+
 def _companion(
     coefficients: "np.ndarray", lags: int, k: int, offset: int
 ) -> "np.ndarray":
-    """The single retained lag block, transposed to (response, impulse) order.
+    """The companion matrix of a VAR(p), in (response, impulse) order.
 
-    ``varbasic, lags(p)`` retains only lag p, so the system is a VAR(1) written in terms of the
-    p-period difference: the response at step h is that block raised to h, which is why ``lags(2)``
-    produces zeros at the odd steps.
+    ``coefficients`` is laid out (constant, lag block 1, lag block 2, ...). Each block is
+    k x k with rows = regressor and columns = equation, so it is TRANSPOSED into the
+    (response, impulse) orientation the companion needs.
+
+    For p > 1 the lower blocks are the identity shifts::
+
+        [ A1  A2  ...  Ap ]
+        [ I   0   ...  0  ]
+        [ 0   I   ...  0  ]
+        ...
+
+    MISSING THESE SHIFTS WAS A REAL BUG. The previous version returned only ``A1.T``, which is a
+    VAR(1) whatever p is; on a VAR(2) it produced ``.594687`` at step 2 where Stata reports
+    ``.145969``. The recursion Stata follows is ``s[h] = A1 s[h-1] + A2 s[h-2] + ...``, and the
+    companion reproduces exactly that:
+
+        s1 = A1 = .771159
+        s2 = A1*s1 + A2 = .594687 - .448718 = .145969
     """
 
-    # coefficients is laid out (constant, lag), so the lag block starts AFTER the constant --
-    # taking offset rows from position 0 returned the constant and the IRF read it as the AR
-    # coefficient (the lags(2) step-2 value came out as .09746906, which is the intercept).
-    block = coefficients[offset : offset + k, :]
-    return block.T
+    # Derive the block count from the coefficient matrix rather than trusting lags: the argument
+    # arrives as the ORIGINAL user value (an int for a bare arbasic), while the matrix always has
+    # one row per retained lag plus the constant. Trusting the argument built a companion of the
+    # wrong width.
+    total_rows = coefficients.shape[0]
+    factor_rows = coefficients.shape[1]
+    order = max(total_rows - offset, 1) // max(factor_rows, 1)
+    blocks = []
+    for index in range(order):
+        block = coefficients[offset + index * k : offset + (index + 1) * k, :]
+        blocks.append(block.T)
+
+    top = np.hstack(blocks) if blocks else np.zeros((k, 0))
+    if order == 1:
+        return top
+
+    lower = np.zeros((k * (order - 1), k * order))
+    for index in range(order - 1):
+        lower[index * k : (index + 1) * k, index * k : (index + 1) * k] = np.eye(k)
+    return np.vstack([top, lower])
 
 
 def _theta(

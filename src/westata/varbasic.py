@@ -152,6 +152,8 @@ class IrfResult(ResultSerialisation):
     responses: tuple[ImpulseResponse, ...] = ()
     #: The estimated regressor matrix, needed to rebuild each equation's coefficient covariance.
     design: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
+    #: Regressor names in design order -- ``["L1.dlny", "_cons"]`` for a one-lag VAR(1).
+    regressor_names: tuple[str, ...] = ()
 
     # ---------------------------------------------------------------- R4 result surface
     @property
@@ -206,26 +208,87 @@ class IrfResult(ResultSerialisation):
         )
         lines.append(f"{sample:<48}Number of obs     ={self.nobs:>11}")
         lines.append(
-            f"{'Log likelihood = ' + f'{self.ll:>10.5f}':<48}AIC               ={self.aic:>11.6f}"
+            f"{'Log likelihood = ' + f'{self.ll:>10.5f}':<48}AIC               ={_trim(self.aic):>11}"
+        )
+        # MEASURED: 'FPE            =   .0004889' and 'Det(Sigma_ml)  =   .0004331' -- the leading
+        # zero is dropped, and the value sits in a fixed field ending at column 27.
+        lines.append(
+            f"{'FPE':<15}={'':>2}{_coef(self.fpe):>9}"
+            f"{'':<21}HQIC              ={_trim(self.hqic):>11}"
         )
         lines.append(
-            f"{'FPE            = ' + f'{self.fpe:>10.7f}':<48}HQIC              ={self.hqic:>11.6f}"
-        )
-        lines.append(
-            f"{'Det(Sigma_ml)  = ' + f'{self.det_sigma:>10.7f}':<48}SBIC              ={self.sbic:>11.6f}"
+            f"{'Det(Sigma_ml)':<15}={'':>2}{_coef(self.det_sigma):>9}"
+            f"{'':<21}SBIC              ={_trim(self.sbic):>11}"
         )
         lines.append("")
         lines.append("Equation           Parms      RMSE     R-sq      chi2     P>chi2")
         lines.append("-" * 64)
         for index, name in enumerate(self.names):
+            # MEASURED ends: name 0.., Parms 23, RMSE 35, R-sq 44, chi2 55, P>chi2 64.
             lines.append(
-                f"{name:<16}{self.parms[index]:>8}"
-                f"{self.rmse[index]:>10.6f}"
-                f"{self.r2[index]:>9.4f}"
-                f"{self.chi2[index]:>11.5f}"
-                f"{self.chi2_p[index]:>10.4f}"
+                f"{name:<16}{self.parms[index]:>7}"
+                f"{_drop_leading_zero(('%.6f' % self.rmse[index])):>12}"
+                f"{'%.4f' % self.r2[index]:>9}"
+                f"{_sig(self.chi2[index], 7):>11}"
+                f"{'%.4f' % self.chi2_p[index]:>9}"
             )
         lines.append("-" * 64)
+
+        # The coefficient table below the summary, which `varbasic` prints for each equation.
+        # MEASURED (78 wide, pipe at 13):
+        #     '        dlny | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]'
+        #     '         L1. |   .5362727   .1468267     3.65   0.000     .2484976    .8240478'
+        #     '       _cons |   .0437698   .0143197     3.06   0.002     .0157037     .071836'
+        lines.append("")
+        lines.append("-" * 78)
+        lines.append(
+            f"{self.names[0]:>12} | Coefficient  Std. err.      z    P>|z|"
+            "     [95% conf. interval]"
+        )
+        lines.append("-" * 13 + "+" + "-" * 64)
+        # MEASURED column ends (78-wide rows, pipe at 13):
+        #     estimate 25 | std.err 36 | z 45 | P>|z| 53 | lower 66 | upper 78
+        # The design stores the constant first; the table prints the lags first, so the rows are
+        # reordered here rather than in the estimator.
+        coefficients = np.asarray(self.coefficients, dtype=float)
+        errors = self.bse.reshape(len(self.names), -1) if self.bse.size else self.bse
+        # The design puts the constant FIRST and the lags after it; the table prints the lags first.
+        # Detect the constant by its NAME rather than by a hard-coded lag label, which is what broke
+        # the lags(2) case (the label there is `L2.`, not `L1.`).
+        has_constant = bool(self.regressor_names) and self.regressor_names[-1] == "_cons"
+        design_order = list(range(len(self.regressor_names)))
+        if has_constant:
+            design_order = design_order[-1:] + design_order[:-1]
+
+        for equation_index, equation in enumerate(self.names):
+            lines.append(f"{equation:<13}|")
+            # Stata prints the equation's own name as a sub-header inside the block, even for a
+            # single-variable VAR -- MEASURED: 'dlny         |' then '        dlny |' then 'L1.'.
+            lines.append(f"{self.names[equation_index]:>12} |")
+            for position, row in enumerate(design_order):
+                regressor = self.regressor_names[position]
+                estimate = float(coefficients[row, equation_index])
+                error = float(errors[equation_index][row])
+                z_value = estimate / error if error else float("nan")
+                p_value = (
+                    float(2.0 * (1.0 - _norm_cdf(abs(z_value))))
+                    if np.isfinite(z_value)
+                    else float("nan")
+                )
+                low = estimate - 1.959963985 * error
+                high = estimate + 1.959963985 * error
+                lines.append(
+                    f"{regressor:>12} |"
+                    f"{_coef(estimate):>11}"
+                    f"{_coef(error):>11}"
+                    f"{'%.2f' % z_value:>9}"
+                    f"{'%.3f' % p_value:>8}"
+                    f"{_coef(low):>13}"
+                    f"{_coef(high):>12}"
+                )
+                if position + 1 < len(design_order):
+                    lines.append(f"{'':>13}|")
+        lines.append("-" * 78)
         return "\n".join(lines)
 
 
@@ -266,6 +329,79 @@ class Varbasic:
             time=self._time,
             subset=self._subset,
         )
+
+
+def _norm_cdf(value: float) -> float:
+    """Standard normal CDF, so the P>|z| column does not need a scipy import here."""
+
+    import math as _math
+
+    return 0.5 * (1.0 + _math.erf(value / _math.sqrt(2.0)))
+
+
+def _trim(value: float) -> str:
+    """Six decimals with trailing zeros removed, as Stata's information-criteria column shows.
+
+    MEASURED: ``-4.41417`` and ``-4.35399`` on the ``lags(2)`` run, where a fixed six-decimal format
+    would print ``-4.414170`` and ``-4.353990``.
+    """
+
+    if value is None or not np.isfinite(value):
+        return "."
+    text = f"{float(value):.6f}".rstrip("0")
+    return text + "0" if text.endswith(".") else text
+
+
+def _sig(value: float, digits: int) -> str:
+    """Stata's variable-precision column: ``digits`` significant figures, leading zero dropped.
+
+    Used for the equation table's chi2 column, which prints ``13.34017`` (7 significant figures) and
+    ``.0364487`` (also 7, once the leading zero is gone) -- a fixed decimal count reproduces one but
+    not the other.
+    """
+
+    if value is None or not np.isfinite(value):
+        return "."
+    if value == 0:
+        return "0"
+    text = f"%.{digits}g" % float(value)
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
+
+
+def _drop_leading_zero(text: str) -> str:
+    """`0.0364487` -> `.0364487`; also trims trailing zeros so `.025460` prints as `.02546`."""
+
+    trimmed = text.rstrip("0")
+    if trimmed.endswith("."):
+        trimmed += "0"
+    if trimmed.startswith("0."):
+        trimmed = trimmed[1:]
+    elif trimmed.startswith("-0."):
+        trimmed = "-" + trimmed[2:]
+    return trimmed
+
+
+def _coef(value: float) -> str:
+    """Stata's coefficient-column format: seven decimals, leading zero dropped.
+
+    MEASURED: ``.5362727``, ``.0437698``, ``.071836`` -- the last one shows only six decimals because
+    Stata trims trailing zeros on this column.
+    """
+
+    if value is None or not np.isfinite(value):
+        return "."
+    text = f"{float(value):.7f}".rstrip("0")
+    if text.endswith("."):
+        text += "0"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
+    return text
 
 
 def varbasic(
@@ -405,9 +541,22 @@ def varbasic(
             ordered = kept.sort_values(time)
             first = ordered[time].iloc[lags]
             last = ordered[time].iloc[-1]
+            # MEASURED: Stata prints 'Sample: 1980 thru 2012', not '1980.0 thru 2012.0'. A year stored
+            # as a float must be shown as the integer it is.
+            first = int(first) if float(first) == int(first) else first
+            last = int(last) if float(last) == int(last) else last
+
+    # Regressor names in the order the table prints them: the lags first (as `L1.`, `L2.` ...), the
+    # constant last. MEASURED from the capture: `L1.` then `_cons`, not the other way round.
+    regressor_names: list[str] = []
+    for _ in range(len(names)):
+        regressor_names.append(f"L{lags}." if lags > 1 else "L1.")
+    if trend == "c":
+        regressor_names.append("_cons")
 
     return IrfResult(
         names=names,
+        regressor_names=tuple(regressor_names),
         lags=lags,
         nobs=n,
         sample_first=first,

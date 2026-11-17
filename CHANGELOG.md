@@ -7,6 +7,61 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.32] - 2026-11-17
+
+### Fixed — `varbasic` was missing its coefficient table
+
+`varbasic` prints two blocks: the summary, then a coefficient table per equation. Only the summary
+was being produced, so the half the screenshot showed was absent entirely:
+
+```
+------------------------------------------------------------------------------
+        dlny | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+dlny         |
+        dlny |
+         L1. |   .5362727   .1468267     3.65   0.000     .2484976    .8240478
+             |
+       _cons |   .0437698   .0143197     3.06   0.002     .0157037     .071836
+------------------------------------------------------------------------------
+```
+
+The whole block is now byte-identical to Stata for the command in the screenshot and for
+`lags(2)`/`lags(3)` on the full sample.
+
+### Ordering facts that are easy to get backwards
+
+| fact | consequence |
+|---|---|
+| the table prints **lags first, `_cons` last** | the design stores the constant first, so the rows must be reordered for display |
+| the regressor label is **`L1.`**, not `L1.dlny` | the name to look for is the lag marker, not the series |
+| the equation name appears **twice** (`dlny         \|` then `        dlny \|`) | the second is the regressor group, and it appears even for a one-variable VAR |
+
+Detecting the constant by the literal string `"L1."` broke the `lags(2)` case, whose label is `L2.`;
+the check now looks for `_cons` at the end of the name list.
+
+### Number formats, all measured
+
+| column | rule |
+|---|---|
+| coefficients | seven decimals, leading zero dropped, trailing zeros trimmed (`.5362727`, `.071836`) |
+| HQIC / SBIC | trailing zeros dropped — `-4.41417`, not `-4.414170` |
+| equation chi2 | **seven significant figures** — `13.34017` and `.0364487` both, which no fixed decimal count reproduces |
+| equation RMSE | six decimals with the leading zero dropped — `.021471`, `.02546` |
+| `FPE` / `Det(Sigma_ml)` | leading zero dropped — `.0004889` |
+
+### Verified
+
+11 tests in `tests/test_varbasic_coefficient_table.py`, one of which runs `varbasic` in live Stata and
+compares the whole 22-line block. The full `varbasic` suite is 61 tests.
+
+### Deliberately still different
+
+A head-cutting `subset` keeps one fewer observation than Stata, per the R3.4 decision recorded in
+0.3.31: `if year>=1990` gives N=23 here and N=24 in Stata. Tail cuts match exactly.
+
+---
+
 ## [0.3.31] - 2026-11-17
 
 ### Fixed — `varbasic` now follows the package conventions

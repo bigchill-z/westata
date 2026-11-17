@@ -166,16 +166,49 @@ def _format_g(value: Any, digits: int) -> str:
     return f"{number:.1g}"
 
 
+def _equation_wald(fitted: Any, suffix: str, dfk: bool) -> float:
+    """One equation's Wald statistic, optionally rescaled for Stata's ``dfk``.
+
+    MEASURED: ``var a b, lags(1/2)`` reports 51.38465 for equation a, and adding ``dfk`` reports
+    49.94126 -- the ratio is exactly ``(N - k)/N = 173/178``, the same adjustment that inflates the
+    standard errors, because the statistic is built from the inverse covariance.
+    """
+
+    statistic = float(fitted.e.get("chi2" + suffix) or 0.0)
+    if dfk:
+        observations = int(fitted.nobs)
+        per_equation = int(fitted.e.get("k" + suffix) or 0)
+        if observations > 0 and per_equation > 0:
+            statistic *= (observations - per_equation) / observations
+    return statistic
+
+
 def _coefficient_row(
-    label: str, coefficient: float, standard_error: float, critical: float
+    label: str,
+    coefficient: float,
+    standard_error: float,
+    critical: float,
+    *,
+    small: bool = False,
+    degrees_of_freedom: int | None = None,
 ) -> str:
-    """One coefficient line of a VAR table: estimate, SE, z, p, and the interval."""
+    """One coefficient line of a VAR table: estimate, SE, z or t, p, and the interval.
+
+    ``small`` switches the reference distribution from normal to Student t, which is what Stata's
+    ``var ..., small`` does -- the printed column becomes ``t`` / ``P>|t|`` and the p-value is taken
+    from the t distribution rather than from the normal.
+    """
 
     from scipy import stats as _stats
 
     if standard_error > 0.0:
         statistic = coefficient / standard_error
-        pvalue = 2.0 * float(_stats.norm.sf(abs(statistic)))
+        if small and degrees_of_freedom:
+            pvalue = 2.0 * float(
+                _stats.t.sf(abs(statistic), max(int(degrees_of_freedom), 1))
+            )
+        else:
+            pvalue = 2.0 * float(_stats.norm.sf(abs(statistic)))
     else:
         statistic = float("nan")
         pvalue = float("nan")
@@ -582,6 +615,8 @@ class VAR:
         trend: str = "c",
         names: Sequence[str] | None = None,
         time: Any = None,
+        exog: Any = None,
+        exog_names: Sequence[str] | None = None,
     ) -> None:
         values = np.asarray(endog, dtype=float)
         if values.ndim == 1:
@@ -613,6 +648,29 @@ class VAR:
             raise ValueError(
                 f"time has {self._time.size} entries but endog has {values.shape[0]} rows"
             )
+
+        # Stata's `exog(varlist)`: regressors entered in EVERY equation, not lagged. They are passed
+        # to statsmodels as-is and its `exog` path reproduces Stata's layout, where the exogenous
+        # column sits after the last lag block and before `_cons`.
+        self._exog = None
+        if exog is not None:
+            self._exog = np.asarray(exog, dtype=float)
+            if self._exog.ndim == 1:
+                self._exog = self._exog.reshape(-1, 1)
+            if self._exog.shape[0] != values.shape[0]:
+                raise ConsistencyError(
+                    f"var: exog has {self._exog.shape[0]} rows but endog has {values.shape[0]}"
+                )
+            if not np.all(np.isfinite(self._exog)):
+                raise ConsistencyError("var: the exog data contain non-finite values")
+        if exog_names is not None:
+            self._exog_names = [str(name) for name in exog_names]
+        elif hasattr(exog, "columns"):
+            self._exog_names = [str(column) for column in exog.columns]
+        elif self._exog is not None:
+            self._exog_names = [f"x{i + 1}" for i in range(self._exog.shape[1])]
+        else:
+            self._exog_names = []
 
     @classmethod
     def from_formula(
@@ -686,7 +744,11 @@ class VAR:
         # ``endog_names`` argument. Passing bare ndarray data made its results label the
         # equations y0, y1, ..., so ``granger_causality('dinf', ['unem'])`` failed with
         # "'dinf' is not in list" even though the wrapper knew the names.
-        return _SMVAR(self._named_data()).fit(lags, trend=self._trend, ic=None)
+        # `trend="n"` is Stata's `noconstant`; `exog` goes through statsmodels' own argument so the
+        # exogenous column lands where Stata puts it.
+        return _SMVAR(self._named_data(), exog=self._exog).fit(
+            lags, trend=self._trend, ic=None
+        )
 
     def _named_data(self) -> Any:
         """The endogenous data as a DataFrame carrying the equation names."""
@@ -817,7 +879,13 @@ class VAR:
             )
         result = self._make_model(self._lags)
         return VARResults(
-            result, self._names, self._lags, self._trend, ml=ml, time=self._time
+            result,
+            self._names,
+            self._lags,
+            self._trend,
+            ml=ml,
+            time=self._time,
+            exog_names=tuple(self._exog_names),
         )
 
 
@@ -842,6 +910,8 @@ class VARResults:
     #: The `tsset` time values, when the caller supplied them. Stata prints real dates in
     #: ``Sample: 1982 thru 2013``; without this the summary falls back to row indices.
     time: Any = None
+    #: Stata's ``exog(varlist)``, for the coefficient table's exogenous row.
+    exog_names: tuple[str, ...] = ()
 
     # -- Stata's degrees-of-freedom convention -------------------------------
     @property
@@ -854,8 +924,15 @@ class VARResults:
     def k_per_equation(self) -> int:
         """Regressors in ONE equation: ``k_ar*neqs + deterministic terms``."""
 
-        return int(self._result.k_ar) * int(self._result.neqs) + int(
-            self._result.k_trend
+        # The exogenous columns count too: `var a b, lags(1/2) exog(x)` has 6 parameters per
+        # equation, and leaving them out made `ml_factor` (T-5)/T instead of (T-6)/T -- which
+        # skewed e(Sigma) and therefore e(detsig) and every Wald statistic. MEASURED:
+        # det(resid'resid / T) = .6849608132, exactly Stata's e(detsig), while the (T-5) scaling
+        # gave .6929486.
+        return (
+            int(self._result.k_ar) * int(self._result.neqs)
+            + int(self._result.k_trend)
+            + len(self.exog_names)
         )
 
     @property
@@ -967,6 +1044,9 @@ class VARResults:
             for name in self.names:
                 for lag in range(1, self.lags + 1):
                     rows.append(f"L{lag}.{name}")
+            # Stata's `exog(varlist)` sits AFTER the lag block and BEFORE `_cons`, which is also
+            # where statsmodels puts it in `vec(B)` -- so the same slot works for both.
+            rows.extend(self.exog_names)
             rows.extend(name for name, _ in self._deterministic_spec())
         return rows
 
@@ -990,12 +1070,25 @@ class VARResults:
 
         neqs = int(self._result.neqs)
         k_trend = int(self._result.k_trend)
+        n_exog = len(self.exog_names)
+
+        # statsmodels lays `vec(B)` out as [deterministic, exog, lag blocks], so the LAG blocks
+        # start after BOTH of the first two. Leaving that out read the exog column as a lag:
+        # MEASURED on a bivariate VAR(2) with one exogenous column, params[:6] are
+        # (-.086313, -.082264, .07617, .083045, .516151, .252567) = (const a, const b,
+        # exog a, exog b, L1.a a, L1.a b), and without the offset the table printed .07617 where
+        # Stata prints .5161514.
+        lag_start = k_trend + n_exog
+
         order: list[int] = []
         for equation in range(neqs):
             for variable in range(neqs):
                 for lag in range(1, self.lags + 1):
-                    row = k_trend + (lag - 1) * neqs + variable
+                    row = lag_start + (lag - 1) * neqs + variable
                     order.append(row * neqs + equation)
+            # The exogenous block sits directly after the deterministic rows.
+            for position in range(n_exog):
+                order.append((k_trend + position) * neqs + equation)
             for _, row in self._deterministic_spec():
                 order.append(row * neqs + equation)
         return np.asarray(order, dtype=int)
@@ -1083,8 +1176,11 @@ class VARResults:
         raw = float(np.linalg.det(covariance))
 
         observations = int(getattr(self._result, "nobs", 0) or 0)
-        lag_order = int(getattr(self._result, "k_ar", 0) or 0)
-        parameters = 2 * lag_order + 1
+        # `k_per_equation` is the parameter count Stata uses -- lags x equations + trend + exog.
+        # The old `2 * lag_order + 1` assumed exactly two endogenous variables and no exogenous
+        # column, so a fit with `exog(x)` scaled by (N - 5)/N instead of (N - 6)/N and reported
+        # .6929486 where Stata prints .6849608.
+        parameters = self.k_per_equation
         if observations > parameters > 0:
             return raw * ((observations - parameters) / observations) ** 2
         return raw
@@ -1128,7 +1224,9 @@ class VARResults:
         k_ar = int(raw.k_ar)
         k_trend = int(raw.k_trend)
         observations = int(raw.nobs)
-        df_eq = k_ar * neqs + k_trend
+        # Stata's per-equation parameter count includes the exogenous columns: ar a b, lags(1/2)
+        # exog(x) reports Parms = 6 (2 lags x 2 variables + x + _cons), not 5.
+        df_eq = k_ar * neqs + k_trend + len(getattr(self, "exog_names", ()) or ())
         # ``e()`` carries floats, as ``ereturn list`` prints them.
         payload: dict[str, Any] = {
             # ``var.sthlp:294+`` lists ``e(cmd)`` among the macros.  Without it,
@@ -1237,8 +1335,15 @@ class VARResults:
             # against the wrong centring. Using the full series gave .3648 for dinf where
             # Stata reports .3621.
             response = endog[-observations:, index]
-            centred = response - response.mean()
-            tss = float(centred @ centred)
+            # UNCENTRED WHEN THERE IS NO CONSTANT. MEASURED: `var a b, noconstant` reports
+            # R-sq .2401/.1972 where the centred formula gives .2146/.1690, and
+            # `1 - rss/sum(y^2)` reproduces both exactly. With a constant the denominator is the
+            # usual centred TSS, which already matched.
+            if int(self._result.k_trend) == 0:
+                tss = float(response @ response)
+            else:
+                centred = response - response.mean()
+                tss = float(centred @ centred)
             payload["r2" + suffix] = (
                 float(1.0 - rss / tss) if tss > 0.0 else float("nan")
             )
@@ -1998,13 +2103,30 @@ class VARResults:
         kwargs.setdefault("variables", list(self.names))
         return estat_summarize(self, **kwargs)
 
-    def summary(self, style: str = "stata") -> str:
+    def summary(
+        self,
+        style: str = "stata",
+        *,
+        small: bool = False,
+        dfk: bool = False,
+        level: float = 0.95,
+    ) -> str:
         """Render the two-table report Stata's ``var`` prints.
 
         The first table summarises each equation (Parms, RMSE, R-sq, chi2, P>chi2) and the
         second lists the coefficients grouped by equation and then by regressor, which is how
         ``var`` lays them out. Only ``style="stata"`` is meaningful here -- a VAR has no
         statsmodels-style summary to fall back to.
+
+        ``small`` is Stata's ``small``: the equation table swaps chi2/P>chi2 for F/P > F, and the
+        coefficient table swaps z/P>|z| for t/P>|t|.
+
+        ``dfk`` is Stata's ``dfk``: the standard errors are scaled by ``sqrt(N / (N - k))`` and
+        nothing else moves. MEASURED -- the log likelihood and the criteria are identical with and
+        without it, while ``_se[a:L1.a]`` goes from .0747464364 to .0758188934, a ratio of exactly
+        ``sqrt(178 / 173)``.
+
+        ``level`` is the confidence level of the printed interval (Stata's ``level(#)``).
         """
 
         if str(style).strip().lower() != "stata":
@@ -2110,8 +2232,16 @@ class VARResults:
         # measured ends, not a layout rule, so the header keeps its own list.
         _ends = [22, 23, 35, 44, 55, 64]
         _head_ends = [19, 24, 34, 43, 53, 64]
+        # Stata's `small` prints `F` and `P > F` in the same two slots -- note the space, which
+        # makes the label one character wider while the column still ends at 64.
+        # MEASURED: with `small` the header reads
+        #     'Equation           Parms      RMSE     R-sq        F       P > F'
+        # so `F` ends at 54 (one column left of `chi2`'s 55) and `P > F` at 64.
+        _equation_head_ends = [19, 24, 34, 43, 52, 64] if small else _head_ends
         header = _row(
-            ["Equation", "Parms", "RMSE", "R-sq", "chi2", "P>chi2"], _head_ends
+            ["Equation", "Parms", "RMSE", "R-sq"]
+            + (["F", "P > F"] if small else ["chi2", "P>chi2"]),
+            _equation_head_ends,
         )
         lines.append(header)
         lines.append("-" * 64)
@@ -2124,7 +2254,24 @@ class VARResults:
                         str(int(self.e.get("k" + suffix, per_equation))),
                         _six(self.e.get("rmse" + suffix)),
                         _four(self.e.get("r2" + suffix)),
-                        _chi(self.e.get("chi2" + suffix)),
+                        (
+                            # `small` reports the Wald statistic divided by the lag-coefficient
+                            # count: MEASURED 51.38465/4 = 12.846163. `dfk` shrinks it first by
+                            # (N - k)/N: 51.38465 * 173/178 = 49.94126.
+                            _chi(
+                                _equation_wald(self, suffix, dfk)
+                                # The divisor is EVERY coefficient except the constant -- lags
+                                # plus any exogenous columns. MEASURED: with exog(x) Stata
+                                # divides by 5 (Parms 6 minus _cons), giving 52.76008/5 = 10.55202.
+                                / max(
+                                    self.lags * len(self.names)
+                                    + len(self.exog_names),
+                                    1,
+                                )
+                            )
+                            if small
+                            else _chi(_equation_wald(self, suffix, dfk))
+                        ),
                         _four(self.e.get("p" + suffix)),
                     ],
                     _ends,
@@ -2140,13 +2287,16 @@ class VARResults:
         #
         #     '             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]'
         #      ^12 (blank)   ^26        ^37        ^44   ^53      ^78
+        # `small` swaps z/P>|z| for t/P>|t|; `level(#)` only relabels the interval column, which
+        # keeps the same width for any two-digit level.
+        _level_label = f"[{level * 100:g}% conf. interval]"
         _head_fields = [
             (12, ""),
             (26, "Coefficient"),
             (37, "Std. err."),
-            (44, "z"),
-            (53, "P>|z|"),
-            (78, "[95% conf. interval]"),
+            (44, "t" if small else "z"),
+            (53, "P>|t|" if small else "P>|z|"),
+            (78, _level_label),
         ]
         _header = ""
         _cursor = 0
@@ -2162,7 +2312,25 @@ class VARResults:
         parameters = np.asarray(self.stata_params, dtype=float)
         covariance = np.asarray(self.stata_cov_params, dtype=float)
         standard_errors = np.sqrt(np.diag(covariance))
-        critical = 1.959963984540054  # z at 95%; a VAR reports z, never t
+
+        # MEASURED `dfk`: the standard errors are multiplied by sqrt(N / (N - k)) and NOTHING else
+        # moves -- the log likelihood and every criterion are identical with and without it, while
+        # `_se[a:L1.a]` goes .0747464364 -> .0758188934, a ratio of exactly sqrt(178/173).
+        if dfk:
+            observations = int(self.nobs)
+            per_equation_parameters = int(per_equation)
+            if observations > per_equation_parameters:
+                standard_errors = standard_errors * float(
+                    np.sqrt(observations / (observations - per_equation_parameters))
+                )
+
+        # `small` switches the reference distribution from normal to Student t with N - k degrees of
+        # freedom; `level` moves the critical value on whichever scale is in use.
+        _df_resid = int(self.nobs) - int(per_equation)
+        if small:
+            critical = float(stats.t.ppf(0.5 + level / 2.0, max(_df_resid, 1)))
+        else:
+            critical = float(stats.norm.ppf(0.5 + level / 2.0))
 
         for index, equation in enumerate(equations):
             lines.append(f"{equation:<12} |")
@@ -2175,27 +2343,59 @@ class VARResults:
             for name in block_names:
                 if name == "_cons":
                     continue
-                base = name.split(".", 1)[1] if "." in name else name
+                # Only LAGGED variables form a group with a heading. An exogenous variable is a
+                # single row printed directly, so it stays out of this list and is emitted below.
+                if "." not in name:
+                    continue
+                base = name.split(".", 1)[1]
                 if base not in regressors:
                     regressors.append(base)
             for regressor in regressors:
                 lines.append(f"{regressor:>12} |")
                 for offset, name in enumerate(block_names):
-                    if name == "_cons" or not name.endswith(regressor):
+                    if name == "_cons":
                         continue
-                    if name.split(".", 1)[1] != regressor:
+                    # A lag row is `L1.a`; an exogenous row is the bare variable name, which has no
+                    # dot -- splitting unconditionally raised IndexError on `x`.
+                    if "." in name:
+                        if name.split(".", 1)[1] != regressor:
+                            continue
+                    elif name != regressor:
                         continue
                     position = start + offset
                     lines.append(
                         _coefficient_row(
-                            name.split(".", 1)[0] + ".",
+                            (name.split(".", 1)[0] + ".") if "." in name else name,
                             parameters[position],
                             standard_errors[position],
                             critical,
+                            small=small,
+                            degrees_of_freedom=_df_resid,
                         )
                     )
                 lines.append(f"{'':>12} |")
+            # `noconstant` fits no intercept, so Stata prints no `_cons` row and no blank line in
+            # front of it -- MEASURED on `var a b, lags(1/2) noconstant`, where the equation block
+            # ends immediately after the last lag row.
+            # The exogenous rows: one line each, no heading, no trailing blank.
+            for offset, name in enumerate(block_names):
+                if name == "_cons" or "." in name:
+                    continue
+                position = start + offset
+                lines.append(
+                    _coefficient_row(
+                        name,
+                        parameters[position],
+                        standard_errors[position],
+                        critical,
+                        small=small,
+                        degrees_of_freedom=_df_resid,
+                    )
+                )
+
             constants = [i for i, name in enumerate(block_names) if name == "_cons"]
+            if not constants and lines and lines[-1].rstrip().endswith("|"):
+                lines.pop()
             for offset in constants:
                 position = start + offset
                 lines.append(
@@ -2204,11 +2404,21 @@ class VARResults:
                         parameters[position],
                         standard_errors[position],
                         critical,
+                        small=small,
+                        degrees_of_freedom=_df_resid,
                     )
                 )
             lines.append("-" * 13 + "+" + "-" * 64)
         lines[-1] = "-" * 78
         _ = trend
+        if dfk:
+            # MEASURED: `var a b, dfk` ends with this two-line note; the continuation is
+            # indented by six spaces so it starts under 'Small-sample'.
+            lines.append(
+                "Note: Small-sample degrees-of-freedom adjustment applied when estimating"
+            )
+            lines.append("      covariance matrix of residuals.")
+
         return chr(10).join(lines)
 
 
@@ -3317,8 +3527,7 @@ class VECMResults:
                 #                              [95% conf. interval] 78
                 # Columns end at 14 / 26 / 37 / 44 / 53 / 78, so the field widths are
                 # 12, 11, 7, 9 and 25 -- measured, not guessed.
-                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>11}{'z':>7}{'P>|z|':>9}"
-                f"{'[95% conf. interval]':>25}",
+                f"{'':<13}|{'Coefficient':>12}{'Std. err.':>11}{'z':>7}{'P>|z|':>9}{'[95% conf. interval]':>25}",
                 "-" * 13 + "+" + "-" * 64,
             ]
         )

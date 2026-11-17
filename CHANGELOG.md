@@ -7,6 +7,81 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.36] - 2026-11-18
+
+### Added — every `var` option Stata actually has
+
+`exog()`, `noconstant`, `dfk`, `small` and `level()`. **Ten command shapes are byte-identical to
+Stata**, including the combinations:
+
+| command | result |
+|---|---|
+| `var a b, lags(1/2)` | ✅ |
+| `var a b, lags(1/2) exog(x)` | ✅ |
+| `var a b, lags(1/2) noconstant` | ✅ |
+| `var a b, lags(1/2) small` | ✅ |
+| `var a b, lags(1/2) dfk` | ✅ |
+| `var a b, lags(1/2) level(99)` | ✅ |
+| `var a b, lags(1/2) exog(x) small` | ✅ |
+| `var a b, lags(1/2) exog(x) dfk` | ✅ |
+| `var a b, lags(1/2) exog(x) dfk level(99)` | ✅ |
+| `var a b, lags(1/2) exog(x x2)` | ✅ |
+
+```python
+ws.VAR(values, lags=2, exog=frame[["x"]], trend="n").fit().summary(
+    small=True, dfk=True, level=0.99
+)
+```
+
+### The option list was PROBED, not recalled
+
+Stata 19.5 accepts `lags()`, `exog()`, `noconstant`, `dfk`, `small` and `level()` on `var`. It
+**rejects** `nobalc`, `noback`, `noprint`, `nofootnote`, `noheader`, `novce`, `ml`, `mle`, `tmin()`
+and `tmax()` with `r(198)`, so none of those appear in the signature.
+
+### Four corrections that had to be measured
+
+**`dfk` moves only the standard errors.** The log likelihood and every criterion are identical with
+and without it; `_se[a:L1.a]` goes `.0747464364` → `.0758188934`, a ratio of exactly
+`sqrt(N/(N-k))`. The equation Wald statistic shrinks by `(N-k)/N`: `51.38465` → `49.94126`.
+
+**`small` divides the Wald statistic by the non-constant coefficients.** `lags*neqs`, plus any
+exogenous columns — so `exog(x)` makes the divisor **5** where a plain fit uses 4. The reference
+distribution also switches from normal to Student t (`.159` becomes `.161` on one row).
+
+**`level` takes a FRACTION, not a percentage.** Stata writes `level(99)`; this package's R3.3
+requires `0.95`/`0.99`, so `summary(level=0.99)` reproduces `var ..., level(99)`. The printed
+label is still `[99% conf. interval]`.
+
+**`noconstant` switches R-squared to the UNCENTRED denominator.** It reports `.2401/.1972` where the
+centred formula gives `.2146/.1690`, i.e. `1 - rss/sum(y²)`.
+
+**The exogenous columns belong in `k_per_equation`.** That count drives `ml_factor`, and therefore
+`e(Sigma)`, `e(detsig)` and every Wald statistic. Leaving them out reported `.6929486` where Stata
+prints `.6849608`, and `.6929` again on `Det(Sigma_ml)`. A second copy of the same assumption lived
+in `det_sigma`, which hard-coded `2*k_ar+1` — correct only for two variables and no exogenous column.
+
+### Layout details found by comparing
+
+* the exogenous row prints as `x |` with **no group heading and no trailing blank line**, unlike a
+  lag group;
+* `noconstant` prints no `_cons` row *and* no blank line in front of it;
+* the parameter layout puts the exogenous block after the trend and **before** the lag blocks, so
+  the lag offset is `k_trend + n_exog` — omitting it printed `.07617` where Stata prints `.5161514`;
+* `small`'s header ends are `[19, 24, 34, 43, 52, 64]`, one column left of the chi2 header's.
+
+### Fixed while measuring
+
+`VECMResults.summary`'s coefficient header had been split across two list elements by an earlier
+edit, printing as two lines instead of one. `tests/test_vecm_coefficient_table.py` caught it.
+
+### Verified
+
+19 tests in `tests/test_var_options.py`, ten of them parametric over every option combination and
+each compared against a live Stata run.
+
+---
+
 ## [0.3.35] - 2026-11-17
 
 ### Added — `varsoc`'s configuration options

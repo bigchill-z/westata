@@ -7,6 +7,56 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.35] - 2026-11-17
+
+### Added — `varsoc`'s configuration options
+
+`varlmar`, `varstable`, `varwle`, `vargranger` and the `irf` suite were already implemented and
+already byte-identical to Stata. `varsoc` was the one with gaps, and it now takes the options Stata
+actually accepts:
+
+```python
+ws.varsoc(values, names=["a", "b"], maxlag=3, exog=frame[["x"]], constant=False)
+```
+
+Five shapes are byte-identical to Stata, including the two combinations:
+
+| command | result |
+|---|---|
+| `varsoc a b, maxlag(3)` | ✅ |
+| `varsoc a b, maxlag(3) exog(x)` | ✅ |
+| `varsoc a b, maxlag(3) noconstant` | ✅ |
+| `varsoc a b, maxlag(2) exog(x) noconstant` | ✅ |
+| `varsoc a b, maxlag(4)` | ✅ |
+
+### The option list was PROBED, not recalled
+
+Stata 19.5 accepts `maxlag()`, `exog()`, `sep()` and `constant`; it **rejects** `noforsc`, `dots` and
+`dfk` with `r(198)`. Those three are deliberately absent from the signature rather than accepted and
+ignored. `sep()` only spaces the printed block and changes no number, so it is not modelled.
+
+### Two lag-0 rules that only the `noconstant` captures revealed
+
+* The lag-0 row disappears **only when there is nothing to regress on** — no constant AND no
+  exogenous variables. `varsoc a b, noconstant` starts at lag 1, but
+  `varsoc a b, exog(x) noconstant` still prints lag 0 because `x` is a regressor.
+* When it does disappear, the first printed row still carries `.` in the **LR and p** columns, with
+  `df` showing the equation count (`equations²`, not `equations`). The p field is right-aligned to
+  column 38 — a start-anchored column put the dot four places early, visible only on that row.
+
+### A note on the comparison fixture
+
+The first attempt used a bivariate series derived from `gdp_china.dta`. Its third lag is degenerate
+(`det(Sigma)` around `1e-22`), and **Stata's own table jumped by a factor of six between lag 2 and
+lag 3** there. That is a property of the data, not of either implementation, so the regression tests
+generate a well-behaved VAR(2) process instead.
+
+### Verified
+
+13 tests in `tests/test_var_postestimation_options.py`, every one comparing against a live Stata run.
+
+---
+
 ## [0.3.34] - 2026-11-17
 
 ### Fixed — the core `var` command's summary, and a missing `from_formula`

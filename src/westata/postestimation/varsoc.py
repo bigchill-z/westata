@@ -67,6 +67,10 @@ class VarSocResult:
     sample_end: int
     #: The endogenous series names, for the Endogenous: footnote Stata prints.
     names: tuple[str, ...] = ()
+    #: Stata's ``exog(varlist)``, in the order the footnote lists them.
+    exog_names: tuple[str, ...] = ()
+    #: Whether a constant was fitted; ``noconstant`` turns it off.
+    constant: bool = True
 
     def to_frame(self) -> pd.DataFrame:
         """The table as a DataFrame."""
@@ -214,6 +218,16 @@ class VarSocResult:
                 lr_cell = number(row.lr, 5) + ("*" if row.lr == best_lr else "")
                 df_cell = str(int(row.lr_df))
                 p_cell = f"{row.lr_pvalue:.3f}"
+            elif (
+                not self.constant
+                and not self.exog_names
+                and row.lag == min(item.lag for item in self.rows)
+            ):
+                # df is the equation count (each equation gains `equations` parameters per lag);
+                # leaving it blank shifted `p` left by four columns.
+                lr_cell = "."
+                df_cell = str(int(self.equations) ** 2)
+                p_cell = "."
             else:
                 lr_cell = df_cell = p_cell = ""
             # `place` counts from the first character AFTER "  |", so every end is three lower
@@ -261,7 +275,10 @@ class VarSocResult:
                 max(9, 18 - len(number(row.ll))): number(row.ll),
                 _lr_start: lr_cell,
                 30: df_cell,
-                33: p_cell,
+                # The p field is RIGHT-aligned to column 38: `0.342` starts at 33, while the
+                # `noconstant` placeholder `.` sits at 37 -- a start-anchored 33 put the dot four
+                # columns early, which only that row could reveal.
+                max(33, 38 - len(p_cell)): p_cell,
                 max(39, 46 - len(fpe_text(float(row.fpe), best_fpe).rstrip("*"))): fpe_text(float(row.fpe), best_fpe),
             }
             # The measured START column for each criterion's END column.
@@ -300,7 +317,12 @@ class VarSocResult:
         _names_for_footer = getattr(self, "names", None)
         if isinstance(_names_for_footer, (list, tuple)) and _names_for_footer:
             lines.append("   Endogenous: " + " ".join(str(n) for n in _names_for_footer))
-            lines.append("    Exogenous: _cons")
+            # MEASURED: `varsoc a b, exog(x)` prints `Exogenous: x  _cons` -- the exog list
+            # then the constant, two spaces apart; with no exog it is just `_cons`.
+            _exog_label = "  ".join(list(self.exog_names) + (["_cons"] if self.constant else []))
+            # NO `.rstrip()` HERE: Stata prints `    Exogenous: ` with the trailing space when
+            # `noconstant` leaves the list empty.
+            lines.append(f"    Exogenous: {_exog_label}")
         return chr(10).join(lines)
 
 
@@ -310,11 +332,24 @@ def varsoc(
     maxlag: int = 4,
     trend: str = "c",
     names: list[str] | None = None,
+    exog: Any = None,
+    constant: bool = True,
 ) -> VarSocResult:
     """Lag-order selection, as Stata's ``varsoc``.
 
     ``data`` holds the endogenous series in time order (rows) by equation (columns). Missing
     rows must already be dropped. ``trend="c"`` fits a constant, which is Stata's default.
+
+    ``exog`` is Stata's ``exog(varlist)``: variables entered in every equation at every lag order.
+    The list goes into each design matrix next to the lags and is named in the ``Exogenous:``
+    footnote, exactly as Stata prints it.
+
+    ``constant=False`` drops the intercept, Stata's ``noconstant``.
+
+    THE FULL OPTION LIST WAS PROBED, not taken from memory. Stata 19.5 accepts ``maxlag()``,
+    ``exog()``, ``sep()`` and ``constant``; it REJECTS ``noforsc``, ``dots`` and ``dfk`` with
+    ``r(198)``, so those are deliberately absent here rather than silently ignored. ``sep()`` only
+    spaces the printed block and has no effect on the numbers, so it is not modelled.
     """
 
     # The series names come from a DataFrame, so the Endogenous footnote can list them.
@@ -330,6 +365,29 @@ def varsoc(
             "varsoc: the data contain non-finite values; drop the missing rows first"
         )
     nobs_total, equations = values.shape
+
+    # Stata's `exog(varlist)`: extra regressors that appear in every equation, at every order.
+    exog_values = None
+    exog_names: list[str] = []
+    if exog is not None:
+        # The COLUMN NAMES are the honest source: a generated x1/x2 would print a footnote Stata
+        # never shows. `names is None` was the wrong guard -- the endogenous names are separate.
+        if hasattr(exog, "columns"):
+            exog_names = [str(column) for column in exog.columns]
+        exog_values = np.asarray(exog, dtype=float)
+        if exog_values.ndim == 1:
+            exog_values = exog_values.reshape(-1, 1)
+        if exog_values.shape[0] != nobs_total:
+            raise ConsistencyError(
+                f"varsoc: exog has {exog_values.shape[0]} rows but the data have {nobs_total}"
+            )
+        if not np.all(np.isfinite(exog_values)):
+            raise ConsistencyError("varsoc: the exog data contain non-finite values")
+        if not exog_names:
+            exog_names = [f"x{i + 1}" for i in range(exog_values.shape[1])]
+    elif names is None and hasattr(data, "columns"):
+        names = [str(column) for column in data.columns]
+
     if maxlag < 1:
         raise ValueError(f"maxlag must be at least 1; got {maxlag}")
     if nobs_total <= maxlag + 1:
@@ -345,13 +403,27 @@ def varsoc(
     rows: list[VarSocRow] = []
     previous_ll: float | None = None
     previous_k: int | None = None
-    for lag in range(maxlag + 1):
-        columns = [np.ones((sample_size, 1))]
+    # MEASURED: the lag-0 row disappears only when there is NOTHING to regress on -- no constant
+    # AND no exogenous variables. `varsoc a b, noconstant` starts at lag 1, but
+    # `varsoc a b, exog(x) noconstant` still prints lag 0 because `x` is a regressor.
+    _first_lag = 0 if (constant or exog_values is not None) else 1
+    for lag in range(_first_lag, maxlag + 1):
+        columns = [np.ones((sample_size, 1))] if constant else []
         for depth in range(1, lag + 1):
             columns.append(values[maxlag - depth : maxlag - depth + sample_size])
-        design = np.column_stack(columns)
-        coefficients, *_ = np.linalg.lstsq(design, response, rcond=None)
-        residual = response - design @ coefficients
+        if exog_values is not None:
+            columns.append(exog_values[maxlag:])
+        if not columns:
+            # `noconstant` at lag 0 leaves nothing to regress on: Stata prints an intercept-only
+            # comparison row regardless, so fall back to the mean (the zero-column design).
+            design = np.zeros((sample_size, 0))
+        else:
+            design = np.column_stack(columns)
+        if design.shape[1]:
+            coefficients, *_ = np.linalg.lstsq(design, response, rcond=None)
+            residual = response - design @ coefficients
+        else:
+            residual = response - response.mean(axis=0)
         # ML residual covariance: divide by T, which is what Stata's var stores.
         sigma = (residual.T @ residual) / sample_size
         determinant = float(np.linalg.det(sigma))
@@ -385,7 +457,11 @@ def varsoc(
         # THE SAMPLE ALSO DIFFERS BY ROW: lag 0 is evaluated on the common window, lag >= 1 on its
         # OWN sample. That is the second half of the fix and the reason the gap was not constant
         # across lags.
-        _eqparm = lag * equations + 1
+        _eqparm = (
+            lag * equations
+            + (1 if constant else 0)
+            + (0 if exog_values is None else exog_values.shape[1])
+        )
         # ALL ROWS USE THE COMMON WINDOW. Stata's varsoc evaluates every lag on the same rows --
         # the ones left after the largest lag -- which is not the same as ar, whose _fpe uses the
         # per-order sample. Measured: with drop=maxlag all three lags match (.855661/.885083/.903268),
@@ -394,10 +470,16 @@ def varsoc(
         _usable = nobs_total - _drop
         if _usable > _eqparm > 0:
             _target = values[_drop:]
-            _regressors = [np.ones((_usable, 1))]
+            _regressors = [np.ones((_usable, 1))] if constant else []
             for _step in range(1, lag + 1):
                 _regressors.append(values[_drop - _step : nobs_total - _step])
-            _design = np.column_stack(_regressors)
+            if exog_values is not None:
+                _regressors.append(exog_values[_drop:])
+            _design = (
+                np.column_stack(_regressors)
+                if _regressors
+                else np.zeros((_usable, 0))
+            )
             _coefficients, *_ = np.linalg.lstsq(_design, _target, rcond=None)
             _residuals = _target - _design @ _coefficients
             _sigma = _residuals.T @ _residuals / _usable
@@ -411,6 +493,9 @@ def varsoc(
         lr = 0.0
         lr_df = 0
         lr_p = float("nan")
+        # With `noconstant` the first printed row has no predecessor, but Stata still writes `.` in
+        # the LR/df/p columns rather than leaving them blank.
+        _leading_placeholder = not constant and lag == _first_lag
         if previous_ll is not None and previous_k is not None:
             lr = 2.0 * (loglikelihood - previous_ll)
             lr_df = (k - previous_k) * equations
@@ -439,4 +524,6 @@ def varsoc(
         sample_start=int(maxlag + 1),
         sample_end=int(nobs_total),
         names=tuple(names) if names else (),
+        exog_names=tuple(exog_names),
+        constant=bool(constant),
     )

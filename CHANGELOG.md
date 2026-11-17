@@ -7,6 +7,63 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.34] - 2026-11-17
+
+### Fixed — the core `var` command's summary, and a missing `from_formula`
+
+`VAR` already estimated correctly: the coefficient table, the log likelihood and every Wald
+statistic matched Stata before this round. What was wrong was the wrapping, and the summary had four
+formatting defects plus a convention gap.
+
+The whole block is now byte-identical to Stata — **39 lines, no differences** — for a bivariate
+system:
+
+```
+Sample: 1982 thru 2013                          Number of obs     =         32
+Log likelihood =   210.1459                     AIC               =  -12.50912
+FPE            =   1.27e-08                     HQIC              =  -12.35729
+Det(Sigma_ml)  =   6.78e-09                     SBIC              =  -12.05108
+
+Equation           Parms      RMSE     R-sq      chi2     P>chi2
+----------------------------------------------------------------
+dlny                  5     .019038   0.4624   27.52616   0.0000
+dlny2                 5     .005147   0.8542   187.5133   0.0000
+```
+
+| defect | what it was | what it is |
+|---|---|---|
+| `Sample:` | printed row indices, `3 thru 34` | prints the `tsset` values, `1982 thru 2013` |
+| `FPE` / `Det(Sigma_ml)` | `1.272482e-08` | `1.27e-08` — `%.2e` below `1e-5` |
+| per-equation `RMSE` | seven digits below one, `.0190378` | `.019038` |
+| block ending | no trailing blank line | one, as Stata prints |
+
+The `RMSE` rule needed BOTH halves and neither alone works: `|x| >= 1` takes six significant figures
+(`1.002543` → `1.00254`) while `|x| < 1` takes six decimals with trailing zeros trimmed
+(`.019037756` → `.019038`).
+
+### Added — `VAR.from_formula`
+
+`VAR` was the only estimator class without it, which R3.2 requires of every model:
+
+```python
+ws.VAR.from_formula("df = ~ lny + dlny", frame, lags=2).fit()
+```
+
+The left side is a placeholder naming the endogenous set — `df`, `y` or `.` — and anything else must
+list exactly the same variables. `subset=` follows R3.4 and is applied as `data.loc[subset]` before
+estimation.
+
+The time axis is **never inferred from a column name**. Pass `time=` to the constructor for
+`Sample: 1982 thru 2013`; without it the summary falls back to row indices rather than silently
+attaching the wrong axis.
+
+### Verified
+
+14 tests in `tests/test_var_core_command.py`, one of which runs `var dlny dlny2, lags(1/2)` in live
+Stata and compares all 39 lines. The `var`/`vecm`/`irf` suites (934 tests) still pass.
+
+---
+
 ## [0.3.33] - 2026-11-17
 
 ### Added — `ws.irf_table(res).plot()`

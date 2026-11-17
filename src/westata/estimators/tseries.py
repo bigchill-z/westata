@@ -92,7 +92,17 @@ def _six(value: Any) -> str:
         return "."
     if number != number:
         return "."
-    text = f"{number:.6g}"
+    # HYBRID, and both halves are needed:
+    #   |x| >= 1  -> six significant figures  (1.002543 -> 1.00254)
+    #   |x| <  1  -> six decimals with trailing zeros trimmed  (.019037756 -> .019038)
+    # A pure %.6g prints .0190378 (seven digits: the leading zero is not significant) and a pure
+    # %.6f prints 1.002543, so neither rule alone reproduces the measured column.
+    if abs(number) >= 1.0:
+        text = f"{number:.6g}"
+    else:
+        text = f"{number:.6f}".rstrip("0")
+        if text.endswith("."):
+            text += "0"
     if text.startswith("0."):
         text = text[1:]
     elif text.startswith("-0."):
@@ -529,6 +539,24 @@ def _stata_stat(value: float, digits: int = 7) -> str:
     return text_value
 
 
+def _scale_stat(value: float) -> str:
+    """Stata's format for FPE / Det(Sigma_ml): scientific when the magnitude is tiny.
+
+    MEASURED on a bivariate VAR(2): Stata prints ``1.27e-08`` and ``6.78e-09`` where a fixed decimal
+    format produced ``1.272482e-08``. ``%.2e`` reproduces both.
+
+    Larger values keep the ordinary form -- ``.0004889`` on the one-variable fixture -- so the switch
+    is on magnitude, not on the row.
+    """
+
+    if value is None or not np.isfinite(value):
+        return "."
+    magnitude = abs(float(value))
+    if magnitude != 0.0 and magnitude < 1e-5:
+        return f"{float(value):.2e}"
+    return _stata_stat(float(value))
+
+
 class VAR:
     """Vector autoregression (Stata ``var``).
 
@@ -553,6 +581,7 @@ class VAR:
         *,
         trend: str = "c",
         names: Sequence[str] | None = None,
+        time: Any = None,
     ) -> None:
         values = np.asarray(endog, dtype=float)
         if values.ndim == 1:
@@ -576,6 +605,79 @@ class VAR:
                 f"names has {len(self._names)} entries but endog has "
                 f"{values.shape[1]} columns"
             )
+        # Stata's `var` prints `Sample: 1982 thru 2013`, the ACTUAL time values from `tsset`, not
+        # row indices. Optional: without it the summary falls back to indices rather than inventing
+        # dates.
+        self._time = None if time is None else np.asarray(time).reshape(-1)
+        if self._time is not None and self._time.size != values.shape[0]:
+            raise ValueError(
+                f"time has {self._time.size} entries but endog has {values.shape[0]} rows"
+            )
+
+    @classmethod
+    def from_formula(
+        cls,
+        formula: str,
+        data: Any,
+        *,
+        lags: int | None = 1,
+        trend: str = "c",
+        subset: Any = None,
+    ) -> "VAR":
+        """Build a VAR from a formula, like every other model in this package.
+
+        Stata writes ``var y1 y2``, naming the endogenous variables positionally. A formula needs
+        something on the left-hand side, so the LEFT side is required and must list the same
+        variables as the right side -- ``var df = ~ lny + dlny`` is the natural spelling and the one
+        Stata users reach for first::
+
+            ws.VAR.from_formula("df = ~ lny + dlny", frame, lags=2).fit()
+
+        ``subset`` takes a boolean mask over the same frame, per R3.4.
+        """
+
+        if "=" not in formula:
+            raise ConsistencyError(
+                "var: the formula must name the endogenous variables, e.g. 'df = ~ lny + dlny'"
+            )
+        left, _, right = formula.partition("=")
+        left = left.strip()
+        right = right.strip().lstrip("~").strip()
+        variables = [part.strip() for part in right.split("+") if part.strip()]
+        if not variables:
+            raise ConsistencyError("var: the formula lists no endogenous variables")
+        # `df` is a placeholder for "all of them"; anything else must name the same set.
+        if left and left.lower() not in ("df", "y", "."):
+            named = [part.strip() for part in left.split("+") if part.strip()]
+            if sorted(named) != sorted(variables):
+                raise ConsistencyError(
+                    f"var: the left side {named} does not match the endogenous list {variables}"
+                )
+
+        for name in variables:
+            if name not in data.columns:
+                raise ConsistencyError(
+                    f"var: variable {name!r} not found; available columns: {list(data.columns)}"
+                )
+
+        # R3.4: `subset` is applied to the FRAME before anything is estimated.
+        if subset is not None:
+            data = data.loc[subset]
+            if data.empty:
+                raise ConsistencyError("var: `subset` selects no rows")
+
+        frame = data[list(variables)].dropna()
+        # The time axis is OPTIONAL and never guessed from a column name: a caller who wants
+        # Sample: 1982 thru 2013 passes 	ime= to the constructor. Picking "year" by convention
+        # would silently attach the wrong axis on another dataset.
+        time = None
+        return cls(
+            frame.to_numpy(dtype=float),
+            lags=lags,
+            trend=trend,
+            names=list(variables),
+            time=time,
+        )
 
     def _make_model(self, lags: int) -> Any:
         from statsmodels.tsa.vector_ar.var_model import VAR as _SMVAR
@@ -714,7 +816,9 @@ class VAR:
                 "explicitly (Stata requires you to choose, too)"
             )
         result = self._make_model(self._lags)
-        return VARResults(result, self._names, self._lags, self._trend, ml=ml)
+        return VARResults(
+            result, self._names, self._lags, self._trend, ml=ml, time=self._time
+        )
 
 
 @dataclass
@@ -735,6 +839,9 @@ class VARResults:
     lags: int
     trend: str
     ml: bool = True
+    #: The `tsset` time values, when the caller supplied them. Stata prints real dates in
+    #: ``Sample: 1982 thru 2013``; without this the summary falls back to row indices.
+    time: Any = None
 
     # -- Stata's degrees-of-freedom convention -------------------------------
     @property
@@ -1951,6 +2058,17 @@ class VARResults:
         _start = int(getattr(self._result, "k_ar", 1)) + 1
         _end = _total
 
+        # MEASURED: Stata prints the actual `tsset` values -- `Sample: 1982 thru 2013` -- while row
+        # indices gave `3 thru 34`. When no time axis was supplied the indices are the honest
+        # fallback rather than invented dates.
+        if self.time is not None:
+            _times = np.asarray(self.time).reshape(-1)
+            if _times.size == int(getattr(_endog, "shape", [0])[0] if _endog.ndim == 2 else _total):
+                _first = _times[_start - 1]
+                _last = _times[-1]
+                _start = int(_first) if float(_first) == int(_first) else _first
+                _end = int(_last) if float(_last) == int(_last) else _last
+
         lines: list[str] = [
             "",
             "Vector autoregression",
@@ -1959,9 +2077,9 @@ class VARResults:
             f"Number of obs     = {_usable:>10}",
             (f"{'Log likelihood':<15}= {_stata_stat(float(self.ll)):>10}").ljust(48)
             + _crit_block[0],
-            (f"{'FPE':<15}= {_stata_stat(float(self.fpe)):>10}").ljust(48)
+            (f"{'FPE':<15}= {_scale_stat(float(self.fpe)):>10}").ljust(48)
             + _crit_block[1],
-            (f"{'Det(Sigma_ml)':<15}= {_stata_stat(float(self.det_sigma)):>10}").ljust(48)
+            (f"{'Det(Sigma_ml)':<15}= {_scale_stat(float(self.det_sigma)):>10}").ljust(48)
             + _crit_block[2],
             "",
         ]

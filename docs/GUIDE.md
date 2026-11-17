@@ -477,10 +477,19 @@ print(fit)                 # the estimation block
 print(ws.irf_table(fit))   # the responses
 ```
 
-`keep` is Stata's `if` condition. Pass the **full** frame with it rather than pre-filtering: Stata
-builds the lag over the complete time axis (`_qsur.ado:54` marks out the lag on the whole sample), so
-filtering first turns the first retained observation's regressor into a missing value and shifts every
-estimate.
+Filtering belongs in pandas: slice the frame and pass it in, as with any other estimator here — with
+one exception. A condition that cuts the **head** of the series needs `subset=` instead, because Stata
+builds the lag over the complete time axis (`_qsur.ado:54`) and a retained first row may look back
+past the boundary. A pre-sliced frame has nothing there, so that row is lost:
+
+| `if year>=1985` | N | response at step 1 |
+|---|---|---|
+| Stata | 29 | `.528017` |
+| pandas pre-slice (warns) | 28 | `.502390` |
+| `subset=` on the full frame | 29 | `.528017` |
+
+`subset` is also the package-wide spelling for Stata's `if`/`in` (`OLS`, `Logit`, `Poisson`,
+`FEOLS`). Cutting the tail (`year<2013`) is unaffected, so ordinary slicing is fine there.
 
 The bands are delta-method bands with Stata's `/T` covariance normalisation, and the numbers use
 Stata's `%10.0g` format — below `1e-5` they switch to scientific notation.

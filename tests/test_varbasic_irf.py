@@ -71,14 +71,14 @@ def test_the_user_command_matches_stata(panel) -> None:
         "(1) irfname = varbasic, impulse = dlny, and response = dlny.",
         "",
     ]
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", keep=panel["year"] < 2013)
+    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] < 2013)
     assert str(ws.irf_table(fitted)).split("\n") == expected
 
 
 def test_the_estimation_block_numbers_match(panel) -> None:
     """Log likelihood, the information criteria and the equation Wald statistic."""
 
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", keep=panel["year"] < 2013)
+    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] < 2013)
     assert fitted.nobs == 33
     assert fitted.ll == pytest.approx(80.96115340, abs=1e-8)
     assert fitted.aic == pytest.approx(-4.78552445, abs=1e-8)
@@ -131,7 +131,7 @@ def test_keep_builds_the_lag_before_filtering(panel) -> None:
     from Stata's .528017 to .502390. `_qsur.ado:54` marks out the lag over the full sample.
     """
 
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", keep=panel["year"] >= 1985)
+    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] >= 1985)
     assert fitted.nobs == 29
     values = ws.irf_table(fitted).responses[0].values
     assert values[1] == pytest.approx(0.528017, abs=1e-6)
@@ -139,7 +139,7 @@ def test_keep_builds_the_lag_before_filtering(panel) -> None:
 
 def test_keep_selecting_nothing_raises(panel) -> None:
     with pytest.raises(ws.ConsistencyError):
-        ws.varbasic(panel, "dlny", lags=1, time="year", keep=panel["year"] > 3000)
+        ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] > 3000)
 
 
 # ---------------------------------------------------------------- number format
@@ -175,7 +175,7 @@ def test_irf_table_matches_live_stata(panel) -> None:
     except Exception:  # noqa: BLE001
         pytest.skip("live Stata is not available")
 
-    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", keep=panel["year"] < 2013)
+    fitted = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] < 2013)
     ours = str(ws.irf_table(fitted)).split("\n")
 
     try:

@@ -4,8 +4,8 @@
   ],
   "varbasic": {
     "stata": "varbasic dlny, lags(1) irf",
-    "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. `keep` is Stata's `if` condition; pass the FULL frame with it rather than pre-filtering, because the lag is built over the complete time axis.",
-    "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。`keep` 对应 Stata 的 `if` 条件；请传入**完整**数据框，因为滞后是在完整时间轴上构造的。",
+    "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filter with pandas as usual; use `subset` only when the condition cuts the HEAD of the series, because Stata builds the lag over the complete time axis and a retained first row may look back past the boundary.",
+    "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。照常用 pandas 筛选即可；只有当条件**截头**时才用 `subset`，因为 Stata 在完整时间轴上构造滞后，保留下来的首行可能需要回看边界之外。",
     "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')"
   },
   "irf_table": {
@@ -16,8 +16,8 @@
   },
   "Varbasic": {
     "stata": "varbasic dlny, lags(1) irf",
-    "en": "Class form of `varbasic`: `Varbasic(frame, 'dlny').fit()` equals `varbasic(...)`.",
-    "zh": "`varbasic` 的类形式：先用数据构造，再调用 `fit()` 得到结果，与直接调用 `varbasic(...)` 完全等价。",
+    "en": "Class form of `varbasic`: `Varbasic(frame, 'dlny').fit()` equals `varbasic(...)`, including the `subset` mask for a head-cutting condition.",
+    "zh": "`varbasic` 的类形式：`Varbasic(frame, 'dlny').fit()` 与 `varbasic(...)` 等价，同样支持用 `subset` 表达截头的条件。",
     "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.Varbasic(frame, 'dlny', lags=1, time='t').fit()"
   },
   "IrfResult": {

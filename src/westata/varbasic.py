@@ -204,14 +204,14 @@ class Varbasic:
         lags: int = 1,
         trend: str = "c",
         time: str | None = None,
-        keep: "pd.Series | None" = None,
+        subset: "Any | None" = None,
     ) -> None:
         self._series = series
         self._variables = variables
         self._lags = lags
         self._trend = trend
         self._time = time
-        self._keep = keep
+        self._subset = subset
 
     def fit(self) -> IrfResult:
         """Estimate the VAR and register the IRF (the responses need :func:`irf_table`)."""
@@ -222,7 +222,7 @@ class Varbasic:
             lags=self._lags,
             trend=self._trend,
             time=self._time,
-            keep=self._keep,
+            subset=self._subset,
         )
 
 
@@ -233,7 +233,7 @@ def varbasic(
     lags: int = 1,
     trend: str = "c",
     time: str | None = None,
-    keep: "pd.Series | None" = None,
+    subset: "Any | None" = None,
 ) -> IrfResult:
     """Stata's ``varbasic``: fit a VAR(p) and register an IRF.
 
@@ -241,12 +241,19 @@ def varbasic(
     ``varbasic`` itself prints only the estimation block -- the responses need :func:`irf_table`,
     which is also what Stata requires.
 
-    ``keep`` is Stata's ``if`` condition as a boolean mask over ``series``. PASS THE FULL SERIES with
-    ``keep`` rather than pre-filtering: Stata builds the lag on the complete time axis and only then
-    restricts the sample (`_qsur.ado:54` marks out ``l(touse).(varlist)``). Pre-filtering changes the
-    first retained observation's lag from a real value to a missing one and shifts every estimate --
-    on this fixture, ``year>=1985`` gives ``.528017`` from the full series but ``.502390`` from a
-    pre-filtered frame.
+    Everyday filtering belongs in pandas: slice the frame and pass it in, exactly as with any other
+    estimator here.
+
+    ONE CASE DIFFERS FROM STATa, and only this one: a condition that cuts the HEAD of the series.
+    Stata builds the lag over the complete time axis and only then restricts the sample
+    (`_qsur.ado:54`), so a retained first row may look back past the boundary. A pre-sliced frame has
+    nothing there, so that row's regressor is missing and the sample shrinks by one -- measured on
+    gdp_china.dta with ``year>=1985``: Stata reports ``.528017`` over 29 observations, the pre-sliced
+    frame gives ``.502390`` over 28. Cutting the TAIL (``year<2013``) is unaffected.
+
+    ``subset`` exists for exactly that case: pass the FULL frame plus a boolean mask and the lag is
+    built before the filter. It is also the package-wide spelling for Stata's ``if``/``in``
+    (``OLS``, ``Logit``, ``Poisson``, ``FEOLS``), so the two paths share one name.
     """
 
     names = [variables] if isinstance(variables, str) else list(variables)
@@ -278,13 +285,30 @@ def varbasic(
 
     # A row is usable when its lag and its response are both present ...
     usable = ~np.isnan(lagged).any(axis=1) & ~np.isnan(response).any(axis=1)
-    # ... and, when `keep` is given, when the `if` condition accepts the RESPONSE row.
-    if keep is not None:
-        mask = pd.Series(keep, index=series.index).fillna(False).astype(bool).to_numpy()
+    # ... and, when `subset` is given, when Stata's `if` accepts the RESPONSE row.
+    if subset is not None:
+        mask = pd.Series(subset, index=series.index).fillna(False).astype(bool).to_numpy()
         usable &= mask
 
     if not usable.any():
-        raise ConsistencyError("varbasic: no usable observations after applying `keep`")
+        raise ConsistencyError("varbasic: no usable observations after applying `subset`")
+
+    # A pre-sliced frame from the MIDDLE of a series loses its first `lags` rows to a missing
+    # regressor, where Stata would have kept them by reaching back past the slice. Warn instead of
+    # returning a quietly smaller sample. Detectable from the data alone: the first row has a usable
+    # response but no usable lag, and `subset` was not used.
+    if subset is None and not usable[0] and not np.isnan(response[0]).any():
+        import warnings as _warnings
+
+        _warnings.warn(
+            "varbasic: the first row has no usable lag, so the sample is "
+            f"{int(usable.sum())} instead of {int((~np.isnan(response).any(axis=1)).sum())}. "
+            "This happens when the frame was sliced at the HEAD of the series: Stata builds the lag "
+            "over the complete time axis, so pass the full frame with `subset=<mask>` to keep that "
+            "row. Cutting the tail is unaffected.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     design = design[usable]
     response = response[usable]

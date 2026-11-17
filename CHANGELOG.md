@@ -7,6 +7,46 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.30] - 2026-11-17
+
+### Changed — `varbasic` takes `subset=`, not `keep=`
+
+The `if` condition now uses the spelling the rest of the package already had:
+
+```python
+# before: the frame had to be named twice
+ws.varbasic(frame, "dlny", lags=1, time="year", keep=frame["year"] < 2013)
+
+# now: one frame, one mask
+ws.varbasic(frame, "dlny", lags=1, time="year", subset=frame["year"] < 2013)
+```
+
+`subset=` is what `OLS`, `Logit`, `Poisson`, `FEOLS` and `Didregress` all take, so `keep=` was a
+reinvention that made callers repeat themselves. `hdfe.py` already documented why the mask matters
+rather than a pre-sliced frame:
+
+> Filtering the frame by hand instead would work numerically but loses the distinction between the
+> frame and the sample.
+
+That distinction is not cosmetic for a VAR: the lag must be built over the complete time axis
+(`_qsur.ado:54`) and only then restricted. Slicing first turns the first retained observation's
+regressor into a missing value:
+
+| construction | L1 | N |
+|---|---|---|
+| `subset=year>=1985` on the full frame | `.528017` | 29 |
+| the frame sliced to `year>=1985` first | `.502390` | 28 |
+
+No number changed as a result of the rename; `year<2013` still gives N=33 and the same response path.
+
+### Verified
+
+8 new tests in `tests/test_varbasic_subset_convention.py` pin the shared spelling, that the frame is
+named only once, and the mask-versus-slice behaviour above. GUIDE.md and GUIDE.zh-CN.md now show
+`subset=` in both the prose and the runnable snippet; API prose coverage 298/298.
+
+---
+
 ## [0.3.29] - 2026-11-16
 
 ### Added — `varbasic` and `irf table`

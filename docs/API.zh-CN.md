@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.28 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.30 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -8447,12 +8447,12 @@ None
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
-`varbasic` 的类形式：先用数据构造，再调用 `fit()` 得到结果，与直接调用 `varbasic(...)` 完全等价。
+`varbasic` 的类形式：`Varbasic(frame, 'dlny').fit()` 与 `varbasic(...)` 等价，同样支持用 `subset` 表达截头的条件。
 
 **签名**
 
 ```python
-ws.Varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, keep: "'pd.Series | None'" = None) -> 'None'
+ws.Varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
 ```
 
 **`Varbasic.fit`**
@@ -9629,12 +9629,12 @@ None
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
-估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。`keep` 对应 Stata 的 `if` 条件；请传入**完整**数据框，因为滞后是在完整时间轴上构造的。
+估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。照常用 pandas 筛选即可；只有当条件**截头**时才用 `subset`，因为 Stata 在完整时间轴上构造滞后，保留下来的首行可能需要回看边界之外。
 
 **签名**
 
 ```python
-ws.varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, keep: "'pd.Series | None'" = None) -> 'IrfResult'
+ws.varbasic(series: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
 ```
 
 **示例**

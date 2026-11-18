@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.30 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.37 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -2613,7 +2613,13 @@ ARCH         |
 **签名**
 
 ```python
-ws.VAR(endog: 'Any', lags: 'int | None' = 1, *, trend: 'str' = 'c', names: 'Sequence[str] | None' = None) -> 'None'
+ws.VAR(endog: 'Any', lags: 'int | None' = 1, *, trend: 'str' = 'c', names: 'Sequence[str] | None' = None, time: 'Any' = None, exog: 'Any' = None, exog_names: 'Sequence[str] | None' = None) -> 'None'
+```
+
+**`VAR.from_formula`**
+
+```python
+VAR.from_formula(formula: 'str', data: 'Any', *, lags: 'int | None' = 1, trend: 'str' = 'c', subset: 'Any' = None) -> "'VAR'"
 ```
 
 **`VAR.fit`**
@@ -7175,7 +7181,7 @@ None
 **签名**
 
 ```python
-ws.IrfResult(names: 'list[str]', lags: 'int', nobs: 'int', sample_first: 'Any' = None, sample_last: 'Any' = None, coefficients: 'np.ndarray' = None, sigma: 'np.ndarray' = None, sigma_se: 'np.ndarray' = None, ll: 'float' = nan, aic: 'float' = nan, hqic: 'float' = nan, sbic: 'float' = nan, fpe: 'float' = nan, det_sigma: 'float' = nan, rmse: 'tuple[float, ...]' = (), r2: 'tuple[float, ...]' = (), chi2: 'tuple[float, ...]' = (), chi2_p: 'tuple[float, ...]' = (), parms: 'tuple[int, ...]' = (), responses: 'tuple[ImpulseResponse, ...]' = (), design: 'np.ndarray' = None) -> None
+ws.IrfResult(names: 'list[str]', lags: 'int', nobs: 'int', sample_first: 'Any' = None, sample_last: 'Any' = None, sample_has_gap: 'bool' = False, coefficients: 'np.ndarray' = None, sigma: 'np.ndarray' = None, sigma_se: 'np.ndarray' = None, ll: 'float' = nan, aic: 'float' = nan, hqic: 'float' = nan, sbic: 'float' = nan, fpe: 'float' = nan, det_sigma: 'float' = nan, rmse: 'tuple[float, ...]' = (), r2: 'tuple[float, ...]' = (), chi2: 'tuple[float, ...]' = (), chi2_p: 'tuple[float, ...]' = (), parms: 'tuple[int, ...]' = (), responses: 'tuple[ImpulseResponse, ...]' = (), design: 'np.ndarray' = None, regressor_names: 'tuple[str, ...]' = (), lag_orders: "'int | tuple[int, ...]'" = 1) -> None
 ```
 
 **示例**
@@ -8302,7 +8308,7 @@ None
 **签名**
 
 ```python
-ws.VARResults(_result: 'Any', names: 'list[str]', lags: 'int', trend: 'str', ml: 'bool' = True) -> None
+ws.VARResults(_result: 'Any', names: 'list[str]', lags: 'int', trend: 'str', ml: 'bool' = True, time: 'Any' = None, exog_names: 'tuple[str, ...]' = ()) -> None
 ```
 
 **示例**
@@ -8377,7 +8383,7 @@ None
 **签名**
 
 ```python
-ws.VarSocResult(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = ()) -> None
+ws.VarSocResult(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = (), exog_names: 'tuple[str, ...]' = (), constant: 'bool' = True) -> None
 ```
 
 **示例**
@@ -8397,7 +8403,7 @@ None
 
 **Stata 指令:** `varstable`
 
-对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。
+对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。`plot()` 画出 Stata `varstable, graph` 的那张图：每个特征值在复平面上的一个点（横轴实部、纵轴虚部），背后是单位圆——落在圆上或圆外正是稳定性被破坏的情形。因此二元 VAR(2) 显示**四个**点，伴随矩阵每个根一个，而不是每个方程一个。可选：`ax=` 画入已有坐标轴、`figsize=`、`labels=True`（模，即 Stata 的 `modlabel`）或 `labels="distance"`（Stata 的 `dlabel`）、`title=`、`grid=`、`unit_circle=False`。`matplotlib` 在方法内部才导入，因此仍是可选依赖（`pip install "westata[plot]"`）。
 
 **签名**
 
@@ -8452,7 +8458,7 @@ None
 **签名**
 
 ```python
-ws.Varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
+ws.Varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
 ```
 
 **`Varbasic.fit`**
@@ -8987,7 +8993,7 @@ functions:
 **签名**
 
 ```python
-ws.irf_table(fitted: 'IrfResult', *, impulse: 'str | None' = None, response: 'str | None' = None, steps: 'int' = 8) -> 'IrFTable'
+ws.irf_table(fitted: 'IrfResult', *, impulse: 'str | None' = None, response: 'str | None' = None, steps: 'int' = 8, all: 'bool' = False) -> 'IrFTable'
 ```
 
 **示例**
@@ -9634,7 +9640,7 @@ None
 **签名**
 
 ```python
-ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: 'int' = 1, trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
+ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
 ```
 
 **示例**
@@ -9724,7 +9730,7 @@ None
 **签名**
 
 ```python
-ws.varsoc(data: 'np.ndarray | pd.DataFrame', *, maxlag: 'int' = 4, trend: 'str' = 'c', names: 'list[str] | None' = None) -> 'VarSocResult'
+ws.varsoc(data: 'np.ndarray | pd.DataFrame', *, maxlag: 'int' = 4, trend: 'str' = 'c', names: 'list[str] | None' = None, exog: 'Any' = None, constant: 'bool' = True) -> 'VarSocResult'
 ```
 
 **示例**

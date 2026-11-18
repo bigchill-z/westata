@@ -55,6 +55,152 @@ class VarStableResult:
             }
         )
 
+    def plot(
+        self,
+        *,
+        ax: Any = None,
+        figsize: tuple[float, float] | None = None,
+        labels: bool | str = False,
+        title: str | None = None,
+        grid: bool = False,
+        unit_circle: bool = True,
+        **scatter_kwds: Any,
+    ) -> Any:
+        """Draw the roots of the companion matrix, the figure Stata's ``varstable, graph`` makes.
+
+        Each eigenvalue is one point in the COMPLEX PLANE -- real part on x, imaginary part on y --
+        with the unit circle drawn behind it. A point strictly inside the circle is a stable root;
+        one on or outside it breaks stability. This is the companion matrix's spectrum, so a
+        bivariate VAR(2) contributes four points, not two.
+
+        ``matplotlib`` is imported HERE rather than at module scope, following ``irf_table().plot()``:
+        a user who never plots should not need it installed (R1.1 -- no forced dependency).
+
+        Parameters
+        ----------
+        ax:
+            An existing ``matplotlib`` axis to draw into. When omitted a square figure is created.
+        figsize:
+            Passed to ``plt.subplots``; defaults to ``(5.0, 5.0)``. The axes are kept square
+            (``aspect=1``) so the unit circle is a circle rather than an ellipse.
+        labels:
+            Annotate each point. ``True`` writes the modulus (``modlabel`` in Stata's ado),
+            ``"distance"`` writes ``1 - |eigenvalue|`` (Stata's ``dlabel``), and any other string is
+            used as a ``format`` spec for the modulus.
+        title:
+            Override the default ``"Roots of the companion matrix"``.
+        grid:
+            Draw a light grid. Off by default, matching Stata's ``nogrid`` on both axes.
+        unit_circle:
+            Draw the unit circle. Off leaves only the points.
+        **scatter_kwds:
+            Forwarded to ``Axes.scatter`` for the eigenvalues.
+
+        Returns
+        -------
+        The matplotlib ``Figure``.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as exc:  # pragma: no cover - exercised only without the extra
+            raise ImportError(
+                "VarStableResult.plot() needs matplotlib: pip install 'westata[plot]'"
+            ) from exc
+
+        real = np.asarray([value.real for value in self.eigenvalues], dtype=float)
+        imaginary = np.asarray([value.imag for value in self.eigenvalues], dtype=float)
+        modulus = np.asarray(self.modulus, dtype=float)
+
+        if ax is None:
+            if figsize is None:
+                figsize = (5.0, 5.0)
+            figure, ax = plt.subplots(figsize=figsize)
+        else:
+            figure = ax.figure
+
+        # THE UNIT CIRCLE IS THE REFERENCE, so it is drawn first and stays behind the points.
+        # Stata builds it from `y = ±sqrt(1-x^2)` over x in [-1, 1] (`_vec_grcroots.ado`), which is
+        # the same curve as the parametric form used here; the parametric one avoids the two
+        # vertical tangents where the sqrt form needs a degenerate `function` plot.
+        if unit_circle:
+            theta = np.linspace(0.0, 2.0 * np.pi, 512)
+            ax.plot(
+                np.cos(theta),
+                np.sin(theta),
+                color="black",
+                linewidth=0.9,
+                alpha=0.75,
+                zorder=1,
+            )
+
+        style: dict[str, Any] = dict(scatter_kwds)
+        style.setdefault("zorder", 3)
+        ax.scatter(real, imaginary, **style)
+
+        if labels:
+            # LABELS RADIATE OUTWARD FROM THE CENTRE, and ROOTS SHARING A RAY ARE STACKED VERTICALLY.
+            # A fixed up-and-right offset put two nearly-coincident roots into the same few pixels
+            # (moduli .82182 and .7970223 both sit at angle 0, 0.025 apart), printing them as one
+            # smeared string; a purely radial offset then did the same thing because both angles are
+            # identical. Near-coincident roots are the NORMAL case -- a stable VAR(2) usually has a
+            # pair close together -- so this needs handling, not a tidier dataset.
+            angles = np.arctan2(imaginary, real)
+            radius = 15.0
+            placed: list[float] = []
+            for x_value, y_value, magnitude, angle in zip(real, imaginary, modulus, angles):
+                if labels == "distance":
+                    text = f"{1.0 - magnitude:.3f}"
+                elif isinstance(labels, str):
+                    text = format(magnitude, labels)
+                else:
+                    text = f"{magnitude:.3f}"
+                dx = radius * float(np.cos(angle))
+                dy = radius * float(np.sin(angle))
+                # A RADIAL OFFSET PUSHES A ROOT NEAR |1| OFF THE CANVAS, which is exactly where the
+                # unstable ones sit -- the case a reader most needs to see. Points in the outer part
+                # of the plot get their label on the INWARD side instead.
+                base_limit = max(1.0, float(np.max(np.abs(np.concatenate([real, imaginary])))))
+                if abs(x_value) > 0.5 * base_limit:
+                    dx = -abs(dx) if x_value > 0 else abs(dx)
+                # Space the label away from any already-placed label that would collide with it.
+                for _ in range(len(placed)):
+                    if any(abs(dy - taken) < 11.0 and abs(dx) < 40.0 for taken in placed):
+                        dy += 11.0 * (1.0 if dy >= 0 else -1.0)
+                    else:
+                        break
+                placed.append(dy)
+                ax.annotate(
+                    text,
+                    xy=(x_value, y_value),
+                    xytext=(dx, dy),
+                    textcoords="offset points",
+                    fontsize=8,
+                    ha="center",
+                    va="center",
+                )
+
+        # The axes span a little beyond the unit circle so a root on the boundary is not clipped.
+        # Stata pins both axes to -1..1 with `range(-1 1)`; a root at exactly 1 would be cut in half
+        # there, so the margin is deliberate rather than cosmetic. With labels on, the margin has to
+        # grow as well or the outermost annotation is drawn outside the axes.
+        values_extent = float(np.max(np.abs(np.concatenate([real, imaginary])))) if real.size else 1.0
+        extent = max(1.0, values_extent)
+        limit = extent * (1.20 if labels else 1.05)
+        ax.set_xlim(-limit, limit)
+        ax.set_ylim(-limit, limit)
+        ax.set_aspect(1.0)
+
+        ax.axhline(0.0, color="grey", linewidth=0.6, alpha=0.6, zorder=0)
+        ax.axvline(0.0, color="grey", linewidth=0.6, alpha=0.6, zorder=0)
+        if grid:
+            ax.grid(True, alpha=0.3, linewidth=0.6)
+        ax.set_xlabel("Real")
+        ax.set_ylabel("Imaginary")
+        ax.set_title(title if title is not None else "Roots of the companion matrix", fontsize=10)
+
+        return figure
+
     def __str__(self) -> str:
         """Stata's boxed eigenvalue table.
 

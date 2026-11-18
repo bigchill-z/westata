@@ -7,6 +7,90 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.38] - 2026-11-18
+
+### Added — `varstable(...).plot()`, the figure Stata's `varstable, graph` draws
+
+`varstable, graph` is not a time-series plot. `varstable_w2.ado` hands the option to
+`_vec_grcroots.ado`, which draws the eigenvalues of the COMPANION matrix in the complex plane —
+real part on x, imaginary part on y — over a unit circle, titled `Roots of the companion matrix`.
+`plot()` is that figure:
+
+```python
+fit = ws.VAR(df[["dinf", "unem"]], lags=2).fit()
+ws.varstable(fit).plot()                   # circle + one point per root
+ws.varstable(fit).plot(labels=True)        # annotate with the modulus  (Stata's `modlabel`)
+ws.varstable(fit).plot(labels="distance")  # 1 - |eigenvalue|           (Stata's `dlabel`)
+```
+
+Three details are load-bearing and each is pinned by a test:
+
+* **THE POINTS ARE THE COMPANION MATRIX'S SPECTRUM.** A bivariate VAR(2) contributes FOUR points
+  (`lags * equations`), not one per equation. Drawing the per-equation coefficient eigenvalues would
+  show half the spectrum while looking entirely plausible.
+* **THE UNSTABLE ROOT MUST STAY VISIBLE.** Stata pins both axes to `range(-1 1)`, which clips a root
+  at 1.08 in half — the very case the figure exists to show. The limits here grow to include the
+  outermost root, and labels are placed on the INWARD side near the edge so they are not cut off.
+* **NEAR-COINCIDENT ROOTS ARE THE NORMAL CASE.** On the reference fit the two real roots are
+  `.82182` and `.7970223` — 0.025 apart, both at angle 0 — so labels placed on the same ray printed
+  on top of each other. They are stacked vertically now; a purely radial offset was not enough
+  because the angles are identical.
+
+Options: `ax=`, `figsize=`, `labels=` (`True` / `"distance"` / a format string), `title=`, `grid=`,
+`unit_circle=False`, and any other keyword goes to `Axes.scatter`. `matplotlib` is imported inside
+the method, so plotting stays an optional dependency (`pip install "westata[plot]"`), matching
+`irf_table().plot()`.
+
+### Verified
+
+24 tests in `tests/test_varstable_plot.py`. Four mutations were run against them — drawing the
+modulus instead of the complex point, skipping the unit circle, dropping the collision handling, and
+pinning the axes to Stata's `-1..1` — and all four were caught, so the guards are not vacuous. Full
+`pytest -q`: 6679 passed, 21 skipped, 0 failed.
+
+---
+
+## [0.3.37] - 2026-11-18
+
+### Fixed — `varbasic` took its lag on ROW POSITION, not on the time axis
+
+`varbasic` shifted lag blocks by row index (`block[lag:] = raw[:-lag]`), which is equivalent to
+Stata's `tsset` only when the time axis has no hole. With an interior gap it keeps one row too many
+**and pairs it with the wrong period**. Measured on `gdp_china.dta` with `year == 1989` dropped:
+
+| | Sample line | N | `L1` |
+|---|---|---|---|
+| Stata | `Sample: 1980 thru 2013, but with a gap` | 32 | `.5016988` |
+| before | `Sample: 1980 thru 2013` | **33** | 1990 paired with **1988** |
+| after | byte-identical to Stata | **32** | `.5016988` |
+
+The 33rd row was not a spare observation: it put 1990 next to 1988, a different year. Stata's own
+`e(sample)` confirms the mechanism — `levelsof year if e(sample)` is `1980..1988` then `1991..2013`,
+so **1990 is absent** because its `L1` is the removed 1989. Every criterion moved with it: `ll`
+84.2783, `AIC` -5.142394, `SBIC` -5.050785, `FPE` .0003422 now all reproduce Stata.
+
+The `Sample:` line is now built from the rows that actually entered — it used to be computed as "the
+first row after `max(lags)` in the frame", which described a sample the numbers below it had not
+used. Stata's `, but with a gap` suffix is reproduced at the END of the line; it describes the AXIS,
+so it appears even when no row was dropped because of a gap.
+
+### Fixed — `time` silently refused to be honoured
+
+`varbasic(..., time="nope")` did not raise: it fell back to `Sample: (not recorded)`, which is
+indistinguishable from deliberately omitting the argument and leaves the caller believing a time axis
+was applied. A `time` that does not name a column now raises and lists the available columns. Two
+more axis defects are refused the way `tsset` refuses them: a time column containing missing values,
+and duplicate periods.
+
+### Verified
+
+13 tests in `tests/test_varbasic_time_axis.py`, pinning each cell of the table above, the
+mechanism stated as facts about the retained years rather than only the count, the
+byte-identical Sample line, and all four refusals. `time` remains optional: omitting it
+changes no number, only the Sample line.
+
+---
+
 ## [0.3.36] - 2026-11-18
 
 ### Added — every `var` option Stata actually has

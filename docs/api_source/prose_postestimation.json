@@ -618,8 +618,8 @@
   },
   "VarStableResult": {
     "stata": "varstable",
-    "en": "The stability check for a fitted VAR: the companion-matrix eigenvalues and whether the process is stable. `to_frame()` gives the eigenvalue table.",
-    "zh": "对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。",
+    "en": "The stability check for a fitted VAR: the companion-matrix eigenvalues and whether the process is stable. `to_frame()` gives the eigenvalue table. `plot()` draws what Stata's `varstable, graph` draws: every eigenvalue as a point in the complex plane (real part on x, imaginary part on y) with the unit circle behind it, since a root on or outside that circle is what breaks stability. A bivariate VAR(2) therefore shows FOUR points, one per companion-matrix root, not one per equation. Options: `ax=` to draw into an existing axis, `figsize=`, `labels=True` (the modulus, Stata's `modlabel`) or `labels=\"distance\"` (Stata's `dlabel`), `title=`, `grid=`, `unit_circle=False`. `matplotlib` is imported inside the method, so it stays an optional dependency (`pip install \"westata[plot]\"`).",
+    "zh": "对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。`plot()` 画出 Stata `varstable, graph` 的那张图：每个特征值在复平面上的一个点（横轴实部、纵轴虚部），背后是单位圆——落在圆上或圆外正是稳定性被破坏的情形。因此二元 VAR(2) 显示**四个**点，伴随矩阵每个根一个，而不是每个方程一个。可选：`ax=` 画入已有坐标轴、`figsize=`、`labels=True`（模，即 Stata 的 `modlabel`）或 `labels=\"distance\"`（Stata 的 `dlabel`）、`title=`、`grid=`、`unit_circle=False`。`matplotlib` 在方法内部才导入，因此仍是可选依赖（`pip install \"westata[plot]\"`）。",
     "example": "r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())\nprint(r.to_frame())"
   },
   "VarWleResult": {

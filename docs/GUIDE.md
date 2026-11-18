@@ -437,7 +437,7 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 | `arch` / `garch` | `GARCH` (needs `arch`) |
 | unit-root tests | `unitroot(test=...)`, `XtUnitroot` |
 | `vecrank` | `vecrank(...)` — `lags(1)` included |
-| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`, `varlmar`, `varstable`, `varwle` |
+| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`, `varlmar`, `varstable`, `varwle` (and `varstable(...).plot()` for `varstable, graph`) |
 | `veclmar` / `vecstable` | `veclmar`, `vecstable` |
 | `vargranger` | `vargranger(fitted)` |
 | `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
@@ -492,6 +492,26 @@ This package deliberately does not reproduce that — the sample is whatever pan
 
 Cutting the tail (`year<2013`) matches Stata either way.
 
+**`time=` is optional, but it is doing real work.** Omitting it changes no number — every
+coefficient, criterion and IRF is identical — and only the `Sample:` line degrades to
+`(not recorded)`. What it buys you is the **time axis**, which decides whether a lag is even defined:
+
+* The lag is taken on the axis, not on row position. With an interior gap, a row whose predecessor
+  period is missing cannot enter the sample, and Stata says so on the header line:
+
+  | `gdp_china.dta` with `year == 1989` dropped | Sample line | N |
+  |---|---|---|
+  | Stata | `Sample: 1980 thru 2013, but with a gap` | 32 |
+  | westata with `time=` | same, byte for byte | 32 |
+  | westata without `time=` | `Sample: (not recorded)`, lag shifted by row | 33 |
+
+  The 33rd row is not a spare observation: it pairs 1990 with 1988 — a different year — and moves
+  `L1` off Stata's `.5016988`. Pass `time=` whenever the frame can have a hole; without it, that
+  alignment is the caller's responsibility.
+
+* It also turns three silent failures into refusals, matching `tsset`: a `time` naming a column that
+  does not exist, a time column containing missing values, and duplicate periods.
+
 The bands are delta-method bands with Stata's `/T` covariance normalisation, and the numbers use
 Stata's `%10.0g` format — below `1e-5` they switch to scientific notation.
 
@@ -512,6 +532,30 @@ ws.irf_table(fit, all=True).plot()          # every combination, one panel each
 
 Useful arguments: `ax=` to draw into an axis you already own, `show_ci=False` for the path alone,
 `markers=True`, `grid=False`, and `figsize=(w, h)`. Every other keyword goes to `Axes.plot`.
+
+**Plotting stability: `varstable(...).plot()`**
+
+`varstable, graph` draws the eigenvalues of the COMPANION matrix in the complex plane — real part on
+x, imaginary part on y — with the unit circle behind them. `varstable(...).plot()` is that figure.
+
+```python
+# `df` here is the guide's auto.csv; any two series work.
+fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
+ws.varstable(fit).plot()                       # circle + points
+ws.varstable(fit).plot(labels=True)            # annotate with the modulus
+ws.varstable(fit).plot(labels="distance")      # Stata's `dlabel`: 1 - |eigenvalue|
+```
+
+| | |
+|---|---|
+| points | one per companion-matrix root, so a bivariate VAR(2) has **four** |
+| stability | a point **inside** the circle is stable; on or outside it is not |
+| labels | `True` = modulus (`modlabel`), `"distance"` = `1 - modulus` (`dlabel`), or a format string |
+| other | `ax=`, `figsize=`, `title=`, `grid=`, `unit_circle=False`; extra keywords go to `Axes.scatter` |
+
+Labels are placed radially and stacked vertically when two roots nearly coincide — the reference fit
+has real roots `.82182` and `.7970223` only `0.025` apart, which a naive offset prints on top of each
+other. As with `irf_table().plot()`, `matplotlib` is optional and imported inside the method.
 
 ### `prais` and its `corc` option
 

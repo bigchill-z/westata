@@ -374,6 +374,7 @@ Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点�
 | Stata | 状态 | 说明 |
 |---|---|---|
 | `var` 的 `irf` / `fevd` / `vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
+| `varbasic` / `irf table` | ✅ 已实现（E3） | `ws.varbasic(frame, vars, lags=..., time=...)` 估计 VAR 并登记 IRF；`ws.irf_table(...)` 出表。**估计块对两份 StataNow 19.5 实跑逐字节相同**（39 行零差异）。四处载重细节：残差协方差按 **T** 而非 T−k 归一（用 T−k 得 se 0.1514890 对 Stata 的 0.1468267，差 3.2%）；`lags(p)` **只保留 p 期**而非 `1..p`（非 p 倍数步响应恒为 0），裸 `varbasic` 才是 L1+L2；`irf` **只打印估计块**，响应须 `irf table`；**滞后按时间轴而非行位置取**——`drop if year == 1989` 时行位移版留 33 个观测（Stata 32），并把 1990 配上 1988 这一整年，`L1` 因此偏离 `.5016988`。`time` 参数可选（不传只影响 `Sample:` 行），传了则把「`time` 列不存在」「时间列含缺失」「周期重复」从静默降级改为按 `tsset` 拒绝 |
 | `arima` 的季节项 | ⚠️ | 参数已支持，未验证 |
 | `arch` 的 EGARCH / GJR | ⚠️ | 能跑，未单独验证 |
 | `vec` 的漂移项 | ⚠️ | α 精确；漂移项未对拍（见 §8） |

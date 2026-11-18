@@ -407,6 +407,22 @@ print(ws.irf_table(fit))   # the responses
 
 截尾（`year<2013`）两种情况都与 Stata 一致。
 
+**`time=` 是可选的，但它在做实事。** 不传它不改变任何数字——每个系数、信息准则与脉冲响应都相同——
+只有 `Sample:` 行会退化为 `(not recorded)`。它换来的是**时间轴**，而时间轴决定滞后是否有定义：
+
+* 滞后按时间轴取，不按行位置取。数据中间有缺口时，前一期不存在的行不能进入样本，Stata 会把它写在表头上：
+
+  | `gdp_china.dta` 删掉 `year == 1989` | Sample 行 | N |
+  |---|---|---|
+  | Stata | `Sample: 1980 thru 2013, but with a gap` | 32 |
+  | westata（传 `time=`）| 逐字节相同 | 32 |
+  | westata（不传 `time=`）| `Sample: (not recorded)`，滞后按行位移 | 33 |
+
+  多出来的第 33 行不是白捡的观测：它把 1990 配上 1988——**换了整整一年**——并把 `L1` 推离 Stata
+  的 `.5016988`。只要数据框可能有缺口就请传 `time=`；不传，这个对齐责任就落在调用方身上。
+
+* 它还把三种静默失效变成拒绝，与 `tsset` 一致：`time` 指向不存在的列、时间列含缺失值、周期重复。
+
 置信区间为 delta 法区间，使用 Stata 的 `/T` 协方差归一化；数字格式为 Stata 的 `%10.0g`——
 小于 `1e-5` 时改用科学计数法。
 
@@ -427,6 +443,30 @@ ws.irf_table(fit, all=True).plot()          # 全部组合，各占一个面板
 
 常用参数：`ax=` 画入已有坐标轴，`show_ci=False` 只画曲线，`markers=True`、`grid=False`、
 `figsize=(w, h)`；其余关键字会转发给 `Axes.plot`。
+
+**绘制稳定性：`varstable(...).plot()`**
+
+`varstable, graph` 把**伴随矩阵**的特征值画在复平面上——横轴实部、纵轴虚部，背后是单位圆。
+`varstable(...).plot()` 就是那张图。
+
+```python
+# 本指南的 df 是 auto.csv；任意两列都可以。
+fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
+ws.varstable(fit).plot()                       # 单位圆 + 点
+ws.varstable(fit).plot(labels=True)            # 标注模
+ws.varstable(fit).plot(labels="distance")      # Stata 的 `dlabel`：1 - |特征值|
+```
+
+| | |
+|---|---|
+| 点数 | 伴随矩阵每个根一个，因此二元 VAR(2) 有**四个** |
+| 稳定性 | 点在圆**内**即稳定；在圆上或圆外则不稳定 |
+| 标签 | `True` = 模（`modlabel`）、`"distance"` = `1 - 模`（`dlabel`）、或格式字符串 |
+| 其他 | `ax=`、`figsize=`、`title=`、`grid=`、`unit_circle=False`；其余关键字转发给 `Axes.scatter` |
+
+标签沿半径方向放置，两个根几乎重合时竖直错开——参考数据里两个实根为 `.82182` 与 `.7970223`，
+只差 `0.025`，朴素的偏移会把它们印在一起。与 `irf_table().plot()` 一样，`matplotlib` 是可选的，
+在方法内部才导入。
 
 ### 方程组
 
@@ -474,7 +514,7 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 | `arch` / `garch` | `GARCH`（需要 `arch`）|
 | 单位根检验 | `unitroot(test=...)`、`XtUnitroot` |
 | `vecrank` | `vecrank(...)` —— 含 `lags(1)` |
-| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`、`varlmar`、`varstable`、`varwle` |
+| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`、`varlmar`、`varstable`、`varwle`（`varstable(...).plot()` 对应 `varstable, graph`） |
 | `veclmar` / `vecstable` | `veclmar`、`vecstable` |
 | `vargranger` | `vargranger(fitted)` |
 | `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |

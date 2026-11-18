@@ -158,6 +158,9 @@ class IrfResult(ResultSerialisation):
     nobs: int
     sample_first: Any = None
     sample_last: Any = None
+    #: True when the ``time`` axis has an interior gap, so the ``Sample:`` line carries Stata's
+    #: ``, but with a gap`` suffix. A property of the axis, not of the retained rows.
+    sample_has_gap: bool = False
     coefficients: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
     sigma: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
     sigma_se: np.ndarray = field(default=None, repr=False)  # type: ignore[assignment]
@@ -230,7 +233,12 @@ class IrfResult(ResultSerialisation):
 
         lines = ["", "Vector autoregression", ""]
         sample = (
+            # MEASURED, gdp_china.dta with `drop if year == 1989`:
+            #     Sample: 1980 thru 2013, but with a gap          Number of obs     =         32
+            # The suffix follows the LAST period, not the first, and the column width is measured
+            # from the 48-character field Stata pads to before 'Number of obs'.
             f"Sample: {self.sample_first} thru {self.sample_last}"
+            + (", but with a gap" if self.sample_has_gap else "")
             if self.sample_first is not None
             else "Sample: (not recorded)"
         )
@@ -476,7 +484,13 @@ def varbasic(
 ) -> IrfResult:
     """Stata's ``varbasic``: fit a VAR(p) and register an IRF.
 
-    ``time`` names the time variable; when given, the reported sample range uses its values.
+    ``time`` names the time variable. It is OPTIONAL -- omitting it changes no number, only the
+    ``Sample:`` line -- but when given it is load-bearing, because the lag is built on the TIME
+    axis: a row enters only if the earlier period it needs actually exists. That is what Stata's
+    ``tsset`` does, and skipping it silently pairs a row with a *different* year whenever the frame
+    has an interior gap (measured: 33 observations against Stata's 32, with 1990's lag taken from
+    1988). Passing ``time`` turns that into a refusal rather than a wrong number.
+
     ``varbasic`` itself prints only the estimation block -- the responses need :func:`irf_table`,
     which is also what Stata requires.
 
@@ -493,6 +507,16 @@ def varbasic(
     names = [variables] if isinstance(variables, str) else list(variables)
     if not names:
         raise ConsistencyError("varbasic: at least one variable is required")
+
+    # A `time` that does not name a column cannot be honoured, and silently falling back to
+    # `Sample: (not recorded)` is indistinguishable from the caller omitting the argument on
+    # purpose. It is also dangerous for a second reason: the output would claim a sample it never
+    # verified. Refuse instead, and name what IS available so the typo is obvious.
+    if time is not None and time not in data.columns:
+        raise ConsistencyError(
+            f"varbasic: `time` names {time!r}, which is not a column; "
+            f"available columns: {list(data.columns)}"
+        )
 
     # R3.4: `subset` is applied to the FRAME, before the lag is built, so `varbasic(data, subset=m)`
     # and `varbasic(data.loc[m], ...)` cannot disagree.
@@ -522,12 +546,65 @@ def varbasic(
             f"varbasic: only {n_rows} rows for lags({', '.join(str(v) for v in order)})"
         )
 
+    # THE LAG IS TAKEN ON THE TIME AXIS, NOT ON ROW POSITION -- and the difference is a wrong
+    # number, not a cosmetic one. Stata's `tsset` makes `L1.y` mean "the previous PERIOD", so with
+    # an interior gap a row whose predecessor period is missing cannot enter the sample.
+    #
+    # Measured on gdp_china.dta with `drop if year == 1989` (StataNow 19.5):
+    #
+    #     Sample: 1980 thru 2013, but with a gap   Number of obs = 32
+    #     .5016988   L1      .049534   _cons
+    #
+    # and `levelsof year if e(sample)` is 1980..1988 then 1991..2013: 1990 is ABSENT because its L1
+    # is 1989, which no longer exists. Shifting by row position instead keeps 33 rows and pairs 1990
+    # with 1988 -- a different observation entirely -- producing .5017/.0495 shifted and nobs 33.
+    #
+    # Without `time` there is no axis to align to, so the historical position-based shift stays and
+    # the caller accepts that a gapped frame is its own responsibility (documented on the function).
+    axis = None
+    if time is not None:
+        axis = data[time].to_numpy()
+        if pd.isna(axis).any():
+            raise ConsistencyError(
+                f"varbasic: `time` column {time!r} has missing values; a lag cannot be "
+                "aligned to the time axis when the axis itself is incomplete"
+            )
+        # Stata's `tsset` requires strictly increasing periods; its `delta` is what names L1, L2.
+        numeric_axis = pd.to_numeric(pd.Series(axis), errors="coerce")
+        if numeric_axis.notna().all():
+            ordered_axis = np.sort(numeric_axis.to_numpy(dtype=float))
+            steps = np.diff(ordered_axis)
+            if steps.size and np.any(steps <= 0):
+                raise ConsistencyError(
+                    f"varbasic: `time` column {time!r} has duplicate periods, which `tsset` "
+                    "refuses; the lag would be ambiguous"
+                )
+            delta = float(steps.min()) if steps.size else 1.0
+        else:
+            # A non-numeric axis (dates, strings) has no subtraction; fall back to ordering the
+            # distinct values and stepping through their sorted positions.
+            distinct = pd.unique(pd.Series(axis))
+            rank = {value: index for index, value in enumerate(sorted(distinct))}
+            numeric_axis = pd.Series([rank[value] for value in axis]).astype(float)
+            delta = 1.0
+        axis = numeric_axis.to_numpy(dtype=float)
+
     # Each retained lag contributes its own regressor block; the response is the current row.
-    lag_blocks = []
-    for lag in order:
-        block = np.full_like(raw, np.nan)
-        block[lag:, :] = raw[: n_rows - lag, :]
-        lag_blocks.append(block)
+    lag_blocks: list[np.ndarray] = []
+    if axis is None:
+        for lag in order:
+            block = np.full_like(raw, np.nan)
+            block[lag:, :] = raw[: n_rows - lag, :]
+            lag_blocks.append(block)
+    else:
+        position_of = {float(value): index for index, value in enumerate(axis)}
+        for lag in order:
+            block = np.full_like(raw, np.nan)
+            for index, current in enumerate(axis):
+                source = position_of.get(current - delta * lag)
+                if source is not None:
+                    block[index, :] = raw[source, :]
+            lag_blocks.append(block)
     response = raw
     if trend == "c":
         design = np.column_stack([np.ones((n_rows, 1))] + lag_blocks)
@@ -602,17 +679,36 @@ def varbasic(
 
     sigma_se = sigma * np.sqrt(2.0 / n)
 
+    # THE SAMPLE RANGE COMES FROM THE ROWS THAT ACTUALLY ENTERED, not from "the first row after
+    # `max(order)` in the frame". Those two agree on a gapless series and disagree exactly when it
+    # matters: with an interior gap the shifted-by-position rule reported `Sample: 1980 thru 2013`
+    # while the estimation sample skipped a year, so the label described a different sample than the
+    # numbers below it.
     first = last = None
-    if time is not None and time in data.columns:
-        kept = data[list(names) + [time]].dropna()
-        if len(kept) > max(order):
-            ordered = kept.sort_values(time)
-            first = ordered[time].iloc[max(order)]
-            last = ordered[time].iloc[-1]
+    has_gap = False
+    if time is not None:
+        # `kept_positions` indexes the FULL frame (that is what `raw` spans), so the labels must come
+        # from the unfiltered time column -- dropping rows here first would shift every position.
+        row_labels = data[time].to_numpy()
+        sample_values = row_labels[kept_positions]
+        if len(sample_values):
+            ordered = pd.Series(sample_values).sort_values()
+            first = ordered.iloc[0]
+            last = ordered.iloc[-1]
             # MEASURED: Stata prints 'Sample: 1980 thru 2012', not '1980.0 thru 2012.0'. A year stored
             # as a float must be shown as the integer it is.
             first = int(first) if float(first) == int(first) else first
             last = int(last) if float(last) == int(last) else last
+            # MEASURED: `tsset` prints 'Time variable: year, 1978 to 2013, but with a gap' and
+            # `varbasic` carries that suffix at the END of its Sample line, after the last period:
+            #     Sample: 1980 thru 2013, but with a gap          Number of obs     =         32
+            # It is a property of the TIME AXIS, not of the estimation sample -- the gap is visible
+            # even when no row was dropped because of it.
+            axis_values = np.sort(pd.to_numeric(pd.Series(row_labels), errors="coerce").dropna().to_numpy(dtype=float))
+            if axis_values.size > 1:
+                step = float(np.min(np.diff(axis_values)))
+                if step > 0 and np.any(np.diff(axis_values) > step * (1.0 + 1e-9)):
+                    has_gap = True
 
     # Regressor names in the order the table prints them: every retained lag first (`L1.`, `L2.` ...),
     # the constant last. MEASURED from the capture: `L1.`, `L2.`, then `_cons`.
@@ -632,6 +728,7 @@ def varbasic(
         nobs=n,
         sample_first=first,
         sample_last=last,
+        sample_has_gap=has_gap,
         coefficients=coefficients,
         sigma=sigma,
         sigma_se=sigma_se,

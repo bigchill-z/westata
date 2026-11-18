@@ -79,6 +79,12 @@ NO_TABLE = {
     # tests/test_estat_ovtest.py + the five test_ovtest_* modules, against live StataNow
     # 19.5 captures on grilic.dta and auto.dta.
     "estat ovtest": "prints result text, not an estimation table; Stata captures verified",
+    # varbasic prints the VAR estimation block: a header of six scalars then a two-column
+    # Equation/Parms/RMSE/R-sq/chi2/P>chi2 block. The generic TABLE-layout sweep has no matching
+    # spec, and no is needed -- the whole 39-line block is compared byte-for-byte against two live
+    # StataNow 19.5 captures (plain and gapped) in tests/test_varbasic_*.py, which is a stronger
+    # check than a column sweep.
+    "varbasic": "VAR estimation block compared byte-for-byte against two Stata captures",
     # xtoverid (user-written, ado/plus) prints THREE lines of result text -- the test
     # description, the model line and the Sargan-Hansen statistic -- and returns r(j)/
     # r(jdf)/r(jp). No estimation table, so a TABLE-layout sweep has nothing to compare.

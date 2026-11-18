@@ -51,6 +51,15 @@ from westata.postestimation.xtoverid import XtOveridResult, xtoverid
 from westata.postestimation.xtserial import XtSerialResult, xtserial
 from westata.postestimation.varsoc import VarSocResult, varsoc
 from westata.postestimation.varstable import VarStableResult, varstable
+from westata.postestimation.irf_graph import (
+    IRF_GRAPH_STATISTICS,
+    IRF_STATISTICS,
+    IrfSeries,
+    irf_cgraph,
+    irf_graph,
+    irf_ograph,
+    irf_series,
+)
 from westata.postestimation.varwle import VarWleResult, varwle
 from westata.postestimation.bgodfrey import BgTestResult, estat_bgodfrey
 from westata.postestimation.dfgls import DFGLSResult, dfgls
@@ -149,6 +158,13 @@ __all__ = [
     "varsoc",
     "VarStableResult",
     "varstable",
+    "IRF_STATISTICS",
+    "IRF_GRAPH_STATISTICS",
+    "IrfSeries",
+    "irf_cgraph",
+    "irf_graph",
+    "irf_ograph",
+    "irf_series",
     "VarWleResult",
     "varwle",
     "Correlogram",

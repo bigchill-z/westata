@@ -699,5 +699,47 @@
     "en": "The object `ws.xtoverid` returns. Fields: `statistic` (`r(j)`), `df` (`r(jdf)`, the number of overidentifying restrictions), `pvalue` (`r(jp)`), `tested` (the names of the coefficients constrained to zero), `description` (what the test compares -- \"fixed vs random effects\" for the `xtreg, re` case) and `model` (the estimator that was re-estimated). `str()` reproduces the three lines Stata prints; `to_dict()` gives the three `r()` names and `to_frame()` a one-row DataFrame.",
     "zh": "`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 \"fixed vs random effects\"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。",
     "example": "fit = ws.RandomEffects.from_formula(\"y ~ x1\", base, entity=\"firm\", time=\"year\").fit()\nr = ws.xtoverid(fit)\nprint(r.statistic, r.df, r.pvalue)"
+  },
+  "irf_graph": {
+    "stata": "irf graph oirf",
+    "en": "Plot what Stata's `irf graph` plots: one subgraph per impulse-response combination, with the asymptotic confidence band. `statistic=` selects the series and takes the five a `var` can supply -- `irf`, `oirf`, `cirf`, `coirf` and `fevd`. The five statistics Stata's syntax also accepts but does NOT define after a plain `var` (`dm`, `cdm`, `sirf`, `csirf`, `sfevd`) raise and name the model they belong to, because Stata prints `.` in every cell for them and plotting zeros would fabricate a result. Narrow the panels with `impulse=` and `response=` (Stata's `impulse()` / `response()`), drop the band with `show_ci=False` (Stata's `noci`), set the level with `level=` (`level(95)` is `0.95`), and use `individual=True` for one figure per combination. `matplotlib` is optional and imported inside the call. Reachable as `ws.irf_graph(fit)`.",
+    "zh": "画出 Stata `irf graph` 的那张图：每个 (冲击, 响应) 组合一个子图，并带渐近置信带。`statistic=` 选择序列，取 `var` 能提供的五个：`irf`、`oirf`、`cirf`、`coirf`、`fevd`。Stata 语法也接受但在普通 `var` 之后**并未定义**的五个（`dm`、`cdm`、`sirf`、`csirf`、`sfevd`）会报错并说明它们属于哪种模型——因为那些单元格 Stata 打印的是 `.`，画成 0 等于凭空造数。用 `impulse=` 与 `response=`（对应 Stata 的 `impulse()` / `response()`）收窄面板，`show_ci=False` 去掉置信带（Stata 的 `noci`），`level=` 设置信水平（`level(95)` 即 `0.95`），`individual=True` 则每个组合单独一张图。`matplotlib` 为可选依赖，在调用内部导入。可调用为 `ws.irf_graph(fit)`。",
+    "example": "fit = ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()\nws.irf_graph(fit, statistic='oirf', periods=6)"
+  },
+  "IrfSeries": {
+    "stata": "irf table oirf",
+    "en": "The series `irf_graph` draws, without the drawing. `values` is shaped `(step, response, impulse)` for ALL five statistics, so one index convention works throughout; `lower`/`upper` hold the band where Stata provides one (`fevd` carries none). `statistic` records which series it is, `names` the equation names, `steps` the step axis. `at(response, impulse)` returns one path, `to_frame()` a long table with step/impulse/response/value (and the band when present). `fevd` is the Cholesky variance decomposition: the series starts with Stata's all-zero step 0.",
+    "zh": "`irf_graph` 所画的序列，只是不含绘图。`values` 对**全部五个**统计量都形如 `(step, response, impulse)`，因此整个模块共用一种索引约定；`lower`/`upper` 存放 Stata 提供的置信带（`fevd` 没有）。`statistic` 记录是哪个序列，`names` 是方程名，`steps` 是步长轴。`at(response, impulse)` 返回单条路径，`to_frame()` 返回 step/impulse/response/value 的长表（有置信带时一并给出）。`fevd` 是 Cholesky 方差分解，序列以 Stata 的全零第 0 步开头。",
+    "example": "fit = ws.VAR(base[[\"y\", \"x1\"]].to_numpy(), lags=1, names=[\"y\", \"x1\"]).fit()\ns = ws.irf_series(fit, statistic='coirf', periods=10)\nprint(s.values.shape)\nprint(s.at('y', 'x1'))"
+  },
+  "irf_series": {
+    "stata": "irf table oirf",
+    "en": "The numbers behind `irf_graph`, without the figure: the series Stata's `irf graph <stat>` plots. Accepts a fitted VAR or its `irf()` analysis, and `statistic=` takes the five a `var` supplies (`irf`, `oirf`, `cirf`, `coirf`, `fevd`); the ones Stata accepts but leaves undefined after `var` raise instead of returning zeros. Returns an `IrfSeries` shaped `(step, response, impulse)`.",
+    "zh": "`irf_graph` 背后的数值，只是不绘图，也就是 Stata `irf graph <stat>` 所画的序列。接受已拟合的 VAR 或其 `irf()` 分析对象；`statistic=` 取 `var` 能提供的五个（`irf`、`oirf`、`cirf`、`coirf`、`fevd`）；Stata 接受但在 `var` 之后未定义的那些会报错而非返回 0。返回形状为 `(step, response, impulse)` 的 `IrfSeries`。",
+    "example": "fit = ws.VAR(base[[\"y\", \"x1\"]].to_numpy(), lags=1, names=[\"y\", \"x1\"]).fit()\ns = ws.irf_series(fit, statistic='oirf', periods=8)\nprint(s.values.shape)"
+  },
+  "IRF_STATISTICS": {
+    "stata": "irf graph",
+    "en": "Every statistic `irf graph`'s syntax accepts, in Stata's own order: `irf`, `oirf`, `dm`, `cirf`, `coirf`, `cdm`, `fevd`, `sirf`, `csirf`, `sfevd` (transcribed from `_irf_stats.ihlp`). Ten in total -- but a plain `var` defines only five of them, which is why this tuple and `IRF_GRAPH_STATISTICS` are different names.",
+    "zh": "`irf graph` 语法接受的全部统计量，按 Stata 自己的顺序：`irf`、`oirf`、`dm`、`cirf`、`coirf`、`cdm`、`fevd`、`sirf`、`csirf`、`sfevd`（抄自 `_irf_stats.ihlp`）。共十个——但普通 `var` 只定义其中五个，这正是它与 `IRF_GRAPH_STATISTICS` 是两个名字的原因。",
+    "example": "ws.IRF_STATISTICS"
+  },
+  "IRF_GRAPH_STATISTICS": {
+    "stata": "irf graph",
+    "en": "The subset of `IRF_STATISTICS` that a `var` (and therefore this package's `VAR`) can actually supply: `irf`, `oirf`, `cirf`, `coirf`, `fevd`. The other five -- `dm`, `cdm`, `sirf`, `csirf`, `sfevd` -- are accepted by Stata's syntax but come back as `.` in every cell after `var`, because they belong to the ARDL/ECM family or need a `svar` decomposition. Requesting one raises and names that model.",
+    "zh": "`IRF_STATISTICS` 中 `var`（因而本包的 `VAR`）真正能提供的子集：`irf`、`oirf`、`cirf`、`coirf`、`fevd`。另外五个——`dm`、`cdm`、`sirf`、`csirf`、`sfevd`——Stata 的语法接受，但在 `var` 之后每个单元格都是 `.`，因为它们属于 ARDL/ECM 族或需要 `svar` 分解。请求它们会报错并指明所属模型。",
+    "example": "ws.IRF_GRAPH_STATISTICS"
+  },
+  "irf_ograph": {
+    "stata": "irf ograph",
+    "en": "Overlaid impulse responses -- Stata's `irf ograph`, the sibling of `irf graph`. Where `irf graph` draws one SUBGRAPH per (impulse, response) combination, `irf ograph` lays several on ONE axis so their shapes can be compared directly. Stata spells a spec as `(irfname impulse response stat)`; pass those triples as `ographs=`, or use the convenience form `impulse=`/`response=` plus a list of `statistic=`. The confidence band is drawn only for a single spec, because several overlapping regions on one axis are unreadable. Reuses the same five-statistic gate as `irf_graph`: the ones undefined after `var` raise rather than plotting zeros.",
+    "zh": "叠在一张图上的脉冲响应——Stata 的 `irf ograph`，即 `irf graph` 的姊妹命令。`irf graph` 为每个 (冲击, 响应) 组合画一个**子图**，而 `irf ograph` 把多条叠到**同一坐标轴**上，便于直接比较形状。Stata 的 spec 写作 `(irfname impulse response stat)`，用 `ographs=` 传这些三元组即可；也可用便捷形式：给 `impulse=`/`response=` 再给一串 `statistic=`。置信带只在单个 spec 时绘制，因为同一轴上多个重叠区间无法阅读。沿用 `irf_graph` 的同一道统计量闸门：`var` 之后未定义的那些会报错，而不是画成 0。",
+    "example": "fit = ws.VAR(base[[\"y\", \"x1\"]].to_numpy(), lags=1, names=[\"y\", \"x1\"]).fit()\nws.irf_ograph(fit, impulse='y', response='x1', statistic=['oirf', 'coirf'], periods=6)"
+  },
+  "irf_cgraph": {
+    "stata": "irf cgraph",
+    "en": "Combined panels -- Stata's `irf cgraph`, the third member of the `irf` graph family. The three differ only in LAYOUT, which is what makes them easy to confuse: `irf graph` gives one subgraph per (impulse, response) combination; `irf ograph` overlays several statistics on ONE axis; `irf cgraph` combines several SPECS as subgraphs of one figure, and a spec may itself carry several statistics, which then share that panel. Stata writes a spec as `(irfname impulse response stat)`; pass those triples as `specs=`, or use the convenience form. Reuses the same five-statistic gate: the statistics undefined after `var` raise rather than plotting zeros.",
+    "zh": "组合成多面板——Stata 的 `irf cgraph`，`irf` 绘图家族中的第三个成员。三者只在**布局**上不同，这也正是它们容易被混淆的原因：`irf graph` 为每个 (冲击, 响应) 组合画一个子图；`irf ograph` 把多条统计量叠到**同一**坐标轴；`irf cgraph` 把多个 **spec** 组合成一张图的多个子图，而单个 spec 本身可以带多条统计量，它们共享该面板。Stata 的 spec 写作 `(irfname impulse response stat)`，用 `specs=` 传这些三元组，也可用便捷形式。沿用同一道统计量闸门：`var` 之后未定义的那些会报错，而不是画成 0。",
+    "example": "fit = ws.VAR(base[[\"y\", \"x1\"]].to_numpy(), lags=1, names=[\"y\", \"x1\"]).fit()\nws.irf_cgraph(fit, specs=[('y', 'x1', 'oirf'), ('y', 'x1', 'fevd')], periods=6)"
   }
 }

@@ -85,6 +85,14 @@ NO_TABLE = {
     # StataNow 19.5 captures (plain and gapped) in tests/test_varbasic_*.py, which is a stronger
     # check than a column sweep.
     "varbasic": "VAR estimation block compared byte-for-byte against two Stata captures",
+    # irf graph produces GRAPHS, so there is no table for the layout sweep to compare. The
+    # series behind each figure is pinned instead: tests/test_irf_graph.py checks all five
+    # statistics against a live `irf table <stat>, noci` capture at steps 0..4 (within 5e-6,
+    # the printed-precision limit), plus the panel structure and every refusal.
+    "irf graph / irf ograph / irf cgraph": (
+        "draw figures, not tables; the five underlying series are Stata-verified, and all "
+        "three layouts (per-combination, overlaid, combined) are pinned by tests"
+    ),
     # xtoverid (user-written, ado/plus) prints THREE lines of result text -- the test
     # description, the model line and the Sargan-Hansen statistic -- and returns r(j)/
     # r(jdf)/r(jp). No estimation table, so a TABLE-layout sweep has nothing to compare.

@@ -533,6 +533,73 @@ ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
 ws.vecrank(values, lags=1)
 ```
 
+**绘制脉冲响应：`irf_graph()`**
+
+Stata 的 `irf graph oirf` 是「子命令 + 统计量」两段式。`ws.irf_graph(fit, statistic=...)` 画的是同一张图：
+每个 (冲击, 响应) 组合一个子图，并带置信带。
+
+```python
+fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
+ws.irf_graph(fit, statistic="oirf")                      # 四个组合
+ws.irf_graph(fit, statistic="oirf", periods=12)          # 更长步长
+ws.irf_graph(fit, statistic="oirf", impulse="mpg", response="price")   # 单个面板
+ws.irf_graph(fit, statistic="fevd")                      # 方差分解
+```
+
+`var` 之后**定义了五个**统计量：`irf`、`oirf`、`cirf`、`coirf`、`fevd`。Stata 的语法也接受
+`dm`、`cdm`、`sirf`、`csirf`、`sfevd`，但在 `var` 之后这些单元格 Stata 一律打印 `.`
+（它们属于 ARDL/ECM 族与 `svar`）。本包会拒绝并说明它们属于哪种模型，而不是画成 0。
+
+| | |
+|---|---|
+| `impulse=`、`response=` | 对应 Stata 的 `impulse()` / `response()`，用于收窄面板 |
+| `show_ci=False` | 对应 Stata 的 `noci` |
+| `level=0.99` | 对应 Stata 的 `level(99)` |
+| `individual=True` | 每个组合单独一张图，而非一张图多个子图 |
+| `same_y=True` | 各面板共用纵轴——默认关闭，与 Stata 一致 |
+| `periods=` | 最后一个步长（含） |
+| `lstep=`、`ustep=` | 对应 Stata 的 `lstep()` / `ustep()`，裁剪报告的步长区间 |
+
+`ws.irf_series(fit, statistic=...)` 返回同样的数值而不绘图，对全部统计量都形如
+`(step, response, impulse)`，因此只需要记住一种索引约定。
+
+两个实测陷阱值得知道，因为弄错时看起来都很合理。`coirf` 是**正交化**响应的累积和；
+statsmodels 自带的 `orth_cum_effects` 是另一条序列（第 4 步 `.008323` 对 Stata 的 `.008195`）。
+`fevd` 来自一个以 step 1 开头的 `(response, step, impulse)` 数组，因此要补上 Stata 的全零第 0 步；
+轴序弄反会把 `.121271` 与 `.002094` 对调。
+
+
+**比较形状：`irf_ograph()`**
+
+`irf graph` 给每个组合一个子图；`irf ograph` 把多条叠到**同一**坐标轴上，形状可直接比较：
+
+```python
+ws.irf_ograph(fit, impulse="mpg", response="price", statistic=["oirf", "coirf"])
+ws.irf_ograph(fit, ographs=[("price", "price", "oirf"), ("mpg", "mpg", "oirf")])
+```
+
+后一种就是 Stata 自己的 `(impulse response statistic)` spec 列表。只有叠加**单个** spec 时才画
+置信带——同一轴上多个重叠区间无法阅读。
+
+**第三个变体 `irf_cgraph()`。** 三者只在面板的排布方式上不同，这正是它们容易被混淆的原因：
+
+| 命令 | 一个「spec」变成 | 图形 |
+|---|---|---|
+| `irf_graph()` | 一个面板 | 所有组合并排 |
+| `irf_ograph()` | 一条线 | 多条序列叠在同一坐标轴 |
+| `irf_cgraph()` | 一个面板 | 多个 spec 组合成多个子图 |
+
+```python
+ws.irf_cgraph(fit, specs=[("price", "mpg", "oirf"), ("price", "mpg", "fevd")])
+ws.irf_cgraph(fit, specs=[("price", "price", ["oirf", "cirf"])])   # 一个面板，两条序列
+```
+
+一个 spec 可以带多条统计量，它们共享该面板并附图例。
+
+**保存图形。** 每个绘图调用都接受 `save=`（对应 Stata 的 `isaving()`）。配合 `individual=True`
+时各面板会输出**带编号**的文件（`panel1.png`、`panel2.png`……），这正是 `iname(stub)` 的语义——
+全部写到一个路径只会剩下最后一张。
+
 ### `prais` 与它的 `corc` 选项
 
 `corc=True` 是**另一张表**，不只是另一个估计量：它丢弃变换后的第一个观测，

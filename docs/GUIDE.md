@@ -557,6 +557,77 @@ Labels are placed radially and stacked vertically when two roots nearly coincide
 has real roots `.82182` and `.7970223` only `0.025` apart, which a naive offset prints on top of each
 other. As with `irf_table().plot()`, `matplotlib` is optional and imported inside the method.
 
+**Plotting impulse responses: `irf_graph()`**
+
+Stata's `irf graph oirf` is a subcommand plus a statistic. `ws.irf_graph(fit, statistic=...)`
+draws the same thing: one subgraph per (impulse, response) combination, with the confidence band.
+
+```python
+fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
+ws.irf_graph(fit, statistic="oirf")                      # all four pairs
+ws.irf_graph(fit, statistic="oirf", periods=12)          # longer horizon
+ws.irf_graph(fit, statistic="oirf", impulse="mpg", response="price")   # one panel
+ws.irf_graph(fit, statistic="fevd")                      # variance decomposition
+```
+
+After a `var`, **five** statistics are defined — `irf`, `oirf`, `cirf`, `coirf`, `fevd`. Stata's
+syntax also accepts `dm`, `cdm`, `sirf`, `csirf` and `sfevd`, but prints `.` in every cell for
+them after `var` (they belong to the ARDL/ECM family and to `svar`). This package refuses them and
+says which model they belong to, rather than plotting zeros.
+
+| | |
+|---|---|
+| `impulse=`, `response=` | Stata's `impulse()` / `response()`; narrows the panels |
+| `show_ci=False` | Stata's `noci` |
+| `level=0.99` | Stata's `level(99)` |
+| `individual=True` | one figure per combination instead of one figure of subgraphs |
+| `same_y=True` | share one y-axis across panels — off by default, as in Stata |
+| `periods=` | last step, inclusive |
+| `lstep=`, `ustep=` | Stata's `lstep()` / `ustep()`: trim the reported step range |
+
+`ws.irf_series(fit, statistic=...)` returns the same numbers without drawing them, shaped
+`(step, response, impulse)` for every statistic — so one index convention covers all five.
+
+Two measured traps are worth knowing because both look plausible when wrong. `coirf` is the
+cumulative sum of the **orthogonalised** responses; statsmodels' own `orth_cum_effects` is a
+different series (`.008323` against Stata's `.008195` at step 4). And `fevd` comes from a
+`(response, step, impulse)` array that starts at step 1, so Stata's all-zero step 0 is prepended;
+a wrong axis permutation swaps `.121271` with `.002094`.
+
+
+**Comparing shapes: `irf_ograph()`**
+
+`irf graph` gives every combination its own subgraph. `irf ograph` puts several on **one** axis so
+the shapes are directly comparable:
+
+```python
+ws.irf_ograph(fit, impulse="mpg", response="price", statistic=["oirf", "coirf"])
+ws.irf_ograph(fit, ographs=[("price", "price", "oirf"), ("mpg", "mpg", "oirf")])
+```
+
+The second form is Stata's own `(impulse response statistic)` spec list. The confidence band is
+drawn only when a single spec is overlaid — several overlapping bands on one axis are unreadable.
+
+**The third variant, `irf_cgraph()`.** The three commands differ only in how panels are arranged,
+which is exactly what makes them easy to mix up:
+
+| command | a "spec" becomes | figure |
+|---|---|---|
+| `irf_graph()` | one panel | all combinations side by side |
+| `irf_ograph()` | one line | several series overlaid on one axis |
+| `irf_cgraph()` | one panel | several specs combined as subgraphs |
+
+```python
+ws.irf_cgraph(fit, specs=[("price", "mpg", "oirf"), ("price", "mpg", "fevd")])
+ws.irf_cgraph(fit, specs=[("price", "price", ["oirf", "cirf"])])   # one panel, two series
+```
+
+A spec may carry several statistics, which then share that panel with a legend.
+
+**Saving figures.** Every drawing call takes `save=` (Stata's `isaving()`). With `individual=True`
+the panels get numbered files (`panel1.png`, `panel2.png`, …), which is what `iname(stub)` does —
+writing them all to one path would leave only the last one on disk.
+
 ### `prais` and its `corc` option
 
 `corc=True` is a **different table**, not only a different estimate: it drops the transformed

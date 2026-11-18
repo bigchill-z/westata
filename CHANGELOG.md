@@ -7,6 +7,80 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.39] - 2026-11-18
+
+### Added — `irf_graph()`, the figures `irf graph` draws
+
+Stata writes it as a subcommand plus a statistic: `irf graph oirf`. `ws.irf_graph(fit, statistic=...)`
+draws the same figure — one subgraph per (impulse, response) combination, with the asymptotic band:
+
+```python
+fit = ws.VAR(df[["dinf", "unem"]], lags=2).fit()
+ws.irf_graph(fit, statistic="oirf")                     # all four pairs
+ws.irf_graph(fit, statistic="oirf", impulse="unem", response="dinf")   # one panel
+ws.irf_graph(fit, statistic="fevd", periods=12)         # variance decomposition
+```
+
+`ws.irf_series(...)` returns the same numbers without drawing, shaped `(step, response, impulse)`.
+
+### Five statistics are defined after `var`; five are not
+
+`_irf_stats.ihlp` lists ten. After a plain `var`, only `irf`, `oirf`, `cirf`, `coirf` and `fevd`
+produce numbers — measured, not assumed. `irf table dm`, `cdm`, `sirf` and `sfevd` print `.` in
+**every cell**, because `dm`/`cdm` belong to the ARDL/ECM family and the structural pair needs an
+`svar` decomposition. They raise here, naming that model, rather than plotting zeros.
+
+### Three traps that were measured rather than guessed
+
+**`coirf` is not statsmodels' `orth_cum_effects`.** Cumulating the orthogonalised responses
+reproduces Stata to `4.8e-07`; the attribute statsmodels offers gives `.008323` where Stata prints
+`.008195` at step 4 — `2.1e-04` out, larger than every printed digit.
+
+**FEVD's array is `(response, step, impulse)` and starts at step 1.** The permutation that
+reproduces Stata is `(1, 0, 2)`, and Stata's all-zero step 0 has to be prepended.
+The plausible-looking `(1, 2, 0)` swaps `.121271` with `.002094` — an error of `1.2e-01` that still
+reads as a normal variance share.
+
+**statsmodels' `IRAnalysis` carries no names at all** (and `model.endog_names` is `None`), so reading
+equation names off it silently yields `['y1','y2']`: the panels are mislabelled and `impulse="unem"`
+raises while every number stays correct. Names come from the caller's `VARResults.names`.
+
+### Also: the whole `irf` graph family, `lstep()`/`ustep()`, and saving
+
+All three layout commands are implemented. They differ ONLY in arrangement, which is why they are
+easy to confuse:
+
+| command | a "spec" becomes | figure |
+|---|---|---|
+| `irf_graph()` | one panel | every combination side by side |
+| `irf_ograph()` | one line | several series overlaid on one axis |
+| `irf_cgraph()` | one panel | several specs combined as subgraphs |
+
+`irf ograph` takes Stata's `(impulse response statistic)` triples via `ographs=`; `irf cgraph` takes
+them via `specs=`, and a spec may itself carry a list of statistics, which then share that panel.
+Both reuse `irf_graph`'s five-statistic gate, so `dm`/`cdm`/`sirf`/`csirf`/`sfevd` raise rather than
+plotting zeros.
+
+Every drawing call accepts `save=` (Stata's `isaving()`). With `individual=True` the panels get
+NUMBERED files — `iname(stub)`'s behaviour — because writing them all to one path would leave only
+the last on disk, which looks like success until somebody opens it.
+
+`lstep()` / `ustep()` trim the REPORTED step range. The series is still computed over the full
+horizon first, so a cumulative statistic keeps the sum it would have had; trimming before computing
+would silently restart the accumulation.
+
+### Verified
+
+63 tests in `tests/test_irf_graph.py`, pinning all five statistics against a live capture at steps
+0..4 (each within `5e-6`, the printed-precision limit), the single index convention, the Cholesky
+impact zeros, the FEVD zero step, panel titles, `noci`, `individual=`, `level=`, and every refusal.
+Six mutations were run against these guards — coirf via `orth_cum_effects`, the wrong FEVD
+permutation, a dropped zero step, names read from the analysis, refusals disabled, and `noci`
+ignored — and all six were caught. `irf_ograph` goes through the same statistic gate. Registry entry added (`irf graph`, E3; 101 entries / 58 E3) and
+the coverage audit reports `UNACCOUNTED FOR: 0`.
+
+---
+
 ## [0.3.38] - 2026-11-18
 
 ### Added — `varstable(...).plot()`, the figure Stata's `varstable, graph` draws

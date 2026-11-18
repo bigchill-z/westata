@@ -2,6 +2,127 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
+## 〇之十三、2026-11-18 westata 命名统一规范：规则已讨论定稿，待分批准施
+
+用户要求先盘点 westata 全部类/函数名，再共同讨论统一命名方式。盘点已存
+`docs/NAMING_INVENTORY.md`（127 模块、221 类、795 模块级函数、顶层 253 导出）。
+
+### 已定（用户 2026-11-18 选择）—— 以下两条已被后续讨论推翻，保留仅为追溯
+1. ~~改造口径 = 先立规范 + 修拼写硬伤，不做批量重命名~~ → **已推翻**：用户后续同意升级为
+   「规范 + 渐进重命名」（见下方「范围升级」）。
+2. ~~结果类后缀统一单数 `*Result`~~ → **已推翻**：用户最终决定**全局统一复数
+   `*Result → *Results`**（见下方「结果类最终决定」）。
+
+### 主导权：已演进为「Stata 词源 + Python 形态」（2026-11-18 多轮讨论后的当前共识）
+用户后续推翻了早先的「双轨并存 / Python 优先」提法，新方向（原话）：
+> 「是否可以将stata和Python风格结合，名字基于stata后按照Python进行改造，因为stata很多命令都是简写，不是很好理解」
+> 「基于stata的名字修改，如OLS改为Regress」
+
+逐轮确认下来的现行规则（**尚未最终定稿，见下方待拍板**）：
+1. **词源 = Stata 命令名**：类名以对应 Stata 命令为唯一来源，`OLS → Regress`、
+   `QuantileRegression → QuantileRegress`、`PanelOLS → PanelRegress`。
+   **澄清（2026-11-18 纠偏）**：此前误称此方向「与 R1.2 一致、OLS 是违规」是错的。
+   R1.2 第 59 行约束的是**命令函数**用 Stata snake_case，通篇未要求类名等于 Stata 命令；
+   `OLS` 在 §4.2/§7 被明确列为达标示例。因此这是一次**新的产品取向**（让 Python 类名也
+   镜像 Stata 命令），需在规范中**新增条款**确立，而非援引 R1.2。既有 R1.2 不冲突但也不授权。
+2. **缩写展开**： cryptic Stata 前缀/缩写按统计语义展开为完整英文词：
+   `xt→Panel`、`svy→Survey`、`rd→RegressionDiscontinuity`、`teffects→TreatmentEffects`、
+   `q→Quantile`、`r→Robust`、`hdfe→HighDimFixedEffects`。
+   **熟词保留（用户 2026-11-18 明确）**：`DID`、`IV` 算熟词，保留缩写不展开——
+   `Didregress→DIDRegress`、`IV2SLS` 原名保留、`XtIvreg→PanelIVRegress`（xt 展开、IV 保留）。
+   用户选择「全改造：完全按统计术语命名」，但边界选「只改缩写/前缀型」——已是 Stata
+   命令同形的 `Logit`/`Probit`/`Tobit` 等保持不动。
+3. **形态保持 statsmodels**：`from_formula(...).fit()`、duck-typed 结果、数值对齐 Stata
+   均不变。README「statsmodels-style API」与新命名不冲突（名字镜像 Stata、接口镜像 statsmodels）。
+4. **结果类**：统一单数 `*Result`（`VARResults`/`VECMResults`/`ContrastResults` 一并改）。
+5. **兼容**：旧名保留一个版本 + `DeprecationWarning`；e-class 函数薄包装（`newey`/`prais`/
+   `synth`/`rdrobust`）同样标 deprecated，不删除。
+6. **`Xt*` / `Svy*` 类名**：用户明确要求改为 Python 名（不再作为例外保留）。
+
+### 函数名范围：用户坚持「函数名也按缩写展开」（2026-11-18 最终表态）
+已向用户明确指出（AGENTS.md §0/§7 要求的纠偏义务，已完成）：函数名展开会**破坏 R1.2
+整条规则的基础**——`xtset→panel_set`、`varsoc→var_select_order`（及 `estat_` 后缀展开）
+之后，用户无法从 Python 名反查 Stata 命令，而 README 的
+核心命题正是「在 Python 里跑是否得到 Stata 相同的数」。替代方案（只改类名、函数名保留）
+已给出，用户**明确选择坚持展开**。按 §0「若用户坚持，记录风险并给出最小可行替代」：
+
+- **记录的风险**：改名落地后，Python→Stata 反查能力在一个版本后消失（兼容期内还能靠旧别名
+  反查）；这与 `docs/API_CONVENTIONS.md` R1.2 直接冲突，必须同步改写 R1.2，不能保留原文本。
+- **最小可行缓解**：① 旧函数名保留一个版本 + `DeprecationWarning`，兼容期内反查仍可用；
+  ② 每个新函数的 docstring 第一行写明对应的 Stata 命令（如 "Python name for Stata `xtset`"），
+  使 `help()` 仍可反查；③ 在 `docs/NAMING_CONVENTIONS.md` 与 GUIDE 增加「Stata 命令 → Python 名」
+  对照表，作为长期反查入口。
+- **未验证**：以上缓解尚未实施，不得写成已完成。
+
+### 逐族核实后的补充裁决（2026-11-18，5 个子智能体读源码核实 `_stata_command`/docstring 后）
+- **estat_* 函数（2026-11-18 澄清纠正）**：用户原意是 **`estat_` 前缀保留、后面的后缀按缩写展开**，
+  不是整个函数名不展开（领队此前误解为整体保留，已纠正）。
+  - 后缀展开：`estat_ptrends→estat_parallel_trends`、`estat_esize→estat_effect_size`、
+    `estat_firststage→estat_first_stage`、`estat_hettest→estat_heteroskedasticity_test`、
+    `estat_imtest→estat_information_matrix_test`、`estat_overid→estat_overidentification`、
+    `estat_ovtest→estat_omitted_variables_test`、`estat_corrgram→estat_correlogram`、
+    `estat_weakrobust→estat_weak_instrument_robust`。
+  - 后缀保留：人名 `bgodfrey`/`moran`/`mundlak`/`szroeter`/`dwatson`（用户选「保留人名」）；
+    熟词 `auc`/`gof`/`ic`/`vce`/`vif`（用户勾选全保留）；已是完整词的 `classification`/
+    `endogenous`/`summarize`。
+  - 早先的 `estat_*→estimate_*` 提议（fam-func 表）全部作废。
+  - 实施注意：`estat_*` 是顶层函数 + 结果对象方法双向对齐（R5.7），改名须两侧同步。
+- **IV 族**：`IV2SLS`/`IVLIML`/`IVGMM` **保留原名**（用户明确，IV 与 2SLS/LIML/GMM 均为熟词缩写）。
+- **面板 xtreg 后缀**：用**短熟词后缀**——`PanelOLS→PanelRegressFE`、`RandomEffects→PanelRegressRE`、
+  `RandomEffectsMLE→PanelRegressMLE`、`BetweenOLS→PanelRegressBE`、
+  `FirstDifferenceOLS→PanelRegressFD`（fe/re/be/fd/mle 当熟词保留）。
+- **熟词扩充**：`RD`、`VECM` 也列为熟词保留——`Rdrobust→RDRobust`（避免 29 字符超长）、
+  `VECM` 原名保留（与 VAR 并列）；Stata 命令 `vec` 仅在 docstring 标注。
+- **结果类的 Xt*/Svy* 前缀**：用户明确**也展开**为 `Panel*`/`Survey*`——
+  `XtSetResult→PanelSetResult`、`XtDesResult→PanelDesResult`、`XtSumResult→PanelSumResult`、
+  `XtSerialResult→PanelSerialResult`、`XtOveridResult→PanelOveridResult`、`XtTest0Result→PanelTest0Result`、
+  `Svylike*` 若存在同理。这**修订了早先「结果类一律保留原名」的规则**：结果类规则改为
+  「统一后缀 + 前缀展开，但不把命令新名联动到结果类」。
+- **teffects 撞名**：用户选择「合并重复类」。**领队纠偏（AGENTS.md §0/§7）**：核实源码发现
+  `TeffectsRa`（teffects_ra.py，函数 teffects_ra() 的类形式）与 `RegressionAdjustment`
+  （treatreg_effects.py）是**两个独立实现**——不同模块、不同构造函数、不同影响函数方差算法
+  （见两处源码），`TeffectsNnmatch` 与 `NearestNeighbourMatching` 同理。直接合并属**功能重构**，
+  会改变 API 与数值，超出本次改名范围，且无法保证与已对拍的 Stata 数值一致。
+  按 §0「若用户坚持，记录风险并给出最小可行替代」：本次改名阶段**先不合并**，按推荐方案
+  「只改 Teffects* 包装类，语义类保留」处理（`TeffectsRa→TreatmentEffectsRa`、
+  `TeffectsNnmatch→TreatmentEffectsNnmatch`、`TeffectsPsmatch→TreatmentEffectsPsmatch`；
+  `RegressionAdjustment`/`NearestNeighbourMatching`/`IPW`/`AIPW` 保留），避免撞名且零功能改动。
+  合并作为**独立的功能重构任务**另行评估，需先证明两组数值等价并有回归测试。此项**未实施**。
+
+### 结果类最终决定（2026-11-18，推翻早先的统一单数）
+- **全局统一复数 `*Result → *Results`**：63 个单数结果类（AST 扫描确认）全部加 s，
+  如 `AucResult→AucResults`、`NeweyWestResult→NeweyWestResults`。已是复数者不动。
+  `Xt*` 前缀先展开再加 s（`XtSerialResult→PanelSerialResults`）。
+  完整清单见 `docs/NAMING_MAP.md` §5。
+- **撞名例外（用户选「保持现状、各自保留」）**：`ContrastResult`（contrast.py:422，单行列对象）
+  与 `ContrastResults`（ecosystem.py:100，多行聚合）语义不同，两者各自保留原名，不适用统一复数
+  规则（否则 `ContrastResult→ContrastResults` 会撞名）。登记为例外。
+- **不**把命令新名联动到结果类名。
+
+### 其余已定事项
+- **展开边界**：展开生僻前缀/缩写（xt/svy/rd/teffects/hdfe），保留行业熟词
+  （**DID/IV/RD/VECM** 用户明确；VAR/ARIMA/GARCH/AR/MA 等 Stata 命令同形者亦保留）。
+  特例：用户明确 `OLS→Regress`（因 Stata 命令叫 regress 而非 ols），优先于「熟词保留」。
+  `IV2SLS`/`IVLIML`/`IVGMM` 原名保留；`Didregress→DIDRegress`；`XtIvreg→PanelIVRegress`。
+- **兼容**：旧名（类与函数）保留一个版本 + `DeprecationWarning`；e-class 函数薄包装
+  （`newey`/`prais`/`synth`/`rdrobust`）同样标 deprecated，不删除。
+- **文档冲突需同步修订**：`docs/API_CONVENTIONS.md` R1.2 整条改写、README「API follows
+  statsmodels」需补充命名层说明、`docs/API*.md` 由生成器重渲染、中英文 GUIDE 同步。
+
+### 结论性提醒
+本次改名是**多发布周期工程**：253 个顶层导出中类名约 60 个、函数名约 60–174 个、
+结果类 54 个受影响，加上 `retest/` 约 180 处按名调用、文档与 6655 项测试。
+按仓库规则，全量测试通过后须 bump 版本、更新中英文文档并推 PyPI + GitHub。
+**当前尚未修改任何公共名字，尚未写最终规范正文，所有工作产出仅为
+`docs/NAMING_INVENTORY.md`（盘点）与本决策记录。**
+
+改名使用规模（供决策参考）：`Rdrobust` 247 处、`Varbasic` 179、`VARResults` 91、
+`VECMResults` 45、`RdRobustResult` 29、`TefectsRaResult` 26、`ContrastResults` 27、
+`IrFTable` 18、`SucestResult` 17。仓库规则要求：全量测试通过后须同步更新中英文
+README/GUIDE/API 文档、bump 版本并推 PyPI + GitHub——本次改名属多发布周期工程，非单个 PR。
+
+---
+
 ## 〇之十二、2026-11-18 `var` 的 `Sample:` 行在**日期型时间轴**上仍与 Stata 不一致（用户决定暂不修）
 
 `var dinf unem, lags(1/2)` 在 `macro_swatson.dta` 上已逐行对拍 StataNow 19.5：**38 行中 37 行逐字符相同**，

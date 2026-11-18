@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.37 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.38 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -19,7 +19,7 @@ _westata 版本: 0.3.37 · 生成脚本 `docs/render_api_reference.py`_
 - **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
 - **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`ImpulseResponse`](#impulseresponse), [`IrFTable`](#irftable), [`IrfResult`](#irfresult), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`Varbasic`](#varbasic), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtDesResult`](#xtdesresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtSetResult`](#xtsetresult), [`XtSumResult`](#xtsumresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`irf_table`](#irf_table), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`panel_description`](#panel_description), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`varbasic`](#varbasic), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtdes`](#xtdes), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xtset`](#xtset), [`xtsum`](#xtsum), [`xttest0`](#xttest0)
+- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`IRF_GRAPH_STATISTICS`](#irf_graph_statistics), [`IRF_STATISTICS`](#irf_statistics), [`ImpulseResponse`](#impulseresponse), [`IrFTable`](#irftable), [`IrfResult`](#irfresult), [`IrfSeries`](#irfseries), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`Varbasic`](#varbasic), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtDesResult`](#xtdesresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtSetResult`](#xtsetresult), [`XtSumResult`](#xtsumresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`irf_cgraph`](#irf_cgraph), [`irf_graph`](#irf_graph), [`irf_ograph`](#irf_ograph), [`irf_series`](#irf_series), [`irf_table`](#irf_table), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`panel_description`](#panel_description), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`varbasic`](#varbasic), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtdes`](#xtdes), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xtset`](#xtset), [`xtsum`](#xtsum), [`xttest0`](#xttest0)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -7108,6 +7108,42 @@ print('see estat_endogenous for a runnable end-to-end example')
 None
 ```
 
+### `IRF_GRAPH_STATISTICS`
+
+**Stata 指令:** `irf graph`
+
+`IRF_STATISTICS` 中 `var`（因而本包的 `VAR`）真正能提供的子集：`irf`、`oirf`、`cirf`、`coirf`、`fevd`。另外五个——`dm`、`cdm`、`sirf`、`csirf`、`sfevd`——Stata 的语法接受，但在 `var` 之后每个单元格都是 `.`，因为它们属于 ARDL/ECM 族或需要 `svar` 分解。请求它们会报错并指明所属模型。
+
+**示例**
+
+```python
+ws.IRF_GRAPH_STATISTICS
+```
+
+**输出**
+
+```text
+('irf', 'oirf', 'cirf', 'coirf', 'fevd')
+```
+
+### `IRF_STATISTICS`
+
+**Stata 指令:** `irf graph`
+
+`irf graph` 语法接受的全部统计量，按 Stata 自己的顺序：`irf`、`oirf`、`dm`、`cirf`、`coirf`、`cdm`、`fevd`、`sirf`、`csirf`、`sfevd`（抄自 `_irf_stats.ihlp`）。共十个——但普通 `var` 只定义其中五个，这正是它与 `IRF_GRAPH_STATISTICS` 是两个名字的原因。
+
+**示例**
+
+```python
+ws.IRF_STATISTICS
+```
+
+**输出**
+
+```text
+('irf', 'oirf', 'dm', 'cirf', 'coirf', 'cdm', 'fevd', 'sirf', 'csirf', 'sfevd')
+```
+
 ### `ImpulseResponse`
 
 **Stata 指令:** `irf table irf`
@@ -7196,6 +7232,33 @@ for _t in range(1, 60):
 frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
 fit = ws.varbasic(frame, 'dlny', lags=1, time='t')
 print(fit.ll)
+```
+
+**输出**
+
+```text
+None
+```
+
+### `IrfSeries`
+
+**Stata 指令:** `irf table oirf`
+
+`irf_graph` 所画的序列，只是不含绘图。`values` 对**全部五个**统计量都形如 `(step, response, impulse)`，因此整个模块共用一种索引约定；`lower`/`upper` 存放 Stata 提供的置信带（`fevd` 没有）。`statistic` 记录是哪个序列，`names` 是方程名，`steps` 是步长轴。`at(response, impulse)` 返回单条路径，`to_frame()` 返回 step/impulse/response/value 的长表（有置信带时一并给出）。`fevd` 是 Cholesky 方差分解，序列以 Stata 的全零第 0 步开头。
+
+**签名**
+
+```python
+ws.IrfSeries(statistic: 'str', names: 'Sequence[str]', steps: 'tuple[int, ...]', values: 'np.ndarray', lower: 'np.ndarray | None' = None, upper: 'np.ndarray | None' = None, level: 'float' = 0.95) -> None
+```
+
+**示例**
+
+```python
+fit = ws.VAR(base[["y", "x1"]].to_numpy(), lags=1, names=["y", "x1"]).fit()
+s = ws.irf_series(fit, statistic='coirf', periods=10)
+print(s.values.shape)
+print(s.at('y', 'x1'))
 ```
 
 **输出**
@@ -8982,6 +9045,107 @@ matrices:
 
 functions:
              e(sample)
+```
+
+### `irf_cgraph`
+
+**Stata 指令:** `irf cgraph`
+
+组合成多面板——Stata 的 `irf cgraph`，`irf` 绘图家族中的第三个成员。三者只在**布局**上不同，这也正是它们容易被混淆的原因：`irf graph` 为每个 (冲击, 响应) 组合画一个子图；`irf ograph` 把多条统计量叠到**同一**坐标轴；`irf cgraph` 把多个 **spec** 组合成一张图的多个子图，而单个 spec 本身可以带多条统计量，它们共享该面板。Stata 的 spec 写作 `(irfname impulse response stat)`，用 `specs=` 传这些三元组，也可用便捷形式。沿用同一道统计量闸门：`var` 之后未定义的那些会报错，而不是画成 0。
+
+**签名**
+
+```python
+ws.irf_cgraph(result: 'Any', *, specs: 'Sequence[tuple[str | int, str | int, str | Sequence[str]]] | None' = None, statistic: 'str | Sequence[str]' = 'oirf', impulse: 'str | int | Sequence[str | int] | None' = None, response: 'str | int | Sequence[str | int] | None' = None, periods: 'int' = 10, level: 'float' = 0.95, show_ci: 'bool' = True, lstep: 'int | None' = None, ustep: 'int | None' = None, figsize: 'tuple[float, float] | None' = None, title: 'str | None' = None, grid: 'bool' = True, **plot_kwds: 'Any') -> 'Any'
+```
+
+**示例**
+
+```python
+fit = ws.VAR(base[["y", "x1"]].to_numpy(), lags=1, names=["y", "x1"]).fit()
+ws.irf_cgraph(fit, specs=[('y', 'x1', 'oirf'), ('y', 'x1', 'fevd')], periods=6)
+```
+
+**输出**
+
+```text
+Figure(1200x360)
+```
+
+### `irf_graph`
+
+**Stata 指令:** `irf graph oirf`
+
+画出 Stata `irf graph` 的那张图：每个 (冲击, 响应) 组合一个子图，并带渐近置信带。`statistic=` 选择序列，取 `var` 能提供的五个：`irf`、`oirf`、`cirf`、`coirf`、`fevd`。Stata 语法也接受但在普通 `var` 之后**并未定义**的五个（`dm`、`cdm`、`sirf`、`csirf`、`sfevd`）会报错并说明它们属于哪种模型——因为那些单元格 Stata 打印的是 `.`，画成 0 等于凭空造数。用 `impulse=` 与 `response=`（对应 Stata 的 `impulse()` / `response()`）收窄面板，`show_ci=False` 去掉置信带（Stata 的 `noci`），`level=` 设置信水平（`level(95)` 即 `0.95`），`individual=True` 则每个组合单独一张图。`matplotlib` 为可选依赖，在调用内部导入。可调用为 `ws.irf_graph(fit)`。
+
+**签名**
+
+```python
+ws.irf_graph(result: 'Any', *, statistic: 'str' = 'irf', impulse: 'str | int | Sequence[str | int] | None' = None, response: 'str | int | Sequence[str | int] | None' = None, periods: 'int' = 10, level: 'float' = 0.95, lstep: 'int | None' = None, ustep: 'int | None' = None, show_ci: 'bool' = True, individual: 'bool' = False, figsize: 'tuple[float, float] | None' = None, same_y: 'bool' = False, title: 'str | None' = None, ax: 'Any' = None, grid: 'bool' = True, save: 'str | None' = None, **plot_kwds: 'Any') -> 'Any'
+```
+
+**示例**
+
+```python
+fit = ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()
+ws.irf_graph(fit, statistic='oirf', periods=6)
+```
+
+**输出**
+
+```text
+Figure(1200x720)
+```
+
+### `irf_ograph`
+
+**Stata 指令:** `irf ograph`
+
+叠在一张图上的脉冲响应——Stata 的 `irf ograph`，即 `irf graph` 的姊妹命令。`irf graph` 为每个 (冲击, 响应) 组合画一个**子图**，而 `irf ograph` 把多条叠到**同一坐标轴**上，便于直接比较形状。Stata 的 spec 写作 `(irfname impulse response stat)`，用 `ographs=` 传这些三元组即可；也可用便捷形式：给 `impulse=`/`response=` 再给一串 `statistic=`。置信带只在单个 spec 时绘制，因为同一轴上多个重叠区间无法阅读。沿用 `irf_graph` 的同一道统计量闸门：`var` 之后未定义的那些会报错，而不是画成 0。
+
+**签名**
+
+```python
+ws.irf_ograph(result: 'Any', *, ographs: 'Sequence[tuple[str | int, str | int, str]] | None' = None, statistic: 'str | Sequence[str]' = 'oirf', impulse: 'str | int' = 0, response: 'str | int' = 0, periods: 'int' = 10, level: 'float' = 0.95, show_ci: 'bool' = True, lstep: 'int | None' = None, ustep: 'int | None' = None, figsize: 'tuple[float, float] | None' = None, title: 'str | None' = None, ax: 'Any' = None, grid: 'bool' = True, **plot_kwds: 'Any') -> 'Any'
+```
+
+**示例**
+
+```python
+fit = ws.VAR(base[["y", "x1"]].to_numpy(), lags=1, names=["y", "x1"]).fit()
+ws.irf_ograph(fit, impulse='y', response='x1', statistic=['oirf', 'coirf'], periods=6)
+```
+
+**输出**
+
+```text
+Figure(700x400)
+```
+
+### `irf_series`
+
+**Stata 指令:** `irf table oirf`
+
+`irf_graph` 背后的数值，只是不绘图，也就是 Stata `irf graph <stat>` 所画的序列。接受已拟合的 VAR 或其 `irf()` 分析对象；`statistic=` 取 `var` 能提供的五个（`irf`、`oirf`、`cirf`、`coirf`、`fevd`）；Stata 接受但在 `var` 之后未定义的那些会报错而非返回 0。返回形状为 `(step, response, impulse)` 的 `IrfSeries`。
+
+**签名**
+
+```python
+ws.irf_series(result: 'Any', *, statistic: 'str' = 'irf', periods: 'int' = 10, level: 'float' = 0.95, lstep: 'int | None' = None, ustep: 'int | None' = None) -> 'IrfSeries'
+```
+
+**示例**
+
+```python
+fit = ws.VAR(base[["y", "x1"]].to_numpy(), lags=1, names=["y", "x1"]).fit()
+s = ws.irf_series(fit, statistic='oirf', periods=8)
+print(s.values.shape)
+```
+
+**输出**
+
+```text
+None
 ```
 
 ### `irf_table`

@@ -7,6 +7,46 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.40] - 2026-11-19
+
+### Fixed — `var`'s `Sample:` line printed nanoseconds on a date axis
+
+`VAR.summary()` built the sample label with `float(time_value)`. For a `datetime64` that
+silently becomes NANOSECONDS SINCE 1970, so a quarterly fit printed
+
+    Sample: -276220800000000000 thru 1009843200000000000          Number of obs = ...
+
+19 digits, which also overflowed the 48-character field and pushed `Number of obs` off the
+line. Nothing raised: every number below it was correct, only the label was wrong — and it was
+wrong in a way that deleted the column beside it.
+
+The label is now built by TYPE, not by casting. A `datetime64` axis is formatted per the
+frequency inferred from its spacing, matching every `%t?` format Stata supports:
+
+| spacing | label | | spacing | label |
+|---|---|---|---|---|
+| yearly | `1981` | | weekly | `1990w2` |
+| quarterly | `1990q2` | | half-yearly | `1990h2` |
+| monthly | `1990m2` | | daily | `02jan1990` |
+
+Inferring is unavoidable — pandas stores no Stata format to read — so an axis whose spacing
+matches nothing falls back to the calendar date, the one label that is true whatever the
+spacing. A numeric axis keeps its number, fractional values included. Over-long labels are
+truncated with an ellipsis rather than allowed to collide with `Number of obs`.
+
+On macro_swatson.dta the whole six-line header is now BYTE-IDENTICAL to the live Stata output,
+where previously 37 of 38 lines matched and this was the one difference.
+
+### Verified
+
+17 tests in `tests/test_var_sample_labels.py`: all six frequencies against live `tsset` labels,
+the nanosecond regression itself, the right-column survival, truncation, the numeric and
+fractional axes, and the no-axis fallback. Five mutations were run against them — restoring the
+`float` cast, labelling every frequency as a year, the half-yearly/weekly ordering trap, dropping
+the truncation guard, and rounding a fractional axis — and all five were caught.
+
+---
+
 ## [0.3.39] - 2026-11-18
 
 ### Added — `irf_graph()`, the figures `irf graph` draws

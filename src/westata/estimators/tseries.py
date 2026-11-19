@@ -590,6 +590,116 @@ def _scale_stat(value: float) -> str:
     return _stata_stat(float(value))
 
 
+
+#: Stata's `tsset` period labels, transcribed from live output for each frequency:
+#:
+#:     quarterly   1990q2       monthly   1990m2       weekly   1990w2
+#:     half-yearly 1990h2       yearly    1981         daily    02jan1990
+#:
+#: The DAILY one is the odd member: `ddmonyyyy` with a lowercase month and no separators, not a
+#: numeric period at all.
+_MONTHS_LOWER = (
+    "jan", "feb", "mar", "apr", "may", "jun",
+    "jul", "aug", "sep", "oct", "nov", "dec",
+)
+
+
+def _stata_period_label(value: Any, frequency: str | None = None) -> str:
+    """Render one time-axis value the way `tsset` labels a period.
+
+    THE BUG THIS REPLACES: the caller did `float(_first)`, which for a `datetime64` silently
+    becomes NANOSECONDS SINCE 1970 -- `1961-04-01` -> `-2.8e+17`. It never raised, so the
+    `Sample:` line printed a 19-digit integer that overflowed the 48-character field and pushed
+    `Number of obs` off the line entirely. A silent wrong answer is worse than an exception.
+
+    A numeric axis keeps its number (`1981`, not `1981.0`); a `datetime64` axis becomes the
+    period tag for its frequency, or a calendar date when the frequency cannot be inferred.
+    """
+
+    if isinstance(value, np.datetime64):
+        if frequency is None:
+            return _datetime_label(value)
+        return _period_tag(value, frequency)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if not np.isfinite(number):
+        return str(value)
+    if number == int(number):
+        return str(int(number))
+    return str(value)
+
+
+def _datetime_label(value: Any) -> str:
+    """`ddmonyyyy`, Stata's daily label: `02jan1990`."""
+
+    stamp = np.datetime64(value, "D")
+    year = int(stamp.astype("datetime64[Y]").astype(int)) + 1970
+    month = int(stamp.astype("datetime64[M]").astype(int)) % 12 + 1
+    day = int((stamp - stamp.astype("datetime64[M]")).astype(int)) + 1
+    return f"{day:02d}{_MONTHS_LOWER[month - 1]}{year}"
+
+
+def _frequency_of(values: np.ndarray) -> str | None:
+    """The sampling frequency, inferred from the smallest positive step on a `datetime64` axis.
+
+    MEASURED against live `tsset`/`var` output for every frequency Stata supports. Inferring is
+    unavoidable -- pandas stores no Stata `%tq`/`%tm` format -- so the spacing is the only
+    evidence available. The bands are the nominal period lengths in days, widened just enough to
+    absorb month-end and leap-year jitter; anything unrecognised is reported as a calendar date,
+    the one label that is true whatever the spacing.
+    """
+
+    if values.size < 2:
+        return None
+    days = np.sort(np.unique(values.astype("datetime64[D]").astype(int)))
+    steps = np.diff(days)
+    steps = steps[steps > 0]
+    if steps.size == 0:
+        return None
+    step = int(steps.min())
+
+    # ORDER MATTERS: half-yearly (182d) sits inside the weekly test's range if that test comes
+    # first, and a half-yearly axis would then print as `1990w27`.
+    if step >= 350:
+        return "yearly"
+    if 150 <= step < 350:
+        return "halfyearly"
+    if 84 <= step < 150:
+        return "quarterly"
+    if 26 <= step < 84:
+        return "monthly"
+    if 5 <= step < 26:
+        return "weekly"
+    return "daily"
+
+
+def _period_tag(value: Any, frequency: str) -> str:
+    """`1990q2` / `1990m2` / `1990w2` / `1990h2` / `1981`, per the measured formats."""
+
+    stamp = np.datetime64(value, "D")
+    year = int(stamp.astype("datetime64[Y]").astype(int)) + 1970
+    month = int(stamp.astype("datetime64[M]").astype(int)) % 12 + 1
+
+    if frequency == "yearly":
+        return str(year)
+    if frequency == "quarterly":
+        return f"{year}q{(month - 1) // 3 + 1}"
+    if frequency == "monthly":
+        return f"{year}m{month}"
+    if frequency == "halfyearly":
+        return f"{year}h{1 if month <= 6 else 2}"
+    if frequency == "weekly":
+        offset = int(stamp.astype("datetime64[D]").astype(int)) - _year_start_day(year)
+        return f"{year}w{offset // 7 + 1}"
+    return _datetime_label(value)
+
+
+def _year_start_day(year: int) -> int:
+    return int(np.datetime64(f"{year}-01-01", "D").astype(int))
+
+
 class VAR:
     """Vector autoregression (Stata ``var``).
 
@@ -2180,22 +2290,31 @@ class VARResults:
         _start = int(getattr(self._result, "k_ar", 1)) + 1
         _end = _total
 
-        # MEASURED: Stata prints the actual `tsset` values -- `Sample: 1982 thru 2013` -- while row
-        # indices gave `3 thru 34`. When no time axis was supplied the indices are the honest
-        # fallback rather than invented dates.
+        # MEASURED: Stata prints the actual `tsset` values -- `Sample: 1982 thru 2013`, or
+        # `1961q2 thru 2002q1` on a quarterly axis -- while row indices gave `3 thru 34`. When no
+        # time axis was supplied the indices are the honest fallback rather than invented dates.
+        #
+        # THE LABELS ARE BUILT AS STRINGS, NOT NUMBERS. This used to do `float(_first)`, which on a
+        # `datetime64` silently yields nanoseconds since 1970: `Sample: -276220800000000000 thru
+        # 1009843200000000000`, 19 digits that also overflowed the 48-character field and pushed
+        # `Number of obs` off the line. Formatting by type is the fix; casting is not.
         if self.time is not None:
             _times = np.asarray(self.time).reshape(-1)
-            if _times.size == int(getattr(_endog, "shape", [0])[0] if _endog.ndim == 2 else _total):
-                _first = _times[_start - 1]
-                _last = _times[-1]
-                _start = int(_first) if float(_first) == int(_first) else _first
-                _end = int(_last) if float(_last) == int(_last) else _last
+            _expected = int(getattr(_endog, "shape", [0])[0] if _endog.ndim == 2 else _total)
+            if _times.size == _expected:
+                _frequency = (
+                    _frequency_of(_times)
+                    if _times.dtype.kind == "M"
+                    else None
+                )
+                _start = _stata_period_label(_times[_start - 1], _frequency)
+                _end = _stata_period_label(_times[-1], _frequency)
 
         lines: list[str] = [
             "",
             "Vector autoregression",
             "",
-            f"{'Sample: ' + str(_start) + ' thru ' + str(_end):<48}"
+            f"{_sample_field(_start, _end):<48}"
             f"Number of obs     = {_usable:>10}",
             (f"{'Log likelihood':<15}= {_stata_stat(float(self.ll)):>10}").ljust(48)
             + _crit_block[0],
@@ -5132,3 +5251,17 @@ def render_dfuller(result: Any, *, variable: str, regression: str = "c") -> str:
     if pvalue is not None and np.isfinite(float(pvalue)):
         lines.append("MacKinnon approximate p-value for Z(t) = %.4f." % float(pvalue))
     return "\n".join(lines)
+
+
+def _sample_field(first: Any, last: Any) -> str:
+    """`Sample: <first> thru <last>`, truncated to the 48-column field it must fit.
+
+    Stata's `tsset` labels never exceed this width, but a caller can pass any `time=` axis, and a
+    long label would otherwise run into `Number of obs` and delete it from the line -- which is
+    how the nanosecond bug became invisible rather than merely wrong.
+    """
+
+    text = f"Sample: {first} thru {last}"
+    if len(text) <= 47:
+        return text
+    return text[:46] + "…"

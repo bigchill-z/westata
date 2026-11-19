@@ -374,6 +374,7 @@ Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点�
 | Stata | 状态 | 说明 |
 |---|---|---|
 | `var` 的 `irf` / `fevd` / `vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
+| `var` 的 `Sample:` 行（日期型时间轴）| ✅ 已修（2026-11-19）| 原先 `Sample:` 取值走 `float(datetime64)`，静默变成**纳秒整数**（`1961-04-01` → `-2.8e+17`），19 位数字还把 48 字符字段撑爆、挤掉右侧 `Number of obs`。现按**类型**格式化：`datetime64` 依间距推断频率后输出 `1990q2` / `1990m2` / `1990w2` / `1990h2` / `02jan1990`，年型 `1981`，数值型沿用原逻辑，超长标签截断加省略号。六种频率逐字符对上 StataNow 19.5 的 `tsset` 输出，见 `tests/test_var_sample_labels.py` |
 | `varbasic` / `irf table` | ✅ 已实现（E3） | `ws.varbasic(frame, vars, lags=..., time=...)` 估计 VAR 并登记 IRF；`ws.irf_table(...)` 出表。**估计块对两份 StataNow 19.5 实跑逐字节相同**（39 行零差异）。四处载重细节：残差协方差按 **T** 而非 T−k 归一（用 T−k 得 se 0.1514890 对 Stata 的 0.1468267，差 3.2%）；`lags(p)` **只保留 p 期**而非 `1..p`（非 p 倍数步响应恒为 0），裸 `varbasic` 才是 L1+L2；`irf` **只打印估计块**，响应须 `irf table`；**滞后按时间轴而非行位置取**——`drop if year == 1989` 时行位移版留 33 个观测（Stata 32），并把 1990 配上 1988 这一整年，`L1` 因此偏离 `.5016988`。`time` 参数可选（不传只影响 `Sample:` 行），传了则把「`time` 列不存在」「时间列含缺失」「周期重复」从静默降级改为按 `tsset` 拒绝 |
 | `arima` 的季节项 | ⚠️ | 参数已支持，未验证 |
 | `arch` 的 EGARCH / GJR | ⚠️ | 能跑，未单独验证 |

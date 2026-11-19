@@ -427,6 +427,34 @@ print(ws.irf_table(fit))   # the responses
 小于 `1e-5` 时改用科学计数法。
 
 
+**`var` 的 `Sample:` 行（日期型时间轴）**
+
+`var` 打印的是 `tsset` 的真实期间值，`datetime64` 列按 Stata `%t?` 格式输出：
+
+| 轴间距 | 标签 |
+|---|---|
+| 年度 | `1981` |
+| 季度 | `1990q2` |
+| 月度 | `1990m2` |
+| 周度 | `1990w2` |
+| 半年 | `1990h2` |
+| 日度 | `02jan1990` |
+
+频率由轴上最小步长**推断**，因为 pandas 不保存 Stata 的格式；间距匹配不上任何一种时退回日历
+日期——那是无论间距如何都成立的唯一标签。数值型轴保留其数值（`1981`；`1981.5` 仍是小数）。
+
+```python
+# `df` is this guide's auto.csv; any two series plus a date axis work.
+# DELIBERATELY SEPARATE NAMES: this block must not touch `vdata`/`fit`, which later blocks in
+# this guide build on and then reuse.
+label_demo = df.dropna(subset=["price", "mpg"]).copy()
+label_demo["quarter"] = pd.date_range("1961-04-01", periods=len(label_demo), freq="QS")
+label_fit = ws.VAR(label_demo[["price", "mpg"]], lags=1, time=label_demo["quarter"]).fit()
+# Sample: 1961q2 thru ...             Number of obs = ...
+```
+
+不传 `time=` 时打印行号——这是诚实的回退，而不是编造日期。
+
 **绘制脉冲响应：`irf_table(...).plot()`**
 
 `varbasic` 登记脉冲响应，`irf_table` 将其列成表，`plot()` 则绘制成图。每个 (impulse, response)

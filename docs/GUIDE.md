@@ -557,6 +557,37 @@ Labels are placed radially and stacked vertically when two roots nearly coincide
 has real roots `.82182` and `.7970223` only `0.025` apart, which a naive offset prints on top of each
 other. As with `irf_table().plot()`, `matplotlib` is optional and imported inside the method.
 
+**`var`'s `Sample:` line on a date axis**
+
+`var` prints the actual `tsset` periods, and a `datetime64` column is labelled the way Stata's
+`%t?` formats print them:
+
+| axis spacing | label |
+|---|---|
+| yearly | `1981` |
+| quarterly | `1990q2` |
+| monthly | `1990m2` |
+| weekly | `1990w2` |
+| half-yearly | `1990h2` |
+| daily | `02jan1990` |
+
+The frequency is inferred from the smallest step on the axis, because pandas stores no Stata
+format to read; an axis whose spacing matches nothing falls back to the calendar date, the only
+label that is true whatever the spacing. A numeric axis keeps its number (`1981`, and `1981.5`
+stays fractional).
+
+```python
+# `df` is this guide's auto.csv; any two series plus a date axis work.
+# DELIBERATELY SEPARATE NAMES: this block must not touch `vdata`/`fit`, which later blocks in
+# this guide build on and then reuse.
+label_demo = df.dropna(subset=["price", "mpg"]).copy()
+label_demo["quarter"] = pd.date_range("1961-04-01", periods=len(label_demo), freq="QS")
+label_fit = ws.VAR(label_demo[["price", "mpg"]], lags=1, time=label_demo["quarter"]).fit()
+# Sample: 1961q2 thru ...             Number of obs = ...
+```
+
+Without `time=` the row index is printed instead — an honest fallback rather than invented dates.
+
 **Plotting impulse responses: `irf_graph()`**
 
 Stata's `irf graph oirf` is a subcommand plus a statistic. `ws.irf_graph(fit, statistic=...)`

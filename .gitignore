@@ -48,3 +48,9 @@ retest/domains/*/_tmp/
 
 # Local CI environment directory (not part of the source tree)
 _ci_env/
+
+# Stata IRF sets written by `irf set`/`irf create` during a capture run. The extension is
+# `.irf` but the bytes are an ordinary <stata_dta> dataset, so this is generated output, not a
+# fixture: it is rewritten on every run and carries no evidence of its own.
+*.irf
+

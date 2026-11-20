@@ -50,7 +50,7 @@ def rendered():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("cobb_douglas.dta is not available")
-    return str(ws.OLS.from_formula("y ~ k", frame).fit().estat_ic())
+    return str(ws.Regress.from_formula("y ~ k", frame).fit().estat_ic())
 
 
 def test_every_line_matches_stata(rendered) -> None:

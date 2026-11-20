@@ -29,7 +29,7 @@ def fitted():
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    return frame, ws.OLS.from_formula("y ~ x1", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def test_without_the_option_no_label_column_appears(fitted) -> None:

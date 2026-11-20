@@ -19,7 +19,7 @@ stata 19.5
        e(V) full rel=2.499e-14 (A)
        GMM default (guard) b rel=1.234e-15 se rel=6.096e-16
 
-[F4] L4 OLS e(F) follows the VCE; L5 e(df_r)=G-1; L6 e() coverage
+[F4] L4 Regress e(F) follows the VCE; L5 e(df_r)=G-1; L6 e() coverage
 (1978 automobile data)
        regress mpg weight foreign                       e(F) rel=1.222e-15(A) e(df_r) 71.0/71.0 match=True
            e() coverage: missing=[] wrong=[]

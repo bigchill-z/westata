@@ -35,7 +35,7 @@ def fitted():
         frame = pd.read_stata(GIRLIC).dropna(subset=["lnw", "s", "expr"])
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
 
 
 def test_a_string_constraint_is_accepted(fitted) -> None:

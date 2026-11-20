@@ -60,7 +60,7 @@ def trend_fit():
         frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
-    return ws.vecrank(frame[["dinf", "unem"]].to_numpy(float), lags=2, trend="trend")
+    return ws.vec_rank(frame[["dinf", "unem"]].to_numpy(float), lags=2, trend="trend")
 
 
 def test_the_parameter_counts_match_stata(trend_fit) -> None:

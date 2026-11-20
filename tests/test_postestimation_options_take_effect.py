@@ -43,7 +43,7 @@ def collinear_frame():
 
 @pytest.fixture(scope="module")
 def collinear_result(collinear_frame):
-    return ws.OLS.from_formula("y ~ x3 + x1 + x2", collinear_frame).fit()
+    return ws.Regress.from_formula("y ~ x3 + x1 + x2", collinear_frame).fit()
 
 
 def test_the_fixture_really_separates_the_orders(collinear_result) -> None:
@@ -127,7 +127,7 @@ def test_the_correlation_option_changes_the_matrix(collinear_result) -> None:
 def test_summarize_honours_the_variables_argument(collinear_frame) -> None:
     """``estat summarize`` with an explicit list must report only those variables."""
 
-    result = ws.OLS.from_formula("y ~ x3 + x1", collinear_frame).fit()
+    result = ws.Regress.from_formula("y ~ x3 + x1", collinear_frame).fit()
 
     table = result.estat_summarize(variables=["x3"]).table
 

@@ -48,7 +48,7 @@ def frame():
 
 
 def _variance_ols(frame: pd.DataFrame, groups, **fit_kwargs) -> np.ndarray:
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit(
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit(
         cov_type="cluster", cov_kwds={"groups": groups}, **fit_kwargs
     )
     return np.asarray(fitted.cov_params(), dtype=float)
@@ -156,7 +156,7 @@ def test_ols_and_iv_share_the_same_combination_rule(frame) -> None:
 def test_n_clust_reports_the_smallest_dimension(frame) -> None:
     """Stata reports the smallest per-dimension group count for a multiway fit."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit(
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame[["grp_a", "grp_b"]]}
     )
 
@@ -180,7 +180,7 @@ def test_iv_n_clust_also_uses_the_smallest_dimension(frame) -> None:
 def test_one_way_clustering_is_unchanged(frame) -> None:
     """The multiway branch must not alter the ordinary path."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit(
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame["grp_a"]}
     )
     matrix = np.asarray(fitted.cov_params(), dtype=float)
@@ -192,7 +192,7 @@ def test_one_way_clustering_is_unchanged(frame) -> None:
 def test_a_single_column_dataframe_is_still_one_way(frame) -> None:
     """A one-column frame must not be mistaken for a multiway spec."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit(
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame[["grp_a"]]}
     )
 

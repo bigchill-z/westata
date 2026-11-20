@@ -104,7 +104,7 @@ def heteroskedastic():
 def test_robust_fit_reports_the_score_test(homoskedastic) -> None:
     _, model = homoskedastic
 
-    rendered = model.fit(cov_type="HC1").estat_overid()
+    rendered = model.fit(cov_type="HC1").estat_overidentification()
 
     assert rendered.test == "Wooldridge score"
 
@@ -114,7 +114,7 @@ def test_score_matches_an_independent_transcription(homoskedastic) -> None:
     result = model.fit(cov_type="HC1")
     expected = _hand_score(result.iv_structure, result.resid)
 
-    assert result.estat_overid().statistic == pytest.approx(expected, rel=1e-10)
+    assert result.estat_overidentification().statistic == pytest.approx(expected, rel=1e-10)
 
 
 def test_score_matches_the_transcription_on_heteroskedastic_data(
@@ -124,15 +124,15 @@ def test_score_matches_the_transcription_on_heteroskedastic_data(
     result = model.fit(cov_type="HC1")
     expected = _hand_score(result.iv_structure, result.resid)
 
-    assert result.estat_overid().statistic == pytest.approx(expected, rel=1e-10)
+    assert result.estat_overidentification().statistic == pytest.approx(expected, rel=1e-10)
 
 
 def test_score_and_sargan_agree_under_homoskedasticity(homoskedastic) -> None:
     """The ado's own remark: with homoskedastic errors they coincide."""
 
     _, model = homoskedastic
-    sargan = model.fit().estat_overid().statistic
-    score = model.fit(cov_type="HC1").estat_overid().statistic
+    sargan = model.fit().estat_overidentification().statistic
+    score = model.fit(cov_type="HC1").estat_overidentification().statistic
 
     assert score == pytest.approx(sargan, abs=1e-4)
 
@@ -141,8 +141,8 @@ def test_score_and_sargan_diverge_under_heteroskedasticity(heteroskedastic) -> N
     """The decisive check: if these were equal the robust path would be a no-op."""
 
     _, model = heteroskedastic
-    sargan = model.fit().estat_overid().statistic
-    score = model.fit(cov_type="HC1").estat_overid().statistic
+    sargan = model.fit().estat_overidentification().statistic
+    score = model.fit(cov_type="HC1").estat_overidentification().statistic
 
     assert not np.isclose(sargan, score, rtol=1e-3), (sargan, score)
 
@@ -150,12 +150,12 @@ def test_score_and_sargan_diverge_under_heteroskedasticity(heteroskedastic) -> N
 def test_statistic_is_non_negative(heteroskedastic) -> None:
     _, model = heteroskedastic
 
-    assert model.fit(cov_type="HC1").estat_overid().statistic >= 0.0
+    assert model.fit(cov_type="HC1").estat_overidentification().statistic >= 0.0
 
 
 def test_pvalue_is_the_chi2_upper_tail(heteroskedastic) -> None:
     _, model = heteroskedastic
-    rendered = model.fit(cov_type="HC1").estat_overid()
+    rendered = model.fit(cov_type="HC1").estat_overidentification()
 
     assert rendered.pvalue == pytest.approx(
         float(stats.chi2.sf(rendered.statistic, rendered.df)), rel=1e-12
@@ -166,13 +166,13 @@ def test_df_is_the_number_of_restrictions(heteroskedastic) -> None:
     _, model = heteroskedastic
 
     # 2 excluded instruments for 1 endogenous regressor.
-    assert model.fit(cov_type="HC1").estat_overid().df == 1.0
+    assert model.fit(cov_type="HC1").estat_overidentification().df == 1.0
 
 
 def test_r_names_follow_overid2sls(heteroskedastic) -> None:
     _, model = heteroskedastic
 
-    payload = model.fit(cov_type="HC1").estat_overid().to_dict()
+    payload = model.fit(cov_type="HC1").estat_overidentification().to_dict()
 
     assert set(payload) == {"score", "p_score"}
 
@@ -182,7 +182,7 @@ def test_no_basmann_under_robust_vce(heteroskedastic) -> None:
 
     _, model = heteroskedastic
 
-    assert model.fit(cov_type="HC1").estat_overid().basmann is None
+    assert model.fit(cov_type="HC1").estat_overidentification().basmann is None
 
 
 def test_clustered_vce_is_refused(heteroskedastic) -> None:
@@ -194,13 +194,13 @@ def test_clustered_vce_is_refused(heteroskedastic) -> None:
     )
 
     with pytest.raises(ValueError, match="clustered"):
-        clustered.estat_overid()
+        clustered.estat_overidentification()
 
 
 def test_nonrobust_still_reports_sargan_and_basmann(homoskedastic) -> None:
     _, model = homoskedastic
 
-    rendered = model.fit().estat_overid()
+    rendered = model.fit().estat_overidentification()
 
     assert rendered.test == "Sargan"
     assert rendered.basmann is not None
@@ -209,7 +209,7 @@ def test_nonrobust_still_reports_sargan_and_basmann(homoskedastic) -> None:
 def test_output_names_the_score_test(heteroskedastic) -> None:
     _, model = heteroskedastic
 
-    text = str(model.fit(cov_type="HC1").estat_overid())
+    text = str(model.fit(cov_type="HC1").estat_overidentification())
 
     assert "Wooldridge score" in text
     assert "overidentifying restrictions" in text
@@ -236,10 +236,10 @@ def overid_frame():
 def test_2sls_reports_sargan_then_the_score(overid_frame) -> None:
     model = ws.IV2SLS.from_formula("y ~ [x ~ z1 + z2 + z3]", overid_frame)
 
-    assert model.fit().estat_overid().test == "Sargan"
-    assert model.fit(cov_type="HC0").estat_overid().test == "Wooldridge score"
+    assert model.fit().estat_overidentification().test == "Sargan"
+    assert model.fit(cov_type="HC0").estat_overidentification().test == "Wooldridge score"
     assert (
-        model.fit(cov_type="HAC", cov_kwds={"maxlags": 1}).estat_overid().test
+        model.fit(cov_type="HAC", cov_kwds={"maxlags": 1}).estat_overidentification().test
         == "Wooldridge score"
     )
 
@@ -250,10 +250,10 @@ def test_gmm_always_reports_hansen_j(overid_frame) -> None:
 
     model = ws.IVGMM.from_formula("y ~ [x ~ z1 + z2 + z3]", overid_frame)
 
-    assert model.fit().estat_overid().test == "Hansen J"
-    assert model.fit(cov_type="HC0").estat_overid().test == "Hansen J"
+    assert model.fit().estat_overidentification().test == "Hansen J"
+    assert model.fit(cov_type="HC0").estat_overidentification().test == "Hansen J"
     assert (
-        model.fit(cov_type="HAC", cov_kwds={"maxlags": 1}).estat_overid().test
+        model.fit(cov_type="HAC", cov_kwds={"maxlags": 1}).estat_overidentification().test
         == "Hansen J"
     )
 
@@ -278,13 +278,13 @@ def test_liml_refuses_a_robust_overidentification_test(
     )
 
     with pytest.raises(ValueError, match="LIML"):
-        fitted.estat_overid()
+        fitted.estat_overidentification()
 
 
 def test_liml_still_reports_sargan_when_unadjusted(overid_frame) -> None:
     fitted = ws.IVLIML.from_formula("y ~ [x ~ z1 + z2 + z3]", overid_frame).fit()
 
-    rendered = fitted.estat_overid()
+    rendered = fitted.estat_overidentification()
 
     assert rendered.test == "Sargan"
     assert rendered.basmann is not None

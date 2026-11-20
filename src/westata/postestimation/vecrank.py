@@ -57,7 +57,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError, UnsupportedError
 
-__all__ = ["VecRankResult", "VecRankRow", "vecrank"]
+__all__ = ["VecRankResults", "VecRankRow", "vec_rank"]
 
 #: 95% critical values for the trace statistic, by (deterministic order, rank).
 #: ``vecrank.sthlp`` tabulates the same numbers; only the constant case is wired up, because
@@ -110,7 +110,7 @@ class VecRankRow:
 
 
 @dataclass(frozen=True)
-class VecRankResult:
+class VecRankResults:
     """``vecrank``: Johansen tests for cointegration."""
 
     rows: tuple[VecRankRow, ...]
@@ -531,13 +531,13 @@ def _johansen_lags_one(
     return eigenvalues, trace
 
 
-def vecrank(
+def vec_rank(
     data: Any,
     *,
     lags: int = 2,
     trend: str = "constant",
     show_max: bool = False,
-) -> VecRankResult:
+) -> VecRankResults:
     """Johansen cointegration rank test, as ``vecrank``.
 
     ``data`` holds the endogenous series in time order (rows) by equation (columns); missing
@@ -659,7 +659,7 @@ def vecrank(
                 maximum_critical=max_cv,
             )
         )
-    return VecRankResult(
+    return VecRankResults(
         rows=tuple(rows),
         nobs=nobs,
         lags=lags,

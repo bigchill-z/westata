@@ -58,7 +58,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def re_fit(frame):
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         FORMULA, frame, entity="province", time="t"
     ).fit(cov_type="robust")
 
@@ -68,7 +68,7 @@ def unbalanced_fit(frame):
     """One observation dropped, which is all it takes to leave ``e(Tcon) == 0``."""
 
     trimmed = frame.drop(index=frame.index[(frame["province"] == 1) & (frame["t"] == 5)])
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         FORMULA, trimmed, entity="province", time="t"
     ).fit()
 
@@ -152,12 +152,12 @@ def test_unbalanced_uses_the_percentiles_not_a_single_theta(unbalanced_fit) -> N
 def test_fe_is_unaffected(re_fit, frame) -> None:
     """``xtreg ..., fe theta`` is r(198); the flag must change nothing."""
 
-    fe = ws.PanelOLS.from_formula(FORMULA, frame, entity="province", time="t").fit()
+    fe = ws.PanelRegressFE.from_formula(FORMULA, frame, entity="province", time="t").fit()
     assert fe.summary(theta=True) == fe.summary()
 
 
 def test_be_is_unaffected(frame) -> None:
-    be = ws.BetweenOLS.from_formula(FORMULA, frame, entity="province", time="t").fit()
+    be = ws.PanelRegressBE.from_formula(FORMULA, frame, entity="province", time="t").fit()
     assert be.summary(theta=True) == be.summary()
 
 
@@ -169,7 +169,7 @@ def test_mle_is_unaffected_even_though_it_titles_itself_random_effects(frame) ->
     alone would print a theta block for a command that refuses the option.
     """
 
-    mle = ws.RandomEffectsMLE.from_formula(
+    mle = ws.PanelRegressMLE.from_formula(
         FORMULA, frame, entity="province", time="t"
     ).fit()
     assert str(mle.e.get("title") or "").startswith("Random-effects")
@@ -180,7 +180,7 @@ def test_a_plain_ols_fit_is_unaffected() -> None:
     """No ``e(Tcon)`` at all: the helper returns nothing rather than raising."""
 
     auto = pd.read_stata("tests/data/auto.dta")
-    ols = ws.OLS.from_formula("mpg ~ weight", auto).fit()
+    ols = ws.Regress.from_formula("mpg ~ weight", auto).fit()
     assert ols.summary(theta=True) == ols.summary()
 
 
@@ -225,7 +225,7 @@ def test_the_flag_composes_with_first(re_fit) -> None:
 def test_a_theta_fit_without_the_stored_scalar_prints_nothing(frame) -> None:
     """An unbalanced fit that somehow lacks the percentiles must not print a broken box."""
 
-    fit = ws.RandomEffects.from_formula(
+    fit = ws.PanelRegressRE.from_formula(
         FORMULA, frame.drop(index=frame.index[0]), entity="province", time="t"
     ).fit()
     # Simulate a lost key rather than depending on one existing.

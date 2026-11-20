@@ -281,7 +281,7 @@ def main() -> int:
         st.quiet("regress mpg weight i.foreign")
         st.quiet("margins, over(foreign)")
         stata_over = np.asarray(st.matrix("r(table)")).T.tolist()
-        ols = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+        ols = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
         ols_exog = np.asarray(ols.design_matrix[0], dtype=float)
         foreign = auto["foreign"].to_numpy()
         before_rows = [

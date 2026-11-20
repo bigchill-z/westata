@@ -39,7 +39,7 @@ def mixed_frame():
 def test_a_factor_variable_does_not_crash_the_table(mixed_frame) -> None:
     """The whole point: one categorical column must not lose the other rows."""
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
 
     table = result.estat_summarize().table
 
@@ -50,7 +50,7 @@ def test_a_factor_variable_does_not_crash_the_table(mixed_frame) -> None:
 def test_the_factor_row_reports_only_an_observation_count(mixed_frame) -> None:
     """``Obs`` is countable; mean/sd/min/max are undefined for strings."""
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
     table = result.estat_summarize().table
     row = table.loc["grp"]
 
@@ -62,7 +62,7 @@ def test_the_factor_row_reports_only_an_observation_count(mixed_frame) -> None:
 def test_the_factor_row_is_printed_with_stata_missing_markers(mixed_frame) -> None:
     """Stata prints ``.`` for a missing statistic -- never ``nan``."""
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
     rendered = str(result.estat_summarize())
 
     grp_line = next(line for line in rendered.splitlines() if line.strip().startswith("grp"))
@@ -73,8 +73,8 @@ def test_the_factor_row_is_printed_with_stata_missing_markers(mixed_frame) -> No
 def test_the_numeric_rows_are_unchanged_by_the_factor(mixed_frame) -> None:
     """The factor must not disturb the statistics of the other variables."""
 
-    with_factor = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
-    without = ws.OLS.from_formula("y ~ x1", mixed_frame).fit()
+    with_factor = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    without = ws.Regress.from_formula("y ~ x1", mixed_frame).fit()
 
     a = with_factor.estat_summarize().table
     b = without.estat_summarize().table
@@ -93,7 +93,7 @@ def test_the_underlying_variable_is_named_not_the_dummy(mixed_frame) -> None:
     variable the user never typed.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
     table = result.estat_summarize().table
 
     assert "grp" in table.index
@@ -103,7 +103,7 @@ def test_the_underlying_variable_is_named_not_the_dummy(mixed_frame) -> None:
 def test_a_purely_numeric_model_still_prints_numbers(mixed_frame) -> None:
     """Regression guard for the missing-marker change: real values still format."""
 
-    result = ws.OLS.from_formula("y ~ x1", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", mixed_frame).fit()
     rendered = str(result.estat_summarize())
 
     assert "nan" not in rendered.lower()
@@ -119,7 +119,7 @@ def test_a_purely_numeric_model_still_prints_numbers(mixed_frame) -> None:
 def test_naming_the_factor_explicitly_also_works(mixed_frame) -> None:
     """``variables=["grp"]`` must follow the same path, not a different one."""
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
 
     table = result.estat_summarize(variables=["grp"]).table
 
@@ -155,7 +155,7 @@ def test_the_factor_model_labels_the_constant_cons(mixed_frame) -> None:
     model and ``Intercept`` on a factor model.
     """
 
-    rendered = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit().summary(
+    rendered = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit().summary(
         style="stata"
     )
     rows = _rows(rendered)
@@ -167,7 +167,7 @@ def test_the_factor_model_labels_the_constant_cons(mixed_frame) -> None:
 def test_the_constant_is_printed_last_in_a_factor_model(mixed_frame) -> None:
     """``_constant_last_order`` supplies the ordering when the mapping refuses."""
 
-    rendered = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit().summary(
+    rendered = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit().summary(
         style="stata"
     )
     labels = list(_rows(rendered))
@@ -184,7 +184,7 @@ def test_every_label_carries_its_own_value_under_a_factor_model(mixed_frame) -> 
 
     from westata.results.summary import _stata_coef
 
-    result = ws.OLS.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + C(grp)", mixed_frame).fit()
     rows = _rows(result.summary(style="stata"))
     stored = dict(result.params.items())
 
@@ -205,7 +205,7 @@ def test_every_label_carries_its_own_value_under_a_factor_model(mixed_frame) -> 
 def test_a_numeric_model_is_unaffected(mixed_frame) -> None:
     """Regression guard for the shared rendering path."""
 
-    result = ws.OLS.from_formula("y ~ x1", mixed_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", mixed_frame).fit()
     rows = _rows(result.summary(style="stata"))
 
     assert list(rows) == ["x1", "_cons"]

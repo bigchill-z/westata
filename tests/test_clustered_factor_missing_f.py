@@ -76,7 +76,7 @@ def frame() -> pd.DataFrame:
 def _fit(frame: pd.DataFrame, formula_tail: str, cov: str | None = "cluster"):
     kw = {"groups": frame["province"]} if cov == "cluster" else None
     formula = f"{Y} ~ " + " + ".join(XS) + formula_tail
-    return ws.OLS.from_formula(formula, frame).fit(cov_type=cov, cov_kwds=kw)
+    return ws.Regress.from_formula(formula, frame).fit(cov_type=cov, cov_kwds=kw)
 
 
 def test_lsdv_slopes_and_clustered_errors_match_stata(frame) -> None:

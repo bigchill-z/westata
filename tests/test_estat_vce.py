@@ -43,7 +43,7 @@ def _permute_to_display_order(result):
 
 
 def test_estat_vce_round_trips_cov_params(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     rendered = result.estat_vce()
     positions = _permute_to_display_order(result)
     expected = np.asarray(result.cov_params())[np.ix_(positions, positions)]
@@ -57,7 +57,7 @@ def test_estat_vce_round_trips_cov_params(auto) -> None:
 
 
 def test_estat_vce_correlation_is_scaled_covariance(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     positions = _permute_to_display_order(result)
     cov = np.asarray(result.cov_params())[np.ix_(positions, positions)]
     se = np.sqrt(np.diag(cov))
@@ -73,7 +73,7 @@ def test_estat_vce_correlation_is_scaled_covariance(auto) -> None:
 
 
 def test_estat_vce_correlation_entries_are_bounded(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     corr = result.estat_vce(correlation=True).to_frame().to_numpy()
 
     assert np.all(np.diag(corr) == 0.0)
@@ -82,7 +82,7 @@ def test_estat_vce_correlation_entries_are_bounded(auto) -> None:
 
 
 def test_estat_vce_labels_use_stata_spelling(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     names = result.estat_vce().names
 
     assert "_cons" in names
@@ -100,7 +100,7 @@ def test_estat_vce_ordered_cutpoints_are_bare(auto) -> None:
 
 
 def test_estat_vce_renders_lower_triangle_only(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     text = str(result.estat_vce())
 
     assert "Covariance matrix" in text
@@ -135,7 +135,7 @@ def test_estat_vce_works_on_nonlinear_models(auto) -> None:
 
 
 def test_estat_vce_module_function_matches_method(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight", auto).fit()
 
     np.testing.assert_allclose(
         estat_vce(result).to_frame().to_numpy(),

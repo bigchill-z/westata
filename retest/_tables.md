@@ -50,16 +50,16 @@
 | 5h regress [aweight=w] vce(robust)：精度型 meat | 1.06e-15 | 8.86e-16 |
 | 6a regress if mpg>20 | 2.98e-14 | 4.16e-16 |
 | 6b regress if weight<4000 & mpg>18 | 3.03e-15 | 6.18e-16 |
-| 7a areg absorb(gid) [分类 FE] vs FEOLS | 1.13e-15 | 1.82e-16 |
+| 7a areg absorb(gid) [分类 FE] vs RegressHighDimFixedEffects | 1.13e-15 | 1.82e-16 |
 | 7b areg absorb(gid) vce(robust) | 1.13e-15 | 8.33e-16 |
 | 7c-bis areg cluster(gid) vs reghdfe 同规格（归因用） | 9.38e-16 | 7.94e-16 |
 | 7d areg absorb(gid) vce(cluster t) [非嵌套] | 7.81e-16 | 1.27e-15 |
 | 7e areg absorb(cont) [数值存储、8 个取值] | 5.91e-16 | 3.33e-16 |
-| 8a reghdfe absorb(gid) vs FEOLS | 9.38e-16 | 1.86e-16 |
-| 8b reghdfe absorb(gid t) 双向 vs FEOLS 双向 | 1.08e-15 | 2.05e-16 |
+| 8a reghdfe absorb(gid) vs RegressHighDimFixedEffects | 9.38e-16 | 1.86e-16 |
+| 8b reghdfe absorb(gid t) 双向 vs RegressHighDimFixedEffects 双向 | 1.08e-15 | 2.05e-16 |
 | 8c reghdfe absorb(gid t) vce(robust) | 1.08e-15 | 3.36e-16 |
 | 8d reghdfe absorb(gid t) vce(cluster gid) | 1.08e-15 | 2.10e-16 |
-| 9 FEOLS(gid+t, HC1) vs areg absorb(gid)+i.t | 9.43e-16 | 7.84e-16 |
+| 9 RegressHighDimFixedEffects(gid+t, HC1) vs areg absorb(gid)+i.t | 9.43e-16 | 7.84e-16 |
 | 10a ivregress 2sls 恰好识别 (e1=z1) | 2.64e-15 | 2.76e-15 |
 | 10b ivregress 2sls 过度识别 (e1=z1 z2) | 2.64e-15 | 3.24e-15 |
 | 10c ivregress 2sls vce(robust) vs westata HC0（实测正确映射） | 2.64e-15 | 6.10e-15 |
@@ -73,15 +73,15 @@
 | 12a-bis gmm：e(V) 全矩阵逐元素（12a 的对角已含于 SE） | 2.20e-16 | 3.67e-16 |
 | 12b ivregress gmm vce(robust) vs westata HC0（实测正确映射） | 2.20e-16 | 8.15e-16 |
 | 13 eivreg reliab(x1 .9 x2 .95) | 4.50e-16 | 6.39e-16 |
-| 14a OLS e(): N/df_r/df_m/r2/r2_a/rmse/F/ll | 5.11e-15 | 6.81e-16 |
-| 14b OLS e(rss)/e(mss)：westata 未存，靠 resid 反算 | 5.11e-15 | 6.81e-16 |
-| 14c 加权 OLS e(N)/e(df_r)/e(r2)：fweight 的 N=sum(w) | 4.87e-16 | 3.04e-16 |
+| 14a Regress e(): N/df_r/df_m/r2/r2_a/rmse/F/ll | 5.11e-15 | 6.81e-16 |
+| 14b Regress e(rss)/e(mss)：westata 未存，靠 resid 反算 | 5.11e-15 | 6.81e-16 |
+| 14c 加权 Regress e(N)/e(df_r)/e(r2)：fweight 的 N=sum(w) | 4.87e-16 | 3.04e-16 |
 
 **panel**（22 条）
 
 | 命令 | 系数相对差 | SE 相对差 |
 |---|---|---|
-| xtset 面板声明 | 0.00e+00 | — |
+| panel_set 面板声明 | 0.00e+00 | — |
 | xtreg, fe（平衡） | 1.27e-16 | 1.85e-16 |
 | xtreg, fe 的 e(r2)=r2_w 与 e(rmse)=sigma_e 数值一致 | 0.00e+00 | 0.00e+00 |
 | xtreg, fe（非平衡） | 5.26e-16 | 0.00e+00 |
@@ -138,7 +138,7 @@
 | contrast: r. (3-level factor) | 5.35e-14 | — |
 | contrast: g. (3-level factor) | 3.81e-15 | — |
 | contrast: a. (3-level factor) | 5.35e-14 | — |
-| pwcompare: 3-level factor (unadjusted) | 5.35e-14 | — |
+| pairwise_compare: 3-level factor (unadjusted) | 5.35e-14 | — |
 | margins: predictive margin (regress, t form) | 4.08e-12 | — |
 | predict poisson: n link check (Stata e(b) reproduces Stata n) | 2.64e-16 | — |
 | predict tobit: xb link check (Stata e(b) reproduces Stata xb) | 1.73e-16 | — |
@@ -298,8 +298,8 @@
 | 命令 | 档位 | 系数相对差 | SE 相对差 | 备注 |
 |---|---|---|---|---|
 | var: VAR(1) e(Sigma) (as reported) | E | 1.01e-02 | — | Same DOF story as the SEs: Stata's e(Sigma) is the ML estimate, statsmodels' sigma_u the unbiased one, so the  |
-| var: Granger causality, VAR(1) (Stata vargranger) | E | 1.00e-02 | — | westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- a |
+| var: Granger causality, VAR(1) (Stata var_granger) | E | 1.00e-02 | — | westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- a |
 | var: VAR(2) e(Sigma) (as reported) | E | 1.71e-02 | — | Same DOF story as the SEs: Stata's e(Sigma) is the ML estimate, statsmodels' sigma_u the unbiased one, so the  |
-| var: Granger causality, VAR(2) (Stata vargranger) | E | 1.68e-02 | — | westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- a |
+| var: Granger causality, VAR(2) (Stata var_granger) | E | 1.68e-02 | — | westata HAS granger causality (VARResults.granger_causality), but it returns statsmodels' kind='f' result -- a |
 | arch: GARCH(1,1) | E | 1.07e-02 | 2.78e-01 | KNOWN DIVERGENCE (the one the old register flagged), reproduced from scratch and now attributed to TWO indepen |
 

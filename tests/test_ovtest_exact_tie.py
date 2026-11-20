@@ -61,15 +61,15 @@ def _plain() -> pd.DataFrame:
 
 
 def test_a_polynomial_collinear_design_is_flagged() -> None:
-    fit = ws.OLS.from_formula("lnwage ~ educ + exper + exper2", _mincer()).fit()
-    result = ws.estat_ovtest(fit, rhs=True)
+    fit = ws.Regress.from_formula("lnwage ~ educ + exper + exper2", _mincer()).fit()
+    result = ws.estat_omitted_variables_test(fit, rhs=True)
     assert result.ambiguous is True
     assert "warning: the auxiliary design contains an exact tie" in str(result)
 
 
 def test_a_plain_design_is_not_flagged() -> None:
-    fit = ws.OLS.from_formula("y ~ a + b + c", _plain()).fit()
-    result = ws.estat_ovtest(fit, rhs=True)
+    fit = ws.Regress.from_formula("y ~ a + b + c", _plain()).fit()
+    result = ws.estat_omitted_variables_test(fit, rhs=True)
     assert result.ambiguous is False
     assert "warning:" not in str(result)
 
@@ -89,8 +89,8 @@ def test_a_duplicated_regressor_also_counts_as_a_tie() -> None:
     frame = pd.DataFrame({"x1": x1, "x1_copy": x1})
     frame["y"] = 1.0 + 2.0 * x1 + rng.normal(size=n)
 
-    fit = ws.OLS.from_formula("y ~ x1 + x1_copy", frame).fit()
-    result = ws.estat_ovtest(fit, rhs=True)
+    fit = ws.Regress.from_formula("y ~ x1 + x1_copy", frame).fit()
+    result = ws.estat_omitted_variables_test(fit, rhs=True)
     assert result.ambiguous is True
 
 
@@ -103,8 +103,8 @@ def test_the_tie_is_only_among_the_powers_of_the_squared_term() -> None:
     """
 
     frame = _mincer()
-    fit = ws.OLS.from_formula("lnwage ~ educ + exper", frame).fit()
-    result = ws.estat_ovtest(fit, rhs=True)
+    fit = ws.Regress.from_formula("lnwage ~ educ + exper", frame).fit()
+    result = ws.estat_omitted_variables_test(fit, rhs=True)
     assert result.ambiguous is False, (
         "a model with no squared regressor must not be flagged"
     )

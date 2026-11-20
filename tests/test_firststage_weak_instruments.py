@@ -43,7 +43,7 @@ def grilic_fit():
 def test_the_relative_bias_row_reports_the_values(grilic_fit) -> None:
     """It said '(not available)' while Stata prints four numbers."""
 
-    rendered = str(ws.estat_firststage(grilic_fit))
+    rendered = str(ws.estat_first_stage(grilic_fit))
     assert "(not available)" not in rendered
     assert "13.91" in rendered and "5.39" in rendered
 
@@ -57,14 +57,14 @@ def test_the_relative_bias_row_still_degrades_honestly() -> None:
     from test_firststage_layout import _frame
 
     fit = ws.IV2SLS.from_formula("y ~ x + [endog ~ z1 + z2]", _frame()).fit()
-    rendered = str(ws.estat_firststage(fit))
+    rendered = str(ws.estat_first_stage(fit))
     assert "(not available)" in rendered
 
 
 def test_the_pipe_sits_at_fifteen_for_any_name_length(grilic_fit) -> None:
     """A one-character name used to push it to 12, a five-character one to 15."""
 
-    rendered = str(ws.estat_firststage(grilic_fit))
+    rendered = str(ws.estat_first_stage(grilic_fit))
     rows = [
         line
         for line in rendered.splitlines()
@@ -78,6 +78,6 @@ def test_the_pipe_sits_at_fifteen_for_any_name_length(grilic_fit) -> None:
 def test_the_eigenvalue_line_has_a_fixed_total_width(grilic_fit) -> None:
     """45 characters, whatever the statistic's digit count."""
 
-    rendered = str(ws.estat_firststage(grilic_fit))
+    rendered = str(ws.estat_first_stage(grilic_fit))
     eigenvalue = next(line for line in rendered.splitlines() if "Minimum eigenvalue" in line)
     assert len(eigenvalue) == 45

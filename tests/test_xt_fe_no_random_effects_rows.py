@@ -60,7 +60,7 @@ def test_fe_has_no_random_effects_rows(frame) -> None:
     """The substring bug put these here; a conditional fit has neither."""
 
     rendered = str(
-        ws.XtLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="fe")
+        ws.PanelLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="fe")
         .fit()
         .summary(style="stata")
     )
@@ -70,7 +70,7 @@ def test_fe_has_no_random_effects_rows(frame) -> None:
 
 def test_re_keeps_its_random_effects_rows(frame) -> None:
     rendered = str(
-        ws.XtLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
+        ws.PanelLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
         .fit()
         .summary(style="stata")
     )
@@ -81,10 +81,10 @@ def test_re_keeps_its_random_effects_rows(frame) -> None:
 def test_the_discriminator_is_the_metadata_not_the_title_text(frame) -> None:
     """'re' appears inside 'regression' -- that is what made the substring test wrong."""
 
-    fe = ws.XtLogit.from_formula(
+    fe = ws.PanelLogit.from_formula(
         "y ~ x1", frame, entity="sid", time="t", method="fe"
     ).fit()
-    re_fit = ws.XtLogit.from_formula(
+    re_fit = ws.PanelLogit.from_formula(
         "y ~ x1", frame, entity="sid", time="t", method="re"
     ).fit()
     fe_title = str((getattr(fe, "e", None) or {}).get("title") or "")
@@ -100,7 +100,7 @@ def test_xtprobit_re_still_matches_the_shape(frame) -> None:
     """The sibling that shares the assembly path; its line count must stay aligned."""
 
     rendered = str(
-        ws.XtProbit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
+        ws.PanelProbit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
         .fit()
         .summary(style="stata")
     )

@@ -31,8 +31,8 @@ Every estimator in scope funnels into one of four assembly sites. Knowing which 
 | `_CountBase` (counts.py) | `src/westata/estimators/counts.py:584-587` | `{}` (base) |
 | `_ZeroInflatedBase` | `src/westata/estimators/counts.py:816-824` | `n_zero`, `n_nonzero`, `inflate="none"` |
 | `_TruncatedBase` | `src/westata/estimators/counts.py:991-996` | `truncation_point`, `lower`, `upper` |
-| `Truncreg` | `src/westata/estimators/limited.py:752-758` | `lower`, `upper`, `n_truncated`, `n_uncensored` |
-| `Intreg` | `src/westata/estimators/limited.py:947-955` | `lnsigma`, `n_left`, `n_right`, `n_interval`, `n_uncensored` |
+| `TruncatedRegress` | `src/westata/estimators/limited.py:752-758` | `lower`, `upper`, `n_truncated`, `n_uncensored` |
+| `IntervalRegress` | `src/westata/estimators/limited.py:947-955` | `lnsigma`, `n_left`, `n_right`, `n_interval`, `n_uncensored` |
 | `_MLLimitedBase` | `src/westata/estimators/limited.py:492-493` | `{}` (base) |
 | `_Ordered` (ologit/oprobit) | — (no `_extra_scalars`; inline at `discrete.py:1562-1583`) | `k_aux` inline |
 
@@ -116,7 +116,7 @@ nbreg  e keys: ['N','aic','bic','chi2','chi2type','df_m','df_r','k_aux','ll','ll
 nbreg  e values: ll_0 = nan, r2_p = nan, chi2 = nan, p = nan
 ```
 
-Because `e(ll_0)` is `NaN` for `nbreg`, `summary(style="stata")` falls into the **OLS branch** and prints `R-squared / Adj R-squared / Root MSE` instead of `Log likelihood / Pseudo R2` (see §4, Q1). Stata's `nbreg` fixture *does* carry `ll_0 = -1040.145594343475` (nbreg.json:38), so the statistic exists on Stata's side.
+Because `e(ll_0)` is `NaN` for `nbreg`, `summary(style="stata")` falls into the **Regress branch** and prints `R-squared / Adj R-squared / Root MSE` instead of `Log likelihood / Pseudo R2` (see §4, Q1). Stata's `nbreg` fixture *does* carry `ll_0 = -1040.145594343475` (nbreg.json:38), so the statistic exists on Stata's side.
 
 ### 1.4 `nbreg, nbre1` (NB1) — `westata.NegativeBinomialNB1`
 
@@ -354,7 +354,7 @@ Runtime: `xtlogit re e keys: ['N','N_g','aic','bic','chi2','chi2type','converged
 | `e(ic)` | iteration count | mismatch (Q5) |
 | `e(k)`, `e(k_eq)`, `e(k_dv)`, `e(k_eq_model)`, `e(k_aux)`, `e(consonly)`, `e(noconstant)`, `e(rc)` | **no** | missing |
 
-Runtime: `xtlogit pa e keys: ['N','N_g','alpha','chi2','chi2type','converged','corr','df_m','df_r','estimator','family','ic','link','p','quasi_likelihood','rank','scale','vce']` — **no `ll`**, which is why the Stata-style summary renders an `F`-test + OLS R² block (see §4).
+Runtime: `xtlogit pa e keys: ['N','N_g','alpha','chi2','chi2type','converged','corr','df_m','df_r','estimator','family','ic','link','p','quasi_likelihood','rank','scale','vce']` — **no `ll`**, which is why the Stata-style summary renders an `F`-test + Regress R² block (see §4).
 
 ### 3.4 `xtprobit re`
 
@@ -439,7 +439,7 @@ Evidence chain:
 * `LR chi2(2)` — `src/westata/results/summary.py:191-194`; the label comes from `e(chi2type)` (`:185-186`), which `logit` sets to `"LR"` at `src/westata/estimators/discrete.py:613`.
 * `Prob > chi2` — `src/westata/results/summary.py:195`.
 
-**But the four-line guarantee is conditional, not structural.** The `Log likelihood` / `Pseudo R2` pair lives inside `if np.isfinite(pseudo_r2):` (`summary.py:218`). Whenever `e(r2_p)` is `NaN`, the renderer silently falls through to the **OLS branch** at `summary.py:221-224` and prints `R-squared / Adj R-squared / Root MSE` — three lines that are *meaningless* for a maximum-likelihood model. Two live failures in scope:
+**But the four-line guarantee is conditional, not structural.** The `Log likelihood` / `Pseudo R2` pair lives inside `if np.isfinite(pseudo_r2):` (`summary.py:218`). Whenever `e(r2_p)` is `NaN`, the renderer silently falls through to the **Regress branch** at `summary.py:221-224` and prints `R-squared / Adj R-squared / Root MSE` — three lines that are *meaningless* for a maximum-likelihood model. Two live failures in scope:
 
 1. **`nbreg`** — `e(ll_0)` is `NaN` on this dataset (`e(ll_0)` comes from statsmodels' `result.llnull`, which `NegativeBinomial` does not provide; the code path is `src/westata/estimators/discrete.py:597-602`). Result:
    ```
@@ -452,9 +452,9 @@ Evidence chain:
    Stata's `nbreg` fixture *does* carry `ll_0 = -1040.145594343475` and `r2_p = 0.060909064` (nbreg.json:38, 47). So this is a **data-availability gap** (see §5), not a renderer gap.
 2. **`xtlogit, pa`** — no likelihood by construction (`panel_nonlinear.py:1192-1193`), so `r2_p` is absent and the renderer prints `F(2, 21)` + an all-`.` R² block. Stata's `xtlogit, pa` also has no `e(ll)`, but it *does* print `Wald chi2` rather than an F test, and it does not print an R-squared block at all.
 
-`svy: logit` has `e(ll)` but no `e(r2_p)`, so it also renders the OLS block (`R-squared . / Adj R-squared . / Root MSE .6629`). Stata's `svy: logit` prints neither.
+`svy: logit` has `e(ll)` but no `e(r2_p)`, so it also renders the Regress block (`R-squared . / Adj R-squared . / Root MSE .6629`). Stata's `svy: logit` prints neither.
 
-**Verdict on Q1:** the four lines are all implemented and correct for `logit`/`probit`/`poisson`/`ologit`/`oprobit`/`tobit`/`truncreg`/`intreg`/`heckman`/`etregress`/`xtlogit fe|re`/`xtprobit re`/`xttobit`/`xtpoisson re`. The gap is that the **fallback is an OLS block rather than a likelihood-appropriate block**, which surfaces for `nbreg` (a real data gap) and `xtlogit, pa` (a real semantic gap).
+**Verdict on Q1:** the four lines are all implemented and correct for `logit`/`probit`/`poisson`/`ologit`/`oprobit`/`tobit`/`truncreg`/`intreg`/`heckman`/`etregress`/`xtlogit fe|re`/`xtprobit re`/`xttobit`/`xtpoisson re`. The gap is that the **fallback is an Regress block rather than a likelihood-appropriate block**, which surfaces for `nbreg` (a real data gap) and `xtlogit, pa` (a real semantic gap).
 
 ### 4.2 Q2 — `estat gof` (deviance / Pearson goodness of fit)
 
@@ -467,7 +467,7 @@ Evidence:
 * `grep -rn "gof" src/westata` → **0 hits** outside a docstring-free code path; the only `gof` token in the whole repo's fixtures is Stata's own macro `"gof": "poiss_g"` at `tests/conformance/stata_fixtures/poisson_sim.json:41`. westata stores no such macro.
 * `grep -rn "deviance" src/westata` → exactly two hits, both in the **`nl`** estimator, out of scope: `src/westata/estimators/nonlinear.py:86` (docstring, "``e(deviance)`` is Stata's 'Res. dev.'") and `src/westata/estimators/nonlinear.py:1340` (`"deviance": -2.0 * log_likelihood`). No count model sets it.
 * `grep -rn "pearson" src/westata` → one hit, and it is a *comment about a different estimator*: `src/westata/estimators/panel_nonlinear.py:81` ("which is neither the Pearson nor the deviance estimate this module computes"). No Pearson residual statistic is exposed.
-* There is no `estat` command surface at all. `src/westata/postestimation/__init__.py:1-31` exports exactly `test`, `lincom`, `nlcom`, `testnl`, `contrast`, `pwcompare`, `hausman`, `lrtest`, `margins`, `predict`. No `estat ic`, no `estat gof`, no `estat summarize`, no `estat ic`→`r()` return.
+* There is no `estat` command surface at all. `src/westata/postestimation/__init__.py:1-31` exports exactly `test`, `lincom`, `nlcom`, `testnl`, `contrast`, `pairwise_compare`, `hausman`, `lrtest`, `margins`, `predict`. No `estat ic`, no `estat gof`, no `estat summarize`, no `estat ic`→`r()` return.
 
 So `poisson`/`nbreg`/`zip`/`zinb`/`ztp`/`tnbreg`/`xtpoisson`/`xtnbreg` in westata expose **no deviance, no Pearson chi2, no dispersion statistic, no `estat gof` output block**. This is a whole missing postestimation command, not a missing key.
 
@@ -601,7 +601,7 @@ Items 1–4 and 11 are the highest value-per-line in the whole audit: they close
 |---|---|---|
 | 1 | **`estat gof` command surface** | a brand-new postestimation entry point, not a key. Nothing in `src/westata/postestimation/` corresponds to it (`__init__.py:1-31`) |
 | 2 | **`estat ic` command surface** returning AIC/BIC | new entry point; must resolve the `e(ic)` collision first (§6.1 #11) or it will be actively wrong |
-| 3 | Likelihood-appropriate fallback block for the `summary.py:221-224` OLS branch | when `r2_p` is `NaN` **and** `e(ll)` is present, print `Log likelihood` without `Pseudo R2` rather than `R-squared/Adj R-squared/Root MSE`. This is the fix for `nbreg`'s current output and for `svy: logit` |
+| 3 | Likelihood-appropriate fallback block for the `summary.py:221-224` Regress branch | when `r2_p` is `NaN` **and** `e(ll)` is present, print `Log likelihood` without `Pseudo R2` rather than `R-squared/Adj R-squared/Root MSE`. This is the fix for `nbreg`'s current output and for `svy: logit` |
 | 4 | `zip`/`zinb` header block: `Inflation model: logit`, `Nonzero obs`, `Zero obs` | renderer addition; values already stored (`counts.py:819-820`) |
 | 5 | `truncreg` header block: `Limit: Lower` / `Upper` | renderer addition; values already stored (`limited.py:754-755`) |
 | 6 | `heckman` header note `(regression model with sample selection)` + `Selected`/`Nonselected` | renderer addition; values already stored (`limited.py:1829-1830`) |

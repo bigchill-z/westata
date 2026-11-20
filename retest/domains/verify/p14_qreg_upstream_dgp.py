@@ -16,7 +16,7 @@ def run(tag, df, taus=(0.25,0.5,0.75)):
     X0 = None
     print("="*72); print(f"### {tag}  n={len(df)}")
     for tau in taus:
-        r = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+        r = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
         ri = r.fit(cov_type="iid"); rr = r.fit(cov_type="robust")
         pn = list(rr.param_names); order=[pn.index(k) for k in ("x1","x2","Intercept")]
         with S() as s:

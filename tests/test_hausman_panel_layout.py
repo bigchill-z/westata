@@ -50,10 +50,10 @@ def reference():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("munnell.dta is not available")
-    fe = ws.PanelOLS.from_formula(
+    fe = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="st_abb", time="year"
     ).fit()
-    re = ws.RandomEffects.from_formula(
+    re = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="st_abb", time="year"
     ).fit()
     return fe.hausman(re)

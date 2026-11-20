@@ -39,7 +39,7 @@ def _line(n: int) -> str:
             "x": rng.normal(size=n),
         }
     )
-    rendered = str(ws.estat_dwatson(ws.OLS.from_formula("y ~ x", frame).fit()))
+    rendered = str(ws.estat_dwatson(ws.Regress.from_formula("y ~ x", frame).fit()))
     return next(line for line in rendered.splitlines() if "d-statistic" in line)
 
 

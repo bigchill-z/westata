@@ -120,7 +120,7 @@ def test_two_sequences_produce_the_cartesian_product() -> None:
 def test_a_scalar_still_returns_a_single_result() -> None:
     """The previous behaviour must not change for the ordinary call."""
 
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", _ols_frame()).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", _ols_frame()).fit()
 
     produced = fitted.margins(dydx="x1", at={"x2": 0.0})
 
@@ -143,7 +143,7 @@ def test_predict_accepts_a_dataframe_with_extra_columns() -> None:
     """The usual case: the fitting frame carries the response and other columns."""
 
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     predicted = np.asarray(fitted.predict(exog=frame.head(10)), dtype=float)
 
@@ -154,7 +154,7 @@ def test_the_dataframe_path_agrees_with_a_hand_built_matrix() -> None:
     """Selecting the wrong column would still "work" and give a plausible number."""
 
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     by_frame = np.asarray(fitted.predict(exog=frame), dtype=float)
 
@@ -168,7 +168,7 @@ def test_the_dataframe_path_agrees_with_a_hand_built_matrix() -> None:
 
 def test_a_dataframe_missing_a_regressor_is_refused_by_name() -> None:
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     with pytest.raises(ValueError, match="x2"):
         fitted.predict(exog=frame[["x1", "z"]])
@@ -176,7 +176,7 @@ def test_a_dataframe_missing_a_regressor_is_refused_by_name() -> None:
 
 def test_the_stored_design_is_used_when_no_exog_is_given() -> None:
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.asarray(fitted.predict(), dtype=float),
@@ -190,7 +190,7 @@ def test_the_stored_design_is_used_when_no_exog_is_given() -> None:
 @pytest.mark.parametrize("suffix", ["csv", "tsv", "tex", "md", "html"])
 def test_etable_writes_the_requested_format(tmp_path, suffix: str) -> None:
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     target = tmp_path / f"table.{suffix}"
     ws.etable([fitted], file=target)
@@ -203,7 +203,7 @@ def test_etable_still_returns_the_dataframe(tmp_path) -> None:
     """Writing is a side effect, not a replacement for the return value."""
 
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     returned = ws.etable([fitted], file=tmp_path / "table.csv")
 
@@ -215,7 +215,7 @@ def test_the_written_csv_round_trips(tmp_path) -> None:
     """A file that exists but is empty would pass a mere existence check."""
 
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     target = tmp_path / "table.csv"
     table = ws.etable([fitted], file=target)
@@ -226,7 +226,7 @@ def test_the_written_csv_round_trips(tmp_path) -> None:
 
 def test_an_unknown_extension_is_refused_rather_than_guessed(tmp_path) -> None:
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     with pytest.raises(ValueError, match="extension"):
         ws.etable([fitted], file=tmp_path / "table.xyz")
@@ -236,7 +236,7 @@ def test_writing_is_optional() -> None:
     """The original call, with no ``file=``, keeps working unchanged."""
 
     frame = _ols_frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     table = ws.etable([fitted])
 

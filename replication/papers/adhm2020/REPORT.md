@@ -15,7 +15,7 @@
 | 标准误复现了吗？ | **是，两侧都是。** `ivreg2` 五列与作者日志逐位相同；westata 现在也产得出来——两维聚类已实现，SE = 9.236939 与 `ivreg2` 一致 |
 | `pystata` 与 `westata` 有差异吗？ | **单维聚类下没有差异**（10 个回归，最大相对差 3.2e-12） |
 | 数据能获取吗？ | **能。** 作者完整归档（do、dta、log、tab），无需联网 |
-| 最大的发现 | **westata 内部不一致**（已消除）：`FEOLS` 曾支持双维聚类而 `OLS`/`IV2SLS` 不支持，调用形状却一样 |
+| 最大的发现 | **westata 内部不一致**（已消除）：`RegressHighDimFixedEffects` 曾支持双维聚类而 `Regress`/`IV2SLS` 不支持，调用形状却一样 |
 
 ---
 
@@ -133,27 +133,27 @@ pass a single cluster variable as cov_kwds={'clusters': ...}
 | stock Stata `regress` | **支持**（`vce(cluster a b)`） |
 | stock Stata `ivregress` | 拒绝（`multiway cluster VCE not allowed`） |
 | `ivreg2`（用户自写） | **支持** |
-| westata `FEOLS` | **支持** |
-| westata `OLS` / `IV2SLS` | 拒绝 → **现已支持** |
+| westata `RegressHighDimFixedEffects` | **支持** |
+| westata `Regress` / `IV2SLS` | 拒绝 → **现已支持** |
 
-所以 **修复前** westata 的处境是：IV 上和原版 Stata 平手（都不能），比 `ivreg2` 差；OLS 上落后于原版 Stata。
+所以 **修复前** westata 的处境是：IV 上和原版 Stata 平手（都不能），比 `ivreg2` 差；Regress 上落后于原版 Stata。
 
-**修复后**：两处都能做，`OLS`/`IV2SLS`/`FEOLS` 三者行为一致，实现共享一份 CGM 分解。与 `ivreg2` 的对照仍然成立——它才是这篇论文真正的参照实现（stock `ivregress` 至今拒绝）。
+**修复后**：两处都能做，`Regress`/`IV2SLS`/`RegressHighDimFixedEffects` 三者行为一致，实现共享一份 CGM 分解。与 `ivreg2` 的对照仍然成立——它才是这篇论文真正的参照实现（stock `ivregress` 至今拒绝）。
 
 ---
 
 ## 4. 发现：内部不一致（已消除），以及与 Stata 的真实差距
 
-我最初以为"双维聚类在 OLS 上支持、只在 IV 上缺失"，并把 OLS 写成对照项。**运行后发现 OLS 也拒绝**：
+我最初以为"双维聚类在 Regress 上支持、只在 IV 上缺失"，并把 Regress 写成对照项。**运行后发现 Regress 也拒绝**：
 
 ```
 ValueError: cov_kwds['groups'] must be one-dimensional; got 2 dimensions
 ```
 
-但再试 `FEOLS`，它**接受**同样的两列：
+但再试 `RegressHighDimFixedEffects`，它**接受**同样的两列：
 
 ```python
-ws.FEOLS.from_formula("y ~ x | 0", frame).fit(
+ws.RegressHighDimFixedEffects.from_formula("y ~ x | 0", frame).fit(
     cov_type="cluster", cov_kwds={"groups": frame[["czone","congressionaldistrict"]]})
 # OK, N=3772
 ```
@@ -162,13 +162,13 @@ ws.FEOLS.from_formula("y ~ x | 0", frame).fit(
 
 | 估计器 | 双维聚类 | 报错 |
 |---|---|---|
-| `FEOLS`（pyfixest 后端） | **支持** | — |
-| `OLS` | 拒绝 | `ValueError` |
+| `RegressHighDimFixedEffects`（pyfixest 后端） | **支持** | — |
+| `Regress` | 拒绝 | `ValueError` |
 | `IV2SLS` | 拒绝 | `UnsupportedError` |
 
 **同一个 `cov_kwds=` 写法，一个估计器接受、另一个拒绝，调用形状完全一样，用户无从预判。** 而包的某个角落已经证明这件事能做。
 
-**修复后**三者一致：`FEOLS`、`OLS`、`IV2SLS` 都接受双列 `groups`/`clusters`，共用 `westata.vce.cluster.cov_multiway_cluster` 这一条实现。
+**修复后**三者一致：`RegressHighDimFixedEffects`、`Regress`、`IV2SLS` 都接受双列 `groups`/`clusters`，共用 `westata.vce.cluster.cov_multiway_cluster` 这一条实现。
 
 ### 4.1 但真正的参照系是 Stata 自己
 
@@ -185,7 +185,7 @@ ws.FEOLS.from_formula("y ~ x | 0", frame).fit(
 所以准确的说法是：
 
 - **IV 上**：westata 与原版 Stata **平手**（都拒绝），只是比用户自写的 `ivreg2` 差——而作者用的正是 `ivreg2`；
-- **OLS 上**：westata **当时**落后于原版 Stata（`regress` 能做，`OLS` 不能）。**这是唯一一处 westata 落后于"无需任何插件"的 Stata 的地方**——现已修复。
+- **Regress 上**：westata **当时**落后于原版 Stata（`regress` 能做，`Regress` 不能）。**这是唯一一处 westata 落后于"无需任何插件"的 Stata 的地方**——现已修复。
 
 ### 4.2 修复路径已验证，并已实现
 
@@ -234,7 +234,7 @@ ivreg2 的双维值          = 9.236939   ← 逐位相同
 | 功能缺失（P0） | ADH 的加权 IV | 高（抛异常） | 已修复 |
 | 契约缺陷（P1） | AD 的权重对齐 | **低**（报错误导） | 已修复（AD 篇）|
 | **能力缺口（P1）** | **ADHM 的 IV 双维聚类** | 中（抛异常，但 `ivreg2` 能做） | **已修复** |
-| **一致性缺陷（P2）** | **ADHM 的 OLS 双维聚类** | 中（`regress` 能做，`OLS` 不能） | **已修复** |
+| **一致性缺陷（P2）** | **ADHM 的 Regress 双维聚类** | 中（`regress` 能做，`Regress` 不能） | **已修复** |
 | 设计边界 | CK 的数据层、NQ 的 `areg` 约定 | — | 已归因 |
 
 ### 6.3 结论
@@ -243,10 +243,10 @@ ivreg2 的双维值          = 9.236939   ← 逐位相同
 |---|---|
 | "westata 能算出和 Stata 一样的系数" | **成立**，本篇 50 个参数，最大差 9.3e-13 |
 | "westata 能产出 IV 的双维聚类标准误" | **不成立**，`IV2SLS` 拒绝；但**原版 Stata 也拒绝**，只有 `ivreg2` 行 |
-| "westata 在 OLS 上能产出双维聚类标准误" | **不成立，且落后于原版 Stata**——`regress` 可以 |
-| "复现成功 = 可以替代 Stata" | **部分成立**：系数完全一致；方差估计上，IV 与 `ivreg2` 有差距，OLS 与原版 Stata 有差距 |
+| "westata 在 Regress 上能产出双维聚类标准误" | **不成立，且落后于原版 Stata**——`regress` 可以 |
+| "复现成功 = 可以替代 Stata" | **部分成立**：系数完全一致；方差估计上，IV 与 `ivreg2` 有差距，Regress 与原版 Stata 有差距 |
 
-**一句话**：系数这一层已经完全够用（本篇 50 个参数，最大差 9.3e-13）；但**方差估计**这一层还有缺口。需要说清楚的是，westata 在 IV 双维聚类上**与原版 Stata 平手**——真正的标杆是 `ivreg2`，而 westata 比它差；只有在 OLS 双维聚类上，westata 才真的落后于原版 Stata。
+**一句话**：系数这一层已经完全够用（本篇 50 个参数，最大差 9.3e-13）；但**方差估计**这一层还有缺口。需要说清楚的是，westata 在 IV 双维聚类上**与原版 Stata 平手**——真正的标杆是 `ivreg2`，而 westata 比它差；只有在 Regress 双维聚类上，westata 才真的落后于原版 Stata。
 
 ---
 
@@ -284,7 +284,7 @@ ssc install ivreg2, replace
 2. 断言实际跑的是 `ivreg2 ... cluster(czone congressionaldistrict)`，防止测试因为跑错命令而"碰巧通过"；
 3. 单维聚类下 westata 与 Stata 对齐到 1e-9；
 4. **双维聚类必须仍被 westata 拒绝**，且必须是 `UnsupportedError`（若哪天支持了，报告需重写）；
-5. **`FEOLS` 必须继续支持双维**（守住"内部不一致"这个判断）；
+5. **`RegressHighDimFixedEffects` 必须继续支持双维**（守住"内部不一致"这个判断）；
 6. **CGM 恒等式必须在同一份数据上成立**（`sqrt(VA²+VB²−VAB²) = 9.236939`）——这是"修复只是组合步骤"的证据。
 
 ---
@@ -293,7 +293,7 @@ ssc install ivreg2, replace
 
 > **ADHM (2020) 的系数与双维聚类标准误都被精确复现**——五列全部逐位吻合，包括 `ivreg2` 算出的 9.236939，而 westata 现在也给出同一个数。westata 在 10 个单维聚类回归上与 Stata 一致到 3.2e-12。
 >
-> 复现过程中发现的**内部不一致已修复**：`FEOLS` 曾支持双维聚类而 `OLS`/`IV2SLS` 拒绝，调用形状却一样；现在三者共享一份 CGM 分解实现。
+> 复现过程中发现的**内部不一致已修复**：`RegressHighDimFixedEffects` 曾支持双维聚类而 `Regress`/`IV2SLS` 拒绝，调用形状却一样；现在三者共享一份 CGM 分解实现。
 >
 > 值得说清的是参照系：在 **IV 上原版 Stata 也拒绝**双维聚类（`ivregress`: 'multiway cluster VCE not allowed'），能做的是用户自写的 `ivreg2`。所以 westata 对齐的是 `ivreg2`，不是 stock Stata。这个区分决定了缺口的严重性判断——用单维替代会**一致地低估**标准误最多 11%，让 t=1.77 的估计显得更显著，所以当时不能糊弄过去。
 

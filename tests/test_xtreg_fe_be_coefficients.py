@@ -39,14 +39,14 @@ def panel():
 
 @pytest.fixture(scope="module")
 def fixed(panel):
-    return ws.PanelOLS.from_formula(
+    return ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def between(panel):
-    return ws.BetweenOLS.from_formula(
+    return ws.PanelRegressBE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
 
@@ -80,7 +80,7 @@ def test_within_and_between_are_different_estimators(fixed, between) -> None:
 def test_the_between_estimator_runs_on_entity_means(panel) -> None:
     """Its observation count is the number of units, not the number of rows."""
 
-    between = ws.BetweenOLS.from_formula(
+    between = ws.PanelRegressBE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
     # NOBS is the entity count and e(N) the LONG-panel size: Stata's xtreg, be reports 816 for

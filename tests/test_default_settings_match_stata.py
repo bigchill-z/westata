@@ -50,7 +50,7 @@ def frame():
 @pytest.mark.parametrize(
     ("estimator", "formula", "expected_intercept"),
     [
-        ("OLS", "y ~ x1 + x2", -0.0412574166),
+        ("Regress", "y ~ x1 + x2", -0.0412574166),
         ("Logit", "binary ~ x1 + x2", -0.0880482147),
         ("Probit", "binary ~ x1 + x2", -0.0552519598),
         ("Poisson", "count ~ x1 + x2", 0.6911347907),
@@ -69,7 +69,7 @@ def test_the_default_includes_a_constant(
 @pytest.mark.parametrize(
     ("estimator", "formula"),
     [
-        ("OLS", "y ~ x1 + x2"),
+        ("Regress", "y ~ x1 + x2"),
         ("Logit", "binary ~ x1 + x2"),
         ("Probit", "binary ~ x1 + x2"),
         ("Poisson", "count ~ x1 + x2"),
@@ -86,7 +86,7 @@ def test_the_default_rank_is_three(frame, estimator, formula) -> None:
 @pytest.mark.parametrize(
     ("estimator", "formula"),
     [
-        ("OLS", "y ~ x1 + x2"),
+        ("Regress", "y ~ x1 + x2"),
         ("Logit", "binary ~ x1 + x2"),
         ("Probit", "binary ~ x1 + x2"),
         ("Poisson", "count ~ x1 + x2"),

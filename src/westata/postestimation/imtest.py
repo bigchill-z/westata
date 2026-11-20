@@ -65,12 +65,12 @@ from westata.postestimation.names import is_constant_name
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["ImTestResult", "estat_imtest"]
+__all__ = ["ImTestResults", "estat_information_matrix_test"]
 
 
 
 
-class ImTestResult:
+class ImTestResults:
     """Cameron & Trivedi's IM-test decomposition, optionally White's test.
 
     Attributes
@@ -134,7 +134,7 @@ class ImTestResult:
 
     def __repr__(self) -> str:
         return (
-            f"<ImTestResult total chi2({self.df_total:g})={self.total:.4f} "
+            f"<ImTestResults total chi2({self.df_total:g})={self.total:.4f} "
             f"p={self._pvalue(self.total, self.df_total):.4f}>"
         )
 
@@ -259,12 +259,12 @@ def _uncentred_chi2(y: np.ndarray, design: np.ndarray) -> tuple[float, float]:
     return float(y.size * (1.0 - rss / uss)), df
 
 
-def estat_imtest(
+def estat_information_matrix_test(
     result: Any,
     *,
     white: bool = False,
     design: Any = None,
-) -> ImTestResult:
+) -> ImTestResults:
     """Stata's ``estat imtest`` after ``regress``.
 
     Parameters
@@ -397,7 +397,7 @@ def estat_imtest(
         design_k = np.ones((n, 1))
     chi2_k, _ = _uncentred_chi2(y_k, design_k)
 
-    return ImTestResult(
+    return ImTestResults(
         heteroskedasticity=chi2_h,
         skewness=chi2_s,
         kurtosis=chi2_k,

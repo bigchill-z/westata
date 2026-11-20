@@ -107,7 +107,7 @@ from westata.results.base import StataResults
 from westata.estimators.least_squares import numerical_hessian
 from westata.postestimation.names import CONSTANT_SPELLINGS
 
-__all__ = ["XtLogit", "XtNbreg", "XtPoisson", "XtProbit", "XtTobit"]
+__all__ = ["PanelLogit", "PanelNbRegress", "PanelPoisson", "PanelProbit", "PanelTobit"]
 
 _LOG_2PI = float(np.log(2.0 * np.pi))
 #: Largest exponent handed to ``exp``.  Past this the density is numerically
@@ -855,7 +855,7 @@ class _PanelBase:
 
 
 # ------------------------------------------------------------------- xtlogit
-class XtLogit(_PanelBase):
+class PanelLogit(_PanelBase):
     """Panel logit (Stata ``xtlogit``), ``fe`` / ``re`` / ``pa``.
 
     ``model_name`` is ``"xtlogit, fe"``, ``"xtlogit, re"`` or ``"xtlogit, pa"``
@@ -1305,7 +1305,7 @@ class XtLogit(_PanelBase):
 
 
 # ------------------------------------------------------------------ xtprobit
-class XtProbit(_PanelBase):
+class PanelProbit(_PanelBase):
     """Panel probit (Stata ``xtprobit``), random effects only.
 
     The same integral as ``xtlogit, re`` with ``Phi`` in place of ``Lambda``.
@@ -1426,7 +1426,7 @@ class XtProbit(_PanelBase):
 
 
 # ------------------------------------------------------------------- xttobit
-class XtTobit(_PanelBase):
+class PanelTobit(_PanelBase):
     """Random-effects Tobit (Stata ``xttobit``).
 
     ``y*_it = x_it'b + u_i + e_it`` with ``u_i ~ N(0, sigma_u^2)`` and
@@ -1638,7 +1638,7 @@ class XtTobit(_PanelBase):
 
 
 # ----------------------------------------------------------------- xtpoisson
-class XtPoisson(_PanelBase):
+class PanelPoisson(_PanelBase):
     """Panel Poisson (Stata ``xtpoisson``), ``fe`` / ``re``.
 
     ``method="fe"``
@@ -1860,7 +1860,7 @@ class XtPoisson(_PanelBase):
 
 
 # ------------------------------------------------------------------- xtnbreg
-class XtNbreg(_PanelBase):
+class PanelNbRegress(_PanelBase):
     """Conditional fixed-effects negative binomial (Stata ``xtnbreg, fe``).
 
     Stata maximises the Hausman-Hall-Griliches (1984) conditional kernel

@@ -40,7 +40,7 @@ def vecm_fit():
 
 def test_a_vecm_is_refused_with_an_explanation(vecm_fit) -> None:
     with pytest.raises(ws.UnsupportedError) as caught:
-        ws.vargranger(vecm_fit)
+        ws.var_granger(vecm_fit)
     message = str(caught.value)
     assert "var" in message
     assert "VECM" in message or "vec" in message.lower()
@@ -50,7 +50,7 @@ def test_the_refusal_is_not_an_attribute_error(vecm_fit) -> None:
     """It used to surface AttributeError about granger_causality."""
 
     try:
-        ws.vargranger(vecm_fit)
+        ws.var_granger(vecm_fit)
     except ws.UnsupportedError:
         pass
     except AttributeError:  # pragma: no cover - the regression this guards
@@ -66,6 +66,6 @@ def test_a_var_still_works() -> None:
         [np.cumsum(rng.normal(size=n)), np.cumsum(rng.normal(size=n))]
     )
     fitted = ws.VAR(values, lags=2, names=["x", "y"]).fit()
-    rendered = str(ws.vargranger(fitted))
+    rendered = str(ws.var_granger(fitted))
     assert "Granger" in rendered
     assert "chi2" in rendered

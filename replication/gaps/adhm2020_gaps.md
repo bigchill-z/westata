@@ -19,7 +19,7 @@
 | **`ivreg2` + 双维聚类**（作者实际使用的） | westata 做不到 → **GAP 1** | **已修复**，SE = 9.236939 与 `ivreg2` 逐位相同 |
 | **stock Stata `regress` + 双维** | Stata 能做，westata 不能 → **GAP 2** | **已修复** |
 | **stock Stata `ivregress` + 双维** | 双方都拒绝 | 仍是 NOTE（这是 Stata 自己的限制，不是 westata 的） |
-| `FEOLS` + 双维 | westata 能做 | 现在三个估计器一致 |
+| `RegressHighDimFixedEffects` + 双维 | westata 能做 | 现在三个估计器一致 |
 
 修复的判据不是"能跑"，而是**数字对上**：论文报的 9.236939，westata 现在给出同一个值。
 
@@ -87,7 +87,7 @@ pass a single cluster variable as cov_kwds={'clusters': ...}
 |---|---|
 | 是否静默出错 | **否**，抛 `UnsupportedError` |
 | 是否有替代 | 有单维，但**不等价且方向性偏低** |
-| 与其他估计器的关系 | `FEOLS` 支持（见 §4） |
+| 与其他估计器的关系 | `RegressHighDimFixedEffects` 支持（见 §4） |
 
 不误导，但确实产不出，所以是 **P1**（不是 P0——P0 留给"静默出错"）。
 
@@ -95,12 +95,12 @@ pass a single cluster variable as cov_kwds={'clusters': ...}
 
 ---
 
-## 3. GAP 2：OLS 的多维聚类（P2）—— 已修复
+## 3. GAP 2：Regress 的多维聚类（P2）—— 已修复
 
 ### 3.1 现象（修复前）
 
 ```python
-ws.OLS.from_formula(...).fit(
+ws.Regress.from_formula(...).fit(
     cov_type="cluster", cov_kwds={"groups": frame[["czone", "congressionaldistrict"]]}
 )
 ```
@@ -120,33 +120,33 @@ ValueError: cov_kwds['groups'] must be one-dimensional; got 2 dimensions
 
 ### 3.2 当时的分级：P2
 
-会抛异常、不误导，且有 `FEOLS` 作为替代路径。但它构成**内部不一致**（见 §4），所以值得修——P2 不是"可以不做"，是"不紧急但该做"。
+会抛异常、不误导，且有 `RegressHighDimFixedEffects` 作为替代路径。但它构成**内部不一致**（见 §4），所以值得修——P2 不是"可以不做"，是"不紧急但该做"。
 
 ---
 
-## 4. 内部不一致：`FEOLS` 能做，`OLS`/`IV2SLS` 不能 —— 已消除
+## 4. 内部不一致：`RegressHighDimFixedEffects` 能做，`Regress`/`IV2SLS` 不能 —— 已消除
 
 **修复前**，同一个 `cov_kwds=` 写法，三个估计器行为不同：
 
 | 估计器 | 双维聚类 | 报错 |
 |---|---|---|
-| `FEOLS`（pyfixest 后端） | **支持** | — |
-| `OLS` | 拒绝 | `ValueError` |
+| `RegressHighDimFixedEffects`（pyfixest 后端） | **支持** | — |
+| `Regress` | 拒绝 | `ValueError` |
 | `IV2SLS` | 拒绝 | `UnsupportedError` |
 
 ```python
 # 这个能跑
-ws.FEOLS.from_formula("y ~ x | 0", frame).fit(
+ws.RegressHighDimFixedEffects.from_formula("y ~ x | 0", frame).fit(
     cov_type="cluster", cov_kwds={"groups": frame[["a","b"]]})   # OK
 
 # 这个不行，调用形状完全一样
-ws.OLS.from_formula("y ~ x", frame).fit(
+ws.Regress.from_formula("y ~ x", frame).fit(
     cov_type="cluster", cov_kwds={"groups": frame[["a","b"]]})   # ValueError
 ```
 
 用户无从预判。**包的某个角落已经证明这件事能做**，所以这不是"未实现的统计方法"，而是一致性缺陷——同一份语义没有共享一条实现路径。
 
-**现在三者一致**：`FEOLS`、`OLS`、`IV2SLS` 都接受双列 `groups`/`clusters`，并且共享 `westata.vce.cluster.cov_multiway_cluster` 这一条实现。
+**现在三者一致**：`RegressHighDimFixedEffects`、`Regress`、`IV2SLS` 都接受双列 `groups`/`clusters`，并且共享 `westata.vce.cluster.cov_multiway_cluster` 这一条实现。
 
 ---
 
@@ -175,7 +175,7 @@ ivreg2 的双维值          = 9.236939     ← 逐位相同
 1. `cov_kwds` 的 `groups` / `clusters` 接受**多列**（DataFrame 或 `(n, k)` 数组）；
 2. 每个非空维度子集算一次一维聚类肉，交集用各列标签组成的复合键；
 3. 按包含-排除符号求和，**每个子集各自的** $G/(G-1) \cdot (N-1)/(N-K)$（Stata 的约定）；
-4. `OLS` 与 `IV2SLS` 共用这一份实现——`IV2SLS._cluster_labels` 不再抛异常。
+4. `Regress` 与 `IV2SLS` 共用这一份实现——`IV2SLS._cluster_labels` 不再抛异常。
 
 `e(N_clust)` 跟着报**最小的**每维组数，与 `df_t` 一致（Stata 也是这个约定）。
 
@@ -203,7 +203,7 @@ ivreg2 的双维值          = 9.236939     ← 逐位相同
 | 估计器 | 提示内容 | 为什么不一样 |
 |---|---|---|
 | `IV2SLS` / `IVLIML` / `IVGMM` | 「**不是** stock Stata 功能；`ivregress` 拒绝，来源是用户自写的 `ivreg2`」 | 不说就是误导方向 |
-| `OLS` | 「与 stock Stata 的 `regress, vce(cluster a b)` 一致」 | 这里**确实是**原版行为，说成"非原版"同样是错的 |
+| `Regress` | 「与 stock Stata 的 `regress, vce(cluster a b)` 一致」 | 这里**确实是**原版行为，说成"非原版"同样是错的 |
 
 ```
 UserWarning: multiway clustering on IV is NOT a stock Stata feature. Stock
@@ -217,7 +217,7 @@ reproduces in Stata only through `ivreg2`, not through `ivregress`.
 
 测试 `tests/test_multiway_provenance_warning.py`（9 项）锁定：两条提示必须不同、
 IV 提示必须同时点名 `ivregress`（拒绝方）与 `ivreg2`（来源方，且标明 user-written）、
-OLS 提示不得声称"非原版"、单维与无聚类不得提示、以及**提示不影响数值**。
+Regress 提示不得声称"非原版"、单维与无聚类不得提示、以及**提示不影响数值**。
 
 ---
 
@@ -228,9 +228,9 @@ OLS 提示不得声称"非原版"、单维与无聚类不得提示、以及**提
   [OK  ] multiway cluster (IV)     SE = 9.236939，与 ivreg2 逐位相同
   [NOTE] vs stock Stata (IV)       stock ivregress 也拒绝（'multiway cluster VCE not allowed'）
   [OK  ] one-way cluster (czone)   coefficient 15.83783, SE 8.32436
-  [OK  ] multiway cluster (OLS)    two-way OLS clustering works (N=3772)
+  [OK  ] multiway cluster (Regress)    two-way Regress clustering works (N=3772)
 -- controls --
-  [OK  ] FEOLS two-way cluster     works (N=3772)
+  [OK  ] RegressHighDimFixedEffects two-way cluster     works (N=3772)
   [OK  ] CGM decomposition         sqrt(VA²+VB²−VAB²) = 9.236939，与 ivreg2 逐位相同
   [OK  ] public surface            142 public names
 

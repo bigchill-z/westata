@@ -13,38 +13,38 @@
 
 | 条目 | 性质 | 状态 |
 |---|---|---|
-| `PanelOLS` 不接受权重 | 能力缺失（P2） | **已修复** |
+| `PanelRegressFE` 不接受权重 | 能力缺失（P2） | **已修复** |
 | 系数、聚类标准误、联合检验 | 全部正确 | — |
 
-`PanelOLS` 现在接受 `weights=`/`weight_type=`，加权拟合与 Stata `xtreg, fe` 逐位相同：
+`PanelRegressFE` 现在接受 `weights=`/`weight_type=`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 
-| 量 | westata `PanelOLS`（加权） | Stata `xtreg` |
+| 量 | westata `PanelRegressFE`（加权） | Stata `xtreg` |
 |---|---|---|
 | `fpresence1900` 系数 | 0.633869 | 0.633869 |
 | 聚类标准误 | 0.40751063 | 0.40751063 |
 
-`xtreg` 是本篇的核心命令。修复前 westata 的对应物 `PanelOLS` **没有 `weights` 参数**，
-论文 5 列中有 4 列（加权列）只能绕道 `FEOLS`；现在 `PanelOLS` 可直接做。
+`xtreg` 是本篇的核心命令。修复前 westata 的对应物 `PanelRegressFE` **没有 `weights` 参数**，
+论文 5 列中有 4 列（加权列）只能绕道 `RegressHighDimFixedEffects`；现在 `PanelRegressFE` 可直接做。
 
 ---
 
-## 1. `PanelOLS` 不支持权重（P2）—— 已修复
+## 1. `PanelRegressFE` 不支持权重（P2）—— 已修复
 
 ### 1.1 现象（修复前）
 
 论文的命令是 `xtreg urbrate ... [aweight=totalpop1750], fe cluster(id)`。
-按文档映射，`xtreg` 对应 `PanelOLS`，但它原先接受不了权重：
+按文档映射，`xtreg` 对应 `PanelRegressFE`，但它原先接受不了权重：
 
 ```
-PanelOLS.from_formula(formula, data, *, entity, time, subset=None)   # 修复前
-PanelOLS.from_formula(formula, data, *, entity, time, subset=None,
+PanelRegressFE.from_formula(formula, data, *, entity, time, subset=None)   # 修复前
+PanelRegressFE.from_formula(formula, data, *, entity, time, subset=None,
                       weights=None, weight_type=None)                 # 现在
 ```
 
 现在可用：
 
 ```python
-ws.PanelOLS.from_formula(
+ws.PanelRegressFE.from_formula(
     "urbrate ~ " + " + ".join(spec.regressors), frame,
     entity="id", time="year",
     weights=frame["totalpop1750"], weight_type="aweight",
@@ -63,20 +63,20 @@ ws.PanelOLS.from_formula(
 ### 1.2 影响（修复前的处境）
 
 本篇 5 个复现规格中，**4 个是加权的**（Table 3 列 1、3，Table 4 列 1，以及不含年份
-虚拟变量的变体）。修复前用 `PanelOLS` 只能做那 1 个无权重列，其余 4 列必须绕道 `FEOLS`。
+虚拟变量的变体）。修复前用 `PanelRegressFE` 只能做那 1 个无权重列，其余 4 列必须绕道 `RegressHighDimFixedEffects`。
 
 这不是"少一个选项"——`xtreg, fe [aweight=]` 是实证论文里非常常见的组合。这也是它被
 评为 P2（而非可以长期搁置）的原因：影响的是**文档指定的那个对应物能不能直接完成任务**。
 
 ### 1.3 现有的替代路径
 
-`FEOLS` 与 `Areg` 都接受 `weights`/`weight_type`，且都通过吸收实体效应实现同一 within
+`RegressHighDimFixedEffects` 与 `Areg` 都接受 `weights`/`weight_type`，且都通过吸收实体效应实现同一 within
 估计量——但**三者的正确对照命令不同**，这一点曾经把本文件引向一个错误结论（§1.5）：
 
 | 估计器 | 接受权重 | 与哪个 Stata 命令对齐 |
 |---|---|---|
-| `PanelOLS` | ✓（现已支持） | `xtreg, fe` — 系数与聚类 SE 均精确吻合 |
-| `FEOLS` | ✓ | `xtreg` / `reghdfe` — 精确吻合（修复前本篇走这条） |
+| `PanelRegressFE` | ✓（现已支持） | `xtreg, fe` — 系数与聚类 SE 均精确吻合 |
+| `RegressHighDimFixedEffects` | ✓ | `xtreg` / `reghdfe` — 精确吻合（修复前本篇走这条） |
 | `Areg` | ✓ | **`areg`** — 系数与 SE 均精确吻合（见 §1.5） |
 
 修复前后"能否完成任务"都不受影响——差别在于是否必须绕道。**这也是当初把它评为 P2、
@@ -87,8 +87,8 @@ ws.PanelOLS.from_formula(
 | 判据 | 情况 |
 |---|---|
 | 是否静默出错 | **否**，`TypeError` 立刻报错 |
-| 是否有替代 | **有**，`FEOLS` 精确可用 |
-| 影响面 | 中：`PanelOLS` 是文档里 `xtreg` 的对应物，用户会先试它 |
+| 是否有替代 | **有**，`RegressHighDimFixedEffects` 精确可用 |
+| 影响面 | 中：`PanelRegressFE` 是文档里 `xtreg` 的对应物，用户会先试它 |
 
 不会算错，且有替代路径，但对应物缺参数会让使用者绕路。**P2。**（已修复，分级保留作为
 当时的判断依据——它解释了为什么这条该修却不紧急。）
@@ -104,7 +104,7 @@ ws.PanelOLS.from_formula(
 | Stata `areg ... [aweight], absorb(id) vce(cluster id)` | 0.633869 | **0.45292274** |
 | Stata `xtreg ... [aweight], fe vce(cluster id)` | 0.633869 | **0.40751063** |
 | westata `Areg` | 0.633869 | **0.45292274** ✅ = `areg` |
-| westata `FEOLS` | 0.633869 | **0.40751063** ✅ = `xtreg` |
+| westata `RegressHighDimFixedEffects` | 0.633869 | **0.40751063** ✅ = `xtreg` |
 
 **两个 westata 估计器都对**，各自对齐各自的 Stata 命令。`Areg` 声称替代的是 `areg`，
 拿它与 `xtreg` 比就必然差 11%——**差的不是实现，是参照系**。
@@ -119,8 +119,8 @@ ws.PanelOLS.from_formula(
 
 ```
 -- estimator surface --
-  [OK   ] PanelOLS weights       weighted x1 coefficient 0.633869, clustered SE 0.407511
-  [OK   ] FEOLS weighted FE      coefficient 0.633869, clustered SE 0.407511
+  [OK   ] PanelRegressFE weights       weighted x1 coefficient 0.633869, clustered SE 0.407511
+  [OK   ] RegressHighDimFixedEffects weighted FE      coefficient 0.633869, clustered SE 0.407511
   [OK   ] Areg weighted SE       coefficient 0.633869, clustered SE 0.45292274 (= Stata areg)
 
 -- controls --
@@ -129,7 +129,7 @@ ws.PanelOLS.from_formula(
 
 **4 ok, 0 note, 0 gap, 0 error。**
 
-（修复前是 `2 ok, 1 note, 1 gap`：`PanelOLS weights` 为 `GAP`，`Areg weighted SE` 为
+（修复前是 `2 ok, 1 note, 1 gap`：`PanelRegressFE weights` 为 `GAP`，`Areg weighted SE` 为
 `NOTE`——后者是因为当时拿它与 `xtreg` 对照，见 §1.5。）
 
 ---
@@ -148,7 +148,7 @@ ws.PanelOLS.from_formula(
 |---|---|
 | `test_westata_matches_stata_on_every_parameter` | 系数与 SE 对齐到 1e-9 |
 | `test_the_joint_wald_test_matches` | 联合 Wald F 统计量一致 |
-| `test_panelols_accepts_the_paper_weight` | `PanelOLS` 有 `weights=`/`weight_type=` 两个参数（方向已随修复反转） |
+| `test_panelols_accepts_the_paper_weight` | `PanelRegressFE` 有 `weights=`/`weight_type=` 两个参数（方向已随修复反转） |
 | `test_panelols_weighted_matches_xtreg` | 加权拟合复现 Stata 的 0.633869 / 0.407511，而不只是"能跑" |
 | `test_weights_require_a_weight_type` | 给了权重必须给类型（Stata 从不猜权重类型） |
 

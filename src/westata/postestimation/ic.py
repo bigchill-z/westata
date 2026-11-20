@@ -42,10 +42,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-__all__ = ["IcResult", "estat_ic"]
+__all__ = ["IcResults", "estat_ic"]
 
 
-class IcResult:
+class IcResults:
     """The ``estat ic`` table.
 
     Attributes
@@ -96,7 +96,7 @@ class IcResult:
 
     def __repr__(self) -> str:
         return (
-            f"<IcResult N={self.n:g} df={self.df:g} "
+            f"<IcResults N={self.n:g} df={self.df:g} "
             f"AIC={self.aic:.4f} BIC={self.bic:.4f}>"
         )
 
@@ -303,7 +303,7 @@ def estat_ic(
     *,
     n: float | None = None,
     df: float | None = None,
-) -> IcResult:
+) -> IcResults:
     """Stata's ``estat ic`` for one fitted model.
 
     Parameters
@@ -358,7 +358,7 @@ def estat_ic(
     )
     caic = -2.0 * ll_model + parameters * (np.log(sample) + 1.0)
 
-    return IcResult(
+    return IcResults(
         n=sample,
         ll_null=ll_null,
         ll_model=ll_model,

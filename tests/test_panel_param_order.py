@@ -56,7 +56,7 @@ def fit():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("lin_1992.dta is not available")
-    return ws.PanelOLS.from_formula(
+    return ws.PanelRegressFE.from_formula(
         FORMULA, frame, entity="province", time="t"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["province"]})
 
@@ -102,5 +102,5 @@ def test_ols_agrees_with_the_panel_estimator() -> None:
     """Both paths must use the same rule; OLS had it right all along."""
 
     frame = pd.read_stata(DATA, convert_categoricals=False)
-    ols = ws.OLS.from_formula(FORMULA, frame).fit()
+    ols = ws.Regress.from_formula(FORMULA, frame).fit()
     assert ols.stata_param_names == STATA_ORDER

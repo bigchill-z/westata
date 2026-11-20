@@ -67,7 +67,7 @@ def test_poisson_default_is_the_count_mean(frames) -> None:
 
 
 def test_ols_default_stays_xb(frames) -> None:
-    result = ws.OLS.from_formula("y ~ x", frames["continuous"]).fit()
+    result = ws.Regress.from_formula("y ~ x", frames["continuous"]).fit()
     assert np.allclose(result.predict(), result.predict(kind="xb"))
 
 

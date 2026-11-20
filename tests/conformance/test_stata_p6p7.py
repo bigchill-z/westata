@@ -109,9 +109,9 @@ def overdispersed_frame(n: int = 1200, seed: int = 47) -> pd.DataFrame:
 
 
 def test_truncreg_matches_stata():
-    Truncreg = _require("Truncreg")
+    TruncatedRegress = _require("TruncatedRegress")
     frame = truncated_frame()
-    result = Truncreg.from_formula("y ~ x1 + x2", frame, lower=0.0).fit()
+    result = TruncatedRegress.from_formula("y ~ x1 + x2", frame, lower=0.0).fit()
 
     params = result.params
     assert float(params["x1"]) == pytest.approx(1.568894, rel=1e-4)
@@ -124,9 +124,9 @@ def test_truncreg_matches_stata():
 
 
 def test_intreg_matches_stata():
-    Intreg = _require("Intreg")
+    IntervalRegress = _require("IntervalRegress")
     frame = interval_frame()
-    result = Intreg.from_formula("lo hi ~ x1", frame).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x1", frame).fit()
 
     assert float(result.params["x1"]) == pytest.approx(1.197311, rel=1e-4)
     assert float(result.params["Intercept"]) == pytest.approx(1.94128, rel=1e-4)

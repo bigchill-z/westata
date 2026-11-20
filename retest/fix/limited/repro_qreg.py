@@ -62,7 +62,7 @@ with Stata() as st:
                 stata_b = np.asarray(cap.b, dtype=float)[order]
                 stata_se = np.sqrt(np.diag(np.asarray(cap.V, dtype=float)))[order]
 
-                res = ws.QuantileRegression.from_formula(
+                res = ws.QuantileRegress.from_formula(
                     "y ~ x1 + x2", df, quantile=tau).fit(cov_type=cov_type)
                 ours_b = np.asarray(res.params, dtype=float)[[0, 1, 2]]
                 ours_se = np.asarray(res.bse, dtype=float)[[0, 1, 2]]

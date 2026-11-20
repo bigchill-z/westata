@@ -55,11 +55,11 @@ def _render(estimator, formula, frame):
 @pytest.mark.parametrize(
     ("estimator", "formula", "expected_lines"),
     [
-        (ws.RandomEffects, "lny ~ lnk1 + lnlabor", 23),
-        (ws.RandomEffects, "lny ~ lnk1 + lnk2 + lnlabor", 24),
-        (ws.PanelOLS, "lny ~ lnk1 + lnlabor", 24),
-        (ws.PanelOLS, "lny ~ lnk1 + lnk2 + lnlabor", 25),
-        (ws.BetweenOLS, "lny ~ lnk1 + lnk2 + lnlabor", 20),
+        (ws.PanelRegressRE, "lny ~ lnk1 + lnlabor", 23),
+        (ws.PanelRegressRE, "lny ~ lnk1 + lnk2 + lnlabor", 24),
+        (ws.PanelRegressFE, "lny ~ lnk1 + lnlabor", 24),
+        (ws.PanelRegressFE, "lny ~ lnk1 + lnk2 + lnlabor", 25),
+        (ws.PanelRegressBE, "lny ~ lnk1 + lnk2 + lnlabor", 20),
     ],
 )
 def test_the_table_has_the_stata_line_count(frame, estimator, formula, expected_lines) -> None:
@@ -69,11 +69,11 @@ def test_the_table_has_the_stata_line_count(frame, estimator, formula, expected_
 @pytest.mark.parametrize(
     ("estimator", "formula"),
     [
-        (ws.RandomEffects, "lny ~ lnk1 + lnlabor"),
-        (ws.RandomEffects, "lny ~ lnk1 + lnk2 + lnlabor"),
-        (ws.PanelOLS, "lny ~ lnk1 + lnlabor"),
-        (ws.PanelOLS, "lny ~ lnk1 + lnk2 + lnlabor"),
-        (ws.BetweenOLS, "lny ~ lnk1 + lnk2 + lnlabor"),
+        (ws.PanelRegressRE, "lny ~ lnk1 + lnlabor"),
+        (ws.PanelRegressRE, "lny ~ lnk1 + lnk2 + lnlabor"),
+        (ws.PanelRegressFE, "lny ~ lnk1 + lnlabor"),
+        (ws.PanelRegressFE, "lny ~ lnk1 + lnk2 + lnlabor"),
+        (ws.PanelRegressBE, "lny ~ lnk1 + lnk2 + lnlabor"),
     ],
 )
 def test_the_header_names_the_estimator(frame, estimator, formula) -> None:
@@ -89,7 +89,7 @@ def test_the_header_names_the_estimator(frame, estimator, formula) -> None:
 def test_the_entry_point_is_summary_not_str(frame) -> None:
     """str() returns the repr line; the table comes from summary(style="stata")."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnlabor", frame, entity="sid", time="year"
     ).fit()
     assert len(str(fitted).splitlines()) == 1
@@ -99,6 +99,6 @@ def test_the_entry_point_is_summary_not_str(frame) -> None:
 def test_adding_a_regressor_adds_a_row(frame) -> None:
     """Two specifications must differ by the coefficient rows, not agree by accident."""
 
-    short = _render(ws.RandomEffects, "lny ~ lnk1 + lnlabor", frame)
-    long = _render(ws.RandomEffects, "lny ~ lnk1 + lnk2 + lnlabor", frame)
+    short = _render(ws.PanelRegressRE, "lny ~ lnk1 + lnlabor", frame)
+    long = _render(ws.PanelRegressRE, "lny ~ lnk1 + lnk2 + lnlabor", frame)
     assert len(long) == len(short) + 1

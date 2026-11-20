@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from westata.postestimation.dfgls import dfgls
+from westata.postestimation.dfgls import df_gls
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -40,7 +40,7 @@ def inflation():
 
 
 def test_demeaned_statistics_match_stata(inflation) -> None:
-    result = dfgls(inflation, maxlag=4, trend=False)
+    result = df_gls(inflation, maxlag=4, trend=False)
     observed = {cell.lags: cell.statistic for cell in result.cells}
     assert set(observed) == set(STATA_MU)
     for lags, expected in STATA_MU.items():
@@ -48,7 +48,7 @@ def test_demeaned_statistics_match_stata(inflation) -> None:
 
 
 def test_detrended_statistics_match_stata(inflation) -> None:
-    result = dfgls(inflation, maxlag=4, trend=True)
+    result = df_gls(inflation, maxlag=4, trend=True)
     observed = {cell.lags: cell.statistic for cell in result.cells}
     for lags, expected in STATA_TAU.items():
         assert observed[lags] == pytest.approx(expected, abs=5e-4), f"lag {lags}"
@@ -57,17 +57,17 @@ def test_detrended_statistics_match_stata(inflation) -> None:
 def test_every_lag_uses_the_same_sample(inflation) -> None:
     """dfgls.ado:137 marks the sample out with L(1/maxlag+1) before looping."""
 
-    result = dfgls(inflation, maxlag=4)
+    result = df_gls(inflation, maxlag=4)
     assert len({cell.nobs for cell in result.cells}) == 1
 
 
 def test_the_default_maxlag_is_schwert(inflation) -> None:
     """int(12*(n/100)**0.25) = 13 for 166 observations."""
 
-    result = dfgls(inflation)
+    result = df_gls(inflation)
     assert max(cell.lags for cell in result.cells) == 13
 
 
 def test_ordering_runs_from_the_longest_lag_down(inflation) -> None:
-    result = dfgls(inflation, maxlag=4)
+    result = df_gls(inflation, maxlag=4)
     assert [cell.lags for cell in result.cells] == [4, 3, 2, 1]

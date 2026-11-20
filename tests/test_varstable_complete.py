@@ -48,7 +48,7 @@ def _rows(n: int) -> list[str]:
     )
     return [
         line
-        for line in str(ws.varstable(ws.VAR(frame, lags=2).fit())).splitlines()
+        for line in str(ws.var_stable(ws.VAR(frame, lags=2).fit())).splitlines()
         if line.startswith("  |")
     ]
 

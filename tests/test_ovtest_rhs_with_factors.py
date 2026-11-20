@@ -50,31 +50,31 @@ def _frame(n: int = 300, seed: int = 3, with_x2: bool = False) -> pd.DataFrame:
 def test_a_continuous_variable_beside_a_factor_is_testable(n) -> None:
     """One continuous regressor plus a factor: three powers, not a refusal."""
 
-    fitted = ws.OLS.from_formula("y ~ x1 + C(grp)", _frame(n)).fit()
-    result = ws.estat_ovtest(fitted, rhs=True)
+    fitted = ws.Regress.from_formula("y ~ x1 + C(grp)", _frame(n)).fit()
+    result = ws.estat_omitted_variables_test(fitted, rhs=True)
     assert result.df == 3, result.df
     assert np.isfinite(result.statistic)
 
 
 def test_two_continuous_variables_give_six_degrees_of_freedom() -> None:
-    fitted = ws.OLS.from_formula("y ~ x1 + x2 + C(grp)", _frame(with_x2=True)).fit()
-    result = ws.estat_ovtest(fitted, rhs=True)
+    fitted = ws.Regress.from_formula("y ~ x1 + x2 + C(grp)", _frame(with_x2=True)).fit()
+    result = ws.estat_omitted_variables_test(fitted, rhs=True)
     assert result.df == 6, result.df
 
 
 def test_the_captured_values_match() -> None:
     """reg y x1 i.grp then `estat ovtest, rhs` at n=300: F(3, 293) = .17, p = .9155."""
 
-    fitted = ws.OLS.from_formula("y ~ x1 + C(grp)", _frame()).fit()
-    result = ws.estat_ovtest(fitted, rhs=True)
+    fitted = ws.Regress.from_formula("y ~ x1 + C(grp)", _frame()).fit()
+    result = ws.estat_omitted_variables_test(fitted, rhs=True)
     assert round(float(result.statistic), 2) == 0.17
     assert result.df_denom == 293
     assert round(float(result.pvalue), 4) == 0.9155
 
 
 def test_the_label_and_layout_are_unchanged() -> None:
-    fitted = ws.OLS.from_formula("y ~ x1 + C(grp)", _frame()).fit()
-    lines = [line for line in str(ws.estat_ovtest(fitted, rhs=True)).splitlines()]
+    fitted = ws.Regress.from_formula("y ~ x1 + C(grp)", _frame()).fit()
+    lines = [line for line in str(ws.estat_omitted_variables_test(fitted, rhs=True)).splitlines()]
     assert lines[1] == "Ramsey RESET test for omitted variables"
     assert lines[2] == "Omitted: Powers of independent variables"
 
@@ -86,14 +86,14 @@ def test_an_all_indicator_model_still_refuses() -> None:
     frame = pd.DataFrame({"y": rng.normal(size=300)})
     frame["g1"] = (rng.normal(size=300) > 0).astype(float)
     frame["g2"] = (rng.normal(size=300) > 0.5).astype(float)
-    fitted = ws.OLS.from_formula("y ~ g1 + g2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ g1 + g2", frame).fit()
     with pytest.raises(ValueError, match="powers of all explanatory variables collinear"):
-        ws.estat_ovtest(fitted, rhs=True)
+        ws.estat_omitted_variables_test(fitted, rhs=True)
 
 
 def test_the_default_path_is_unaffected() -> None:
     """`rhs=False` uses powers of the fitted values and must still return three df."""
 
-    fitted = ws.OLS.from_formula("y ~ x1 + C(grp)", _frame()).fit()
-    result = ws.estat_ovtest(fitted)
+    fitted = ws.Regress.from_formula("y ~ x1 + C(grp)", _frame()).fit()
+    result = ws.estat_omitted_variables_test(fitted)
     assert result.df == 3

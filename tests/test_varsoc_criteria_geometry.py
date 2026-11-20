@@ -38,7 +38,7 @@ def _rows(n: int, maxlag: int = 4) -> list[str]:
     )
     return [
         line
-        for line in str(ws.varsoc(frame, maxlag=maxlag)).splitlines()
+        for line in str(ws.var_select_order(frame, maxlag=maxlag)).splitlines()
         if line.startswith("  |")
     ]
 

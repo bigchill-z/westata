@@ -42,9 +42,22 @@ def _register_text() -> str:
 
 
 def _command_phrase(method: str) -> str:
-    """``estat_auc`` -> ``estat auc``: how the register writes it."""
+    """The register documents the STATA command, not the Python method name.
 
-    return "estat " + method[len("estat_") :]
+    `estat_first_stage` is the Python name after the 0.3.41 rename; Stata's command stays
+    `estat firststage`. The naming contract's expansion table is the authoritative inverse.
+    """
+
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import naming_map as nm  # noqa: PLC0415
+
+    suffix = method[len("estat_") :]
+    # Inverse of ESTAT_SUFFIX_EXPANSIONS: expanded Python suffix -> Stata suffix.
+    inverse = {v: k for k, v in nm.ESTAT_SUFFIX_EXPANSIONS.items()}
+    stata_suffix = inverse.get(suffix, suffix)
+    return "estat " + stata_suffix
 
 
 def test_there_are_several_estat_methods() -> None:

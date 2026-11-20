@@ -38,7 +38,7 @@ def test_estat_ic_uses_minus_two_ll_plus_two_k(frame) -> None:
     against ``e(ll)`` rather than against ``e(aic)``.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     e = result.e
     ic = result.estat_ic()
 
@@ -48,7 +48,7 @@ def test_estat_ic_uses_minus_two_ll_plus_two_k(frame) -> None:
 def test_estat_ic_bic_uses_log_n(frame) -> None:
     """``BIC = -2*ll + log(N)*k``."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     e = result.e
     ic = result.estat_ic()
 
@@ -64,7 +64,7 @@ def test_e_aic_differs_from_estat_ic_by_the_known_constant(frame) -> None:
     rather than a suspicious mismatch.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     e = result.e
     gap = result.estat_ic().aic - e["aic"]
 
@@ -74,7 +74,7 @@ def test_e_aic_differs_from_estat_ic_by_the_known_constant(frame) -> None:
 def test_estat_summarize_means_equal_the_raw_means(frame) -> None:
     """The descriptive table must describe the same data the model used."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     table = result.estat_summarize().table
 
     for name in ("y", "x1", "x3"):
@@ -86,7 +86,7 @@ def test_estat_summarize_means_equal_the_raw_means(frame) -> None:
 def test_estat_summarize_sd_is_the_sample_sd(frame) -> None:
     """Unweighted descriptive SD is the ``ddof=1`` standard deviation."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     table = result.estat_summarize().table
 
     for name in ("y", "x1"):
@@ -98,7 +98,7 @@ def test_estat_summarize_sd_is_the_sample_sd(frame) -> None:
 def test_vif_tolerance_is_the_reciprocal(frame) -> None:
     """``1/VIF`` IS the tolerance column -- two renderings of one number."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
     vif = result.estat_vif()
 
     for name, value, tolerance in zip(vif.names, vif.vif, vif.tolerance):
@@ -108,7 +108,7 @@ def test_vif_tolerance_is_the_reciprocal(frame) -> None:
 def test_vif_mean_is_the_mean_of_the_column(frame) -> None:
     """``Mean VIF`` in the footer must be the column mean."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
     vif = result.estat_vif()
 
     assert vif.mean_vif == pytest.approx(float(np.mean(vif.vif)), rel=1e-12)
@@ -121,7 +121,7 @@ def test_a_single_regressor_has_vif_exactly_one(frame) -> None:
     wrong matrix.
     """
 
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     assert result.estat_vif().vif[0] == pytest.approx(1.0, rel=1e-12)
 
@@ -133,7 +133,7 @@ def test_collinear_regressors_show_large_vif(frame) -> None:
     used the wrong columns, the VIFs would come out near 1.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
     vif = result.estat_vif()
     mapping = dict(zip(vif.names, vif.vif))
 
@@ -150,7 +150,7 @@ def test_estat_vce_diagonal_is_the_squared_standard_errors(frame) -> None:
     reordering looks like a corrupted matrix.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x3", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x3", frame).fit()
     matrix = result.estat_vce()
     covariance = np.asarray(matrix.to_frame(), dtype=float)
 

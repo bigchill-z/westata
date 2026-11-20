@@ -19,9 +19,9 @@
 
 | # | Stata 命令 | westata 调用 | 数据 | 判定 | 系数相对差 | 标准误相对差 |
 |---|---|---|---|---|---|---|
-| 1 | `sureg (price weight mpg) (mpg weight foreign)` | `Sureg.from_formula([...]).fit()` | auto (N=74) | **A** | 5.75e-13 | 6.09e-15 |
+| 1 | `sureg (price weight mpg) (mpg weight foreign)` | `SeeminglyUnrelatedRegress.from_formula([...]).fit()` | auto (N=74) | **A** | 5.75e-13 | 6.09e-15 |
 | 2 | `sureg ..., vce(robust)` | `fit(cov_type="robust")` | auto | **error** | — | — |
-| 3 | `mvreg price mpg = weight foreign` | `Mvreg.from_formula("price mpg = weight foreign")` | auto | **A** | 7.18e-15 | 9.12e-14 |
+| 3 | `mvreg price mpg = weight foreign` | `MultivariateRegress.from_formula("price mpg = weight foreign")` | auto | **A** | 7.18e-15 | 9.12e-14 |
 | 4 | `manova price mpg = foreign` (p=2,q=1) | `Manova.from_formula(...)` | auto | **A** | 1.96e-14 | n/a（无 SE） |
 | 5 | `manova y1 y2 y3 = g` (p=3,q=2) | 同上 | 自造 N=90 | **A** | 4.68e-15 | n/a |
 | 6 | `manova z1 z2 z3 = g` (p=3,q=3, s=2.4337) | 同上 | 自造 N=100 | **A** | 7.55e-14 | n/a |
@@ -41,22 +41,22 @@
 | 20 | `teffects nnmatch ..., nneighbor(3)` | `nneighbor=3` | 同上 | **A / E(SE)** | 8.86e-16 | **4.53e-02** |
 | 21 | `teffects nnmatch ..., atet` | `nneighbor=1, estimand="atet"` | 同上 | **A / E(SE)** | 0（位相同） | **1.63e-01** |
 | 22 | `teffects nnmatch ..., biasadj(x1 x2)` | 无对应能力 | 同上 | **error** | — | — |
-| 23 | `didregress (y x1) (treated), group(unit) time(period)` | `Didregress.from_formula("y x1",...)` | 自造面板 N=120 | **A** | 1.93e-15 | 8.69e-16 |
+| 23 | `didregress (y x1) (treated), group(unit) time(period)` | `DIDRegress.from_formula("y x1",...)` | 自造面板 N=120 | **A** | 1.93e-15 | 8.69e-16 |
 | 24 | `didregress (y) (treated), ...`（窄表） | 同上（4 列子表） | 同上 | **A** | 0（位相同） | 0（位相同） |
 | 25 | `didregress (y) (treated), ...`（含无关列 x1） | 同上（全表） | 同上 | **C** | 1.85e-04 | —（规格问题） |
 | 26 | `didregress ..., vce(robust)` | `fit(cov_type="HC1")` | 同上 | **A** | 1.93e-15 | 1.06e-15 |
 | 27 | `didregress ..., vce(unadjusted)` | `fit(cov_type="nonrobust")` | 同上 | **skip** | — | — |
-| 28 | `didregress (y) (treated)`，5 期交错采纳 | `Didregress("y",...)` | 自造面板 N=600 | **A** | 1.67e-15 | 3.39e-16 |
-| 29 | `xtdidregress (y) (treated)`，5 期 | `Xtdidregress("y",...)` | 同上 | **A** | 1.67e-15 | 2.53e-16 |
-| 30 | `xtdidregress (y x1) (treated)`，2 期 | `Xtdidregress("y x1",...)` | N=120 | **A** | 1.93e-15 | 8.86e-16 |
+| 28 | `didregress (y) (treated)`，5 期交错采纳 | `DIDRegress("y",...)` | 自造面板 N=600 | **A** | 1.67e-15 | 3.39e-16 |
+| 29 | `xtdidregress (y) (treated)`，5 期 | `PanelDIDRegress("y",...)` | 同上 | **A** | 1.67e-15 | 2.53e-16 |
+| 30 | `xtdidregress (y x1) (treated)`，2 期 | `PanelDIDRegress("y x1",...)` | N=120 | **A** | 1.93e-15 | 8.86e-16 |
 | 31 | did vs xtdid 的嵌套自由度约定 | 两个类的 SE 比值 | N=120 | **A** | 1.81e-16 | n/a |
-| 32 | `svyset psu [pw=w], strata(h)` + `svy: mean y x1` | `SurveyDesign.from_frame` + `SvyMean` | 自造设计 N=576 | **A** | 3.84e-15 | 0（位相同） |
-| 33 | `svy: total y x1` | `SvyTotal` | 同上 | **A** | 3.90e-15 | 0（位相同） |
-| 34 | `svy: proportion grp`（3 水平） | `SvyProportion` | 同上 | **A** | 0（位相同） | 1.47e-16 |
-| 35 | `svy: proportion f`（二值） | `SvyProportion` | 同上 | **A** | 0（位相同） | 0（位相同） |
-| 36 | `svy: regress y x1` | `SvyRegress` | 同上 | **A** | 9.77e-16 | 0（位相同） |
-| 37 | `svy: regress y x1 i.f` | `SvyRegress("y ~ x1 + C(f)")` | 同上 | **A** | 3.46e-15 | 1.86e-16 |
-| 38 | `svy: logit gbin x1` | `SvyLogit` | 同上 | **A** | 1.85e-14 | 1.51e-15 |
+| 32 | `svyset psu [pw=w], strata(h)` + `svy: mean y x1` | `SurveyDesign.from_frame` + `SurveyMean` | 自造设计 N=576 | **A** | 3.84e-15 | 0（位相同） |
+| 33 | `svy: total y x1` | `SurveyTotal` | 同上 | **A** | 3.90e-15 | 0（位相同） |
+| 34 | `svy: proportion grp`（3 水平） | `SurveyProportion` | 同上 | **A** | 0（位相同） | 1.47e-16 |
+| 35 | `svy: proportion f`（二值） | `SurveyProportion` | 同上 | **A** | 0（位相同） | 0（位相同） |
+| 36 | `svy: regress y x1` | `SurveyRegress` | 同上 | **A** | 9.77e-16 | 0（位相同） |
+| 37 | `svy: regress y x1 i.f` | `SurveyRegress("y ~ x1 + C(f)")` | 同上 | **A** | 3.46e-15 | 1.86e-16 |
+| 38 | `svy: logit gbin x1` | `SurveyLogit` | 同上 | **A** | 1.85e-14 | 1.51e-15 |
 | 39 | `svyset psu`（**self-weight**）+ `svy: mean y` | `SurveyDesign(psu="psu")` | 同上 | **A** | 1.27e-16 | 1.26e-16 |
 | 40 | `svyset psu, strata(h)`（无权重）+ `svy: mean y` | `SurveyDesign(psu,strata)` | 同上 | **A** | 1.27e-16 | 0（位相同） |
 | 41 | `svyset psu [pw=w], strata(h) fpc(fpc)` + `svy: mean y` | `SurveyDesign(..., fpc="fpc")` | 同上 | **A** | 1.28e-16 | 0（位相同） |
@@ -115,7 +115,7 @@ inv(J'J)   的 se        = [5.76788434e+00, 3.88353577e-03, 6.25759448e-07]  ←
    只有默认 `rcond` 的 `pinv` 给出 westata 的数；
 2. `_jacobian()` 是中心差分，步长 `1e-6*max(1,|θ|)`，对 `weight^2` 这类量级到 1e5 的项
    精度足够（`max|J - X_analytic| = 5.2e-09`，相对 5e-11），**不是**差分误差；
-3. 同一模型的 OLS（`y ~ weight + I(weight**2)`）两边 SE 完全一致，说明数据/设计没问题。
+3. 同一模型的 Regress（`y ~ weight + I(weight**2)`）两边 SE 完全一致，说明数据/设计没问题。
 
 **影响**：任何"变量量级差异大"的 `nl` 模型（多项式、幂函数、指数衰减）都会踩到；
 一旦最小特征方向被截断，SE 会小几个数量级，t 值虚高，显著性判断完全错误。
@@ -174,7 +174,7 @@ PO(0) = (1/n1) [ Σ_{t=1} x_i'b0 + Σ_{t=0} odds_i (y_i - x_i'b0) ]      ← 增
 PO(1) = mean_{t=1} y_i                                                ← 未增广
 ATET  = PO(1) - PO(0)
 ```
-用 westata 的 `_LogitPropensity` 得到的 p_i、以及两臂 OLS 的 b0，可以把这个 PO(0)
+用 westata 的 `_LogitPropensity` 得到的 p_i、以及两臂 Regress 的 b0，可以把这个 PO(0)
 重算到 `0.023627059413063943`（Stata 是 `0.02362705941306397`，相对差 2.8e-17），
 PO(1) 重算到 `2.0766293842852925`（与 Stata 位相同）。**所以 Stata 的公式已被完全确定。**
 
@@ -230,7 +230,7 @@ mean0 = mean_{t=1}(augmented0)   where augmented0 = x0'b0 + (1-t)*(y-x0'b0)/(1-p
 ### 6. `didregress` 的"无协变量"写法会被自动加协变量（第 25 条）
 
 **现象**：Stata 写 `didregress (y) (treated), group(unit) time(period)` 表示**不加协变量**；
-westata 的 `Didregress.from_formula("y", "treated", panel2, ...)` 在 `covariates=None` 时
+westata 的 `DIDRegress.from_formula("y", "treated", panel2, ...)` 在 `covariates=None` 时
 会把**所有其余"组内时变"的数值列**当协变量（并发 `RuntimeWarning` 提示）。
 本次面板里有一列无关的 `x1`，于是：
 
@@ -254,7 +254,7 @@ westata 也**无法表达"显式不要协变量"**（`covariates=[]` 抛 `ValueE
 
 这是本次最有意思的一条，因为它看起来像"westata 算错了"，实测证明**恰恰相反**。
 
-**做法**：`auto.dta` 全是整数，所以 74 次 leave-one-out OLS 可以用
+**做法**：`auto.dta` 全是整数，所以 74 次 leave-one-out Regress 可以用
 `fractions.Fraction` **精确有理数**求解，得到一个与两个实现都无关的真值。
 
 | 量 | 精确有理数 | westata | Stata |
@@ -391,7 +391,7 @@ Stata 的 `permute <varlist> <exp_list>` 通用形式不支持。）
   才拿到完整对比。**这是一个工具层面的坑，写进"未覆盖/注意事项"**。
 - `svy: logit` 的线性化 VCE 与 Stata 一致到 1.5e-15（westata 没有走"拟似然/robust"替代）。
 
-**唯一未覆盖**：`svy: mean y, over(f)`（子总体估计）。westata 的 `SvyMean`/`SvyProportion`
+**唯一未覆盖**：`svy: mean y, over(f)`（子总体估计）。westata 的 `SurveyMean`/`SurveyProportion`
 没有 `over()` 概念，无法表达。
 
 ### 13. `sureg` / `mvreg` 的 `e(V)` 交叉项（BRIEF 明确要求）

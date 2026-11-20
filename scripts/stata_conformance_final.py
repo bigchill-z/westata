@@ -57,8 +57,8 @@ def check_esttab(o: StataOracle) -> Outcome:
     )
 
     frame = pd.read_stata(ROOT / "tests" / "data" / "auto.dta", convert_categoricals=False)
-    r1 = ws.OLS.from_formula("mpg ~ weight", frame).fit()
-    r2 = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    r1 = ws.Regress.from_formula("mpg ~ weight", frame).fit()
+    r2 = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
     table = ws.etable([r1, r2], digits=6)
 
     # Parse esttab's plain output: a row of "weight  -0.006008  ..." etc.
@@ -151,7 +151,7 @@ def check_predict_ols(o: StataOracle) -> Outcome:
     values = _read_stata_vars(o, ["xbhat", "reshat"])
 
     frame = pd.read_stata(ROOT / "tests" / "data" / "auto.dta", convert_categoricals=False)
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
 
     xb_gap = rel(result.predict(kind="xb"), values["xbhat"])
     resid_gap = rel(result.predict(kind="residuals"), values["reshat"])

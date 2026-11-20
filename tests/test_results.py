@@ -54,7 +54,7 @@ def make_results(*, dist: str = "t", e=None, **overrides) -> StataResults:
         df_resid=27,
         df_model=2,
         dist=dist,
-        model_name="OLS",
+        model_name="Regress",
         cov_type="nonrobust",
         e=e,
     )

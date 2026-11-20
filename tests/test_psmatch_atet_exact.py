@@ -33,7 +33,7 @@ def matched():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("nsw_dw.dta is not available")
-    return ws.teffects_psmatch(
+    return ws.treatment_effects_psmatch(
         frame["re78"], frame["treat"], frame[COVARIATES]
     )
 

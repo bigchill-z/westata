@@ -151,7 +151,7 @@ def _two_way_ols() -> str:
     frame = _frame()
     spec = _spec()
     try:
-        result = ws.OLS.from_formula(
+        result = ws.Regress.from_formula(
             f"{spec.depvar} ~ {ENDOG}", frame, weights=frame[WEIGHT], weight_type="aweight"
         ).fit(cov_type="cluster", cov_kwds={"groups": frame[list(CLUSTERS)]})
     except Exception as exc:
@@ -173,7 +173,7 @@ def _two_way_feols() -> str:
 
     frame = _frame()
     spec = _spec()
-    result = ws.FEOLS.from_formula(f"{spec.depvar} ~ {ENDOG} | 0", frame).fit(
+    result = ws.RegressHighDimFixedEffects.from_formula(f"{spec.depvar} ~ {ENDOG} | 0", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame[list(CLUSTERS)]}
     )
     return f"FEOLS two-way clustering works (N={int(result.nobs)})"

@@ -53,7 +53,7 @@ def _panel_frame(n_units: int = 100, n_periods: int = 9, seed: int = 8100):
 
 @pytest.fixture(scope="module")
 def xtlogit_fit():
-    return ws.XtLogit.from_formula(
+    return ws.PanelLogit.from_formula(
         "y ~ x1", _panel_frame(), entity="firm", time="year", method="fe"
     ).fit()
 
@@ -70,7 +70,7 @@ def xtpcse_fit():
             "year": np.tile(np.arange(1, 15), 100),
         }
     )
-    return ws.XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    return ws.PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
 
 
 # ------------------------------------------------------- xt non-linear shape
@@ -139,7 +139,7 @@ def test_the_two_shapes_are_different(xtlogit_fit, xtpcse_fit) -> None:
 def test_a_plain_regression_still_has_none() -> None:
     rng = np.random.default_rng(8104)
     frame = pd.DataFrame({"y": rng.normal(size=200), "x": rng.normal(size=200)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert _panel_design_block(fitted) == []
 

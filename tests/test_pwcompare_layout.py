@@ -43,8 +43,8 @@ def table():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
     frame["grp"] = np.tile([1, 2, 3], len(frame))[: len(frame)].astype(int)
-    fit = ws.OLS.from_formula("consumption ~ C(grp) + temp", frame).fit()
-    return ws.pwcompare(fit, "grp")
+    fit = ws.Regress.from_formula("consumption ~ C(grp) + temp", frame).fit()
+    return ws.pairwise_compare(fit, "grp")
 
 
 RENDERED = [

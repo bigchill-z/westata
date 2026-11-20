@@ -44,7 +44,7 @@ def frame():
 
 
 CASES = {
-    "OLS": (lambda f: ws.OLS.from_formula("y ~ x1", f).fit(), "regress"),
+    "Regress": (lambda f: ws.Regress.from_formula("y ~ x1", f).fit(), "regress"),
     "Logit": (lambda f: ws.Logit.from_formula("yb ~ x1", f).fit(), "logit"),
     "Poisson": (lambda f: ws.Poisson.from_formula("ycnt ~ x1", f).fit(), "poisson"),
     "Tobit": (lambda f: ws.Tobit.from_formula("y ~ x1", f).fit(), "tobit"),
@@ -54,14 +54,14 @@ CASES = {
     ),
     # MEASURED: Stata stores e(cmd)="xtreg" and e(model)="fe" -- the comma form belongs to
     # e(model), never to e(cmd). See test_panel_e_model_names_the_estimator below.
-    "PanelOLS": (
-        lambda f: ws.PanelOLS.from_formula(
+    "PanelRegressFE": (
+        lambda f: ws.PanelRegressFE.from_formula(
             "y ~ x1", f, entity="firm", time="year"
         ).fit(),
         "xtreg",
     ),
-    "QuantileRegression": (
-        lambda f: ws.QuantileRegression.from_formula("y ~ x1", f).fit(),
+    "QuantileRegress": (
+        lambda f: ws.QuantileRegress.from_formula("y ~ x1", f).fit(),
         "qreg",
     ),
 }
@@ -83,9 +83,9 @@ def test_e_cmd_names_the_stata_command(frame, label) -> None:
 @pytest.mark.parametrize(
     "label, estimator, expected",
     [
-        ("PanelOLS", ws.PanelOLS, "fe"),
-        ("RandomEffects", ws.RandomEffects, "re"),
-        ("BetweenOLS", ws.BetweenOLS, "be"),
+        ("PanelRegressFE", ws.PanelRegressFE, "fe"),
+        ("PanelRegressRE", ws.PanelRegressRE, "re"),
+        ("PanelRegressBE", ws.PanelRegressBE, "be"),
     ],
 )
 def test_panel_e_model_names_the_estimator(frame, label, estimator, expected) -> None:
@@ -126,7 +126,7 @@ def test_e_depvar_survives_the_new_fallbacks(frame, label) -> None:
 NON_RECOVERABLE = ("cmdline",)
 
 
-@pytest.mark.parametrize("label", ["OLS", "Logit"])
+@pytest.mark.parametrize("label", ["Regress", "Logit"])
 @pytest.mark.parametrize("macro", NON_RECOVERABLE)
 def test_underivable_macros_are_absent_not_invented(frame, label, macro) -> None:
     """``e(cmdline)`` is a per-CALL string with no field to recover it from.
@@ -156,7 +156,7 @@ def test_underivable_macros_are_absent_not_invented(frame, label, macro) -> None
 def test_e_cmd_does_not_override_an_explicit_value(frame) -> None:
     """An estimator that sets ``e(cmd)`` itself must win over the fallback."""
 
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     result._e["cmd"] = "explicitly_set"
 
     assert result.e["cmd"] == "explicitly_set"
@@ -169,7 +169,7 @@ def test_newey_keeps_its_own_macros(frame) -> None:
     including the two that cannot be derived elsewhere.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame.index.to_numpy())._results
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame.index.to_numpy())._results
 
     assert result.e["cmd"] == "newey"
     assert result.e["properties"] == "b V"
@@ -198,14 +198,14 @@ def test_e_df_r_is_absent_for_z_based_models(frame) -> None:
 def test_t_based_models_keep_e_df_r(frame) -> None:
     """``tobit.sthlp`` documents ``e(df_r)``, and OLS certainly needs it."""
 
-    assert "df_r" in ws.OLS.from_formula("y ~ x1", frame).fit().e
+    assert "df_r" in ws.Regress.from_formula("y ~ x1", frame).fit().e
     assert "df_r" in ws.Tobit.from_formula("y ~ x1", frame).fit().e
 
 
 def test_df_r_still_agrees_with_n_minus_rank_where_present(frame) -> None:
     """Where the key exists it must still satisfy ``N - df_r == rank``."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
 
     assert e["N"] - e["df_r"] == e["rank"]

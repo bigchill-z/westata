@@ -43,7 +43,7 @@ def panel():
 def test_re_stores_theta_from_the_ado_formula(panel) -> None:
     """``theta = 1 - s_e/sqrt(T*s_u^2 + s_e^2)`` (``xtreg_re.ado:265-266``)."""
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -56,7 +56,7 @@ def test_re_stores_theta_from_the_ado_formula(panel) -> None:
 
 
 def test_theta_is_within_the_unit_interval(panel) -> None:
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -67,7 +67,7 @@ def test_fe_does_not_store_theta(panel) -> None:
     """``xtreg_fe.json`` has no ``e(theta)``: the within estimator never
     quasi-demeans."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -78,7 +78,7 @@ def test_fe_does_not_store_theta(panel) -> None:
 def test_re_stores_a_wald_chi_square(panel) -> None:
     """``xtreg_re.json`` carries ``chi2`` and ``p`` and no ``e(F)`` statistic."""
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -92,7 +92,7 @@ def test_re_stores_a_wald_chi_square(panel) -> None:
 def test_re_chi2_equals_the_wald_statistic(panel) -> None:
     """``e(chi2)`` is ``e(F) * e(df_m)`` because F is that Wald over df_m."""
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -103,7 +103,7 @@ def test_re_chi2_equals_the_wald_statistic(panel) -> None:
 def test_re_p_is_the_chi2_upper_tail(panel) -> None:
     from scipy import stats
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -115,7 +115,7 @@ def test_re_p_is_the_chi2_upper_tail(panel) -> None:
 
 # -------------------------------------------------------------- fe block
 def test_fe_stores_the_absorbed_effects_block(panel) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -132,7 +132,7 @@ def test_fe_r2_c_is_the_pooled_ols_r2(panel) -> None:
     the WITHIN R-squared, which can be larger or smaller than the pooled one.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -159,7 +159,7 @@ def test_fe_F_f_compares_within_r2_against_pooled_r2(panel) -> None:
     recorded 28.085.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -178,7 +178,7 @@ def test_fe_F_f_compares_within_r2_against_pooled_r2(panel) -> None:
 def test_fe_p_f_is_the_upper_tail_of_F_f(panel) -> None:
     from scipy import stats
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -189,7 +189,7 @@ def test_fe_p_f_is_the_upper_tail_of_F_f(panel) -> None:
 
 
 def test_fe_and_be_store_ll_0(panel) -> None:
-    for estimator in (ws.PanelOLS, ws.BetweenOLS):
+    for estimator in (ws.PanelRegressFE, ws.PanelRegressBE):
         result = estimator.from_formula(
             "y ~ x1 + x2", panel, entity="firm", time="year"
         ).fit()
@@ -202,7 +202,7 @@ def test_fe_and_be_store_ll_0(panel) -> None:
 def test_re_does_not_store_ll_0(panel) -> None:
     """``xtreg_re.json`` has no ``e(ll_0)``."""
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -210,7 +210,7 @@ def test_re_does_not_store_ll_0(panel) -> None:
 
 
 def test_re_does_not_store_the_absorbed_block(panel) -> None:
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -221,7 +221,7 @@ def test_re_does_not_store_the_absorbed_block(panel) -> None:
 
 # ---------------------------------------------------------------- common
 def test_sum_w_and_rc_are_stored(panel) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
 
@@ -232,7 +232,7 @@ def test_sum_w_and_rc_are_stored(panel) -> None:
 def test_the_model_test_p_value_is_stored(panel) -> None:
     from scipy import stats
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -255,9 +255,9 @@ def test_full_fixture_coverage(panel) -> None:
 
     fixtures = Path("tests/conformance/stata_fixtures")
     for name, fixture, estimator in (
-        ("xtreg, fe", "xtreg_fe.json", ws.PanelOLS),
-        ("xtreg, re", "xtreg_re.json", ws.RandomEffects),
-        ("xtreg, be", "xtreg_be.json", ws.BetweenOLS),
+        ("xtreg, fe", "xtreg_fe.json", ws.PanelRegressFE),
+        ("xtreg, re", "xtreg_re.json", ws.PanelRegressRE),
+        ("xtreg, be", "xtreg_be.json", ws.PanelRegressBE),
     ):
         expected = set(json.loads((fixtures / fixture).read_text())["scalars"])
         result = estimator.from_formula(

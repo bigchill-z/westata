@@ -65,13 +65,13 @@ def test_the_fevd_columns_use_them(var_fit) -> None:
 
 
 def test_granger_equations_use_them(var_fit) -> None:
-    rendered = str(ws.vargranger(var_fit))
+    rendered = str(ws.var_granger(var_fit))
     assert "dinf" in rendered
     assert "unem" in rendered
 
 
 def test_the_wald_table_headings_use_them(var_fit) -> None:
-    rendered = str(ws.varwle(var_fit))
+    rendered = str(ws.var_wle(var_fit))
     assert "Equation: dinf" in rendered
     assert "Equation: unem" in rendered
 
@@ -79,13 +79,13 @@ def test_the_wald_table_headings_use_them(var_fit) -> None:
 def test_the_lm_table_has_no_variable_names(var_fit) -> None:
     """Stata's varlmar is a property of the system, not of an equation -- checked against a live run."""
 
-    rendered = str(ws.varlmar(var_fit))
+    rendered = str(ws.var_lmar(var_fit))
     assert "dinf" not in rendered
     assert "Lagrange-multiplier test" in rendered
 
 
 def test_the_stability_table_has_no_variable_names(var_fit) -> None:
-    rendered = str(ws.varstable(var_fit))
+    rendered = str(ws.var_stable(var_fit))
     assert "dinf" not in rendered
     assert "Eigenvalue" in rendered
 

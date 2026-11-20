@@ -76,7 +76,7 @@ def _ar_from_regressions(frame: pd.DataFrame, beta0: float = 0.0):
 def test_the_ar_statistic_matches_the_restricted_f(strong_model) -> None:
     frame, result = strong_model
 
-    reported = result.estat_weakrobust()
+    reported = result.estat_weak_instrument_robust()
 
     expected, _ = _ar_from_regressions(frame)
     assert reported.f_statistic == pytest.approx(expected, rel=1e-10)
@@ -85,7 +85,7 @@ def test_the_ar_statistic_matches_the_restricted_f(strong_model) -> None:
 def test_the_chi2_form_is_q_times_the_f(strong_model) -> None:
     """Stata reports both forms; they differ by the numerator df."""
 
-    reported = strong_model[1].estat_weakrobust()
+    reported = strong_model[1].estat_weak_instrument_robust()
 
     assert reported.statistic == pytest.approx(
         reported.df * reported.f_statistic, rel=1e-12
@@ -96,11 +96,11 @@ def test_the_denominator_degrees_of_freedom(strong_model) -> None:
     frame, result = strong_model
     _, df_denom = _ar_from_regressions(frame)
 
-    assert result.estat_weakrobust().df_denom == pytest.approx(df_denom)
+    assert result.estat_weak_instrument_robust().df_denom == pytest.approx(df_denom)
 
 
 def test_the_p_value_is_the_upper_f_tail(strong_model) -> None:
-    reported = strong_model[1].estat_weakrobust()
+    reported = strong_model[1].estat_weak_instrument_robust()
 
     assert reported.pvalue == pytest.approx(
         float(
@@ -115,7 +115,7 @@ def test_the_p_value_is_the_upper_f_tail(strong_model) -> None:
 def test_the_null_of_no_endogenous_effect_is_rejected_here(strong_model) -> None:
     """These data have a real effect, so the test should reject."""
 
-    assert strong_model[1].estat_weakrobust().pvalue < 0.001
+    assert strong_model[1].estat_weak_instrument_robust().pvalue < 0.001
 
 
 def test_the_statistic_does_not_collapse_with_a_weak_instrument(weak_model) -> None:
@@ -125,7 +125,7 @@ def test_the_statistic_does_not_collapse_with_a_weak_instrument(weak_model) -> N
     coefficient honestly -- it is large because the data were built with a real effect.
     """
 
-    reported = weak_model[1].estat_weakrobust()
+    reported = weak_model[1].estat_weak_instrument_robust()
 
     assert np.isfinite(reported.statistic)
     assert reported.statistic > 0.0
@@ -135,7 +135,7 @@ def test_the_statistic_does_not_collapse_with_a_weak_instrument(weak_model) -> N
 def test_the_first_stage_is_in_fact_weak(weak_model) -> None:
     """Guard: if the fixture were actually strong, the previous test proves nothing."""
 
-    first_stage = weak_model[1].estat_firststage()
+    first_stage = weak_model[1].estat_first_stage()
 
     assert float(np.asarray(first_stage.partial_r2).ravel()[0]) < 0.05
 
@@ -143,7 +143,7 @@ def test_the_first_stage_is_in_fact_weak(weak_model) -> None:
 def test_to_dict_reports_the_r_names(strong_model) -> None:
     """``r(chi2)``, ``r(F)``, ``r(df)``, ``r(df_r)``, ``r(p)``."""
 
-    table = strong_model[1].estat_weakrobust().to_dict()
+    table = strong_model[1].estat_weak_instrument_robust().to_dict()
 
     assert set(table) == {"chi2", "F", "df", "df_r", "p"}
     for value in table.values():
@@ -151,7 +151,7 @@ def test_to_dict_reports_the_r_names(strong_model) -> None:
 
 
 def test_the_rendered_text_names_the_test(strong_model) -> None:
-    rendered = str(strong_model[1].estat_weakrobust())
+    rendered = str(strong_model[1].estat_weak_instrument_robust())
 
     assert "Anderson-Rubin" in rendered
     assert "chi2(" in rendered
@@ -179,7 +179,7 @@ def test_an_overidentified_model_refuses_the_default(frame=None) -> None:
     result = ws.IV2SLS.from_formula("y ~ x + [e ~ z1 + z2]", overidentified).fit()
 
     with pytest.raises(NotImplementedError) as caught:
-        result.estat_weakrobust()
+        result.estat_weak_instrument_robust()
 
     message = str(caught.value)
     assert "CLR" in message
@@ -201,7 +201,7 @@ def test_an_overidentified_model_accepts_ar() -> None:
     )
     result = ws.IV2SLS.from_formula("y ~ x + [e ~ z1 + z2]", overidentified).fit()
 
-    reported = result.estat_weakrobust(ar=True)
+    reported = result.estat_weak_instrument_robust(ar=True)
 
     assert reported.test == "Anderson-Rubin"
     assert reported.df == 2.0  # two instruments tested
@@ -209,7 +209,7 @@ def test_an_overidentified_model_accepts_ar() -> None:
 
 def test_clr_is_refused_with_a_reason(strong_model) -> None:
     with pytest.raises(NotImplementedError) as caught:
-        strong_model[1].estat_weakrobust(clr=True)
+        strong_model[1].estat_weak_instrument_robust(clr=True)
 
     assert "Moreira" in str(caught.value)
 
@@ -223,7 +223,7 @@ def test_a_non_iv_result_is_refused() -> None:
     )
 
     with pytest.raises(NotImplementedError):
-        ws.OLS.from_formula("y ~ x", frame).fit().estat_weakrobust()
+        ws.Regress.from_formula("y ~ x", frame).fit().estat_weak_instrument_robust()
 
 
 # ------------------------------------------------------- betanull null hypothesis
@@ -231,8 +231,8 @@ def test_the_default_null_is_zero(strong_model) -> None:
     """``sthlp:458-460``: "By default, the null hypothesis is that the coefficients of
     all endogenous regressors are zero"."""
 
-    explicit = strong_model[1].estat_weakrobust(betanull={"e": 0.0})
-    implicit = strong_model[1].estat_weakrobust()
+    explicit = strong_model[1].estat_weak_instrument_robust(betanull={"e": 0.0})
+    implicit = strong_model[1].estat_weak_instrument_robust()
 
     assert implicit.f_statistic == pytest.approx(explicit.f_statistic, rel=1e-12)
 
@@ -243,7 +243,7 @@ def test_a_mapping_assigns_by_name(strong_model) -> None:
     result = strong_model[1]
     estimated = float(result.params["e"])
 
-    at_estimate = result.estat_weakrobust(betanull={"e": estimated})
+    at_estimate = result.estat_weak_instrument_robust(betanull={"e": estimated})
 
     # Testing the estimated value is the AR minimum, so the statistic collapses to 0.
     assert at_estimate.f_statistic == pytest.approx(0.0, abs=1e-8)
@@ -255,8 +255,8 @@ def test_a_sequence_assigns_by_position(strong_model) -> None:
     result = strong_model[1]
     estimated = float(result.params["e"])
 
-    by_position = result.estat_weakrobust(betanull=[estimated])
-    by_name = result.estat_weakrobust(betanull={"e": estimated})
+    by_position = result.estat_weak_instrument_robust(betanull=[estimated])
+    by_name = result.estat_weak_instrument_robust(betanull={"e": estimated})
 
     assert by_position.f_statistic == pytest.approx(
         by_name.f_statistic, rel=1e-12
@@ -273,8 +273,8 @@ def test_the_statistic_is_zero_at_the_estimated_value(strong_model) -> None:
     result = strong_model[1]
     estimated = float(result.params["e"])
 
-    at_estimate = result.estat_weakrobust(betanull={"e": estimated}).f_statistic
-    at_zero = result.estat_weakrobust().f_statistic
+    at_estimate = result.estat_weak_instrument_robust(betanull={"e": estimated}).f_statistic
+    at_zero = result.estat_weak_instrument_robust().f_statistic
 
     assert at_estimate == pytest.approx(0.0, abs=1e-8)
     assert at_zero > 1.0
@@ -286,8 +286,8 @@ def test_the_statistic_grows_with_the_distance_from_the_estimate(strong_model) -
     result = strong_model[1]
     estimated = float(result.params["e"])
 
-    near = result.estat_weakrobust(betanull={"e": estimated + 0.1}).f_statistic
-    far = result.estat_weakrobust(betanull={"e": estimated + 1.0}).f_statistic
+    near = result.estat_weak_instrument_robust(betanull={"e": estimated + 0.1}).f_statistic
+    far = result.estat_weak_instrument_robust(betanull={"e": estimated + 1.0}).f_statistic
 
     assert far > near
 
@@ -296,14 +296,14 @@ def test_a_wrong_length_sequence_is_refused(strong_model) -> None:
     """Padding or truncating would test a hypothesis the caller did not write."""
 
     with pytest.raises(ValueError, match="value"):
-        strong_model[1].estat_weakrobust(betanull=[0.0, 1.0])
+        strong_model[1].estat_weak_instrument_robust(betanull=[0.0, 1.0])
 
 
 def test_an_unknown_name_is_refused(strong_model) -> None:
     """``sthlp:481-482``: the default is an error for non-endogenous names."""
 
     with pytest.raises(ValueError) as caught:
-        strong_model[1].estat_weakrobust(betanull={"not_a_regressor": 1.0})
+        strong_model[1].estat_weak_instrument_robust(betanull={"not_a_regressor": 1.0})
 
     message = str(caught.value)
     assert "not_a_regressor" in message
@@ -315,7 +315,7 @@ def test_a_string_betanull_is_refused(strong_model) -> None:
     """A bare string is neither a mapping nor a sequence of numbers."""
 
     with pytest.raises(TypeError):
-        strong_model[1].estat_weakrobust(betanull="1.0")
+        strong_model[1].estat_weak_instrument_robust(betanull="1.0")
 
 
 # -------------------------------------------- two endogenous regressors
@@ -356,7 +356,7 @@ def test_the_multi_endogenous_statistic_is_the_restricted_f(two_endogenous) -> N
         rss_unrestricted / df_denom
     )
 
-    reported = result.estat_weakrobust(ar=True)
+    reported = result.estat_weak_instrument_robust(ar=True)
     assert reported.f_statistic == pytest.approx(expected_f, rel=1e-10)
     assert reported.statistic == pytest.approx(q * expected_f, rel=1e-10)
     assert reported.df == q
@@ -369,7 +369,7 @@ def test_a_joint_null_at_the_estimates_collapses_to_zero(two_endogenous) -> None
     first = float(result.params["e1"])
     second = float(result.params["e2"])
 
-    reported = result.estat_weakrobust(ar=True, betanull={"e1": first, "e2": second})
+    reported = result.estat_weak_instrument_robust(ar=True, betanull={"e1": first, "e2": second})
 
     assert reported.f_statistic == pytest.approx(0.0, abs=1e-8)
 
@@ -385,8 +385,8 @@ def test_an_unspecified_coefficient_defaults_to_zero(two_endogenous) -> None:
     first = float(result.params["e1"])
     second = float(result.params["e2"])
 
-    partial = result.estat_weakrobust(ar=True, betanull={"e1": first})
-    joint = result.estat_weakrobust(ar=True, betanull={"e1": first, "e2": second})
+    partial = result.estat_weak_instrument_robust(ar=True, betanull={"e1": first})
+    joint = result.estat_weak_instrument_robust(ar=True, betanull={"e1": first, "e2": second})
 
     assert partial.f_statistic > 1.0
     assert joint.f_statistic == pytest.approx(0.0, abs=1e-8)
@@ -398,7 +398,7 @@ def test_the_sequence_form_needs_one_value_per_regressor(two_endogenous) -> None
     result = two_endogenous[1]
 
     with pytest.raises(ValueError, match="value"):
-        result.estat_weakrobust(ar=True, betanull=[0.0])
+        result.estat_weak_instrument_robust(ar=True, betanull=[0.0])
 
 
 def test_the_sequence_form_works_when_complete(two_endogenous) -> None:
@@ -406,8 +406,8 @@ def test_the_sequence_form_works_when_complete(two_endogenous) -> None:
     first = float(result.params["e1"])
     second = float(result.params["e2"])
 
-    by_position = result.estat_weakrobust(ar=True, betanull=[first, second])
-    by_name = result.estat_weakrobust(
+    by_position = result.estat_weak_instrument_robust(ar=True, betanull=[first, second])
+    by_name = result.estat_weak_instrument_robust(
         ar=True, betanull={"e1": first, "e2": second}
     )
 

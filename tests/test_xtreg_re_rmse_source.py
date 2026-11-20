@@ -54,7 +54,7 @@ def panel():
 def test_random_effects_rmse_matches_stata(panel) -> None:
     """`y ~ k1 + C(year)`: Stata reports 9570.0353629102."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "y ~ k1 + C(year)", panel, entity="st_abb", time="year"
     ).fit()
     assert float(fitted.e["rmse"]) == pytest.approx(9570.0353629102, abs=1e-6)
@@ -63,7 +63,7 @@ def test_random_effects_rmse_matches_stata(panel) -> None:
 def test_the_year_dummies_are_part_of_the_demeaned_regression(panel) -> None:
     """Dropping them gives 10096.69, which is the trap earlier attempts fell into."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "y ~ k1 + C(year)", panel, entity="st_abb", time="year"
     ).fit()
     assert abs(float(fitted.e["rmse"]) - 10096.69) > 1.0
@@ -72,7 +72,7 @@ def test_the_year_dummies_are_part_of_the_demeaned_regression(panel) -> None:
 def test_a_two_regressor_model_also_matches(panel) -> None:
     """`y ~ k1 + k2`: Stata reports 5820.7379599524."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "y ~ k1 + k2", panel, entity="st_abb", time="year"
     ).fit()
     assert float(fitted.e["rmse"]) == pytest.approx(5820.7379599524, abs=1e-6)
@@ -81,7 +81,7 @@ def test_a_two_regressor_model_also_matches(panel) -> None:
 def test_sigma_e_is_unaffected(panel) -> None:
     """sigma_e comes from the WITHIN regression and was already right -- 9567.7548814077."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "y ~ k1 + C(year)", panel, entity="st_abb", time="year"
     ).fit()
     assert float(fitted.e["sigma_e"]) == pytest.approx(9567.7548814077, abs=1e-6)
@@ -90,7 +90,7 @@ def test_sigma_e_is_unaffected(panel) -> None:
 def test_the_two_are_still_different_quantities(panel) -> None:
     """The whole point of the fix: rmse and sigma_e must not collapse onto each other."""
 
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "y ~ k1 + C(year)", panel, entity="st_abb", time="year"
     ).fit()
     rmse = float(fitted.e["rmse"])
@@ -103,7 +103,7 @@ def test_the_two_are_still_different_quantities(panel) -> None:
 def test_fixed_effects_rmse_is_unchanged(panel) -> None:
     """`xtreg, fe` keeps its own formula: Stata reports 5035.6356610104 for `y ~ k1 + k2`."""
 
-    fitted = ws.PanelOLS.from_formula(
+    fitted = ws.PanelRegressFE.from_formula(
         "y ~ k1 + k2", panel, entity="st_abb", time="year"
     ).fit()
     assert float(fitted.e["rmse"]) == pytest.approx(5035.6356610104, abs=1e-6)
@@ -112,7 +112,7 @@ def test_fixed_effects_rmse_is_unchanged(panel) -> None:
 def test_between_effects_rmse_is_unchanged(panel) -> None:
     """`xtreg, be`: Stata reports 8206.9664237721 for `y ~ k1 + k2`."""
 
-    fitted = ws.BetweenOLS.from_formula(
+    fitted = ws.PanelRegressBE.from_formula(
         "y ~ k1 + k2", panel, entity="st_abb", time="year"
     ).fit()
     assert float(fitted.e["rmse"]) == pytest.approx(8206.9664237721, abs=1e-6)

@@ -106,7 +106,7 @@ with Stata() as st:
         cap = st.estimate("etregress y x1, treat(s = z1 z2) twostep") if tag == "dgp1" \
             else st.estimate("etregress y x1, treat(t = z1 z2) twostep")
         treat_name = "s" if tag == "dgp1" else "t"
-        res = ws.Etregress.from_formula(
+        res = ws.EndogenousTreatmentRegress.from_formula(
             f"y ~ x1 + treat({treat_name} ~ z1 + z2)", frame).fit()
         stata = {k: cap.scalars.get(k) for k in ("rho", "sigma", "lambda")}
         print(f"etregress {tag}: Stata e(rho)={stata['rho']} e(sigma)={stata['sigma']} "

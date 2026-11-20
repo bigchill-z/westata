@@ -22,7 +22,7 @@ import pytest
 
 import westata as ws
 
-DIAGNOSTICS = ("estat_hettest", "estat_ovtest", "estat_imtest")
+DIAGNOSTICS = ("estat_heteroskedasticity_test", "estat_omitted_variables_test", "estat_information_matrix_test")
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +43,7 @@ def frames():
 
 @pytest.fixture(scope="module")
 def linear(frames):
-    return ws.OLS.from_formula("y ~ x1 + x2", frames).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", frames).fit()
 
 
 @pytest.fixture(scope="module")
@@ -119,7 +119,7 @@ def test_the_refusals_name_the_estimator(binary) -> None:
     """A refusal that says only "not available" cannot be acted on."""
 
     with pytest.raises((ValueError, NotImplementedError)) as caught:
-        binary.estat_hettest()
+        binary.estat_heteroskedasticity_test()
 
     message = str(caught.value).lower()
     assert "logit" in message or "regress" in message or "linear" in message
@@ -128,7 +128,7 @@ def test_the_refusals_name_the_estimator(binary) -> None:
 def test_hettest_reports_a_statistic_and_a_p_value(linear) -> None:
     """The output has to carry the two numbers a reader needs."""
 
-    rendered = linear.estat_hettest()
+    rendered = linear.estat_heteroskedasticity_test()
     text = str(rendered)
 
     assert "chi2" in text.lower()
@@ -138,6 +138,6 @@ def test_hettest_reports_a_statistic_and_a_p_value(linear) -> None:
 def test_ovtest_reports_an_f_statistic(linear) -> None:
     """Ramsey's test is an F test on added powers of the fitted values."""
 
-    text = str(linear.estat_ovtest())
+    text = str(linear.estat_omitted_variables_test())
 
     assert "F(" in text or "Prob > F" in text

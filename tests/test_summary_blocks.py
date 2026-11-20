@@ -40,7 +40,7 @@ def _survey_frame() -> pd.DataFrame:
 
 # --------------------------------------------------------------- regress / ML
 def test_regress_keeps_the_ols_block(auto) -> None:
-    text = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit().summary("stata")
+    text = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit().summary("stata")
 
     assert "R-squared" in text
     assert "Adj R-squared" in text
@@ -62,7 +62,7 @@ def test_qreg_does_not_print_a_log_likelihood(auto) -> None:
     """qreg is not a likelihood model, so the line must be absent."""
 
     text = (
-        ws.QuantileRegression.from_formula("mpg ~ weight", auto, quantile=0.25)
+        ws.QuantileRegress.from_formula("mpg ~ weight", auto, quantile=0.25)
         .fit()
         .summary("stata")
     )
@@ -74,7 +74,7 @@ def test_qreg_prints_the_deviation_lines(auto) -> None:
     """Stata prints both sums of deviations (p8_outputs.txt:21-22)."""
 
     result = (
-        ws.QuantileRegression.from_formula("mpg ~ weight", auto, quantile=0.25).fit()
+        ws.QuantileRegress.from_formula("mpg ~ weight", auto, quantile=0.25).fit()
     )
     text = result.summary("stata")
 
@@ -87,7 +87,7 @@ def test_qreg_prints_the_deviation_lines(auto) -> None:
 
 def test_qreg_prints_no_model_test_or_r_squared(auto) -> None:
     text = (
-        ws.QuantileRegression.from_formula("mpg ~ weight", auto, quantile=0.5)
+        ws.QuantileRegress.from_formula("mpg ~ weight", auto, quantile=0.5)
         .fit()
         .summary("stata")
     )
@@ -103,7 +103,7 @@ def test_svy_header_shows_the_design_block() -> None:
     design = ws.SurveyDesign(
         psu="psu", strata="stratum", weights="w", singleunit="certainty"
     )
-    text = ws.SvyMean.from_frame(["y"], frame, design).fit().summary("stata")
+    text = ws.SurveyMean.from_frame(["y"], frame, design).fit().summary("stata")
 
     assert "Number of strata" in text
     assert "Number of PSUs" in text
@@ -116,7 +116,7 @@ def test_svy_header_has_no_bogus_root_mse() -> None:
 
     frame = _survey_frame()
     design = ws.SurveyDesign(psu="psu", strata="stratum", weights="w")
-    text = ws.SvyMean.from_frame(["y"], frame, design).fit().summary("stata")
+    text = ws.SurveyMean.from_frame(["y"], frame, design).fit().summary("stata")
 
     assert "Root MSE" not in text
     assert "Adj R-squared" not in text
@@ -127,7 +127,7 @@ def test_svy_header_counts_obs_once() -> None:
 
     frame = _survey_frame()
     design = ws.SurveyDesign(psu="psu", strata="stratum", weights="w")
-    text = ws.SvyMean.from_frame(["y"], frame, design).fit().summary("stata")
+    text = ws.SurveyMean.from_frame(["y"], frame, design).fit().summary("stata")
 
     assert text.count("Number of obs") == 1
 
@@ -135,7 +135,7 @@ def test_svy_header_counts_obs_once() -> None:
 def test_svy_mean_prints_no_model_f_test() -> None:
     frame = _survey_frame()
     design = ws.SurveyDesign(psu="psu", strata="stratum", weights="w")
-    text = ws.SvyMean.from_frame(["y"], frame, design).fit().summary("stata")
+    text = ws.SurveyMean.from_frame(["y"], frame, design).fit().summary("stata")
 
     assert "F(0" not in text
 

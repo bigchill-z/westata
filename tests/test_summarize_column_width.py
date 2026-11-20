@@ -34,7 +34,7 @@ import westata as ws
 def _rows(n: int = 1500) -> list[str]:
     rng = np.random.default_rng(n)
     frame = pd.DataFrame({"y": rng.normal(size=n), "x": rng.normal(size=n)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     return [
         line
         for line in str(ws.estat_summarize(fitted)).splitlines()

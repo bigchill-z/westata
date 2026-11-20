@@ -75,16 +75,16 @@ def _frame(n: int = 300, seed: int = 6000):
 
 #: Every model that publishes ``e(marginsok)``, with a builder returning a fitted result.
 BUILDERS = {
-    "regress": lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(),
+    "regress": lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(),
     "logit": lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),
     "probit": lambda frame: ws.Probit.from_formula("yb ~ x", frame).fit(),
-    "qreg": lambda frame: ws.QuantileRegression.from_formula("y ~ x", frame).fit(),
+    "qreg": lambda frame: ws.QuantileRegress.from_formula("y ~ x", frame).fit(),
     "tobit": lambda frame: ws.Tobit.from_formula("ycens ~ x", frame, lower=0).fit(),
-    "intreg": lambda frame: ws.Intreg.from_formula("lo hi ~ x", frame).fit(),
+    "intreg": lambda frame: ws.IntervalRegress.from_formula("lo hi ~ x", frame).fit(),
     "heckman": lambda frame: ws.Heckman.from_formula(
         "y ~ x + select(s ~ z)", frame
     ).fit(),
-    "etregress": lambda frame: ws.Etregress.from_formula(
+    "etregress": lambda frame: ws.EndogenousTreatmentRegress.from_formula(
         "y ~ x + treat(t ~ z)", frame
     ).fit(),
 }
@@ -171,7 +171,7 @@ def test_heckman_advertises_five_selection_types_and_can_produce_them() -> None:
 
 def test_etregress_advertises_five_treatment_types_and_can_produce_them() -> None:
     frame = _frame()
-    fitted = ws.Etregress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
+    fitted = ws.EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
 
     advertised = set(_declared_types(str(fitted.e["marginsok"])))
     expected = {"cte", "yctrt", "ycntrt", "ptrt", "xbtrt"}

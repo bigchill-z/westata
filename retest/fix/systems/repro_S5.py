@@ -42,7 +42,7 @@ def main() -> int:
             st, "didregress (y) (treated), group(unit) time(period)")
 
     banner("S5.1  didregress (y x1): explicit covariate -- must be unchanged")
-    model = ws.Didregress.from_formula(
+    model = ws.DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period")
     res = model.fit()
     header()
@@ -63,7 +63,7 @@ def main() -> int:
     noisy["noise"] = rng.normal(size=len(noisy))
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        bare_model = ws.Didregress.from_formula(
+        bare_model = ws.DIDRegress.from_formula(
             "y", "treated", noisy, group="unit", time="period")
         bare_res = bare_model.fit()
             # (the fix must not need a warning at all here)
@@ -82,7 +82,7 @@ def main() -> int:
     banner("S5.3  covariates='all': the old behaviour is still available, explicitly")
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        all_model = ws.Didregress.from_formula(
+        all_model = ws.DIDRegress.from_formula(
             "y", "treated", noisy, group="unit", time="period", covariates="all")
     print(f"  covariates          = {all_model.covariates}")
     print(f"  inferred_covariates = {all_model.inferred_covariates}")

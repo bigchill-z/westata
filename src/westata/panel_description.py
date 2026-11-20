@@ -58,12 +58,12 @@ from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
 __all__ = [
-    "XtSetResult",
-    "XtDesResult",
-    "XtSumResult",
-    "xtset",
-    "xtdes",
-    "xtsum",
+    "PanelSetResults",
+    "PanelDesResults",
+    "PanelSumResults",
+    "panel_set",
+    "panel_describe",
+    "panel_summarize",
 ]
 
 #: ``xtdes`` prints every line 75 characters wide; ``xtsum`` uses 79.
@@ -136,7 +136,7 @@ def _cell(text: str, end: int, used: int) -> str:
 
 # ---------------------------------------------------------------- xtset
 @dataclass(frozen=True)
-class XtSetResult(ResultSerialisation):
+class PanelSetResults(ResultSerialisation):
     """``xtset``: confirm the panel structure and summarise it."""
 
     entity: str
@@ -162,7 +162,7 @@ class XtSetResult(ResultSerialisation):
         return "\n".join(lines)
 
 
-def xtset(data: pd.DataFrame, entity: str, time: str) -> XtSetResult:
+def panel_set(data: pd.DataFrame, entity: str, time: str) -> PanelSetResults:
     """Stata's ``xtset panelvar timevar``.
 
     Validates that the pair identifies the observations, then reports the balance, the time range and
@@ -196,7 +196,7 @@ def xtset(data: pd.DataFrame, entity: str, time: str) -> XtSetResult:
         except (TypeError, ValueError):
             gapped = False
 
-    return XtSetResult(
+    return PanelSetResults(
         entity=entity,
         time=time,
         balance=balance,
@@ -231,7 +231,7 @@ _QUANTILE_COLUMNS = (
 
 
 @dataclass(frozen=True)
-class XtDesResult(ResultSerialisation):
+class PanelDesResults(ResultSerialisation):
     """``xtdes``: the panel's shape, its T distribution and its observation patterns."""
 
     entity: str
@@ -315,7 +315,7 @@ class XtDesResult(ResultSerialisation):
         return "\n".join(lines)
 
 
-def xtdes(data: pd.DataFrame, entity: str, time: str) -> XtDesResult:
+def panel_describe(data: pd.DataFrame, entity: str, time: str) -> PanelDesResults:
     """Stata's ``xtdes``: describe the shape of a panel."""
 
     subset = _panel_frame(data, entity, time)
@@ -336,7 +336,7 @@ def xtdes(data: pd.DataFrame, entity: str, time: str) -> XtDesResult:
     patterns = sorted(counts.items())
 
     entity_values = sorted(pd.unique(subset[entity]).tolist())
-    return XtDesResult(
+    return PanelDesResults(
         entity=entity,
         time=time,
         entities=int(sizes.size),
@@ -356,7 +356,7 @@ def xtdes(data: pd.DataFrame, entity: str, time: str) -> XtDesResult:
 
 # ---------------------------------------------------------------- xtsum
 @dataclass(frozen=True)
-class XtSumResult(ResultSerialisation):
+class PanelSumResults(ResultSerialisation):
     """``xtsum``: overall / between / within decomposition of the listed variables."""
 
     entity: str
@@ -450,13 +450,13 @@ def _xtsum(value: float | None) -> str:
     return text
 
 
-def xtsum(
+def panel_summarize(
     data: pd.DataFrame,
     variables: Sequence[str],
     *,
     entity: str,
     time: str,
-) -> XtSumResult:
+) -> PanelSumResults:
     """Stata's ``xtsum``: decompose each variable into overall, between and within variation.
 
     ``overall`` uses every observation; ``between`` uses the per-entity means (``n`` of them);
@@ -518,7 +518,7 @@ def xtsum(
         }
         out.append((name, overall, between, within))
 
-    return XtSumResult(
+    return PanelSumResults(
         entity=entity,
         time=time,
         variables=out,

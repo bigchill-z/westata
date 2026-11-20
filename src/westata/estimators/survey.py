@@ -114,11 +114,11 @@ from westata.results.base import StataResults
 __all__ = [
     "SurveyDesign",
     "SurveyLayout",
-    "SvyLogit",
-    "SvyMean",
-    "SvyProportion",
-    "SvyRegress",
-    "SvyTotal",
+    "SurveyLogit",
+    "SurveyMean",
+    "SurveyProportion",
+    "SurveyRegress",
+    "SurveyTotal",
 ]
 
 #: Supported ``singleunit()`` strategies.  Only ``certainty`` is fixture-verified.
@@ -674,7 +674,7 @@ class _SvyCommand:
 # ---------------------------------------------------------------------------
 # svy: mean / total / proportion
 # ---------------------------------------------------------------------------
-class SvyMean(_SvyCommand):
+class SurveyMean(_SvyCommand):
     """Survey-weighted mean (``svy: mean``).
 
     ``ybar = sum(w y) / sum(w)`` with influence function
@@ -743,7 +743,7 @@ class SvyMean(_SvyCommand):
         )
 
 
-class SvyTotal(SvyMean):
+class SurveyTotal(SurveyMean):
     """Survey-weighted total (``svy: total``).
 
     ``T = sum(w y)`` with influence function ``psi_i = w_i y_i``.  The weights
@@ -828,7 +828,7 @@ class _LogitScale:
         return 1.0 / (1.0 + np.exp(-arr))
 
 
-class SvyProportion(SvyMean):
+class SurveyProportion(SurveyMean):
     """Weighted proportions of a categorical variable (``svy: proportion``).
 
     One coefficient per observed level, in ``variable=level`` order with the
@@ -1012,7 +1012,7 @@ _SURVEY_TITLES = {
 }
 
 
-class SvyRegress(_SvyCommand):
+class SurveyRegress(_SvyCommand):
     """Survey-weighted linear regression (``svy: regress``).
 
     The coefficients are weighted least squares -- exactly what
@@ -1248,7 +1248,7 @@ def _fit_weighted_logit(
     )
 
 
-class SvyLogit(_SvyCommand):
+class SurveyLogit(_SvyCommand):
     """Survey-weighted logistic regression (``svy: logit``).
 
     Pseudo-maximum-likelihood with sampling weights, linearised with

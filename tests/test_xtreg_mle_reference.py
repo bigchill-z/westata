@@ -53,13 +53,13 @@ def fitted():
     frame = frame.dropna(subset=columns).copy()
     frame["pid"] = frame["province"].astype("category").cat.codes + 1
     frame["tid"] = frame["year"].astype(int)
-    return ws.RandomEffectsMLE(FORMULA, frame, entity="pid", time="tid").fit()
+    return ws.PanelRegressMLE(FORMULA, frame, entity="pid", time="tid").fit()
 
 
 def test_the_class_exists() -> None:
     """The report calls it missing; it is a top-level export."""
 
-    assert hasattr(ws, "RandomEffectsMLE")
+    assert hasattr(ws, "PanelRegressMLE")
 
 
 @pytest.mark.parametrize("term", sorted(STATA_MLE))

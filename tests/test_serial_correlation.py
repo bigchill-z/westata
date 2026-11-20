@@ -38,7 +38,7 @@ def fitted():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
     frame = frame.sort_values("time").reset_index(drop=True)
-    return ws.OLS.from_formula("consumption ~ temp + price + income", frame).fit()
+    return ws.Regress.from_formula("consumption ~ temp + price + income", frame).fit()
 
 
 def test_durbin_watson_matches_stata(fitted) -> None:
@@ -64,7 +64,7 @@ def test_wntestq_explicit_lags_matches_stata(fitted) -> None:
 
 
 def test_corrgram_autocorrelations_match_stata(fitted) -> None:
-    grid = ws.estat_corrgram(fitted)
+    grid = ws.estat_correlogram(fitted)
     expected = {
         1: (0.3298, 0.3969, 0.0578),
         2: (0.0362, -0.1681, 0.1616),
@@ -80,7 +80,7 @@ def test_corrgram_autocorrelations_match_stata(fitted) -> None:
 def test_corrgram_q_matches_wntestq_at_the_same_order(fitted) -> None:
     """The Q column accumulates lags 1..k, so the last row equals wntestq at that order."""
 
-    grid = ws.estat_corrgram(fitted, lags=10)
+    grid = ws.estat_correlogram(fitted, lags=10)
     portmanteau = ws.wntestq(fitted, lags=10)
     assert grid.rows[-1].q == pytest.approx(portmanteau.q, rel=1e-12)
 

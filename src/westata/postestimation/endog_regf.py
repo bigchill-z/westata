@@ -52,12 +52,12 @@ from westata.postestimation.names import is_constant_name
 #: The constant-name test lives in `names.py` (R6.1).
 _is_constant = is_constant_name
 
-__all__ = ["RegFResult", "endog_regf_test"]
+__all__ = ["RegFResults", "endog_regf_test"]
 
 
 
 
-class RegFResult:
+class RegFResults:
     """Stata's ``regF`` endogeneity test.
 
     Attributes
@@ -86,7 +86,7 @@ class RegFResult:
 
     def __repr__(self) -> str:
         return (
-            f"<RegFResult F({self.df_num:g},{self.df_denom:g})="
+            f"<RegFResults F({self.df_num:g},{self.df_denom:g})="
             f"{self.statistic:.4f} p={self.pvalue:.4f}>"
         )
 
@@ -116,7 +116,7 @@ def endog_regf_test(
     cov_type: str = "nonrobust",
     cluster_labels: Sequence[Any] | None = None,
     tested: Sequence[str] | None = None,
-) -> RegFResult:
+) -> RegFResults:
     """Run ``regF``: the augmented-regression F test for endogeneity.
 
     Parameters
@@ -240,6 +240,6 @@ def endog_regf_test(
     statistic = float(
         beta_block @ np.linalg.solve(cov_block, beta_block) / n_endog
     )
-    return RegFResult(
+    return RegFResults(
         statistic=statistic, df_num=float(n_endog), df_denom=float(df_denom)
     )

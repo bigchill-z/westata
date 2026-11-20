@@ -40,7 +40,7 @@ def frames():
 
 @pytest.fixture(scope="module")
 def ols(frames):
-    return ws.OLS.from_formula("y ~ x1 + x2", frames).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", frames).fit()
 
 
 @pytest.fixture(scope="module")

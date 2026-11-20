@@ -23,12 +23,12 @@ import pandas as pd
 import pytest
 
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.hdfe import FEOLS
+from westata.estimators.hdfe import RegressHighDimFixedEffects
 from westata.estimators.panel import (
-    BetweenOLS,
-    FirstDifferenceOLS,
-    PanelOLS,
-    RandomEffects,
+    PanelRegressBE,
+    PanelRegressFD,
+    PanelRegressFE,
+    PanelRegressRE,
 )
 
 N_ENTITIES = 5
@@ -116,7 +116,7 @@ def fe_components(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 # --------------------------------------------------------------------- FE
 def test_fe_matches_within_transformed_ols() -> None:
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     Xd, yd = fe_components(df)
     beta, _, cov = ols(Xd, yd, df_resid=FE_DF_R)
@@ -129,7 +129,7 @@ def test_fe_matches_within_transformed_ols() -> None:
 
 def test_two_way_fe_matches_two_way_demeaned_ols() -> None:
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
         entity_effects=True, time_effects=True
     )
 
@@ -155,7 +155,7 @@ def test_two_way_fe_matches_two_way_demeaned_ols() -> None:
 
 def test_pooled_panel_degenerates_to_ols() -> None:
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
         entity_effects=False, time_effects=False
     )
 
@@ -172,7 +172,7 @@ def test_re_matches_linearmodels_swamy_arora() -> None:
     from linearmodels.panel import RandomEffects as BackendRandomEffects
 
     df = make_panel()
-    res = RandomEffects.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     backend = BackendRandomEffects.from_formula(
         "y ~ 1 + x1 + x2", df.set_index(["firm", "year"])
@@ -187,7 +187,7 @@ def test_re_matches_linearmodels_swamy_arora() -> None:
 
 def test_be_matches_group_mean_ols() -> None:
     df = make_panel()
-    res = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     means = df.groupby("firm")[["y", "x1", "x2"]].mean()
     X = np.column_stack([np.ones(N_ENTITIES), means[["x1", "x2"]].to_numpy()])
@@ -207,7 +207,7 @@ def test_be_matches_group_mean_ols() -> None:
 
 def test_fd_matches_first_differenced_ols() -> None:
     df = make_panel()
-    res = FirstDifferenceOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressFD.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     diffs = (
         df.set_index(["firm", "year"])[["y", "x1", "x2"]]
@@ -233,7 +233,7 @@ def test_fe_df_resid_matches_stata_formula() -> None:
     """``xtreg, fe`` reports ``df_r = N - K - n_entities + 1`` (``[R] xtreg``)."""
 
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     n_entities = df["firm"].nunique()
     expected = N_OBS - K_WITH_CONSTANT - n_entities + 1
@@ -257,7 +257,7 @@ def test_fe_without_constant_uses_the_no_intercept_df_rule() -> None:
     """
 
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2 - 1", df, entity="firm", time="year").fit()
+    res = PanelRegressFE.from_formula("y ~ x1 + x2 - 1", df, entity="firm", time="year").fit()
 
     assert "Intercept" not in res.params.index
     assert res.e["rank"] == 2
@@ -365,7 +365,7 @@ def test_unbalanced_panel_fe_and_fd() -> None:
     n = len(unbalanced)
     n_entities = unbalanced["firm"].nunique()
 
-    fe = PanelOLS.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
+    fe = PanelRegressFE.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
     Xd, yd = fe_components(unbalanced)
     df_r = n - K_WITH_CONSTANT - n_entities + 1
     beta, _, cov = ols(Xd, yd, df_resid=df_r)
@@ -377,7 +377,7 @@ def test_unbalanced_panel_fe_and_fd() -> None:
     assert fe.nobs == n
     assert fe.df_resid == df_r
 
-    fd = FirstDifferenceOLS.from_formula(
+    fd = PanelRegressFD.from_formula(
         "y ~ x1 + x2", unbalanced, entity="firm", time="year"
     ).fit()
     # The reference is the BACKEND's first-difference estimator on the same frame,
@@ -416,11 +416,11 @@ def test_unbalanced_re_and_be() -> None:
     n = len(unbalanced)
     n_entities = unbalanced["firm"].nunique()
 
-    re = RandomEffects.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
+    re = PanelRegressRE.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
     assert re.nobs == n
     assert re.df_resid == n - K_WITH_CONSTANT
 
-    be = BetweenOLS.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
+    be = PanelRegressBE.from_formula("y ~ x1 + x2", unbalanced, entity="firm", time="year").fit()
     assert be.nobs == n_entities
     assert be.df_resid == n_entities - K_WITH_CONSTANT
     means = unbalanced.groupby("firm")[["y", "x1", "x2"]].mean()
@@ -433,10 +433,10 @@ def test_unbalanced_re_and_be() -> None:
 @pytest.mark.parametrize(
     "build",
     [
-        lambda df: PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        lambda df: RandomEffects.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        lambda df: BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        lambda df: FirstDifferenceOLS.from_formula(
+        lambda df: PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        lambda df: PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        lambda df: PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        lambda df: PanelRegressFD.from_formula(
             "y ~ x1 + x2", df, entity="firm", time="year"
         ),
     ],
@@ -477,7 +477,7 @@ def test_fe_r2_is_the_within_r_squared() -> None:
     """``xtreg, fe`` reports the within R-squared, not the levels R-squared."""
 
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
 
     Xd, yd = fe_components(df)
     beta, resid, _ = ols(Xd, yd, df_resid=FE_DF_R)
@@ -490,10 +490,10 @@ def test_fe_r2_is_the_within_r_squared() -> None:
 def test_summary_stata_style_renders() -> None:
     df = make_panel()
     for model in (
-        PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        RandomEffects.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        FirstDifferenceOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        PanelRegressFD.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
     ):
         text = model.fit().summary(style="stata")
         # `xtreg, re` prints z / P>|z| (its model test is a Wald chi2); fe, be and fd
@@ -509,7 +509,7 @@ def test_summary_stata_style_renders() -> None:
 # --------------------------------------------------------------------- cov types
 def test_unknown_cov_type_raises_value_error() -> None:
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     with pytest.raises(ValueError, match="cov_type"):
         model.fit(cov_type="definitely-not-a-cov-type")
 
@@ -517,14 +517,14 @@ def test_unknown_cov_type_raises_value_error() -> None:
 @pytest.mark.parametrize("cov_type", ["HC0", "HC2", "HC3", "HAC"])
 def test_unrepresentable_cov_types_are_rejected(cov_type: str) -> None:
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     with pytest.raises(UnsupportedError):
         model.fit(cov_type=cov_type)
 
 
 def test_cluster_requires_labels() -> None:
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     with pytest.raises(ValueError, match="clusters"):
         model.fit(cov_type="cluster")
 
@@ -546,7 +546,7 @@ def test_cluster_standard_errors_match_stata_cr1() -> None:
     """
 
     df = make_panel()
-    res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit(
         cov_type="cluster", cov_kwds={"clusters": df["firm"].to_numpy()}
     )
 
@@ -603,7 +603,7 @@ def test_clustered_df_m_and_rank_are_documented_deviations() -> None:
         ("y ~ x1", 1, 0, 1),
         ("y ~ x1 + x2", 2, 1, 2),
     ):
-        res = PanelOLS.from_formula(formula, df, entity="firm", time="year").fit(
+        res = PanelRegressFE.from_formula(formula, df, entity="firm", time="year").fit(
             cov_type="cluster", cov_kwds={"clusters": clusters}
         )
         # westata's own, self-consistent quantities.
@@ -619,7 +619,7 @@ def test_clustered_df_m_and_rank_are_documented_deviations() -> None:
 
     # The unclustered path keeps the parameter-vector reading for both, and
     # there e(rank) equals Stata's (no redefinition happens without clustering).
-    plain = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    plain = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert plain.e["rank"] == K_WITH_CONSTANT
     assert plain.e["df_m"] == 2  # slopes, not Stata's effects-inclusive 6
 
@@ -646,7 +646,7 @@ def test_robust_is_statas_clustered_vce_not_hc1() -> None:
     """
 
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     res = model.fit(cov_type="robust")
     same = model.fit(
         cov_type="cluster", cov_kwds={"clusters": df["firm"].to_numpy()}
@@ -677,7 +677,7 @@ def test_robust_is_statas_clustered_vce_not_hc1() -> None:
 
 def test_nonrobust_is_the_default() -> None:
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     default = model.fit()
     explicit = model.fit(cov_type="nonrobust")
     assert default.cov_type == "nonrobust"
@@ -690,7 +690,7 @@ def test_ssc_always_applies_stata_defaults() -> None:
     from westata.protocols import SSC
 
     df = make_panel()
-    model = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
+    model = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year")
     clusters = df["firm"].to_numpy()
 
     # ``SSC()`` is Stata's default, so it must reproduce the implicit settings.
@@ -730,8 +730,8 @@ def test_ssc_always_applies_stata_defaults() -> None:
 def test_multiindex_input_matches_long_input() -> None:
     df = make_panel()
     indexed = df.set_index(["firm", "year"])
-    long_res = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
-    mi_res = PanelOLS.from_formula("y ~ x1 + x2", indexed, entity="firm", time="year").fit()
+    long_res = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    mi_res = PanelRegressFE.from_formula("y ~ x1 + x2", indexed, entity="firm", time="year").fit()
     np.testing.assert_allclose(long_res.params.to_numpy(), mi_res.params.to_numpy(), rtol=0.0, atol=1e-12)
     np.testing.assert_allclose(long_res.bse.to_numpy(), mi_res.bse.to_numpy(), rtol=0.0, atol=1e-12)
 
@@ -740,9 +740,9 @@ def test_row_order_does_not_change_results() -> None:
     df = make_panel()
     shuffled = df.sample(frac=1.0, random_state=7).reset_index(drop=True)
     for build in (
-        lambda frame: PanelOLS.from_formula("y ~ x1 + x2", frame, entity="firm", time="year"),
-        lambda frame: RandomEffects.from_formula("y ~ x1 + x2", frame, entity="firm", time="year"),
-        lambda frame: FirstDifferenceOLS.from_formula(
+        lambda frame: PanelRegressFE.from_formula("y ~ x1 + x2", frame, entity="firm", time="year"),
+        lambda frame: PanelRegressRE.from_formula("y ~ x1 + x2", frame, entity="firm", time="year"),
+        lambda frame: PanelRegressFD.from_formula(
             "y ~ x1 + x2", frame, entity="firm", time="year"
         ),
     ):
@@ -756,21 +756,21 @@ def test_duplicate_panel_cells_are_rejected() -> None:
     df = make_panel()
     duplicated = pd.concat([df, df.iloc[[0]]], ignore_index=True)
     with pytest.raises(ConsistencyError, match="repeated"):
-        PanelOLS.from_formula("y ~ x1 + x2", duplicated, entity="firm", time="year")
+        PanelRegressFE.from_formula("y ~ x1 + x2", duplicated, entity="firm", time="year")
 
 
 def test_missing_panel_column_is_reported() -> None:
     df = make_panel()
     with pytest.raises(ConsistencyError, match="firm_id"):
-        PanelOLS.from_formula("y ~ x1", df, entity="firm_id", time="year")
+        PanelRegressFE.from_formula("y ~ x1", df, entity="firm_id", time="year")
 
 
 @pytest.mark.parametrize(
     "build",
     [
-        lambda df: RandomEffects.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        lambda df: BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
-        lambda df: FirstDifferenceOLS.from_formula(
+        lambda df: PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        lambda df: PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year"),
+        lambda df: PanelRegressFD.from_formula(
             "y ~ x1 + x2", df, entity="firm", time="year"
         ),
     ],
@@ -790,13 +790,13 @@ def test_missing_values_are_dropped_listwise() -> None:
     with_missing.loc[3, "x1"] = np.nan
     with_missing.loc[11, "y"] = np.nan
 
-    res = PanelOLS.from_formula("y ~ x1 + x2", with_missing, entity="firm", time="year").fit()
+    res = PanelRegressFE.from_formula("y ~ x1 + x2", with_missing, entity="firm", time="year").fit()
 
     assert res.nobs == len(df) - 2
     assert res.nobs == len(res.resid)
     np.testing.assert_allclose(
         res.params.to_numpy(),
-        PanelOLS.from_formula(
+        PanelRegressFE.from_formula(
             "y ~ x1 + x2", df.drop(index=[3, 11]), entity="firm", time="year"
         )
         .fit()
@@ -819,10 +819,10 @@ def test_cluster_labels_survive_listwise_deletion() -> None:
     with_missing.loc[3, "x1"] = np.nan
     clean = df.drop(index=[3]).reset_index(drop=True)
 
-    from_fully_observed = PanelOLS.from_formula(
+    from_fully_observed = PanelRegressFE.from_formula(
         "y ~ x1 + x2", clean, entity="firm", time="year"
     ).fit(cov_type="cluster", cov_kwds={"clusters": clean["firm"].to_numpy()})
-    from_frame_with_na = PanelOLS.from_formula(
+    from_frame_with_na = PanelRegressFE.from_formula(
         "y ~ x1 + x2", with_missing, entity="firm", time="year"
     ).fit(cov_type="cluster", cov_kwds={"clusters": with_missing["firm"].to_numpy()})
 
@@ -863,10 +863,10 @@ def test_panel_indexed_cluster_series_is_aligned_by_index() -> None:
         with_missing["firm"].to_numpy(),
         index=pd.MultiIndex.from_frame(with_missing[["firm", "year"]]),
     )
-    positional = PanelOLS.from_formula(
+    positional = PanelRegressFE.from_formula(
         "y ~ x1 + x2", with_missing, entity="firm", time="year"
     ).fit(cov_type="cluster", cov_kwds={"clusters": with_missing["firm"].to_numpy()})
-    by_index = PanelOLS.from_formula(
+    by_index = PanelRegressFE.from_formula(
         "y ~ x1 + x2", with_missing, entity="firm", time="year"
     ).fit(cov_type="cluster", cov_kwds={"clusters": labels})
 
@@ -889,7 +889,7 @@ def test_xtreg_fe_stores_stata_e_spellings() -> None:
     """
 
     df = make_panel()
-    result = PanelOLS.from_formula(
+    result = PanelRegressFE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
 
@@ -925,10 +925,10 @@ def test_xtreg_r2_w_is_not_a_blanket_alias_of_r2() -> None:
 
     df = make_panel()
 
-    fe = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    fe = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert fe.e["r2_w"] == pytest.approx(fe.e["r2"], rel=1e-15)
 
-    re = RandomEffects.from_formula(
+    re = PanelRegressRE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     assert "r2_w" in re.e
@@ -938,7 +938,7 @@ def test_xtreg_r2_w_is_not_a_blanket_alias_of_r2() -> None:
     assert "r2" not in re.e
     assert "r2_w" in re.e
 
-    be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    be = PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert "r2_w" in be.e
     # Stata's be stores r2 == r2_b, and r2_w is a different quantity.
     assert be.e["r2"] == pytest.approx(be.e["r2_b"], rel=1e-12)
@@ -958,7 +958,7 @@ def test_reghdfe_stores_tss_mss_and_ll_0() -> None:
     """
 
     df = make_panel()
-    result = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit()
+    result = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit()
 
     assert {"rss", "mss", "tss", "ll_0"} <= set(result.e)
     assert result.e["rss"] + result.e["mss"] == pytest.approx(result.e["tss"], rel=1e-12)
@@ -987,7 +987,7 @@ def test_xtreg_sigma_u_is_the_sd_of_panel_means_of_the_level_residual() -> None:
     """
 
     df = make_panel()
-    result = PanelOLS.from_formula(
+    result = PanelRegressFE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
 
@@ -1015,7 +1015,7 @@ def test_xtreg_variance_components_are_consistent() -> None:
     """``sigma^2 = sigma_u^2 + sigma_e^2`` and ``rho`` is the implied share."""
 
     df = make_panel()
-    for estimator in (PanelOLS, RandomEffects):
+    for estimator in (PanelRegressFE, PanelRegressRE):
         result = estimator.from_formula(
             "y ~ x1 + x2", df, entity="firm", time="year"
         ).fit()
@@ -1033,7 +1033,7 @@ def test_xtreg_group_size_block_matches_the_panel() -> None:
     """``e(Tbar)``/``e(g_min)``/``e(g_avg)``/``e(g_max)``/``e(Tcon)``."""
 
     df = make_panel()
-    for estimator in (PanelOLS, RandomEffects, BetweenOLS, FirstDifferenceOLS):
+    for estimator in (PanelRegressFE, PanelRegressRE, PanelRegressBE, PanelRegressFD):
         result = estimator.from_formula(
             "y ~ x1 + x2", df, entity="firm", time="year"
         ).fit()
@@ -1056,7 +1056,7 @@ def test_xtreg_sums_of_squares_match_what_stata_stores() -> None:
 
     df = make_panel()
 
-    fe = PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    fe = PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     # `xtreg, fe` stores rss / mss / tss and NOT tss_within or tss_between -- verified with
     # `display e(tss_within)` on munnell.dta, which prints ".". Those two belong to reghdfe,
     # where the absorbed-only response is retained; publishing them here put numbers under
@@ -1074,11 +1074,11 @@ def test_xtreg_sums_of_squares_match_what_stata_stores() -> None:
     # expose: the within-scale mss and rss sum to the within total, which is below tss.
     assert fe.e["mss"] + fe.e["rss"] < fe.e["tss"]
 
-    be = BetweenOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    be = PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     assert {"rss", "mss"} <= set(be.e)
     assert "tss" not in be.e, "xtreg_be.json does not store e(tss)"
 
-    re = RandomEffects.from_formula(
+    re = PanelRegressRE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     assert "tss" not in re.e

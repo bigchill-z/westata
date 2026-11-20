@@ -84,8 +84,8 @@ import westata as ws
 
 df = pd.read_stata("tests/data/auto.dta")
 
-# OLS with a factor variable and clustered standard errors (regress)
-res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit(
+# Regress with a factor variable and clustered standard errors (regress)
+res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit(
     cov_type="cluster", cov_kwds={"groups": df["foreign"]},
 )
 print(res.summary(style="stata"))          # Stata layout
@@ -107,14 +107,14 @@ Other models, on the same data:
 
 ```python
 # Quantile regression (qreg) — median
-ws.QuantileRegression.from_formula("mpg ~ weight + C(foreign)", df).fit()
+ws.QuantileRegress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 
 # Robust regression (rreg)
-ws.RobustRegression.from_formula("mpg ~ weight", df).fit()
+ws.RobustRegress.from_formula("mpg ~ weight", df).fit()
 
 # Systems of equations (sureg): one list entry per equation
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
-ws.Sureg.from_formula(
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
+ws.SeeminglyUnrelatedRegress.from_formula(
     ["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 ).fit(cov_type="robust")                     # robust VCE
 
@@ -126,8 +126,8 @@ ws.Tobit.from_formula("rep78 ~ weight + mpg", df, lower=0).fit()
 A publication-style table:
 
 ```python
-base = ws.OLS.from_formula("mpg ~ weight", df).fit()
-full = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+base = ws.Regress.from_formula("mpg ~ weight", df).fit()
+full = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 print(ws.etable([base, full], model_names=["Base", "Full"]))
 ```
 
@@ -151,11 +151,11 @@ full.estat_vce().to_frame()                  # full symmetric matrix as a DataFr
 
 | Family | westata | Stata |
 |---|---|---|
-| Linear | `OLS` | `regress` (4 weight types, `i.` factors) |
+| Linear | `Regress` | `regress` (4 weight types, `i.` factors) |
 | IV | `IV2SLS` / `IVLIML` / `IVGMM` | `ivregress 2sls/liml/gmm` |
-| HDFE | `FEOLS` | `reghdfe` |
+| HDFE | `RegressHighDimFixedEffects` | `reghdfe` |
 | HDFE | `Areg` | `areg` (requires `absorb=`, reports `_cons`) |
-| Panel | `PanelOLS` / `RandomEffects` / `BetweenOLS` / `FirstDifferenceOLS` | `xtreg fe/re/be/fd` |
+| Panel | `PanelRegressFE` / `PanelRegressRE` / `PanelRegressBE` / `PanelRegressFD` | `xtreg fe/re/be/fd` |
 | Binary | `Logit` / `Probit` | `logit` / `probit` |
 | Count | `Poisson` / `NegativeBinomial` | `poisson` / `nbreg` |
 | Ordered | `OrderedLogit` / `OrderedProbit` | `ologit` / `oprobit` |
@@ -219,11 +219,11 @@ Measured relative agreement with StataNow 19.5:
 | `ologit` / `oprobit` | ~2e-5 | — |
 | `nbreg` | 6.0e-9 | 1.6e-6 |
 | `arima` | 4.8e-5 | 8.2e-5 |
-| `predict` (OLS xb) | 1.6e-15 | — |
+| `predict` (Regress xb) | 1.6e-15 | — |
 | `predict` (logit pr) | 3.1e-11 | — |
 | `predict` (tobit e/ystar) | 5.8e-10 | — |
 | `etable` vs `esttab` | 0.0 | — |
-| `vecrank` (all lag orders) | 0.0 (4 dp) | — |
+| `vec_rank` (all lag orders) | 0.0 (4 dp) | — |
 | `dfuller` | 2.3e-4 | — |
 | `ivregress gmm` | 4.9e-16 | 6.9e-18 |
 | `arch` | 1.4e-04 | z values not comparable |
@@ -267,9 +267,9 @@ would change a number if you got it backwards:
   errors substantially.
 - **`margins` differentiates the response, not the linear index.** For a logit
   the marginal effect is `mean(p(1-p))·b`, not the coefficient itself.
-- **`PanelOLS.from_formula` ignores `entity_effects`.** Passing it to `fit()`
-  gives pooled OLS; construct the model directly to get fixed effects.
-- **`ivregress` reports z and Wald chi2**, while OLS and the panel estimators use
+- **`PanelRegressFE.from_formula` ignores `entity_effects`.** Passing it to `fit()`
+  gives pooled Regress; construct the model directly to get fixed effects.
+- **`ivregress` reports z and Wald chi2**, while Regress and the panel estimators use
   t and F.
 - **`e()` keys differ per command.** There is no uniform set: `regress` stores no
   `e(aic)`, `tobit` stores none either, while the ML families do. Assuming
@@ -338,9 +338,9 @@ biasadj()` raises `UnsupportedError`.
 
 Not implemented, and they raise instead of approximating: Mata, the graphics
 system, data management, SEM/GSEM, survival analysis, Bayesian estimation, `mi`,
-`xtabond2`, `csdid`, `rdrobust` (automatic bandwidth only), graphics for
+`xtabond2`, `csdid`, `rd_robust` (automatic bandwidth only), graphics for
 `synth`/`synth2`, general `gmm`, `nlsur`, multi-way
-clustering (CGM), `vecrank`'s fixed-N exact critical values, and Stata's
+clustering (CGM), `vec_rank`'s fixed-N exact critical values, and Stata's
 arbitrary `r()` statistics outside the `[U] exp_list` grammar.
 
 `ws.synth` implements Stata's **default path plus the extended feature set**

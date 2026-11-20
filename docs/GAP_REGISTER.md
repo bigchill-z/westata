@@ -48,8 +48,8 @@
 | 因果推断 | `teffects ra`, `teffects ipw`, `teffects aipw`, `teffects nnmatch` | 3 E3, 1 E1 |
 | 复杂抽样 | `svyset / svy: mean`, `svy: total`, `svy: proportion`, `svyset fpc / singleunit` | 4 E3 |
 | 重抽样 | `jackknife`, `bootstrap`, `permute`, `bootstrap / permute expressions (exp_list)` | 3 E2, 1 E1 |
-| 时间序列 | `arima`, `var`, `arch`, `dfuller`, `vecrank (Johansen)`, `vec (VECM estimation)`, `pperron / kpss` | 2 E3, 4 E2, 1 E1 |
-| 后估计 | `test`, `lincom`, `lrtest`, `hausman`, `contrast`, `pwcompare`, `predict, stdp/stdf`, `margins`, `predict` | 8 E3, 1 E2 |
+| 时间序列 | `arima`, `var`, `arch`, `dfuller`, `vec_rank (Johansen)`, `vec (VECM estimation)`, `pperron / kpss` | 2 E3, 4 E2, 1 E1 |
+| 后估计 | `test`, `lincom`, `lrtest`, `hausman`, `contrast`, `pairwise_compare`, `predict, stdp/stdf`, `margins`, `predict` | 8 E3, 1 E2 |
 | 成表 | `etable` | 1 E3 |
 
 ### 数值一致性最好的部分
@@ -77,14 +77,14 @@
 | `lrtest` | ✅ E3 | 嵌套检验，`df==0` 返回 p=1.0 |
 | `hausman` | ✅ E3 | **排除常数项**，否则 `V_c−V_e` 不定 |
 | `contrast` | ✅ E3 | `r.`/`g.`/`a.`；`a.` 是 low-vs-high |
-| `pwcompare` | ✅ E3 | 无多重比较校正 |
+| `pairwise_compare` | ✅ E3 | 无多重比较校正 |
 | `predict, stdp/stdf` | ✅ E3 | **`stdf` 仅线性族**，Stata 对 logit/poisson 报 `r(198)` |
 | `predict, ptrt` / `xbtrt` / `yctrt` / `ycntrt` / `cte` | ✅ 已实现（`etregress`） | 依据 `etregress.ado:423`（`marginsok "XB CTE YCTrt YCNTrt PTrt XBTrt default"`）与 `etregress_postestimation.sthlp:136-167`。`ptrt`=`Pr(treatment=1)`，`xbtrt`=处理方程线性预测，`yctrt`/`ycntrt`=`E(y\|t=1)`/`E(y\|t=0)`，**`cte` = 两者之差**（定义即「潜在结果均值之差」，故是导出量而非独立公式——恒等式 `cte == yctrt−ycntrt` 已验证到 1e-12）。处理方程设计需从 `e(treat_varlist)` + `model_data` 重建 |
 | `predict, psel` / `mills` / `nshazard` / `ycond` / `yexpected` | ✅ 已实现（`heckman`） | 全部五个选择统计量，依据 `heckman.ado:491`（`marginsok default XB PSel YCond YExpected Mills NShazard`）与 `heckman_postestimation.sthlp:201-221`。**行数不同是语义要求**：`psel`/`mills`/`nshazard` 出自**全样本** probit（400 行），`ycond`/`yexpected` 属**结果方程**（仅选中行 256）。`mills` 与 `nshazard` 是**同义词**（同一组数）。核心恒等式 `ycond = xb + lambda·mills` 已验证到 1e-8 |
 | `predict, score` | ✅ 已实现（`regress`/`logit`/`probit`/`poisson`） | `result.predict(kind="score")`；`predict.sthlp:188-189`：**「对线性预测的对数似然导数」**，故单方程模型只有**一个**变量（复数 `scores` 保留给多方程模型）。**Logit 的 `∂ll/∂η = y−p`（即残差），但 Probit 是 `(y−p)φ(η)/(p(1−p))`**——早期把两者合并成一个分支导致 probit 值错。验收判据：**有截距时 `Σ∂llᵢ/∂ηᵢ = 0`**（截距一阶条件），修复前 probit 给出 0.2504，修复后 3e-15 |
 | `predict, e` / `predict, ystar` | ✅ 已实现（`tobit`/`truncreg`/`intreg`） | `kind="e"` / `kind="ystar"`；定义见 `tobit_postestimation.sthlp:143-148`：`e` = `E(xb+u \| a < xb+u < b)`（**条件**期望），`ystar` = `E(y*)`。左删失时 `e > ystar` 恒成立，已验证 |
 | `predict, fitted` | ✅ 已实现 | `result.predict(kind="fitted")`；Stata 的**同义词**之一（与 `xb` 并列出现在 `regress`/`xtreg` 等多个命令的 `predict` 语法中）。本包把 `fitted` 与 `xb` 分开登记，因为 `SUPPORTED_TYPES` 是逐命令列出的：`regress` 列 `fitted`，`logit`/`poisson` 不列 |
-| `predict, xb` | ✅ 已实现 | `result.predict(kind="xb")`；线性指数。`newey` 的 `index` 与它同义（`newey_p.ado:54` 送入同一分支） |
+| `predict, xb` | ✅ 已实现 | `result.predict(kind="xb")`；线性指数。`newey_west` 的 `index` 与它同义（`newey_p.ado:54` 送入同一分支） |
 | `predict, residuals` | ✅ 已实现 | `result.predict(kind="residuals")`；`y - xb` |
 | `predict, pr` / `predict, n` / `predict, ir` | ✅ 已实现（计数/二值族） | `pr` 的计数形式**需要参数**（`poisson_postestimation.sthlp:147-148` 的 `pr(n)`）；`nbreg` 用负二项 pmf 而非 Poisson（`alpha=exp(lnalpha)`）|
 | `predict, hat` / `leverage` / `rstandard` / `rstudent` / `cooksd` / `dfbeta` / `stdr` / `covratio` / `dfits` / `welsch` | ✅ 已实现（`regress` 且 `vce(ols)`） | 影响诊断；`regress_postestimation.sthlp:152-153` 明确：除 `vce(ols)` 外的任何 VCE 下均不可用，因此按 VCE 拒绝而非静默计算 |
@@ -98,24 +98,24 @@
 | `estat gof` | ✅ 已实现（`poisson` 专属） | `result.estat_gof()`；公式抄自 `poisgof.ado`，含易漏的 `Σ lngamma(1+y)` 项；**`nbreg` 刻意拒绝**（Stata 无此命令） |
 | `estat ic` | ✅ 已实现 | `result.estat_ic()`；四准则公式抄自 `estimates.ado:985-1002`；`df` 默认 `rank(V)`。**注意 `e(aic)` 与 `estat ic` 的 AIC 本就不同**（差 `N(1+log2π)`），见 §8.20.12 |
 | `estat dwatson` | ✅ 已实现（线性模型） | `result.estat_dwatson()`；`d = Σ(e_t−e_{t−1})² / Σe_t²`，输出 `Durbin–Watson d-statistic(  df,     N) =  d`（49 字符）。**矩阵实现早已存在于 `postestimation/serial.py` 且逐值正确，但从未挂到结果对象上**——第 93 轮才发现 `result.estat_dwatson()` 抛 `AttributeError`；本次仅补接线。grilic 实测 `Durbin–Watson d-statistic(  4,   758) =  1.704354` 逐字节一致。**2026-11-12 补 `time=`**：`L.` 定义在时间轴上，缺口两侧不得相减；icecream 删 `time==5` 后 Stata 为 `.8930395`，按行序是 `1.0868969` |
-| `estat ptrends` | ✅ 已实现（`didregress`/`xtdidregress`） | `ws.estat_ptrends(fit)` / `result.estat_ptrends()`；Stata 打印 `F(1, n_groups-1)` 的**单个线性趋势交互**（`treated_indicator * period`），组与期效应被面板吸收。60 组 / 15 期 / 20 组受处理的种子面板上返回 `statistic`/`df_numerator`/`df_denominator`/`pvalue` 四项，自由度结构为 `(1, 59)`。**此前实现完整但从未导出**，0.3.13 补上导出与结果对象方法。`estat trendplots`/`granger`/`grangerplot`/`bdecomp` 仍未实现，由 `test_didregress_postestimation_gap.py` 的缺席守卫覆盖 |
+| `estat ptrends` | ✅ 已实现（`didregress`/`xtdidregress`） | `ws.estat_parallel_trends(fit)` / `result.estat_parallel_trends()`；Stata 打印 `F(1, n_groups-1)` 的**单个线性趋势交互**（`treated_indicator * period`），组与期效应被面板吸收。60 组 / 15 期 / 20 组受处理的种子面板上返回 `statistic`/`df_numerator`/`df_denominator`/`pvalue` 四项，自由度结构为 `(1, 59)`。**此前实现完整但从未导出**，0.3.13 补上导出与结果对象方法。`estat trendplots`/`granger`/`grangerplot`/`bdecomp` 仍未实现，由 `test_didregress_postestimation_gap.py` 的缺席守卫覆盖 |
 | `estat bgodfrey` | ✅ 已实现（线性模型） | `result.estat_bgodfrey()` / `ws.estat_bgodfrey(fit, lags=, nomiss0=)`；公式抄自 `bgodfrey.ado:163-196` 的 `Calc`：辅助回归带原始回归元，`chi2 = e(N)*e(r2)`，滞后残差前 p 个缺失**默认补 0**、`nomiss0` 保持缺失。icecream 实测 `4.237/4.487/4.775/5.099`，`nomiss0` 为 `4.704/5.111/5.053/5.679`，逐值一致。**`time=` 复现 `tsset`**：删 `time==5` 后 Stata 为 `4.220/4.476/4.787/5.048`，按行序则是 `3.286/3.363/3.403/5.084`，并按 `bgodfrey.ado:44` 先打 `Number of gaps in sample = N`。稳健/聚类 VCE、跨单位面板（r(459)）、非 `regress` 拟合（r(321)）一律拒绝 |
-| `estat corrgram` / `corrgram` | ✅ 已实现（数值列 + 条形图） | `result.estat_corrgram()`；AC 为 `Σ(xm·L^k.xm)/Σxm²`（`ac.ado:133-136`），PAC 为残差对前 k 阶滞后**带常数项**回归的第 k 个系数（`pac.ado:128-156`，非 Yule-Walker），条形按 `corrgram.ado` 的 `MkString` 每单位 8 字符、截断取界。**默认阶数是 `max(1, min(int(n/2)-2, 40))`**（`corrgram.ado:18`），与回归的参数个数无关且有 40 上限；旧实现误用 `(n-k)//2`，只在 k=4 时巧合相等，n=758 时会报 377 而非 40。`time=` 支持缺口，缺口处滞后缺失、PAC 打 `.`，并按 `corrgram.ado:47-49` 打 `(note: time series has N gap(s))` |
+| `estat corrgram` / `corrgram` | ✅ 已实现（数值列 + 条形图） | `result.estat_correlogram()`；AC 为 `Σ(xm·L^k.xm)/Σxm²`（`ac.ado:133-136`），PAC 为残差对前 k 阶滞后**带常数项**回归的第 k 个系数（`pac.ado:128-156`，非 Yule-Walker），条形按 `corrgram.ado` 的 `MkString` 每单位 8 字符、截断取界。**默认阶数是 `max(1, min(int(n/2)-2, 40))`**（`corrgram.ado:18`），与回归的参数个数无关且有 40 上限；旧实现误用 `(n-k)//2`，只在 k=4 时巧合相等，n=758 时会报 377 而非 40。`time=` 支持缺口，缺口处滞后缺失、PAC 打 `.`，并按 `corrgram.ado:47-49` 打 `(note: time series has N gap(s))` |
 | `wntestq` | ✅ 已实现 | `result.wntestq()` / `ws.wntestq(...)`；`Q = n(n+2)Σρ̂²/(n-k)`，默认阶数同样取自 `ac.ado:71` 的 `max(1, min(int(n/2)-2, 40))`（旧实现的 `(n-k)//2` 已修正为 40 上限）。接受结果对象或裸数值序列。icecream 实测 `Q 26.1974 / chi2(13)`（默认）与 `Q 16.3718 / p .0895`（`lags(10)`） |
 | `estat vif` | ✅ 已实现（线性模型） | `result.estat_vif()`；公式抄自 `vif.ado`，支持 `uncentered`/`nosort`；无常数模型与非线性模型按 Stata 行为拒绝 |
-| `estat hettest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_hettest()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`。**无变量列表 = 拟合值**（`hettest.ado:110-115`），不是“全部回归元”——这曾是与 Stata 不一致的根因；`rhs=True` 才是全部 `e(b)` 回归元。`variables` 按**原始数据变量名**解析（`rep78` 是原始 1-5 列，df=1），否则按设计列名。估计权重被辅助回归复用（`fweight`/`iweight` 的 `e(N)=sum(w)`）。robust/cluster VCE、pweight 与 `noconstant` 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29；单回归元时按 `hettest.ado:126-128` 静默丢弃。90 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/hettest_auto.json`） |
-| `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_ovtest()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True`。**`noconstant` 拟合按 Stata 拒绝**（`ovtest.ado:7` 的 `_isfit cons` → r(301)"not appropriate after regress, nocons"）；此前默认路径会对这种拟合返回 `F(3,195)=64.86, p=3.9e-29`，即对一个 Stata 根本不肯跑的检验给出五星级拒绝。累计 7 个测试模块、6 批 Stata 实跑对照 |
-| `estat firststage` | ✅ 已实现 | `result.estat_firststage()`；列定义抄自 `ivregress_estat.ado`，含 Shea's partial R²（多内生变量时）。**`r(mineig)` 与 `r(mineigcv)` 已实现**（Cragg-Donald 最小特征值 + Stock-Yogo 三张表逐字抄录），见 §8.20.48 |
-| `estat overid` | ✅ 已实现 | `result.estat_overid()`；Sargan + Basmann（2SLS/LIML）、Hansen J（GMM）、**Wooldridge score（稳健/HAC）**；辅助回归须用**全部工具**（含外生）。LIML 在稳健/HAC 下按 Stata 拒绝，见 §8.20.14、§8.20.30、§8.20.46 |
+| `estat hettest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_heteroskedasticity_test()`；公式抄自 `hettest.ado`，支持 `normal`（默认）/`iid`/`fstat`。**无变量列表 = 拟合值**（`hettest.ado:110-115`），不是“全部回归元”——这曾是与 Stata 不一致的根因；`rhs=True` 才是全部 `e(b)` 回归元。`variables` 按**原始数据变量名**解析（`rep78` 是原始 1-5 列，df=1），否则按设计列名。估计权重被辅助回归复用（`fweight`/`iweight` 的 `e(N)=sum(w)`）。robust/cluster VCE、pweight 与 `noconstant` 按 Stata 行为拒绝。**`mtest()` 已实现**（bonferroni/holm/sidak/noadjust，含 Holm 单调下限），见 §8.20.29；单回归元时按 `hettest.ado:126-128` 静默丢弃。90 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/hettest_auto.json`） |
+| `estat ovtest` | ✅ 已实现（线性模型） | `result.estat_omitted_variables_test()`；公式抄自 `ovtest.ado`，含决定性的 `[0,1]` 标准化步骤；支持 `rhs=True`。**`noconstant` 拟合按 Stata 拒绝**（`ovtest.ado:7` 的 `_isfit cons` → r(301)"not appropriate after regress, nocons"）；此前默认路径会对这种拟合返回 `F(3,195)=64.86, p=3.9e-29`，即对一个 Stata 根本不肯跑的检验给出五星级拒绝。累计 7 个测试模块、6 批 Stata 实跑对照 |
+| `estat firststage` | ✅ 已实现 | `result.estat_first_stage()`；列定义抄自 `ivregress_estat.ado`，含 Shea's partial R²（多内生变量时）。**`r(mineig)` 与 `r(mineigcv)` 已实现**（Cragg-Donald 最小特征值 + Stock-Yogo 三张表逐字抄录），见 §8.20.48 |
+| `estat overid` | ✅ 已实现 | `result.estat_overidentification()`；Sargan + Basmann（2SLS/LIML）、Hansen J（GMM）、**Wooldridge score（稳健/HAC）**；辅助回归须用**全部工具**（含外生）。LIML 在稳健/HAC 下按 Stata 拒绝，见 §8.20.14、§8.20.30、§8.20.46 |
 | `estat endogenous` | ✅ 已实现（全内生变量） | `result.estat_endogenous()`；Durbin + Wu-Hausman、**robwool/acwool（稳健/HAC）**、**regF（增广回归，解锁 cluster）**。LIML 拒绝、GMM 的 C 统计量未实现（有阻塞证据），见 §8.20.15、§8.20.35、§8.20.36、§8.20.47 |
 | `estat classification` | ✅ 已实现（logit/probit） | `result.estat_classification()`；2×2 表 + 9 个百分比，抄自 `lstat.ado`；支持 `cutoff()`，见 §8.20.18 |
-| `estat imtest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_imtest(white=...)`；Cameron-Trivedi 三项分解 + 可选 White 检验，抄自 `imtest.ado`。**自由度取自辅助回归的实际秩，而非列数**——指示变量的平方 `x²==x` 与自身完全共线，Stata 的 `_regress` 会丢弃它，`mpg~weight+foreign` 的 White 检验是 `df=4` 而不是按列数算出的 5（这是此前的缺陷：统计量对、df 与 p 值错）。Stata 默认用 **float** 精度（`imtest.ado:35`），本实现用 double，故与 `,double` 一致到 1e-12、与默认精度差约 1e-8（差异已记录在 fixture 中，不复刻 float32 累加）。20 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/imtest_auto.json`），见 §8.20.19 |
+| `estat imtest` | ✅ 已实现（线性模型，已对 Stata 逐值验证） | `result.estat_information_matrix_test(white=...)`；Cameron-Trivedi 三项分解 + 可选 White 检验，抄自 `imtest.ado`。**自由度取自辅助回归的实际秩，而非列数**——指示变量的平方 `x²==x` 与自身完全共线，Stata 的 `_regress` 会丢弃它，`mpg~weight+foreign` 的 White 检验是 `df=4` 而不是按列数算出的 5（这是此前的缺陷：统计量对、df 与 p 值错）。Stata 默认用 **float** 精度（`imtest.ado:35`），本实现用 double，故与 `,double` 一致到 1e-12、与默认精度差约 1e-8（差异已记录在 fixture 中，不复刻 float32 累加）。20 个用例对照 StataNow 19.5 实跑输出（`tests/conformance/stata_fixtures/imtest_auto.json`），见 §8.20.19 |
 | `estat summarize` | ✅ 已实现 | `result.estat_summarize()`；列定义照 `estat_summ.ado`；`fweight` 改变 Obs 且 sd 等于展开数据。**aweight/pweight/iweight 归一化到 `sum(w)=N`（尺度不变），估计权重自动沿用**，见 §8.20.20、§8.20.34、§8.20.49 |
 | `estat auc` | ✅ 已实现（logit/probit） | `result.estat_auc()`；AUC = Mann-Whitney U/(n₁n₀)，与 `lroc.ado:47-49` 的梯形法等价；`r(N)` 已补，见 §8.20.74 |
-| `estat weakrobust` | ⚠️ 部分实现 | `result.estat_weakrobust()`；**Anderson-Rubin 已实现**（受限 F，闭式可验；其分布不依赖工具强度）。**CLR 刻意拒绝**（需模拟条件分布，Stata 为无源码内置）。过度识别模型默认拒绝（Stata 默认报 CLR），须显式 `ar=True`。`betanull()` 支持按名/按位置，见 §8.20.83 |
+| `estat weakrobust` | ⚠️ 部分实现 | `result.estat_weak_instrument_robust()`；**Anderson-Rubin 已实现**（受限 F，闭式可验；其分布不依赖工具强度）。**CLR 刻意拒绝**（需模拟条件分布，Stata 为无源码内置）。过度识别模型默认拒绝（Stata 默认报 CLR），须显式 `ar=True`。`betanull()` 支持按名/按位置，见 §8.20.83 |
 | `estat mundlak` | ✅ 已实现（xtreg） | `result.estat_mundlak(entity=..., time=...)`；把**组内均值**加入方程后联合检验（`xtreg_postestimation.sthlp:366-370`）。`xtreg_estat.ado:5` 的五个子命令至此齐备。**须显式传 `entity`/`time`**：结果对象保存的是编码后的组标签，不含列名，见 §8.20.84 |
 | `estat szroeter` | ✅ 已实现（线性模型） | `result.estat_szroeter()`；公式逐字抄自 `szroeter.ado:158-178`（`Q = n²/(2(n-1)) · (h-mh)²/vh`，用**秩**而非水平值，因备择假设是「方差随变量**单调**变化」）。支持 `rhs=True` 与 `mtest()` 四种调整（bonferroni/holm/sidak/noadjust）。加权、聚类、非 regress 一律拒绝（`szroeter.ado:13-22`） |
-| `estat esize` | ✅ 已实现（线性模型） | `result.estat_esize()`；`eta2 = R²`（默认）、`epsilon2`、`omega2`。**注意**：`esize.ado` 把算式交给编译内置，公式取自帮助文件所引文献（Kerlinger 1964；Grisson & Kim 2012），已注明来源；eta² 的置信区间用非中心 F（Smithson 2001）。epsilon 与 omega 互斥（`esize.ado:14`） |
+| `estat esize` | ✅ 已实现（线性模型） | `result.estat_effect_size()`；`eta2 = R²`（默认）、`epsilon2`、`omega2`。**注意**：`esize.ado` 把算式交给编译内置，公式取自帮助文件所引文献（Kerlinger 1964；Grisson & Kim 2012），已注明来源；eta² 的置信区间用非中心 F（Smithson 2001）。epsilon 与 omega 互斥（`esize.ado:14`） |
 | `estat moran` | ⚠️ 已实现（**与 Stata 可能数值不同**） | `result.estat_moran(errorlag=W)`；**本机无 Stata 依据**——`estat_moran.sthlp:56-59` 的 Methods and formulas 不在帮助文件内，且无 `estat_moran.ado`（编译内置）。实现的是**标准随机化 Moran 检验**（Moran 1950；Cliff & Ord 1981），p 值对「无空间相关」精确但可能与 Stata 不同。本包无 `spmatrix` 工具链，权重矩阵须由调用者传入 |
 | `suest` | ✅ 已实现（线性模型） | `result.suest(other1, other2, ...)`；把多个拟合堆叠为**一个参数向量 + 联合 sandwich 协方差**（`suest.sthlp:84-88`）。**关键在于交叉块非零**——两个模型用同一批观测时得分相关，块对角堆叠会错误地报零协方差；sandwich 用 `V = B(Σsᵢsᵢ')B` 按**观测逐行**配对才捕获到。前置条件按 `sthlp:99-102`：各模型须能 `predict, score`，线性模型中它等于残差（`regress_postestimation.sthlp:193`），故已为 `regress` 补上 `score` 类型。样本量必须一致，否则拒绝 |
 | `suest, vce(cluster)` | ✅ 已实现 | `result.suest(other, cluster=labels)`；`sthlp:108-109` 允许 `vce(cluster clustvar)`。meat 改为**按簇先聚合得分再取外积**（`Σ_c (Σ_{i∈c}sᵢ)(…)`），这正是捕捉簇内相关的关键。**边界验证**：每个观测自成一簇时结果与不聚类**完全一致**，证明这是真泛化而非另一套公式 |
@@ -186,9 +186,9 @@
 | `didregress` 多期交错 | ⬜ | 仅做标准 2×2 |
 | `stteffects` | ⬜ | 生存处理效应 |
 | `csdid`、`drdid` | ❌ | 用户包，不在 base |
-| `rdrobust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
+| `rd_robust` | ⚠️ 已实现，自动带宽缺 | 点估计与 Stata 精确一致（含 `covs()`）；**`bandwidth=None` 明确拒绝**，因为 CCT 选择器未实现。第 102–105 轮实测 h=17.754（mserd），五种构造全部偏离 10% 以上，其中一种的「吻合」已证伪为两侧发散量的均值巧合。见 `tests/test_rdrobust_bandwidth_gap.py` 与 `test_rdrobust_bw_pilot_artefact.py` |
 | `synth` / `synth2` | ✅ 两者均 E2（`synth` 2026-11-09，`synth2` 2026-11-11） | 第 125 轮确认：`~/ado/plus/s/synth.ado` **931 行可读**，只有 Mata 子程序是二进制（`lsynth_mata_subr.mlib`）。外壳展示了 normalize/regsval/normweights 与 lossfunction 优化；原记「受阻于 `.mlib` 中的嵌套优化器」**已被 P0 实测证伪**：`e(V_matrix)` 可直接导出、`regsval` 是确定性纯函数可辨识、两个内核被精确求解。2026-11-09 落地 `ws.synth`（默认路径 → 扩展功能，E2：逐量对拍 22 份全精度 fixture）。**2026-11-11 `ws.synth2` 落地非图形全部功能**（拟合统计、6 列平衡表、U_wt/V_wt、空间安慰剂含 cutoff 与逐期双侧/右侧/左侧 p 值、时间安慰剂、留一包络，E2：对拍 5 份全精度 fixture，设计与实测界见 `docs/superpowers/specs/2026-11-11-synth2-design.md`）。**仍不做**：两者的一切图形（`figure`/`nofigure`/`savegraph`/`show`/`graphlist`）、Stata `frame()`/`symbol()`、任何参数推断 |
-| `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `teffects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
+| `psmatch` / `pstest` | ⚠️ 点估计精确、推断为空 | `treatment_effects_psmatch` 的 ATET 与 Stata 精确一致（2639.865），但 `se`/`z`/`p`/CI 为 NaN，`variance_matches_stata=False`。AI-robust 方差需局部线性估计量，**不编造**。见 `tests/test_psmatch_inference_status.py` |
 
 #### 3.6.1 报告 P1 清单实测复核（第 144–145 轮）
 
@@ -196,12 +196,12 @@
 
 | 报告条目 | 报告描述 | 当前实测 |
 |---|---|---|
-| C16-01/02/03 | `rdrobust` 无自动带宽、无 `covs` | **`covs()` 已支持且精确**；仅自动带宽仍明确拒绝（五种构造 10–15% 偏离，其中一种「吻合」已证伪为均值假象） |
+| C16-01/02/03 | `rd_robust` 无自动带宽、无 `covs` | **`covs()` 已支持且精确**；仅自动带宽仍明确拒绝（五种构造 10–15% 偏离，其中一种「吻合」已证伪为均值假象） |
 | C15-03 | `psmatch` 无 `caliper` | **`caliper=` 已支持** |
 | C15-01/02 | `psmatch`/`ra`/`nnmatch` 无方差 | 属实且**有意**：三者 `se`/`p`/CI 均为 NaN，`variance_matches_stata=False`。不猜测 AI-robust 方差 |
-| C14-05 | `vecrank` 只支持 `trend(constant)` | **五个 `trend()` 选项全部实现**，k=2/k=3、trace/max 表逐字节匹配 Stata（第 142–143 轮） |
-| C12-05 | `xtreg, mle` 缺失 | **`RandomEffectsMLE` 已实现**，三个方差分量与 Stata 一致（第 112 轮） |
-| C12-11 | `xtserial` 缺失 | **已实现**（第 2026-11-14 轮）。此前记「本环境无 ado、无参照可验证」是**环境限制而非能力边界**：`xtserial` 由 Drukker 维护、不在 SSC 上，用 `net install xtserial, from("http://www.stata.com/users/ddrukker")` 装上 v1.1.0 后即取得完整参照。`xtserial.ado` 全body 仅四行（差分回归 → 残差滞后回归 → 检验 lag == -.5）。lin_1992 实测 `r(corr)=-0.192578492734578`、`r(F)=12.511374216982579`、`r(df_r)=27`、`r(p)=0.001484513025783`，本包逐值一致（corr 差 2.7e-10、F 差 8.4e-09），输出块逐字符一致。见 `tests/test_xtserial.py` |
+| C14-05 | `vec_rank` 只支持 `trend(constant)` | **五个 `trend()` 选项全部实现**，k=2/k=3、trace/max 表逐字节匹配 Stata（第 142–143 轮） |
+| C12-05 | `xtreg, mle` 缺失 | **`PanelRegressMLE` 已实现**，三个方差分量与 Stata 一致（第 112 轮） |
+| C12-11 | `panel_serial` 缺失 | **已实现**（第 2026-11-14 轮）。此前记「本环境无 ado、无参照可验证」是**环境限制而非能力边界**：`panel_serial` 由 Drukker 维护、不在 SSC 上，用 `net install panel_serial, from("http://www.stata.com/users/ddrukker")` 装上 v1.1.0 后即取得完整参照。`panel_serial.ado` 全body 仅四行（差分回归 → 残差滞后回归 → 检验 lag == -.5）。lin_1992 实测 `r(corr)=-0.192578492734578`、`r(F)=12.511374216982579`、`r(df_r)=27`、`r(p)=0.001484513025783`，本包逐值一致（corr 差 2.7e-10、F 差 8.4e-09），输出块逐字符一致。见 `tests/test_xtserial.py` |
 | C08-05 | `prais, corc` 缺失 | **`corc=` 已实现**，与 Stata 一样在 icecream.dta 上不收敛且 rho 差 0.005%（第 111 轮） |
 | C13-06 | `irf create` / `.irf` 体系缺失 | **OIRF/FEVD/irf_table 数值早已验证**；第 144 轮新增 `irf_create()` 写出 23 列 `.dta`，5 个数值列与 Stata 精确一致。**限制**：`pandas.to_stata` 无法写 `_dta[]` characteristics，故 Stata 的 `irf table` 仍读不了（r(498)），是数值导出而非 drop-in `.irf` set |
 | C18-01/02 | `synth`/`synth2` 整章缺失 | **复核当时**：`synth` 已于 2026-11-09 落地（B 档 / E2，`ws.synth`，六个 `e()` 矩阵对拍 6 份全精度 fixture），而 `synth2` **仍缺**（当时记为图形/placebo 包装器，有意不做）。**后续补齐**：2026-11-11 `synth` 扩展功能全量落地；同日 `synth2` 非图形全部功能落地（E2，对拍 5 份全精度 fixture，见 `docs/superpowers/specs/2026-11-11-synth2-design.md`），现两者仅图形（`figure`/`savegraph`/`show`）与 Stata `frame()`/`symbol()` 不做。原记「受阻于二进制 `.mlib` 中的嵌套优化器」已由 P0 实测证伪：两个 Mata 内核被精确求解、`e(V_matrix)` 可直接导出。详见 §3.6.4 |
@@ -214,9 +214,9 @@
 |---|---|---|
 | X01 `kpss` | 0.12 / 0.50 | **第 146 轮修复排版**：Maxlag 行区分自动/显式、`%.3g` 去前导零、临界值单行、空行为单空格。四种情形（`inf` 默认/显式 maxlag、`dinf`、`notrend`）与 Stata 逐字节一致。数值本就正确 |
 | X05 `format_ereturn_list` | 0.58 / 1.00 | **第 156 轮补齐结构缺口**：`matrices:` 现在有 `e(beta) : 1 x 3`（标准化系数 `.55469752/.18441586/.1487096`，与 `mat list e(beta)` 精确一致），`functions:` 现在有 `e(sample)`（Stata 只打印名字，无值）。四行逐字节匹配。**仍保留的差异**：macros 顺序不同，且 westata 额外提供 `e(sigma)`/`e(aic)`/`e(bic)`/`e(_aic_is_stata)` |
-| C13-04 `varstable` | 0.27 / 0.00 | **误判**：第 147 轮验证 11/11 行与 Stata 逐字节一致，含复特征值与两位结论行。见 `tests/test_varstable_stata.py` |
+| C13-04 `var_stable` | 0.27 / 0.00 | **误判**：第 147 轮验证 11/11 行与 Stata 逐字节一致，含复特征值与两位结论行。见 `tests/test_varstable_stata.py` |
 | C13-08 季节哑变量回归 | 0.17 / 0.07 | **数值全对，差距在排版**：第 183 轮确认季节性拟合的每个系数与标准误都与 Stata 一致；`C(var)[T.level]` 的 22 字符存储名原样进标签列，把表撑到 87 宽（Stata 78）。改为分组头 + 水平行的两段结构后恢复 78。见 `tests/test_factor_group_rendering.py` |
-| C14-04 `varsoc` | 0.14 / 0.84 | **已解决**（第 178–180 轮）：LL/AIC/HQIC/BIC/FPE 五列全部精确。见下方 3.6.3 与 `tests/test_varsoc_fixed_window.py` |
+| C14-04 `var_select_order` | 0.14 / 0.84 | **已解决**（第 178–180 轮）：LL/AIC/HQIC/BIC/FPE 五列全部精确。见下方 3.6.3 与 `tests/test_varsoc_fixed_window.py` |
 | C08-07 `corrgram` | 0.00 / 0.91 | **已解决**（第 185–186 轮）：16/16 行逐字节一致。缺口是两条条形图列根本没画；第 185 轮靠试凑只做到 11/16，**第 186 轮读 `corrgram.ado` 的 `MkString` 一步解决**：`ve = int(8*corr) + 9`（**8 字符/单位、截断**），且我第 185 轮抄错了一个参照值（`-.0934` Stata 画 0 笔，不是 1 笔）。见 `tests/test_corrgram_layout.py` |
 
 **X05 剩余差异是有意保留的**：`e(beta)`/`e(sample)` 已补齐，但**不会为了完全一致而删除额外标量**——`e(aic)`/`e(bic)` 等是 westata 额外提供的信息，删掉它们会降低包自身的可用性。macros 顺序同理（Stata 的宏集合也依赖具体估计命令）。
@@ -238,7 +238,7 @@
 
 **结论**：这是 statsmodels 状态空间 MLE 与 Stata 状态空间 MLE 在**参数化或似然定义**上的差异。**没有继续在 `arima` 上调参**——20+ 次试探后仍无方向，继续下去就是凑数。这两项都**没有声称已修**。
 
-顺带确认了一条长期可用的事实：**`D:\Program Files\StataNow19\ado\base` 下有 3962 个可读 `.ado` 文件**，`varsoc` 的 FPE 就是靠 `var.ado:296` 解决的。遇到口径不明的命令，应先去这里找，而不是拟合。
+顺带确认了一条长期可用的事实：**`D:\Program Files\StataNow19\ado\base` 下有 3962 个可读 `.ado` 文件**，`var_select_order` 的 FPE 就是靠 `var.ado:296` 解决的。遇到口径不明的命令，应先去这里找，而不是拟合。
 
 #### 3.6.3 剩余缺口的三种终结状态（第 149 轮）
 
@@ -255,19 +255,19 @@
 - Stata 自身的 `mata describe using <mlib>` **只列出函数名与字节数**（`emptymat()` 164 bytes、`normalize()` 500 bytes …），**没有导出源码的选项**；`mata describe` 也只有 `using` 一种形式。
 
 **结论**：A 类不是「再找找源码」的问题，而是**源码根本不存在于安装目录中**。除非有第三方反编译器（本环境没有，且即便有也只是还原字节码语义），否则这些命令不可复现。这把 A 类与 B 类的处理统一了：两者都是**信息不可得**，区别只在于 B 类连参照输出都没有。
-| **B. 本环境无参照** | `rddensity`（`xtserial` 已于 2026-11-14 解除：装上 Drukker 的 ado 后取得参照并实现，见 C12-11） | 无 ado、Stata 报 r(111)/r(199)，无法取得任何参照输出 | **不可验证，保持拒绝**，不写猜测实现 |
-| **C. 有明确算法但规模大 / 有意不做** | `rdrobust` 自动带宽、`teffects` AI-robust 方差、`varsoc` 信息准则表 | 五种带宽构造 10–15% 偏离（一种「吻合」证伪为均值假象）；AI 方差见下方核实；`varsoc` 见下方第 177 轮核实 | **已记录原因**，等有明确需求或可验证算法再做 |
+| **B. 本环境无参照** | `rddensity`（`panel_serial` 已于 2026-11-14 解除：装上 Drukker 的 ado 后取得参照并实现，见 C12-11） | 无 ado、Stata 报 r(111)/r(199)，无法取得任何参照输出 | **不可验证，保持拒绝**，不写猜测实现 |
+| **C. 有明确算法但规模大 / 有意不做** | `rd_robust` 自动带宽、`teffects` AI-robust 方差、`var_select_order` 信息准则表 | 五种带宽构造 10–15% 偏离（一种「吻合」证伪为均值假象）；AI 方差见下方核实；`var_select_order` 见下方第 177 轮核实 | **已记录原因**，等有明确需求或可验证算法再做 |
 
-**第 177 轮对 `varstable` 的核实**（`C13-04`，布局 0.27 / 数值覆盖 **0.00**）。与实时 Stata 比对，输出 **11/11 行逐字节一致**，包括共轭复根对 `.2258777 ± .6292178i` 的同一个模数 `.668533` 和两句结论。
+**第 177 轮对 `var_stable` 的核实**（`C13-04`，布局 0.27 / 数值覆盖 **0.00**）。与实时 Stata 比对，输出 **11/11 行逐字节一致**，包括共轭复根对 `.2258777 ± .6292178i` 的同一个模数 `.668533` 和两句结论。
 
 **0.00 分的原因是数据准备，不是算法**：`macro_swatson.dta` 含缺失值，Stata 建 VAR 时自动丢弃，`ws.VAR` 则明确拒绝并报 `var: the series contains missing values`。不做 `dropna()` 就直接比对，会在产出任何数字前失败。拒绝是**有意设计**（静默丢行比报错更糟），但意味着 Stata 的隐式整行删除必须由调用方显式完成。守卫同时固定这两件事。
 
-**第 177 轮对 `varsoc` 的核实**（`C14-04`，布局 0.14 / 数值覆盖 0.84）。实测发现这不是排版差距，而是**两条互相独立的实现分歧**：
+**第 177 轮对 `var_select_order` 的核实**（`C14-04`，布局 0.14 / 数值覆盖 0.84）。实测发现这不是排版差距，而是**两条互相独立的实现分歧**：
 
 - **样本口径不同**：Stata 在比较 0–4 阶时使用**同一样本**（N = 198），westata 逐阶使用各自样本（2 阶时 N = 166）。这直接改变了 AIC 的缩放 —— lag 2 上 Stata 给 `-14.8625`，westata 给 `-20.538232`，差值 5.6757 全部来自样本量。
 - **表内容不同**：Stata 的框线表含 `LL / LR / df / p / FPE / AIC / HQIC / SBIC` 八列并在最优阶标注 `*`，westata 只输出四个准则的纯文本。
 
-**结论**：`varsoc` 需要重写（统一样本 + 完整表 + LR 检验 + 星号标记），是一个独立工作量，不是修一个数字。本轮**没有动它**，也没有声称已修。同一数据上的 `varstable` 反而在第 177 轮验证为 11/11 逐字节一致 —— 见下条。
+**结论**：`var_select_order` 需要重写（统一样本 + 完整表 + LR 检验 + 星号标记），是一个独立工作量，不是修一个数字。本轮**没有动它**，也没有声称已修。同一数据上的 `var_stable` 反而在第 177 轮验证为 11/11 逐字节一致 —— 见下条。
 
 **第 178 轮补充（尝试重写，未攻克，但把口径钉住了）**。已确证的事实：
 
@@ -304,11 +304,11 @@ fpe = ((T + eqparm)/(T - eqparm))**K * detsig_ml
 
 被拆成两步。
 
-**`dfgls` 已于第 154 轮完全移出本表**：1%/5%/10% 临界值列与三行页脚全部实现，`dfgls lrgnp` 与 `dfgls lrgnp, notrend` 两种情形各 20/20 行逐字节匹配 Stata。唯一残留是 no-trend 的 `GetCritM` 响应面在最大 lag 处 5% 列偏高约 0.013（`p/N=0.196` 位于拟合区域边缘，无整数 lag 可精确复现），已在 `_crit_m` 中就地注明。
+**`df_gls` 已于第 154 轮完全移出本表**：1%/5%/10% 临界值列与三行页脚全部实现，`df_gls lrgnp` 与 `df_gls lrgnp, notrend` 两种情形各 20/20 行逐字节匹配 Stata。唯一残留是 no-trend 的 `GetCritM` 响应面在最大 lag 处 5% 列偏高约 0.013（`p/N=0.196` 位于拟合区域边缘，无整数 lag 可精确复现），已在 `_crit_m` 中就地注明。
 
 对 A 类的补充实测（第 149 轮）：`rcm.ado` 的 1126 行里，模型选择的 Mata 调用全部指向编译函数（`rcm_levelsofsel` 等），**ado 层没有可抄的选择逻辑**。`rcm` 给定 `selected=` 时全部精确（ATT 1e-7 内），只有自动 forward 选择与 Stata 不一致——第 149 轮穷举证实 Stata 选的是 RSS 更差的模型，说明其搜索空间受限，而该空间不可读。
 
-**推论（第 152 轮修正，第 159 轮补证）**：A 类不是「再读一遍 ado 就能解决」的问题。但**不要把「重建失败」直接归入 A 类**——第 151 轮证明 `dfgls` 曾被错误地放在这里，五轮失败的真正原因却是**默认选项写反**（Stata 默认 `trend`，包默认 `notrend`），与 Mata 毫无关系。判断 A 类的正确依据是**确认执行的确实是 `.mlib` 里的编译函数**，而不是「重建结果对不上」。
+**推论（第 152 轮修正，第 159 轮补证）**：A 类不是「再读一遍 ado 就能解决」的问题。但**不要把「重建失败」直接归入 A 类**——第 151 轮证明 `df_gls` 曾被错误地放在这里，五轮失败的真正原因却是**默认选项写反**（Stata 默认 `trend`，包默认 `notrend`），与 Mata 毫无关系。判断 A 类的正确依据是**确认执行的确实是 `.mlib` 里的编译函数**，而不是「重建结果对不上」。
 
 第 159 轮补上了此前一直缺失的那一环：**A 类的「源码不可得」现在是实测结论，不是猜测**。`.mlib` 不含任何 Mata 语法、Stata 也不提供导出源码的命令。因此 A 类的正确表述是「信息不可得」，与 B 类同源；两者的唯一差别是 B 类连参照输出都拿不到，而 A 类至少能用 Stata 跑出参照值来验证未来的实现。**但既然无法读到算法，写出来的实现就无法逐项验证，按本项目的纪律仍不交付。**
 
@@ -373,18 +373,18 @@ Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点�
 
 | Stata | 状态 | 说明 |
 |---|---|---|
-| `var` 的 `irf` / `fevd` / `vargranger` | ⚠️ | 有封装，未与 Stata 对拍 |
+| `var` 的 `irf` / `fevd` / `var_granger` | ⚠️ | 有封装，未与 Stata 对拍 |
 | `var` 的 `Sample:` 行（日期型时间轴）| ✅ 已修（2026-11-19）| 原先 `Sample:` 取值走 `float(datetime64)`，静默变成**纳秒整数**（`1961-04-01` → `-2.8e+17`），19 位数字还把 48 字符字段撑爆、挤掉右侧 `Number of obs`。现按**类型**格式化：`datetime64` 依间距推断频率后输出 `1990q2` / `1990m2` / `1990w2` / `1990h2` / `02jan1990`，年型 `1981`，数值型沿用原逻辑，超长标签截断加省略号。六种频率逐字符对上 StataNow 19.5 的 `tsset` 输出，见 `tests/test_var_sample_labels.py` |
 | `varbasic` / `irf table` | ✅ 已实现（E3） | `ws.varbasic(frame, vars, lags=..., time=...)` 估计 VAR 并登记 IRF；`ws.irf_table(...)` 出表。**估计块对两份 StataNow 19.5 实跑逐字节相同**（39 行零差异）。四处载重细节：残差协方差按 **T** 而非 T−k 归一（用 T−k 得 se 0.1514890 对 Stata 的 0.1468267，差 3.2%）；`lags(p)` **只保留 p 期**而非 `1..p`（非 p 倍数步响应恒为 0），裸 `varbasic` 才是 L1+L2；`irf` **只打印估计块**，响应须 `irf table`；**滞后按时间轴而非行位置取**——`drop if year == 1989` 时行位移版留 33 个观测（Stata 32），并把 1990 配上 1988 这一整年，`L1` 因此偏离 `.5016988`。`time` 参数可选（不传只影响 `Sample:` 行），传了则把「`time` 列不存在」「时间列含缺失」「周期重复」从静默降级改为按 `tsset` 拒绝 |
 | `arima` 的季节项 | ⚠️ | 参数已支持，未验证 |
 | `arch` 的 EGARCH / GJR | ⚠️ | 能跑，未单独验证 |
 | `vec` 的漂移项 | ⚠️ | α 精确；漂移项未对拍（见 §8） |
-| `vecrank` 的固定 N 精确临界值 | ⬜ | 未抄录 IPS/Table 2；请求时抛错 |
+| `vec_rank` 的固定 N 精确临界值 | ⬜ | 未抄录 IPS/Table 2；请求时抛错 |
 | `svar` | ⬜ | 结构 VAR |
-| `vecstable` / `vecnorm` | ⬜ | |
-| `newey` | ✅ 已实现 | `ws.newey(y ~ x, lag=#)`；`lag()` 必需，Bartlett 核；`Checkt` 三种间隔判定（`tflag==2` 即便 force 也拒绝）；`e()` 只有 7 个标量；`predict` 限 `xb/index/stdp/residuals`。见 §8.20.50 |
+| `vec_stable` / `vecnorm` | ⬜ | |
+| `newey_west` | ✅ 已实现 | `ws.newey_west(y ~ x, lag=#)`；`lag()` 必需，Bartlett 核；`Checkt` 三种间隔判定（`tflag==2` 即便 force 也拒绝）；`e()` 只有 7 个标量；`predict` 限 `xb/index/stdp/residuals`。见 §8.20.50 |
 | `prais` | ✅ 已实现（含 `corc`） | `ws.prais(frame, formula, corc=...)`；PW 与 CORC 都在。**在 icecream.dta 上 `corc` 与 Stata 一样不收敛**（Stata 自己报 `r(430)`），rho 差 0.005%。`ConvergenceError` 现在携带 `.rho`，与 Stata 先打印 rho 再报错的行为对齐。见第 111 轮 |
-| `dfgls` / `ers` | ✅ 已实现（第 151 + 154 轮） | `ws.dfgls(series)` 默认即 Stata 默认（**有趋势**，`cbar=-13.5`）；`notrend=True` 对应 `dfgls, notrend`。**两种情形的表各 20/20 行逐字节匹配 Stata**，含 1%/5%/10% 临界值列与三行页脚（SC/MAIC/Opt lag）。根因曾是**默认选项写反**——包默认 `trend=False` 实现的是 `notrend`，却与 Stata 默认输出对比，五轮排查因此走偏。唯一残留：no-trend 的 `GetCritM` 在最大 lag 处 5% 列偏高约 0.013，已在 `_crit_m` 注明 |
+| `df_gls` / `ers` | ✅ 已实现（第 151 + 154 轮） | `ws.df_gls(series)` 默认即 Stata 默认（**有趋势**，`cbar=-13.5`）；`notrend=True` 对应 `df_gls, notrend`。**两种情形的表各 20/20 行逐字节匹配 Stata**，含 1%/5%/10% 临界值列与三行页脚（SC/MAIC/Opt lag）。根因曾是**默认选项写反**——包默认 `trend=False` 实现的是 `notrend`，却与 Stata 默认输出对比，五轮排查因此走偏。唯一残留：no-trend 的 `GetCritM` 在最大 lag 处 5% 列偏高约 0.013，已在 `_crit_m` 注明 |
 | `sspace` / `ucm` / `mgarch` / `dsge` | ❌ | 见 §7 |
 
 ### 3.9 重抽样范围
@@ -485,7 +485,7 @@ Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点�
 | `ivregress gmm` | 系数精确（4.9e-16），但稳健标准误差 **2.9e-2**；GMM 权重矩阵构造与 Stata 不同 |
 | `arch` | alpha 差 6.9e-3，均值常数差 **3.6e-2**；Stata 默认用 OPG 标准误 |
 | `pperron` | 差 1.6e-2，超出 Stata 显示精度，可能是默认滞后截断不同 |
-| `vecrank, lags(1)` | 差 0.4%；无滞后差分时的边界处理 |
+| `vec_rank, lags(1)` | 差 0.4%；无滞后差分时的边界处理 |
 | `vec` 的漂移项 | westata `[-0.0227, -0.0324]` vs Stata `[-0.0257, -0.0025]`；β 归一化已一致，属重参数化问题 |
 | `arima` | 4.8e-5，优化器停止点差异 |
 | `var` 的 IRF/FEVD/Granger | 有封装，未对拍 |
@@ -510,7 +510,7 @@ Nelder-Mead + SLSQP，自述「权重第三位小数、点估计几个百分点�
 |---|---|
 | DID 协变量列索引错位 | 从已过滤的名字列表取索引，导致截距（全 1）成为唯一协变量；吸水后零方差，x1 系数变 0，`treated` 从 1.186 悄悄变成 1.154 |
 | `_absorb` 的转置启发式 | `shape[0] != n` 时转置，把 `(n,1)` 变成 `(1,n)`，吸收了错误的轴 |
-| `teffects ra` 影响函数 | OLS 残差与设计正交，模型误差项**恒为零**；只用它们会使标准误小 33 倍 |
+| `teffects ra` 影响函数 | Regress 残差与设计正交，模型误差项**恒为零**；只用它们会使标准误小 33 倍 |
 | `nl` 的 Total SS 应**不中心化** | Stata 只在有加性参数时中心化；`{b0}*exp(...)` 没有，故 Total = `sum(y²)` = 1017.4143，非 406.7919 |
 | `frontier` 缺 `/lnsig2v`、`/lnsig2u` | 方差分量的推断行完全缺失，也无 Wald χ² 与边界 LR |
 
@@ -543,7 +543,7 @@ M 估计量：`psi = −A⁻¹m`，`Var = mean(psi²)/n`（用 Stata 的 `1/n`�
 | IPW ATE se | 0.1632 | **0.09392416** | 把倾向得分当固定 |
 | AIPW ATE se | 0.06416 | **0.06250844** | 漏了系数影响函数 |
 
-关键细节：OLS 残差与设计**正交**，所以 RA 的 plug-in 项**恒为零**——
+关键细节：Regress 残差与设计**正交**，所以 RA 的 plug-in 项**恒为零**——
 只用那些项的影响函数无论怎么缩放都不可能对。
 
 ## 8.4 P10 的两处修正与一条方法论教训
@@ -569,7 +569,7 @@ M 估计量：`psi = −A⁻¹m`，`Var = mean(psi²)/n`（用 Stata 的 `1/n`�
 登记册里的"已知差距"必须意味着"已查证且不可约"，不能意味着"我在这里放弃了"。
 
 **修正 3：我的任务书本身错了。**
-我告诉实现者"`mvreg` 的 VCE 不同于 OLS"。**对角元完全相同**——
+我告诉实现者"`mvreg` 的 VCE 不同于 Regress"。**对角元完全相同**——
 Stata 两种算法都报 .04886691，差异只在非对角块
 （`V[0,4] = 0.0013157 = 0.556·√(V₀₀V₄₄)`）。
 实现者按我的要求写了测试、发现它失败、然后改测试而非改代码——这是正确的判断。
@@ -633,7 +633,7 @@ Bootstrap 的方差是随机数流的函数，Stata 的 RNG 不是 numpy 的。*
 
 ### 最有价值的一条：`vec` 的滞后 off-by-one 犯了两次
 
-`vecrank` 里早已诊断并修正过「Stata `lags(#)` → `k_ar_diff = # - 1`」，
+`vec_rank` 里早已诊断并修正过「Stata `lags(#)` → `k_ar_diff = # - 1`」，
 但**没有传导到同一个类的 `fit()`**。
 
 结果：同一个 `VECM` 类里两个方法对「一个 lag 是什么」的理解不一致。
@@ -717,7 +717,7 @@ e(vcetype)   = OPG
 | `se(beta)` | 3.4e-02 | **2.4e-04** | **140×** |
 | `se(omega)` | 1.6e-02 | **2.7e-04** | 60× |
 
-再从手册查到 `arch0(xb0)` 是默认（priming = OLS 残差方差，不是无条件方差），系数差降到 **1.4e-4**。
+再从手册查到 `arch0(xb0)` 是默认（priming = Regress 残差方差，不是无条件方差），系数差降到 **1.4e-4**。
 
 **剩余**：Stata 停在自己的收敛判据（`e(ic) = 7`），要复现它的停止点需要 `ml` 的精确迭代规则。
 参数差 1.4e-4 而似然差 2.8e-03，正是「两个优化器停在一个平坦曲面上的邻近不同点」的特征。
@@ -1032,7 +1032,7 @@ bootstrap VCE 在数百 reps 下**不可能**与 Stata 逐位一致——估计�
 ### 算法（`xtgls.ado` `mc1` + `_crcar1.ado` `regress` 分支）
 
 ```
-1. 原始数据 OLS，取残差 e
+1. 原始数据 Regress，取残差 e
 2. 每个面板：rho_i = Σ(e_t · e_{t-1}) / Σ(e_{t-1}²)      ← 无截距最小二乘
 3. 跨面板合并成【一个】共同 rho，按面板观测数加权：
        rho = Σ_i rho_i · N_i / Σ_i N_i
@@ -1239,7 +1239,7 @@ Stata 的 `e(ic)` 是 **AIC/BIC 的惩罚项**（参数数 + 1），fixture 实�
 
 #### 顺带修好的渲染
 
-`xtlogit, pa` 是 GEE（无似然），此前因 `e(r2_p)` 缺失而落进 OLS 分支、
+`xtlogit, pa` 是 GEE（无似然），此前因 `e(r2_p)` 缺失而落进 Regress 分支、
 打印空的 `R-squared` / `Root MSE`。第 1 轮的 `_HEADER_BLOCK` 已把它标为
 `none`，本轮实测确认它现在只打印 `Wald chi2` 与系数表。
 
@@ -1313,7 +1313,7 @@ Mean VIF = 各 VIF 的算术平均
   `not appropriate after regress, nocons; use option uncentered`。
   westata 同样抛 `ValueError` 并提示 `uncentered=True`。
 - **非线性模型**：`estat vif` 经 `regress_estat` 到达 `vif.ado`，
-  辅助回归按构造是 OLS，所以对 `logit` 等抛 `NotImplementedError`。
+  辅助回归按构造是 Regress，所以对 `logit` 等抛 `NotImplementedError`。
 
 近共线时 `1-R²` 在双精度下留下极小正残差，VIF 得到 4.5e15 这样的
 **有限大数**而非 `inf`，因此 `Mean VIF` 仍可计算、输出仍可读
@@ -1323,7 +1323,7 @@ Mean VIF = 各 VIF 的算术平均
 
 ### 8.20.9 第 6 轮：`estat hettest`（Breusch-Pagan / Cook-Weisberg）
 
-`result.estat_hettest()` 提供 Stata 的 `estat hettest`。算法抄自
+`result.estat_heteroskedasticity_test()` 提供 Stata 的 `estat hettest`。算法抄自
 `hettest.ado`（StataNow 19.5, v3.4.4）：
 
 ```
@@ -1370,7 +1370,7 @@ df = e(df_m)
 
 ### 8.20.10 第 7 轮：`estat ovtest`（Ramsey RESET 设定检验）
 
-`result.estat_ovtest()` 提供 Stata 的 `estat ovtest`。算法抄自
+`result.estat_omitted_variables_test()` 提供 Stata 的 `estat ovtest`。算法抄自
 `ovtest.ado`（StataNow 19.5, v2.7.0）的默认 `freset` 路径：
 
 ```
@@ -1537,7 +1537,7 @@ CAIC = -2·ll + df·(log(N)+1)
 
 ### 8.20.13 第 10 轮：`estat firststage`（IV 第一阶段诊断）
 
-`result.estat_firststage()` 提供 Stata 的 `estat firststage`。列定义抄自
+`result.estat_first_stage()` 提供 Stata 的 `estat firststage`。列定义抄自
 `ivregress_estat.ado` 的 `FirstStage` 程序：
 
 | 列 | 定义 |
@@ -1591,7 +1591,7 @@ F=0.45；强工具场景得 partial R²=0.90、F=4445。方向正确。
 
 ### 8.20.14 第 11 轮：`estat overid`（过度识别检验）
 
-`result.estat_overid()` 提供 Stata 的 `estat overid`。公式抄自
+`result.estat_overidentification()` 提供 Stata 的 `estat overid`。公式抄自
 `ivregress_estat.ado` 的 `OverID2sls`：
 
 ```
@@ -1614,14 +1614,14 @@ GMM     → Hansen's J（即 e(J)，estimator 已存）
 
 `ado` 写的是 `N·(1 − rss_aux/rss_main)`，而不是常见的 `N·R²`。
 二者在**此处恰好相等**，因为 `rss_main` 是残差序列的**中心化总平方和**
-（OLS 的 `e(rss)` 就是 `Σe²`，而辅助回归的 TSS 也是 `Σ(e−ē)²`，
+（Regress 的 `e(rss)` 就是 `Σe²`，而辅助回归的 TSS 也是 `Σ(e−ē)²`，
 在 `ē≈0` 时两者相同）。测试
 `test_sargan_equals_n_times_r2_of_the_auxiliary` 显式验证了这个恒等式。
 
 #### GMM 报的是 Hansen J，不是 Sargan
 
 Sargan 假设同方差，J 不假设。`ivregress_estat.ado:428-436` 对 GMM 报
-`e(J)`。所以 `estat_overid` 在 GMM 结果上返回 `test="Hansen J"` 且
+`e(J)`。所以 `estat_overidentification` 在 GMM 结果上返回 `test="Hansen J"` 且
 `basmann=None`——**用 Sargan 冒充 J 会是错误的**。
 
 #### 已验证
@@ -1649,7 +1649,7 @@ Sargan 假设同方差，J 不假设。`ivregress_estat.ado:428-436` 对 GMM 报
 
 ```
 uc    = 2SLS 残差（一致模型）
-ue    = 对 exog + endog 做 OLS 的残差（有效模型，当全部内生变量都被检验时）
+ue    = 对 exog + endog 做 Regress 的残差（有效模型，当全部内生变量都被检验时）
 USSR  = Σue²
 uePue = (ue ~ exog + endog + addlinst, noconstant) 的 e(mss)
 ucPuc = (uc ~ exog + addlinst, noconstant) 的 e(mss)
@@ -1686,7 +1686,7 @@ dfFdenom = N − k − df
 
 **仍未做**：`estat endogenous` 的**部分集检验**
 （`estat endogenous varlist`，只检验部分内生变量 —— 此时有效模型是受限 2SLS
-而非 OLS，代码路径在 `Endog2sls:1160-1170`）；robust 情形的
+而非 Regress，代码路径在 `Endog2sls:1160-1170`）；robust 情形的
 `regF`/`robwool`/`acwool` 变体（`:1253-1300`）。
 
 ---
@@ -1710,18 +1710,18 @@ dfFdenom = N − k − df
 
 > `e(F_f)`/`e(p_f)`：需要实体效应本身，linearmodels 不返回，故留空而非近似。
 
-**这是错的。** 读 `xtreg_fe.ado:505-524` 后发现三者都来自**一次普通 OLS**：
+**这是错的。** 读 `xtreg_fe.ado:505-524` 后发现三者都来自**一次普通 Regress**：
 
 ```stata
 scalar `r2'  = 1 - e(rss)/e(tss)              // 组内 R²
-quietly _regress `y' `xvars' if `touse'       // 普通 OLS
+quietly _regress `y' `xvars' if `touse'       // 普通 Regress
 local r2c = e(r2)
 ereturn scalar r2_c = `r2c'
 ereturn scalar F_f = ((`r2'-`r2c')/e(df_a))/((1-`r2')/e(df_r))
 ereturn scalar p_f = fprob(e(df_a), e(df_r), e(F_f))
 ```
 
-`F_f` 是**组内 R² 与混合 OLS R² 的比较**，按吸收自由度缩放——**完全不需要实体效应**。
+`F_f` 是**组内 R² 与混合 Regress R² 的比较**，按吸收自由度缩放——**完全不需要实体效应**。
 
 **教训（第 8 次同型）**：我曾用"linearmodels 不返回实体效应"给一个**可实现的量**
 披上了"结构限制"的外衣。这与 §8.4 修正 1（把 `ddof` 错误写成"不可约的约定"）
@@ -1729,9 +1729,9 @@ ereturn scalar p_f = fprob(e(df_a), e(df_r), e(F_f))
 
 #### `r2_c` 不能与 `r2` 简单比较
 
-`xtreg, fe` 的 `e(r2)` 是**组内** R²，而 `r2_c` 是**混合 OLS** R²。
+`xtreg, fe` 的 `e(r2)` 是**组内** R²，而 `r2_c` 是**混合 Regress** R²。
 我最初的测试断言 `r2_c >= r2`，在测试面板上失败（0.717 < 0.919）——
-**实现是对的，断言错了**。已改为直接复算混合 OLS 的 R² 来对照。
+**实现是对的，断言错了**。已改为直接复算混合 Regress 的 R² 来对照。
 
 #### 新增的结构标志
 
@@ -1835,7 +1835,7 @@ stdr     = rmse · √(1−h)          ← fpredict.ado:62 "Std. err. of the res
 
 ### 8.20.19 第 16 轮：`estat imtest`（Cameron & Trivedi IM 检验）
 
-`result.estat_imtest()` 提供 Stata 的 `estat imtest`。实现抄自
+`result.estat_information_matrix_test()` 提供 Stata 的 `estat imtest`。实现抄自
 `imtest.ado`（StataNow 19.5, v2.1.5）：
 
 ```
@@ -1868,7 +1868,7 @@ total  = chi2_h + chi2_s + chi2_k
 
 #### 第 202 轮修复：自由度必须取实际秩，不是列数
 
-用户报告 `estat_imtest(white=True)` 与 `estat imtest, white` 不一致。实测后
+用户报告 `estat_information_matrix_test(white=True)` 与 `estat imtest, white` 不一致。实测后
 统计量本身已经对到 1e-8（那 1e-8 是 Stata 默认 float 精度造成的，见下），
 **真正的错误在自由度**：
 
@@ -2028,7 +2028,7 @@ Var_w / Var_unw = c(N−1)/(cN−1)     （常数权重 c）
 
 > **后续状态（第 22、24 轮）：第 1、2 项均已实现，当时的理由都是错的。**
 > - `F_absorb`/`p_absorb`/`r2_c`：第 22 轮补齐（`areg` 达 22/22），见 §8.20.25。
->   "PyFixest 不返回吸收效应"是真的，但**不需要**吸收效应——只需混合 OLS 的 R²。
+>   "PyFixest 不返回吸收效应"是真的，但**不需要**吸收效应——只需混合 Regress 的 R²。
 > - `N_cdf`/`N_cds`：第 24 轮补齐（`logit`/`probit` 达 20/20），见 §8.20.27。
 >   语义在 `logit.sthlp:243-244` 里写得很清楚，不是"需先定义"。
 >
@@ -2194,7 +2194,7 @@ Treatment model: none
 
 #### 一个 API 陷阱
 
-`XtUnitroot` 的 `test=` 是**构造函数**参数，不是 `fit()` 的。
+`PanelUnitroot` 的 `test=` 是**构造函数**参数，不是 `fit()` 的。
 
 我第一版写 `fit(method='llc')`，Python 静默接受了未知关键字（被 `**kwargs` 吞掉），
 **返回了 `ips` 的结果**——因为默认值就是 `ips`。这类"参数名错了但没报错"的
@@ -2204,7 +2204,7 @@ Treatment model: none
 
 ### 8.20.25 第 22 轮：`areg` 的 `F_absorb`/`p_absorb`/`r2_c`（收回一处"已知缺口"）
 
-第 18 轮我把这三个键登记为"需要混合 OLS R²，PyFixest 不返回吸收效应，故留空"。
+第 18 轮我把这三个键登记为"需要混合 Regress R²，PyFixest 不返回吸收效应，故留空"。
 **这个判断错了两次：**
 
 1. 第 13 轮已在 `xtreg, fe` 里实现过同一套（那里叫 `F_f`/`p_f`/`r2_c`）。
@@ -2228,7 +2228,7 @@ p_absorb = fprob(df_a, df_r, F_absorb)
 
 第一版我用 `model._X` 当设计矩阵，得 `r2_c = 0.9187`。
 
-**但真正的 pooled OLS R² 是 0.7174。** 原因：PyFixest 的 `_X` 已经**去掉吸收效应**
+**但真正的 pooled Regress R² 是 0.7174。** 原因：PyFixest 的 `_X` 已经**去掉吸收效应**
 （demeaned），在它上面回归得到的是**组内** R²，不是混合 R²。而 0.9187 恰好接近
 `e(r2) = 0.9497`，所以看起来完全合理。
 
@@ -2543,7 +2543,7 @@ A/B 对比时看到"两法一致"，差点得出"零填充无害"的结论。
 #### 问题三：HAC 路径根本不可达
 
 `SUPPORTED_COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster")` ——
-**没有 HAC**。所以 `estat_overid` 永远收不到 HAC 结果，prewhitening 分支
+**没有 HAC**。所以 `estat_overidentification` 永远收不到 HAC 结果，prewhitening 分支
 无法通过公开 API 触达。
 
 处理方式：保留该分支（它是 ado 规范的一部分），在函数层验证其算术，
@@ -2558,7 +2558,7 @@ A/B 对比时看到"两法一致"，差点得出"零填充无害"的结论。
 ### 8.20.32 第 29 轮：Newey-West HAC 协方差（`westata.vce.hac`）
 
 第 28 轮确认 `SUPPORTED_COV_TYPES` 里**没有 HAC**，导致 prewhitening 不可达。
-本轮实现 HAC 本身。抄自 `newey.ado:133-183`。
+本轮实现 HAC 本身。抄自 `newey_west.ado:133-183`。
 
 #### 公式
 
@@ -2576,7 +2576,7 @@ V = (X'X)^-1 · xtx · (X'X)^-1 × N/(N−K)
 
 #### 一个必须区分的参照物
 
-`newey.sthlp:113-114` 说 `lag(0)` 等价于 `vce(robust)`。
+`newey_west.sthlp:113-114` 说 `lag(0)` 等价于 `vce(robust)`。
 
 **Stata 的 `vce(robust)` 带 `N/(N−K)` 因子，所以 `lag(0)` 对应 HC1，不是 HC0。**
 
@@ -2622,7 +2622,7 @@ prewhitening 不可达状态**仍然成立**。
 #### 为什么不需要重写 IV 的 VCE
 
 2SLS 是 `kappa == 1` 的 k-class 估计量，其 bread 就是 `Xhat'Xhat`——
-**这正是 `compute_cov` 已实现的 OLS 形状三明治**。所以只需把带宽转发过去。
+**这正是 `compute_cov` 已实现的 Regress 形状三明治**。所以只需把带宽转发过去。
 
 修改点：`_prepare_cov_kwds` 接受 `maxlags`（存到 `self._hac_kwds`），
 `_shared_vce` 把它转发给 `compute_cov`。
@@ -2633,7 +2633,7 @@ prewhitening 不可达状态**仍然成立**。
 
 起初看起来像核函数写错。实际是 **`N/(N−K)` 因子没应用**：
 
-`newey.sthlp:113-114` 说 `lag(0)` 等于 `vce(robust)`，而 Stata 的 `vce(robust)`
+`newey_west.sthlp:113-114` 说 `lag(0)` 等于 `vce(robust)`，而 Stata 的 `vce(robust)`
 **无条件**带 `N/(N−K)`。`_shared_vce` 里 `cov_ssc` 只在 `not settings.adj`
 时才重建，导致 HAC 拿到的因子为 1。
 
@@ -2643,14 +2643,14 @@ prewhitening 不可达状态**仍然成立**。
 
 我一开始写测试断言 `ssc(adj=False)` 会去掉因子。**失败。**
 
-`newey` 的文档里**没有**关闭该因子的选项，所以 westata 也不该允许。
+`newey_west` 的文档里**没有**关闭该因子的选项，所以 westata 也不该允许。
 测试改为：
 - 用 `cov_hac(..., ssc=SSC(adj=False))` 拿原始 sandwich，确认比值恰为 `N/(N−K)`；
 - 确认 `ssc(adj=False)` 对 IV 的 HAC 拟合**没有任何影响**。
 
 #### 端到端可达性验证
 
-`estat_overid` 现在真的走 prewhitening 分支了：
+`estat_overidentification` 现在真的走 prewhitening 分支了：
 
 | `lags` | score |
 |---|---|
@@ -2737,7 +2737,7 @@ VCE，Stata 在那里换成基于回归的变体"）。本轮补齐 score 检验
 #### 公式（`ivregress_estat.ado:1187-1263`）
 
 ```
-uhat     = y 对 (exog + endog) 的 OLS 残差
+uhat     = y 对 (exog + endog) 的 Regress 残差
 endhat_i = endog_i 对 (exog + addlinst) 的拟合值
 rhat_i   = endhat_i 对 (exog + endog) 的残差 × uhat
 robwool  = N − rss（ones 对 rhat 回归，nocons）
@@ -2805,9 +2805,9 @@ ivregress 2sls `dep' `indep' ..., `vceopt' small
 ```
 
 其中 `indep = exog test x2hat`，**没有 `(endog = instr)` 块**。
-没有那个块时，`ivregress 2sls` 没有内生变量需要工具化，**退化为普通 OLS**。
+没有那个块时，`ivregress 2sls` 没有内生变量需要工具化，**退化为普通 Regress**。
 
-改正为 OLS 后：**F = 70.636，p = 4.6e-11**，与手算 Wald 形式一致到 1e-10。
+改正为 Regress 后：**F = 70.636，p = 4.6e-11**，与手算 Wald 形式一致到 1e-10。
 
 #### 解锁 cluster
 
@@ -2838,7 +2838,7 @@ Stata 在 robust 下**同时**报 `regF` 与 `robwool`，而 westata 的
 
 为此给 `ManovaResult` 加了 `n_equations` 字段，避免从 `statistics` 里猜。开发过程中，我第一版确实在猜，已改正。
 
-#### `vecrank`（`vecrank.sthlp:179-210`）
+#### `vec_rank`（`vec_rank.sthlp:179-210`）
 
 **标量**：`N`、`k_eq`、`k_dv`、`tmin`、`tmax`、`n_lags`、`k_ce95`、`k_ce99`、`k_cesbic`、`k_cehqic`
 
@@ -2910,8 +2910,8 @@ df_a_initial − df_a == df_a_nested + df_a_redundant == 1
 | `areg.json` | **29** | `k_absorb − 1`（截距单独报告）|
 | `reghdfe_firm.json` | **30** | `= df_a_initial`（截距被吸收）|
 
-`FEOLS` 对外声称 `model_name="reghdfe"`，故采用 **reghdfe 语义**。
-为此加了类标志 `_absorb_df_drops_constant`（`FEOLS` 为 `False`）。
+`RegressHighDimFixedEffects` 对外声称 `model_name="reghdfe"`，故采用 **reghdfe 语义**。
+为此加了类标志 `_absorb_df_drops_constant`（`RegressHighDimFixedEffects` 为 `False`）。
 
 #### 一个连带 bug
 
@@ -2925,7 +2925,7 @@ df_a_initial − df_a == df_a_nested + df_a_redundant == 1
 而 `areg.json` 的 `cmdline` 是 `areg y x1 x2, absorb(firm)`——**180 行 panel 数据**，
 不是 auto。那些测试一直是在**自证**。
 
-已改为：用 auto 数据只验证 `FEOLS`（reghdfe 语义）的内部一致性，
+已改为：用 auto 数据只验证 `RegressHighDimFixedEffects`（reghdfe 语义）的内部一致性，
 并注明 `areg` 的 29 应在 `test_hdfe.py` 里对照正确的 fixture。
 
 #### 五个 reghdfe fixture 全部 100%
@@ -3043,7 +3043,7 @@ result.stata_cov_params     # e(V) 顺序
 #### 关键：顺序必须从公式恢复
 
 patsy 会**字母序重排**且把截距放首位，**原始书写顺序被销毁**。
-所以 `OLS.from_formula` 记录 `_formula_rhs_order` 并传到结果对象。
+所以 `Regress.from_formula` 记录 `_formula_rhs_order` 并传到结果对象。
 
 验证：`mpg ~ weight + foreign` 与 `mpg ~ foreign + weight` 给出**不同**的
 `stata_param_names`——证明顺序来自公式，不是字母序或数据顺序。
@@ -3196,7 +3196,7 @@ westata 也如此：`stata_factor_terms == []`，单行 `rep78`。这是对的�
 
 ### 8.20.44 第 41 轮：辅助参数的位置与斜杠（`lnalpha` / `cut*`）
 
-第 40 轮的扫描覆盖了 `OLS` 族，但**没测 ML 模型**。本轮补上，发现两处差异。
+第 40 轮的扫描覆盖了 `Regress` 族，但**没测 ML 模型**。本轮补上，发现两处差异。
 
 #### 差异一：斜杠是显示格式，不是 `e(b)` 的存储名
 
@@ -3232,7 +3232,7 @@ westata 也如此：`stata_factor_terms == []`，单行 `rep78`。这是对的�
 | `nbreg` | `['weight','_cons','lnalpha']` |
 | `ologit` | `['weight','cut1','cut2','cut3','cut4']` |
 | `logit` | `['weight','mpg','_cons']`（无辅助参数，不受影响）|
-| `OLS` | 仍与 `regress_auto.json` 一致 |
+| `Regress` | 仍与 `regress_auto.json` 一致 |
 
 #### 一条写错的测试
 
@@ -3288,7 +3288,7 @@ iv_liml.json: cmdline = ivregress liml y x2 (x = z1 z2)
 
 #### 一次自我纠正
 
-扫描时我怀疑 `PanelOLS fe` 不该有 `_cons`。查 `xtreg_fe.json` 后确认
+扫描时我怀疑 `PanelRegressFE fe` 不该有 `_cons`。查 `xtreg_fe.json` 后确认
 其 `names` 正是 `['x1','x2','_cons']`——**实现是对的，我的怀疑没有依据**。
 
 ---
@@ -3327,13 +3327,13 @@ config["bandwidth"] = lags
 | `liml` / `gmm` | **完全相等**（缺因子）|
 | `2sls` | 差 1.0025（有因子）|
 
-`newey.ado:187` 是决定性的：
+`newey_west.ado:187` 是决定性的：
 
 ```stata
 mat `v' = (`xtxi'*`xtx'*`xtxi')*(`nobs'/`tdf')
 ```
 
-**`newey` 无条件乘 `nobs/tdf`，没有 `small` 选项。** 而 `ivregress` 的默认是
+**`newey_west` 无条件乘 `nobs/tdf`，没有 `small` 选项。** 而 `ivregress` 的默认是
 `SSC(adj=False)`，HAC 落入 `else` 分支时跟着丢了因子。
 
 为 HAC 加独立分支强制 `debiased=True` 后，三个估计器一致：
@@ -3601,27 +3601,27 @@ mat `cv' = `relbias' \ `tsls' \ `liml'
 
 #### 一个第三方库问题（记录，不修）
 
-`FEOLS` 在**同时使用权重与吸收固定效应**时，PyFixest 在 Rust 层 panic：
+`RegressHighDimFixedEffects` 在**同时使用权重与吸收固定效应**时，PyFixest 在 Rust 层 panic：
 
 ```
 thread '<unnamed>' panicked at src\demean.rs:71:48:
 called `Option::unwrap()` on a `None` value
 ```
 
-这是 PyFixest 的内部缺陷，与 westata 代码无关。`PanelOLS` 与 `IV2SLS` 本身
-不接受权重，所以 `OLS` 是唯一受影响路径，本轮修复已完整覆盖。
+这是 PyFixest 的内部缺陷，与 westata 代码无关。`PanelRegressFE` 与 `IV2SLS` 本身
+不接受权重，所以 `Regress` 是唯一受影响路径，本轮修复已完整覆盖。
 
 ---
 
-### 8.20.50 第 58–60 轮：`newey` 独立命令
+### 8.20.50 第 58–60 轮：`newey_west` 独立命令
 
-§3.8 里 `newey` 一直标 ⬜「HAC 回归（模型内 HAC 已支持，独立命令未做）」。
+§3.8 里 `newey_west` 一直标 ⬜「HAC 回归（模型内 HAC 已支持，独立命令未做）」。
 HAC 引擎第 27–30 轮已完成并对拍，**缺的只是命令外壳**。
 
 #### 第 58 轮：实现
 
-关键判断：`newey` **不是新估计器**。`newey.ado:96` 点估计直接调 `_regress`，
-只有方差不同，而 Bartlett 核 HAC 已验证。所以实现是复用 `OLS` + HAC VCE。
+关键判断：`newey_west` **不是新估计器**。`newey_west.ado:96` 点估计直接调 `_regress`，
+只有方差不同，而 Bartlett 核 HAC 已验证。所以实现是复用 `Regress` + HAC VCE。
 
 移植的规范细节：
 
@@ -3633,9 +3633,9 @@ HAC 引擎第 27–30 轮已完成并对拍，**缺的只是命令外壳**。
 | `tflag==1`（不规则）需 `force` | `ado:78-81` | 有 force 才放行 |
 | 仅 `aweight` | `ado:15` `[aw/]` | 其他抛 `NotImplementedError` |
 
-`e()` 必须**删减**：`newey.ado:191` 用 `mat post` 创建全新 `e()`，
-`newey.sthlp:156-187` 只有 7 个标量（`N df_m df_r F p lag rank`）。
-`regress` 的 `r2`/`rss`/`mss`/`rmse`/`sigma`/`ll` **在 `newey` 里不存在**，
+`e()` 必须**删减**：`newey_west.ado:191` 用 `mat post` 创建全新 `e()`，
+`newey_west.sthlp:156-187` 只有 7 个标量（`N df_m df_r F p lag rank`）。
+`regress` 的 `r2`/`rss`/`mss`/`rmse`/`sigma`/`ll` **在 `newey_west` 里不存在**，
 保留会凭空造出表面。
 
 `lag(0)` = **HC1**（非 HC0），实测比值正好 `√(N/(N−K))`，与第 30 轮发现互证。
@@ -3644,7 +3644,7 @@ HAC 引擎第 27–30 轮已完成并对拍，**缺的只是命令外壳**。
 
 `newey_p.ado:20` 只列四种：`XB Index STDP REsiduals`，而 `regress` 有 15 种。
 `regress_postestimation.sthlp:152-153` 明确影响诊断量只在 `vce(ols)` 下可用，
-而 `newey` 是 HAC。
+而 `newey_west` 是 HAC。
 
 `newey_p.ado:54`：
 
@@ -3657,13 +3657,13 @@ if "`type'" == "" | "`type'" == "index" | "`type'" == "xb" {
 `newey_estat.ado:5-20` 只有一个专用分支 `durbinalt`（要求 `force`），
 其余走 `estat_default`。
 
-**一处自造回归**：第 58 轮把 `model_name` 改为 `"newey"`，
+**一处自造回归**：第 58 轮把 `model_name` 改为 `"newey_west"`，
 而 `predict` 按 `model_name` 查注册表 → 所有 predict 类型报
-`no prediction types registered`。已注册 `"newey"`。
+`no prediction types registered`。已注册 `"newey_west"`。
 
-#### 第 60 轮：表头必须换成 `newey` 自己的
+#### 第 60 轮：表头必须换成 `newey_west` 自己的
 
-`newey.ado:245-258` 打印的表头**不是 `regress` 的**：
+`newey_west.ado:245-258` 打印的表头**不是 `regress` 的**：
 
 ```
 Regression with Newey–West standard errors   Number of obs = N
@@ -3673,7 +3673,7 @@ Maximum lag = lag                            F(df_m, df_r) = F
 
 **没有 R²、没有 Adj R²、没有 Root MSE**，左栏多一行 `Maximum lag`。
 
-新增 `_HEADER_BLOCK["newey"] = "newey"`，该种类不打印拟合块，并在 F 行前
+新增 `_HEADER_BLOCK["newey_west"] = "newey_west"`，该种类不打印拟合块，并在 F 行前
 输出 `Maximum lag`。
 
 另一处自造回归：`NeweyWestResult.__str__` 先委托 `StataResults.summary()`，
@@ -3733,9 +3733,9 @@ lag-j 项是**带符号交叉乘积**，方向取决于变量。改为断言「�
 > e(r2) — R-squared for **each equation**
 > e(F) — F statistic for **each equation**
 
-用独立 `OLS` 逐方程交叉验证，**精确一致（1e-10）**：
+用独立 `Regress` 逐方程交叉验证，**精确一致（1e-10）**：
 
-| 响应 | manova R² | OLS R² | manova F | OLS F |
+| 响应 | manova R² | Regress R² | manova F | Regress F |
 |---|---|---|---|---|
 | y1 | 0.36940469 | 0.36940469 | 25.482435 | 25.482435 |
 | y2 | 0.17319174 | 0.17319174 | 9.111956 | 9.111956 |
@@ -3842,7 +3842,7 @@ Var(xb₁−xb₂) = x'V₁₁x + x'V₂₂x − 2x'V₁₂x
 - 按方程分别预测
 - `stdp` 用 `σ²ⱼ(X'X)⁻¹` 的 sandwich 形式（沿用第 65 轮教训，不用捷径）
 
-**验证**：方程 1/2 的 `xb` 与独立 OLS 拟合值**精确一致**；`xb+resid` 重构原值；
+**验证**：方程 1/2 的 `xb` 与独立 Regress 拟合值**精确一致**；`xb+resid` 重构原值；
 单方程诊断量正确拒绝（堆叠拟合没有形状正确的 `X`）。
 
 #### 第 68 轮：一个我编造的程序名
@@ -3884,11 +3884,11 @@ est local predict "reg3_p"
 | `mvreg` 的 `estat_cmd` | `mvreg_estat` | ✅ |
 | `sureg` 的 `predict` | `reg3_p` | ✅ |
 
-**0 个编造。** 但审计暴露了反向缺口：`newey.ado:218` 有
+**0 个编造。** 但审计暴露了反向缺口：`newey_west.ado:218` 有
 `eret local predict newey_p`，而我们的实现把它只存在 Python 属性
 `predict_cmd` 上，**`e()` 里没有**。
 
-`newey.sthlp:168-180` 明确列出 8 个宏。现已全部写入 `e()`，
+`newey_west.sthlp:168-180` 明确列出 8 个宏。现已全部写入 `e()`，
 `e()` 从 7 个键增至 15 个：
 
 `cmd`、`title`、`vcetype`、`estat_cmd`、`predict`、`properties`、
@@ -3900,7 +3900,7 @@ est local predict "reg3_p"
 
 ### 8.20.54 第 70–72 轮：默认路径审计与「静默错误」清理
 
-#### 第 70 轮：`Sqreg` 的默认路径崩溃
+#### 第 70 轮：`SimultaneousQuantileRegress` 的默认路径崩溃
 
 审计 `e()` 键时（初版报 245 个「缺失」，实为把矩阵/函数/条件键误判），
 意外抓到一个真实 bug：
@@ -3910,7 +3910,7 @@ generator = Mt19937_64(DEFAULT_SEED if seed is None else seed)
 # NameError: name 'DEFAULT_SEED' is not defined
 ```
 
-**`Sqreg(...).fit()` 不传 `seed` 就崩溃。**
+**`SimultaneousQuantileRegress(...).fit()` 不传 `seed` 就崩溃。**
 
 而**所有既有测试都传了 `seed=`**，所以从未被发现——
 功能「已测试、已文档、却在最常见的用法下不可用」。
@@ -3925,10 +3925,10 @@ generator = Mt19937_64(DEFAULT_SEED if seed is None else seed)
 | 结果 | 数量 |
 |---|---|
 | 正常 | 22 |
-| `Eivreg` 拒绝 | 1（**正确**）|
+| `ErrorsInVariablesRegress` 拒绝 | 1（**正确**）|
 | 崩溃 | **0** |
 
-`Eivreg` 无 `reliab` 时拒绝是对的（否则退化为 OLS 却自称 EIV）。
+`ErrorsInVariablesRegress` 无 `reliab` 时拒绝是对的（否则退化为 Regress 却自称 EIV）。
 测试中明确区分了 **「默认跑不起来」与「默认不该跑」**。
 
 #### 第 72 轮：`estat` 交叉乘积审计
@@ -3937,19 +3937,19 @@ generator = Mt19937_64(DEFAULT_SEED if seed is None else seed)
 
 | 方法 | 问题 | 证据 |
 |---|---|---|
-| `estat_hettest` | logit/poisson 上**返回数值** | `hettest.ado:108` 用 `e(rss)/e(N)`，`:155` 用 `e(mss)/2`，非线性模型**两者都没有** |
-| `estat_ovtest` | 同上 | 回归残差对拟合值幂次，是比较平方和的 **OLS 设定检验** |
+| `estat_heteroskedasticity_test` | logit/poisson 上**返回数值** | `hettest.ado:108` 用 `e(rss)/e(N)`，`:155` 用 `e(mss)/2`，非线性模型**两者都没有** |
+| `estat_omitted_variables_test` | 同上 | 回归残差对拟合值幂次，是比较平方和的 **Regress 设定检验** |
 
 **最危险的地方：错误数值与正确数值几乎相同。**
 
-| 检验 | logit（错误）| OLS（正确）|
+| 检验 | logit（错误）| Regress（正确）|
 |---|---|---|
 | `hettest` | 0.00496 | 0.00487 |
 | `ovtest` | 1.3478 | 1.3508 |
 
 两个都「量级正常、无报错」，只有对照才能发现。
 
-同时 `estat_hettest` 在 `nbreg` 上抛 **`IndexError`**（未捕获异常），
+同时 `estat_heteroskedasticity_test` 在 `nbreg` 上抛 **`IndexError`**（未捕获异常），
 已一并变成 `ValueError`。
 
 修正方式：显式要求 `e(rss)` 与 `e(mss)` 存在，否则按估计器名拒绝并说明原因。
@@ -4059,7 +4059,7 @@ sd(u) == e[sigma_u]      ✅ 0.36129872 精确一致
 | 模型 | 类型 | 根因 |
 |---|---|---|
 | `nbreg` | `n` | `params.size(3) != exog.shape[1](2)`，被参数数量检查拦截 |
-| `newey` | `index` | 基础分派器不支持；它只是 `xb` 的别名 |
+| `newey_west` | `index` | 基础分派器不支持；它只是 `xb` 的别名 |
 | `xtreg, fd` | `xb/stdp/stdf/fitted` | **设计矩阵 2 列 but 只有 1 个系数** |
 | `zip`/`zinb`/`ztp`/`tnbreg` | `residuals` | Stata 文档里**没有** `residuals` |
 
@@ -4125,8 +4125,8 @@ if !`fvops' & "`nosort'" == "" {
 第 72 轮只覆盖 8 个估计器。本轮扩到 23 个，发现 **2 处未捕获异常**：
 
 ```
-estat_summarize / Mvreg  -> KeyError
-estat_summarize / Sureg  -> KeyError
+estat_summarize / MultivariateRegress  -> KeyError
+estat_summarize / SeeminglyUnrelatedRegress  -> KeyError
 ```
 
 **根因**：多方程模型系数名带方程前缀（`y:x2`/`x1:_cons`），与数据列名
@@ -4135,28 +4135,28 @@ estat_summarize / Sureg  -> KeyError
 依据：`estat_summ.ado:15` 接受 **`eqlist`（方程列表）**，说明本就支持多方程。
 
 修法分三层：解析冒号**后**的部分作回归元、冒号**前**的部分作响应名、
-并读取 `e(outcomes)`（`Mvreg` 有，`Sureg` 没有，只能靠前缀解析）。
+并读取 `e(outcomes)`（`MultivariateRegress` 有，`SeeminglyUnrelatedRegress` 没有，只能靠前缀解析）。
 
 | 模型 | 修复前 | 修复后 |
 |---|---|---|
-| `Mvreg` | `KeyError` | `['x1','y']` |
-| `Sureg` | `KeyError` | `['x1','y','x2']` |
+| `MultivariateRegress` | `KeyError` | `['x1','y']` |
+| `SeeminglyUnrelatedRegress` | `KeyError` | `['x1','y','x2']` |
 
 同时加兜底：变量列表为空时报**清晰的 `ValueError`**（列出可用列），
 不让 `KeyError` 穿透——**未捕获异常不是拒绝，它不告诉调用者原因**。
 
 #### 第 80 轮：两处「返回了不该有的数」
 
-**① `estat vif` 在 IV 上返回 OLS 的 VIF**
+**① `estat vif` 在 IV 上返回 Regress 的 VIF**
 
-`IV2SLS` 的 `estat vif` 给出 `1.000203`，与 OLS **完全相同**。
+`IV2SLS` 的 `estat vif` 给出 `1.000203`，与 Regress **完全相同**。
 
 `ivregress_estat.ado:20-56` 只分派 firststage / overid / endogenous /
 weakrobust / sbknown|sbsingle，其余走 `estat_default`；而
 `estat_default.ado` 只提供 ic / summarize / bootstrap / **vce**——**没有 vif**。
 
-那个数值只是**对同一设计矩阵重算了一遍 OLS 的 VIF**。它看起来合理，正因为
-IV 与 OLS 共用设计。
+那个数值只是**对同一设计矩阵重算了一遍 Regress 的 VIF**。它看起来合理，正因为
+IV 与 Regress 共用设计。
 
 **② `rreg` 后 `estat` 全部不可用**
 
@@ -4168,17 +4168,17 @@ est local estat_cmd ""        // reset to empty
 
 显式清空。但 `rreg` **有** `e(rss)`/`e(mss)`，所以第 72 轮加的
 「有 rss/mss 就放行」检查**放行了** `hettest`/`ovtest`，返回数值。
-那些检验假设 **OLS 残差**，而 `rreg` 的残差来自迭代重加权。
+那些检验假设 **Regress 残差**，而 `rreg` 的残差来自迭代重加权。
 
 **两处的共同点：不是崩溃，而是静默返回一个不该有的数。**
 
 #### 第 81 轮：反向缺口——`reghdfe` 该有的却没有
 
-第 79 轮矩阵里 `FEOLS` 的 `estat_summarize`/`estat_vif` 是 `ref`，
+第 79 轮矩阵里 `RegressHighDimFixedEffects` 的 `estat_summarize`/`estat_vif` 是 `ref`，
 我当时当作合理拒绝。查证发现 **`reghdfe` 在 Stata 中支持这两个命令**，
 拒绝理由是「未保留估计样本数据」——**而估计器其实一直持有那份数据**。
 
-修法：`FEOLS.fit` 现在保留 `model_data`、`design_matrix` 与
+修法：`RegressHighDimFixedEffects.fit` 现在保留 `model_data`、`design_matrix` 与
 `response_name`/`e(depvar)`。
 
 **教训**：「拒绝」有两种——**不该支持**（正确）与**本可支持但缺数据**（缺口）。
@@ -4191,7 +4191,7 @@ est local estat_cmd ""        // reset to empty
 第 83 轮发现同一个估计器上**两种错误方向同时存在**：
 
 - `estat_summarize` **本来可以支持却拒绝**（缺口）
-- `estat_hettest`/`ovtest` **本不该支持却返回数值**（过度放行）
+- `estat_heteroskedasticity_test`/`ovtest` **本不该支持却返回数值**（过度放行）
 
 原因：我的实现用**单一启发式依据**（「有 `rss`/`mss` 就放行」）判断，
 而面板模型恰好两者都有 → 前者被误拒、后者被误放。
@@ -4213,8 +4213,8 @@ if strpos(`"`allowed_butsum'"',`"`subcmd'"') == 0 {
 | 项 | 修复前 | 修复后 |
 |---|---|---|
 | `estat_summarize` | 拒绝（「未保留数据」）| ✅ 可用 |
-| `estat_hettest` | 返回数值 | ❌ 拒绝 |
-| `estat_ovtest` | 返回数值 | ❌ 拒绝 |
+| `estat_heteroskedasticity_test` | 返回数值 | ❌ 拒绝 |
+| `estat_omitted_variables_test` | 返回数值 | ❌ 拒绝 |
 
 修法：面板 `fit` 保留 `model_data` 与 `depvar`（使 summarize 可用），
 同时在 `hettest`/`ovtest` 中按 `model_name` 显式拒绝。
@@ -4376,10 +4376,10 @@ di as smcl "Variable: " as res "`y'"
 
 | 估计器 | 修复前 |
 |---|---|
-| `Tobit`/`Truncreg`/`Intreg` | ❌ |
+| `Tobit`/`TruncatedRegress`/`IntervalRegress` | ❌ |
 | `OrderedLogit` | ❌ |
-| `QuantileRegression`/`RobustRegression` | ❌ |
-| `FEOLS`/`PanelOLS` | ✅（第 81 轮）|
+| `QuantileRegress`/`RobustRegress` | ❌ |
+| `RegressHighDimFixedEffects`/`PanelRegressFE` | ✅（第 81 轮）|
 | `Logit`/`Probit`/`Poisson` | ❌（第 89 轮修）|
 
 **六份帮助文件（`tobit`/`truncreg`/`intreg`/`ologit`/`qreg`/`rreg`）
@@ -4411,17 +4411,17 @@ if "depvar" not in self._e:
 | 估计器 | 绕过的原因 |
 |---|---|
 | `_Ordered`（`ologit`/`oprobit`）| 重写了 `fit`（`discrete.py:1725`），不走 `_DiscreteBase.fit` |
-| `QuantileRegression`/`RobustRegression` | 各自构造 `StataResults` |
+| `QuantileRegress`/`RobustRegress` | 各自构造 `StataResults` |
 
 最终 6 个全部覆盖：
 
 ```
 Tobit    depvar='y'
-Truncreg depvar='w'
-Intreg   depvar='lo hi'    ← 区间由两列给出，Stata 记录两列
+TruncatedRegress depvar='w'
+IntervalRegress   depvar='lo hi'    ← 区间由两列给出，Stata 记录两列
 OrderedLogit depvar='rep'
-QuantileRegression depvar='y'
-RobustRegression depvar='y'
+QuantileRegress depvar='y'
+RobustRegress depvar='y'
 ```
 
 #### 一条可复用的教训
@@ -4461,7 +4461,7 @@ RobustRegression depvar='y'
 
 | 模型 | `N − df_r` | `rank` |
 |---|---|---|
-| `OLS` | 2 | 2 ✅ |
+| `Regress` | 2 | 2 ✅ |
 | `Logit` | **0** | 2 ❌ |
 | `Poisson` | **0** | 2 ❌ |
 
@@ -4515,8 +4515,8 @@ df_r = e(N) - e(df_m)
 
 | 恒等式 | 适用 | 结果 |
 |---|---|---|
-| `r2 = mss/(mss+rss)` | OLS | ✅ 精确 |
-| `ll = −N/2·(ln2π + ln(rss/N) + 1)` | OLS | ✅ 精确 |
+| `r2 = mss/(mss+rss)` | Regress | ✅ 精确 |
+| `ll = −N/2·(ln2π + ln(rss/N) + 1)` | Regress | ✅ 精确 |
 | `chi2 = 2·(ll − ll_0)` | Logit/Poisson | ✅ 精确 |
 | `ll_0` = 常数模型对数似然 | Logit | ✅ 与直接拟合一致 |
 | `N − df_r = rank` | 含 `df_r` 且非 tobit/面板 | ✅ |
@@ -4528,7 +4528,7 @@ df_r = e(N) - e(df_m)
 | 模型 | 现象 | 真相 |
 |---|---|---|
 | `Tobit` | `N−df_r=1` vs `rank=3` | `tobit.ado` 定义 `df_r = N − df_m`，`rank` 含 `lnsigma` |
-| `PanelOLS` | `N−df_r=41` vs `rank=2` | `df_r` **吸收组效应**（60 组 + 1）|
+| `PanelRegressFE` | `N−df_r=41` vs `rank=2` | `df_r` **吸收组效应**（60 组 + 1）|
 | 面板的 `r2` | `0.0088` vs `mss/tss=0.2244` | `r2`=**组内**，`r2_o`=**整体** |
 
 **共同教训：「恒等式不成立」的第一反应应当是「这个恒等式适用吗」，而不是「实现错了」。**
@@ -4609,9 +4609,9 @@ else quietly {
 
 #### 第 100 轮：继承导致的 `theta` 泄漏
 
-`xtreg_be.ado` **完全没有 `theta`**（grep 计数为 0），但 `BetweenOLS` 有。
+`xtreg_be.ado` **完全没有 `theta`**（grep 计数为 0），但 `PanelRegressBE` 有。
 
-根因：`BetweenOLS(RandomEffects)` **继承**了 `_stores_theta = True`。
+根因：`PanelRegressBE(PanelRegressRE)` **继承**了 `_stores_theta = True`。
 
 修正：显式设 `_stores_theta = False`，并加测试锁定 `fe`/`be`/`fd` 都无 `theta`。
 
@@ -4631,7 +4631,7 @@ else quietly {
 
 #### 第 101 轮：`fd` 的 `theta` 缺失是**偶然**的
 
-`FirstDifferenceOLS` 没有重设任何标志，全部继承 `RandomEffects`：
+`PanelRegressFD` 没有重设任何标志，全部继承 `PanelRegressRE`：
 
 ```python
 fd._stores_theta = True       # 继承了 re
@@ -4666,7 +4666,7 @@ est scalar r2_w = r(rho)^2
 
 `xtreg_be.ado` 全文只设置 `df_*`、`g_*`、`p`、`r`、`rmse`、`r2_*`、`Tbar`/`Tcon`、`N_g`。
 
-**`be` 是对实体均值做 OLS，没有面板/误差分解可报。**
+**`be` 是对实体均值做 Regress，没有面板/误差分解可报。**
 
 修正后：
 
@@ -5651,7 +5651,7 @@ labels = np.asarray(cluster)   # 局部变量覆盖了 labels= 参数
 
 #### 第 146 轮：`estat` 适用性矩阵
 
-| 命令 | OLS | Logit | Poisson | IV2SLS |
+| 命令 | Regress | Logit | Poisson | IV2SLS |
 |---|---|---|---|---|
 | `summarize` | ✅ | ✅ | ✅ | ✅ |
 | `vce` | ✅ | ✅ | ✅ | ✅ |
@@ -5665,7 +5665,7 @@ labels = np.asarray(cluster)   # 局部变量覆盖了 labels= 参数
 - `ivregress_estat.ado` 也不分派 `vif`。
 
 **`ivregress` 是最容易误判的一个**：它有 `e(r2)` 和完整的拟合统计量，
-看起来「应该」支持 VIF。第 102 轮曾发现它返回的正是 **OLS 的 VIF**——
+看起来「应该」支持 VIF。第 102 轮曾发现它返回的正是 **Regress 的 VIF**——
 一个看似合理但拟合于另一个模型的数字。
 
 测试同时断言**行为**与**ado 证据**，将来若要加必须与证据辩论。
@@ -5777,7 +5777,7 @@ Prob > F        =     0.7777
 | `margins` | `margins.sthlp:1101`（`r(table)` 的行标签）| `b`、`se`、`t`、`p`、`ll`、`ul` |
 
 **统计量以自己分布的名字存储**——`logit` 的 `test` 没有 `r(F)`，
-`OLS` 的没有 `r(chi2)`。
+`Regress` 的没有 `r(chi2)`。
 
 #### 三处「不发明表面」的克制
 
@@ -6074,7 +6074,7 @@ CLR 需要模拟分布，且 Stata 实现是**无 `ado/base` 源码的编译内�
 
 ```python
 # AR 在点估计处取极小值 → 统计量恰为 0
-statistic = estat_weakrobust(betanull={"e": estimated}).f_statistic
+statistic = estat_weak_instrument_robust(betanull={"e": estimated}).f_statistic
 assert statistic == pytest.approx(0.0, abs=1e-8)
 ```
 
@@ -6133,10 +6133,10 @@ local allowed_butsum "hausman mundlak vce"
 #### 第 173 轮：继承导致的 `e(chi2)` 误报
 
 ```python
-class RandomEffects(PanelOLS):
+class PanelRegressRE(PanelRegressFE):
     _stores_wald_chi2 = True       # ← 被子类继承
-class BetweenOLS(RandomEffects):   # 未覆盖
-class FirstDifferenceOLS(RandomEffects):  # 未覆盖
+class PanelRegressBE(PanelRegressRE):   # 未覆盖
+class PanelRegressFD(PanelRegressRE):  # 未覆盖
 ```
 
 `be`/`fd` 因此报告了 Stata **不存储**的 `e(chi2)`，其值就是 `F × df_m`。
@@ -6162,7 +6162,7 @@ class FirstDifferenceOLS(RandomEffects):  # 未覆盖
 
 **实际输出全部符合。**
 
-本轮还有一个方法论收获：我的审计脚本误报「`PanelOLS._stores_mss` 泄漏」——
+本轮还有一个方法论收获：我的审计脚本误报「`PanelRegressFE._stores_mss` 泄漏」——
 
 **实际语义是「存 `mss` 但不存 `tss`」**，专为 `be` 设计：
 
@@ -6371,13 +6371,13 @@ assert len(set(outcomes)) == 1   # 三种命令对同一模型必须给出相同
 | 排除项 | 依据 |
 |---|---|
 | `ivregress` | `ivregress_estat.ado:20-56` → `estat_default`（无 vif）|
-| **`newey`** | **`newey_estat.ado:11-17` 只处理 `durbinalt`** |
+| **`newey_west`** | **`newey_estat.ado:11-17` 只处理 `durbinalt`** |
 
 **最值得记录的对比**：
 
 | 命令 | `predict` | `estat vif` |
 |---|---|---|
-| `newey` | ✅ | ❌ |
+| `newey_west` | ✅ | ❌ |
 
 **因为两者由不同的 ado 服务**（`newey_p.ado` vs `newey_estat.ado`）。
 
@@ -6848,7 +6848,7 @@ arima.ado:727   marginsnotok stdp mse Residuals YResiduals
 
 **一处被既有测试抓住的假设错误**：最初用 `("t","treat","treatment")` 猜处理变量名，
 但 `test_predict_registry` 用了一列叫 **`yb`** 的处理变量。改为按**参数位置**推导——
-`Etregress.from_formula` 把处理变量追加为结果设计的最后一列（`names = list(...) + [treatment_lhs]`），
+`EndogenousTreatmentRegress.from_formula` 把处理变量追加为结果设计的最后一列（`names = list(...) + [treatment_lhs]`），
 **这是结构事实，不是命名约定**。
 
 #### 第 231 轮：把「宏即能力清单」变成自动测试
@@ -6888,7 +6888,7 @@ arima.ado:727   marginsnotok stdp mse Residuals YResiduals
 且数值在高斯偏差尺度上（`N·log(rss/N)+2k`），与 `estat ic` 的 `-2ll+2k` 不同。
 改为按 `e(_aic_is_stata)` 条件显示：`regress` 不显示，ML 族继续显示。
 
-**第 235 轮**：ML 模型的表头是 OLS 样式，显示
+**第 235 轮**：ML 模型的表头是 Regress 样式，显示
 `R-squared: .` / `Adj. R-squared: .` / `F-statistic: .` / `Df Residuals: 250`
 ——**一行的 `.` 让表格看起来像坏掉的回归表**。改为按命令实际报告的内容选区块。
 
@@ -7443,7 +7443,7 @@ log f(tau) + (-0.5 log pi) + log w - log sigma + log scale
 
 ### 另一个没有妥协的地方
 
-第 44 轮我试过把 `Etregress.fit()` 的默认值从 `control` 改成 `ml`（与 Stata 的默认一致），
+第 44 轮我试过把 `EndogenousTreatmentRegress.fit()` 的默认值从 `control` 改成 `ml`（与 Stata 的默认一致），
 结果 **16 个测试失败**——两条路径写入的 `e()` 宏不同（`r2_p`、`cmd`、五种 margins）。
 已撤回并在 docstring 里写明原因：**改变一个包默认跑哪个估计器是估计器决策，不是排版
 改动**，不能凭一次布局比对就发布。
@@ -7465,7 +7465,7 @@ log f(tau) + (-0.5 log pi) + log w - log sigma + log scale
 
 | 批次 | 内容 | 工时 | 状态 |
 |---|---|---|---|
-| P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict stdp`） | 2–3 周 | **已完成** |
+| P5 | 后估计补完（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pairwise_compare`/`predict stdp`） | 2–3 周 | **已完成** |
 | P6 | 受限因变量（`heckman`/`truncreg`/`intreg`/`etregress`） | 3–4 周 | **已完成** |
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`ztnb`/`tpoisson`/`tnbreg`） | 2–3 周 | **已完成**（`gnbreg` 除外） |
 | P8 | 分位数与稳健（`qreg`/`sqreg`/`bsqreg`/`rreg`） | 2–3 周 | **已完成**（`sqreg`/`bsqreg` 止于 E1） |
@@ -7483,7 +7483,7 @@ log f(tau) + (-0.5 log pi) + log w - log sigma + log scale
 
 | 批次 | 内容 | 状态 |
 |---|---|---|
-| P5 | 后估计（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pwcompare`/`predict se`） | ✅ |
+| P5 | 后估计（`nlcom`/`testnl`/`lrtest`/`hausman`/`contrast`/`pairwise_compare`/`predict se`） | ✅ |
 | P6 | 受限因变量（`truncreg`/`intreg`/`heckman`/`etregress`） | ✅ |
 | P7 | 计数扩展（`zip`/`zinb`/`ztp`/`tnbreg`） | ✅ |
 | P8 | 分位数与稳健（`qreg`/`rreg`/`sqreg`/`bsqreg`） | ✅ |

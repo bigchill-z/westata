@@ -50,7 +50,7 @@ def test_newey_is_not_a_member() -> None:
     """``newey_estat.ado:11-17`` forwards everything but ``durbinalt`` to
     ``estat_default``, which has no ``vif``."""
 
-    assert "newey" not in _LINEAR_MODELS
+    assert "newey_west" not in _LINEAR_MODELS
 
 
 def test_the_exclusions_are_not_accidental_omissions() -> None:
@@ -66,7 +66,7 @@ def test_the_exclusions_are_not_accidental_omissions() -> None:
 
 # ------------------------------------------------------------------- behaviour
 def test_regress_accepts_vif() -> None:
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", _frame()).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", _frame()).fit()
 
     rendered = fitted.estat_vif()
 
@@ -77,7 +77,7 @@ def test_regress_accepts_vif() -> None:
 def test_eivreg_accepts_vif() -> None:
     """``eivreg`` is a member, and its VIF must be computable, not just permitted."""
 
-    fitted = ws.Eivreg.from_formula(
+    fitted = ws.ErrorsInVariablesRegress.from_formula(
         "y ~ x1 + x2", _frame(), reliab={"x1": 0.9, "x2": 0.85}
     ).fit()
 
@@ -108,7 +108,7 @@ def test_newey_refuses_vif() -> None:
 
     # ``westata.newey`` is a FUNCTION that returns the fitted result directly -- there
     # is no separate ``.fit()`` step, unlike the class-based estimators.
-    fitted = ws.newey("y ~ x1 + x2", _frame(), lag=2)
+    fitted = ws.newey_west("y ~ x1 + x2", _frame(), lag=2)
 
     with pytest.raises(NotImplementedError):
         fitted.estat_vif()
@@ -121,7 +121,7 @@ def test_newey_predict_still_works() -> None:
     ``estat vif`` does not -- the two commands are served by different ado files.
     """
 
-    fitted = ws.newey("y ~ x1 + x2", _frame(), lag=2)
+    fitted = ws.newey_west("y ~ x1 + x2", _frame(), lag=2)
 
     values = np.asarray(fitted.predict(kind="xb"), dtype=float)
 
@@ -133,8 +133,8 @@ def test_the_vif_numbers_are_the_same_shape_for_both_members() -> None:
     """``regress`` and ``eivreg`` report the same two columns."""
 
     frame = _frame()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().estat_vif()
-    errors_in_variables = ws.Eivreg.from_formula(
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().estat_vif()
+    errors_in_variables = ws.ErrorsInVariablesRegress.from_formula(
         "y ~ x1 + x2", frame, reliab={"x1": 0.9, "x2": 0.85}
     ).fit().estat_vif()
 

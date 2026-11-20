@@ -51,13 +51,13 @@ def _frame(*, heteroskedastic: bool, n: int = 200, seed: int = 2900):
 @pytest.fixture(scope="module")
 def homoskedastic():
     frame = _frame(heteroskedastic=False)
-    return frame, ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 @pytest.fixture(scope="module")
 def heteroskedastic():
     frame = _frame(heteroskedastic=True)
-    return frame, ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 def _manual_statistic(frame: pd.DataFrame, residuals: np.ndarray, name: str):
@@ -226,7 +226,7 @@ def test_a_weighted_fit_is_refused() -> None:
 
     frame = _frame(heteroskedastic=False, n=120)
     weights = np.ones(len(frame))
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "y ~ x1 + x2", frame, weights=weights, weight_type="fweight"
     ).fit()
 
@@ -239,7 +239,7 @@ def test_a_clustered_fit_is_refused() -> None:
 
     frame = _frame(heteroskedastic=False, n=200)
     groups = pd.Series(np.arange(len(frame)) % 20, name="g")
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit(
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit(
         cov_type="cluster", cov_kwds={"groups": groups}
     )
 

@@ -43,12 +43,12 @@ def _frame(n: int = 300, seed: int = 5400):
 
 @pytest.fixture(scope="module")
 def regress_fit():
-    return ws.OLS.from_formula("y ~ x", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x", _frame()).fit()
 
 
 @pytest.fixture(scope="module")
 def qreg_fit():
-    return ws.QuantileRegression.from_formula("y ~ x", _frame()).fit()
+    return ws.QuantileRegress.from_formula("y ~ x", _frame()).fit()
 
 
 @pytest.fixture(scope="module")

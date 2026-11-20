@@ -26,7 +26,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError, ConvergenceError
 
-__all__ = ["PraisResult", "prais", "prais_winsten"]
+__all__ = ["PraisResults", "prais", "prais_winsten"]
 
 
 class Prais:
@@ -87,7 +87,7 @@ class Prais:
             corc=corc,
         )
 
-    def fit(self) -> PraisResult:
+    def fit(self) -> PraisResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _prais_impl(
@@ -228,7 +228,7 @@ def prais_winsten(
     return coefficients, current_rho, iterations, trace
 
 
-class PraisResult:
+class PraisResults:
     """Results of a Prais-Winsten AR(1) regression."""
 
     __slots__ = (
@@ -702,7 +702,7 @@ def prais(
     maxiter: int = 100,
     tolerance: float = 1e-6,
     corc: bool = False,
-) -> PraisResult:
+) -> PraisResults:
     """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.
 
     Thin wrapper over :class:`westata.Prais` -- the class is the implementation; this
@@ -719,7 +719,7 @@ def _prais_impl(
     maxiter: int = 100,
     tolerance: float = 1e-6,
     corc: bool = False,
-) -> PraisResult:
+) -> PraisResults:
     """Fit a Prais-Winsten AR(1) regression, as Stata's ``prais``.
 
     ``formula`` is a statsmodels/patsy style spec such as ``"y ~ x1 + x2"``. The data must
@@ -824,7 +824,7 @@ def _prais_impl(
         else float("nan")
     )
 
-    return PraisResult(
+    return PraisResults(
         params=coefficients,
         names=list(names),
         depvar=str(lhs),

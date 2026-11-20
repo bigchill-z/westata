@@ -80,7 +80,7 @@ def test_no_fake_step_number_is_emitted() -> None:
 
 
 def test_ols_has_no_iteration_line() -> None:
-    rendered = str(ws.OLS.from_formula("price ~ mpg", _auto()).fit().summary())
+    rendered = str(ws.Regress.from_formula("price ~ mpg", _auto()).fit().summary())
     assert "Iteration" not in rendered
 
 

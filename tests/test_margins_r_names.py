@@ -30,7 +30,7 @@ def fitted():
             "x1": rng.normal(size=n),
         }
     )
-    return ws.OLS.from_formula("y ~ x1", frame).fit()
+    return ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def test_the_margins_row_reports_the_six_table_rows(fitted) -> None:

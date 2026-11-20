@@ -77,7 +77,7 @@ def test_lag_two_matches(fitted) -> None:
 
 
 def test_the_package_prints_those_numbers(fitted) -> None:
-    rendered = str(ws.varwle(fitted))
+    rendered = str(ws.var_wle(fitted))
     assert "733.0650" in rendered or "733.065" in rendered
     assert "125.9184" in rendered or "125.918" in rendered
 

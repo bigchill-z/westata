@@ -87,7 +87,7 @@ def balance():
         threshold = distance.min()
         selected = controls[distance <= threshold + 1e-6]
         weights[selected] += 1.0 / selected.size
-    return ws.tebalance_summarize(
+    return ws.treatment_balance_summarize(
         treatment, frame[COVS].to_numpy(float), match_weights=weights, names=COVS
     )
 

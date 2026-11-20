@@ -39,7 +39,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError
 
-__all__ = ["LmarResult", "LmarRow", "varlmar", "veclmar"]
+__all__ = ["LmarResults", "LmarRow", "var_lmar", "vec_lmar"]
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class LmarRow:
 
 
 @dataclass(frozen=True)
-class LmarResult:
+class LmarResults:
     """Lagrange-multiplier test for residual autocorrelation."""
 
     rows: tuple[LmarRow, ...]
@@ -124,7 +124,7 @@ def _deterministic_block(trend: str, size: int) -> np.ndarray | None:
     raise ValueError(f"varlmar: unsupported deterministic specification {trend!r}")
 
 
-def varlmar(result: Any, *, mlag: int = 2) -> LmarResult:
+def var_lmar(result: Any, *, mlag: int = 2) -> LmarResults:
     """LM test for residual autocorrelation at each of lags ``1..mlag``.
 
     ``result`` must be a fitted VAR (or a VECM, whose residuals are the same object) exposing
@@ -196,10 +196,10 @@ def varlmar(result: Any, *, mlag: int = 2) -> LmarResult:
                 pvalue=float(stats.chi2.sf(statistic, degrees)),
             )
         )
-    return LmarResult(rows=tuple(rows))
+    return LmarResults(rows=tuple(rows))
 
 
-def veclmar(result: Any, *, mlag: int = 2) -> LmarResult:
+def vec_lmar(result: Any, *, mlag: int = 2) -> LmarResults:
     """VECM residual autocorrelation test, as ``veclmar``.
 
     ``veclmar.ado`` converts the VECM to its VAR form with ``_vec_postvar`` and forwards to
@@ -279,4 +279,4 @@ def veclmar(result: Any, *, mlag: int = 2) -> LmarResult:
                 pvalue=float(stats.chi2.sf(statistic, degrees)),
             )
         )
-    return LmarResult(rows=tuple(rows))
+    return LmarResults(rows=tuple(rows))

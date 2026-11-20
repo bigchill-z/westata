@@ -76,11 +76,11 @@ import pandas as pd
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["TefectsRaResult", "teffects_ra"]
+__all__ = ["TreatmentEffectsRaResults", "treatment_effects_ra"]
 
 
 @dataclass(frozen=True)
-class TefectsRaResult(ResultSerialisation):
+class TreatmentEffectsRaResults(ResultSerialisation):
     """``teffects ra``: regression-adjustment treatment effects."""
 
     ate: float
@@ -121,7 +121,7 @@ class TefectsRaResult(ResultSerialisation):
         return "\n".join(lines)
 
 
-class TeffectsRa:
+class TreatmentEffectsRa:
     """``teffects ra (depvar covariates) (treatment)`` -- regression adjustment.
 
     Class form of :func:`westata.teffects_ra` (R2.7).  Stata writes this subcommand with
@@ -183,7 +183,7 @@ class TeffectsRa:
             add_constant=add_constant,
         )
 
-    def fit(self) -> TefectsRaResult:
+    def fit(self) -> TreatmentEffectsRaResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _teffects_ra_impl(
@@ -195,14 +195,14 @@ class TeffectsRa:
         )
 
 
-def teffects_ra(
+def treatment_effects_ra(
     response: Any,
     treatment: Any,
     covariates: Any,
     *,
     estimand: str = "ate",
     add_constant: bool = True,
-) -> TefectsRaResult:
+) -> TreatmentEffectsRaResults:
     """Fit Stata's ``teffects ra`` -- thin wrapper over :class:`westata.TeffectsRa`."""
 
     return _teffects_ra_impl(
@@ -221,7 +221,7 @@ def _teffects_ra_impl(
     *,
     estimand: str = "ate",
     add_constant: bool = True,
-) -> TefectsRaResult:
+) -> TreatmentEffectsRaResults:
     """Regression-adjustment treatment effect, as ``teffects ra (y x) (t)``.
 
     ``covariates`` is an ``(n, k)`` array; a constant column is prepended unless
@@ -278,7 +278,7 @@ def _teffects_ra_impl(
     atet = float((mu_1 - mu_0)[treated].mean())
     estimate = ate if key == "ate" else atet
 
-    return TefectsRaResult(
+    return TreatmentEffectsRaResults(
         ate=ate,
         po_0=po_0,
         po_1=po_1,

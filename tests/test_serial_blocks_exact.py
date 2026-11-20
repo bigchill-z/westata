@@ -35,7 +35,7 @@ def three_regressor():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +46,7 @@ def five_regressor():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
 
 
 def test_dwatson_opens_with_a_blank_line(three_regressor) -> None:
@@ -72,7 +72,7 @@ def test_dwatson_matches_a_third_fit(three_regressor) -> None:
     """icecream's value is 1.021169 -- six decimals with no trailing zero to drop."""
 
     frame = pd.read_stata(ICECREAM)
-    fitted = ws.OLS.from_formula("consumption ~ price + income + temp", frame).fit()
+    fitted = ws.Regress.from_formula("consumption ~ price + income + temp", frame).fit()
     assert str(ws.estat_dwatson(fitted)).rstrip().endswith("1.021169")
 
 

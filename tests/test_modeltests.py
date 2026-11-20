@@ -30,7 +30,7 @@ from scipy import stats
 
 import westata as ws
 from westata.errors import ConsistencyError
-from westata.postestimation.modeltests import HausmanResult, LRTestResult, hausman, lrtest
+from westata.postestimation.modeltests import HausmanResults, LRTestResults, hausman, lrtest
 
 
 # --------------------------------------------------------------------- fixtures
@@ -56,11 +56,11 @@ def _panel(n_entities: int = 40, n_periods: int = 6, seed: int = 21) -> pd.DataF
 
 
 def _fe(frame: pd.DataFrame, formula: str = "y ~ x1 + x2"):
-    return ws.PanelOLS.from_formula(formula, frame, entity="firm", time="year").fit()
+    return ws.PanelRegressFE.from_formula(formula, frame, entity="firm", time="year").fit()
 
 
 def _re(frame: pd.DataFrame, formula: str = "y ~ x1 + x2"):
-    return ws.RandomEffects.from_formula(formula, frame, entity="firm", time="year").fit()
+    return ws.PanelRegressRE.from_formula(formula, frame, entity="firm", time="year").fit()
 
 
 class _StubResult:
@@ -82,8 +82,8 @@ def test_lrtest_matches_hand_computation_and_chi2():
     """``y ~ x1`` vs ``y ~ x1 + x2``: LR == 2(ll_u - ll_r), df == 1."""
 
     frame = _frame()
-    restricted = ws.OLS.from_formula("y ~ x1", frame).fit()
-    unrestricted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", frame).fit()
+    unrestricted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     outcome = unrestricted.lrtest(restricted)
 
@@ -99,8 +99,8 @@ def test_lrtest_matches_hand_computation_and_chi2():
 
 def test_lrtest_uses_the_parameter_count_difference_as_df():
     frame = _frame()
-    restricted = ws.OLS.from_formula("y ~ x1", frame).fit()
-    unrestricted = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", frame).fit()
+    unrestricted = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
 
     outcome = unrestricted.lrtest(restricted)
     expected = 2.0 * (unrestricted.llf - restricted.llf)
@@ -116,8 +116,8 @@ def test_lrtest_matches_statsmodels_loglikelihood():
     import statsmodels.api as sm
 
     frame = _frame()
-    restricted = ws.OLS.from_formula("y ~ x1", frame).fit()
-    unrestricted = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", frame).fit()
+    unrestricted = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
 
     big = sm.OLS(frame["y"], sm.add_constant(frame[["x1", "x2", "x3"]])).fit()
     small = sm.OLS(frame["y"], sm.add_constant(frame[["x1"]])).fit()
@@ -146,8 +146,8 @@ def test_lrtest_identical_models_is_refused_like_stata_r498():
     """
 
     frame = _frame()
-    first = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
-    second = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    first = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
+    second = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     with pytest.raises(ConsistencyError, match="r\\(498\\)"):
         first.lrtest(second)
@@ -168,8 +168,8 @@ def test_lrtest_equal_parameter_counts_of_different_models_is_also_r498():
     """
 
     frame = _frame()
-    left = ws.OLS.from_formula("y ~ x1", frame).fit()
-    right = ws.OLS.from_formula("y ~ x2", frame).fit()
+    left = ws.Regress.from_formula("y ~ x1", frame).fit()
+    right = ws.Regress.from_formula("y ~ x2", frame).fit()
 
     with pytest.raises(ConsistencyError, match="r\\(498\\)"):
         left.lrtest(right)
@@ -194,8 +194,8 @@ def test_lrtest_swaps_the_arguments_the_way_stata_does():
     """
 
     frame = _frame()
-    small = ws.OLS.from_formula("y ~ x1", frame).fit()
-    big = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    small = ws.Regress.from_formula("y ~ x1", frame).fit()
+    big = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     forward = small.lrtest(big)
     backward = big.lrtest(small)
@@ -209,8 +209,8 @@ def test_lrtest_swaps_the_arguments_the_way_stata_does():
 
 def test_lrtest_rejects_different_sample_sizes():
     frame = _frame(n=300)
-    full = ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
-    trimmed = ws.OLS.from_formula("y ~ x1", frame.iloc[:200]).fit()
+    full = ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    trimmed = ws.Regress.from_formula("y ~ x1", frame.iloc[:200]).fit()
 
     assert full.nobs != trimmed.nobs
     with pytest.raises(ConsistencyError, match="different samples"):
@@ -233,8 +233,8 @@ def test_lrtest_warns_and_still_reports_a_negative_statistic():
     clean = pd.DataFrame({"y": 1.0 + x1 + rng.normal(scale=0.05, size=n), "x1": x1, "x2": x2})
     noisy = pd.DataFrame({"y": 1.0 + x1 + rng.normal(scale=5.0, size=n), "x1": x1, "x2": x2})
 
-    restricted = ws.OLS.from_formula("y ~ x1", clean).fit()
-    unrestricted = ws.OLS.from_formula("y ~ x1 + x2", noisy).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", clean).fit()
+    unrestricted = ws.Regress.from_formula("y ~ x1 + x2", noisy).fit()
 
     assert unrestricted.llf < restricted.llf
     with pytest.warns(RuntimeWarning, match="lower log-likelihood"):
@@ -248,7 +248,7 @@ def test_lrtest_warns_and_still_reports_a_negative_statistic():
 
 def test_lrtest_rejects_a_model_without_a_log_likelihood():
     frame = _frame()
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     missing = _StubResult(param_names=["Intercept", "x1"], nobs=fitted.nobs, llf=float("nan"))
 
     with pytest.raises(ConsistencyError, match="log-likelihood"):
@@ -257,13 +257,13 @@ def test_lrtest_rejects_a_model_without_a_log_likelihood():
 
 def test_lrtest_is_also_available_as_a_free_function():
     frame = _frame()
-    restricted = ws.OLS.from_formula("y ~ x1", frame).fit()
-    unrestricted = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", frame).fit()
+    unrestricted = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     via_method = unrestricted.lrtest(restricted)
     via_function = lrtest(unrestricted, restricted)
 
-    assert isinstance(via_function, LRTestResult)
+    assert isinstance(via_function, LRTestResults)
     assert via_function.statistic == pytest.approx(via_method.statistic, rel=0.0)
     assert via_function.df == via_method.df
     assert via_function.pvalue == via_method.pvalue
@@ -271,11 +271,11 @@ def test_lrtest_is_also_available_as_a_free_function():
 
 def test_lrtest_result_is_a_frozen_dataclass():
     frame = _frame()
-    outcome = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().lrtest(
-        ws.OLS.from_formula("y ~ x1", frame).fit()
+    outcome = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().lrtest(
+        ws.Regress.from_formula("y ~ x1", frame).fit()
     )
 
-    assert isinstance(outcome, LRTestResult)
+    assert isinstance(outcome, LRTestResults)
     with pytest.raises(Exception):  # frozen dataclass
         outcome.statistic = 0.0  # type: ignore[misc]
 
@@ -405,7 +405,7 @@ def test_hausman_falls_back_to_a_generalised_inverse_and_warns():
 
     # The generalised-inverse path is exercised: the statistic is finite and
     # never negative, and the p-value stays a probability.
-    assert isinstance(outcome, HausmanResult)
+    assert isinstance(outcome, HausmanResults)
     assert np.isfinite(outcome.statistic)
     assert outcome.statistic >= 0.0
     assert 0.0 <= outcome.pvalue <= 1.0
@@ -425,7 +425,7 @@ def test_hausman_rejects_different_sample_sizes():
 def test_hausman_rejects_models_sharing_no_slope():
     frame = _panel()
     fe = _fe(frame, "y ~ x1")
-    other = ws.OLS.from_formula("y ~ x2", frame).fit()
+    other = ws.Regress.from_formula("y ~ x2", frame).fit()
 
     with pytest.raises(ConsistencyError, match="share no"):
         fe.hausman(other)
@@ -439,7 +439,7 @@ def test_hausman_is_also_available_as_a_free_function():
     via_method = fe.hausman(re)
     via_function = hausman(fe, re)
 
-    assert isinstance(via_function, HausmanResult)
+    assert isinstance(via_function, HausmanResults)
     assert via_function.statistic == pytest.approx(via_method.statistic, rel=0.0)
     assert via_function.df == via_method.df
     assert via_function.excluded == via_method.excluded
@@ -524,8 +524,8 @@ def test_lrtest_nested_regress_matches_stata():
     """``lrtest RU RR``: chi2 = 2.41124840273977, df = 1, p = .12046626248080883."""
 
     frame = _auto()
-    big = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
-    small = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    big = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
+    small = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     outcome = ws.lrtest(big, small)
     assert outcome.statistic == pytest.approx(2.41124840273977, rel=1e-9)
@@ -537,8 +537,8 @@ def test_lrtest_accepts_either_argument_order_like_stata():
     """``lrtest L1 B1`` relabels the pair; Stata still reports the same numbers."""
 
     frame = _auto()
-    big = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
-    small = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    big = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
+    small = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     reversed_ = ws.lrtest(small, big)
     assert reversed_.statistic == pytest.approx(2.41124840273977, rel=1e-9)
@@ -556,8 +556,8 @@ def test_lrtest_non_nested_reports_the_negative_statistic_stata_reports():
     """
 
     frame = _auto()
-    other = ws.OLS.from_formula("mpg ~ foreign + length", frame).fit()
-    weight_only = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    other = ws.Regress.from_formula("mpg ~ foreign + length", frame).fit()
+    weight_only = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     with pytest.warns(RuntimeWarning):
         outcome = ws.lrtest(other, weight_only)
@@ -617,7 +617,7 @@ def test_hausman_constant_is_reachable_through_the_result_method():
     with pytest.warns(RuntimeWarning, match="not positive definite"):
         via_function = hausman(fe, re, constant=True)
 
-    assert isinstance(via_method, HausmanResult)
+    assert isinstance(via_method, HausmanResults)
     assert via_method.df == 3
     assert via_method.statistic == pytest.approx(0.952546096131752, rel=1e-9)
     # Forwarding must not perturb the number: identical to the free function.

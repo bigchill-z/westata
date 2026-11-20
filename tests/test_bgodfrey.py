@@ -48,7 +48,7 @@ def fitted():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
     frame = frame.sort_values("time").reset_index(drop=True)
-    return ws.OLS.from_formula("consumption ~ temp + price + income", frame).fit()
+    return ws.Regress.from_formula("consumption ~ temp + price + income", frame).fit()
 
 
 def test_every_lag_matches_stata(fitted) -> None:
@@ -78,7 +78,7 @@ def test_robust_fits_are_refused(fitted) -> None:
     """``bgodfrey.ado:5-10`` rejects a robust regression, and so does this."""
 
     frame = pd.read_stata(DATA, convert_categoricals=False).sort_values("time")
-    robust = ws.OLS.from_formula(
+    robust = ws.Regress.from_formula(
         "consumption ~ temp + price + income", frame.reset_index(drop=True)
     ).fit(cov_type="hc1")
     with pytest.raises(Exception):

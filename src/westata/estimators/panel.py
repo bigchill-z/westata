@@ -183,10 +183,10 @@ from westata.results.base import StataResults
 from westata.vce.ssc import resolve_ssc
 
 __all__ = [
-    "PanelOLS",
-    "RandomEffects",
-    "BetweenOLS",
-    "FirstDifferenceOLS",
+    "PanelRegressFE",
+    "PanelRegressRE",
+    "PanelRegressBE",
+    "PanelRegressFD",
 ]
 
 #: ``cov_type`` (lower-case) -> the covariance Stata actually produces here.
@@ -299,7 +299,7 @@ _XTREG_TITLES = {
 }
 
 
-class PanelOLS:
+class PanelRegressFE:
     """Fixed-effects panel regression (Stata ``xtreg, fe``).
 
     Parameters
@@ -2049,7 +2049,7 @@ class PanelOLS:
         return float("nan")
 
 
-class RandomEffects(PanelOLS):
+class PanelRegressRE(PanelRegressFE):
     """Random-effects GLS (Stata ``xtreg, re``).
 
     Uses linearmodels' default Swamy-Arora variance-component estimator; the
@@ -2531,7 +2531,7 @@ def _stats_norm_ppf(q: float) -> float:
     return float(_stats.norm.ppf(q))
 
 
-class RandomEffectsMLE(RandomEffects):
+class PanelRegressMLE(PanelRegressRE):
     """Random-effects by MAXIMUM LIKELIHOOD (Stata ``xtreg, mle``).
 
     ``xtreg, re`` is a GLS estimator that plugs in Swamy-Arora variance components;
@@ -2734,7 +2734,7 @@ class RandomEffectsMLE(RandomEffects):
         return results
 
 
-class BetweenOLS(RandomEffects):
+class PanelRegressBE(PanelRegressRE):
     """Between estimator on entity means (Stata ``xtreg, be``).
 
     The regression runs on one row per entity, so ``e(N)`` is the number of
@@ -2815,7 +2815,7 @@ class BetweenOLS(RandomEffects):
         return df_resid
 
 
-class FirstDifferenceOLS(RandomEffects):
+class PanelRegressFD(PanelRegressRE):
     """First-difference estimator (Stata ``xtreg, fd``).
 
     Periods are differenced (``t`` against ``t - 1``, so a missing period is not

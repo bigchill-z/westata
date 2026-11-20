@@ -76,26 +76,26 @@ print("### A-tier random spot check (12 claims, all originally <=1e-9)")
 
 check("linear_iv #1 regress mpg weight foreign",
       A, None, "regress mpg weight foreign",
-      lambda: ws.OLS.from_formula("mpg ~ weight + foreign", A).fit(),
+      lambda: ws.Regress.from_formula("mpg ~ weight + foreign", A).fit(),
       scalars=("N", "df_r", "r2", "rmse"))
 
 check("linear_iv #2 regress i.foreign (factor alignment)",
       A, None, "regress mpg weight i.foreign",
-      lambda: ws.OLS.from_formula("mpg ~ weight + C(foreign)", A).fit())
+      lambda: ws.Regress.from_formula("mpg ~ weight + C(foreign)", A).fit())
 
 check("linear_iv #6 cluster 14 groups",
       P, None, "regress y x1 x2, vce(cluster gid)",
-      lambda: ws.OLS.from_formula("y ~ x1 + x2", P).fit(
+      lambda: ws.Regress.from_formula("y ~ x1 + x2", P).fit(
           cov_type="cluster", cov_kwds={"groups": P["gid"].to_numpy()}))
 
 check("linear_iv #10 fweight",
       P, None, "regress y x1 x2 [fweight=w]",
-      lambda: ws.OLS.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
+      lambda: ws.Regress.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
                                   weight_type="fweight").fit())
 
 check("linear_iv #pweight",
       P, None, "regress y x1 x2 [pweight=w]",
-      lambda: ws.OLS.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
+      lambda: ws.Regress.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
                                   weight_type="pweight").fit())
 
 check("linear_iv #10a ivregress 2sls",
@@ -108,29 +108,29 @@ check("linear_iv #12a ivregress gmm (e(V) full matrix checked below)",
 
 check("linear_iv #13 eivreg",
       P, None, "eivreg y x1 x2, reliab(x1 .9 x2 .95)",
-      lambda: ws.Eivreg.from_formula("y ~ x1 + x2", P,
+      lambda: ws.ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", P,
                                      reliab={"x1": 0.9, "x2": 0.95}).fit())
 
 check("panel #xtreg fe",
       P, "xtset gid t", "xtreg y x1 x2, fe",
-      lambda: ws.PanelOLS.from_formula("y ~ x1 + x2", P, entity="gid", time="t").fit())
+      lambda: ws.PanelRegressFE.from_formula("y ~ x1 + x2", P, entity="gid", time="t").fit())
 
 check("panel #xtreg re",
       P, "xtset gid t", "xtreg y x1 x2, re",
-      lambda: ws.RandomEffects.from_formula("y ~ x1 + x2", P, entity="gid", time="t").fit())
+      lambda: ws.PanelRegressRE.from_formula("y ~ x1 + x2", P, entity="gid", time="t").fit())
 
 check("systems #sureg 2eq",
       A.dropna(), None, "sureg (price weight mpg) (mpg weight foreign)",
-      lambda: ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
+      lambda: ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
                                     A.dropna()).fit())
 
 check("systems #mvreg",
       A.dropna(), None, "mvreg price mpg = weight foreign",
-      lambda: ws.Mvreg.from_formula("price mpg = weight + foreign", A.dropna()).fit())
+      lambda: ws.MultivariateRegress.from_formula("price mpg = weight + foreign", A.dropna()).fit())
 
 check("linear_iv #7a areg absorb(gid)",
       P, None, "areg y x1 x2, absorb(gid)",
-      lambda: ws.FEOLS.from_formula("y ~ x1 + x2 | gid", P).fit())
+      lambda: ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", P).fit())
 
 check("discrete #1 logit",
       A, None, "logit foreign weight mpg",
@@ -152,7 +152,7 @@ with S() as s:
 
     s.send(A.dropna())
     b, V, nm = s.est("sureg (price weight mpg) (mpg weight foreign)")
-    su = ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
+    su = ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
                                A.dropna()).fit()
     print(f"  sureg full e(V) ({len(nm)}x{len(nm)}) rel = "
           f"{rel(np.asarray(su.cov_params()).reshape(-1), V.reshape(-1)):.4e}  (positional: "
@@ -166,7 +166,7 @@ with S() as s:
     s.run("quietly regress mpg weight foreign")
     s.run("test weight foreign")
     print(f"  Stata test weight foreign: F={s.r('F')} df={s.r('df')} p={s.r('p')}")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", A).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", A).fit()
     t = m.test("weight", "foreign")
     print(f"  westata test            : {t}")
     s.run("lincom 2*weight - 3*foreign")

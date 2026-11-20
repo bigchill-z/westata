@@ -48,7 +48,7 @@ def frames():
     return small, small.assign(hi=(small["lnw"] > small["lnw"].median()).astype(float))
 
 
-@pytest.mark.parametrize("model", ["OLS", "Poisson"])
+@pytest.mark.parametrize("model", ["Regress", "Poisson"])
 def test_continuous_models_render_identically(frames, model: str) -> None:
     small, _ = frames
     cls = getattr(ws, model)
@@ -99,7 +99,7 @@ def test_the_iteration_output_models_are_only_missing_the_iteration_lines(frames
     """
 
     small, _ = frames
-    rendered = str(ws.RobustRegression.from_formula("lnw ~ s + expr", small).fit().summary(style="stata"))
+    rendered = str(ws.RobustRegress.from_formula("lnw ~ s + expr", small).fit().summary(style="stata"))
     assert "Robust regression" in rendered
     assert "Huber iteration" not in rendered
     assert "|" in rendered          # the coefficient table itself IS present

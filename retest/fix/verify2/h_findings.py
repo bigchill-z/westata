@@ -101,7 +101,7 @@ def h2():
         s.q(spec + " vce(cluster id)")
         sd = {key: s.sc(f"e({key})") for key in ("df_m", "df_b", "rank", "df_r", "F")}
         form = "y ~ x1 + x2" if k == 2 else "y ~ x1"
-        w = ws.PanelOLS.from_formula(form, df, entity="id", time="t").fit(
+        w = ws.PanelRegressFE.from_formula(form, df, entity="id", time="t").fit(
             cov_type="cluster", cov_kwds={"clusters": df["id"].to_numpy()})
         wd = {key: w.e.get(key) for key in ("df_m", "df_b", "rank", "df_r", "F")}
         print(f"  {spec} vce(cluster id)  ({k} slopes)")

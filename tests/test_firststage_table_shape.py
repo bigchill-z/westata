@@ -40,14 +40,14 @@ def _two_endogenous(n: int = 300, seed: int = 889):
 def multi():
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 + e2 ~ z1 + z2]", frame).fit()
-    return result.estat_firststage()
+    return result.estat_first_stage()
 
 
 @pytest.fixture(scope="module")
 def single(multi):
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 ~ z1]", frame).fit()
-    return result.estat_firststage()
+    return result.estat_first_stage()
 
 
 def test_one_endogenous_regressor_uses_the_r_squared_table(single) -> None:
@@ -143,8 +143,8 @@ def test_the_all_option_shows_the_r_squared_block_for_many_endogenous() -> None:
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 + e2 ~ z1 + z2]", frame).fit()
 
-    default = str(result.estat_firststage())
-    with_all = str(result.estat_firststage(all=True))
+    default = str(result.estat_first_stage())
+    with_all = str(result.estat_first_stage(all=True))
 
     assert "Shea" in default
     assert "R-sq." in with_all
@@ -157,8 +157,8 @@ def test_the_all_option_changes_nothing_for_one_endogenous() -> None:
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 ~ z1]", frame).fit()
 
-    default = result.estat_firststage()
-    with_all = result.estat_firststage(all=True)
+    default = result.estat_first_stage()
+    with_all = result.estat_first_stage(all=True)
 
     assert str(default) == str(with_all)
     assert np.array_equal(default.r2, with_all.r2)
@@ -170,8 +170,8 @@ def test_the_numbers_are_the_same_in_both_tables() -> None:
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 + e2 ~ z1 + z2]", frame).fit()
 
-    default = result.estat_firststage()
-    with_all = result.estat_firststage(all=True)
+    default = result.estat_first_stage()
+    with_all = result.estat_first_stage(all=True)
 
     assert np.array_equal(default.partial_r2, with_all.partial_r2)
     assert np.array_equal(default.f, with_all.f)
@@ -183,5 +183,5 @@ def test_the_flag_is_readable_afterwards() -> None:
     frame = _two_endogenous()
     result = ws.IV2SLS.from_formula("y ~ x + [e1 + e2 ~ z1 + z2]", frame).fit()
 
-    assert result.estat_firststage().show_all is False
-    assert result.estat_firststage(all=True).show_all is True
+    assert result.estat_first_stage().show_all is False
+    assert result.estat_first_stage(all=True).show_all is True

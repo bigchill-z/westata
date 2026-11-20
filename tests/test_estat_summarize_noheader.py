@@ -25,7 +25,7 @@ def result():
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    return frame, ws.OLS.from_formula("y ~ x1", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def test_the_default_prints_the_header(result) -> None:
@@ -95,7 +95,7 @@ def test_a_clustered_table_keeps_its_group_block(result) -> None:
 
     frame, fitted = result
     frame_with_groups = frame.assign(grp=np.arange(len(frame)) % 10)
-    with_cluster = ws.OLS.from_formula("y ~ x1", frame_with_groups).fit()
+    with_cluster = ws.Regress.from_formula("y ~ x1", frame_with_groups).fit()
 
     full = with_cluster.estat_summarize(
         cluster=frame_with_groups["grp"], cluster_name="grp"

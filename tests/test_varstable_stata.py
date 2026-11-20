@@ -47,12 +47,12 @@ def fitted():
 
 
 def test_every_line_matches_stata(fitted) -> None:
-    rendered = str(ws.varstable(fitted)).splitlines()
+    rendered = str(ws.var_stable(fitted)).splitlines()
     assert rendered == STATA_TABLE
 
 
 def test_the_complex_pair_shares_a_modulus(fitted) -> None:
-    result = ws.varstable(fitted)
+    result = ws.var_stable(fitted)
     # The result exposes the eigenvalues; the printed modulus repeats for a conjugate pair.
     moduli = [abs(complex(value)) for value in np.asarray(result.eigenvalues, dtype=complex)]
     assert moduli[2] == pytest.approx(moduli[3], abs=1e-12)
@@ -60,6 +60,6 @@ def test_the_complex_pair_shares_a_modulus(fitted) -> None:
 
 
 def test_the_stability_conclusion_is_based_on_the_unit_circle(fitted) -> None:
-    result = ws.varstable(fitted)
+    result = ws.var_stable(fitted)
     assert bool(result.stable) is True
     assert max(abs(complex(v)) for v in np.asarray(result.eigenvalues, dtype=complex)) < 1.0

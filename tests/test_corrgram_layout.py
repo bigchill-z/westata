@@ -56,8 +56,8 @@ def correlogram():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
-    fitted = ws.OLS.from_formula("consumption ~ price + income + temp", frame).fit()
-    return ws.estat_corrgram(fitted, lags=13)
+    fitted = ws.Regress.from_formula("consumption ~ price + income + temp", frame).fit()
+    return ws.estat_correlogram(fitted, lags=13)
 
 
 def test_the_whole_block_matches_stata(correlogram) -> None:

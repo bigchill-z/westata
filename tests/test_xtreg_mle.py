@@ -45,7 +45,7 @@ def mle():
         frame = _frame()
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("lin_1992.dta is not available")
-    return ws.RandomEffectsMLE.from_formula(
+    return ws.PanelRegressMLE.from_formula(
         FORMULA, frame, entity="province", time="year"
     ).fit()
 
@@ -80,7 +80,7 @@ def test_mle_is_not_the_gls_estimator(mle) -> None:
     """Guard against the two being confused: sigma_u differs by 60%."""
 
     frame = _frame()
-    gls = ws.RandomEffects.from_formula(
+    gls = ws.PanelRegressRE.from_formula(
         FORMULA, frame, entity="province", time="year"
     ).fit()
     assert float(gls.params["ltlan"]) == pytest.approx(0.565591486884, abs=1e-9)

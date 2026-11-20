@@ -58,8 +58,8 @@ westata **不支持 `##`**（`FormulaError`），用户写 `price ~ mpg * C(fore
 | `xtreg ..., re` / `fe` / `be` | **无** |
 | `xtlogit ..., fe` | 拟合失败（munnell 的 `y` 不适合），未采到 |
 | `var consumption temp price, lags(1/2)` | `Sample: 3 thru 30`（**表内已有**，非遗漏）|
-| `vecrank consumption price, lags(2)` | `Sample: 3 thru 30`（同上）|
-| `varsoc ...` | 无 |
+| `vec_rank consumption price, lags(2)` | `Sample: 3 thru 30`（同上）|
+| `var_select_order ...` | 无 |
 | **`prais ..., corc`** | **`Iteration 0: rho = 0.0000` × 7** |
 | `ivregress 2sls`（两种设定）| 无 |
 | **`heckman`** | **`Iteration k: Log likelihood = ...` × 16，含 `(not concave)` × 12** |
@@ -121,7 +121,7 @@ Logistic regression                                     Number of obs =     74
 ### `prais.ado:172-217` 的循环
 
 ```stata
-scalar rho = 0                 // 起点是 0，不是 OLS 残差算出的值
+scalar rho = 0                 // 起点是 0，不是 Regress 残差算出的值
 scalar lastrho = 2
 local it_ct = 0
 while it_ct < iterate & abs(rho - lastrho) > toleran {
@@ -153,7 +153,7 @@ rho = Σ(e_t · e_{t-1}) / Σ(e_{t-1}²)
 **不是** `Σ(e_t·e_{t-1}) / Σ(e_t²)`。用后者第一步得 `0.3298`，用前者得 **`0.4006`**——
 **与 Stata 的 `Iteration 1` 精确一致**。
 
-**② westata 的起点不同**：它用 OLS 残差算出的 rho 起步，Stata 从 **0** 起步。
+**② westata 的起点不同**：它用 Regress 残差算出的 rho 起步，Stata 从 **0** 起步。
 
 ### 为什么本轮没有落地
 
@@ -201,7 +201,7 @@ sum vals;  scalar rho = numer / r(sum)
 rho = 0 ; lastrho = 2 ; it_ct = 0
 while it_ct < iterate & abs(rho - lastrho) > toleran {
     lastrho = rho
-    predict resid            // 【上一轮拟合】的残差（首轮是普通 OLS）
+    predict resid            // 【上一轮拟合】的残差（首轮是普通 Regress）
     rho = crcar1(resid)      // 由该残差算新 rho
     if it_ct == 0 { 打印 "Iteration 0:  rho = 0" }   // 字面量 0
     prais_e : rho            // 【用新 rho 拟合】
@@ -211,7 +211,7 @@ while it_ct < iterate & abs(rho - lastrho) > toleran {
 ```
 
 **每一轮打印的 rho，既是本轮残差步的结果，也是下一轮拟合采用的 rho。**
-把"拟合"和"算 rho"当成一个整体、并用 OLS 估计值重新播种，
+把"拟合"和"算 rho"当成一个整体、并用 Regress 估计值重新播种，
 就会得到 `0.3895, 0.3975, 0.3999…` 而不是 Stata 的 `0.4008, 0.4009…`。
 
 ### 独立脚本验证结果（100% 命中）
@@ -421,7 +421,7 @@ westata 的 `IPW`/`AIPW` 在优化失败时**静默返回**，源码里没有任
 |---|---|
 | 横截面（regress/logit/probit/poisson/nbreg/zip/summarize/tabulate/correlate/ivregress）| ✅ |
 | 面板（xtreg re/fe/be、xtlogit fe/re、xtprobit）| ✅ |
-| 时间序列（var/vecrank/varsoc/prais）| ✅ |
+| 时间序列（var/vec_rank/var_select_order/prais）| ✅ |
 | postestimation（estat ic/vif/hettest/imtest/summarize/ovtest/dwatson）| ✅ |
 | 处理效应（teffects ra/ipw/psmatch/nnmatch）| ✅ |
 | **ML 迭代日志中间值** | ❌ 算法路径差异，待用户决策 |
@@ -566,7 +566,7 @@ note: 1 group (6 obs) dropped because of all zero outcomes
 
 | 维度 | 覆盖 |
 |---|---|
-| 命令族 | 横截面（regress/logit/probit/poisson/nbreg/zip/summarize/tabulate/correlate/ivregress）、面板（xtreg re/fe/be、xtlogit/xtprobit/xtpoisson/xtnbreg/xtgls/xtpcse）、时间序列（var/vecrank/varsoc/prais）、postestimation（estat ic/vif/hettest/imtest/summarize/ovtest/dwatson/lrtest）、处理效应（teffects ra/ipw/psmatch/nnmatch） |
+| 命令族 | 横截面（regress/logit/probit/poisson/nbreg/zip/summarize/tabulate/correlate/ivregress）、面板（xtreg re/fe/be、xtlogit/xtprobit/xtpoisson/xtnbreg/xtgls/xtpcse）、时间序列（var/vec_rank/var_select_order/prais）、postestimation（estat ic/vif/hettest/imtest/summarize/ovtest/dwatson/lrtest）、处理效应（teffects ra/ipw/psmatch/nnmatch） |
 | 说明类别 | `note:`、`Note:`、`Warning:`、`Assumption:`、`Iteration`、收敛警告、`(omitted)` 行、星号脚注 |
 | 方法 | ① 57+ 次活体 Stata 输出探测 ② 3962 个 ado 文件的 display 语句源码扫描 ③ 边界数据实测（非整数因变量、全零组、时间缺口、301 次未收敛） |
 | 文档 | `NOTES_AUDIT.md` 9 轮共 559 行，逐项记录生产者、触发条件、精确文案、处理结果 |

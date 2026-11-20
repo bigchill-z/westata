@@ -53,10 +53,10 @@ def block():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("munnell.dta is not available")
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         FORMULA, frame, entity="st_abb", time="year"
     ).fit()
-    return ws.xttest0(result, entity=frame["st_abb"].to_numpy())
+    return ws.panel_test0(result, entity=frame["st_abb"].to_numpy())
 
 
 def test_the_test_statistic_is_unchanged(block) -> None:

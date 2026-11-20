@@ -91,7 +91,7 @@ def frame() -> pd.DataFrame:
 
 def _fit(frame: pd.DataFrame, cov: str | None):
     kw = {"groups": frame["pid"]} if cov == "cluster" else None
-    return ws.PanelOLS.from_formula(
+    return ws.PanelRegressFE.from_formula(
         f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
     ).fit(cov_type=cov, cov_kwds=kw)
 
@@ -151,7 +151,7 @@ def test_robust_is_a_cluster_vce_not_hc1(frame) -> None:
     """``fe r`` == ``fe vce(cluster pid)``; it is NOT the HC1 of ``regress, robust``."""
 
     frame["pid"] = frame["province"]
-    explicit = ws.PanelOLS.from_formula(
+    explicit = ws.PanelRegressFE.from_formula(
         f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["pid"]})
     assert explicit.e.get("N_clust") == 28
@@ -171,7 +171,7 @@ def test_clustered_xtreg_stores_the_keys_stata_stores(frame) -> None:
     """
 
     frame["pid"] = frame["province"]
-    clustered = ws.PanelOLS.from_formula(
+    clustered = ws.PanelRegressFE.from_formula(
         f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["pid"]})
     assert clustered.e.get("vcetype") == "Robust"
@@ -187,7 +187,7 @@ def test_the_table_prints_statas_cluster_note_and_robust_heading(frame) -> None:
     """The two lines that were missing while every number was correct."""
 
     frame["pid"] = frame["province"]
-    clustered = ws.PanelOLS.from_formula(
+    clustered = ws.PanelRegressFE.from_formula(
         f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["pid"]})
     rendered = str(clustered.summary())
@@ -221,7 +221,7 @@ def test_a_cluster_series_works_on_every_supported_linearmodels(frame) -> None:
     from westata.estimators.panel import _as_cluster_block
 
     frame["pid"] = frame["province"]
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         f"{Y} ~ " + " + ".join(XS), frame, entity="pid", time="t"
     )
     _, labels, n_clust = model._resolve_cov("cluster", {"groups": frame["pid"]})
@@ -237,10 +237,10 @@ def test_a_plain_array_of_labels_is_still_a_blind_cluster(frame) -> None:
 
     frame["pid"] = frame["province"]
     formula = f"{Y} ~ " + " + ".join(XS)
-    as_series = ws.PanelOLS.from_formula(formula, frame, entity="pid", time="t").fit(
+    as_series = ws.PanelRegressFE.from_formula(formula, frame, entity="pid", time="t").fit(
         cov_type="cluster", cov_kwds={"groups": frame["pid"]}
     )
-    as_array = ws.PanelOLS.from_formula(formula, frame, entity="pid", time="t").fit(
+    as_array = ws.PanelRegressFE.from_formula(formula, frame, entity="pid", time="t").fit(
         cov_type="cluster", cov_kwds={"groups": frame["pid"].to_numpy()}
     )
     assert float(as_array.bse["ltlan"]) == pytest.approx(

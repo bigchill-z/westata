@@ -31,7 +31,7 @@ with Stata() as st:
     cc = st.estimate("xtreg yy x1, fe vce(cluster id)")
     print("xtreg fe robust :", cr.names, np.sqrt(np.diag(cr.V)))
     print("xtreg fe cluster:", cc.names, np.sqrt(np.diag(cc.V)))
-    p = ws.PanelOLS.from_formula("yy ~ x1", p2, entity="id", time="t")
+    p = ws.PanelRegressFE.from_formula("yy ~ x1", p2, entity="id", time="t")
     rh = p.fit(cov_type="HC1"); rc = p.fit(cov_type="cluster", cov_kwds={"groups": p2["id"]})
     print("west HC1    :", list(rh.param_names), np.asarray(rh.bse))
     print("west cluster:", list(rc.param_names), np.asarray(rc.bse))

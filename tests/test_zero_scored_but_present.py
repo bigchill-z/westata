@@ -79,6 +79,6 @@ def test_the_absent_features_are_still_absent() -> None:
     # ``xtserial`` used to be listed here as absent.  Recorded as "not verifiable in
     # this environment", which turned out to be an install step nobody had tried:
     # net install xtserial, from("http://www.stata.com/users/ddrukker").
-    assert callable(ws.xtserial)
+    assert callable(ws.panel_serial)
     assert callable(ws.synth)
     assert callable(ws.synth2)

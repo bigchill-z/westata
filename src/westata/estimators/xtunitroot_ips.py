@@ -33,7 +33,7 @@ from scipy import stats
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["IpsResult", "im_pesaran_shin"]
+__all__ = ["IpsResults", "im_pesaran_shin"]
 
 #: ``_ipstab1`` table 1: T, mean of t, variance of t. The last row is the limit.
 _IPS_MEAN_VAR: tuple[tuple[float, float, float], ...] = (
@@ -75,7 +75,7 @@ _IPS_TILDE_MEAN_VAR: tuple[tuple[float, float, float], ...] = (
 
 
 @dataclass(frozen=True)
-class IpsResult(ResultSerialisation):
+class IpsResults(ResultSerialisation):
     """Result of the Im-Pesaran-Shin test (Stata ``xtunitroot ips``)."""
 
     tbar: float
@@ -188,7 +188,7 @@ def im_pesaran_shin(
     demean: bool = False,
     lags: int | None = None,
     level: float = 0.05,
-) -> IpsResult:
+) -> IpsResults:
     """Im-Pesaran-Shin panel unit-root test.
 
     Parameters
@@ -307,7 +307,7 @@ def im_pesaran_shin(
     )
     pvalue = float(stats.norm.cdf(zttilde))
 
-    return IpsResult(
+    return IpsResults(
         tbar=tbar,
         ttildebar=ttildebar,
         zt=zt,

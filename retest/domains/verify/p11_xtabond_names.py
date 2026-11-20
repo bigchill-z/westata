@@ -3,7 +3,7 @@ import sys, inspect
 import numpy as np, pandas as pd
 sys.path.insert(0,"retest/domains/verify"); sys.path.insert(0,"src")
 import westata as ws
-print(inspect.signature(ws.XtAbond.__init__))
+print(inspect.signature(ws.PanelAbond.__init__))
 
 rng = np.random.default_rng(5150)
 G, T = 60, 8
@@ -19,7 +19,7 @@ for g in range(G):
 D = pd.DataFrame(rows, columns=["id","t","y","x1","x2"])
 for lags in (1,2):
     exog = D[["x1","x2"]].to_numpy()
-    m = ws.XtAbond(D["y"].to_numpy(), exog, D["id"].to_numpy(), D["t"].to_numpy(),
+    m = ws.PanelAbond(D["y"].to_numpy(), exog, D["id"].to_numpy(), D["t"].to_numpy(),
                    lags=lags, param_names=tuple(f"L{l}.y" for l in range(1, lags+1)),
                    exog_names=("x1","x2"))
     r = m.fit()

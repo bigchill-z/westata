@@ -18,7 +18,7 @@ import pytest
 from scipy import stats
 
 import westata as ws
-from westata.postestimation.lincom import LincomResult
+from westata.postestimation.lincom import LincomResults
 from westata.postestimation.nonlinear import nlcom, testnl
 from westata.postestimation.tests import WaldTest
 
@@ -34,7 +34,7 @@ def _frame(n: int = 200, seed: int = 5) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def ols():
-    return ws.OLS.from_formula("y ~ x1 + x2 + x3", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2 + x3", _frame()).fit()
 
 
 @pytest.fixture(scope="module")
@@ -54,7 +54,7 @@ def test_single_coefficient_matches_lincom(ols):
     nonlinear = nlcom(ols, "_b[x1]")
     linear = ols.lincom("x1")
 
-    assert isinstance(nonlinear, LincomResult)
+    assert isinstance(nonlinear, LincomResults)
     assert nonlinear.estimate == pytest.approx(linear.estimate, rel=1e-12)
     assert nonlinear.std_err == pytest.approx(linear.std_err, rel=1e-9)
     assert nonlinear.statistic == pytest.approx(linear.statistic, rel=1e-8)
@@ -372,7 +372,7 @@ def test_quoted_factor_coefficient_names_are_addressable():
     y = 1.0 + np.where(g == "b", 0.8, 0.0) + np.where(g == "c", -0.4, 0.0)
     y = y + rng.normal(scale=0.5, size=n)
     frame = pd.DataFrame({"y": y, "g": pd.Categorical(g)})
-    result = ws.OLS.from_formula("y ~ C(g)", frame).fit()
+    result = ws.Regress.from_formula("y ~ C(g)", frame).fit()
 
     name = next(value for value in result.param_names if value.startswith("C(g)"))
     b = float(result.params[name])

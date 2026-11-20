@@ -17,7 +17,7 @@ import pytest
 
 import westata as ws
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.synth import SynthResult, _normalize, _regsval, synth
+from westata.estimators.synth import SynthResults, _normalize, _regsval, synth
 
 
 # --------------------------------------------------------------------------- #
@@ -68,7 +68,7 @@ def test_the_package_exports_synth() -> None:
 
 
 def test_result_is_a_frozen_dataclass(fitted) -> None:
-    assert isinstance(fitted, SynthResult)
+    assert isinstance(fitted, SynthResults)
     with pytest.raises(Exception):
         fitted.RMSPE = 0.0  # type: ignore[misc]
 

@@ -90,9 +90,9 @@ README 第 259 行明确写着：
 三个探针全部通过，记录在此以说明"没有缺口"是**测出来的**，不是没测：
 
 ```
-[OK] plain OLS      coefficient 2.3258, matching the paper's 2.33
+[OK] plain Regress      coefficient 2.3258, matching the paper's 2.33
 [OK] Stata labels   stata_param_names = ['nj', '_cons']
-[OK] weighted OLS   weighted OLS runs (N=357)
+[OK] weighted Regress   weighted Regress runs (N=357)
 [OK] public surface 142 public names
 ```
 

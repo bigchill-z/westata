@@ -62,7 +62,7 @@ import westata as ws
 
 df = pd.read_csv("docs/data/auto.csv")
 
-res = ws.OLS.from_formula("price ~ weight + mpg + C(foreign)", df).fit()
+res = ws.Regress.from_formula("price ~ weight + mpg + C(foreign)", df).fit()
 print(res.summary(style="stata"))
 print(res.params["weight"])
 print(res.bse["weight"])
@@ -75,17 +75,17 @@ keyword arguments:
 
 ```python
 # Stata:  regress price weight mpg, vce(robust)
-ws.OLS.from_formula("price ~ weight + mpg", df).fit(cov_type="HC1")
+ws.Regress.from_formula("price ~ weight + mpg", df).fit(cov_type="HC1")
 
 # Stata:  regress price weight mpg, vce(cluster foreign)
-ws.OLS.from_formula("price ~ weight + mpg", df).fit(
+ws.Regress.from_formula("price ~ weight + mpg", df).fit(
     cov_type="cluster", cov_kwds={"groups": df["foreign"]},
 )
 
 # Stata:  regress price weight mpg [aweight=w]
 # weights and weight_type are from_formula arguments, not fit ones.
 weighted = df.assign(w=np.abs(np.random.default_rng(0).normal(size=len(df))))
-ws.OLS.from_formula(
+ws.Regress.from_formula(
     "price ~ weight + mpg", weighted, weights=weighted["w"], weight_type="aweight",
 ).fit()
 ```
@@ -96,16 +96,16 @@ ws.OLS.from_formula(
 
 | Stata | westata |
 |---|---|
-| `regress` | `OLS`, `WLS` via `weights=` |
+| `regress` | `Regress`, `WLS` via `weights=` |
 | `ivregress 2sls` / `liml` / `gmm` | `IV2SLS`, `IVLIML`, `IVGMM` |
-| `eivreg` | `Eivreg` |
-| `reghdfe` | `FEOLS` (backend: `pyfixest`) |
+| `eivreg` | `ErrorsInVariablesRegress` |
+| `reghdfe` | `RegressHighDimFixedEffects` (backend: `pyfixest`) |
 | `areg` | `Areg` (its own command; `absorb=` required, reports `_cons`) |
 | `nl` | `Nl` |
 
 ```python
 ws.IV2SLS.from_formula("y_iv ~ w + [x_endog ~ z1 + z2]", sim).fit()
-ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
+ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
 ```
 
 **Where `xtreg, re`'s `e(rmse)` comes from**
@@ -127,32 +127,32 @@ releases in westata. On `y ~ k1 + C(year)` the two now agree to the last digit:
 pdata = df.head(72).copy()
 pdata["firm"] = (pdata.index // 6) + 1
 pdata["year"] = (pdata.index % 6) + 1
-fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
+fit = ws.PanelRegressRE.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
 print(fit.e["rmse"], fit.e["sigma_e"])
 ```
 
 
-**Describing a panel: `xtset`, `xtdes` and `xtsum`**
+**Describing a panel: `panel_set`, `panel_describe` and `panel_summarize`**
 
-`xtset` validates that the entity/time pair identifies the observations and reports the shape Stata
+`panel_set` validates that the entity/time pair identifies the observations and reports the shape Stata
 prints, including whether the panel is strongly balanced and whether any entity skips a period:
 
 ```python
-ws.xtset(pdata, entity="firm", time="year")
+ws.panel_set(pdata, entity="firm", time="year")
 # Panel variable: pid (strongly balanced)
 #  Time variable: year, 1970 to 1986
 #          Delta: 1 unit
 ```
 
-`xtdes` adds the resource: the entity and time ranges with `n`/`T`, the `Delta` and `Span`, the
+`panel_describe` adds the resource: the entity and time ranges with `n`/`T`, the `Delta` and `Span`, the
 distribution of the per-entity counts, and the observation-pattern table where `1` means the period
 is present and `.` means it is missing:
 
 ```python
-ws.xtdes(pdata, entity="firm", time="year")
+ws.panel_describe(pdata, entity="firm", time="year")
 ```
 
-`xtsum` splits each variable into its overall, between and within components. Three details are easy
+`panel_summarize` splits each variable into its overall, between and within components. Three details are easy
 to get wrong and were measured rather than assumed:
 
 * the within standard deviation is the plain sample sd of the deviations (`ddof=1`); multiplying by
@@ -162,7 +162,7 @@ to get wrong and were measured rather than assumed:
   one.
 
 ```python
-ws.xtsum(pdata, ["price", "mpg"], entity="firm", time="year")
+ws.panel_summarize(pdata, ["price", "mpg"], entity="firm", time="year")
 ```
 
 All three raise `ConsistencyError` when a column is absent or when the pair does not identify the
@@ -172,19 +172,19 @@ observations, rather than silently estimating on duplicates.
 
 | Stata | westata |
 |---|---|
-| `xtreg, fe` / `re` / `be` / `fd` | `PanelOLS`, `RandomEffects`, `BetweenOLS`, `FirstDifferenceOLS` |
-| `xtlogit, fe` / `re` / `pa` | `XtLogit(method=...)` |
-| `xtpoisson` | `XtPoisson` |
-| `xtnbreg` | `XtNbreg` |
-| `xttobit` | `XtTobit` |
-| `xtgls` | `XtGls` |
-| `xtpcse` | `XtPcse` |
-| `xtabond` | `XtAbond` |
-| `xtivreg` | `XtIvreg` |
+| `xtreg, fe` / `re` / `be` / `fd` | `PanelRegressFE`, `PanelRegressRE`, `PanelRegressBE`, `PanelRegressFD` |
+| `xtlogit, fe` / `re` / `pa` | `PanelLogit(method=...)` |
+| `xtpoisson` | `PanelPoisson` |
+| `xtnbreg` | `PanelNbRegress` |
+| `xttobit` | `PanelTobit` |
+| `xtgls` | `PanelGls` |
+| `xtpcse` | `PanelPcse` |
+| `xtabond` | `PanelAbond` |
+| `xtivreg` | `PanelIVRegress` |
 
 ```python
-ws.PanelOLS.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()
-ws.XtLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
+ws.PanelRegressFE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()
+ws.PanelLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
                         method="fe").fit()
 ```
 
@@ -233,29 +233,29 @@ fitted.odds_ratios          # pd.Series, no parentheses
 | Stata | westata |
 |---|---|
 | `tobit` | `Tobit` |
-| `truncreg` | `Truncreg` |
-| `intreg` | `Intreg` |
+| `truncreg` | `TruncatedRegress` |
+| `intreg` | `IntervalRegress` |
 | `heckman` | `Heckman(method="twostep" or "ml")` |
-| `etregress` | `Etregress(method="control" or "ml")` |
+| `etregress` | `EndogenousTreatmentRegress(method="control" or "ml")` |
 
 ```python
 ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
-**`xttest0` — the Breusch-Pagan LM test for random effects**
+**`panel_test0` — the Breusch-Pagan LM test for random effects**
 
-After a random-effects fit, `ws.xttest0(result)` reproduces Stata's `xttest0`:
+After a random-effects fit, `ws.panel_test0(result)` reproduces Stata's `panel_test0`:
 
 ```python
-# 12 entities x 6 periods: xttest0 requires a balanced panel.
+# 12 entities x 6 periods: panel_test0 requires a balanced panel.
 panel = df.head(72).copy()
 panel["sid"] = (panel.index // 6) + 1
 panel["year"] = (panel.index % 6) + 1
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
-print(ws.xttest0(re_fit))
+print(ws.panel_test0(re_fit))
 ```
 
 The panel variable is taken from the fit's own `e(ivar)`, so no `entity=` argument is needed; pass
@@ -270,7 +270,7 @@ Stata's `theta` is a REPORTING option, not an estimation one: it changes what is
 estimated. In westata it is the `theta` keyword on `summary`:
 
 ```python
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
 print(re_fit.summary(theta=True))
@@ -296,17 +296,17 @@ The underlying scalars are always available without the flag, as `e(theta)` or t
 keys (the two forms are mutually exclusive). The flag is a **no-op** on `xtreg, fe` / `be` / `mle`,
 where Stata answers `option theta not allowed` (r(198)), and under `style='statsmodels'`.
 
-**`xtoverid` — the Sargan-Hansen test of overidentifying restrictions**
+**`panel_overid` — the Sargan-Hansen test of overidentifying restrictions**
 
-Stata's `xtoverid` is a user-written command (Schaffer & Stillman), not a base one. After a
+Stata's `panel_overid` is a user-written command (Schaffer & Stillman), not a base one. After a
 random-effects fit it asks whether the extra moment conditions that the RE estimator uses hold; a
 rejection means RE is inconsistent and fixed effects is preferred.
 
 ```python
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
-print(ws.xtoverid(re_fit))
+print(ws.panel_overid(re_fit))
 ```
 
 ```
@@ -319,12 +319,12 @@ Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
 The `to_dict()` method names them the way Stata does. Two things are load-bearing and both are measured:
 
 - the **VCE follows the original fit**. The same equation gives `53.285` under the conventional
-  VCE and `221.225` under `cov_type="robust"` — a 4x difference, not a rounding one. `xtoverid.ado`
+  VCE and `221.225` under `cov_type="robust"` — a 4x difference, not a rounding one. `panel_overid.ado`
   mirrors `e(vcetype)` when it refits, and so does this implementation.
 - the auxiliary equation is quasi-demeaned at the **original `e(theta)`**. Every added regressor is
   a within deviation with a zero group mean, so it carries no between variation; re-estimating the
   variance components instead drifts `sigma_u` from `.1332` to `.0947` and lands 4.66 away on the
-  statistic. Stata's own `xtoverid, noisily` prints the original `sigma_u`/`theta`, which is what
+  statistic. Stata's own `panel_overid, noisily` prints the original `sigma_u`/`theta`, which is what
   the fixed-theta solve reproduces.
 
 Only the `xtreg, re` branch is implemented: `xtreg, fe` is refused by the ado itself, and the
@@ -334,14 +334,14 @@ single `e(theta)`, only the five percentiles, and choosing one would be inventin
 
 **The variance-component block of xtreg, mle**
 
-`RandomEffectsMLE` reproduces Stata's `xtreg ..., mle`. Below the coefficient table it prints
+`PanelRegressMLE` reproduces Stata's `xtreg ..., mle`. Below the coefficient table it prints
 `/sigma_u`, `/sigma_e` and `rho`, each with a confidence interval:
 
 ```python
 panel = df.head(72).copy()
 panel["sid"] = (panel.index // 6) + 1
 panel["year"] = (panel.index % 6) + 1
-res = ws.RandomEffectsMLE.from_formula("price ~ mpg + weight", panel,
+res = ws.PanelRegressMLE.from_formula("price ~ mpg + weight", panel,
                                        entity="sid", time="year").fit()
 print(res.summary())
 ```
@@ -385,22 +385,22 @@ standard errors come from a quasi-ML sandwich rather than the information matrix
 
 | Stata | westata |
 |---|---|
-| `qreg` | `QuantileRegression` |
-| `sqreg` | `Sqreg` |
-| `bsqreg` | `Bsqreg` |
-| `rreg` | `RobustRegression` |
+| `qreg` | `QuantileRegress` |
+| `sqreg` | `SimultaneousQuantileRegress` |
+| `bsqreg` | `BootstrappedQuantileRegress` |
+| `rreg` | `RobustRegress` |
 
 ### Systems of equations
 
 | Stata | westata |
 |---|---|
-| `sureg` | `Sureg` |
-| `mvreg` | `Mvreg` |
+| `sureg` | `SeeminglyUnrelatedRegress` |
+| `mvreg` | `MultivariateRegress` |
 | `manova` | `Manova` |
 
 ```python
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
                      ).fit(cov_type="robust")
 ```
 
@@ -409,10 +409,10 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`, `RegressionAdjustment`, `IPW`, `AIPW` |
-| `teffects nnmatch ..., atet` / `caliper()` | `teffects_nnmatch(...)` — the function form adds `caliper` and `tie_tolerance` |
-| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
-| `tebalance summarize` | `tebalance_summarize(...)` |
-| `didregress` / `xtdidregress` | `Didregress`, `Xtdidregress` |
+| `teffects nnmatch ..., atet` / `caliper()` | `treatment_effects_nnmatch(...)` — the function form adds `caliper` and `tie_tolerance` |
+| `teffects psmatch ..., atet` | `treatment_effects_psmatch(...)` |
+| `tebalance summarize` | `treatment_balance_summarize(...)` |
+| `didregress` / `xtdidregress` | `DIDRegress`, `PanelDIDRegress` |
 | `rcm` | `rcm(...)` — pass `selected=` for a result that matches Stata |
 | `synth` (default path) | `synth(...)` — six `e()` matrices, evidence grade E2 |
 
@@ -425,8 +425,8 @@ are not reproduced (the AI-robust and sandwich forms live in compiled code), so
 ```python
 d = df.dropna(subset=["price", "mpg", "weight"]).copy()
 d["treat"] = (d["foreign"] > 0).astype(int)
-ws.teffects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
-ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
+ws.treatment_effects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
+ws.treatment_balance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
 ```
 
 ### Time series
@@ -435,25 +435,25 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 |---|---|
 | `arima` | `ARIMA` |
 | `arch` / `garch` | `GARCH` (needs `arch`) |
-| unit-root tests | `unitroot(test=...)`, `XtUnitroot` |
-| `vecrank` | `vecrank(...)` — `lags(1)` included |
-| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`, `varlmar`, `varstable`, `varwle` (and `varstable(...).plot()` for `varstable, graph`) |
-| `veclmar` / `vecstable` | `veclmar`, `vecstable` |
-| `vargranger` | `vargranger(fitted)` |
+| unit-root tests | `unitroot(test=...)`, `PanelUnitroot` |
+| `vec_rank` | `vec_rank(...)` — `lags(1)` included |
+| `var_select_order` / `var_lmar` / `var_stable` / `var_wle` | `var_select_order`, `var_lmar`, `var_stable`, `var_wle` (and `var_stable(...).plot()` for `var_stable, graph`) |
+| `vec_lmar` / `vec_stable` | `vec_lmar`, `vec_stable` |
+| `var_granger` | `var_granger(fitted)` |
 | `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
-| `newey` | `Newey.from_formula(formula, data, lag=...)` / `newey(formula, data, lag=...)` |
+| `newey_west` | `Newey.from_formula(formula, data, lag=...)` / `newey_west(formula, data, lag=...)` |
 | `synth` | `Synth.from_variables(data, unit=..., time=..., depvar=..., predictors=[...], trunit=..., trperiod=...)` |
 | `synth2` | `Synth2.from_variables(...)`, same options |
-| `rcm` | `Rcm.from_variables(outcome, data, predictors=[...], unit=..., time=..., treated_unit=..., treatment_period=...)` |
-| `rdrobust` | `Rdrobust.from_variables(outcome, running, data, *, bandwidth=...)` |
-| `teffects ra` | `TeffectsRa.from_variables(outcome, treatment, data, covariates=[...])` |
-| `teffects psmatch` | `TeffectsPsmatch.from_variables(...)` |
-| `teffects nnmatch` | `TeffectsNnmatch.from_variables(...)` |
+| `rcm` | `RegressionControlMethod.from_variables(outcome, data, predictors=[...], unit=..., time=..., treated_unit=..., treatment_period=...)` |
+| `rd_robust` | `RDRobust.from_variables(outcome, running, data, *, bandwidth=...)` |
+| `teffects ra` | `TreatmentEffectsRa.from_variables(outcome, treatment, data, covariates=[...])` |
+| `teffects psmatch` | `TreatmentEffectsPsmatch.from_variables(...)` |
+| `teffects nnmatch` | `TreatmentEffectsNnmatch.from_variables(...)` |
 
 ```python
 values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
-ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
-ws.vecrank(values, lags=1)
+ws.var_granger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
+ws.vec_rank(values, lags=1)
 ```
 
 **`varbasic` and `irf table`**
@@ -533,17 +533,17 @@ ws.irf_table(fit, all=True).plot()          # every combination, one panel each
 Useful arguments: `ax=` to draw into an axis you already own, `show_ci=False` for the path alone,
 `markers=True`, `grid=False`, and `figsize=(w, h)`. Every other keyword goes to `Axes.plot`.
 
-**Plotting stability: `varstable(...).plot()`**
+**Plotting stability: `var_stable(...).plot()`**
 
-`varstable, graph` draws the eigenvalues of the COMPANION matrix in the complex plane — real part on
-x, imaginary part on y — with the unit circle behind them. `varstable(...).plot()` is that figure.
+`var_stable, graph` draws the eigenvalues of the COMPANION matrix in the complex plane — real part on
+x, imaginary part on y — with the unit circle behind them. `var_stable(...).plot()` is that figure.
 
 ```python
 # `df` here is the guide's auto.csv; any two series work.
 fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
-ws.varstable(fit).plot()                       # circle + points
-ws.varstable(fit).plot(labels=True)            # annotate with the modulus
-ws.varstable(fit).plot(labels="distance")      # Stata's `dlabel`: 1 - |eigenvalue|
+ws.var_stable(fit).plot()                       # circle + points
+ws.var_stable(fit).plot(labels=True)            # annotate with the modulus
+ws.var_stable(fit).plot(labels="distance")      # Stata's `dlabel`: 1 - |eigenvalue|
 ```
 
 | | |
@@ -681,7 +681,7 @@ ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
 ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
 ```
 
-`prais` and `newey` are estimation commands, so they also have the class form every other
+`prais` and `newey_west` are estimation commands, so they also have the class form every other
 estimator uses (R2.7). The function stays available and returns the same numbers:
 
 ```python
@@ -693,7 +693,7 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 > function's positional order, which is the reverse of every other `from_formula` — 52 call
 > sites pass `ws.prais(frame, FORMULA)` positionally, and swapping the two would not raise,
 > it would try to parse the frame as a formula. Use `Prais.from_formula(formula, data)` for
-> the standard order. Neither `fit()` accepts `cov_type`: Stata's `prais` and `newey` have no
+> the standard order. Neither `fit()` accepts `cov_type`: Stata's `prais` and `newey_west` have no
 > `vce()` option, so the variance is part of the estimator, and offering a `cov_type` would
 > promise a choice that cannot be honoured.
 
@@ -707,19 +707,19 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 | `margins` | `res.margins(...)` |
 | `linktest` | `ws.linktest(res)` |
 | `suest` | `ws.suest([fit_a, fit_b])` |
-| `vargranger` | `ws.vargranger(var_fit)` |
+| `var_granger` | `ws.var_granger(var_fit)` |
 | `summarize` | `ws.summarize(frame, ["y", "x1"])` |
 | `ereturn list` | `format_ereturn_list(res)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
-| `xtserial` | `ws.xtserial(data, "y ~ x1 + x2", entity=..., time=...)` |
+| `panel_serial` | `ws.panel_serial(data, "y ~ x1 + x2", entity=..., time=...)` |
 
-### `xtserial`: the Wooldridge panel serial-correlation test
+### `panel_serial`: the Wooldridge panel serial-correlation test
 
-`xtserial` is **not a Stata built-in and is not on SSC**; it is Drukker's package:
+`panel_serial` is **not a Stata built-in and is not on SSC**; it is Drukker's package:
 
 ```stata
-net install xtserial, from("http://www.stata.com/users/ddrukker")
+net install panel_serial, from("http://www.stata.com/users/ddrukker")
 ```
 
 Its body is four lines: difference the response **and every regressor** (no constant,
@@ -735,7 +735,7 @@ panel_like = df.assign(
     province=(np.arange(len(df)) % 12) + 1,
     t=(np.arange(len(df)) // 12) + 1,
 )
-result = ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t")
+result = ws.panel_serial(panel_like, "price ~ mpg + weight", entity="province", time="t")
 print(result)
 ```
 
@@ -763,7 +763,7 @@ work on it. Pass `keep_first_stage=False` to skip keeping it. Measured on
 standard error agrees with Stata to within 5e-7.
 
 ```python
-res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 res.test("weight")                       # one restriction
 res.test("weight", "C(foreign)[T.1]")    # joint
 res.lincom("weight + 1000*C(foreign)[T.1]")
@@ -825,7 +825,7 @@ option changes the statistic itself, not merely its degrees of freedom:
 ```python
 # The table above was captured from `regress consumption temp price income` on
 # icecream.dta; here we use the bundled auto.csv so the example runs anywhere.
-fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
+fit = ws.Regress.from_formula("price ~ mpg + weight", df).fit()
 
 print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # zero-fill, full sample
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # keep them missing
@@ -849,7 +849,7 @@ axis with `time=`:
 # A period column plus one deliberately missing period: without `time=` the lag pairs the
 # rows on either side of the gap, which is NOT what `L.` does.
 time_series = df.assign(year=range(1, len(df) + 1)).drop(index=10).reset_index(drop=True)
-gapped = ws.OLS.from_formula("price ~ mpg + weight", time_series).fit()
+gapped = ws.Regress.from_formula("price ~ mpg + weight", time_series).fit()
 
 ws.estat_bgodfrey(gapped, lags=1)              # lags by row order
 ws.estat_bgodfrey(gapped, lags=1, time="year")  # lags on `year`; missing across the gap
@@ -878,7 +878,7 @@ estimated, and it is **capped at 40**: at n = 758 Stata reports `chi2(40)`, not 
 `(n-k)//2` rule would give.
 
 Panel data is refused outright: `_ts ..., onepanel` answers `sample may not include multiple
-panels` (r(459)), and `areg` / `reghdfe` / `newey` / `xtreg` fits answer
+panels` (r(459)), and `areg` / `reghdfe` / `newey_west` / `xtreg` fits answer
 `estat bgodfrey not valid` (r(321)).
 
 ### `estat ovtest` and its `rhs` option
@@ -920,9 +920,9 @@ Two details decide the numbers and neither is guessable from the output:
 ```python
 # `lnw`/`expr2` belong to grilic.dta; the guide's `df` is auto.csv, so the example uses
 # continuous columns from it. The behaviour is the same either way.
-fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
-print(ws.estat_ovtest(fit))            # powers of the fitted values
-print(ws.estat_ovtest(fit, rhs=True))  # powers of the regressors
+fit = ws.Regress.from_formula("price ~ mpg + weight", df).fit()
+print(ws.estat_omitted_variables_test(fit))            # powers of the fitted values
+print(ws.estat_omitted_variables_test(fit, rhs=True))  # powers of the regressors
 ```
 
 ### Explanatory text Stata prints around a table
@@ -957,7 +957,7 @@ sometimes needed when the estimators' VCEs are not directly comparable:
 
 ```python
 iv = ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit()
-ols = ws.OLS.from_formula("price ~ weight + mpg", df).fit()
+ols = ws.Regress.from_formula("price ~ weight + mpg", df).fit()
 
 print(ws.hausman(iv, ols).statistic)                    # Stata: hausman iv ols
 print(ws.hausman(iv, ols, constant=True).statistic)     # hausman iv ols, constant
@@ -996,8 +996,8 @@ layout** from `esttab` (no column numbers, no dependent-variable row, a `Legend:
 it accepts any number of models.
 
 ```python
-fit_a = ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1")
-fit_b = ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
+fit_a = ws.Regress.from_formula("price ~ mpg", df).fit(cov_type="HC1")
+fit_b = ws.Regress.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
 print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True))
 ```
 
@@ -1006,8 +1006,8 @@ centred and abbreviated past ten characters; values use eight significant figure
 eight decimals below.
 
 **The robust VCE differs between commands.** `regress ..., r` is HC1 while `ivregress ..., r` is HC0,
-so a table mixing OLS and IV models needs `cov_type="HC1"` on the OLS fits and `"HC0"` on the IV ones.
-Using HC0 throughout scales every OLS standard error by `sqrt(n/(n-k))`.
+so a table mixing Regress and IV models needs `cov_type="HC1"` on the Regress fits and `"HC0"` on the IV ones.
+Using HC0 throughout scales every Regress standard error by `sqrt(n/(n-k))`.
 
 
 #### Adding standard errors, p-values or stars
@@ -1036,8 +1036,8 @@ tables**, not a flag on one:
 
 ```python
 fits = [
-    ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
-    ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
+    ws.Regress.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
+    ws.Regress.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
     ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit(cov_type="HC0"),
 ]
 names = ["ols_a", "ols_b", "tsls"]
@@ -1113,12 +1113,12 @@ Every table below now matches a live capture exactly, at every size tested:
 
 | Table | Sizes verified |
 |---|---|
-| `varsoc` | 100, 200, 300, 900, 1500 |
-| `varstable` | 60, 200, 900, 1500 |
-| `vecstable` | 100, 300, 900 |
+| `var_select_order` | 100, 200, 300, 900, 1500 |
+| `var_stable` | 60, 200, 900, 1500 |
+| `vec_stable` | 100, 300, 900 |
 | `dfuller` | 4 sizes x 2 lag counts |
-| `varlmar`, `varwle`, `veclmar`, `vargranger` | 100, 300, 900 |
-| `estat ic` (OLS, absorbed, VAR, zip, zinb) | 2-3 sizes each |
+| `var_lmar`, `var_wle`, `vec_lmar`, `var_granger` | 100, 300, 900 |
+| `estat ic` (Regress, absorbed, VAR, zip, zinb) | 2-3 sizes each |
 | `estat summarize` | 200, 1500, 3000, and scales 1e-5..1e3 |
 | `estat overid`, `estat ovtest`, `estat dwatson` | 2-3 sizes each |
 | `logit`, `probit`, `poisson`, `nbreg` headers | 800, 1500 |
@@ -1137,7 +1137,7 @@ Six differences are numerical rather than presentational and are recorded rather
 papered over:
 
 * `estat vif`'s 1/VIF in the ninth significant figure;
-* `varstable`'s eigenvalues at n >= 300, ninth figure, which the modulus column inherits;
+* `var_stable`'s eigenvalues at n >= 300, ninth figure, which the modulus column inherits;
 * VECM coefficients in the last printed digit;
 * `zip`/`zinb` coefficients in the seventh significant figure.
 

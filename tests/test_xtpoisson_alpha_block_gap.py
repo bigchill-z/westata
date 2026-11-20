@@ -50,7 +50,7 @@ def _counts():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtPoisson.from_formula(
+    return ws.PanelPoisson.from_formula(
         "n ~ x1", _counts(), entity="sid", time="t", method="re"
     ).fit()
 

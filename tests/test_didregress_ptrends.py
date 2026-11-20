@@ -29,7 +29,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.estimators.did import estat_ptrends
+from westata.estimators.did import estat_parallel_trends
 
 #: Captured from a live `estat ptrends` on the fixture below.
 STATA_STATISTIC = 0.251088
@@ -49,7 +49,7 @@ def did_result():
     frame = pd.DataFrame(
         {"y": outcome, "canal_post": post, "county": group, "year": period}
     )
-    return ws.Didregress.from_formula(
+    return ws.DIDRegress.from_formula(
         "y", "canal_post", frame, group="county", time="year"
     ).fit()
 
@@ -57,14 +57,14 @@ def did_result():
 def test_ptrends_returns_the_population_shape(did_result) -> None:
     """The four quantities Stata's `F(1, 59)` line needs."""
 
-    outcome = estat_ptrends(did_result)
+    outcome = estat_parallel_trends(did_result)
     assert set(outcome) == {"statistic", "df_numerator", "df_denominator", "pvalue"}
 
 
 def test_the_denominator_dof_is_n_groups_minus_one(did_result) -> None:
     """59 matches Stata exactly, which is what identifies the design as 60 groups."""
 
-    assert estat_ptrends(did_result)["df_denominator"] == 59.0
+    assert estat_parallel_trends(did_result)["df_denominator"] == 59.0
 
 
 def test_the_statistic_is_close_but_not_yet_exact(did_result) -> None:
@@ -73,7 +73,7 @@ def test_the_statistic_is_close_but_not_yet_exact(did_result) -> None:
     When the remaining gap is closed, tighten this to abs=1e-6 against STATA_STATISTIC.
     """
 
-    observed = estat_ptrends(did_result)["statistic"]
+    observed = estat_parallel_trends(did_result)["statistic"]
     assert observed == pytest.approx(STATA_STATISTIC, rel=0.02)
     # And it is NOT exact yet -- this assertion is the reminder.
     assert observed != pytest.approx(STATA_STATISTIC, abs=1e-4)
@@ -84,7 +84,7 @@ def test_it_refuses_a_result_without_a_did_design() -> None:
 
     rng = np.random.default_rng(1)
     frame = pd.DataFrame({"y": rng.normal(size=40), "x": rng.normal(size=40)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     with pytest.raises(Exception):
-        estat_ptrends(fitted)
+        estat_parallel_trends(fitted)

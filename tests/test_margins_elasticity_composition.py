@@ -31,7 +31,7 @@ def fitted():
             "x1": covariate,
         }
     )
-    return frame, ws.OLS.from_formula("y ~ x1", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def _expected(form: str, slope: float, covariate: np.ndarray, prediction: np.ndarray):
@@ -120,7 +120,7 @@ def test_each_group_uses_its_own_factor(form) -> None:
             "x1": covariate,
         }
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     groups = np.array(["a"] * 100 + ["b"] * 100)
     slope = float(result.params["x1"])
     matrix = np.asarray(result.design_matrix[0], dtype=float)
@@ -148,7 +148,7 @@ def test_the_two_group_values_differ() -> None:
             "x1": covariate,
         }
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     groups = np.array(["a"] * 100 + ["b"] * 100)
 
     rows = result.margins(eydx="x1", over=groups)

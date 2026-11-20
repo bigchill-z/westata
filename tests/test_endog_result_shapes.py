@@ -93,7 +93,7 @@ def test_the_unadjusted_branch_carries_the_wu_degrees_of_freedom(unconditional) 
 
 # -------------------------------------------------------------- RegFResult shape
 def test_the_clustered_branch_is_the_regF_type(clustered) -> None:
-    assert type(clustered).__name__ == "RegFResult"
+    assert type(clustered).__name__ == "RegFResults"
 
 
 def test_the_regF_result_has_a_single_statistic(clustered) -> None:
@@ -135,7 +135,7 @@ def test_the_regF_test_matches_the_control_function_f(clustered) -> None:
 
 # ------------------------------------------------------- EndogScoreResult shape
 def test_the_robust_branch_is_the_score_type(robust) -> None:
-    assert type(robust).__name__ == "EndogScoreResult"
+    assert type(robust).__name__ == "EndogScoreResults"
 
 
 def test_the_score_result_has_a_single_df(robust) -> None:

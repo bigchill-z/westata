@@ -40,7 +40,7 @@ from westata.postestimation.names import is_constant_name
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["VifResult", "estat_vif"]
+__all__ = ["VifResults", "estat_vif"]
 
 #: Model names whose design is an ordinary linear predictor, so that a VIF is
 #: meaningful.  Matches what Stata's ``regress_estat`` forwards to ``vif.ado``:
@@ -89,7 +89,7 @@ def _display_name(name: str) -> str:
     return stata_display_name(name)
 
 
-class VifResult:
+class VifResults:
     """The ``estat vif`` table.
 
     Attributes
@@ -123,7 +123,7 @@ class VifResult:
     # -- presentation ---------------------------------------------------
     def __repr__(self) -> str:
         return (
-            f"<VifResult {len(self.names)} regressors, "
+            f"<VifResults {len(self.names)} regressors, "
             f"mean VIF {self.mean_vif:.2f}>"
         )
 
@@ -252,7 +252,7 @@ def estat_vif(
     *,
     uncentered: bool = False,
     nosort: bool = False,
-) -> VifResult:
+) -> VifResults:
     """Stata's ``estat vif`` for a linear fit.
 
     Parameters
@@ -326,7 +326,7 @@ def estat_vif(
 
     mean_vif = float(np.mean(values)) if values else float("nan")
 
-    return VifResult(
+    return VifResults(
         [labels[i] for i in order],
         [values[i] for i in order],
         mean_vif,

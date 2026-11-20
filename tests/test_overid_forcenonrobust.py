@@ -46,13 +46,13 @@ def classical(frame):
 
 
 def test_a_robust_vce_uses_the_wooldridge_score_by_default(robust) -> None:
-    assert robust.estat_overid().test == "Wooldridge score"
+    assert robust.estat_overidentification().test == "Wooldridge score"
 
 
 def test_forcenonrobust_switches_to_sargan(robust) -> None:
     """The reported test is Sargan, and Basmann comes back with it."""
 
-    forced = robust.estat_overid(forcenonrobust=True)
+    forced = robust.estat_overidentification(forcenonrobust=True)
 
     assert forced.test == "Sargan"
     assert forced.basmann is not None
@@ -66,8 +66,8 @@ def test_the_forced_numbers_match_the_classical_fit(robust, classical) -> None:
     reports.  A version that computed something else under robustness would fail here.
     """
 
-    forced = robust.estat_overid(forcenonrobust=True)
-    plain = classical.estat_overid()
+    forced = robust.estat_overidentification(forcenonrobust=True)
+    plain = classical.estat_overidentification()
 
     assert float(forced.statistic) == pytest.approx(
         float(plain.statistic), rel=1e-10
@@ -80,8 +80,8 @@ def test_the_forced_numbers_match_the_classical_fit(robust, classical) -> None:
 def test_the_wooldridge_statistic_is_a_different_number(robust) -> None:
     """Guard: the two routes must not accidentally coincide."""
 
-    default = robust.estat_overid()
-    forced = robust.estat_overid(forcenonrobust=True)
+    default = robust.estat_overidentification()
+    forced = robust.estat_overidentification(forcenonrobust=True)
 
     assert float(default.statistic) != pytest.approx(float(forced.statistic), rel=1e-6)
 
@@ -89,8 +89,8 @@ def test_the_wooldridge_statistic_is_a_different_number(robust) -> None:
 def test_a_classical_fit_is_unaffected(classical) -> None:
     """Nothing to force: it already reports Sargan."""
 
-    assert classical.estat_overid().test == "Sargan"
-    assert classical.estat_overid(forcenonrobust=True).test == "Sargan"
+    assert classical.estat_overidentification().test == "Sargan"
+    assert classical.estat_overidentification(forcenonrobust=True).test == "Sargan"
 
 
 def test_clustering_is_still_refused(robust) -> None:
@@ -116,7 +116,7 @@ def test_clustering_is_still_refused(robust) -> None:
     )
 
     with pytest.raises(ValueError, match="clustered"):
-        clustered.estat_overid()
+        clustered.estat_overidentification()
 
 
 def test_liml_with_robust_vce_is_refused_by_default(frame) -> None:
@@ -125,7 +125,7 @@ def test_liml_with_robust_vce_is_refused_by_default(frame) -> None:
     liml = ws.IVLIML.from_formula("y ~ x + [e ~ z1 + z2]", frame).fit(cov_type="HC1")
 
     with pytest.raises(ValueError, match="LIML"):
-        liml.estat_overid()
+        liml.estat_overidentification()
 
 
 def test_liml_accepts_forcenonrobust(frame) -> None:
@@ -133,7 +133,7 @@ def test_liml_accepts_forcenonrobust(frame) -> None:
 
     liml = ws.IVLIML.from_formula("y ~ x + [e ~ z1 + z2]", frame).fit(cov_type="HC1")
 
-    forced = liml.estat_overid(forcenonrobust=True)
+    forced = liml.estat_overidentification(forcenonrobust=True)
 
     assert np.isfinite(float(forced.statistic))
 
@@ -141,6 +141,6 @@ def test_liml_accepts_forcenonrobust(frame) -> None:
 def test_the_degrees_of_freedom_are_the_restriction_count(robust) -> None:
     """Two instruments for one endogenous regressor leaves one restriction."""
 
-    forced = robust.estat_overid(forcenonrobust=True)
+    forced = robust.estat_overidentification(forcenonrobust=True)
 
     assert float(forced.df) == 1.0

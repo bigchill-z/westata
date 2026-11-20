@@ -23,7 +23,7 @@ import westata as ws
 def fit():
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length"]].dropna()
-    return frame, ws.OLS.from_formula("mpg ~ weight + length", frame).fit()
+    return frame, ws.Regress.from_formula("mpg ~ weight + length", frame).fit()
 
 
 def _pieces(result):
@@ -156,7 +156,7 @@ def test_robust_vce_is_refused(fit) -> None:
     """``regress_postestimation.sthlp:152-153`` restricts these to vce(ols)."""
 
     frame, _ = fit
-    robust = ws.OLS.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
+    robust = ws.Regress.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
 
     for kind in ("hat", "leverage", "rstandard", "rstudent", "cooksd", "dfbeta"):
         with pytest.raises(ws.UnsupportedError, match="vce\\(ols\\)"):
@@ -166,7 +166,7 @@ def test_robust_vce_is_refused(fit) -> None:
 def test_clustered_vce_is_refused(fit) -> None:
     frame, _ = fit
     groups = (np.arange(len(frame)) % 7).astype(int)
-    clustered = ws.OLS.from_formula("mpg ~ weight + length", frame).fit(
+    clustered = ws.Regress.from_formula("mpg ~ weight + length", frame).fit(
         cov_type="cluster", cov_kwds={"groups": groups}
     )
 

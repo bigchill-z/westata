@@ -56,20 +56,20 @@ def panel():
 
 
 def test_fe_coefficient_and_default_se(panel) -> None:
-    fit = ws.PanelOLS(FORMULA, panel, entity="pid", time="tid").fit()
+    fit = ws.PanelRegressFE(FORMULA, panel, entity="pid", time="tid").fit()
     assert float(fit.params["ltlan"]) == pytest.approx(STATA_FE["coef"], abs=5e-7)
     assert float(fit.bse["ltlan"]) == pytest.approx(STATA_FE["default_se"], abs=5e-7)
 
 
 def test_fe_robust_se(panel) -> None:
-    fit = ws.PanelOLS(FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
+    fit = ws.PanelRegressFE(FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
     assert float(fit.bse["ltlan"]) == pytest.approx(STATA_FE["robust_se"], abs=5e-7)
 
 
 def test_fe_clustered_se_equals_robust_here(panel) -> None:
     """Every pid is its own cluster on this data, so the two coincide -- as in Stata."""
 
-    fit = ws.PanelOLS(FORMULA, panel, entity="pid", time="tid").fit(
+    fit = ws.PanelRegressFE(FORMULA, panel, entity="pid", time="tid").fit(
         cov_type="clustered", cov_kwds={"groups": panel["pid"]}
     )
     assert float(fit.bse["ltlan"]) == pytest.approx(STATA_FE["robust_se"], abs=5e-7)
@@ -78,7 +78,7 @@ def test_fe_clustered_se_equals_robust_here(panel) -> None:
 def test_the_constant_se_is_not_the_ltlan_se(panel) -> None:
     """The trap: .72596946 is the constant's SE, not ltlan's."""
 
-    fit = ws.PanelOLS(FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
+    fit = ws.PanelRegressFE(FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
     by_position = float(np.asarray(fit.bse).ravel()[0])
     by_label = float(fit.bse["ltlan"])
     assert by_position == pytest.approx(0.72596946, abs=5e-6)
@@ -92,11 +92,11 @@ def ols_fit():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_ovtest_default_matches_stata(ols_fit) -> None:
-    values = ols_fit.estat_ovtest().to_dict()
+    values = ols_fit.estat_omitted_variables_test().to_dict()
     assert values["F"] == pytest.approx(1.3343880671, rel=1e-6)
     assert values["df"] == 3
     assert values["df_r"] == 751
@@ -106,7 +106,7 @@ def test_ovtest_default_matches_stata(ols_fit) -> None:
 def test_ovtest_rhs_matches_stata(ols_fit) -> None:
     """Stata: F(9, 745) = 1.70, p 0.0842. The report called this P0-broken."""
 
-    values = ols_fit.estat_ovtest(rhs=True).to_dict()
+    values = ols_fit.estat_omitted_variables_test(rhs=True).to_dict()
     assert values["F"] == pytest.approx(1.7042, abs=5e-4)
     assert values["df"] == 9
     assert values["df_r"] == 745

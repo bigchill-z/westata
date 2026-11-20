@@ -52,7 +52,7 @@ def fitted():
         frame = pd.read_stata(DATA).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_the_standardized_coefficients_match_stata(fitted) -> None:
@@ -98,6 +98,6 @@ def test_a_result_without_regressors_gets_no_beta_row(fitted) -> None:
     """A model whose only parameter is the constant has nothing to standardize."""
 
     frame = pd.read_stata(DATA).dropna(subset=["lnw"])
-    intercept_only = ws.OLS.from_formula("lnw ~ 1", frame).fit()
+    intercept_only = ws.Regress.from_formula("lnw ~ 1", frame).fit()
     lines = format_ereturn_list(intercept_only).splitlines()
     assert not any("e(beta)" in line for line in lines)

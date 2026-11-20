@@ -47,11 +47,11 @@ from scipy import stats
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["RdRobustResult", "rdrobust"]
+__all__ = ["RdRobustResults", "rd_robust"]
 
 
 @dataclass(frozen=True)
-class RdRobustResult(ResultSerialisation):
+class RdRobustResults(ResultSerialisation):
     """``rdrobust``: sharp RD estimate at a cutoff.
 
     ``se``/``z``/``pvalue``/``ci`` are ``nan`` when the variance estimator could not be
@@ -317,7 +317,7 @@ def _side_variance(
     return float(e1 @ inverse @ middle @ inverse @ e1)
 
 
-class Rdrobust:
+class RDRobust:
     """``rdrobust depvar running`` -- local-polynomial RD estimate.
 
     Class form of :func:`westata.rdrobust` (R2.7).  Stata's command takes two variable
@@ -386,7 +386,7 @@ class Rdrobust:
             covs=covs,
         )
 
-    def fit(self) -> RdRobustResult:
+    def fit(self) -> RdRobustResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _rdrobust_impl(
@@ -402,7 +402,7 @@ class Rdrobust:
         )
 
 
-def rdrobust(
+def rd_robust(
     response: Any,
     running: Any,
     *,
@@ -413,7 +413,7 @@ def rdrobust(
     bias_order: int = 2,
     kernel: str = "triangular",
     covs: Any = None,
-) -> RdRobustResult:
+) -> RdRobustResults:
     """Fit Stata's ``rdrobust`` -- thin wrapper over :class:`westata.Rdrobust`."""
 
     return _rdrobust_impl(
@@ -440,7 +440,7 @@ def _rdrobust_impl(
     bias_order: int = 2,
     kernel: str = "triangular",
     covs: Any = None,
-) -> RdRobustResult:
+) -> RdRobustResults:
     """Sharp RD estimate at ``cutoff``.
 
     Bandwidth selection is not implemented: pass ``bandwidth`` explicitly, or the default
@@ -515,7 +515,7 @@ def _rdrobust_impl(
         lower_bound = float(mu_right - mu_left - 1.959963984540054 * standard_error)
         upper_bound = float(mu_right - mu_left + 1.959963984540054 * standard_error)
 
-    return RdRobustResult(
+    return RdRobustResults(
         se=standard_error,
         z=statistic,
         pvalue=probability,

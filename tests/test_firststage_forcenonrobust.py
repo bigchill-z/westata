@@ -50,30 +50,30 @@ def robust(frame):
 
 
 def test_the_classical_fit_reports_the_statistic(classical) -> None:
-    assert classical.estat_firststage().reports_mineig is True
+    assert classical.estat_first_stage().reports_mineig is True
 
 
 def test_the_robust_fit_suppresses_it_by_default(robust) -> None:
     """``sthlp:417-418``: it is only reported under a robust VCE on request."""
 
-    assert robust.estat_firststage().reports_mineig is False
+    assert robust.estat_first_stage().reports_mineig is False
 
 
 def test_forcenonrobust_restores_it(robust) -> None:
-    assert robust.estat_firststage(forcenonrobust=True).reports_mineig is True
+    assert robust.estat_first_stage(forcenonrobust=True).reports_mineig is True
 
 
 def test_the_option_is_harmless_on_a_classical_fit(classical) -> None:
     """There is nothing to force: the statistic is already reported."""
 
-    assert classical.estat_firststage(forcenonrobust=True).reports_mineig is True
+    assert classical.estat_first_stage(forcenonrobust=True).reports_mineig is True
 
 
 def test_the_vce_kind_is_detected(robust, classical) -> None:
     """The suppression keys off the covariance actually used, not a caller flag."""
 
-    assert robust.estat_firststage().robust_vce is True
-    assert classical.estat_firststage().robust_vce is False
+    assert robust.estat_first_stage().robust_vce is True
+    assert classical.estat_first_stage().robust_vce is False
 
 
 def test_the_value_is_unchanged_by_the_option(robust) -> None:
@@ -83,15 +83,15 @@ def test_the_value_is_unchanged_by_the_option(robust) -> None:
     that recomputed it on the robust fit would be answering a different question.
     """
 
-    suppressed = robust.estat_firststage()
-    forced = robust.estat_firststage(forcenonrobust=True)
+    suppressed = robust.estat_first_stage()
+    forced = robust.estat_first_stage(forcenonrobust=True)
 
     assert suppressed.mineig == pytest.approx(forced.mineig, rel=1e-12)
 
 
 def test_the_critical_values_are_unchanged_too(robust) -> None:
-    suppressed = robust.estat_firststage()
-    forced = robust.estat_firststage(forcenonrobust=True)
+    suppressed = robust.estat_first_stage()
+    forced = robust.estat_first_stage(forcenonrobust=True)
 
     assert np.array_equal(
         suppressed.mineigcv, forced.mineigcv, equal_nan=True
@@ -116,7 +116,7 @@ def test_all_and_forcenonrobust_compose(frame) -> None:
         cov_type="HC1"
     )
 
-    rendered = fitted.estat_firststage(all=True, forcenonrobust=True)
+    rendered = fitted.estat_first_stage(all=True, forcenonrobust=True)
 
     assert rendered.show_all is True
     assert rendered.reports_mineig is True
@@ -133,7 +133,7 @@ def test_clustered_fits_count_as_robust(frame) -> None:
         cov_type="cluster", cov_kwds={"clusters": groups}
     )
 
-    assert clustered.estat_firststage().reports_mineig is False
+    assert clustered.estat_first_stage().reports_mineig is False
     assert (
-        clustered.estat_firststage(forcenonrobust=True).reports_mineig is True
+        clustered.estat_first_stage(forcenonrobust=True).reports_mineig is True
     )

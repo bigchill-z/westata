@@ -42,13 +42,13 @@ def panel():
 
 @pytest.fixture(scope="module")
 def random_effects(panel):
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
 
 
 def test_the_lm_statistic_matches_stata(panel, random_effects) -> None:
-    result = ws.xttest0(random_effects, entity=panel["sid"].to_numpy())
+    result = ws.panel_test0(random_effects, entity=panel["sid"].to_numpy())
     rendered = str(result)
     assert "3921.14" in rendered
 
@@ -56,7 +56,7 @@ def test_the_lm_statistic_matches_stata(panel, random_effects) -> None:
 def test_the_test_reports_a_chi_bar_squared_not_a_chi2(panel, random_effects) -> None:
     """Stata labels it `chibar2(01)`; the boundary null is why the label differs."""
 
-    rendered = str(ws.xttest0(random_effects, entity=panel["sid"].to_numpy()))
+    rendered = str(ws.panel_test0(random_effects, entity=panel["sid"].to_numpy()))
     assert "chibar2" in rendered
 
 
@@ -69,7 +69,7 @@ def test_it_finds_the_entity_labels_from_e_ivar(random_effects) -> None:
     variable name (`province`) that the old hard-coded candidate list did not contain.
     """
 
-    rendered = str(ws.xttest0(random_effects))
+    rendered = str(ws.panel_test0(random_effects))
     assert "Breusch and Pagan" in rendered
     # The equation line names the recorded panel variable, not a placeholder.
     assert "[sid,t] = Xb + u[sid]" in rendered, rendered
@@ -81,4 +81,4 @@ def test_it_still_refuses_when_the_recorded_name_is_missing(random_effects) -> N
     # e is a read-only property, so pass an explicit entity= that the frame does not contain:
     # the resulting label/residual length mismatch must raise rather than silently truncate.
     with pytest.raises(Exception):
-        ws.xttest0(random_effects, entity=random_effects.model_data["sid"].iloc[:-5])
+        ws.panel_test0(random_effects, entity=random_effects.model_data["sid"].iloc[:-5])

@@ -39,7 +39,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def mle(panel):
-    return ws.RandomEffectsMLE.from_formula(
+    return ws.PanelRegressMLE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
 
@@ -68,7 +68,7 @@ def test_mle_and_random_effects_are_different_fits(panel, mle) -> None:
     If the two agreed exactly, one of them would not be doing its own job.
     """
 
-    re = ws.RandomEffects.from_formula(
+    re = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="sid", time="year"
     ).fit()
     assert float(mle.params["lnk1"]) != pytest.approx(

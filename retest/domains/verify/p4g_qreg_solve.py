@@ -44,7 +44,7 @@ def case(tag, x1, x2, y, tau):
     n = len(df)
     X = np.column_stack([x1, x2, np.ones(n)])
     XtX = X.T @ X
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     ri = q.fit(cov_type="iid"); rr = q.fit(cov_type="robust")
     pn = list(rr.param_names)
     order = [pn.index(k) for k in ("x1", "x2", "Intercept")]

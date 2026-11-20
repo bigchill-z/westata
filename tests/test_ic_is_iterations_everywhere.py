@@ -63,10 +63,10 @@ BUILDERS = {
     "heckman_ml": lambda frame: ws.Heckman.from_formula(
         "y ~ x + select(s ~ z)", frame
     ).fit(method="ml"),
-    "etregress_ml": lambda frame: ws.Etregress.from_formula(
+    "etregress_ml": lambda frame: ws.EndogenousTreatmentRegress.from_formula(
         "y2 ~ x + treat(t ~ z)", frame
     ).fit(method="ml"),
-    "xtlogit_fe": lambda frame: ws.XtLogit.from_formula(
+    "xtlogit_fe": lambda frame: ws.PanelLogit.from_formula(
         "yb ~ x", frame, entity="id", method="fe"
     ).fit(),
     "logit": lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),

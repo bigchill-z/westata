@@ -102,7 +102,7 @@ def _fit_ols(spec: Spec, frame: pd.DataFrame):
     if spec.weight_var:
         kwargs["weights"] = frame[spec.weight_var]
         kwargs["weight_type"] = spec.weight_type
-    model = ws.OLS.from_formula(spec.formula, frame, **kwargs)
+    model = ws.Regress.from_formula(spec.formula, frame, **kwargs)
     if spec.cluster:
         return model.fit(cov_type="cluster", cov_kwds={"groups": frame[spec.cluster]})
     return model.fit(cov_type="nonrobust")
@@ -150,7 +150,7 @@ def _fit_first_stage(spec: Spec, frame: pd.DataFrame):
     if spec.weight_var:
         kwargs["weights"] = frame[spec.weight_var]
         kwargs["weight_type"] = spec.weight_type
-    model = ws.OLS.from_formula(formula, frame, **kwargs)
+    model = ws.Regress.from_formula(formula, frame, **kwargs)
     if spec.cluster:
         return model.fit(cov_type="cluster", cov_kwds={"groups": frame[spec.cluster]})
     return model.fit(cov_type="nonrobust")

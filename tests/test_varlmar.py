@@ -54,7 +54,7 @@ def data():
 
 
 def test_varlmar_matches_stata(data) -> None:
-    result = ws.varlmar(ws.VAR(data, lags=2, names=["dinf", "unem"]).fit(), mlag=2)
+    result = ws.var_lmar(ws.VAR(data, lags=2, names=["dinf", "unem"]).fit(), mlag=2)
     for row in result.rows:
         chi2, pvalue = STATA_VARLMAR[row.lag]
         assert row.chi2 == pytest.approx(chi2, abs=5e-4), row.lag
@@ -64,7 +64,7 @@ def test_varlmar_matches_stata(data) -> None:
 
 def test_veclmar_matches_stata(data) -> None:
     vecm = ws.VECM(data, coint_rank=1, lags=2, names=["dinf", "unem"]).fit()
-    result = ws.veclmar(vecm, mlag=2)
+    result = ws.vec_lmar(vecm, mlag=2)
     for row in result.rows:
         chi2, pvalue = STATA_VECLMAR[row.lag]
         assert row.chi2 == pytest.approx(chi2, abs=5e-4), row.lag
@@ -74,9 +74,9 @@ def test_veclmar_matches_stata(data) -> None:
 def test_the_two_statistics_are_genuinely_different(data) -> None:
     """Guard against 'veclmar is just varlmar renamed' -- Stata reports different numbers."""
 
-    var_stat = ws.varlmar(ws.VAR(data, lags=2, names=["dinf", "unem"]).fit(), mlag=1)
+    var_stat = ws.var_lmar(ws.VAR(data, lags=2, names=["dinf", "unem"]).fit(), mlag=1)
     vecm = ws.VECM(data, coint_rank=1, lags=2, names=["dinf", "unem"]).fit()
-    vec_stat = ws.veclmar(vecm, mlag=1)
+    vec_stat = ws.vec_lmar(vecm, mlag=1)
     assert abs(var_stat.rows[0].chi2 - vec_stat.rows[0].chi2) > 1.0
 
 
@@ -84,6 +84,6 @@ def test_the_sample_is_not_truncated(data) -> None:
     """varlmar.ado zero-fills the leading lags instead of dropping them."""
 
     result = ws.VAR(data, lags=2, names=["dinf", "unem"]).fit()
-    table = ws.varlmar(result, mlag=2)
+    table = ws.var_lmar(result, mlag=2)
     assert len(table.rows) == 2
     assert table.rows[0].df == table.rows[1].df == 4

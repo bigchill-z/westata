@@ -30,7 +30,7 @@ def lincom_fit():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 @pytest.fixture(scope="module")
@@ -41,7 +41,7 @@ def contrast_fit():
         pytest.skip("auto.dta is missing")
     frame = frame.reset_index(drop=True)
     frame["fx"] = (frame["foreign"] == "Foreign").astype(float)
-    return ws.OLS.from_formula("mpg ~ weight + C(fx)", frame).fit()
+    return ws.Regress.from_formula("mpg ~ weight + C(fx)", frame).fit()
 
 
 def test_lincom_opens_with_a_blank_line(lincom_fit) -> None:

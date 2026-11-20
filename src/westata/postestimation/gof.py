@@ -38,10 +38,10 @@ import numpy as np
 from scipy import stats
 from scipy.special import gammaln
 
-__all__ = ["GofResult", "estat_gof"]
+__all__ = ["GofResults", "estat_gof"]
 
 
-class GofResult:
+class GofResults:
     """Stata's ``estat gof`` output for a Poisson fit.
 
     Attributes
@@ -80,7 +80,7 @@ class GofResult:
 
     def __repr__(self) -> str:
         return (
-            f"<GofResult df={self.df:g} deviance={self.deviance:.6g} "
+            f"<GofResults df={self.df:g} deviance={self.deviance:.6g} "
             f"pearson={self.pearson:.6g}>"
         )
 
@@ -112,7 +112,7 @@ class GofResult:
         }
 
 
-class LfitResult:
+class LfitResults:
     """Stata's ``estat gof`` after ``logit``/``probit`` -- ``lfit.ado``.
 
     This is a DIFFERENT test from the Poisson one: ``lfit.ado:44-97`` collapses
@@ -214,7 +214,7 @@ class LfitResult:
         }
 
 
-def _lfit_pearson(result: Any) -> LfitResult:
+def _lfit_pearson(result: Any) -> LfitResults:
     """``lfit.ado:44-97`` -- the default (no ``group()``) branch.
 
     Collapse by covariate pattern, then form the Pearson chi-square.  The
@@ -300,7 +300,7 @@ def _lfit_pearson(result: Any) -> LfitResult:
     if not response_name:
         e_macros = getattr(result, "e", None) or {}
         response_name = str(e_macros.get("depvar", "") or "")
-    return LfitResult(
+    return LfitResults(
         chi2=chi2,
         pvalue=pvalue,
         df=df,
@@ -392,7 +392,7 @@ def _lfit_hosmer_lemeshow(result: Any, group: int) -> "LfitResult":
     if not response_name:
         e_macros = getattr(result, "e", None) or {}
         response_name = str(e_macros.get("depvar", "") or "")
-    return LfitResult(
+    return LfitResults(
         chi2=chi2,
         pvalue=pvalue,
         df=df,
@@ -513,7 +513,7 @@ def estat_gof(
 
     df = float(result.e["N"] - result.e["df_m"] - 1.0)
 
-    return GofResult(
+    return GofResults(
         deviance=deviance,
         deviance_pvalue=float(stats.chi2.sf(deviance, df)) if df > 0 else float("nan"),
         pearson=pearson,

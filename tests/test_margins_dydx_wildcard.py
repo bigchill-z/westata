@@ -34,7 +34,7 @@ def fitted():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("cobb_douglas.dta is not available")
-    return ws.OLS.from_formula("y ~ k + l", frame).fit()
+    return ws.Regress.from_formula("y ~ k + l", frame).fit()
 
 
 def test_the_wildcard_expands_to_every_non_constant(fitted) -> None:

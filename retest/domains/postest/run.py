@@ -242,7 +242,7 @@ def panel_frame(seed, n_ent, n_t, corr):
 # ---------------------------------------------------------------- test/lincom
 def section_test(rec, st, auto):
     st.run("sysuse auto, clear")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     st.quiet("regress mpg weight foreign")
     for name, command, spec, note in (
@@ -262,7 +262,7 @@ def section_test(rec, st, auto):
         cmp_vec(rec, name, command, v, n, w, wn, notes=[note])
 
     st.quiet("regress mpg weight foreign, vce(robust)")
-    m_rob = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
+    m_rob = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
     st.quiet("test weight foreign")
     v, n = test_vector(st, "F")
     w, wn = test_ws_vector(m_rob.test("weight", "foreign"))
@@ -288,7 +288,7 @@ def section_test(rec, st, auto):
 def section_lincom(rec, st, auto):
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     for name, command, expr, note in (
         ("lincom: single coefficient (regress)", "lincom weight", "weight",
@@ -342,7 +342,7 @@ def section_lincom(rec, st, auto):
 def section_nlcom(rec, st, auto):
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     def nlcom_pair(name, command, expression, estimator, note=()):
         st.quiet(command)
@@ -392,7 +392,7 @@ def section_nlcom(rec, st, auto):
 def section_testnl(rec, st, auto):
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     command = "testnl (_b[weight]=1) (_b[foreign]=0)"
     st.quiet(command)
@@ -456,8 +456,8 @@ def section_lrtest(rec, st, auto):
     st.quiet("estimates store RR")
     st.quiet("lrtest RU RR")
     v = [st.scalar("r(chi2)"), st.scalar("r(df)"), st.scalar("r(p)")]
-    big_r = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
-    small_r = ws.OLS.from_formula("mpg ~ weight", auto).fit()
+    big_r = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
+    small_r = ws.Regress.from_formula("mpg ~ weight", auto).fit()
     res_r = ws.lrtest(big_r, small_r)
     cmp_vec(rec, "lrtest: nested regress (df=1)", "lrtest RU RR", v,
             ["chi2", "df", "p"],
@@ -474,8 +474,8 @@ def section_lrtest(rec, st, auto):
     stata_ok, stata_err = stata_accepts(st, command)
     stata_vals = ({"chi2": st.scalar("r(chi2)"), "df": st.scalar("r(df)"),
                    "p": st.scalar("r(p)")} if stata_ok else {})
-    m1 = ws.OLS.from_formula("mpg ~ weight", auto).fit()
-    m2 = ws.OLS.from_formula("mpg ~ weight", auto).fit()
+    m1 = ws.Regress.from_formula("mpg ~ weight", auto).fit()
+    m2 = ws.Regress.from_formula("mpg ~ weight", auto).fit()
     try:
         res0 = ws.lrtest(m2, m1)                  # equal parameter counts -> df = 0
         ws_ok = True
@@ -504,8 +504,8 @@ def section_lrtest(rec, st, auto):
     stata_ok, stata_err = stata_accepts(st, command)
     stata_vals = ({"chi2": st.scalar("r(chi2)"), "df": st.scalar("r(df)"),
                    "p": st.scalar("r(p)")} if stata_ok else {})
-    a = ws.OLS.from_formula("mpg ~ weight", auto).fit()
-    b = ws.OLS.from_formula("mpg ~ foreign + length", auto).fit()
+    a = ws.Regress.from_formula("mpg ~ weight", auto).fit()
+    b = ws.Regress.from_formula("mpg ~ foreign + length", auto).fit()
     try:
         ws.lrtest(b, a)
         ws_ok, ws_text = True, "accepted"
@@ -539,9 +539,9 @@ def section_hausman(rec, st):
         st.quiet(command)
         v = [st.scalar("r(chi2)"), st.scalar("r(df)"), st.scalar("r(p)")]
 
-        ws_fe = ws.PanelOLS.from_formula("y ~ 1 + x1 + x2", df, entity="id", time="year"
+        ws_fe = ws.PanelRegressFE.from_formula("y ~ 1 + x1 + x2", df, entity="id", time="year"
                                          ).fit(entity_effects=True)
-        ws_re = ws.RandomEffects.from_formula("y ~ 1 + x1 + x2", df, entity="id",
+        ws_re = ws.PanelRegressRE.from_formula("y ~ 1 + x1 + x2", df, entity="id",
                                               time="year").fit()
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -585,7 +585,7 @@ def section_hausman(rec, st):
 def section_contrast(rec, st, auto):
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight i.foreign")
-    m2 = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    m2 = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
     columns = ("b", "se", "stat", "p", "ll", "ul")
 
     def block(name, command, stata_kind, ws_rows, labels):
@@ -604,7 +604,7 @@ def section_contrast(rec, st, auto):
     data3 = auto.dropna(subset=["rep78"]).reset_index(drop=True)
     st.send(data3)
     st.quiet("regress mpg i.r3")
-    m3 = ws.OLS.from_formula("mpg ~ C(r3)", data3).fit()
+    m3 = ws.Regress.from_formula("mpg ~ C(r3)", data3).fit()
     for method, labels in (("r", ["2vs1", "3vs1"]), ("g", ["1", "2", "3"]),
                            ("a", ["1vs2", "2vs3"])):
         rows = m3.contrast("C(r3)", method)
@@ -613,7 +613,7 @@ def section_contrast(rec, st, auto):
 
     st.quiet("regress mpg i.r3")
     st.quiet("pwcompare r3")
-    rows = ws.OLS.from_formula("mpg ~ C(r3)", data3).fit().pwcompare("C(r3)")
+    rows = ws.Regress.from_formula("mpg ~ C(r3)", data3).fit().pairwise_compare("C(r3)")
     labels = ["2vs1", "3vs1", "3vs2"]
     sv, sn = flat_table(st, "r(table_vs)", columns=columns, labels=labels)
     wv, wn = rows_vector(rows, labels, columns)
@@ -686,7 +686,7 @@ def section_margins(rec, st, auto):
 
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight i.foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     command = "margins"
     st.quiet(command)
@@ -901,7 +901,7 @@ def section_samples(rec, st, auto):
     """Every comparison must run on the same observations (BRIEF discipline #4)."""
 
     cases = [
-        ("regress mpg weight foreign", auto, lambda: ws.OLS.from_formula(
+        ("regress mpg weight foreign", auto, lambda: ws.Regress.from_formula(
             "mpg ~ weight + foreign", auto).fit()),
         ("logit foreign weight mpg", auto, lambda: ws.Logit.from_formula(
             "foreign ~ weight + mpg", auto).fit()),
@@ -930,13 +930,13 @@ def section_gaps(rec, st, auto):
 
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight i.foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     command = "pwcompare foreign, mcompare(bonferroni)"
     stata_ok, stata_err = stata_accepts(st, command)
     ws_ok, ws_text = False, ""
     try:
-        m.pwcompare("C(foreign)", adjust="bonferroni")
+        m.pairwise_compare("C(foreign)", adjust="bonferroni")
         ws_ok, ws_text = True, "accepted"
     except Exception as exc:                      # noqa: BLE001
         ws_text = f"{type(exc).__name__}: {exc}"
@@ -969,7 +969,7 @@ def section_gaps(rec, st, auto):
 def section_predict(rec, st, auto):
     st.run("sysuse auto, clear")
     st.quiet("regress mpg weight foreign")
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     for kind in ("xb", "stdp", "stdf", "residuals"):
         command = f"predict double p_{kind}, {kind}"
         st.quiet(command)
@@ -1209,8 +1209,8 @@ def section_etable(rec, st, auto):
     text = st.output(command)
     parsed = parse_esttab(text, ["1", "2"])
 
-    m1 = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
-    m2 = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
+    m1 = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
+    m2 = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
     table = ws.etable([m1, m2], model_names=["1", "2"], digits=6, stars=False,
                       stats=[("N", "Observations"), ("r2", "R-squared"),
                              ("r2_a", "Adj-R2")])

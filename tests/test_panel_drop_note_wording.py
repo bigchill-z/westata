@@ -36,7 +36,7 @@ def _panel(count: bool) -> pd.DataFrame:
 
 
 def test_xtpoisson_uses_the_zero_outcome_wording() -> None:
-    fitted = ws.XtPoisson.from_formula(
+    fitted = ws.PanelPoisson.from_formula(
         "y ~ x", _panel(True), entity="pid", time="year", method="fe"
     ).fit()
     lines = str(fitted.summary()).splitlines()
@@ -46,7 +46,7 @@ def test_xtpoisson_uses_the_zero_outcome_wording() -> None:
 
 def test_xtpoisson_does_not_print_logit_prose() -> None:
     rendered = str(
-        ws.XtPoisson.from_formula(
+        ws.PanelPoisson.from_formula(
             "y ~ x", _panel(True), entity="pid", time="year", method="fe"
         ).fit().summary()
     )
@@ -64,7 +64,7 @@ def test_xtlogit_keeps_its_own_two_line_wording() -> None:
     frame["x"] = rng.normal(size=len(frame))
     frame["z"] = rng.normal(size=len(frame))
     frame["y"] = (rng.random(len(frame)) < 0.5).astype(float)
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "y ~ x + z", frame, entity="pid", time="year", method="fe"
     ).fit()
     assert int(fitted.e["N_group_drop"]) == 1
@@ -75,7 +75,7 @@ def test_xtlogit_keeps_its_own_two_line_wording() -> None:
 
 
 def test_the_drop_counts_remain_in_e() -> None:
-    fitted = ws.XtPoisson.from_formula(
+    fitted = ws.PanelPoisson.from_formula(
         "y ~ x", _panel(True), entity="pid", time="year", method="fe"
     ).fit()
     assert int(fitted.e["N_group_drop"]) == 1

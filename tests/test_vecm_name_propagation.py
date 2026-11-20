@@ -69,11 +69,11 @@ def test_varstable_refuses_a_vecm(vecm) -> None:
     """Stata's varstable raises r(198) after vec; vecstable is the right command there."""
 
     with pytest.raises(Exception):
-        ws.varstable(vecm)
+        ws.var_stable(vecm)
 
 
 def test_vecstable_accepts_the_vecm(vecm) -> None:
-    rendered = str(ws.vecstable(vecm))
+    rendered = str(ws.vec_stable(vecm))
     assert "Eigenvalue" in rendered
 
 

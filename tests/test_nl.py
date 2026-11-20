@@ -391,7 +391,7 @@ def test_nl_on_a_linear_model_reproduces_ols():
     frame = pd.DataFrame({"y": 1.5 + 2.5 * x + rng.normal(size=n), "x": x})
 
     nonlinear = Nl.from_formula("y = {b0} + {b1} * x", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert float(nonlinear.params["/b0"]) == pytest.approx(
         float(plain.params["Intercept"]), abs=1e-6
@@ -932,7 +932,7 @@ def test_frontier_gaussian_limit_when_inefficiency_is_absent():
     frame = pd.DataFrame({"y": 1.0 + 2.0 * x + rng.normal(scale=0.5, size=n), "x": x})
 
     frontier = Frontier.from_formula("y ~ x", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert float(frontier.params["x"]) == pytest.approx(
         float(plain.params["x"]), abs=0.05

@@ -53,7 +53,7 @@ from typing import Any, Sequence
 import numpy as np
 from scipy import stats
 
-__all__ = ["MTestResult", "adjust_pvalues", "MTEST_METHODS"]
+__all__ = ["MTestResults", "adjust_pvalues", "MTEST_METHODS"]
 
 #: The values ``_mtest.ado:84`` accepts.
 MTEST_METHODS = ("bonferroni", "holm", "sidak", "noadjust")
@@ -124,7 +124,7 @@ def adjust_pvalues(pvalues: Sequence[float], method: str) -> np.ndarray:
     return adjusted
 
 
-class MTestResult:
+class MTestResults:
     """The per-variable heteroskedasticity tests and their adjusted p-values.
 
     Attributes
@@ -144,7 +144,7 @@ class MTestResult:
 
     def __repr__(self) -> str:
         return (
-            f"<MTestResult {len(self.table)} variables, "
+            f"<MTestResults {len(self.table)} variables, "
             f"method={self.method!r}>"
         )
 

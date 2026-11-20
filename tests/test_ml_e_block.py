@@ -91,7 +91,7 @@ def test_panel_e_ic_is_the_iteration_count(binary_panel) -> None:
     reading is uniform across both families.
     """
 
-    result = ws.XtLogit.from_formula("y ~ x", binary_panel, entity="id").fit()
+    result = ws.PanelLogit.from_formula("y ~ x", binary_panel, entity="id").fit()
     e = result.e
 
     # ``ic`` is a plausible iteration count, and is NOT the k+1 rule.
@@ -110,7 +110,7 @@ def test_panel_iterations_and_ic_are_the_same_quantity(binary_panel) -> None:
     against the old, wrong layout.
     """
 
-    result = ws.XtLogit.from_formula("y ~ x", binary_panel, entity="id").fit()
+    result = ws.PanelLogit.from_formula("y ~ x", binary_panel, entity="id").fit()
     e = result.e
 
     assert "iterations" in e

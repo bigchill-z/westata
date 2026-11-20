@@ -39,7 +39,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def lsdv(panel):
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor + C(sid)", panel
     ).fit(cov_type="cluster", cov_kwds={"groups": panel["sid"]})
 
@@ -54,7 +54,7 @@ def test_cluster_requires_labels_rather_than_inferring_them(panel) -> None:
     """`cov_type="cluster"` without groups raises; guessing from the dummies would be too clever."""
 
     with pytest.raises(Exception):
-        ws.OLS.from_formula(
+        ws.Regress.from_formula(
             "lny ~ lnk1 + lnk2 + lnlabor + C(sid)", panel
         ).fit(cov_type="cluster")
 
@@ -62,10 +62,10 @@ def test_cluster_requires_labels_rather_than_inferring_them(panel) -> None:
 def test_the_point_estimates_match_the_absorbed_fit(panel) -> None:
     """LSDV and the within estimator answer the same question -- the slopes must agree."""
 
-    lsdv = ws.OLS.from_formula(
+    lsdv = ws.Regress.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor + C(sid)", panel
     ).fit()
-    within = ws.FEOLS.from_formula("lny ~ lnk1 + lnk2 + lnlabor | sid", panel).fit()
+    within = ws.RegressHighDimFixedEffects.from_formula("lny ~ lnk1 + lnk2 + lnlabor | sid", panel).fit()
 
     for name in ("lnk1", "lnk2", "lnlabor"):
         assert float(lsdv.params[name]) == pytest.approx(

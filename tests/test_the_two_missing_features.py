@@ -39,7 +39,7 @@ def test_synth_is_now_implemented() -> None:
 
     assert hasattr(ws, "synth")
     assert callable(ws.synth)
-    assert hasattr(ws, "SynthResult")
+    assert hasattr(ws, "SynthResults")
 
 
 def test_synth2_is_now_implemented() -> None:
@@ -47,7 +47,7 @@ def test_synth2_is_now_implemented() -> None:
 
     assert hasattr(ws, "synth2")
     assert callable(ws.synth2)
-    assert hasattr(ws, "Synth2Result")
+    assert hasattr(ws, "Synth2Results")
 
 
 def test_rdrobust_itself_works_with_explicit_bandwidths() -> None:
@@ -60,7 +60,7 @@ def test_rdrobust_itself_works_with_explicit_bandwidths() -> None:
     running = rng.uniform(-1.0, 1.0, n)
     response = 0.5 * (running >= 0) + 0.3 * running + rng.normal(scale=0.3, size=n)
 
-    fitted = ws.rdrobust(response, running, cutoff=0.0, bandwidth=0.3)
+    fitted = ws.rd_robust(response, running, cutoff=0.0, bandwidth=0.3)
     assert np.isfinite(float(fitted.tau))
 
 
@@ -75,4 +75,4 @@ def test_rdrobust_refuses_without_a_bandwidth() -> None:
     response = 0.5 * (running >= 0) + 0.3 * running + rng.normal(scale=0.3, size=n)
 
     with pytest.raises(Exception):
-        ws.rdrobust(response, running, cutoff=0.0)
+        ws.rd_robust(response, running, cutoff=0.0)

@@ -126,11 +126,11 @@ import pandas as pd
 
 from westata.errors import ConsistencyError
 from westata.estimators import _pyfixest_compat as _compat
-from westata.estimators.hdfe import FEOLS
+from westata.estimators.hdfe import RegressHighDimFixedEffects
 from westata.protocols import SSC
 from westata.results.base import StataResults
 
-__all__ = ["Didregress", "Xtdidregress"]
+__all__ = ["DIDRegress", "PanelDIDRegress"]
 
 COV_TYPES = ("cluster", "HC1", "nonrobust")
 """Canonical ``cov_type`` values accepted by :meth:`Didregress.fit`.
@@ -254,7 +254,7 @@ def _collinearity_error(treatment: str, group: str, detail: str) -> ConsistencyE
 
 
 # ------------------------------------------------------------------- FE plumbing
-class _DidFEOLS(FEOLS):
+class _DidFEOLS(RegressHighDimFixedEffects):
     """``FEOLS`` with a DID degrees-of-freedom convention and design capture.
 
     Everything numerical -- the within transform, the clustered sandwich, the
@@ -284,7 +284,7 @@ class _DidFEOLS(FEOLS):
     ) -> dict[str, str | bool]:
         """``FEOLS``'s SSC mapping with the DID ``k_fixef`` convention."""
 
-        settings = FEOLS._pyfixest_ssc(ssc, cov_type)
+        settings = RegressHighDimFixedEffects._pyfixest_ssc(ssc, cov_type)
         settings["k_fixef"] = cls.K_FIXEF
         return settings
 
@@ -321,7 +321,7 @@ class _DidFEOLS(FEOLS):
             # clustering the nested-effect rule does not apply and PyFixest
             # counts all 209 regardless -- correctly, because `N - K` must then
             # pay for every absorbed parameter.
-            "rank": FEOLS._rank(model, nobs),
+            "rank": RegressHighDimFixedEffects._rank(model, nobs),
             "n_clusters": n_clusters,
         }
         # FEOLS labels every result "reghdfe", and StataResults exposes no
@@ -421,7 +421,7 @@ def _treatment_time_info(
         return {}
 
 
-class Didregress:
+class DIDRegress:
     """Two-way fixed-effects difference-in-differences (Stata ``didregress``).
 
     Parameters
@@ -954,7 +954,7 @@ class Didregress:
         results.model_data = sample.reset_index(drop=True)
 
 
-class Xtdidregress(Didregress):
+class PanelDIDRegress(DIDRegress):
     """Panel difference-in-differences (Stata ``xtdidregress``).
 
     The estimator is the same two-way fixed-effects regression as
@@ -988,7 +988,7 @@ class Xtdidregress(Didregress):
                 "use didregress for a genuinely repeated cross-section."
             )
 
-def estat_ptrends(result: Any) -> dict[str, float]:
+def estat_parallel_trends(result: Any) -> dict[str, float]:
     """`estat ptrends` after `didregress`: the parallel-trends test over the pretreatment periods.
 
     Stata, on a 60-group / 15-period panel with 20 treated (synthetic, seeded):

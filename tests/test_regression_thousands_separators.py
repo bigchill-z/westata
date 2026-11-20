@@ -30,7 +30,7 @@ import westata as ws
 def _render(n: int):
     rng = np.random.default_rng(n)
     frame = pd.DataFrame({"y": rng.normal(size=n), "x": rng.normal(size=n)})
-    return str(ws.OLS.from_formula("y ~ x", frame).fit().summary(style="stata"))
+    return str(ws.Regress.from_formula("y ~ x", frame).fit().summary(style="stata"))
 
 
 def test_the_observation_count_is_separated() -> None:

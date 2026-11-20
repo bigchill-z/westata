@@ -142,8 +142,8 @@ from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
 __all__ = [
-    "QuantileRegression",
-    "RobustRegression",
+    "QuantileRegress",
+    "RobustRegress",
     "solve_lad",
 ]
 
@@ -307,7 +307,7 @@ def _chamberlain_bandwidth(quantile: float, nobs: int, alpha: float) -> float:
     return float(z * np.sqrt(quantile * (1.0 - quantile) / nobs))
 
 
-class QuantileRegression:
+class QuantileRegress:
     """Quantile regression (Stata ``qreg``)."""
 
     _stata_command = "qreg"
@@ -619,7 +619,7 @@ class QuantileRegression:
         return float(ordered[min(max(position, 1), ordered.size) - 1])
 
 
-class RobustRegression:
+class RobustRegress:
     """Robust regression (Stata ``rreg``)."""
 
     _stata_command = "rreg"

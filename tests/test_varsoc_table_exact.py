@@ -49,7 +49,7 @@ def rendered():
     rng = np.random.default_rng(11)
     n = 200
     frame = pd.DataFrame({"y1": rng.normal(size=n), "y2": rng.normal(size=n)})
-    return str(ws.varsoc(frame[["y1", "y2"]], maxlag=2))
+    return str(ws.var_select_order(frame[["y1", "y2"]], maxlag=2))
 
 
 def test_every_line_matches_stata(rendered) -> None:

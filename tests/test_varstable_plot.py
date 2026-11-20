@@ -32,7 +32,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.varstable import VarStableResult
+from westata.postestimation.varstable import VarStableResults
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -46,14 +46,14 @@ pytestmark = pytest.mark.skipif(
 def stable_result():
     frame = pd.read_stata(DATA)
     values = frame[["dinf", "unem"]].dropna()
-    return ws.varstable(ws.VAR(values, lags=2).fit())
+    return ws.var_stable(ws.VAR(values, lags=2).fit())
 
 
 @pytest.fixture(scope="module")
-def unstable_result() -> VarStableResult:
+def unstable_result() -> VarStableResults:
     """One root outside the circle -- the case a reader most needs to see."""
 
-    return VarStableResult(
+    return VarStableResults(
         eigenvalues=(0.35 + 0.0j, 1.08 + 0.0j, -0.2 + 0.55j, -0.2 - 0.55j),
         modulus=(0.35, 1.08, 0.58523, 0.58523),
     )
@@ -263,7 +263,7 @@ def test_plot_does_not_change_the_result(stable_result) -> None:
 def test_a_single_eigenvalue_still_plots() -> None:
     """No divide-by-zero or empty-extent guard: one point is a legitimate figure."""
 
-    single = VarStableResult(eigenvalues=(0.5 + 0.0j,), modulus=(0.5,))
+    single = VarStableResults(eigenvalues=(0.5 + 0.0j,), modulus=(0.5,))
     figure = single.plot()
     assert len(figure.axes[0].collections[0].get_offsets()) == 1
     assert figure.axes[0].get_xlim()[1] > 0.5

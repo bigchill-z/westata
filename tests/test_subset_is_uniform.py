@@ -60,11 +60,11 @@ MASK = lambda frame: frame["x"] > 0.0  # noqa: E731 - a tiny helper, not a fixtu
 
 #: name -> (builder taking subset=, builder taking a pre-filtered frame)
 BUILDERS = {
-    "OLS": (
-        lambda frame, mask=None: ws.OLS.from_formula(
+    "Regress": (
+        lambda frame, mask=None: ws.Regress.from_formula(
             "y ~ x", frame, **({} if mask is None else {"subset": mask})
         ).fit(),
-        lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(),
+        lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(),
     ),
     "Logit": (
         lambda frame, mask=None: ws.Logit.from_formula(
@@ -90,21 +90,21 @@ BUILDERS = {
         ).fit(),
         lambda frame: ws.IVLIML.from_formula("y ~ 1 + [e ~ z]", frame).fit(),
     ),
-    "FEOLS": (
-        lambda frame, mask=None: ws.FEOLS.from_formula(
+    "RegressHighDimFixedEffects": (
+        lambda frame, mask=None: ws.RegressHighDimFixedEffects.from_formula(
             "y ~ x | firm", frame, **({} if mask is None else {"subset": mask})
         ).fit(),
-        lambda frame: ws.FEOLS.from_formula("y ~ x | firm", frame).fit(),
+        lambda frame: ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm", frame).fit(),
     ),
-    "PanelOLS": (
-        lambda frame, mask=None: ws.PanelOLS.from_formula(
+    "PanelRegressFE": (
+        lambda frame, mask=None: ws.PanelRegressFE.from_formula(
             "y ~ x",
             frame,
             entity="firm",
             time="year",
             **({} if mask is None else {"subset": mask}),
         ).fit(),
-        lambda frame: ws.PanelOLS.from_formula(
+        lambda frame: ws.PanelRegressFE.from_formula(
             "y ~ x", frame, entity="firm", time="year"
         ).fit(),
     ),
@@ -180,8 +180,8 @@ def test_a_boolean_mask_and_an_index_agree(frame) -> None:
     """``subset`` takes either a mask or labels, matching ``OLS``."""
 
     mask = MASK(frame)
-    by_mask = ws.OLS.from_formula("y ~ x", frame, subset=mask).fit()
-    by_index = ws.OLS.from_formula("y ~ x", frame, subset=frame.index[mask]).fit()
+    by_mask = ws.Regress.from_formula("y ~ x", frame, subset=mask).fit()
+    by_index = ws.Regress.from_formula("y ~ x", frame, subset=frame.index[mask]).fit()
 
     np.testing.assert_allclose(
         np.asarray(by_mask.params, dtype=float),
@@ -196,7 +196,7 @@ def test_the_panel_estimator_keeps_a_usable_frame_under_subset(frame) -> None:
     """``PanelOLS`` needs consecutive entity/time levels after restriction."""
 
     mask = MASK(frame)
-    fitted = ws.PanelOLS.from_formula(
+    fitted = ws.PanelRegressFE.from_formula(
         "y ~ x", frame, entity="firm", time="year", subset=mask
     ).fit()
 
@@ -208,7 +208,7 @@ def test_the_hdfe_predict_still_works_under_subset(frame) -> None:
     """The absorbed-effect prediction reads the estimation frame, so it must follow."""
 
     mask = MASK(frame)
-    fitted = ws.FEOLS.from_formula("y ~ x | firm", frame, subset=mask).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm", frame, subset=mask).fit()
 
     predicted = np.asarray(fitted.predict(kind="xb"), dtype=float)
     assert predicted.shape == (int(mask.sum()),)
@@ -221,10 +221,10 @@ def test_a_subset_that_selects_nothing_is_refused_rather_than_silently_empty(fra
 
     empty = frame["x"] > 1e9
     with pytest.raises(Exception):
-        ws.OLS.from_formula("y ~ x", frame, subset=empty).fit()
+        ws.Regress.from_formula("y ~ x", frame, subset=empty).fit()
 
 
 def test_no_subset_means_the_full_sample(frame) -> None:
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert float(fitted.e["N"]) == len(frame)

@@ -53,7 +53,7 @@ def test_predict_ols_xb_and_residuals_match_stata():
         pytest.skip("predict_ols_values.csv missing")
     reference = pd.read_csv(path)
     frame = pd.read_stata(DATA / "auto.dta", convert_categoricals=False)
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
 
     # Measured: 1.6e-15 on xb, 5.1e-13 on residuals.
     assert _rel(result.predict(kind="xb"), reference["xb2"]) < 1e-12
@@ -118,8 +118,8 @@ def test_etable_matches_esttab_coefficients():
     """etable's cells come from the same estimates esttab prints."""
 
     frame = pd.read_stata(DATA / "auto.dta", convert_categoricals=False)
-    r1 = ws.OLS.from_formula("mpg ~ weight", frame).fit()
-    r2 = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    r1 = ws.Regress.from_formula("mpg ~ weight", frame).fit()
+    r2 = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
     table = ws.etable([r1, r2], digits=6)
 
     # Values captured from ``esttab m1 m2, b(%9.6f) se(%9.6f)``:

@@ -82,7 +82,7 @@ __all__ = [
     "IPW",
     "NearestNeighbourMatching",
     "RegressionAdjustment",
-    "TreatmentEffectResult",
+    "TreatmentEffectResults",
 ]
 
 #: Reported when the influence-function variance is exact and reproduces Stata.
@@ -97,7 +97,7 @@ _APPROX_SE = "Abadie-Imbens approximation"
 
 
 @dataclass(frozen=True)
-class TreatmentEffectResult(ResultSerialisation):
+class TreatmentEffectResults(ResultSerialisation):
     """A treatment effect together with its potential-outcome means.
 
     Attributes
@@ -439,7 +439,7 @@ def _summarise_from_standard_error(
     se_method: str,
     nobs: int = 0,
     weights: Any = None,
-) -> TreatmentEffectResult:
+) -> TreatmentEffectResults:
     """Build the result from an already-computed standard error."""
 
     if not np.isfinite(std_err) or std_err < 0.0:
@@ -457,7 +457,7 @@ def _summarise_from_standard_error(
         z = float("nan")
         pvalue = float("nan")
         lower = upper = float(estimate)
-    return TreatmentEffectResult(
+    return TreatmentEffectResults(
         estimand=estimand.upper(),
         estimate=float(estimate),
         std_err=float(std_err),
@@ -484,7 +484,7 @@ def _summarise(
     command: str,
     se_method: str = _EXACT_SE,
     weights: Any = None,
-) -> TreatmentEffectResult:
+) -> TreatmentEffectResults:
     """Assemble a :class:`TreatmentEffectResult` from an influence function."""
 
     # The influence function has one row per observation, so its length IS the
@@ -710,7 +710,7 @@ class RegressionAdjustment:
             ) from None
         return beta, fitted, residual, influence
 
-    def fit(self) -> TreatmentEffectResult:
+    def fit(self) -> TreatmentEffectResults:
         """Estimate the requested estimand and its potential-outcome means."""
 
         x, treated = self._x, self._treated
@@ -1082,7 +1082,7 @@ class IPW:
             mean0 = float(((1.0 - t) * y * odds).mean() / ((1.0 - t) * odds).mean())
         return mean1, mean0
 
-    def fit(self) -> TreatmentEffectResult:
+    def fit(self) -> TreatmentEffectResults:
         _require_two_arms(self._treated, self._command)
         model = _LogitPropensity(self._x, self._treated, command=self._command)
         p = model.checked_propensity()
@@ -1157,7 +1157,7 @@ class AIPW(IPW):
 
     _command = "teffects aipw"
 
-    def fit(self) -> TreatmentEffectResult:
+    def fit(self) -> TreatmentEffectResults:
         x, y, treated = self._x, self._y, self._treated
         arm = _require_two_arms(treated, self._command)
         k = x.shape[1]
@@ -1498,7 +1498,7 @@ class NearestNeighbourMatching:
         return group.var(axis=1, ddof=1)
 
 
-    def fit(self) -> TreatmentEffectResult:
+    def fit(self) -> TreatmentEffectResults:
         y, treated = self._y, self._treated
         n = y.size
         arm = _require_two_arms(treated, self._command)

@@ -59,7 +59,7 @@ def series():
 def test_the_default_is_statas_default_and_matches_every_tau(series) -> None:
     """Bare dfgls() is the TREND case -- the inverted default was the whole five-round defect."""
 
-    result = ws.dfgls(series)
+    result = ws.df_gls(series)
     assert [cell.lags for cell in result.cells] == list(range(10, 0, -1))
     assert all(cell.nobs == 51 for cell in result.cells)
     assert [round(float(cell.statistic), 4) for cell in result.cells] == pytest.approx(
@@ -71,7 +71,7 @@ def test_notrend_reproduces_the_other_stata_case(series) -> None:
     """The +0.806 that rounds 119-123 thought was wrong IS Stata -- for `notrend`."""
 
     for kwargs in ({"notrend": True}, {"trend": False}):
-        result = ws.dfgls(series, **kwargs)
+        result = ws.df_gls(series, **kwargs)
         assert float(result.cells[0].statistic) == pytest.approx(
             STATA_NOTREND_FIRST, abs=5e-4
         ), kwargs
@@ -80,8 +80,8 @@ def test_notrend_reproduces_the_other_stata_case(series) -> None:
 def test_the_two_specifications_are_different_estimands(series) -> None:
     """Pinned so a future 'simplification' cannot quietly merge them again."""
 
-    trended = float(ws.dfgls(series).cells[0].statistic)
-    detrended = float(ws.dfgls(series, notrend=True).cells[0].statistic)
+    trended = float(ws.df_gls(series).cells[0].statistic)
+    detrended = float(ws.df_gls(series, notrend=True).cells[0].statistic)
     assert trended < 0 < detrended
     assert abs(trended - detrended) > 2.0
 
@@ -94,7 +94,7 @@ def test_the_full_table_matches_stata_line_for_line(series) -> None:
     columns were ABSENT -- true then, wrong now.
     """
 
-    rendered = str(ws.dfgls(series, name="lrgnp"))
+    rendered = str(ws.df_gls(series, name="lrgnp"))
     lines = [line for line in rendered.splitlines() if line.strip()]
     assert len(lines) == 20
     # Every line between the two rules is 62 characters, header included.
@@ -112,7 +112,7 @@ def test_the_critical_columns_use_two_different_sample_sizes(series) -> None:
     Getting this wrong is subtle: using one N for both columns reproduces neither.
     """
 
-    result = ws.dfgls(series)
+    result = ws.df_gls(series)
     ones = {round(cell.critical_1, 3) for cell in result.cells}
     assert ones == {-3.724}, "the 1% column must be constant"
     fives = [round(cell.critical_5, 3) for cell in result.cells]
@@ -127,7 +127,7 @@ def test_the_footer_selects_on_the_sequential_t_rule_not_the_smallest_rmse(serie
     The old property returned the minimum-RMSE lag, which is 10 here, while Stata prints 1.
     """
 
-    result = ws.dfgls(series)
+    result = ws.df_gls(series)
     assert result.best_lag == 1
     smallest_rmse = min(result.cells, key=lambda cell: cell.rmse).lags
     assert smallest_rmse != result.best_lag

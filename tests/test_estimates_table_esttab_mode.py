@@ -53,8 +53,8 @@ pytestmark = pytest.mark.skipif(
 def models():
     frame = pd.read_stata(DATA)
     return [
-        ws.OLS.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
-        ws.OLS.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
+        ws.Regress.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
+        ws.Regress.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
             cov_type="HC1"
         ),
         ws.IV2SLS.from_formula(

@@ -29,7 +29,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["AucResult", "estat_auc"]
+__all__ = ["AucResults", "estat_auc"]
 
 #: Model names whose ``estat`` program dispatches ``auc`` to ``lroc``.
 #: ``probit.ado:259`` records ``e(estat_cmd) = "probit_estat"``, which forwards to the
@@ -37,7 +37,7 @@ __all__ = ["AucResult", "estat_auc"]
 _AUC_MODELS = ("logit", "probit")
 
 
-class AucResult:
+class AucResults:
     """The ``estat auc`` output.
 
     Attributes
@@ -66,7 +66,7 @@ class AucResult:
         return {"area": self.area, "N": float(self.n)}
 
 
-def estat_auc(result: Any) -> AucResult:
+def estat_auc(result: Any) -> AucResults:
     """Area under the ROC curve for a binary-outcome fit.
 
     Parameters
@@ -111,7 +111,7 @@ def estat_auc(result: Any) -> AucResult:
     u_statistic = positive_rank_sum - positive.size * (positive.size + 1) / 2.0
     area = u_statistic / (positive.size * negative.size)
 
-    return AucResult(area=float(area), n=int(outcome.size))
+    return AucResults(area=float(area), n=int(outcome.size))
 
 
 def _average_ranks(values: np.ndarray) -> np.ndarray:

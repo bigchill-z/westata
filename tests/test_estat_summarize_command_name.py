@@ -41,7 +41,7 @@ def test_the_absorbed_fit_names_areg(n) -> None:
             "id": np.arange(n) // 20,
         }
     )
-    fitted = ws.FEOLS.from_formula("y ~ x | id", frame).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | id", frame).fit()
     heading = _heading(fitted)
     assert "areg" in heading, heading
     assert "reghdfe" not in heading, heading
@@ -56,14 +56,14 @@ def test_the_heading_still_carries_the_observation_count() -> None:
             "id": np.arange(600) // 20,
         }
     )
-    fitting = ws.FEOLS.from_formula("y ~ x | id", frame).fit()
+    fitting = ws.RegressHighDimFixedEffects.from_formula("y ~ x | id", frame).fit()
     assert "Number of obs" in _heading(fitting)
 
 
 def test_a_plain_regression_still_names_itself() -> None:
     rng = np.random.default_rng(300)
     frame = pd.DataFrame({"y": rng.normal(size=300), "x": rng.normal(size=300)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     assert "regress" in _heading(fitted)
 
 

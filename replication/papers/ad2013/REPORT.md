@@ -171,7 +171,7 @@
 按 API 签名正常调用：
 
 ```python
-ws.OLS.from_formula(formula, frame, weights=frame["timepwt48"], weight_type="aweight")
+ws.Regress.from_formula(formula, frame, weights=frame["timepwt48"], weight_type="aweight")
 ```
 
 得到：

@@ -39,7 +39,7 @@ def fitted():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("munnell.dta is not available")
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
-    return ws.PanelOLS.from_formula("y ~ k1 + C(year)", frame, entity="sid", time="year").fit()
+    return ws.PanelRegressFE.from_formula("y ~ k1 + C(year)", frame, entity="sid", time="year").fit()
 
 
 def test_the_block_is_forty_two_lines(fitted) -> None:

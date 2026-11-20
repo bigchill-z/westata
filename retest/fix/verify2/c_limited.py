@@ -127,7 +127,7 @@ def main():
         s.send(fq)
         for tau in (0.25, 0.5, 0.75):
             E = s.est(f"qreg y x1 x2, quantile({tau}) vce(robust)")
-            res = ws.QuantileRegression.from_formula("y ~ x1 + x2", fq,
+            res = ws.QuantileRegress.from_formula("y ~ x1 + x2", fq,
                                                     quantile=tau).fit(cov_type="robust")
             pairs = [("x1", "x1"), ("x2", "x2"), ("_cons", "Intercept")]
             b, _ = cmp_b(E, res, pairs)
@@ -137,7 +137,7 @@ def main():
             out[f"qreg_{tag}"] = max(b, se)
             # iid too, since the fix must not break the default VCE
             E2 = s.est(f"qreg y x1 x2, quantile({tau})")
-            res2 = ws.QuantileRegression.from_formula("y ~ x1 + x2", fq,
+            res2 = ws.QuantileRegress.from_formula("y ~ x1 + x2", fq,
                                                      quantile=tau).fit(cov_type="iid")
             se2, _ = cmp_se(E2, res2, pairs)
             print(f"       iid se rel={fmt(se2)} ({tier(se2)})")
@@ -158,7 +158,7 @@ def main():
     fe = etreg_frame()
     s.send(fe)
     E = s.est("etregress y x1, treat(t = z1 z2) twostep")
-    et = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", fe).fit(method="twostep")
+    et = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", fe).fit(method="twostep")
     for key in ("sigma", "rho", "lambda"):
         sv, wv = E.e.get(key), et.e.get(key)
         if sv is None or wv is None:
@@ -174,7 +174,7 @@ def main():
     frr = rreg_frame()
     s.send(frr)
     E = s.est("rreg y x1 x2")
-    rr = ws.RobustRegression.from_formula("y ~ x1 + x2", frr).fit()
+    rr = ws.RobustRegress.from_formula("y ~ x1 + x2", frr).fit()
     pairs = [("x1", "x1"), ("x2", "x2"), ("_cons", "Intercept")]
     b, _ = cmp_b(E, rr, pairs)
     se, _ = cmp_se(E, rr, pairs)

@@ -37,10 +37,10 @@ import numpy as np
 import pandas as pd
 
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.synth import SynthResult, synth
+from westata.estimators.synth import SynthResults, synth
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["Synth2Result", "synth2"]
+__all__ = ["Synth2Results", "synth2"]
 
 #: Stata stores an absent ``e()`` matrix as this 1x1 missing sentinel.
 _STATA_MISSING = 8.98846567431158e307
@@ -50,7 +50,7 @@ _STATA_MISSING = 8.98846567431158e307
 # Result object -- a frozen dataclass, NOT StataResults (no e(b)/e(V))
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
-class Synth2Result(ResultSerialisation):
+class Synth2Results(ResultSerialisation):
     """Outcome of :func:`synth2`.
 
     Field names mirror Stata's ``e()`` verbatim.  Note ``synth2`` calls
@@ -97,7 +97,7 @@ class Synth2Result(ResultSerialisation):
     loo_units: tuple[Any, ...] = ()
 
     # audit
-    synth_result: SynthResult | None = None
+    synth_result: SynthResults | None = None
     method: str = "regression"
     numerically_inactive: tuple[str, ...] = ()
 
@@ -389,7 +389,7 @@ class Synth2:
             show=show,
         )
 
-    def fit(self) -> Synth2Result:
+    def fit(self) -> Synth2Results:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _synth2_impl(
@@ -456,7 +456,7 @@ def synth2(
     frame: str | None = None,
     show: int | None = None,
     **unsupported: Any,
-) -> Synth2Result:
+) -> Synth2Results:
 
     """Fit Stata's ``synth2`` -- thin wrapper over :class:`westata.Synth2`."""
 
@@ -525,7 +525,7 @@ def _synth2_impl(
     frame: str | None = None,
     show: int | None = None,
     **unsupported: Any,
-) -> Synth2Result:
+) -> Synth2Results:
     """Fit Stata ``synth2``'s NON-GRAPHICS feature set.
 
     All optimisation is delegated to :func:`westata.synth`.  See the module
@@ -740,7 +740,7 @@ def _synth2_impl(
         ) if given
     )
 
-    return Synth2Result(
+    return Synth2Results(
         N=N, T=T, T0=T0, T1=T1, K=K, J=J, rmse=rmse, r2=r2, att=att,
         bal=bal, U_wt=U_wt, V_wt=V_wt, mspe=mspe, pval=pval,
         Y_treated=Y_treated, Y_synthetic=Y_synthetic, time_index=tidx,
@@ -788,7 +788,7 @@ def _average_control_means(
 
 
 def _in_space_placebo(
-    data: pd.DataFrame, synth_kw: dict, opts: dict, main: SynthResult,
+    data: pd.DataFrame, synth_kw: dict, opts: dict, main: SynthResults,
     Y_treated: np.ndarray, Y_synthetic: np.ndarray, effect: np.ndarray,
     tidx: np.ndarray, pre: np.ndarray, post: np.ndarray, trperiod: float,
     mspe_pre: float, mspe_post: float, trunit: Any,
@@ -856,7 +856,7 @@ def _in_space_placebo(
 
 
 def _leave_one_out(
-    data: pd.DataFrame, synth_kw: dict, main: SynthResult,
+    data: pd.DataFrame, synth_kw: dict, main: SynthResults,
     U_wt: np.ndarray, control_units: list[Any],
 ):
     """Re-run synth without each positive-weight donor; return min/max envelopes."""

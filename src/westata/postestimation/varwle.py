@@ -40,7 +40,7 @@ from scipy import stats
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["VarWleResult", "varwle"]
+__all__ = ["VarWleResults", "var_wle"]
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ class VarWleRow:
 
 
 @dataclass(frozen=True)
-class VarWleResult(ResultSerialisation):
+class VarWleResults(ResultSerialisation):
     """``varwle``: Wald tests that each lag's coefficients are jointly zero."""
 
     rows: tuple[VarWleRow, ...]
@@ -124,7 +124,7 @@ def _chi2_cell(value: float) -> str:
     return text.rjust(10)
 
 
-def varwle(result: Any) -> VarWleResult:
+def var_wle(result: Any) -> VarWleResults:
     """Wald lag-exclusion tests, as ``varwle``.
 
     ``result`` must be a fitted VAR exposing the Stata-ordered parameter vector and its
@@ -216,4 +216,4 @@ def varwle(result: Any) -> VarWleResult:
             )
         )
 
-    return VarWleResult(rows=tuple(rows), equations=tuple(equation_names))
+    return VarWleResults(rows=tuple(rows), equations=tuple(equation_names))

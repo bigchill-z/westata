@@ -59,16 +59,16 @@ def frame():
 
 #: name -> builder that fits with ``cov_kwds={key: labels}``.
 BUILDERS = {
-    "OLS": lambda frame, key: ws.OLS.from_formula("y ~ x1", frame).fit(
+    "Regress": lambda frame, key: ws.Regress.from_formula("y ~ x1", frame).fit(
         cov_type="cluster", cov_kwds={key: frame["grp"].to_numpy()}
     ),
     "IV2SLS": lambda frame, key: ws.IV2SLS.from_formula(
         "y ~ x1 + [endog ~ z]", frame
     ).fit(cov_type="cluster", cov_kwds={key: frame["grp"].to_numpy()}),
-    "FEOLS": lambda frame, key: ws.FEOLS.from_formula("y ~ x1 | firm", frame).fit(
+    "RegressHighDimFixedEffects": lambda frame, key: ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", frame).fit(
         cov_type="cluster", cov_kwds={key: frame["grp"].to_numpy()}
     ),
-    "PanelOLS": lambda frame, key: ws.PanelOLS.from_formula(
+    "PanelRegressFE": lambda frame, key: ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit(cov_type="cluster", cov_kwds={key: frame["grp"].to_numpy()}),
 }
@@ -142,7 +142,7 @@ def test_a_missing_key_still_raises() -> None:
 
     frame = _frame()
     with pytest.raises((ValueError, KeyError)):
-        ws.OLS.from_formula("y ~ x1", frame).fit(cov_type="cluster", cov_kwds={})
+        ws.Regress.from_formula("y ~ x1", frame).fit(cov_type="cluster", cov_kwds={})
 
 
 def test_a_genuinely_wrong_key_is_still_rejected() -> None:
@@ -150,6 +150,6 @@ def test_a_genuinely_wrong_key_is_still_rejected() -> None:
 
     frame = _frame()
     with pytest.raises((ValueError, KeyError, TypeError)):
-        ws.OLS.from_formula("y ~ x1", frame).fit(
+        ws.Regress.from_formula("y ~ x1", frame).fit(
             cov_type="cluster", cov_kwds={"group": frame["grp"].to_numpy()}
         )

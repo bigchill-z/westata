@@ -56,13 +56,13 @@ def frame():
 @pytest.fixture(scope="module")
 def fitted():
     """150 observations: the size the diagnostic captures used."""
-    return ws.OLS.from_formula("y ~ x1 + x2", _panel(150)).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", _panel(150)).fit()
 
 
 def test_newey_west_standard_errors_match_stata(frame) -> None:
     """C08-04. `time=` takes the period values, not a column name."""
 
-    result = ws.newey("y ~ x1 + x2", frame, lag=3, time=frame["t"].to_numpy())
+    result = ws.newey_west("y ~ x1 + x2", frame, lag=3, time=frame["t"].to_numpy())
     assert float(result.bse["x1"]) == pytest.approx(0.6013106107, abs=1e-9)
     assert float(result.bse["x2"]) == pytest.approx(0.8212126775, abs=1e-9)
     assert float(result.bse["Intercept"]) == pytest.approx(1.2964624083, abs=1e-9)
@@ -72,7 +72,7 @@ def test_newey_rejects_a_column_name_for_time(frame) -> None:
     """The error is explicit, so a wrong argument cannot pass as correct ordering."""
 
     with pytest.raises(Exception):
-        ws.newey("y ~ x1 + x2", frame, lag=3, time="t")
+        ws.newey_west("y ~ x1 + x2", frame, lag=3, time="t")
 
 
 def test_durbin_watson_matches_stata(fitted) -> None:
@@ -92,7 +92,7 @@ def test_breusch_godfrey_matches_stata(fitted) -> None:
 def test_white_test_matches_stata(fitted) -> None:
     """C08-03 (patched here as White's IM test): chi2(5) = 4.62."""
 
-    rendered = str(ws.estat_imtest(fitted, white=True))
+    rendered = str(ws.estat_information_matrix_test(fitted, white=True))
     assert "4.62" in rendered
 
 

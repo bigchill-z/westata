@@ -20,7 +20,7 @@ def case(tag, x1, x2, y):
         _b,Vi,_ = s.est("qreg y x1 x2, quantile(.5)")
     ii=[nm.index(k) for k in ("x1","x2","_cons")]
     Vr=Vr[np.ix_(ii,ii)]; Vi=Vi[np.ix_(ii,ii)]
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=.5)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=.5)
     ri=q.fit(cov_type="iid"); rr=q.fit(cov_type="robust")
     pn=list(rr.param_names); order=[pn.index(k) for k in ("x1","x2","Intercept")]
     print("="*72); print(f"### {tag}")

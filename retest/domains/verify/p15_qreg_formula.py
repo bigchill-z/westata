@@ -65,7 +65,7 @@ def run(tag, df, taus):
     print("=" * 76)
     print(f"### {tag}")
     for tau in taus:
-        r = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+        r = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
         ri = r.fit(cov_type="iid")
         sp = r._sparsity
         X = r._X

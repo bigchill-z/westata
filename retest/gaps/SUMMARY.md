@@ -37,7 +37,7 @@
 > **第 31 轮**：修复 LIML/GMM 的裸 KeyError 回归；澄清 `estat summarize` 的 aweight sd 随权重尺度变化（已知限制，故意不猜修）。
 > **第 32 轮**：`estat endogenous` 的稳健/HAC score 检验（`robwool`/`acwool`），收回第 12 轮的"直接报错"。
 > **第 33 轮**：`regF`（增广回归内生性检验），解锁 cluster；修正一个把 F 算成 0 的设计错误。
-> **第 34 轮**：`ManovaResult` 与 `JohansenResult` 的 `e()`（manova 8 键、vecrank 18 键）。
+> **第 34 轮**：`ManovaResult` 与 `JohansenResult` 的 `e()`（manova 8 键、vec_rank 18 键）。
 > **第 35 轮**：`reghdfe` 补齐 → **13 个估计器全部 100% 覆盖 fixture**；修正 `df_a` 命令间语义差异与一个测试自证缺陷。
 > **第 36 轮**：披露验证面的真实边界（21 个 fixture 中仅 3 个可数值对拍），新增 5 条守护测试。
 > **第 37 轮**：新增 `stata_params`/`stata_cov_params`：修正系数排列顺序与 Stata `e(b)` 不一致导致的误判陷阱。
@@ -74,7 +74,7 @@
 | `xtreg, be` | **存 `mss`** | `xtreg_be.json` 有 `mss` | ❌ 缺 |
 | `xtgls` / `xtpcse` | 存 | p9 输出 + 已算 | ❌ 缺 |
 
-**`rss` 反而大面积已有**（OLS/IV/nl/qreg/rreg/sureg/mvreg/xtreg/xtivreg/xtabond 都有）。
+**`rss` 反而大面积已有**（Regress/IV/nl/qreg/rreg/sureg/mvreg/xtreg/xtivreg/xtabond 都有）。
 
 **关键点：这不是"漏了一个键"，是三件不同的事：**
 

@@ -40,7 +40,7 @@ def grilic_fit():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
 
 
 def test_vif_opens_with_a_blank_line(grilic_fit) -> None:
@@ -64,7 +64,7 @@ def test_vif_values_are_unchanged(grilic_fit) -> None:
 def test_imtest_has_its_rules_and_blank_lines(grilic_fit) -> None:
     """Twelve lines: blank, title, blank, rule, header, split, 3 rows, split, total, rule."""
 
-    lines = str(ws.estat_imtest(grilic_fit)).splitlines()
+    lines = str(ws.estat_information_matrix_test(grilic_fit)).splitlines()
     assert len(lines) == 12
     assert lines[0] == ""
     assert lines[2] == ""
@@ -75,6 +75,6 @@ def test_imtest_has_its_rules_and_blank_lines(grilic_fit) -> None:
 
 
 def test_imtest_numbers_are_unchanged(grilic_fit) -> None:
-    rendered = str(ws.estat_imtest(grilic_fit))
+    rendered = str(ws.estat_information_matrix_test(grilic_fit))
     assert "21.54" in rendered and "14.67" in rendered
     assert "39.88" in rendered

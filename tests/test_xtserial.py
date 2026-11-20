@@ -73,7 +73,7 @@ def _frame() -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def result():
-    return ws.xtserial(_frame(), FORMULA, entity="province", time="t")
+    return ws.panel_serial(_frame(), FORMULA, entity="province", time="t")
 
 
 def test_every_returned_scalar_matches_stata(result) -> None:
@@ -138,20 +138,20 @@ def test_a_panel_without_gaps_gives_the_same_n_minus_panels() -> None:
         for period in range(1, 9)
     ]
     frame = pd.DataFrame(rows)
-    result = ws.xtserial(frame, "y ~ x", entity="id", time="t")
+    result = ws.panel_serial(frame, "y ~ x", entity="id", time="t")
     assert result.nobs == 6 * 8 - 6, "one lost first period per panel, and nothing else"
     assert result.df_r == 5
 
 
 def test_it_is_reachable_from_the_package_root() -> None:
-    assert hasattr(ws, "xtserial")
-    assert hasattr(ws, "XtSerialResult")
+    assert hasattr(ws, "panel_serial")
+    assert hasattr(ws, "PanelSerialResults")
 
 
 def test_a_missing_column_is_named(result=None) -> None:
     frame = _frame()
     with pytest.raises(Exception, match="not a column"):
-        ws.xtserial(frame, "ltvfo ~ nosuchvar", entity="province", time="t")
+        ws.panel_serial(frame, "ltvfo ~ nosuchvar", entity="province", time="t")
 
 
 def test_the_test_rejects_autocorrelation_and_accepts_independence() -> None:
@@ -168,8 +168,8 @@ def test_the_test_rejects_autocorrelation_and_accepts_independence() -> None:
             error = 0.85 * error + shocked
             correlated.append({"id": unit, "t": period, "y": error + rng.normal() * 0.1,
                                "x": rng.normal()})
-    clean = ws.xtserial(pd.DataFrame(independent), "y ~ x", entity="id", time="t")
-    dirty = ws.xtserial(pd.DataFrame(correlated), "y ~ x", entity="id", time="t")
+    clean = ws.panel_serial(pd.DataFrame(independent), "y ~ x", entity="id", time="t")
+    dirty = ws.panel_serial(pd.DataFrame(correlated), "y ~ x", entity="id", time="t")
     assert clean.p > dirty.p
     assert dirty.p < 0.01
 
@@ -225,7 +225,7 @@ def test_the_first_stage_fit_statistics_match_stata(result) -> None:
 def test_the_first_stage_can_be_skipped(result) -> None:
     """``keep_first_stage=False`` keeps the object small without changing the test."""
 
-    skipped = ws.xtserial(
+    skipped = ws.panel_serial(
         _frame(), FORMULA, entity="province", time="t", keep_first_stage=False
     )
     assert skipped.first_stage is None

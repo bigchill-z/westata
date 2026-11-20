@@ -79,7 +79,7 @@ def _fit(spec: Spec, frame: pd.DataFrame):
     kwargs = {}
     if spec.weighted:
         kwargs = {"weights": frame["totalpop1750"], "weight_type": "aweight"}
-    return ws.FEOLS.from_formula(formula(spec), frame, **kwargs).fit(
+    return ws.RegressHighDimFixedEffects.from_formula(formula(spec), frame, **kwargs).fit(
         cov_type="cluster", cov_kwds={"cluster": "id"}
     )
 

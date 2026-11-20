@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "auto.dta"
 
@@ -48,7 +48,7 @@ PUBLISHED_BSE = np.array([2.165547, 0.0006371, 1.075994])
 @pytest.fixture(scope="module")
 def fitted():
     df = pd.read_stata(DATA, convert_categoricals=False)
-    return df, OLS.from_formula("mpg ~ weight + foreign", df).fit()
+    return df, Regress.from_formula("mpg ~ weight + foreign", df).fit()
 
 
 def test_matches_full_precision_reference(fitted):

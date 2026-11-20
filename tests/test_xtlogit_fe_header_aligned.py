@@ -42,7 +42,7 @@ def _panel():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t", method="fe").fit()
+    return ws.PanelLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t", method="fe").fit()
 
 
 def test_log_likelihood_sits_on_the_prob_row(fitted) -> None:
@@ -80,7 +80,7 @@ def test_the_random_effects_variant_is_unaffected() -> None:
     """re keeps its own map: Gaussian and Integration rows present, ll on the Prob row."""
 
     rendered = str(
-        ws.XtLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t", method="re")
+        ws.PanelLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t", method="re")
         .fit()
         .summary(style="stata")
     )

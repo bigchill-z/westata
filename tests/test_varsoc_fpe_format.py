@@ -61,7 +61,7 @@ def fpe_texts():
                 "y2": rng.normal(size=n) * scale,
             }
         )
-        selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
+        selection = ws.var_select_order(frame[["y1", "y2"]], maxlag=2)
         rendered = str(selection)
         row = _lag_row(rendered, 0)
         # The FPE field is the five tokens before AIC; take the whole row and look for the shape.
@@ -94,7 +94,7 @@ def test_the_tiny_scale_truncates_rather_than_rounds() -> None:
     frame = pd.DataFrame(
         {"y1": rng.normal(size=n) * 1e-6, "y2": rng.normal(size=n) * 1e-6}
     )
-    selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
+    selection = ws.var_select_order(frame[["y1", "y2"]], maxlag=2)
     row = _lag_row(str(selection), 0)
     # An exact one-digit mantissa, e.g. 8.6e-25 -- never 8.65 or 8.7.
     import re
@@ -122,7 +122,7 @@ def test_the_fpe_value_now_matches_stata() -> None:
     rng = np.random.default_rng(11)
     n = 200
     frame = pd.DataFrame({"y1": rng.normal(size=n), "y2": rng.normal(size=n)})
-    selection = ws.varsoc(frame[["y1", "y2"]], maxlag=2)
+    selection = ws.var_select_order(frame[["y1", "y2"]], maxlag=2)
 
     observed = [float(row.fpe) for row in selection.rows]
     assert observed[0] == pytest.approx(0.855661, abs=5e-7)

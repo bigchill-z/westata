@@ -25,7 +25,7 @@ import pytest
 
 import westata as ws
 
-PANEL_ESTIMATORS = ("RandomEffects", "PanelOLS", "BetweenOLS", "FirstDifferenceOLS")
+PANEL_ESTIMATORS = ("PanelRegressRE", "PanelRegressFE", "PanelRegressBE", "PanelRegressFD")
 
 
 @pytest.fixture(scope="module")
@@ -60,13 +60,13 @@ def test_every_estimator_reports_an_F(frame, name) -> None:
 def test_random_effects_reports_the_wald_chi2(frame) -> None:
     """``xtreg.sthlp:891-951`` has ``e(chi2)`` AND ``e(chi2type)``."""
 
-    e = _fit(frame, "RandomEffects").e
+    e = _fit(frame, "PanelRegressRE").e
 
     assert e.get("chi2") is not None
     assert e.get("chi2type") == "Wald"
 
 
-@pytest.mark.parametrize("name", ["BetweenOLS", "FirstDifferenceOLS", "PanelOLS"])
+@pytest.mark.parametrize("name", ["PanelRegressBE", "PanelRegressFD", "PanelRegressFE"])
 def test_the_others_do_not_report_a_chi2(frame, name) -> None:
     """``be``/``fd``/``fe`` blocks list only ``e(F)``.
 
@@ -82,12 +82,12 @@ def test_the_others_do_not_report_a_chi2(frame, name) -> None:
 def test_the_inheritance_is_the_reason(frame) -> None:
     """Pin the mechanism, so a future refactor does not quietly reintroduce it."""
 
-    assert issubclass(ws.BetweenOLS, ws.RandomEffects)
-    assert issubclass(ws.FirstDifferenceOLS, ws.RandomEffects)
+    assert issubclass(ws.PanelRegressBE, ws.PanelRegressRE)
+    assert issubclass(ws.PanelRegressFD, ws.PanelRegressRE)
 
-    assert ws.RandomEffects._stores_wald_chi2 is True
-    assert ws.BetweenOLS._stores_wald_chi2 is False
-    assert ws.FirstDifferenceOLS._stores_wald_chi2 is False
+    assert ws.PanelRegressRE._stores_wald_chi2 is True
+    assert ws.PanelRegressBE._stores_wald_chi2 is False
+    assert ws.PanelRegressFD._stores_wald_chi2 is False
 
 
 def test_the_reporting_flag_matches_the_stored_key(frame) -> None:
@@ -98,7 +98,7 @@ def test_the_reporting_flag_matches_the_stored_key(frame) -> None:
         flag = getattr(result, "panel_entity", None) is not None
         assert flag, name  # this fixture is a panel for all four
         has_chi2 = result.e.get("chi2") is not None
-        expected = name == "RandomEffects"
+        expected = name == "PanelRegressRE"
         assert has_chi2 is expected, name
 
 
@@ -109,10 +109,10 @@ def test_between_and_fe_agree_on_the_model_test(frame) -> None:
     ``RandomEffects``, whose chi-square is genuinely documented.
     """
 
-    between = _fit(frame, "BetweenOLS").e
-    fixed = _fit(frame, "PanelOLS").e
+    between = _fit(frame, "PanelRegressBE").e
+    fixed = _fit(frame, "PanelRegressFE").e
 
     assert between.get("chi2") is None
     assert fixed.get("chi2") is None
     # And the RE fit keeps its own.
-    assert _fit(frame, "RandomEffects").e.get("chi2") is not None
+    assert _fit(frame, "PanelRegressRE").e.get("chi2") is not None

@@ -46,7 +46,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def fitted(frame):
-    return ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
 
 
 def test_the_prediction_is_the_right_length(fitted, frame) -> None:

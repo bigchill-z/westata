@@ -76,12 +76,12 @@ def _westata_coefficients(result: object) -> dict[str, float]:
 
 
 CASES = [
-    ("grilic", "lnw s expr tenure", lambda frame: ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()),
-    ("grilic", "lnw s expr tenure rns smsa", lambda frame: ws.OLS.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit()),
-    ("nerlove", "lnq lnpl lnpk lnpf", lambda frame: ws.OLS.from_formula("lnq ~ lnpl + lnpk + lnpf", frame).fit()),
-    ("cobb_douglas", "y k l", lambda frame: ws.OLS.from_formula("y ~ k + l", frame).fit()),
-    ("cobb_douglas", "y k l, noc", lambda frame: ws.OLS.from_formula("y ~ k + l - 1", frame).fit()),
-    ("cobb_douglas", "y k l, robust", lambda frame: ws.OLS.from_formula("y ~ k + l", frame).fit(cov_type="HC1")),
+    ("grilic", "lnw s expr tenure", lambda frame: ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()),
+    ("grilic", "lnw s expr tenure rns smsa", lambda frame: ws.Regress.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit()),
+    ("nerlove", "lnq lnpl lnpk lnpf", lambda frame: ws.Regress.from_formula("lnq ~ lnpl + lnpk + lnpf", frame).fit()),
+    ("cobb_douglas", "y k l", lambda frame: ws.Regress.from_formula("y ~ k + l", frame).fit()),
+    ("cobb_douglas", "y k l, noc", lambda frame: ws.Regress.from_formula("y ~ k + l - 1", frame).fit()),
+    ("cobb_douglas", "y k l, robust", lambda frame: ws.Regress.from_formula("y ~ k + l", frame).fit(cov_type="HC1")),
 ]
 
 
@@ -92,11 +92,11 @@ STATISTIC_CASES = [
     ),
     (
         "ovtest", "estat ovtest", "r(F)",
-        lambda result: float(result.estat_ovtest().statistic),
+        lambda result: float(result.estat_omitted_variables_test().statistic),
     ),
     (
         "imtest", "estat imtest", "r(chi2_t)",
-        lambda result: float(result.estat_imtest().to_dict()["chi2_t"]),
+        lambda result: float(result.estat_information_matrix_test().to_dict()["chi2_t"]),
     ),
     (
         "vif (first)", "estat vif", "r(vif_1)",
@@ -117,7 +117,7 @@ def _statistics() -> None:
     frame = _dedupe(
         pd.read_stata(f"{DATA}/grilic.dta", convert_categoricals=False).dropna()
     ).assign(t=lambda data: np.arange(1, len(data) + 1))
-    result = ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    result = ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
     print()
     print(f"{'statistic':16} {'stata':>20} {'westata':>20} {'rel err':>12}  verdict")
     print("-" * 86)

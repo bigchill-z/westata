@@ -20,8 +20,8 @@ from scipy import stats
 
 import westata as ws
 from westata.errors import UnsupportedError
-from westata.postestimation.contrast import contrast, pwcompare
-from westata.postestimation.lincom import LincomResult
+from westata.postestimation.contrast import contrast, pairwise_compare
+from westata.postestimation.lincom import LincomResults
 
 LEVELS = ["a", "b", "c"]
 
@@ -56,7 +56,7 @@ def _binary(n: int = 600, seed: int = 23) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def ols_result():
-    return ws.OLS.from_formula("y ~ x + C(g, base='a')", _linear()).fit()
+    return ws.Regress.from_formula("y ~ x + C(g, base='a')", _linear()).fit()
 
 
 @pytest.fixture(scope="module")
@@ -100,7 +100,7 @@ def test_reference_contrast_has_one_row_per_non_reference_level(ols_result):
     rows = contrast(ols_result, "C(g)", "r")
 
     assert len(rows) == len(LEVELS) - 1
-    assert all(isinstance(row, LincomResult) for row in rows)
+    assert all(isinstance(row, LincomResults) for row in rows)
 
 
 def test_reference_contrast_estimate_is_level_minus_reference(ols_result):
@@ -199,13 +199,13 @@ def test_grand_mean_standard_error_matches_hand_computation(ols_result):
 
 # --------------------------------------------------------------- pwcompare
 def test_pwcompare_emits_one_row_per_pair(ols_result):
-    rows = pwcompare(ols_result, "C(g)")
+    rows = pairwise_compare(ols_result, "C(g)")
 
     assert len(rows) == len(LEVELS) * (len(LEVELS) - 1) // 2 == 3
 
 
 def test_pwcompare_b_vs_a_equals_difference_of_coefficients(ols_result):
-    rows = pwcompare(ols_result, "C(g)")
+    rows = pairwise_compare(ols_result, "C(g)")
     beta = _level_coefficients(ols_result)
 
     pairs = [("b", "a"), ("c", "a"), ("c", "b")]
@@ -217,7 +217,7 @@ def test_pwcompare_b_vs_a_equals_difference_of_coefficients(ols_result):
 
 
 def test_pwcompare_standard_errors_match_hand_computation(ols_result):
-    rows = pwcompare(ols_result, "C(g)")
+    rows = pairwise_compare(ols_result, "C(g)")
 
     for row, (high, low) in zip(rows, [("b", "a"), ("c", "a"), ("c", "b")]):
         weights = _level_weights(ols_result, high) - _level_weights(ols_result, low)
@@ -230,7 +230,7 @@ def test_pwcompare_is_antisymmetric_in_pairs(ols_result):
     """Contrasting a pair twice with the opposite sign flips the estimate."""
 
     beta = _level_coefficients(ols_result)
-    rows = pwcompare(ols_result, "C(g)")
+    rows = pairwise_compare(ols_result, "C(g)")
     for row, (high, low) in zip(rows, [("b", "a"), ("c", "a"), ("c", "b")]):
         reversed_weights = _level_weights(ols_result, low) - _level_weights(
             ols_result, high
@@ -275,8 +275,8 @@ def test_contrast_propagates_a_robust_vce():
     """A robust VCE must change the contrast standard error, not the estimate."""
 
     data = _linear()
-    plain = ws.OLS.from_formula("y ~ x + C(g, base='a')", data).fit()
-    robust = ws.OLS.from_formula("y ~ x + C(g, base='a')", data).fit(cov_type="HC1")
+    plain = ws.Regress.from_formula("y ~ x + C(g, base='a')", data).fit()
+    robust = ws.Regress.from_formula("y ~ x + C(g, base='a')", data).fit(cov_type="HC1")
 
     plain_row = plain_contrast = contrast(plain, "C(g)", "r")[0]
     robust_row = contrast(robust, "C(g)", "r")[0]
@@ -307,7 +307,7 @@ def test_contrast_labels_each_comparison(ols_result):
         "c vs grand mean",
     ]
 
-    pairwise_rows = pwcompare(ols_result, "C(g)")
+    pairwise_rows = pairwise_compare(ols_result, "C(g)")
     assert [row.label for row in pairwise_rows] == ["b vs a", "c vs a", "c vs b"]
 
 
@@ -358,13 +358,13 @@ def test_contrast_helmert_and_multiple_comparison_raise(ols_result, method):
 
 def test_pwcompare_bonferroni_raises_unsupported(ols_result):
     with pytest.raises(UnsupportedError, match="adjustment is not implemented"):
-        pwcompare(ols_result, "C(g)", adjust="bonferroni")
+        pairwise_compare(ols_result, "C(g)", adjust="bonferroni")
 
 
 @pytest.mark.parametrize("adjust", ["sidak", "tukey", "scheffe", "dunnett", "none", ""])
 def test_pwcompare_rejects_every_other_adjust(ols_result, adjust):
     with pytest.raises(UnsupportedError):
-        pwcompare(ols_result, "C(g)", adjust=adjust)
+        pairwise_compare(ols_result, "C(g)", adjust=adjust)
 
 
 # ------------------------------------------------------------- logit (z) path
@@ -391,7 +391,7 @@ def test_logit_contrast_estimate_is_level_minus_reference(logit_result):
 
 
 def test_logit_pwcompare_standard_errors_match_hand_computation(logit_result):
-    rows = pwcompare(logit_result, "C(g)")
+    rows = pairwise_compare(logit_result, "C(g)")
     assert len(rows) == 3
 
     for row, (high, low) in zip(rows, [("b", "a"), ("c", "a"), ("c", "b")]):
@@ -420,12 +420,12 @@ def test_two_level_factor_contrast_and_pwcompare():
     x = rng.normal(size=g.size)
     y = 1.0 + np.where(g == "b", 1.5, 0.0) + x + rng.normal(size=g.size)
     data = pd.DataFrame({"y": y, "x": x, "g": g})
-    res = ws.OLS.from_formula("y ~ x + C(g, base='a')", data).fit()
+    res = ws.Regress.from_formula("y ~ x + C(g, base='a')", data).fit()
 
     reference_rows = contrast(res, "C(g)", "r")
     adjacent_rows = contrast(res, "C(g)", "a")
     grand_rows = contrast(res, "C(g)", "g")
-    pairwise_rows = pwcompare(res, "C(g)")
+    pairwise_rows = pairwise_compare(res, "C(g)")
 
     assert len(reference_rows) == 1
     assert len(adjacent_rows) == 1
@@ -441,13 +441,13 @@ def test_single_level_factor_cannot_be_contrasted():
     data = pd.DataFrame(
         {"y": rng.normal(size=40), "x": rng.normal(size=40), "g": ["a"] * 40}
     )
-    res = ws.OLS.from_formula("y ~ x + C(g)", data).fit()
+    res = ws.Regress.from_formula("y ~ x + C(g)", data).fit()
 
     # One level, no column at all: there is nothing to contrast.
     with pytest.raises(KeyError, match="does not match any factor column"):
         contrast(res, "C(g)", "r")
     with pytest.raises(KeyError, match="does not match any factor column"):
-        pwcompare(res, "C(g)")
+        pairwise_compare(res, "C(g)")
 
 
 # -------------------------------------------------- factor coding variations
@@ -455,13 +455,13 @@ def test_numeric_factor_levels_resolve_in_sorted_order():
     rng = np.random.default_rng(41)
     g = np.array([1, 2, 3] * 30)
     y = g + 0.1 * rng.normal(size=g.size)
-    res = ws.OLS.from_formula("y ~ C(g)", pd.DataFrame({"y": y, "g": g})).fit()
+    res = ws.Regress.from_formula("y ~ C(g)", pd.DataFrame({"y": y, "g": g})).fit()
 
     # patsy writes numeric levels as "2.0"/"3.0"; the report labels use the
     # observed level values, which is Stata's `contrast r.` row order.
     rows = contrast(res, "C(g)", "r")
     assert [row.label for row in rows] == ["2 vs 1", "3 vs 1"]
-    assert len(pwcompare(res, "C(g)")) == 3
+    assert len(pairwise_compare(res, "C(g)")) == 3
 
 
 def test_categorical_factor_preserves_declared_level_order():
@@ -469,7 +469,7 @@ def test_categorical_factor_preserves_declared_level_order():
     order = ["b", "a", "c"]
     g = pd.Categorical(np.array(order * 30), categories=order)
     y = rng.normal(size=len(g))
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ C(g)", pd.DataFrame({"y": y, "g": g})
     ).fit()
 
@@ -486,7 +486,7 @@ def test_categorical_factor_preserves_declared_level_order():
 def test_explicit_reference_term_is_honoured():
     rng = np.random.default_rng(47)
     g = np.array(["a", "b", "c"] * 30)
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ C(g, base='b')",
         pd.DataFrame({"y": rng.normal(size=g.size), "g": g}),
     ).fit()
@@ -505,31 +505,31 @@ def test_interaction_only_term_raises_unsupported():
     data = pd.DataFrame(
         {"y": rng.normal(size=g.size), "g": g, "x": rng.normal(size=g.size)}
     )
-    res = ws.OLS.from_formula("y ~ x + C(g):x", data).fit()
+    res = ws.Regress.from_formula("y ~ x + C(g):x", data).fit()
 
     with pytest.raises(UnsupportedError, match="interaction"):
         contrast(res, "C(g)", "r")
     with pytest.raises(UnsupportedError, match="interaction"):
-        pwcompare(res, "C(g)")
+        pairwise_compare(res, "C(g)")
 
 
 def test_reference_level_recovered_without_the_estimation_sample():
     rng = np.random.default_rng(59)
     g = np.array(["a", "b", "c"] * 30)
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ C(g, base='c')", pd.DataFrame({"y": rng.normal(size=g.size), "g": g})
     ).fit()
     res.model_data = None  # force the patsy-name fallback
 
     rows = contrast(res, "C(g)", "r")
     assert [row.label for row in rows] == ["a vs c", "b vs c"]
-    assert len(pwcompare(res, "C(g)")) == 3
+    assert len(pairwise_compare(res, "C(g)")) == 3
 
 
 def test_reference_level_unknown_without_the_estimation_sample_raises():
     rng = np.random.default_rng(61)
     g = np.array(["a", "b", "c"] * 30)
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ C(g)", pd.DataFrame({"y": rng.normal(size=g.size), "g": g})
     ).fit()
     res.model_data = None  # patsy names carry no reference literal here
@@ -542,16 +542,16 @@ def test_reference_level_unknown_without_the_estimation_sample_raises():
     with pytest.raises(UnsupportedError, match="complete level set"):
         contrast(res, "C(g)", "a")
     with pytest.raises(UnsupportedError, match="complete level set"):
-        pwcompare(res, "C(g)")
+        pairwise_compare(res, "C(g)")
 
     # With an explicit reference the level set *is* recoverable, so the same
     # result is contrastable without the estimation sample.
-    res_explicit = ws.OLS.from_formula(
+    res_explicit = ws.Regress.from_formula(
         "y ~ C(g, base='b')", pd.DataFrame({"y": rng.normal(size=g.size), "g": g})
     ).fit()
     res_explicit.model_data = None
     assert len(contrast(res_explicit, "C(g)", "a")) == 2
-    assert len(pwcompare(res_explicit, "C(g)")) == 3
+    assert len(pairwise_compare(res_explicit, "C(g)")) == 3
 
 
 # ------------------------------------------------------- cell-means coding
@@ -563,7 +563,7 @@ def test_cell_means_coding_supports_pwcompare_and_grand_mean():
     g = np.array(["a", "b", "c"] * m)
     effect = {"a": 0.5, "b": 2.5, "c": -1.5}
     y = np.array([effect[level] for level in g]) + rng.normal(scale=0.25, size=g.size)
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ 0 + C(g)", pd.DataFrame({"y": y, "g": g})
     ).fit()
 
@@ -576,7 +576,7 @@ def test_cell_means_coding_supports_pwcompare_and_grand_mean():
     for level, value in effect.items():
         assert beta[level] == pytest.approx(value, abs=0.15)
 
-    rows = pwcompare(res, "C(g)")
+    rows = pairwise_compare(res, "C(g)")
     assert [row.label for row in rows] == ["b vs a", "c vs a", "c vs b"]
     assert rows[0].estimate == pytest.approx(beta["b"] - beta["a"], rel=1e-12)
     assert rows[2].estimate == pytest.approx(beta["c"] - beta["b"], rel=1e-12)
@@ -597,7 +597,7 @@ def test_adjacent_contrast_on_cell_means_uses_level_order():
     g = np.array(["a", "b", "c"] * 40)
     y = np.array([{"a": 0.0, "b": 1.0, "c": 4.0}[level] for level in g])
     y = y + 0.05 * rng.normal(size=g.size)
-    res = ws.OLS.from_formula("y ~ 0 + C(g)", pd.DataFrame({"y": y, "g": g})).fit()
+    res = ws.Regress.from_formula("y ~ 0 + C(g)", pd.DataFrame({"y": y, "g": g})).fit()
 
     rows = contrast(res, "C(g)", "a")
     # Stata's adjacent order is "low vs high".
@@ -622,13 +622,13 @@ def test_non_treatment_codings_raise_unsupported(formula, coding):
     data = pd.DataFrame(
         {"y": rng.normal(size=g.size), "g": g, "x": rng.normal(size=g.size)}
     )
-    res = ws.OLS.from_formula(formula, data).fit()
+    res = ws.Regress.from_formula(formula, data).fit()
 
     for call in (
         lambda: contrast(res, "C(g)", "r"),
         lambda: contrast(res, "C(g)", "a"),
         lambda: contrast(res, "C(g)", "g"),
-        lambda: pwcompare(res, "C(g)"),
+        lambda: pairwise_compare(res, "C(g)"),
     ):
         with pytest.raises(UnsupportedError, match="non-treatment contrast"):
             call()

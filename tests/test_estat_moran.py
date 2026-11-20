@@ -55,7 +55,7 @@ def _frame(count: int = 100, seed: int = 3100):
 @pytest.fixture(scope="module")
 def fitted():
     frame = _frame()
-    return frame, ws.OLS.from_formula("y ~ x1", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def _manual_moran(residuals: np.ndarray, weights: np.ndarray):
@@ -144,7 +144,7 @@ def test_positive_autocorrelation_is_detected() -> None:
             "x1": rng.normal(size=count),
         }
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     reported = result.estat_moran(errorlag=weights)
 
@@ -160,7 +160,7 @@ def test_independent_errors_are_not_flagged() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=count), "x1": rng.normal(size=count)}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     reported = result.estat_moran(errorlag=_ring_weights(count))
 

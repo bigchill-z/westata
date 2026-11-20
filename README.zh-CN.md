@@ -88,8 +88,8 @@ import westata as ws
 
 df = pd.read_csv("docs/data/auto.csv")
 
-# 带因子变量与聚类标准误的 OLS（对应 regress）
-res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit(
+# 带因子变量与聚类标准误的 Regress（对应 regress）
+res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit(
     cov_type="cluster", cov_kwds={"groups": df["foreign"]},
 )
 print(res.summary(style="stata"))          # Stata 版式
@@ -108,14 +108,14 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
 
 ```python
 # 分位数回归（qreg）—— 中位数
-ws.QuantileRegression.from_formula("mpg ~ weight + C(foreign)", df).fit()
+ws.QuantileRegress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 
 # 稳健回归（rreg）
-ws.RobustRegression.from_formula("mpg ~ weight", df).fit()
+ws.RobustRegress.from_formula("mpg ~ weight", df).fit()
 
 # 方程组（sureg）：每条方程一个列表元素
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
-ws.Sureg.from_formula(
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
+ws.SeeminglyUnrelatedRegress.from_formula(
     ["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 ).fit(cov_type="robust")                  # 稳健 VCE
 
@@ -127,8 +127,8 @@ ws.Tobit.from_formula("rep78 ~ weight + mpg", df, lower=0).fit()
 出表：
 
 ```python
-base = ws.OLS.from_formula("mpg ~ weight", df).fit()
-full = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+base = ws.Regress.from_formula("mpg ~ weight", df).fit()
+full = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 print(ws.etable([base, full], model_names=["基础", "完整"]))
 ```
 

@@ -20,23 +20,23 @@ Stata 侧：内嵌 StataNow 19.5 MP（`config.init("mp")`，`c(stata_version)=19
 | 1b | 同上（诊断项） | 同上 | 同上 | fail | 5.43e-02 (E) | **5.43e-02 (E)** |
 | 2 | `tobit yu x1 x2, ul(2.5)` | `ws.Tobit(upper=2.5)` | 70 右删失 | fail | 1.06e-08 (B) | **1.62e-02 (E)** |
 | 3 | `tobit yb x1 x2, ll(0) ul(2)` | `ws.Tobit(0, 2)` | 134 左 + 116 右 | fail | 3.37e-08 (B) | **6.65e-02 (E)** |
-| 4 | `truncreg y x1 x2, ll(0)` | `ws.Truncreg(lower=0)` | 366 保留（134 截断） | fail | 1.05e-07 (B) | 6.74e-06 (C) |
-| 5 | `truncreg yu x1 x2, ul(2.5)` | `ws.Truncreg(upper=2.5)` | 430 保留 | fail | 1.91e-08 (B) | 1.63e-06 (C) |
-| 6 | `truncreg yb x1 x2, ll(0) ul(2)` | `ws.Truncreg(0, 2)` | 250 保留 | fail | 1.63e-06 (C) | 8.28e-05 (C) |
-| 7 | `intreg lo hi x1 x2` | `ws.Intreg.from_formula("lo hi ~ …")` | 500 obs 区间删失 | fail | 2.88e-09 (B) | 2.01e-06 (C) |
+| 4 | `truncreg y x1 x2, ll(0)` | `ws.TruncatedRegress(lower=0)` | 366 保留（134 截断） | fail | 1.05e-07 (B) | 6.74e-06 (C) |
+| 5 | `truncreg yu x1 x2, ul(2.5)` | `ws.TruncatedRegress(upper=2.5)` | 430 保留 | fail | 1.91e-08 (B) | 1.63e-06 (C) |
+| 6 | `truncreg yb x1 x2, ll(0) ul(2)` | `ws.TruncatedRegress(0, 2)` | 250 保留 | fail | 1.63e-06 (C) | 8.28e-05 (C) |
+| 7 | `intreg lo hi x1 x2` | `ws.IntervalRegress.from_formula("lo hi ~ …")` | 500 obs 区间删失 | fail | 2.88e-09 (B) | 2.01e-06 (C) |
 | 8 | `heckman y_sel x1, select(s = z1 z2) twostep` | `ws.Heckman(...).fit()` | 600 obs，377 入选 | fail | 1.34e-09 (B) | **6.81e-02 (E)** |
 | 9 | `heckman …, `（默认 = ML） | `fit(method="ml")` | 同上 | **error** | — | — |
-| 10 | `etregress y x1, treat(s = z1 z2) twostep` | `ws.Etregress(...).fit()` | 600 obs | fail | **3.84e-11 (A)** | **6.77e-02 (E)** |
+| 10 | `etregress y x1, treat(s = z1 z2) twostep` | `ws.EndogenousTreatmentRegress(...).fit()` | 600 obs | fail | **3.84e-11 (A)** | **6.77e-02 (E)** |
 | 11 | `etregress …, `（默认 = ML） | `fit(method="ml")` | 同上 | **error** | — | — |
 | 12 | `frontier y x1 x2` | `ws.Frontier(distribution="halfnormal")` | 500 obs，真无效项 | fail | 1.08e-03 (D) | 4.03e-03 (D) |
 | 13 | `frontier …, distribution(exponential)` | `distribution="exponential"` | 同上 | **error** | — | — |
-| 14 | `qreg y x1 x2` | `QuantileRegression(quantile=.5)` | 400 obs 异方差 | fail | 4.56e-09 (B) | 5.15e-09 (B) |
-| 15 | `qreg y x1 x2, quantile(.25)` | `QuantileRegression(quantile=.25)` | 同上 | fail | 5.68e-07 (B) | 4.22e-09 (B) |
+| 14 | `qreg y x1 x2` | `QuantileRegress(quantile=.5)` | 400 obs 异方差 | fail | 4.56e-09 (B) | 5.15e-09 (B) |
+| 15 | `qreg y x1 x2, quantile(.25)` | `QuantileRegress(quantile=.25)` | 同上 | fail | 5.68e-07 (B) | 4.22e-09 (B) |
 | 16 | `qreg y x1 x2, vce(robust)` | `.fit(cov_type="robust")` | 同上，τ=.5 | fail | 4.56e-09 (B) | 5.84e-09 (B) |
 | 17 | `qreg y x1 x2, quantile(.25) vce(robust)` | 同上，τ=.25 | 同上 | fail | 5.68e-07 (B) | **4.63e-02 (E)** |
-| 18 | `sqreg y x1 x2, quantile(.25 .5) reps(500)` | `ws.Sqreg(reps=500)` | 同上，4 seed 池化 | fail | 5.68e-07 (B) | **3.35e-02 (E)** |
-| 19 | `bsqreg y x1 x2, quantile(.5) reps(500)` | `ws.Bsqreg(reps=500)` | 同上，4 seed 池化 | fail | 4.56e-09 (B) | **2.19e-02 (E)** |
-| 20 | `rreg y x1 x2, gen(wt)` | `ws.RobustRegression` | 400 obs 异方差 | fail | 2.70e-04 (C) | **2.06e-01 (E)** |
+| 18 | `sqreg y x1 x2, quantile(.25 .5) reps(500)` | `ws.SimultaneousQuantileRegress(reps=500)` | 同上，4 seed 池化 | fail | 5.68e-07 (B) | **3.35e-02 (E)** |
+| 19 | `bsqreg y x1 x2, quantile(.5) reps(500)` | `ws.BootstrappedQuantileRegress(reps=500)` | 同上，4 seed 池化 | fail | 4.56e-09 (B) | **2.19e-02 (E)** |
+| 20 | `rreg y x1 x2, gen(wt)` | `ws.RobustRegress` | 400 obs 异方差 | fail | 2.70e-04 (C) | **2.06e-01 (E)** |
 | 21 | 同上（权重对比） | `_biweight_weights` | 同上 | fail | 1.35e-03 (D) | — |
 | 22 | `rreg y x1 x2` | 同上 | 300 obs 干净正态 | fail | 2.15e-03 (D) | **2.97e-01 (E)** |
 | 23 | `rreg y x1 x2` | 同上 | 300 obs + 6 个离群 | fail | 1.40e-03 (D) | **1.54e-01 (E)** |
@@ -206,7 +206,7 @@ westata 用 `M = Σ ψ_i² x_i x_i'`，`ψ_i = τ − 1{u_i<0}`；`V = J⁻¹ M 
 τ=.75 复现到 **1.4e-8**，τ=.5 自然仍一致（两者在该点等价）。
 所以 westata 的 sandwich 用了"逐点 Ψ²"，Stata 用"常数 τ(1−τ)"——在 τ≠.5 时差 3–5%。
 后果：非中位数分位的 qreg robust 推断偏保守（SE 偏大 3–5%），t 值偏小。
-这条也被 `QuantileRegression` 的 docstring 自己点名（"only that special case is verified
+这条也被 `QuantileRegress` 的 docstring 自己点名（"only that special case is verified
 against Stata"），本次实测确认：**确实只在 τ=.5 成立**，一般 τ 是错的。
 
 ### 11. sqreg / bsqreg：系数确定，SE 差 2–3%，**主要是 bootstrap 方案差异 + Stata 自身的 MC 波动**
@@ -266,7 +266,7 @@ STR（完整 Huber→biweight 两阶段，逐个留一重拟合），得到的 S
 附带效应：`e(rss)`、`e(mss)`、`e(rmse)`、`e(r2)`、`e(F)` 也全不一致（westata 报加权平方和，
 Stata 报的是能让 `rmse²·(n−k) = rss` 成立的那一套），F 差 24%–38%。这一点旧 registry
 把差异归因为"`[R] rreg` 没把留一构造写清楚"，**本次实测证明不是文档模糊，是 Stata
-用的是闭式 OLS 型方差**——旧结论需要修正。
+用的是闭式 Regress 型方差**——旧结论需要修正。
 
 同时对 `e(rss)` 本身：我试了 `Σw^c e²` 形式的各种权重归一化（c=0,1,2、除以 mean(w)、
 乘 n/sum(w)、`Σe²/w` 等 12 种），没有一个能同时复现四个数据集；`auto.dta` 上甚至能解出
@@ -346,7 +346,7 @@ c=0.1985 但其他数据集无解。这一项**未能归因**，如实记录为�
    `e(athrho)/e(lnsigma)`；two-step 下连 `e(athrho)` 都没有。因此这一项**在 Stata 侧
    无法取到参考值**，记为不可测，不伪造。
 2. **`etregress` 的 `athrho` VCE**：同上——two-step 下 Stata 没有 `e(athrho)` 及其 VCE；
-   westata 的 `Etregress` 也只报 `lambda` 的 SE（`e(selambda)` 对应 Stata 的
+   westata 的 `EndogenousTreatmentRegress` 也只报 `lambda` 的 SE（`e(selambda)` 对应 Stata 的
    `e(selambda)=0.11402906`，westata `bse_lambda` 可对上但差 3.4%）。ML 下的 `athrho`
    因 westata 无 ML 路径而无法比。
 3. **`heckman` / `etregress` 的 ML 数值**：westata 无实现（error），只能记录 Stata 参考值。

@@ -143,7 +143,7 @@ def test_a_model_without_the_macro_is_not_blocked() -> None:
 
     frame = _frame()
     frame = frame.assign(y=1.0 + 0.8 * frame["x"])
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert "marginsnotok" not in fitted.e
     assert fitted.margins(dydx=["x"]) is not None

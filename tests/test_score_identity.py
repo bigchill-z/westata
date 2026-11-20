@@ -44,7 +44,7 @@ def _frame(n: int = 500, seed: int = 4700):
 
 def _fitter(name: str, response: str, frame: pd.DataFrame, formula: str):
     mapping = {
-        "regress": ws.OLS,
+        "regress": ws.Regress,
         "logit": ws.Logit,
         "probit": ws.Probit,
         "poisson": ws.Poisson,
@@ -159,7 +159,7 @@ def test_the_poisson_score_is_y_minus_mu() -> None:
 
 def test_the_linear_score_is_the_residual() -> None:
     frame = _frame()
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert np.allclose(
         np.asarray(fitted.predict(kind="score"), dtype=float),

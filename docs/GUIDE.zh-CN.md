@@ -57,7 +57,7 @@ import westata as ws
 
 df = pd.read_csv("docs/data/auto.csv")
 
-res = ws.OLS.from_formula("price ~ weight + mpg + C(foreign)", df).fit()
+res = ws.Regress.from_formula("price ~ weight + mpg + C(foreign)", df).fit()
 print(res.summary(style="stata"))
 print(res.params["weight"])
 print(res.bse["weight"])
@@ -69,17 +69,17 @@ Stata 里的命令行选项变成关键字参数：
 
 ```python
 # Stata:  regress price weight mpg, vce(robust)
-ws.OLS.from_formula("price ~ weight + mpg", df).fit(cov_type="HC1")
+ws.Regress.from_formula("price ~ weight + mpg", df).fit(cov_type="HC1")
 
 # Stata:  regress price weight mpg, vce(cluster foreign)
-ws.OLS.from_formula("price ~ weight + mpg", df).fit(
+ws.Regress.from_formula("price ~ weight + mpg", df).fit(
     cov_type="cluster", cov_kwds={"groups": df["foreign"]},
 )
 
 # Stata:  regress price weight mpg [aweight=w]
 # weights 与 weight_type 是 from_formula 的参数，不是 fit 的。
 weighted = df.assign(w=abs(pd.Series(range(len(df)), dtype=float) % 7 + 1))
-ws.OLS.from_formula(
+ws.Regress.from_formula(
     "price ~ weight + mpg", weighted, weights=weighted["w"], weight_type="aweight",
 ).fit()
 ```
@@ -90,10 +90,10 @@ ws.OLS.from_formula(
 
 | Stata | westata |
 |---|---|
-| `regress` | `OLS`（加权用 `weights=`）|
+| `regress` | `Regress`（加权用 `weights=`）|
 | `ivregress 2sls` / `liml` / `gmm` | `IV2SLS`、`IVLIML`、`IVGMM` |
-| `eivreg` | `Eivreg` |
-| `reghdfe` | `FEOLS`（后端 `pyfixest`）|
+| `eivreg` | `ErrorsInVariablesRegress` |
+| `reghdfe` | `RegressHighDimFixedEffects`（后端 `pyfixest`）|
 | `areg` | `Areg`（独立命令，必填 `absorb=`，报告 `_cons`）|
 | `nl` | `Nl` |
 
@@ -122,31 +122,31 @@ ws.IV2SLS.from_formula("y_iv ~ w + [x_endog ~ z1 + z2]", sim).fit()
 pdata = df.head(72).copy()
 pdata["firm"] = (pdata.index // 6) + 1
 pdata["year"] = (pdata.index % 6) + 1
-fit = ws.RandomEffects.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
+fit = ws.PanelRegressRE.from_formula("price ~ mpg + weight", pdata, entity="firm", time="year").fit()
 print(fit.e["rmse"], fit.e["sigma_e"])
 ```
 
 
-**描述面板：`xtset`、`xtdes` 与 `xtsum`**
+**描述面板：`panel_set`、`panel_describe` 与 `panel_summarize`**
 
-`xtset` 校验「实体×时间」能否唯一标识观测，并打印 Stata 的形态信息，包括面板是否强平衡、是否有实体
+`panel_set` 校验「实体×时间」能否唯一标识观测，并打印 Stata 的形态信息，包括面板是否强平衡、是否有实体
 跳过了某一期：
 
 ```python
-ws.xtset(pdata, entity="firm", time="year")
+ws.panel_set(pdata, entity="firm", time="year")
 # Panel variable: pid (strongly balanced)
 #  Time variable: year, 1970 to 1986
 #          Delta: 1 unit
 ```
 
-`xtdes` 进一步给出实体与时间范围及 `n`/`T`、`Delta` 与 `Span`、各实体观测数的分布，以及观测模式表
+`panel_describe` 进一步给出实体与时间范围及 `n`/`T`、`Delta` 与 `Span`、各实体观测数的分布，以及观测模式表
 ——其中 `1` 表示该期存在、`.` 表示缺失：
 
 ```python
-ws.xtdes(pdata, entity="firm", time="year")
+ws.panel_describe(pdata, entity="firm", time="year")
 ```
 
-`xtsum` 把每个变量拆成 overall / between / within 三个成分。有三处容易弄错，均已实测确认：
+`panel_summarize` 把每个变量拆成 overall / between / within 三个成分。有三处容易弄错，均已实测确认：
 
 * within 标准差就是离差（deviation）的样本标准差（`ddof=1`）；若再乘 `sqrt(T/(T-1))`（别处使用的
   尺度还原）会得到不同的数；
@@ -154,7 +154,7 @@ ws.xtdes(pdata, entity="firm", time="year")
 * 行标签在 8 列内左对齐，因此 `within` 带两个尾随空格、`between` 只带一个。
 
 ```python
-ws.xtsum(pdata, ["price", "mpg"], entity="firm", time="year")
+ws.panel_summarize(pdata, ["price", "mpg"], entity="firm", time="year")
 ```
 
 三者都会在列不存在、或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`，而不是在有重复键的
@@ -164,20 +164,20 @@ ws.xtsum(pdata, ["price", "mpg"], entity="firm", time="year")
 
 | Stata | westata |
 |---|---|
-| `xtreg, fe` / `re` / `be` / `fd` | `PanelOLS`、`RandomEffects`、`BetweenOLS`、`FirstDifferenceOLS` |
-| `xtlogit, fe` / `re` / `pa` | `XtLogit(method=...)` |
-| `xtpoisson` | `XtPoisson` |
-| `xtnbreg` | `XtNbreg` |
-| `xttobit` | `XtTobit` |
-| `xtgls` | `XtGls` |
-| `xtpcse` | `XtPcse` |
-| `xtabond` | `XtAbond` |
-| `xtivreg` | `XtIvreg` |
+| `xtreg, fe` / `re` / `be` / `fd` | `PanelRegressFE`、`PanelRegressRE`、`PanelRegressBE`、`PanelRegressFD` |
+| `xtlogit, fe` / `re` / `pa` | `PanelLogit(method=...)` |
+| `xtpoisson` | `PanelPoisson` |
+| `xtnbreg` | `PanelNbRegress` |
+| `xttobit` | `PanelTobit` |
+| `xtgls` | `PanelGls` |
+| `xtpcse` | `PanelPcse` |
+| `xtabond` | `PanelAbond` |
+| `xtivreg` | `PanelIVRegress` |
 
 ```python
 panel = pd.read_csv("docs/data/panel.csv")
-ws.PanelOLS.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()
-ws.XtLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
+ws.PanelRegressFE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()
+ws.PanelLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
                         method="fe").fit()
 ```
 
@@ -225,29 +225,29 @@ fitted.odds_ratios          # pd.Series，不加括号
 | Stata | westata |
 |---|---|
 | `tobit` | `Tobit` |
-| `truncreg` | `Truncreg` |
-| `intreg` | `Intreg` |
+| `truncreg` | `TruncatedRegress` |
+| `intreg` | `IntervalRegress` |
 | `heckman` | `Heckman(method="twostep" 或 "ml")` |
-| `etregress` | `Etregress(method="control" 或 "ml")` |
+| `etregress` | `EndogenousTreatmentRegress(method="control" 或 "ml")` |
 
 ```python
 ws.Tobit.from_formula("rep78 ~ weight + length", df, lower=0).fit()
 ws.Heckman.from_formula("y_sel ~ w + select(observed ~ z1 + z2)", sim).fit(method="ml")
 ```
 
-**`xttest0` —— 随机效应的 Breusch-Pagan LM 检验**
+**`panel_test0` —— 随机效应的 Breusch-Pagan LM 检验**
 
-随机效应拟合之后，`ws.xttest0(result)` 复现 Stata 的 `xttest0`：
+随机效应拟合之后，`ws.panel_test0(result)` 复现 Stata 的 `panel_test0`：
 
 ```python
-# 12 entities x 6 periods: xttest0 requires a balanced panel.
+# 12 entities x 6 periods: panel_test0 requires a balanced panel.
 panel = df.head(72).copy()
 panel["sid"] = (panel.index // 6) + 1
 panel["year"] = (panel.index % 6) + 1
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
-print(ws.xttest0(re_fit))
+print(ws.panel_test0(re_fit))
 ```
 
 面板变量取自拟合结果自身的 `e(ivar)`，因此**无需传 `entity=`**；只在需要覆盖时才传。输出的
@@ -261,7 +261,7 @@ Stata 的 `theta` 是**报告**选项，不是估计选项：它只改变打印�
 `summary` 的 `theta` 关键字：
 
 ```python
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
 print(re_fit.summary(theta=True))
@@ -286,16 +286,16 @@ theta        = .81012778
 `xtreg, fe` / `be` / `mle` **不起作用**——Stata 对它们报 `option theta not allowed`（r(198)）
 ——在 `style='statsmodels'` 下同样不起作用。
 
-**`xtoverid` —— 过度识别约束的 Sargan-Hansen 检验**
+**`panel_overid` —— 过度识别约束的 Sargan-Hansen 检验**
 
-Stata 的 `xtoverid` 是用户自编命令（Schaffer & Stillman），不在 base 中。随机效应拟合之后，它
+Stata 的 `panel_overid` 是用户自编命令（Schaffer & Stillman），不在 base 中。随机效应拟合之后，它
 检验 RE 估计量所用的额外矩条件是否成立；拒绝意味着 RE 不一致、应改用固定效应。
 
 ```python
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "price ~ mpg + weight", panel, entity="sid", time="year"
 ).fit()
-print(ws.xtoverid(re_fit))
+print(ws.panel_overid(re_fit))
 ```
 
 ```
@@ -308,10 +308,10 @@ Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
 `to_dict()` 按 Stata 的名字给出。两点是关键，且都经过实测：
 
 - **VCE 跟随原拟合**。同一方程在同方差 VCE 下为 `53.285`，在 `cov_type="robust"` 下为
-  `221.225`——差 4 倍，不是舍入。`xtoverid.ado` 重估时会镜像 `e(vcetype)`，本实现同样如此。
+  `221.225`——差 4 倍，不是舍入。`panel_overid.ado` 重估时会镜像 `e(vcetype)`，本实现同样如此。
 - 辅助方程用**原始 `e(theta)`** 做准去均值。新增的每个回归元都是组均值恒为零的组内离差，
   不含任何组间变异；若改为重新估计方差成分，`sigma_u` 会从 `.1332` 漂到 `.0947`，
-  统计量偏差 4.66。Stata 自己的 `xtoverid, noisily` 打印的就是原始 `sigma_u`/`theta`，
+  统计量偏差 4.66。Stata 自己的 `panel_overid, noisily` 打印的就是原始 `sigma_u`/`theta`，
   固定 theta 求解才能复现。
 
 仅实现 `xtreg, re` 分支：`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支
@@ -320,14 +320,14 @@ Sargan-Hansen statistic  53.285  Chi-sq(7)    P-value = 0.0000
 
 **xtreg, mle 的方差成分区块**
 
-`RandomEffectsMLE` 复现 Stata 的 `xtreg ..., mle`。在系数表之下打印 `/sigma_u`、`/sigma_e` 与
+`PanelRegressMLE` 复现 Stata 的 `xtreg ..., mle`。在系数表之下打印 `/sigma_u`、`/sigma_e` 与
 `rho`，每行都带置信区间：
 
 ```python
 panel = df.head(72).copy()
 panel["sid"] = (panel.index // 6) + 1
 panel["year"] = (panel.index % 6) + 1
-res = ws.RandomEffectsMLE.from_formula("price ~ mpg + weight", panel,
+res = ws.PanelRegressMLE.from_formula("price ~ mpg + weight", panel,
                                        entity="sid", time="year").fit()
 print(res.summary())
 ```
@@ -370,10 +370,10 @@ print(ws.Logit.from_formula("foreign ~ mpg + weight", df).fit(cov_type="robust")
 
 | Stata | westata |
 |---|---|
-| `qreg` | `QuantileRegression` |
-| `sqreg` | `Sqreg` |
-| `bsqreg` | `Bsqreg` |
-| `rreg` | `RobustRegression` |
+| `qreg` | `QuantileRegress` |
+| `sqreg` | `SimultaneousQuantileRegress` |
+| `bsqreg` | `BootstrappedQuantileRegress` |
+| `rreg` | `RobustRegress` |
 
 
 **`varbasic` 与 `irf table`**
@@ -472,17 +472,17 @@ ws.irf_table(fit, all=True).plot()          # 全部组合，各占一个面板
 常用参数：`ax=` 画入已有坐标轴，`show_ci=False` 只画曲线，`markers=True`、`grid=False`、
 `figsize=(w, h)`；其余关键字会转发给 `Axes.plot`。
 
-**绘制稳定性：`varstable(...).plot()`**
+**绘制稳定性：`var_stable(...).plot()`**
 
-`varstable, graph` 把**伴随矩阵**的特征值画在复平面上——横轴实部、纵轴虚部，背后是单位圆。
-`varstable(...).plot()` 就是那张图。
+`var_stable, graph` 把**伴随矩阵**的特征值画在复平面上——横轴实部、纵轴虚部，背后是单位圆。
+`var_stable(...).plot()` 就是那张图。
 
 ```python
 # 本指南的 df 是 auto.csv；任意两列都可以。
 fit = ws.VAR(df[["price", "mpg"]], lags=2).fit()
-ws.varstable(fit).plot()                       # 单位圆 + 点
-ws.varstable(fit).plot(labels=True)            # 标注模
-ws.varstable(fit).plot(labels="distance")      # Stata 的 `dlabel`：1 - |特征值|
+ws.var_stable(fit).plot()                       # 单位圆 + 点
+ws.var_stable(fit).plot(labels=True)            # 标注模
+ws.var_stable(fit).plot(labels="distance")      # Stata 的 `dlabel`：1 - |特征值|
 ```
 
 | | |
@@ -500,13 +500,13 @@ ws.varstable(fit).plot(labels="distance")      # Stata 的 `dlabel`：1 - |特�
 
 | Stata | westata |
 |---|---|
-| `sureg` | `Sureg` |
-| `mvreg` | `Mvreg` |
+| `sureg` | `SeeminglyUnrelatedRegress` |
+| `mvreg` | `MultivariateRegress` |
 | `manova` | `Manova` |
 
 ```python
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
-ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df).fit()
+ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
                      ).fit(cov_type="robust")
 ```
 
@@ -515,10 +515,10 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 | Stata | westata |
 |---|---|
 | `teffects nnmatch` / `ra` / `ipw` / `aipw` | `NearestNeighbourMatching`、`RegressionAdjustment`、`IPW`、`AIPW` |
-| `teffects nnmatch ..., atet` / `caliper()` | `teffects_nnmatch(...)` —— 函数形式另带 `caliper` 与 `tie_tolerance` |
-| `teffects psmatch ..., atet` | `teffects_psmatch(...)` |
-| `tebalance summarize` | `tebalance_summarize(...)` |
-| `didregress` / `xtdidregress` | `Didregress`、`Xtdidregress` |
+| `teffects nnmatch ..., atet` / `caliper()` | `treatment_effects_nnmatch(...)` —— 函数形式另带 `caliper` 与 `tie_tolerance` |
+| `teffects psmatch ..., atet` | `treatment_effects_psmatch(...)` |
+| `tebalance summarize` | `treatment_balance_summarize(...)` |
+| `didregress` / `xtdidregress` | `DIDRegress`、`PanelDIDRegress` |
 | `rcm` | `rcm(...)` —— 需要与 Stata 一致的结果请传 `selected=` |
 | `synth`（默认路径） | `synth(...)` —— 六个 `e()` 矩阵，证据等级 E2 |
 
@@ -530,8 +530,8 @@ ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], df
 ```python
 d = df.dropna(subset=["price", "mpg", "weight"]).copy()
 d["treat"] = (d["foreign"] > 0).astype(int)
-ws.teffects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
-ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
+ws.treatment_effects_nnmatch(d["price"], d["treat"], d[["mpg", "weight"]], nneighbor=2)
+ws.treatment_balance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"])
 ```
 
 ### 时间序列
@@ -540,25 +540,25 @@ ws.tebalance_summarize(d["treat"], d[["mpg", "weight"]], names=["mpg", "weight"]
 |---|---|
 | `arima` | `ARIMA` |
 | `arch` / `garch` | `GARCH`（需要 `arch`）|
-| 单位根检验 | `unitroot(test=...)`、`XtUnitroot` |
-| `vecrank` | `vecrank(...)` —— 含 `lags(1)` |
-| `varsoc` / `varlmar` / `varstable` / `varwle` | `varsoc`、`varlmar`、`varstable`、`varwle`（`varstable(...).plot()` 对应 `varstable, graph`） |
-| `veclmar` / `vecstable` | `veclmar`、`vecstable` |
-| `vargranger` | `vargranger(fitted)` |
+| 单位根检验 | `unitroot(test=...)`、`PanelUnitroot` |
+| `vec_rank` | `vec_rank(...)` —— 含 `lags(1)` |
+| `var_select_order` / `var_lmar` / `var_stable` / `var_wle` | `var_select_order`、`var_lmar`、`var_stable`、`var_wle`（`var_stable(...).plot()` 对应 `var_stable, graph`） |
+| `vec_lmar` / `vec_stable` | `vec_lmar`、`vec_stable` |
+| `var_granger` | `var_granger(fitted)` |
 | `prais` | `Prais.from_formula(formula, data)` / `prais(frame, formula)` |
-| `newey` | `Newey.from_formula(formula, data, lag=...)` / `newey(formula, data, lag=...)` |
+| `newey_west` | `Newey.from_formula(formula, data, lag=...)` / `newey_west(formula, data, lag=...)` |
 | `synth` | `Synth.from_variables(data, unit=…, time=…, depvar=…, predictors=[…], trunit=…, trperiod=…)` |
 | `synth2` | `Synth2.from_variables(…)`，选项同上 |
-| `rcm` | `Rcm.from_variables(outcome, data, predictors=[…], unit=…, time=…, treated_unit=…, treatment_period=…)` |
-| `rdrobust` | `Rdrobust.from_variables(outcome, running, data, *, bandwidth=…)` |
-| `teffects ra` | `TeffectsRa.from_variables(outcome, treatment, data, covariates=[…])` |
-| `teffects psmatch` | `TeffectsPsmatch.from_variables(…)` |
-| `teffects nnmatch` | `TeffectsNnmatch.from_variables(…)` |
+| `rcm` | `RegressionControlMethod.from_variables(outcome, data, predictors=[…], unit=…, time=…, treated_unit=…, treatment_period=…)` |
+| `rd_robust` | `RDRobust.from_variables(outcome, running, data, *, bandwidth=…)` |
+| `teffects ra` | `TreatmentEffectsRa.from_variables(outcome, treatment, data, covariates=[…])` |
+| `teffects psmatch` | `TreatmentEffectsPsmatch.from_variables(…)` |
+| `teffects nnmatch` | `TreatmentEffectsNnmatch.from_variables(…)` |
 
 ```python
 values = df.dropna(subset=["price", "mpg"])[["price", "mpg"]].to_numpy(dtype=float)
-ws.vargranger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
-ws.vecrank(values, lags=1)
+ws.var_granger(ws.VAR(values, lags=1, names=["price", "mpg"]).fit())
+ws.vec_rank(values, lags=1)
 ```
 
 **绘制脉冲响应：`irf_graph()`**
@@ -649,7 +649,7 @@ ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
 ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
 ```
 
-`prais` 与 `newey` 是估计命令，因此也提供与其它估计器一致的类形式（R2.7）。
+`prais` 与 `newey_west` 是估计命令，因此也提供与其它估计器一致的类形式（R2.7）。
 函数形式保留，数字完全相同：
 
 ```python
@@ -661,7 +661,7 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 > 位置顺序，与本包其它 `from_formula` **相反**——已有 52 处按位置传
 > `ws.prais(frame, FORMULA)`，若交换两者不会报错，而会把 DataFrame 当成公式去解析。
 > 要标准顺序请用 `Prais.from_formula(formula, data)`。两者的 `fit()` 都**不接受
-> `cov_type`**：Stata 的 `prais` 与 `newey` 没有 `vce()` 选项，方差是估计量的一部分，
+> `cov_type`**：Stata 的 `prais` 与 `newey_west` 没有 `vce()` 选项，方差是估计量的一部分，
 > 提供一个 `cov_type` 参数等于承诺一个无法兑现的选择。
 
 ### 后估计
@@ -673,19 +673,19 @@ ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 | `margins` | `res.margins(...)` |
 | `linktest` | `ws.linktest(res)` |
 | `suest` | `ws.suest([fit_a, fit_b])` |
-| `vargranger` | `ws.vargranger(var_fit)` |
+| `var_granger` | `ws.var_granger(var_fit)` |
 | `predict` | `res.predict(...)` |
 | `esttab` / `outreg2` | `ws.etable([...])` |
 | `summarize` | `ws.summarize(frame, ["y", "x1"])` |
 | `ereturn list` | `format_ereturn_list(res)` |
-| `xtserial` | `ws.xtserial(data, "y ~ x1 + x2", entity=..., time=...)` |
+| `panel_serial` | `ws.panel_serial(data, "y ~ x1 + x2", entity=..., time=...)` |
 
-### `xtserial`：面板序列相关（Wooldridge 检验）
+### `panel_serial`：面板序列相关（Wooldridge 检验）
 
-`xtserial` **不是 Stata 自带命令，也不在 SSC 上**，它由 Drukker 维护：
+`panel_serial` **不是 Stata 自带命令，也不在 SSC 上**，它由 Drukker 维护：
 
 ```stata
-net install xtserial, from("http://www.stata.com/users/ddrukker")
+net install panel_serial, from("http://www.stata.com/users/ddrukker")
 ```
 
 它的主体只有四行，做的是：对**因变量与每一个回归元**做一阶差分（无常数项、按面板聚类），
@@ -700,7 +700,7 @@ panel_like = df.assign(
     province=(np.arange(len(df)) % 12) + 1,
     t=(np.arange(len(df)) // 12) + 1,
 )
-result = ws.xtserial(panel_like, "price ~ mpg + weight", entity="province", time="t")
+result = ws.panel_serial(panel_like, "price ~ mpg + weight", entity="province", time="t")
 print(result)
 ```
 
@@ -724,7 +724,7 @@ result.first_stage_table()            # 同一张表的字符串形式
 `F(9, 27) = 902.61`，且每个系数与聚类标准误与 Stata 的差都在 5e-7 以内。
 
 ```python
-res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 res.test("weight")                       # 单个约束
 res.test("weight", "C(foreign)[T.1]")    # 联合检验
 res.lincom("weight + 1000*C(foreign)[T.1]")
@@ -800,9 +800,9 @@ res.lincom("weight + 1000*C(foreign)[T.1]")
 ```python
 # lnw/expr2 属于 grilic.dta；本指南的 df 是 auto.csv，故示例改用其中的连续变量。
 # 两种数据下行为相同。
-fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
-print(ws.estat_ovtest(fit))            # 拟合值的幂次
-print(ws.estat_ovtest(fit, rhs=True))  # 自变量的幂次
+fit = ws.Regress.from_formula("price ~ mpg + weight", df).fit()
+print(ws.estat_omitted_variables_test(fit))            # 拟合值的幂次
+print(ws.estat_omitted_variables_test(fit, rhs=True))  # 自变量的幂次
 ```
 
 ### `estat bgodfrey` 与它的 `nomiss0` 选项
@@ -824,7 +824,7 @@ Breusch-Godfrey 与 `estat dwatson` 有一点差别，读输出前值得先知�
 ```python
 # 上表捕获自 icecream.dta 的 `regress consumption temp price income`；
 # 这里改用随包附带的 auto.csv，示例在任何环境都能直接运行。
-fit = ws.OLS.from_formula("price ~ mpg + weight", df).fit()
+fit = ws.Regress.from_formula("price ~ mpg + weight", df).fit()
 
 print(ws.estat_bgodfrey(fit, lags=(1, 2)))                 # 补零，全样本
 print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失
@@ -837,7 +837,7 @@ print(ws.estat_bgodfrey(fit, lags=(1, 2), nomiss0=True))   # 保持缺失
 
 ```python
 iv = ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit()
-ols = ws.OLS.from_formula("price ~ weight + mpg", df).fit()
+ols = ws.Regress.from_formula("price ~ weight + mpg", df).fit()
 
 print(ws.hausman(iv, ols).statistic)                    # Stata: hausman iv ols
 print(ws.hausman(iv, ols, constant=True).statistic)     # hausman iv ols, constant
@@ -880,7 +880,7 @@ Stata 里 `estat bgodfrey` / `estat dwatson` / `wntestq` / `corrgram` 都先调
 # 加一列期号，并故意抹掉其中一期：不给 `time=` 时滞后会把缺口两侧的行接起来，
 # 而这正是 `L.` 不会做的事。
 time_series = df.assign(year=range(1, len(df) + 1)).drop(index=10).reset_index(drop=True)
-gapped = ws.OLS.from_formula("price ~ mpg + weight", time_series).fit()
+gapped = ws.Regress.from_formula("price ~ mpg + weight", time_series).fit()
 
 ws.estat_bgodfrey(gapped, lags=1)               # 按行序取滞后
 ws.estat_bgodfrey(gapped, lags=1, time="year")  # 按 year 取滞后，缺口处滞后缺失
@@ -907,7 +907,7 @@ ws.estat_bgodfrey(gapped, lags=1, time="year")  # 按 year 取滞后，缺口处
 在 n = 758 上 Stata 报 `chi2(40)`，而不是按 `(n-k)//2` 会得到的 377。
 
 面板数据一律拒绝：`_ts ..., onepanel` 的后果是 `sample may not include multiple panels`
-（r(459)）；`areg` / `reghdfe` / `newey` / `xtreg` 拟合则报 `estat bgodfrey not valid`（r(321)）。
+（r(459)）；`areg` / `reghdfe` / `newey_west` / `xtreg` 拟合则报 `estat bgodfrey not valid`（r(321)）。
 
 ### Stata 在表格前后打印的说明文字
 
@@ -961,8 +961,8 @@ Stata 的输出不只是数字：它还会打印 note、警告和迭代日志，
 布局**（没有列号、没有依赖变量行、末尾有 `Legend:` 行），并且支持任意多个模型。
 
 ```python
-fit_a = ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1")
-fit_b = ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
+fit_a = ws.Regress.from_formula("price ~ mpg", df).fit(cov_type="HC1")
+fit_b = ws.Regress.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1")
 print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True))
 ```
 
@@ -970,8 +970,8 @@ print(ws.render_estimates_table([fit_a, fit_b], model_names=["a", "b"], se=True)
 数值在 `|v|≥1` 时用八位有效数字，否则用八位小数。
 
 **稳健 VCE 因命令而异。** `regress ..., r` 是 HC1，而 `ivregress ..., r` 是 HC0；因此混合
-OLS 与 IV 模型的表格需要在 OLS 上用 `cov_type="HC1"`、在 IV 上用 `"HC0"`。若统一用 HC0，
-每个 OLS 标准误都会被 `sqrt(n/(n-k))` 缩放。
+Regress 与 IV 模型的表格需要在 Regress 上用 `cov_type="HC1"`、在 IV 上用 `"HC0"`。若统一用 HC0，
+每个 Regress 标准误都会被 `sqrt(n/(n-k))` 缩放。
 
 ### `estimates table`、`esttab` 与它们的选项
 
@@ -979,8 +979,8 @@ OLS 与 IV 模型的表格需要在 OLS 上用 `cov_type="HC1"`、在 IV 上用 
 
 ```python
 fits = [
-    ws.OLS.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
-    ws.OLS.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
+    ws.Regress.from_formula("price ~ mpg", df).fit(cov_type="HC1"),
+    ws.Regress.from_formula("price ~ mpg + weight", df).fit(cov_type="HC1"),
     ws.IV2SLS.from_formula("price ~ weight + [mpg ~ length]", df).fit(cov_type="HC0"),
 ]
 names = ["ols_a", "ols_b", "tsls"]
@@ -1052,12 +1052,12 @@ print(render_esttab_table(fits, names=names, options=options))
 
 | 表格 | 已验证样本量 |
 |---|---|
-| `varsoc` | 100、200、300、900、1500 |
-| `varstable` | 60、200、900、1500 |
-| `vecstable` | 100、300、900 |
+| `var_select_order` | 100、200、300、900、1500 |
+| `var_stable` | 60、200、900、1500 |
+| `vec_stable` | 100、300、900 |
 | `dfuller` | 4 个样本 × 2 种滞后 |
-| `varlmar`、`varwle`、`veclmar`、`vargranger` | 100、300、900 |
-| `estat ic`（OLS、吸收拟合、VAR、zip、zinb）| 各 2–3 个 |
+| `var_lmar`、`var_wle`、`vec_lmar`、`var_granger` | 100、300、900 |
+| `estat ic`（Regress、吸收拟合、VAR、zip、zinb）| 各 2–3 个 |
 | `estat summarize` | 200、1500、3000，及 1e-5–1e3 多种尺度 |
 | `estat overid`、`estat ovtest`、`estat dwatson` | 各 2–3 个 |
 | `logit`、`probit`、`poisson`、`nbreg` 表头 | 800、1500 |
@@ -1075,7 +1075,7 @@ print(render_esttab_table(fits, names=names, options=options))
 有六处差异是**数值层面**而非表现层面的，予以记录而不是掩盖：
 
 * `estat vif` 的 1/VIF 第 9 位有效数字；
-* `varstable` 在 n ≥ 300 时特征值第 9 位，模数列随之；
+* `var_stable` 在 n ≥ 300 时特征值第 9 位，模数列随之；
 * VECM 系数打印的最后一位；
 * `zip`/`zinb` 系数第 7 位有效数字。
 

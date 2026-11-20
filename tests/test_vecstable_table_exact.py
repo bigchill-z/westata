@@ -54,7 +54,7 @@ def stable():
     y = 2.0 * x + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x": x})
     fitted = ws.VECM(frame[["y", "x"]], coint_rank=1, lags=2).fit()
-    return ws.vecstable(fitted)
+    return ws.vec_stable(fitted)
 
 
 def test_the_table_matches_stata_line_by_line(stable) -> None:

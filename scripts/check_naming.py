@@ -44,11 +44,24 @@ def all_renames(defs: dict[str, list[str]]) -> list[nm.Rename]:
     class automatically becomes a pending rename without editing the contract.
     """
     static = list(nm.ALL_RENAMES)
+    # Result renames: derive from source where possible, but ALSO from the frozen compat table
+    # so a completed migration does not shrink the contract. The table is the durable record of
+    # every old singular name that existed before the migration.
+    try:
+        from westata._compat import RESULT_RENAMED, RENAMED as FROZEN_RENAMED
+    except ImportError:  # pragma: no cover - checker run outside the package
+        RESULT_RENAMED, FROZEN_RENAMED = (), ()
+    seen_old = {r.old for r in static}
     for name in defs:
         if (name.endswith("Result") and not name.endswith("Results")
-                and name not in nm.RESULT_COLLISION_KEEP):
+                and name not in nm.RESULT_COLLISION_KEEP and name not in seen_old):
             static.append(nm.result_rename(name))
-    if "IrFTable" in defs:
+            seen_old.add(name)
+    for old_name, new_name in RESULT_RENAMED:
+        if old_name not in seen_old:
+            static.append(nm.Rename(old_name, new_name, "result"))
+            seen_old.add(old_name)
+    if "IrFTable" in defs and "IrFTable" not in seen_old:
         static.append(nm.Rename("IrFTable", "IrfTable", "result"))
     return static
 
@@ -119,11 +132,20 @@ def check_rn1(report: Report) -> None:
 # R-N2: functions renamed too; every rename is a real change
 # --------------------------------------------------------------------------- #
 def check_rn2(report: Report, defs: dict[str, list[str]]) -> None:
+    """A function rename is valid when OLD or NEW exists (migration may be done or pending).
+
+    Requiring the old name unconditionally made every completed migration a finding, which
+    hides the real defect: a rename where NEITHER spelling is present.
+    """
+
     for r in nm.FUNCTION_RENAMES:
         if r.old == r.new:
             report.add(Finding("R-N2", r.old, "function 'rename' is a no-op"))
-        if r.old not in defs:
-            report.add(Finding("R-N2", r.old, "old function name not found in source tree"))
+        if r.old not in defs and r.new not in defs:
+            report.add(Finding(
+                "R-N2", r.old,
+                f"neither old nor new function name ('{r.new}') found in source tree",
+            ))
 
 
 # --------------------------------------------------------------------------- #
@@ -174,9 +196,21 @@ def check_rn5(report: Report, defs: dict[str, list[str]]) -> None:
             expected = "estat_" + expected_suffix
             if new != expected:
                 report.add(Finding("R-N5", old, f"new name '{new}' != expected '{expected}'"))
-    unhandled = sorted(src_estat - set(renamed) - nm.ESTAT_KEEP)
+    # A migrated estat_* function has its NEW name in the source and no old name; a pending
+    # one has the old name. Neither is a finding -- only a name that is in neither state is.
+    new_estat = set(renamed.values())
+    unhandled = sorted(
+        name for name in src_estat - set(renamed) - nm.ESTAT_KEEP
+        if name not in new_estat
+    )
     for name in unhandled:
         report.add(Finding("R-N5", name, "estat_* function has no rename and is not a registered keep"))
+    for old, new in renamed.items():
+        if old not in defs and new not in defs:
+            report.add(Finding(
+                "R-N5", old,
+                f"neither old nor new estat name ('{new}') found in source tree",
+            ))
     for name in nm.ESTAT_KEEP:
         suffix = name[len("estat_"):] if name.startswith("estat_") else ""
         if suffix and suffix not in nm.ESTAT_SUFFIX_KEEP:
@@ -197,12 +231,15 @@ def check_rn6(report: Report, defs: dict[str, list[str]]) -> None:
         if c > 1:
             owners = sorted(r.old for r in renames if r.new == new)
             report.add(Finding("R-N6", new, f"collision: {owners} all map to this name"))
-    renaming_old = set(old_counts)
+    # After a completed migration every new name exists in source -- that is the goal, not
+    # a collision. Keep the check for a new name that exists but is NOT a contract target at
+    # all (someone introduced a conflicting name outside the migration).
     for new in new_counts:
-        if new in defs and new not in renaming_old:
+        owners = sorted(r.old for r in renames if r.new == new)
+        if new in defs and not any(old in old_counts for old in owners):
             report.add(Finding(
                 "R-N6", new,
-                f"new name already exists in source at {', '.join(defs[new])} and is not renamed away",
+                f"name exists at {', '.join(defs[new])} but no contract entry owns it",
             ))
     for name in nm.RESULT_COLLISION_KEEP:
         if name not in defs:

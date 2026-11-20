@@ -56,7 +56,7 @@ __all__ = [
     "GARCH",
     "VAR",
     "VECM",
-    "UnitRootResult",
+    "UnitRootResults",
     "unitroot",
 ]
 
@@ -3040,7 +3040,7 @@ class VECM:
             )
         n_equations = self._data.shape[1]
         diagnostics = _johansen_diagnostics(self._data, resolved, int(det_order))
-        return JohansenResult(
+        return JohansenResults(
             trace=trace,
             trace_critical=_vecrank_critical(n_equations, specification, statistic="trace"),
             maxeig=maxeig,
@@ -4091,7 +4091,7 @@ class VECMResults:
 
 
 @dataclass
-class JohansenResult:
+class JohansenResults:
     """Johansen trace / max-eigenvalue statistics with critical values."""
 
     trace: np.ndarray
@@ -4705,7 +4705,7 @@ def _dfuller_header(
 
 
 @dataclass
-class UnitRootResult(ResultSerialisation):
+class UnitRootResults(ResultSerialisation):
     """One unit-root test outcome, shaped like Stata's test output."""
 
     test: str
@@ -4941,7 +4941,7 @@ def unitroot(
     regression: str = "c",
     maxlag: int | None = None,
     autolag: str | None = None,
-) -> UnitRootResult:
+) -> UnitRootResults:
     """Unit-root test (Stata ``dfuller`` / ``pperron`` / ``kpss``).
 
     Parameters
@@ -4988,7 +4988,7 @@ def unitroot(
         critical = _dfuller_critical(
             _dfuller_case(regression), float(outcome.nobs)
         )
-        return UnitRootResult(
+        return UnitRootResults(
         regression=str(regression),
             test="Augmented Dickey-Fuller",
             statistic=float(outcome.statistic),
@@ -5026,7 +5026,7 @@ def unitroot(
         # are -3.45608/-2.87804/-2.57, i.e. N = 299 -- which is exactly the
         # ``nobs`` arch reports here, so no offset is needed.
         critical = _dfuller_critical(_dfuller_case(regression), float(observations))
-        return UnitRootResult(
+        return UnitRootResults(
         regression=str(regression),
             test="Phillips-Perron",
             statistic=statistic,
@@ -5046,7 +5046,7 @@ def unitroot(
             nlags=maxlag or "auto",
             result_object=True,
         )
-        return UnitRootResult(
+        return UnitRootResults(
         regression=str(regression),
             test="KPSS",
             statistic=float(outcome.statistic),
@@ -5067,7 +5067,7 @@ def dfuller(
     lags: int | None = None,
     autolag: str | None = None,
     regression: str | None = None,
-) -> UnitRootResult:
+) -> UnitRootResults:
     """Augmented Dickey-Fuller test, spelled the way Stata spells it.
 
     A thin alias: ``dfuller(y, trend=True)`` is ``unitroot(y, test="adf", regression="ct")``.
@@ -5101,7 +5101,7 @@ def pperron(
     lags: int | None = None,
     autolag: str | None = None,
     regression: str | None = None,
-) -> UnitRootResult:
+) -> UnitRootResults:
     """Phillips-Perron test, spelled the way Stata spells it.
 
     ``pperron(y, trend=True)`` is ``unitroot(y, test="pp", regression="ct")``; the option mapping

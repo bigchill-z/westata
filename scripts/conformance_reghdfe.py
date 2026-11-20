@@ -108,7 +108,7 @@ def main() -> int:
                 cov_type = "cluster"
                 cov_kwds = {"cluster": frame["firm"]}
 
-            result = ws.FEOLS.from_formula(formula, frame).fit(
+            result = ws.RegressHighDimFixedEffects.from_formula(formula, frame).fit(
                 cov_type=cov_type, cov_kwds=cov_kwds
             )
             westata_positions, stata_positions, skipped = align(result, capture.names)

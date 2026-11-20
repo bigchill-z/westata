@@ -75,7 +75,7 @@ def test_a_regression_with_lagged_regressors_runs() -> None:
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("macro_swatson.dta is not available")
 
-    fitted = ws.OLS.from_formula("dinf ~ unem + L(unem) + L(dinf)", frame).fit()
+    fitted = ws.Regress.from_formula("dinf ~ unem + L(unem) + L(dinf)", frame).fit()
     assert int(fitted.nobs) == 165
     assert "L(unem)" in fitted.params.index
     assert "L(dinf)" in fitted.params.index

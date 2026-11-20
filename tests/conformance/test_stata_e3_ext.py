@@ -106,7 +106,7 @@ def var_frame(n: int = 400, seed: int = 41):
 
 def test_xtreg_fe_matches_stata():
     capture = _load("xtreg_fe")
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel_frame(), entity="firm", time="year"
     ).fit()
     perm = _align(result, capture.names)
@@ -120,7 +120,7 @@ def test_xtreg_fe_matches_stata():
 
 def test_xtreg_re_matches_stata():
     capture = _load("xtreg_re")
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel_frame(), entity="firm", time="year"
     ).fit()
     perm = _align(result, capture.names)
@@ -131,7 +131,7 @@ def test_xtreg_re_matches_stata():
 
 def test_xtreg_be_matches_stata():
     capture = _load("xtreg_be")
-    result = ws.BetweenOLS.from_formula(
+    result = ws.PanelRegressBE.from_formula(
         "y ~ x1 + x2", panel_frame(), entity="firm", time="year"
     ).fit()
     perm = _align(result, capture.names)
@@ -142,7 +142,7 @@ def test_xtreg_be_matches_stata():
 
 def test_areg_matches_stata():
     capture = _load("areg")
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel_frame()).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel_frame()).fit()
 
     # ``areg`` reports the absorbed effect's constant as ``_cons``, which an FE
     # model with an absorbed firm effect does not identify separately; westata

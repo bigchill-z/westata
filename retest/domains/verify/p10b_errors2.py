@@ -53,9 +53,9 @@ print("\n### heckman / etregress ML")
 probe("Heckman('y ~ x1 + select(s ~ z1)').fit(method='ml')",
       lambda: ws.Heckman.from_formula("y ~ x1 + select(s ~ z1)", Dh).fit(method="ml"))
 probe("Etregress('y ~ x1 + treat(t ~ z1)').fit(method='ml')",
-      lambda: ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1)", Dt).fit(method="ml"))
+      lambda: ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1)", Dt).fit(method="ml"))
 probe("Etregress.fit() default (control)",
-      lambda: ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1)", Dt).fit().params)
+      lambda: ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1)", Dt).fit().params)
 probe("Heckman.fit() default (twostep)",
       lambda: ws.Heckman.from_formula("y ~ x1 + select(s ~ z1)", Dh).fit().params)
 
@@ -66,9 +66,9 @@ probe("Frontier exponential",
       lambda: ws.Frontier.from_formula("price ~ weight + length", A, distribution="exponential").fit().params)
 
 print("\n### sureg robust")
-probe("Sureg default", lambda: ws.Sureg.from_formula(
+probe("Sureg default", lambda: ws.SeeminglyUnrelatedRegress.from_formula(
     ["price ~ weight + mpg", "mpg ~ weight + foreign"], A.dropna()).fit().params)
-probe("Sureg robust", lambda: ws.Sureg.from_formula(
+probe("Sureg robust", lambda: ws.SeeminglyUnrelatedRegress.from_formula(
     ["price ~ weight + mpg", "mpg ~ weight + foreign"], A.dropna()).fit(cov_type="robust"))
 
 print("\n### xtgls corr(ar1)")
@@ -82,18 +82,18 @@ for g in range(G):
         rows.append((g, tt, 1.0 + 0.7 * xx + ui + rng2.normal(0, .5), xx))
 Dp = pd.DataFrame(rows, columns=["id", "t", "y", "x1"])
 probe("XtGls panels=heteroskedastic, corr=independent",
-      lambda: ws.XtGls.from_formula("y ~ x1", Dp, entity="id", time="t",
+      lambda: ws.PanelGls.from_formula("y ~ x1", Dp, entity="id", time="t",
                                     panels="heteroskedastic", corr="independent").fit().params)
 probe("XtGls panels=heteroskedastic, corr=ar1",
-      lambda: ws.XtGls.from_formula("y ~ x1", Dp, entity="id", time="t",
+      lambda: ws.PanelGls.from_formula("y ~ x1", Dp, entity="id", time="t",
                                     panels="heteroskedastic", corr="ar1").fit().params)
 
 print("\n### XtAbond lags=2 parameter names (naming offset defect)")
 probe("XtAbond lags=1 param_names",
-      lambda: ws.XtAbond(Dp.assign(y=np.asarray(Dp.y)), endog="y", lags=1,
+      lambda: ws.PanelAbond(Dp.assign(y=np.asarray(Dp.y)), endog="y", lags=1,
                          regressors=["x1"], entity="id", time="t").fit().param_names)
 probe("XtAbond lags=2 param_names",
-      lambda: ws.XtAbond(Dp.assign(y=np.asarray(Dp.y)), endog="y", lags=2,
+      lambda: ws.PanelAbond(Dp.assign(y=np.asarray(Dp.y)), endog="y", lags=2,
                          regressors=["x1"], entity="id", time="t").fit().param_names)
 
 print("\n### nnmatch biasadj / svy over")
@@ -101,4 +101,4 @@ probe("NearestNeighbourMatching.fit(bias_adjust=...)",
       lambda: ws.NearestNeighbourMatching.from_formula(
           "y", "t", Dt, covariates=["x1"]).fit(bias_adjust=["x1"]))
 probe("SvyMean over=",
-      lambda: ws.SvyMean.from_frame(Dp, "y", over="id"))
+      lambda: ws.SurveyMean.from_frame(Dp, "y", over="id"))

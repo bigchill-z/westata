@@ -15,7 +15,7 @@ for g in range(G):
         rows.append((g,t,yl,x1,x2))
 D = pd.DataFrame(rows, columns=["id","t","y","x1","x2"])
 for lags in (1,2):
-    r = ws.XtAbond.from_formula("y ~ x1 + x2", D, entity="id", time="t", lags=lags).fit()
+    r = ws.PanelAbond.from_formula("y ~ x1 + x2", D, entity="id", time="t", lags=lags).fit()
     print(f"  lags={lags}: param_names = {list(r.param_names)}")
     print(f"            n = {len(r.params)}")
     print(f"            Stata truth for a 2-regressor panel model: L1.y (+L2.y) , x1, x2")

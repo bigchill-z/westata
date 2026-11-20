@@ -80,7 +80,7 @@ from westata.errors import ConsistencyError, UnsupportedError, WeightError
 from westata.protocols import SSC
 from westata.results.base import StataResults
 
-__all__ = ["FEOLS"]
+__all__ = ["RegressHighDimFixedEffects"]
 
 SUPPORTED_COV_TYPES = ("nonrobust", "HC0", "HC1", "cluster")
 """Canonical ``cov_type`` values supported by :class:`FEOLS`.
@@ -202,7 +202,7 @@ def _pooled_r2(
     return 1.0 - float(residual @ residual) / total
 
 
-class FEOLS:
+class RegressHighDimFixedEffects:
     """Fixed-effects OLS with high-dimensional fixed effects (Stata ``reghdfe``).
 
     Parameters
@@ -1629,7 +1629,7 @@ def _group_weighted_mean(values: np.ndarray, groups: Any, weights: np.ndarray) -
     return means[codes]
 
 
-class Areg(FEOLS):
+class Areg(RegressHighDimFixedEffects):
     """Linear regression absorbing categorical indicators -- Stata ``areg``.
 
     This is a DIFFERENT command from ``reghdfe``, not a synonym, and the differences are

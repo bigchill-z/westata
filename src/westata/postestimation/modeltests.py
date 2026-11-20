@@ -62,13 +62,13 @@ from westata.postestimation.names import CONSTANT_SPELLINGS, is_constant_name
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["HausmanResult", "LRTestResult", "hausman", "lrtest"]
+__all__ = ["HausmanResults", "LRTestResults", "hausman", "lrtest"]
 
 #: Names the constant can appear under in westata's results.
 
 
 @dataclass(frozen=True)
-class LRTestResult:
+class LRTestResults:
     """Likelihood-ratio test between a restricted and an unrestricted model.
 
     Attributes
@@ -135,7 +135,7 @@ class LRTestResult:
 
 
 @dataclass(frozen=True)
-class HausmanResult:
+class HausmanResults:
     """Hausman specification test.
 
     Attributes
@@ -399,7 +399,7 @@ def _loglike(result: Any, *, role: str) -> float:
     return value
 
 
-def lrtest(unrestricted: Any, restricted: Any) -> LRTestResult:
+def lrtest(unrestricted: Any, restricted: Any) -> LRTestResults:
     """Likelihood-ratio test that ``restricted`` is adequate (``[R] lrtest``).
 
     Parameters
@@ -473,7 +473,7 @@ def lrtest(unrestricted: Any, restricted: Any) -> LRTestResult:
         # df 1, p .12046626248080883).  No warning, because this is the
         # documented behaviour of the command, not a misuse.
         swapped = lrtest(restricted, unrestricted)
-        return LRTestResult(
+        return LRTestResults(
             statistic=float(swapped.statistic),
             df=float(swapped.df),
             pvalue=float(swapped.pvalue),
@@ -515,7 +515,7 @@ def lrtest(unrestricted: Any, restricted: Any) -> LRTestResult:
     # models. Stata uses the name given to ``estimates store`` (or "." for the active
     # estimate); westata has no store mechanism, so the estimator name is the closest
     # equivalent and at least identifies which fit each side is.
-    return LRTestResult(
+    return LRTestResults(
         statistic=float(statistic),
         df=df,
         pvalue=pvalue,
@@ -737,7 +737,7 @@ def hausman(
     constant: bool = False,
     sigmamore: bool = False,
     sigmaless: bool = False,
-) -> HausmanResult:
+) -> HausmanResults:
     """Hausman test of the efficient estimator's consistency (``[R] hausman``).
 
     Parameters
@@ -897,7 +897,7 @@ def hausman(
     # the coefficient count because reporting chi2(0) would describe no distribution at all.
     df = float(rank) if rank > 0 else float(len(comparable))
     if rank == 0:
-        return HausmanResult(
+        return HausmanResults(
             statistic=0.0,
             df=df,
             pvalue=1.0,
@@ -915,7 +915,7 @@ def hausman(
     # The coefficient table Stata prints above the summary. ``comparable`` holds the names in the
     # order both estimates share them, so the rows line up with the printed (b)/(B)/(b-B).
     _errors = np.sqrt(np.abs(np.diag(symmetric)))
-    return HausmanResult(
+    return HausmanResults(
         statistic=statistic,
         df=df,
         pvalue=float(stats.chi2.sf(statistic, df)),

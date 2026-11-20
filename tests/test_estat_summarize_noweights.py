@@ -29,7 +29,7 @@ def weighted_fit():
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "y ~ x1", frame, weights=weights, weight_type="fweight"
     ).fit()
     return frame, weights, result
@@ -94,7 +94,7 @@ def test_an_unweighted_fit_is_unaffected_by_the_option() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     default = result.estat_summarize().table
     ignored = result.estat_summarize(noweights=True).table
@@ -123,7 +123,7 @@ def test_noweights_also_suppresses_explicitly_supplied_weights() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     supplied = np.full(n, 2.0)
 
     table = result.estat_summarize(

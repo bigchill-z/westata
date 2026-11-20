@@ -27,8 +27,8 @@ def _data(n: int = 100, seed: int = 7) -> pd.DataFrame:
 def results():
     df = _data()
     return [
-        ws.OLS.from_formula("y ~ x1", df).fit(),
-        ws.OLS.from_formula("y ~ x1 + x2", df).fit(),
+        ws.Regress.from_formula("y ~ x1", df).fit(),
+        ws.Regress.from_formula("y ~ x1 + x2", df).fit(),
     ]
 
 
@@ -57,7 +57,7 @@ def test_standard_errors_in_parentheses(results):
 
 def test_stars_reflect_pvalues():
     df = _data()
-    res = ws.OLS.from_formula("y ~ x1 + x2", df).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", df).fit()
     table = etable([res])
     # x1 is strongly significant (true effect 2, noise 0.5); x2 is not.
     assert "*" in table.loc["x1", "(1)"]
@@ -95,7 +95,7 @@ def test_observations_formatted_with_thousands_separator():
     rng = np.random.default_rng(3)
     n = 1500
     df = pd.DataFrame({"y": rng.normal(size=n), "x": rng.normal(size=n)})
-    res = ws.OLS.from_formula("y ~ x", df).fit()
+    res = ws.Regress.from_formula("y ~ x", df).fit()
     table = etable([res])
     assert table.loc["Observations", "(1)"] == "1,500"
 
@@ -130,16 +130,16 @@ def test_mixed_model_types_can_be_combined():
     y = 1.0 + 2.0 * x_endo + rng.normal(size=n)
     iv_df = pd.DataFrame({"y": y, "x_endo": x_endo, "z": z})
 
-    ols = ws.OLS.from_formula("y ~ x1", df).fit()
+    ols = ws.Regress.from_formula("y ~ x1", df).fit()
     iv = ws.IV2SLS.from_formula("y ~ [x_endo ~ z]", iv_df).fit()
 
-    table = etable([ols, iv], model_names=["OLS", "IV"])
-    assert list(table.columns) == ["OLS", "IV"]
-    assert table.loc["Observations", "OLS"] == "100"
+    table = etable([ols, iv], model_names=["Regress", "IV"])
+    assert list(table.columns) == ["Regress", "IV"]
+    assert table.loc["Observations", "Regress"] == "100"
     assert table.loc["Observations", "IV"] == "100"
     # Each model keeps its own coefficient names; the other model's cell is blank.
     assert table.loc["x1", "IV"] == ""
-    assert table.loc["x_endo", "OLS"] == ""
+    assert table.loc["x_endo", "Regress"] == ""
 
 
 def test_empty_results_raise():

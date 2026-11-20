@@ -68,12 +68,12 @@ def clustered():
 
 # ------------------------------------------------------------------ the labels
 def test_overid_names_sargan_when_unadjusted(plain) -> None:
-    assert plain.estat_overid().test == "Sargan"
+    assert plain.estat_overidentification().test == "Sargan"
 
 
 def test_overid_names_the_wooldridge_score_under_a_robust_vce(robust) -> None:
     """``ivregress_estat.ado:175-261`` replaces Sargan with this test."""
-    assert robust.estat_overid().test == "Wooldridge score"
+    assert robust.estat_overidentification().test == "Wooldridge score"
 
 
 def test_endogenous_names_durbin_wu_when_unadjusted(plain) -> None:
@@ -96,7 +96,7 @@ def test_endogenous_names_regF_under_clustering(clustered) -> None:
 
 
 def test_weakrobust_names_anderson_rubin(plain) -> None:
-    assert plain.estat_weakrobust(ar=True).test == "Anderson-Rubin"
+    assert plain.estat_weak_instrument_robust(ar=True).test == "Anderson-Rubin"
 
 
 # ------------------------------------------------------------- the uniform contract
@@ -109,12 +109,12 @@ def test_every_result_has_a_non_empty_test_label(plain, robust, clustered) -> No
     """
 
     results = [
-        plain.estat_overid(),
-        robust.estat_overid(),
+        plain.estat_overidentification(),
+        robust.estat_overidentification(),
         plain.estat_endogenous(),
         robust.estat_endogenous(),
         clustered.estat_endogenous(),
-        plain.estat_weakrobust(ar=True),
+        plain.estat_weak_instrument_robust(ar=True),
     ]
 
     for result in results:
@@ -132,7 +132,7 @@ def test_the_labels_are_distinct_where_the_tests_are(plain, robust) -> None:
     """
 
     for fitted in (plain, robust):
-        overid = fitted.estat_overid().test
+        overid = fitted.estat_overidentification().test
         endogenous = fitted.estat_endogenous().test
         assert overid != endogenous
 
@@ -143,7 +143,7 @@ def test_the_vce_changes_the_label_within_one_command(plain, robust) -> None:
     This is why a caller cannot hard-code ``estat overid`` == Sargan.
     """
 
-    assert plain.estat_overid().test != robust.estat_overid().test
+    assert plain.estat_overidentification().test != robust.estat_overidentification().test
     assert plain.estat_endogenous().test != robust.estat_endogenous().test
 
 
@@ -151,9 +151,9 @@ def test_the_label_matches_the_type(plain, robust, clustered) -> None:
     """``test`` and the class name must not contradict each other."""
 
     mapping = {
-        "EndogenousResult": "Durbin-Wu-Hausman",
-        "RegFResult": "regF",
-        "EndogScoreResult": "robwool",
+        "EndogenousResults": "Durbin-Wu-Hausman",
+        "RegFResults": "regF",
+        "EndogScoreResults": "robwool",
     }
 
     for fitted in (plain, robust, clustered):

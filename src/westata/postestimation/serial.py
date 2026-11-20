@@ -51,10 +51,10 @@ from westata.results.serialisation import ResultSerialisation
 
 __all__ = [
     "Correlogram",
-    "DurbinWatsonResult",
-    "PortmanteauResult",
+    "DurbinWatsonResults",
+    "PortmanteauResults",
     "estat_dwatson",
-    "estat_corrgram",
+    "estat_correlogram",
     "wntestq",
 ]
 
@@ -106,7 +106,7 @@ def _residuals(result: Any, command: str) -> np.ndarray:
 
 
 @dataclass(frozen=True)
-class DurbinWatsonResult(ResultSerialisation):
+class DurbinWatsonResults(ResultSerialisation):
     """``estat dwatson``: the Durbin-Watson d statistic.
 
     Stata prints one line::
@@ -181,7 +181,7 @@ def estat_dwatson(
     *,
     time: str | Any | None = None,
     delta: float = 1.0,
-) -> DurbinWatsonResult:
+) -> DurbinWatsonResults:
     r"""Durbin-Watson d.
 
     .. math:: d = \sum_{t=2}^{n}(e_t - e_{t-1})^2 / \sum_{t=1}^{n} e_t^2
@@ -219,7 +219,7 @@ def estat_dwatson(
     # regressors plus _cons. e(df_m) is 3 there, so it needs the +1.
     df_model = float(getattr(result, "df_model", np.nan)) + 1.0
     nobs = int(np.asarray(resid).size)
-    return DurbinWatsonResult(d=d, df=df_model, nobs=nobs, n_gaps=n_gaps)
+    return DurbinWatsonResults(d=d, df=df_model, nobs=nobs, n_gaps=n_gaps)
 
 
 def _autocorrelations(resid: np.ndarray, lags: int, axis: TimeAxis | None) -> list[float]:
@@ -291,7 +291,7 @@ def _partial_autocorrelations(
 
 
 @dataclass(frozen=True)
-class PortmanteauResult(ResultSerialisation):
+class PortmanteauResults(ResultSerialisation):
     """``wntestq``: Ljung-Box portmanteau Q for white noise."""
 
     q: float
@@ -324,7 +324,7 @@ def wntestq(
     lags: int | None = None,
     time: str | Any | None = None,
     delta: float = 1.0,
-) -> PortmanteauResult:
+) -> PortmanteauResults:
     r"""Ljung-Box Q, as ``wntestq``.
 
     ``corrgram.ado:68`` builds it as
@@ -355,7 +355,7 @@ def wntestq(
         total += rho * rho / (n - k)
     q = float(n * (n + 2) * total)
     pvalue = float(stats.chi2.sf(q, lags))
-    return PortmanteauResult(
+    return PortmanteauResults(
         q=q, df=lags, pvalue=pvalue, lags=lags, n_gaps=0 if axis is None else axis.n_gaps
     )
 
@@ -499,7 +499,7 @@ class Correlogram(ResultSerialisation):
         return "\n".join(framed + [""])
 
 
-def estat_corrgram(
+def estat_correlogram(
     result: Any,
     *,
     lags: int | None = None,

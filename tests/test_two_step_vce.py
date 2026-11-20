@@ -90,7 +90,7 @@ def test_etregress_matches_stata_at_machine_precision():
     """
 
     frame, _selected = _sample()
-    result = ws.Etregress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
+    result = ws.EndogenousTreatmentRegress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
     se = dict(zip(result.param_names, np.asarray(result.bse, dtype=float)))
 
     for term, expected in (
@@ -118,7 +118,7 @@ def test_the_selection_block_is_the_plain_probit_in_both_models():
     for term in ("z1", "z2"):
         assert heckman_se[f"select:{term}"] == pytest.approx(probit_se[term], rel=1e-6)
 
-    etregress = ws.Etregress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
+    etregress = ws.EndogenousTreatmentRegress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
     etregress_se = dict(zip(etregress.param_names, np.asarray(etregress.bse, dtype=float)))
     for term in ("z1", "z2"):
         assert etregress_se[f"treat:{term}"] == pytest.approx(probit_se[term], rel=1e-8)
@@ -136,7 +136,7 @@ def test_the_two_models_differ_in_which_rows_delthat_averages_over():
     frame, selected = _sample()
 
     heckman = ws.Heckman.from_formula("y ~ x1 + select(s ~ z1 + z2)", frame).fit(method="twostep")
-    etregress = ws.Etregress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
+    etregress = ws.EndogenousTreatmentRegress.from_formula("y_obs ~ x1 + treat(s ~ z1 + z2)", frame).fit(method="twostep")
 
     assert float(heckman.e["sigma"]) == pytest.approx(0.9238386375, rel=1e-8)
     assert float(etregress.e["sigma"]) == pytest.approx(0.9172244405, rel=1e-8)

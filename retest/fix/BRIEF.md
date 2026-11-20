@@ -91,10 +91,10 @@ from stata_probe import Stata, compare, rel_diff, canon_stata, canon_westata
 - **L3 (P1-17)** `IVGMM` + `vce(cluster)` 点估计差 3.58e-2：Stata 在该 VCE 下把 GMM 权重矩阵 `W` 也聚类。
   **优先实现**（W 用聚类 S 的逆），用 140×14 组数据验证到 ≤1e-9；
   若实现后无法达到 1e-6，**改为显式 `UnsupportedError`** 并写清"为什么不能给 Stata 的数"。
-- **L4 (P1-15)** `OLS.e['F']` 不随 `cov_type` 变。Stata 的 `e(F)` = 用该 VCE 的 `e(V)` 对**全部斜率**做的 Wald/k。
+- **L4 (P1-15)** `Regress.e['F']` 不随 `cov_type` 变。Stata 的 `e(F)` = 用该 VCE 的 `e(V)` 对**全部斜率**做的 Wald/k。
   实测：把 westata 自己的 `V` 代入 `b'V⁻¹b/k` 可复现 Stata 到 1.9e-15。修：按 `cov` 计算。
   必须验证 nonrobust / HC1 / cluster / pweight 四种情形的 `e(F)` 都到 1e-9。
-- **L5 (P1-16)** `OLS.e['df_r']` 在 cluster 下存 `N-K`，Stata 存 `G-1`（`results.df_resid` 已经是对的）。
+- **L5 (P1-16)** `Regress.e['df_r']` 在 cluster 下存 `N-K`，Stata 存 `G-1`（`results.df_resid` 已经是对的）。
 - **L6** `e()` 覆盖缺口：补 `rss`、`mss`、`sum_w`（fweight 下 = `e(N)`）、`N_clust`（cluster 时）。
   `ll_0`/`kappa`/`J`/`k_endog`/`iterations` 若成本高可留，写进 FIXES 的"未修"。
 
@@ -103,7 +103,7 @@ from stata_probe import Stata, compare, rel_diff, canon_stata, canon_westata
 - **P1 (P0-4)** `xtreg, fe vce(robust)`：Stata 里**严格等于** `vce(cluster panelvar)`
   （Lead 已独立验证 `max|V_robust − V_cluster| = 0.0`，30×6 平衡面板）。westata 映射成 HC1 → 常数项 SE 差 18 倍。
   修：`xtreg` 族的 `cov_type="robust"/"HC1"` 一律映射为 cluster(panelvar)。
-  **注意**：`reghdfe` 的 robust 是 HC1，`areg` 也是 HC1——只有 `xtreg` 不同。不要改 `FEOLS`/`areg` 路径。
+  **注意**：`reghdfe` 的 robust 是 HC1，`areg` 也是 HC1——只有 `xtreg` 不同。不要改 `RegressHighDimFixedEffects`/`areg` 路径。
 - **P2 (P0-5)** `xtreg, fe vce(cluster id)` SE 差 9.36%：小样本因子的 `K` 算成 32（含被吸收效应）。
   `panel.py:403-408` 强制 `auto_df=False`，且**那段注释的论断是错的**（说 auto_df=True 会漏效应）。
   用现场 Stata 验证 `auto_df=True` 是否逐位复现，然后改代码 + 改注释。
@@ -197,10 +197,10 @@ from stata_probe import Stata, compare, rel_diff, canon_stata, canon_westata
 
 - **V1 (P0-?)** VAR 的 SE / `e(Sigma)` / Granger 差 `(T−k_eq)/T`（k_eq 是**每方程**回归元数）。
   实测比值 0.9949706303122452 = `sqrt(296/299)`。修：按 Stata 的每方程 ML 归一化输出。
-- **V2** Granger 默认返回 F 统计量（statsmodels `kind="f"`），Stata `vargranger` 是 **Wald chi2**；改默认 + 文档。
+- **V2** Granger 默认返回 F 统计量（statsmodels `kind="f"`），Stata `var_granger` 是 **Wald chi2**；改默认 + 文档。
 - **V3** `dfuller` 打印的临界值：Stata 的 `dfuller.ado` 硬编码 6 点表按 N 线性插值，照抄后能复算到 1.28e-16。
   修：实现同一张表（统计量与 MacKinnon p 已是 A 档，别改坏）。
-- **V4** `vecrank` 的临界值表：Stata 用 Johansen(1995)（r=1 时 **3.76**），statsmodels 用 Osterwald-Lenum（**3.8415**）。
+- **V4** `vec_rank` 的临界值表：Stata 用 Johansen(1995)（r=1 时 **3.76**），statsmodels 用 Osterwald-Lenum（**3.8415**）。
   修：换成 Stata 的表（trace 与 max-eigen 都要），并造一组边界数据证明选阶与 Stata 一致。
   注意：**只换表，不换统计量公式**（统计量已是 A 档）。
 - **V5** `arima` 在 `d=1` 时 `e(N)` 差 1（Stata 299 vs westata 300）。

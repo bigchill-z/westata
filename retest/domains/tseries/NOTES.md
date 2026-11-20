@@ -15,7 +15,7 @@
 **56 个对比点：pass 35 / fail 21 / error 0 / skip 0。** 最大参数相对差 **1.706e-02**（VAR(2) 的 `e(Sigma)`，已完全归因，见 §2.2）。
 
 > **关于 `stata_probe.compare`（偏离共享工具的理由）**
-> 时间序列命令的 `e(b)` 布局与 `regress` 不同：`arima`/`arch` 的 `e(b)` 里有**两行同名 `_cons`**（均值方程常数 vs 方差方程 σ/ω）；`var`/`vec` 的 `e(b)` 是 1×k 且名字按方程重复；`var, lags(1/2)` 的块内顺序是**变量优先**（`L.y1 L2.y1 L.y2 L2.y2 _cons`）；`dfuller`/`pperron`/`kpss`/`vecrank` 根本不产生估计对象。按名字对齐会错配或直接判 fail。
+> 时间序列命令的 `e(b)` 布局与 `regress` 不同：`arima`/`arch` 的 `e(b)` 里有**两行同名 `_cons`**（均值方程常数 vs 方差方程 σ/ω）；`var`/`vec` 的 `e(b)` 是 1×k 且名字按方程重复；`var, lags(1/2)` 的块内顺序是**变量优先**（`L.y1 L2.y1 L.y2 L2.y2 _cons`）；`dfuller`/`pperron`/`kpss`/`vec_rank` 根本不产生估计对象。按名字对齐会错配或直接判 fail。
 > 因此本领域改为**显式声明配对**（`extra["pairing"]`）、并按全精度向量比较；每条记录另附 `extra["per_param_rel"]` 与 `extra["worst_param"]` 可逐参数复核。共享工具一行未改。这个偏离本身就是一条发现（§2.7）。
 
 ---
@@ -35,16 +35,16 @@
 | 9 | 同上，SE（每方程 ML 归一后） | — | — | **pass / A** | — | **2.899e-16** |
 | 10 | 同上，`e(Sigma)`（原样） | — | — | fail / **E** | 1.014e-02 | — |
 | 11 | 同上，`e(Sigma)`（归一后） | — | — | **pass / A** | 3.252e-15 | — |
-| 12 | `vargranger`（VAR(1)） | `VARResults.granger_causality` | — | fail / **E** | 1.003e-02 | — |
+| 12 | `var_granger`（VAR(1)） | `VARResults.granger_causality` | — | fail / **E** | 1.003e-02 | — |
 | 13 | 同上，归一后 | — | — | **pass / A** | 2.057e-15 | — |
 | 14 | `var y1 y2, lags(1/2)` | `VAR(Y,lags=2)` | y1 y2 | **pass / A** | 1.030e-14 | — |
 | 15 | 同上，SE（原样） | — | — | fail / D | 1.030e-14 | 8.496e-03 |
 | 16 | 同上，SE（归一后） | — | — | **pass / A** | — | **1.224e-16** |
 | 17 | 同上，`e(Sigma)`（原样） | — | — | fail / **E** | 1.706e-02 | — |
 | 18 | 同上，`e(Sigma)`（归一后） | — | — | **pass / A** | 1.084e-14 | — |
-| 19 | `vargranger`（VAR(2)） | — | — | fail / **E** | 1.678e-02 | — |
+| 19 | `var_granger`（VAR(2)） | — | — | fail / **E** | 1.678e-02 | — |
 | 20 | 同上，归一后 | — | — | **pass / A** | 2.485e-15 | — |
-| 21 | `varsoc y1 y2, maxlag(3)` FPE | `VAR.select_order` | y1 y2 | pass / C | 2.297e-06 | — |
+| 21 | `var_select_order y1 y2, maxlag(3)` FPE | `VAR.select_order` | y1 y2 | pass / C | 2.297e-06 | — |
 | 22 | 同上 AIC（去尺度常数） | — | — | pass / B | 7.581e-07 | — |
 | 23 | 同上 BIC（去尺度常数） | — | — | pass / B | 8.467e-07 | — |
 | 24 | 同上 HQIC（去尺度常数） | — | — | pass / B | 7.412e-07 | — |
@@ -52,11 +52,11 @@
 | 26 | `vec yc1 yc2, rank(1) lags(2) trend(constant)` | `VECM(rank=1,lags=2,deterministic="co")` | yc1 yc2 | **pass / A** | 3.047e-10 | — |
 | 27 | `vec ..., trend(rconstant)` | `deterministic="ci"` | yc1 yc2 | **pass / A** | 1.493e-10 | — |
 | 28 | `vec ..., lags(1)` | `lags=1` | yc1 yc2 | **pass / A** | 4.210e-11 | — |
-| 29 | `vecrank yc1 yc2, lags(2) trend(constant) max` trace | `.johansen(lags=2)` | yc1 yc2 | pass / C | 7.792e-06 | — |
+| 29 | `vec_rank yc1 yc2, lags(2) trend(constant) max` trace | `.johansen(lags=2)` | yc1 yc2 | pass / C | 7.792e-06 | — |
 | 30 | 同上 max-eigen | — | — | pass / C | 7.792e-06 | — |
-| 31 | `vecrank ..., lags(1)` trace | `.johansen(lags=1)` | yc1 yc2 | pass / C | 5.430e-06 | — |
+| 31 | `vec_rank ..., lags(1)` trace | `.johansen(lags=1)` | yc1 yc2 | pass / C | 5.430e-06 | — |
 | 32 | 同上 max-eigen | — | — | pass / C | 5.430e-06 | — |
-| 33 | `vecrank` 边界对，lags(2) trace | — | yb1 yb2 | **fail / C** | 1.005e-05 | **选阶 2 vs 1** |
+| 33 | `vec_rank` 边界对，lags(2) trace | — | yb1 yb2 | **fail / C** | 1.005e-05 | **选阶 2 vs 1** |
 | 34 | 同上 max-eigen | — | — | pass / C | 1.005e-05 | — |
 | 35 | `dfuller y_rw, lags(2)` | `unitroot(test="adf",regression="c",maxlag=2)` | y_rw | **pass / A** | 1.179e-12 | — |
 | 36 | 同上，打印的 1/5/10% 临界值 | — | — | fail / **D** | 2.362e-03 | — |
@@ -106,7 +106,7 @@ Stata 名 `L.ar` / `L.ma`，westata 名 `ar.L1` / `ma.S.L4`，按位置配对后
 
 **#6 `e(N)` 约定差异（新增发现）**：`d=1` 时 Stata `e(N)=299`，westata 报 `300`（= 传入序列长度），相对差 3.344e-03。ll/aic/bic 仍一致（同一批差分新息），但**任何用 `e(N)` 归一化的下游计算都会偏 1/300**。这是报告约定，不是估计差异。
 
-### 2.2 VAR / vargranger / varsoc（#7–#25）：系数 A 档；SE / `e(Sigma)` / Granger 的 E 档差异**只是每方程 ML 自由度**
+### 2.2 VAR / var_granger / var_select_order（#7–#25）：系数 A 档；SE / `e(Sigma)` / Granger 的 E 档差异**只是每方程 ML 自由度**
 
 **系数（A 档）**：VAR(1) **8.451e-14**，VAR(2) **1.030e-14**。
 配对是**逐名字翻译**：Stata `e(b)` 是 1×k 行、按方程分块、块内按"变量优先、滞后在后"（`lags(1/2)` 实测为 `L.y1 L2.y1 L.y2 L2.y2 _cons`）；statsmodels 是 `vec(B)` 列主序。`map_stata_var_names()` 把每个 Stata 名字翻译成显式 statsmodels 下标，`extra["pairing"]` 逐条记录。**能到 1e-14 本身就证明翻译正确**，不是假定。
@@ -120,13 +120,13 @@ Stata 名 `L.ar` / `L.ma`，westata 名 `ar.L1` / `ma.S.L4`，按位置配对后
 
 **Granger 因果（#12/#13/#19/#20）—— westata 有，但默认接口返回的统计量与 Stata 不同**：
 - 任务允许 skip，**但不需要**：`VARResults.granger_causality()` 存在且可算。
-- 但它返回 statsmodels `kind="f"` 的 **F 统计量**（VAR(1)：F=20.6804，df=(1, 592)），而 Stata `vargranger` 报 **Wald chi2**（20.8900，df=1）。直接对比就是拿 F 比 chi2。
+- 但它返回 statsmodels `kind="f"` 的 **F 统计量**（VAR(1)：F=20.6804，df=(1, 592)），而 Stata `var_granger` 报 **Wald chi2**（20.8900，df=1）。直接对比就是拿 F 比 chi2。
 - 改用 `kind="wald"`：chi2 `20.6804` vs `20.8900`，比值 `1.0101351351351362`，恰好等于 `T/(T−k_eq) = 1.010135135135135`（T=299, k_eq=3）。VAR(2)：比值 `1.0170648464163805` 对 `T/(T-k_eq) = 1.0170648464163823`。
 - 归一后 **2.057e-15 / 2.485e-15 → A 档**。
 - **p 值**：VAR(1) 4.864e-06 vs 5.427e-06（相对差 1.16e-01），VAR(2) 4.600e-06 vs 5.653e-06（2.29e-01）、2.027e-09 vs 2.836e-09（3.99e-01）。**相对差看着大，是因为 p 已极小**；四个 p 全部远低于 0.001，**显著性结论不变**。
 - **结论**：`granger_causality()` 有两个可操作缺陷 —— (a) 默认 kind 与 Stata 不同（F vs Wald chi2），(b) 残差方差用无偏自由度，与 Stata 的统计量差 `T/(T−k_eq)`。本数据上不翻结论，边界情形会翻。
 
-**`varsoc` 选阶（#21–#25）：数值尺度不同，但选阶一致**
+**`var_select_order` 选阶（#21–#25）：数值尺度不同，但选阶一致**
 - Stata 的 AIC/BIC/HQIC 是 `(−2·ll + penalty)/T`（**水平尺度**，含正态化常数 `neqs·(ln2π+1) = 5.675754132818691`），statsmodels 是 `ln|Sigma_ml| + penalty/T`。**原样比会看到 6.27 vs 0.596**，看起来灾难性，其实是同一量平移。
 - 去掉该常数后：AIC **7.581e-07**、BIC **8.467e-07**、HQIC **7.412e-07** → **B 档**（Stata 只打 5 位小数，这是可达下限）。
 - FPE 定义里没有正态化常数，可直接比：**2.297e-06 → C**（同受打印精度限制：Stata `1.00221` vs westata `1.0022076982`）。
@@ -148,12 +148,12 @@ Stata 名 `L.ar` / `L.ma`，westata 名 `ar.L1` / `ma.S.L4`，按位置配对后
 - GETTING IT WRONG MATTERS：`co` 与 `ci` 的 alpha 差 0.316 vs 0.349（约 10%），选错就是另一个模型。
 
 **beta 的第三行只存在于 Stata**：`e(beta)` 末位是无约束常数的规范化值；statsmodels 把它放进确定性项并用不同规范化，**因此只比前两行（两个斜率）**，`alpha·beta_const` 记在 `extra` 供手工还原漂移。
-**滞后映射**：Stata `lags(#)` 数的是 VAR 滞后，`k_ar_diff = # − 1`。这条在 `vec` 与 `vecrank` 上分别验证过。
+**滞后映射**：Stata `lags(#)` 数的是 VAR 滞后，`k_ar_diff = # − 1`。这条在 `vec` 与 `vec_rank` 上分别验证过。
 
-### 2.4 vecrank（#29–#34）：统计量 C 档（打印精度地板），但**临界值不同，选阶会翻**
+### 2.4 vec_rank（#29–#34）：统计量 C 档（打印精度地板），但**临界值不同，选阶会翻**
 
 - 统计量：`trace r=0` 92.1075 vs 92.10750911，`r=1` 1.384 vs 1.38398922（**7.792e-06**）；lags(1) 时 145.6968 / 1.3049（**5.430e-06**）；max-eigen 同量级。
-- **为什么只能到 C**：`[TS] vecrank` **只留 `r(trendnumber)` / `r(ttext)`**，statistic 和临界值都不在 `r()`/`e()` 里，唯一数据源是**打印表（4 位小数）**。以 92.1075 计，4 位小数 ⇒ ~1e-5 相对精度，C 是这条路径的地板，**不是实现差异**。这是本领域唯一用打印输出当证据的地方，已在代码与 `extra` 标注。
+- **为什么只能到 C**：`[TS] vec_rank` **只留 `r(trendnumber)` / `r(ttext)`**，statistic 和临界值都不在 `r()`/`e()` 里，唯一数据源是**打印表（4 位小数）**。以 92.1075 计，4 位小数 ⇒ ~1e-5 相对精度，C 是这条路径的地板，**不是实现差异**。这是本领域唯一用打印输出当证据的地方，已在代码与 `extra` 标注。
 - **临界值确实不同**：Stata 打 Johansen (1995) 表（r=1 时 **3.76**），statsmodels 用 Osterwald-Lenum（**3.8415**），差 2.2%。
 - **后果：选阶可以翻。** 我扫 seed 造了一对协整序列（`yb1/yb2`，seed=248），其 r=1 的 trace 统计量 ≈ **3.8369**，正落在 3.76 与 3.8415 **之间**：
 
@@ -277,7 +277,7 @@ GARCH 方差递推 `h_t = ω + α·ε²_{t−1} + β·h_{t−1}` 需要 `h_0`。
 | `VECM.johansen`："`lags(2)` 匹配到 195.9673；`lags(1)` 时 statsmodels 287.2485 vs Stata 288.3450，0.4% 差异，rank 判定在 lags(1) 不可互换" | 本次换数据（yc1/yc2）：**lags(2) 与 lags(1) 都是 C 档（7.792e-06 / 5.430e-06），没有出现 0.4% 的边界差异**。旧描述的 0.4% 差异在本次数据上**未复现**；若真实存在，应限于特定数据/`k_ar_diff=0` 边界，本领域**未能独立验证** | **未证实**（旧值可能是真的，但本次数据不支持"lags(1) 必然差 0.4%"）。不过旧注释"rank 判定不可互换"的**警告方向是对的**——真正让选阶翻的是**临界值表**（3.76 vs 3.8415），与滞后阶无关 |
 | `GARCH`："arch 包估计同一模型但默认优化器与 rescaling 不同，故显式暴露收敛状态" | **归因需修正**：`rescale` 已被 westata 显式关掉（`rescale=False`），**不是 rescaling**。真正两个成因是 (a) SE 从 OPG→robust（westata 与 arch robust 逐位相同）；(b) presample h₀ 不同导致**目标函数不同**（交叉验证：各自在各自目标下更优）。"优化器不同"也不是主因——两侧是**不同目标**，不是同一目标的不同搜索 | **需修正** |
 | `unitroot`："`pperron` 让 arch 自选带宽得 −1.994881 vs Stata −1.953（2.1e-2），套用 `floor(4(n/100)^(2/9))` 后达 1.1e-4" | **独立复现**：套用规则后 Z(t) 相对差 **2.055e-13**（比旧记录还好两个量级，因为本次用全精度 `r(Zt)` 而非打印值）。结论**成立** | **一致且更强** |
-| `var`："`select_order` 返回全部准则，避免静默选 AIC" | 功能成立，但**数值尺度与 Stata 差常数** `neqs·(ln2π+1)`，直接拿 `select_order` 对 Stata 的 `varsoc` 表会误判。选阶结论一致（都选 lag 1） | **需补充**：应文档化尺度差 |
+| `var`："`select_order` 返回全部准则，避免静默选 AIC" | 功能成立，但**数值尺度与 Stata 差常数** `neqs·(ln2π+1)`，直接拿 `select_order` 对 Stata 的 `var_select_order` 表会误判。选阶结论一致（都选 lag 1） | **需补充**：应文档化尺度差 |
 | （旧代码未提及） | **新发现**：`var` 的 SE/`e(Sigma)`/Granger 与 Stata 差**每方程**自由度因子 `(T−k_eq)/T`；`arima`/`arch` 不存 `e(aic)/e(bic)`；`e(N)` 在差分模型上差 d；`var, lags(#)` 是 numlist 陷阱；`kpss` 需外部安装且 H0 相反；`dfuller` 临界值是硬编码粗表 | **新增** |
 
 ---
@@ -287,12 +287,12 @@ GARCH 方差递推 `h_t = ω + α·ε²_{t−1} + β·h_{t−1}` 需要 `h_0`。
 1. **`arch` 的 EGARCH / GJR-GARCH / t 分布**：Stata 侧 `arch yg, egarch(1)` 报 `garch(), egarch(), sdgarch(), and pgarch() options require that other`（需与 `arch()` 同时给出）；`arch yg, arch(1) garch(1) distribution(t)` 报 `flat log likelihood encountered`（该数据上 t 分布无法收敛）。**未测** → "EGARCH 是否一致"**无结论**。westata 的 `vol="EGARCH"`、`o=1`、`dist="t"` 路径**未与 Stata 对照**。
 2. **`arch` 的 `vce(robust)`**：Stata 能跑（`e(vcetype)="Semirobust"`），但 **westata 的 `GARCH.fit()` 不接受 `cov_type`**（签名只有 `strict`/`maxiter`），无法选择估计量。**记为接口缺口**，未做数值对比。
 3. **`arch` 的 `archm`（ARCH-in-mean）**：westata 的 `GARCH(mean=...)` 只接受 `"Constant"`。**未测**。
-4. **`vecrank` 的 `trend(none)` / `trend(rtrend)`**：VECM 侧跑过（ll 对得上），但 `vecrank` 侧只测 `trend(constant)`。其余确定性设定下的 Johansen 统计量**未测**。
+4. **`vec_rank` 的 `trend(none)` / `trend(rtrend)`**：VECM 侧跑过（ll 对得上），但 `vec_rank` 侧只测 `trend(constant)`。其余确定性设定下的 Johansen 统计量**未测**。
 5. **`vec` 的 `rank(2)`**：只测 `rank(1)`（任务要求）。rank=2 的规范化与 beta 解释不同，**未测**。
 6. **ARIMA 的 `vce(robust)` / `vce(opg)`**：westata 的 `ARIMA.fit()` 只接受 `cov_type="nonrobust"`，其余直接 `ValueError`；Stata 支持。**记为接口缺口**，未做数值对比。
-7. **`dfgls`**：Stata 有，westata 无对应实现；`ersle`/`zandrews` 两侧都没有。**未测**。
-8. **`vecrank` 的 max-eigen 选阶**：只比了统计量（C 档），**没有**像 trace 那样单独造边界数据验证 max-eigen 选阶翻转。原理上同样会翻（14.07 vs 14.2639），**未实测**。
-9. **`varsoc` 的 LR 检验**：表里有 `LR/df/p` 三列，本次只比 LL / 信息准则 / 选阶，**LR 统计量未单独对比**。
+7. **`df_gls`**：Stata 有，westata 无对应实现；`ersle`/`zandrews` 两侧都没有。**未测**。
+8. **`vec_rank` 的 max-eigen 选阶**：只比了统计量（C 档），**没有**像 trace 那样单独造边界数据验证 max-eigen 选阶翻转。原理上同样会翻（14.07 vs 14.2639），**未实测**。
+9. **`var_select_order` 的 LR 检验**：表里有 `LR/df/p` 三列，本次只比 LL / 信息准则 / 选阶，**LR 统计量未单独对比**。
 10. **多变量（3+ 方程）VAR**：只测 2 方程。方程数增加时 `k_eq` 与 `e(Sigma)` 维度都变，**未测**。
 11. **`arch` 的 presample 剩余 1e-4 差**：如 §2.6，`e(archi)` 是最接近的 h₀，但仍有 −1.005e-04 的 ll 残差未能分解到 Stata 的条件观测处理细节（`e(condobs)=0` 的确切含义）。**未完全分解**。
 12. **`kpss` 用的是 SSC 第三方包（v1.2.3, Baum）而非 Stata 官方命令**（19.5 未内置）。若未来 Stata 内置 `kpss`，需重新对照。

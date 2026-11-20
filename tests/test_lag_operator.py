@@ -43,19 +43,19 @@ def macro():
 def test_the_lag_operator_is_accepted(macro) -> None:
     """It raised `NameError: name 'L' is not defined` before this round."""
 
-    fitted = ws.OLS.from_formula("dinf ~ L(dinf) + unem", macro).fit()
+    fitted = ws.Regress.from_formula("dinf ~ L(dinf) + unem", macro).fit()
     assert int(fitted.nobs) == 165
 
 
 def test_the_lag_coefficients_match_stata(macro) -> None:
-    fitted = ws.OLS.from_formula("dinf ~ L(dinf) + unem", macro).fit()
+    fitted = ws.Regress.from_formula("dinf ~ L(dinf) + unem", macro).fit()
     assert float(fitted.params["L(dinf)"]) == pytest.approx(-0.27168536, abs=1e-6)
     assert float(fitted.params["unem"]) == pytest.approx(-0.22244491, abs=1e-6)
 
 
 def test_a_second_lag_drops_one_more_observation(macro) -> None:
-    one = ws.OLS.from_formula("dinf ~ L(dinf)", macro).fit()
-    two = ws.OLS.from_formula("dinf ~ L(dinf, 2)", macro).fit()
+    one = ws.Regress.from_formula("dinf ~ L(dinf)", macro).fit()
+    two = ws.Regress.from_formula("dinf ~ L(dinf, 2)", macro).fit()
 
     assert int(one.nobs) == 165
     assert int(two.nobs) == 164
@@ -68,8 +68,8 @@ def test_it_matches_a_manually_shifted_column(macro) -> None:
     manual["lagged"] = manual["dinf"].shift(1)
     manual = manual.dropna(subset=["dinf", "lagged", "unem"])
 
-    by_operator = ws.OLS.from_formula("dinf ~ L(dinf) + unem", macro).fit()
-    by_hand = ws.OLS.from_formula("dinf ~ lagged + unem", manual).fit()
+    by_operator = ws.Regress.from_formula("dinf ~ L(dinf) + unem", macro).fit()
+    by_hand = ws.Regress.from_formula("dinf ~ lagged + unem", manual).fit()
 
     assert float(by_operator.params["L(dinf)"]) == pytest.approx(
         float(by_hand.params["lagged"]), rel=1e-10
@@ -78,4 +78,4 @@ def test_it_matches_a_manually_shifted_column(macro) -> None:
 
 def test_a_bad_period_is_rejected(macro) -> None:
     with pytest.raises(Exception):
-        ws.OLS.from_formula("dinf ~ L(dinf, 0)", macro).fit()
+        ws.Regress.from_formula("dinf ~ L(dinf, 0)", macro).fit()

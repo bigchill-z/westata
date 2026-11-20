@@ -33,7 +33,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation import estat_corrgram
+from westata.postestimation import estat_correlogram
 
 DATA = r"D:\myCodeProject\test_westata\data\grilic.dta"
 
@@ -48,7 +48,7 @@ def fitted():
         frame = pd.read_stata(DATA).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_ereturn_list_is_available(fitted) -> None:
@@ -98,7 +98,7 @@ def test_corrgram_matches_stata(fitted) -> None:
         3        0.0668   0.0406   28.367  0.0000
     """
 
-    table = estat_corrgram(fitted, lags=3)
+    table = estat_correlogram(fitted, lags=3)
     frame = table.to_frame() if hasattr(table, "to_frame") else None
     if frame is None:  # pragma: no cover - shape guard
         pytest.skip("corrgram did not return a tabular result")

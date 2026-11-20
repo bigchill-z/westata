@@ -60,7 +60,7 @@ def test_lad_reaches_the_exact_check_function_minimum(tau):
     """
 
     frame = _quantile_data()
-    result = ws.QuantileRegression.from_formula("y ~ x1 + x2", frame, quantile=tau).fit()
+    result = ws.QuantileRegress.from_formula("y ~ x1 + x2", frame, quantile=tau).fit()
     beta = np.asarray(result.params, dtype=float)
 
     expected = {0.5: 208.04731048707464, 0.25: 167.14892238457264}[tau]
@@ -142,7 +142,7 @@ def test_xtgls_warns_when_sigma_is_singular():
     frame = _panel(30, 6)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        ws.XtGls.from_formula(
+        ws.PanelGls.from_formula(
             "y ~ x1 + x2", frame, entity="id", time="t", panels="correlated", corr="independent"
         ).fit()
     matches = [item for item in caught if issubclass(item.category, SingularSigmaWarning)]
@@ -159,7 +159,7 @@ def test_xtgls_does_not_warn_when_sigma_is_well_posed(panels):
     frame = _panel(30, 6)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        ws.XtGls.from_formula(
+        ws.PanelGls.from_formula(
             "y ~ x1 + x2", frame, entity="id", time="t", panels=panels, corr="independent"
         ).fit()
     assert not [item for item in caught if issubclass(item.category, SingularSigmaWarning)]
@@ -173,7 +173,7 @@ def test_xtgls_with_correlated_and_more_periods_than_panels_is_silent():
     frame = _panel(6, 8, seed=31337)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        ws.XtGls.from_formula(
+        ws.PanelGls.from_formula(
             "y ~ x1 + x2", frame, entity="id", time="t", panels="correlated", corr="independent"
         ).fit()
     assert not [item for item in caught if issubclass(item.category, SingularSigmaWarning)]

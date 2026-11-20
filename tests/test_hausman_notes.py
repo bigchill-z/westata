@@ -45,7 +45,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def pair():
     frame = pd.read_stata(DATA)
-    ols = ws.OLS.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit()
     iv = ws.IV2SLS.from_formula(
         "lnw ~ s + expr + tenure + rns + smsa + [iq ~ med + kww]", frame
     ).fit()

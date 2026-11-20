@@ -72,11 +72,11 @@ import pandas as pd
 
 from westata.errors import ConsistencyError
 
-__all__ = ["PsmatchResult", "teffects_psmatch"]
+__all__ = ["PsmatchResults", "treatment_effects_psmatch"]
 
 
 @dataclass(frozen=True)
-class PsmatchResult:
+class PsmatchResults:
     """``teffects psmatch``: ATET from propensity-score nearest-neighbour matching."""
 
     ate: float
@@ -182,7 +182,7 @@ class PsmatchResult:
         return "\n".join(lines)
 
 
-class TeffectsPsmatch:
+class TreatmentEffectsPsmatch:
     """``teffects psmatch (depvar) (treatment) (covariates)`` -- propensity matching.
 
     Class form of :func:`westata.teffects_psmatch` (R2.7).  Stata writes this subcommand
@@ -246,7 +246,7 @@ class TeffectsPsmatch:
             caliper=caliper,
         )
 
-    def fit(self) -> PsmatchResult:
+    def fit(self) -> PsmatchResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _teffects_psmatch_impl(
@@ -260,7 +260,7 @@ class TeffectsPsmatch:
         )
 
 
-def teffects_psmatch(
+def treatment_effects_psmatch(
     response: Any,
     treatment: Any,
     covariates: Any,
@@ -269,7 +269,7 @@ def teffects_psmatch(
     tie_tolerance: float = 1e-9,
     outcome: str = "",
     caliper: float | None = None,
-) -> PsmatchResult:
+) -> PsmatchResults:
     """Fit Stata's ``teffects psmatch`` -- thin wrapper over :class:`TeffectsPsmatch`."""
 
     return _teffects_psmatch_impl(
@@ -292,7 +292,7 @@ def _teffects_psmatch_impl(
     tie_tolerance: float = 1e-9,
     outcome: str = "",
     caliper: float | None = None,
-) -> PsmatchResult:
+) -> PsmatchResults:
     """ATET by propensity-score matching, as ``teffects psmatch ..., atet``.
 
     ``covariates`` is an ``(n, k)`` array. The propensity score comes from a logit of
@@ -400,7 +400,7 @@ def _teffects_psmatch_impl(
         match_counts.append(int(selected.size))
 
     ate = float(np.mean(differences))
-    return PsmatchResult(
+    return PsmatchResults(
         ate=ate,
         nobs=int(y.size),
         treated=int(treated.size),

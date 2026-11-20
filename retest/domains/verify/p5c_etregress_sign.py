@@ -75,7 +75,7 @@ for rho_t in (0.45, -0.55):
             print(f"  alt sqrt(RSS/(n-4)) = {alt2:.12f}  rel={rel([alt2],[e_sig]):.3e}")
             print(f"  Stata b_ctrl (lambda row) = {b[nm.index('lambda')]:.12f}")
 
-        et = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d).fit()
+        et = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d).fit()
         pn = list(et.param_names)
         wl = np.asarray(et.params)[pn.index("lambda")]
         wse = float(np.asarray(et.bse)[pn.index("lambda")])

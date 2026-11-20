@@ -31,13 +31,13 @@ def icecream_fit():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
     frame["grp"] = np.tile([1, 2, 3], len(frame))[: len(frame)].astype(int)
-    return ws.OLS.from_formula("consumption ~ C(grp) + temp", frame).fit()
+    return ws.Regress.from_formula("consumption ~ C(grp) + temp", frame).fit()
 
 
 def test_pwcompare_matches_stata(icecream_fit) -> None:
     """Captured reference, 62 characters per row."""
 
-    lines = str(ws.pwcompare(icecream_fit, "grp")).splitlines()
+    lines = str(ws.pairwise_compare(icecream_fit, "grp")).splitlines()
     assert "Pairwise comparisons of marginal linear predictions" in lines
     assert "Margins: asbalanced" in lines
     assert "     2 vs 1  |  -.0035617   .0194151     -.0434699    .0363465" in lines

@@ -64,7 +64,7 @@ def _difference_in_differences() -> dict:
 
     frame = build()
     balanced = frame.loc[frame["fte"].notna() & frame["fte2"].notna()].reset_index(drop=True)
-    result = ws.OLS.from_formula("d_fte ~ nj", balanced).fit()
+    result = ws.Regress.from_formula("d_fte ~ nj", balanced).fit()
     index = [str(n) for n in result.param_names].index("nj")
     means = balanced.groupby("nj")["d_fte"].mean()
     return {
@@ -85,7 +85,7 @@ def main() -> int:
 
     for spec in SPECS:
         frame = _frame_for(spec)
-        result = ws.OLS.from_formula(spec.formula, frame).fit()
+        result = ws.Regress.from_formula(spec.formula, frame).fit()
         payload["specs"][spec.id] = _serialise(spec, result)
         print(f"[westata] {spec.id}: N={result.nobs}", flush=True)
 

@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["VarGrangerResult", "vargranger"]
+__all__ = ["VarGrangerResults", "var_granger"]
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class _Row:
 
 
 @dataclass(frozen=True)
-class VarGrangerResult(ResultSerialisation):
+class VarGrangerResults(ResultSerialisation):
     """The ``vargranger`` table."""
 
     rows: list[_Row]
@@ -146,7 +146,7 @@ def _stata_chi2(value: float) -> str:
     return text
 
 
-def vargranger(fitted: Any) -> VarGrangerResult:
+def var_granger(fitted: Any) -> VarGrangerResults:
     """Build the ``vargranger`` table for a fitted ``VARResults``.
 
     Stata's ``vargranger`` refuses anything but a var/svar/ivsvar/xtvar estimate::
@@ -203,4 +203,4 @@ def vargranger(fitted: Any) -> VarGrangerResult:
                     pvalue=last.pvalue,
                 )
             )
-    return VarGrangerResult(rows=rows, equations=tuple(names))
+    return VarGrangerResults(rows=rows, equations=tuple(names))

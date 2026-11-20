@@ -62,7 +62,7 @@ def rendered():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
     fit = ws.IV2SLS.from_formula("lnw ~ [expr ~ s + tenure]", frame).fit()
-    return str(fit.estat_firststage())
+    return str(fit.estat_first_stage())
 
 
 def test_every_line_matches_stata(rendered) -> None:

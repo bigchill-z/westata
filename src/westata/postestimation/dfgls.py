@@ -35,7 +35,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError
 
-__all__ = ["DFGLSResult", "dfgls"]
+__all__ = ["DFGLSResults", "df_gls"]
 
 
 @dataclass(frozen=True)
@@ -168,7 +168,7 @@ def _crit_t(nobs: int, lags: int) -> tuple[float, float]:
 
 
 @dataclass(frozen=True)
-class DFGLSResult:
+class DFGLSResults:
     """``dfgls``: the DF-GLS test across a range of lag orders."""
 
     cells: tuple[DFGLSCell, ...]
@@ -389,14 +389,14 @@ def _adf_no_deterministic(
     return statistic, int(response.size), rss, float(coefficients[0]), pvalue
 
 
-def dfgls(
+def df_gls(
     series: Any,
     *,
     maxlag: int | None = None,
     trend: bool = True,
     name: str = "",
     **legacy: Any,
-) -> DFGLSResult:
+) -> DFGLSResults:
     """DF-GLS unit-root test, as ``dfgls varname [, maxlag(#) notrend]``.
 
     **Stata defaults to a TREND, not to no trend.** ``dfgls.ado:39-46`` sets ``trend=1`` unless
@@ -485,4 +485,4 @@ def dfgls(
                 lag_pvalue=pvalue,
             )
         )
-    return DFGLSResult(cells=tuple(cells), trend=bool(trend), variable=str(name))
+    return DFGLSResults(cells=tuple(cells), trend=bool(trend), variable=str(name))

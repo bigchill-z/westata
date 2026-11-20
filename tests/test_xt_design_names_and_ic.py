@@ -52,7 +52,7 @@ def _panel_frame(n_units: int = 100, n_periods: int = 9, seed: int = 8200):
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtLogit.from_formula(
+    return ws.PanelLogit.from_formula(
         "y ~ x1", _panel_frame(), entity="firm", time="year", method="fe"
     ).fit()
 

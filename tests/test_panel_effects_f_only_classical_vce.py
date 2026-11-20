@@ -53,7 +53,7 @@ def _has_effects_f(model):
 
 # ---------------------------------------------------------------- fixed effects
 def test_fixed_effects_prints_the_row(panel) -> None:
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit()
     assert _has_effects_f(model)
@@ -63,7 +63,7 @@ def test_fixed_effects_prints_the_row(panel) -> None:
 def test_robust_fixed_effects_omits_the_row(panel) -> None:
     """Stata's `xtreg ..., fe r` has no effects F test."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit(cov_type="robust")
     assert not _has_effects_f(model)
@@ -72,7 +72,7 @@ def test_robust_fixed_effects_omits_the_row(panel) -> None:
 def test_clustered_fixed_effects_omits_the_row(panel) -> None:
     """Stata's `xtreg ..., fe vce(cluster sid)` has no effects F test either."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit(cov_type="cluster", cov_kwds={"groups": panel["st_abb"]})
     assert not _has_effects_f(model)
@@ -81,7 +81,7 @@ def test_clustered_fixed_effects_omits_the_row(panel) -> None:
 def test_the_fit_still_computes_the_statistic(panel) -> None:
     """The e() scalar is present even when the row is suppressed -- that is why the row leaked."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit(cov_type="robust")
     stored = model.e or {}
@@ -91,14 +91,14 @@ def test_the_fit_still_computes_the_statistic(panel) -> None:
 
 # ---------------------------------------------------------------- other estimators
 def test_random_effects_has_no_row(panel) -> None:
-    model = ws.RandomEffects.from_formula(
+    model = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit()
     assert not _has_effects_f(model)
 
 
 def test_between_effects_has_no_row(panel) -> None:
-    model = ws.BetweenOLS.from_formula(
+    model = ws.PanelRegressBE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit()
     assert not _has_effects_f(model)
@@ -108,7 +108,7 @@ def test_between_effects_has_no_row(panel) -> None:
 def test_the_classical_form_ends_with_the_f_row(panel) -> None:
     """xtreg, fe ends with the F row; the rule sits ABOVE it."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit()
     lines = _lines(model)
@@ -119,7 +119,7 @@ def test_the_classical_form_ends_with_the_f_row(panel) -> None:
 def test_the_robust_form_ends_with_the_rule(panel) -> None:
     """xtreg, fe r drops the F row, so the rule becomes the last line."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit(cov_type="robust")
     lines = _lines(model)

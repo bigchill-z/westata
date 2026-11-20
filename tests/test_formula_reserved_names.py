@@ -39,14 +39,14 @@ def small():
 def test_inf_as_the_response(small) -> None:
     """The exact failure from the report."""
 
-    result = ws.OLS.from_formula("inf ~ C(q)", small).fit()
+    result = ws.Regress.from_formula("inf ~ C(q)", small).fit()
     assert list(result.params.index) == ["Intercept", "C(q)[T.2]", "C(q)[T.3]", "C(q)[T.4]"]
 
 
 def test_the_column_name_survives_in_the_output(small) -> None:
     """The alias must not leak into column names."""
 
-    result = ws.OLS.from_formula("inf ~ C(q)", small).fit()
+    result = ws.Regress.from_formula("inf ~ C(q)", small).fit()
     assert all("__ws_" not in name for name in result.params.index)
     assert result.e["depvar"] == "inf"
 
@@ -54,7 +54,7 @@ def test_the_column_name_survives_in_the_output(small) -> None:
 def test_inf_as_a_predictor(small) -> None:
     frame = small.rename(columns={"inf": "y"})
     frame["inf"] = np.arange(20.0) * 2.0
-    result = ws.OLS.from_formula("y ~ inf", frame).fit()
+    result = ws.Regress.from_formula("y ~ inf", frame).fit()
     assert "inf" in result.params.index
     assert all("__ws_" not in name for name in result.params.index)
 
@@ -65,7 +65,7 @@ def test_nan_and_none_columns_are_escaped_too() -> None:
     frame = pd.DataFrame(
         {"y": np.arange(12.0), "nan": [1.0, 2.0, 3.0] * 4, "None": np.arange(12.0)}
     )
-    result = ws.OLS.from_formula("y ~ nan + None", frame).fit()
+    result = ws.Regress.from_formula("y ~ nan + None", frame).fit()
     assert "nan" in result.params.index
     assert "None" in result.params.index
 
@@ -73,7 +73,7 @@ def test_nan_and_none_columns_are_escaped_too() -> None:
 def test_ordinary_formulas_are_untouched(small) -> None:
     """The escaping path must not disturb the common case."""
 
-    result = ws.OLS.from_formula("inf ~ q", small).fit()
+    result = ws.Regress.from_formula("inf ~ q", small).fit()
     assert list(result.params.index) == ["Intercept", "q"]
 
 
@@ -86,7 +86,7 @@ def test_the_seasonal_regression_matches_stata() -> None:
         pytest.skip("macro_swatson.dta is not available")
     frame = frame.dropna(subset=["inf"]).reset_index(drop=True)
     frame["qn"] = frame["quarter"].dt.quarter
-    result = ws.OLS.from_formula("inf ~ C(qn)", frame).fit()
+    result = ws.Regress.from_formula("inf ~ C(qn)", frame).fit()
     expected = {
         "Intercept": 0.04459462,
         "C(qn)[T.2]": -0.00142554,

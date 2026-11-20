@@ -110,8 +110,8 @@ def frontier_frame(n: int = 400, seed: int = 113) -> pd.DataFrame:
 
 
 def test_sureg_coefficients_match_stata():
-    Sureg = _require("Sureg")
-    result = Sureg.from_formula(
+    SeeminglyUnrelatedRegress = _require("SeeminglyUnrelatedRegress")
+    result = SeeminglyUnrelatedRegress.from_formula(
         ["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()
     ).fit()
 
@@ -132,8 +132,8 @@ def test_sureg_standard_errors_match_stata():
     wrong, so this assertion is the one that actually validates the estimator.
     """
 
-    Sureg = _require("Sureg")
-    result = Sureg.from_formula(
+    SeeminglyUnrelatedRegress = _require("SeeminglyUnrelatedRegress")
+    result = SeeminglyUnrelatedRegress.from_formula(
         ["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()
     ).fit()
 
@@ -148,8 +148,8 @@ def test_sureg_standard_errors_match_stata():
 def test_sureg_covariance_has_cross_equation_blocks():
     """A block-diagonal VCE would mean the equations were treated as unrelated."""
 
-    Sureg = _require("Sureg")
-    result = Sureg.from_formula(
+    SeeminglyUnrelatedRegress = _require("SeeminglyUnrelatedRegress")
+    result = SeeminglyUnrelatedRegress.from_formula(
         ["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()
     ).fit()
     covariance = np.asarray(result.cov_params(), dtype=float)
@@ -169,8 +169,8 @@ def test_sureg_reports_the_cross_equation_correlation():
     correlation is 0.55, and reduction is the *absence* of what SUR adds.
     """
 
-    Sureg = _require("Sureg")
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()).fit()
+    SeeminglyUnrelatedRegress = _require("SeeminglyUnrelatedRegress")
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], sur_frame()).fit()
     correlation = float(np.asarray(result.e["corr"])[0, 1])
     assert 0.3 < correlation < 0.8
 
@@ -179,8 +179,8 @@ def test_sureg_reports_the_cross_equation_correlation():
 
 
 def test_mvreg_coefficients_match_stata():
-    Mvreg = _require("Mvreg")
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", sur_frame()).fit()
+    MultivariateRegress = _require("MultivariateRegress")
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", sur_frame()).fit()
 
     # Each equation contains ALL regressors here, unlike the sureg specification.
     assert float(result.params["y1:x1"]) == pytest.approx(1.95372, rel=1e-4)
@@ -193,8 +193,8 @@ def test_mvreg_coefficients_match_stata():
 
 
 def test_eivreg_matches_stata():
-    Eivreg = _require("Eivreg")
-    result = Eivreg.from_formula("y ~ x1 + x2", eiv_frame(), reliab={"x1": 0.7}).fit()
+    ErrorsInVariablesRegress = _require("ErrorsInVariablesRegress")
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", eiv_frame(), reliab={"x1": 0.7}).fit()
 
     # Stata: x1 2.073214, x2 -.4678675, _cons .8649387
     assert float(result.params["x1"]) == pytest.approx(2.073214, rel=1e-3)
@@ -203,10 +203,10 @@ def test_eivreg_matches_stata():
 
 
 def test_eivreg_with_perfect_reliability_is_ols():
-    Eivreg = _require("Eivreg")
+    ErrorsInVariablesRegress = _require("ErrorsInVariablesRegress")
     frame = eiv_frame()
-    result = Eivreg.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         result.params[["Intercept", "x1", "x2"]].to_numpy(),
@@ -253,7 +253,7 @@ def test_nl_on_a_linear_model_reproduces_ols():
     frame = pd.DataFrame({"y": 1.5 + 2.5 * x + rng.normal(size=n), "x": x})
 
     nonlinear = Nl.from_formula("y = {b0} + {b1} * x", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert float(nonlinear.params["/b0"]) == pytest.approx(
         float(plain.params["Intercept"]), rel=1e-5

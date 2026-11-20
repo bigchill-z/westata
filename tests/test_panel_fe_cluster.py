@@ -48,7 +48,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def fitted(panel):
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="st_abb", time="year"
     )
     return model.fit(
@@ -75,14 +75,14 @@ def test_the_entity_clustered_standard_errors_match(fitted) -> None:
 def test_the_entry_point_is_panelols_not_xtreg() -> None:
     """Recorded because the zero scores came from the missing NAME, not a wrong value."""
 
-    assert hasattr(ws, "PanelOLS")
+    assert hasattr(ws, "PanelRegressFE")
     assert not hasattr(ws, "xtreg")
 
 
 def test_time_effects_are_available_for_the_two_way_case(panel) -> None:
     """`xtreg ..., fe i.year` is PanelOLS with time_effects=True; the call must be accepted."""
 
-    model = ws.PanelOLS.from_formula(
+    model = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", panel, entity="st_abb", time="year"
     )
     two_way = model.fit(time_effects=True)

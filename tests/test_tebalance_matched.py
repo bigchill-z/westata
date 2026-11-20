@@ -84,7 +84,7 @@ def summary():
         selected = controls[distance <= nearest + 1e-9]
         # Each treated unit contributes total weight 1, split across its ties.
         weights[selected] += 1.0 / selected.size
-    return ws.tebalance_summarize(status, values, match_weights=weights, names=names)
+    return ws.treatment_balance_summarize(status, values, match_weights=weights, names=names)
 
 
 def test_the_matched_control_count_needs_normalised_weights(summary) -> None:
@@ -153,7 +153,7 @@ def test_omitting_the_weights_leaves_the_columns_identical(summary) -> None:
     names = ["age", "education", "black", "hispanic", "married", "nodegree", "re74", "re75"]
     status = frame["treat"].to_numpy(float)
     values = frame[names].to_numpy(float)
-    unweighted = ws.tebalance_summarize(status, values, names=names)
+    unweighted = ws.treatment_balance_summarize(status, values, names=names)
     assert unweighted.control_matched == unweighted.control_raw
     for row in unweighted.rows:
         assert row.matched_std_diff == pytest.approx(row.raw_std_diff)

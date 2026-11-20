@@ -108,7 +108,7 @@ with S() as s:
           "rho == lambda/sigma" if abs(e_rho - e_lam/e_sig) < 1e-6 else
           f"rho/sigma vs lambda: {e_rho*e_sig:.10f} vs {e_lam:.10f}")
 
-et = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d2).fit()
+et = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d2).fit()
 pn = list(et.param_names)
 print(f"\n  westata params {pn}")
 print(f"  westata b = {np.round(np.asarray(et.params),10)}")

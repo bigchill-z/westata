@@ -51,26 +51,26 @@ def _frame(n: int = 200, seed: int = 20261115) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def noconstant_fit():
-    return ws.OLS.from_formula("y ~ x1 + x2 - 1", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2 - 1", _frame()).fit()
 
 
 def test_the_default_path_refuses_a_noconstant_fit(noconstant_fit) -> None:
     """The dangerous path: it used to answer F(3, 195) = 64.86, p = 3.9e-29."""
 
     with pytest.raises(ValueError, match="noconstant"):
-        ws.estat_ovtest(noconstant_fit)
+        ws.estat_omitted_variables_test(noconstant_fit)
 
 
 def test_the_rhs_path_refuses_a_noconstant_fit(noconstant_fit) -> None:
     with pytest.raises(ValueError, match="noconstant"):
-        ws.estat_ovtest(noconstant_fit, rhs=True)
+        ws.estat_omitted_variables_test(noconstant_fit, rhs=True)
 
 
 def test_the_message_names_statas_own_diagnosis(noconstant_fit) -> None:
     """A reader must be able to map the exception onto the r(301) Stata gives."""
 
     with pytest.raises(ValueError) as caught:
-        ws.estat_ovtest(noconstant_fit)
+        ws.estat_omitted_variables_test(noconstant_fit)
     message = str(caught.value)
     assert "not appropriate after regress, nocons" in message
     assert "r(301)" in message
@@ -90,7 +90,7 @@ def test_the_refusal_precedes_the_power_arithmetic(noconstant_fit) -> None:
 
     import westata.postestimation.ovtest as module
 
-    source = inspect.getsource(module.estat_ovtest)
+    source = inspect.getsource(module.estat_omitted_variables_test)
     guard = source.index("not appropriate after a noconstant fit")
     assert guard < source.index("resid = np.asarray(result.resid"), (
         "the noconstant guard must run before the residuals are read"
@@ -100,9 +100,9 @@ def test_the_refusal_precedes_the_power_arithmetic(noconstant_fit) -> None:
 def test_a_model_with_a_constant_is_unaffected() -> None:
     """The guard must not misfire: an ordinary fit still returns three df."""
 
-    fitted = ws.OLS.from_formula("y ~ x1 + x2", _frame()).fit()
-    assert ws.estat_ovtest(fitted).df == 3
-    assert ws.estat_ovtest(fitted, rhs=True).df == 6
+    fitted = ws.Regress.from_formula("y ~ x1 + x2", _frame()).fit()
+    assert ws.estat_omitted_variables_test(fitted).df == 3
+    assert ws.estat_omitted_variables_test(fitted, rhs=True).df == 6
 
 
 def test_the_guard_reads_the_design_not_the_formula() -> None:
@@ -112,8 +112,8 @@ def test_the_guard_reads_the_design_not_the_formula() -> None:
     so an estimator that builds its own intercept-free design is covered too.
     """
 
-    fitted = ws.OLS.from_formula("y ~ x1 + x2 - 1", _frame()).fit()
+    fitted = ws.Regress.from_formula("y ~ x1 + x2 - 1", _frame()).fit()
     names = [str(name) for name in fitted.design_matrix[1]]
     assert "Intercept" not in names, names
     with pytest.raises(ValueError, match="noconstant"):
-        ws.estat_ovtest(fitted)
+        ws.estat_omitted_variables_test(fitted)

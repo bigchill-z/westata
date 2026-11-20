@@ -55,7 +55,7 @@ from westata.postestimation.ts_lags import (
     resolve_time_axis,
 )
 
-__all__ = ["BgTestResult", "BgTestRow", "estat_bgodfrey"]
+__all__ = ["BgTestResults", "BgTestRow", "estat_bgodfrey"]
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ class BgTestRow:
 
 
 @dataclass(frozen=True)
-class BgTestResult:
+class BgTestResults:
     """``estat bgodfrey``: Breusch-Godfrey LM test for autocorrelation."""
 
     rows: tuple[BgTestRow, ...]
@@ -185,7 +185,7 @@ def estat_bgodfrey(
     nomiss0: bool = False,
     time: str | Sequence[Any] | None = None,
     delta: float = 1.0,
-) -> BgTestResult:
+) -> BgTestResults:
     """Breusch-Godfrey LM test, as ``estat bgodfrey, lags(...)``.
 
     ``result`` must be an OLS-style fit carrying residuals and the estimation design; Stata
@@ -306,6 +306,6 @@ def estat_bgodfrey(
                 pvalue=float(stats.chi2.sf(statistic, order)),
             )
         )
-    return BgTestResult(
+    return BgTestResults(
         rows=tuple(rows), nobs=nobs, n_gaps=0 if axis is None else axis.n_gaps
     )

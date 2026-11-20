@@ -55,7 +55,7 @@ def panel() -> pd.DataFrame:
 
 def test_ols_with_cluster_and_pweight(cross_section):
     df = cross_section
-    res = ws.OLS.from_formula(
+    res = ws.Regress.from_formula(
         "y ~ x_exog", df, weights=df["weight"], weight_type="pweight"
     ).fit(cov_type="cluster", cov_kwds={"groups": df["group"]})
     assert res.e["N"] == len(df)
@@ -73,21 +73,21 @@ def test_iv2sls_end_to_end(cross_section):
 
 def test_feols_two_way(cross_section, panel):
     df = panel
-    res = ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
     assert res.params["x1"] == pytest.approx(1.5, abs=0.1)
     assert res.params["x2"] == pytest.approx(-0.5, abs=0.1)
 
 
 def test_panel_fe_re_be_fd(panel):
     df = panel
-    fe = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
-    re = ws.RandomEffects.from_formula(
+    fe = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    re = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
-    be = ws.BetweenOLS.from_formula(
+    be = ws.PanelRegressBE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
-    fd = ws.FirstDifferenceOLS.from_formula(
+    fd = ws.PanelRegressFD.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
 
@@ -102,7 +102,7 @@ def test_panel_fe_re_be_fd(panel):
 
 def test_all_results_are_statsmodels_duck_typed(panel):
     df = panel
-    res = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     # The attributes statsmodels downstream code relies on.
     assert isinstance(res.params, pd.Series)
     assert res.cov_params().shape == (len(res.params), len(res.params))

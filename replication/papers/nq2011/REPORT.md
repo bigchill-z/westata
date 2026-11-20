@@ -11,7 +11,7 @@
 |---|---|
 | 论文的结论复现出来了吗？ | **是，系数到 7 位小数。** 表 2 六列的系数全部与作者日志逐位吻合 |
 | 标准误呢？ | **这里出现了一个真实发现**：系数一致，但标准误取决于对照哪个 Stata 命令——`areg` 与 `xtreg, fe` 差 4.5% |
-| `pystata` 与 `westata` 有差异吗？ | **系数全线一致**（最大 4.6e-08）。标准误：`Areg`/`FEOLS`/`PanelOLS` 均跟随 `reghdfe`/`xtreg`，与 `areg` 差 4.3–4.4%（Stata 内部约定，见 §3.2）。`_cons` 见上 |
+| `pystata` 与 `westata` 有差异吗？ | **系数全线一致**（最大 4.6e-08）。标准误：`Areg`/`RegressHighDimFixedEffects`/`PanelRegressFE` 均跟随 `reghdfe`/`xtreg`，与 `areg` 差 4.3–4.4%（Stata 内部约定，见 §3.2）。`_cons` 见上 |
 | 数据能获取吗？ | **能。** Harvard Dataverse，三个文件，含作者自己的完整 log |
 | 有新的 westata 问题吗？ | **有 1 条。** 新增的 `Areg` 命令能对上 `e(cmd)`/`e(title)`，斜率也正确，但 **`_cons` 与 Stata `areg` 不符**（点估计差 5.6e-04，标准误差 125%）。详见 [nq2011_gaps.md](../../gaps/nq2011_gaps.md) §4 |
 
@@ -95,7 +95,7 @@ Nunn & Qian (2011) 正好合适：
 
 基准取自作者归档的 `Replication_country_level_results.log`（7 位小数）。
 
-| 列 | 因变量 | 项 | 作者日志 | Stata `areg` | westata `FEOLS` |
+| 列 | 因变量 | 项 | 作者日志 | Stata `areg` | westata `RegressHighDimFixedEffects` |
 |---|---|---|---|---|---|
 | (1) | 总人口 | 1800 | 0.0725947 | 0.0725947 | 0.0725947 |
 | (1) | 总人口 | 1900 | 0.1213388 | 0.1213388 | 0.1213388 |
@@ -105,7 +105,7 @@ Nunn & Qian (2011) 正好合适：
 | (5) | 城市化 | 1900 | 0.0123354 | 0.0123354 | 0.0123354 |
 | (6) | 城市化 | 1900 | 0.0100279 | 0.0100279 | 0.0100279 |
 
-**7 个系数行全部在 1e-6 内吻合。** `areg`、`xtreg fe`、`FEOLS`、`PanelOLS` 四条路径的**系数完全相同**。
+**7 个系数行全部在 1e-6 内吻合。** `areg`、`xtreg fe`、`RegressHighDimFixedEffects`、`PanelRegressFE` 四条路径的**系数完全相同**。
 
 ### 3.2 标准误：这是本次复现的核心发现
 
@@ -117,8 +117,8 @@ Nunn & Qian (2011) 正好合适：
 |---|---|---|
 | Stata `areg`（作者当年跑的） | 0.1213388 | **0.0171579** |
 | Stata `xtreg, fe` | 0.1213388 | **0.0164182** |
-| westata `FEOLS` | 0.1213388 | **0.0164182** |
-| westata `PanelOLS` | 0.1213388 | **0.0164182** |
+| westata `RegressHighDimFixedEffects` | 0.1213388 | **0.0164182** |
+| westata `PanelRegressFE` | 0.1213388 | **0.0164182** |
 
 **差异的机制**（实测定位，纠正了我最初的错误解释）：
 
@@ -257,7 +257,7 @@ cd D:/myCodeProject/statapy
 .venv/Scripts/python.exe replication/papers/nq2011/nq2011_probe_gaps.py                     # 能力探针
 ```
 
-> 这一篇比其他三篇慢得多（134 秒 vs 3–28 秒），因为它要做 24 次面板回归（6 列 × `areg`/`xtreg`/`FEOLS`/`PanelOLS`），每列最多约 60 个参数、1,552 个观测。
+> 这一篇比其他三篇慢得多（134 秒 vs 3–28 秒），因为它要做 24 次面板回归（6 列 × `areg`/`xtreg`/`RegressHighDimFixedEffects`/`PanelRegressFE`），每列最多约 60 个参数、1,552 个观测。
 
 产物（`replication/papers/nq2011/out/`）：
 

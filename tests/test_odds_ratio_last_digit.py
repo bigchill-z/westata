@@ -70,13 +70,13 @@ def test_regress_variants_are_byte_exact() -> None:
 
     frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     robust = str(
-        ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit(cov_type="HC1").summary(style="stata")
+        ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit(cov_type="HC1").summary(style="stata")
     )
     assert "Linear regression" in robust
     assert robust.startswith("\n")
     assert not robust.startswith("\n\n")
 
     no_constant = str(
-        ws.OLS.from_formula("lnw ~ s + expr + tenure - 1", frame).fit().summary(style="stata")
+        ws.Regress.from_formula("lnw ~ s + expr + tenure - 1", frame).fit().summary(style="stata")
     )
     assert "_cons" not in no_constant

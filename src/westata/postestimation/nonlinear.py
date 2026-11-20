@@ -72,7 +72,7 @@ from typing import Any, Callable, Sequence
 import numpy as np
 from scipy import stats
 
-from westata.postestimation.lincom import LincomResult
+from westata.postestimation.lincom import LincomResults
 from westata.postestimation.tests import WaldTest, run_wald_test
 
 __all__ = ["nlcom", "testnl"]
@@ -603,7 +603,7 @@ def nlcom(
     *,
     level: float = 0.95,
     eform: bool = False,
-) -> LincomResult:
+) -> LincomResults:
     """Point estimate, standard error and interval for ``g(b)``.
 
     Parameters
@@ -685,7 +685,7 @@ def nlcom(
         lower = math.exp(lower)
         upper = math.exp(upper)
 
-    return LincomResult(
+    return LincomResults(
         estimate=estimate,
         std_err=std_err,
         statistic=statistic,

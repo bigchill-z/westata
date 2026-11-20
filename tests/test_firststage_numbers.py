@@ -90,7 +90,7 @@ def _first(values) -> float:
 def test_the_r_squared_is_the_first_stage_fit(strong) -> None:
     frame, result = strong
 
-    assert _first(result.estat_firststage().r2) == pytest.approx(
+    assert _first(result.estat_first_stage().r2) == pytest.approx(
         float(_first_stage_fit(frame).rsquared), rel=1e-10
     )
 
@@ -107,7 +107,7 @@ def test_the_partial_r_squared_is_the_instrument_increment(strong) -> None:
     reduced = _reduced_fit(frame)
     expected = (full.rsquared - reduced.rsquared) / (1.0 - reduced.rsquared)
 
-    assert _first(result.estat_firststage().partial_r2) == pytest.approx(
+    assert _first(result.estat_first_stage().partial_r2) == pytest.approx(
         expected, rel=1e-10
     )
 
@@ -138,7 +138,7 @@ def test_the_f_statistic_uses_statats_denominator(strong) -> None:
         (1.0 - full.rsquared) / df_denom
     )
 
-    reported = result.estat_firststage()
+    reported = result.estat_first_stage()
     # ``df_denom_value`` is the SCALAR view of ``r(df_denom)``.  The attribute
     # itself is a per-equation array, and ``float(array_of_one)`` stopped working
     # in numpy 2.4 ("only 0-dimensional arrays can be converted").
@@ -163,7 +163,7 @@ def test_the_denominator_is_checked_against_a_second_convention(strong) -> None:
 
     frame, result = strong
     auxiliary_df_resid = float(_first_stage_fit(frame).df_resid)
-    reported = result.estat_firststage().df_denom_value
+    reported = result.estat_first_stage().df_denom_value
 
     assert reported == pytest.approx(auxiliary_df_resid)
     # And the values the OLD formula produced are distinguishable from it.
@@ -175,7 +175,7 @@ def test_a_weak_instrument_reports_a_small_partial_r_squared(weak) -> None:
     """The direction of the statistic, not just its arithmetic."""
 
     frame, result = weak
-    reported = result.estat_firststage()
+    reported = result.estat_first_stage()
 
     # Measured 0.0120 with the corrected denominator; the point is that it is tiny
     # relative to the strong case (0.79), not that it sits below one particular value.
@@ -185,7 +185,7 @@ def test_a_weak_instrument_reports_a_small_partial_r_squared(weak) -> None:
 
 def test_a_strong_instrument_reports_a_large_partial_r_squared(strong) -> None:
     frame, result = strong
-    reported = result.estat_firststage()
+    reported = result.estat_first_stage()
 
     assert _first(reported.partial_r2) > 0.5
     assert _first(reported.f) > 100.0
@@ -194,8 +194,8 @@ def test_a_strong_instrument_reports_a_large_partial_r_squared(strong) -> None:
 def test_the_two_strengths_differ(strong, weak) -> None:
     """Guard: if both panels behaved alike the direction tests prove nothing."""
 
-    strong_value = _first(strong[1].estat_firststage().partial_r2)
-    weak_value = _first(weak[1].estat_firststage().partial_r2)
+    strong_value = _first(strong[1].estat_first_stage().partial_r2)
+    weak_value = _first(weak[1].estat_first_stage().partial_r2)
 
     assert strong_value > 10.0 * weak_value
 
@@ -203,7 +203,7 @@ def test_the_two_strengths_differ(strong, weak) -> None:
 def test_the_partial_r_squared_never_exceeds_the_full_one(strong) -> None:
     """A structural bound: the instruments cannot explain more than the whole fit."""
 
-    reported = strong[1].estat_firststage()
+    reported = strong[1].estat_first_stage()
 
     assert _first(reported.partial_r2) <= _first(reported.r2) + 1e-12
 
@@ -211,7 +211,7 @@ def test_the_partial_r_squared_never_exceeds_the_full_one(strong) -> None:
 def test_the_adjusted_r_squared_is_below_the_plain_one(strong) -> None:
     """With more than one regressor the adjustment must shrink it."""
 
-    reported = strong[1].estat_firststage()
+    reported = strong[1].estat_first_stage()
 
     assert _first(reported.adj_r2) < _first(reported.r2)
 
@@ -232,7 +232,7 @@ def test_two_endogenous_variables_get_two_rows() -> None:
     )
     result = ws.IV2SLS.from_formula("y ~ x + [e1 + e2 ~ z1 + z2]", frame).fit()
 
-    reported = result.estat_firststage()
+    reported = result.estat_first_stage()
 
     assert np.asarray(reported.r2, dtype=float).size == 2
     assert list(reported.endog) == ["e1", "e2"]

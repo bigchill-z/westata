@@ -36,7 +36,7 @@ def frame() -> pd.DataFrame:
 def test_newey_class_and_function_agree(frame: pd.DataFrame) -> None:
     """`ws.newey(...)` 与 `ws.Newey.from_formula(...).fit()` 必须逐位相同。"""
 
-    by_function = ws.newey("y ~ x1 + x2", frame, lag=2)
+    by_function = ws.newey_west("y ~ x1 + x2", frame, lag=2)
     by_class = ws.Newey.from_formula("y ~ x1 + x2", frame, lag=2).fit()
 
     assert np.array_equal(by_function.params, by_class.params)

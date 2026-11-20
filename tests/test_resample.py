@@ -26,7 +26,7 @@ def _frame(n: int = 200, seed: int = 401) -> pd.DataFrame:
 def test_jackknife_coefficients_equal_ols():
     frame = _frame()
     jack = Jackknife.from_formula("y ~ x1 + x2", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.sort(np.asarray(jack.params, dtype=float)),
@@ -114,7 +114,7 @@ def test_bootstrap_point_estimate_equals_the_original():
 
     frame = _frame()
     bootstrap = Bootstrap.from_formula("y ~ x1 + x2", frame, reps=50, seed=7).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.sort(np.asarray(bootstrap.params, dtype=float)),
@@ -146,7 +146,7 @@ def test_bootstrap_standard_errors_are_the_right_order():
 
     frame = _frame(n=300)
     bootstrap = Bootstrap.from_formula("y ~ x1 + x2", frame, reps=300, seed=5).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     ratio = float(bootstrap.bse["x1"]) / float(plain.bse["x1"])
     assert 0.5 < ratio < 2.0

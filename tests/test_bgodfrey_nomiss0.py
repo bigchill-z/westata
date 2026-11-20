@@ -47,7 +47,7 @@ def _fit(n: int = 200, seed: int = 5):
             "x": rng.normal(size=n),
         }
     )
-    return ws.OLS.from_formula("y ~ x", frame).fit()
+    return ws.Regress.from_formula("y ~ x", frame).fit()
 
 
 def _chi2(result, order: int, nomiss0: bool) -> float:

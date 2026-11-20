@@ -48,12 +48,12 @@ def test_from_formula_takes_no_noconstant_keyword(frame) -> None:
     """Recorded because it is the first thing a Stata user tries."""
 
     with pytest.raises(TypeError):
-        ws.OLS.from_formula("lnw ~ s", frame, noconstant=True)
+        ws.Regress.from_formula("lnw ~ s", frame, noconstant=True)
 
 
 @pytest.mark.parametrize("formula", ["lnw ~ s - 1", "lnw ~ 0 + s"])
 def test_the_no_constant_fit_matches_stata(frame, formula) -> None:
-    fitted = ws.OLS.from_formula(formula, frame).fit()
+    fitted = ws.Regress.from_formula(formula, frame).fit()
     assert list(fitted.params.index) == ["s"]
     assert float(fitted.params["s"]) == pytest.approx(0.4154001027, abs=1e-9)
     assert float(fitted.bse["s"]) == pytest.approx(0.0021675667, abs=1e-9)
@@ -61,8 +61,8 @@ def test_the_no_constant_fit_matches_stata(frame, formula) -> None:
 
 
 def test_the_two_spellings_agree(frame) -> None:
-    minus = ws.OLS.from_formula("lnw ~ s - 1", frame).fit()
-    plus = ws.OLS.from_formula("lnw ~ 0 + s", frame).fit()
+    minus = ws.Regress.from_formula("lnw ~ s - 1", frame).fit()
+    plus = ws.Regress.from_formula("lnw ~ 0 + s", frame).fit()
     assert float(minus.params["s"]) == pytest.approx(
         float(plus.params["s"]), abs=1e-12
     )
@@ -70,7 +70,7 @@ def test_the_two_spellings_agree(frame) -> None:
 
 def test_a_subsample_regression_matches_stata(frame) -> None:
     subset = frame[frame["s"] > 12]
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", subset).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", subset).fit()
     assert int(fitted.nobs) == 349
     assert float(fitted.params["s"]) == pytest.approx(0.0934136310, abs=1e-9)
 
@@ -80,6 +80,6 @@ def test_the_subsample_is_actually_smaller(frame) -> None:
 
     subset = frame[frame["s"] > 12]
     assert len(subset) < len(frame)
-    full = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
-    part = ws.OLS.from_formula("lnw ~ s + expr", subset).fit()
+    full = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
+    part = ws.Regress.from_formula("lnw ~ s + expr", subset).fit()
     assert float(full.params["s"]) != pytest.approx(float(part.params["s"]), rel=1e-3)

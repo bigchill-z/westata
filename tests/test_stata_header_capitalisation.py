@@ -53,9 +53,9 @@ def frame():
 @pytest.mark.parametrize(
     "builder",
     [
-        lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(),
+        lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(),
         lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),
-        lambda frame: ws.QuantileRegression.from_formula("y ~ x", frame).fit(),
+        lambda frame: ws.QuantileRegress.from_formula("y ~ x", frame).fit(),
     ],
     ids=["regress", "logit", "qreg"],
 )
@@ -69,27 +69,27 @@ def test_the_header_matches_the_captures(frame, builder) -> None:
 
 
 def test_the_first_column_is_spelled_out(frame) -> None:
-    rendered = render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")
+    rendered = render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")
 
     assert "Coefficient" in rendered
 
 
 def test_the_error_label_is_lowercase(frame) -> None:
-    rendered = render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")
+    rendered = render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")
 
     assert "Std. err." in rendered
     assert "Std. Err." not in rendered
 
 
 def test_the_interval_label_is_all_lowercase(frame) -> None:
-    rendered = render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")
+    rendered = render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")
 
     assert "[95% conf. interval]" in rendered
     assert "[95% Conf. Interval]" not in rendered
 
 
 def test_the_four_labels_appear_in_order(frame) -> None:
-    rendered = render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")
+    rendered = render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")
     header = next(line for line in rendered.splitlines() if "Coefficient" in line)
 
     positions = [
@@ -133,7 +133,7 @@ def test_the_label_follows_the_level(level, expected: str) -> None:
 
 
 def test_the_rendered_table_uses_the_results_own_level(frame) -> None:
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     rendered = render_summary(fitted, style="stata")
 
     assert _ci_label(getattr(fitted, "level", None)) in rendered
@@ -141,7 +141,7 @@ def test_the_rendered_table_uses_the_results_own_level(frame) -> None:
 
 def test_the_statsmodels_style_is_unaffected(frame) -> None:
     # Explicit style: "std err" is the statsmodels spelling; Stata's is "Std. err.".
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().summary(style="statsmodels")
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().summary(style="statsmodels")
 
     assert "std err" in rendered
     assert "Coefficient" not in rendered

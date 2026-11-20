@@ -1,7 +1,7 @@
 # Missing auxiliary statistics and display features — linear / IV / panel / time-series
 
 **Audit target**: `westata` at `D:\myCodeProject\statapy` (Stata-conformance econometrics library)
-**Scope**: `regress` (OLS, robust, cluster), `areg`, `reghdfe`, `ivregress 2sls/liml/gmm`, `etregress`, `didregress`, `xtdidregress`, `xtreg fe/be/re/fd`, `xtivreg`, `xtgls`, `xtpcse`, `xtabond`, `arima`, `var`, `vec`, `vecrank`, `arch`, `dfuller`, `pperron`, `xtunitroot`
+**Scope**: `regress` (Regress, robust, cluster), `areg`, `reghdfe`, `ivregress 2sls/liml/gmm`, `etregress`, `didregress`, `xtdidregress`, `xtreg fe/be/re/fd`, `xtivreg`, `xtgls`, `xtpcse`, `xtabond`, `arima`, `var`, `vec`, `vec_rank`, `arch`, `dfuller`, `pperron`, `xtunitroot`
 **Method**: source reading of every `e` dict constructor + StataNow 19.5 fixture comparison + live fits with `./.venv/Scripts/python.exe` dumping `sorted(result.e.keys())`
 **Rule**: every row cites `path:line`. "Stata stores it" and "Stata prints it" are tracked separately.
 
@@ -24,7 +24,7 @@ The three cheapest and highest-value fixes are: (1) `e(tss)`/`e(tss_within)` for
 
 Notation: **MISSING** = in the Stata fixture, absent from westata. **PRESENT** = in both. **fixture-only** = in westata but not that fixture (not a gap). **westata-only** = westata addition (documented, not a conformance gap).
 
-### 1.1 `regress` (OLS) — nonrobust / `vce(robust)` / `vce(cluster)`
+### 1.1 `regress` (Regress) — nonrobust / `vce(robust)` / `vce(cluster)`
 
 Fixture: `tests/conformance/stata_fixtures/regress_auto.json:24-38` (and `regress_auto_robust.json:24-38`, `regress_auto_factor.json:34-48`)
 westata `e` built at `src/westata/estimators/linear.py:311-332`.
@@ -56,7 +56,7 @@ Live confirmation (`auto.dta`, `mpg ~ weight + dom`):
 + 'N_clust' under cov_type='cluster'
 ```
 
-### 1.2 `areg` / `reghdfe` (FEOLS)
+### 1.2 `areg` / `reghdfe` (RegressHighDimFixedEffects)
 
 Fixtures: `areg.json:24-47`, `reghdfe_firm.json:24-54`, `reghdfe_firm_year.json:24-54`, `reghdfe_firm_cluster.json:24-57`, `reghdfe_firm_robust.json:24-54`, `reghdfe_firm_year_cluster.json:24-57`
 westata `e` built at `src/westata/estimators/hdfe.py:538-550`.
@@ -276,12 +276,12 @@ westata returns a **`VARResults` dataclass, not `StataResults`** — it has **no
 
 This is a **structural** gap: because `VAR.fit()` returns a dataclass rather than `StataResults`, every `var` scalar is inaccessible through the uniform `result.e[...]` surface the rest of the package provides. That is a design consequence, not an oversight — but it is the reason a user reading `e(r2_1)` or `e(ll)` after `var` gets an `AttributeError` rather than `None`.
 
-### 1.13 `vec` / `vecrank`
+### 1.13 `vec` / `vec_rank`
 
-Fixtures/display: `e_upgrade_outputs.txt:70-78`; `vecrank` printed-table evidence in `retest/domains/tseries/run.py:279-294` ("`[TS] vecrank` stores only `r(trendnumber)`/`r(ttext)`; the trace and max-eigenvalue statistics exist nowhere else").
+Fixtures/display: `e_upgrade_outputs.txt:70-78`; `vec_rank` printed-table evidence in `retest/domains/tseries/run.py:279-294` ("`[TS] vec_rank` stores only `r(trendnumber)`/`r(ttext)`; the trace and max-eigenvalue statistics exist nowhere else").
 westata: `VECM.fit()` returns statsmodels' `VECMRESults` (`tseries.py:935-968`); `JohansenResult` is a dataclass (`tseries.py:971-1060`) with `trace`, `maxeig`, `trace_critical`, `maxeig_critical`, `eigenvectors`, `to_frame()`, `to_stata_table()`, `select_rank()`.
 
-Neither has an `.e`. Stata's `vec` stores `e(beta)`, `e(alpha)`, `e(Sigma)`, `e(lr)`, `e(ll)`, `e(N)`, `e(rank)`, `e(tmax/min)`, `e(k_eq)`; `vecrank` stores almost nothing (`r(trendnumber)`, `r(ttext)`). westata's `JohansenResult.to_stata_table()` already reproduces `vecrank`'s **printed** table (`tseries.py:1022-1032`), which is the more important surface for this command. The missing items are `e()`-shaped: `e(lr)`, `e(ll)`, `e(Sigma)`, `e(rank)`, `e(N)`.
+Neither has an `.e`. Stata's `vec` stores `e(beta)`, `e(alpha)`, `e(Sigma)`, `e(lr)`, `e(ll)`, `e(N)`, `e(rank)`, `e(tmax/min)`, `e(k_eq)`; `vec_rank` stores almost nothing (`r(trendnumber)`, `r(ttext)`). westata's `JohansenResult.to_stata_table()` already reproduces `vec_rank`'s **printed** table (`tseries.py:1022-1032`), which is the more important surface for this command. The missing items are `e()`-shaped: `e(lr)`, `e(ll)`, `e(Sigma)`, `e(rank)`, `e(N)`.
 
 ### 1.14 `arch`
 
@@ -332,7 +332,7 @@ Note also that westata's `ivregress` **does** store `tss` (`iv.py:826`) even tho
 **No. There is no display/render path anywhere in the package.** Evidence, in order of increasing specificity:
 
 1. **No `estat` entry point exists.** A full-tree search for `estat` across `src/` returns only doc-comment mentions of `estat_cmd`/`estat firststage`/`estat ic` in prose (`src/westata/estimators/iv.py:131-133`, `src/westata/estimators/limited.py:13`-area docstrings) and the `GAP_REGISTER.md:81` line that states it outright: *"`estat vce`、`summarize`、`firststage`、`classification` 未实现"* ("`estat vce`, `summarize`, `firststage`, `classification` not implemented"). No module, class or function named `estat*` exists.
-2. **`cov_params()` is sufficient as data but is never rendered.** `src/westata/results/base.py:203-206` returns the full `k×k` matrix; live check confirms `cov_params().shape == (3, 3)` for a 3-parameter OLS. The complete public surface of `StataResults` is `['conf_int','contrast','cov_params','hausman','lincom','lrtest','margins','nlcom','predict','pwcompare','summary','test','testnl','wald_test']` — no `vce`, no `corr`, no `cov_matrix`, no `estat`.
+2. **`cov_params()` is sufficient as data but is never rendered.** `src/westata/results/base.py:203-206` returns the full `k×k` matrix; live check confirms `cov_params().shape == (3, 3)` for a 3-parameter Regress. The complete public surface of `StataResults` is `['conf_int','contrast','cov_params','hausman','lincom','lrtest','margins','nlcom','predict','pairwise_compare','summary','test','testnl','wald_test']` — no `vce`, no `corr`, no `cov_matrix`, no `estat`.
 3. **The only renderer is `summary()`, and it never touches `cov`.** `src/westata/results/summary.py:132-245` (`stata` style) and `:248-323` (`statsmodels` style) both read `params`, `bse`, `tvalues`/`zvalues`, `pvalues`, `conf_int()`, `df_resid`, `df_model`, and a handful of `e()` scalars. `result.cov` appears nowhere in either function.
 4. **`etable` does not render matrices either.** `src/westata/report/etable.py:52-164` builds a coefficient table with `se=True` underneath; the bottom `stats` block reads `res.e.get(key)` (`etable.py:147`) and can only emit scalars. There is no covariance/correlation block, and no `vce`/`corr` option in the signature (`etable.py:52-64`).
 5. **`corr` in westata means something else entirely.** Searching for correlation-matrix display finds only Stata *option* names being stored as strings: `"corr": "correlated"` (`panel_iv.py:1254`, `xtgls`), `"corr": "independent"` (`panel_iv.py:1564`, `xtpcse`), `"corr": "exchangeable"` (`panel_nonlinear.py:1199`, `xtgee`), `"corr": _corr(fitted, y)` (`panel_iv.py:894`, `xtivreg`'s *y–ŷ* correlation, a scalar), and cross-equation residual correlation lists for `sureg`/`mvreg` (`systems.py:548`, `:750`). **None of these is a coefficient covariance or correlation matrix.**
@@ -341,7 +341,7 @@ Note also that westata's `ivregress` **does** store `tss` (`iv.py:826`) even tho
 
 ### Q3. For `xtreg, fe`, which of `tss`, `tss_within`, `r2_w`, `r2_b`, `r2_o`, `sigma_e`, `sigma_u`, `theta`, `corr`, `df_a`, `k_absorb`, `N_g`, `Tbar`, `g_min/g_avg/g_max`, `F_f`, `ui` does westata set?
 
-**None of the sixteen.** Live `sorted(result.e.keys())` for `PanelOLS.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()` is exactly:
+**None of the sixteen.** Live `sorted(result.e.keys())` for `PanelRegressFE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()` is exactly:
 
 ```
 ['F', 'N', 'df_b', 'df_m', 'df_r', 'll', 'n_entities', 'r2', 'r2_a', 'rank', 'rmse', 'rss']
@@ -354,7 +354,7 @@ Three of them exist under different names with the *same value* (verified to 1e-
 * `sigma_e` ≡ `e["rmse"]`
 * `N_g` ≡ `e["n_entities"]` (`panel.py:752`)
 
-The remaining thirteen (`tss`, `tss_within`, `r2_b`, `r2_o`, `sigma_u`, `theta`, `corr`, `df_a`, `k_absorb`, `Tbar`, `g_min`, `g_avg`, `g_max`, `F_f`, `p_f`, `ui`) have **no westata counterpart at all**, against `xtreg_fe.json:25-62` which stores every one of them. The same twelve-key set is returned by `RandomEffects`, `BetweenOLS` and `FirstDifferenceOLS` (`panel.py:793,874,915`), so `xtreg, re` also loses `chi2`, `theta`, `sigma_u`, `sigma_e`, `sigma`, `rho`, `r2_w`, `r2_b`, `r2_o`, `N_g`, `Tbar`, `g_*` that `xtreg_re.json:24-45` stores.
+The remaining thirteen (`tss`, `tss_within`, `r2_b`, `r2_o`, `sigma_u`, `theta`, `corr`, `df_a`, `k_absorb`, `Tbar`, `g_min`, `g_avg`, `g_max`, `F_f`, `p_f`, `ui`) have **no westata counterpart at all**, against `xtreg_fe.json:25-62` which stores every one of them. The same twelve-key set is returned by `PanelRegressRE`, `PanelRegressBE` and `PanelRegressFD` (`panel.py:793,874,915`), so `xtreg, re` also loses `chi2`, `theta`, `sigma_u`, `sigma_e`, `sigma`, `rho`, `r2_w`, `r2_b`, `r2_o`, `N_g`, `Tbar`, `g_*` that `xtreg_re.json:24-45` stores.
 
 Note that `theta` **is** computed for `re` — `panel_iv.py:902` stores it for `xtivreg, re` from the same Swamy–Arora machinery — and `sigma_u`/`rho`/`r2_b`/`r2_o`/`corr`/`g_min`/`g_avg`/`g_max` are all computed for `xtivreg` at `panel_iv.py:844-898`. The `xtreg` classes simply never call those code paths.
 
@@ -387,13 +387,13 @@ So for `arima` the `e()` surface is **complete relative to what Stata stores**, 
 | Stata command | westata equivalent | Evidence |
 |---|---|---|
 | `estat vce` / `vce, corr` / `vce, covariance` | **None** | `GAP_REGISTER.md:81`; no `estat` symbol in `src/`; `cov_params()` exists but is never rendered (Q2) |
-| `estat ic` | **Partial, data-only** | `e(aic)`/`e(bic)` are readable on `StataResults` (`results/base.py:315-324`) for estimators that store them — but there is **no `estat ic`-style table renderer**, and `var`/`vec`/`vecrank` results have no `.e` at all so `e(aic)` raises `AttributeError` there |
+| `estat ic` | **Partial, data-only** | `e(aic)`/`e(bic)` are readable on `StataResults` (`results/base.py:315-324`) for estimators that store them — but there is **no `estat ic`-style table renderer**, and `var`/`vec`/`vec_rank` results have no `.e` at all so `e(aic)` raises `AttributeError` there |
 | `estat summarize` | **None** | Not implemented anywhere; `GAP_REGISTER.md:81` |
 | `estat firststage` | **Partial, scalar-only** | `e(F_first)` is stored for `ivregress` (`iv.py:807,817`) and a `UserWarning` fires below F=10 (`iv.py:869-876`) — but Stata's full first-stage table (per-endogenous-variable F, R², partial R², Shea's) is not produced. `iv.py:131-133` calls `e(F_first)` an "`estat firststage` analogue" |
 | `estat gof` / `estat hetest` | **None** | `GAP_REGISTER.md:84` |
 | `estat classification` | **None** | `GAP_REGISTER.md:81` |
 
-The full postestimation surface actually exported is `test`, `lincom`, `lrtest`, `hausman`, `contrast`, `pwcompare`, `nlcom`, `testnl`, `margins`, `predict`, `wald_test` — see `src/westata/results/base.py:329-442` and `src/westata/__init__.py:94-107`. Nothing named `estat`, and nothing that renders a matrix.
+The full postestimation surface actually exported is `test`, `lincom`, `lrtest`, `hausman`, `contrast`, `pairwise_compare`, `nlcom`, `testnl`, `margins`, `predict`, `wald_test` — see `src/westata/results/base.py:329-442` and `src/westata/__init__.py:94-107`. Nothing named `estat`, and nothing that renders a matrix.
 
 ---
 
@@ -425,12 +425,12 @@ The only two renderers are `src/westata/results/summary.py` (`stata` style at `:
 | **`Panels:`/`Correlation:`/`Autocorrelation:` header lines** | `xtgls`, `xtpcse` | `e["panels"]`, `e["corr"]`, `e["selection"]` stored | **MISSING (display)** |
 | **ANOVA decomposition table** (`Source | SS df MS`, `Model`/`Residual`/`Total` rows) | `regress` with a single regressor | `rss`/`mss` stored (`linear.py:322-323`); `tss` derivable (`rss+mss`); the **renderer has no ANOVA code at all** — searching `summary.py` for `SS`/`Source`/`Model`/`Residual`/`Total` finds only `df_model`/`df_resid` labels (`:283`) | **MISSING — entirely absent renderer** |
 | **`e(F)`/`e(p)` line for `xtreg, re`** | `xtreg re` | Stata reports Wald `chi2`, westata stores `F` (`panel.py:749`) | **MISSING `chi2`/`p` (data)** |
-| **`estat ic` table** (N, ll, df, AIC, BIC/HQIC) | `arima`, `arch`, and any ML estimator | `e(aic)`/`e(bic)` present on `StataResults`; **no renderer**; and `var`/`vec`/`vecrank` have no `.e` | **MISSING (display)** |
+| **`estat ic` table** (N, ll, df, AIC, BIC/HQIC) | `arima`, `arch`, and any ML estimator | `e(aic)`/`e(bic)` present on `StataResults`; **no renderer**; and `var`/`vec`/`vec_rank` have no `.e` | **MISSING (display)** |
 | **Treatment-and-time information table** + `Data type:` + the ATET footnote | `didregress`, `xtdidregress` | `e["data_type"]` stored (`did.py:786`); the table itself (`p11_did.txt:5-19`) is not reproduced | **MISSING (display)** |
 | **"Absorbed variable: firm" / "Absorbing 1 HDFE group" header** | `areg`, `reghdfe` | `results.absorbed` is set (`hdfe.py:567`) but the renderer never prints it | **MISSING (display)** |
 | **"Statistics robust to heteroskedasticity" / cluster footnote** | `reghdfe` clustered | `e["N_clust"]` stored (`hdfe.py:550`) | **MISSING (display)** |
 | **Fixed-N exact critical-value columns** | `xtunitroot ips/llc` | `_critical_values` raises `UnsupportedError` (`xtunitroot_ips.py:145-146`) | **MISSING (capability)** |
-| **`vecrank` printed table** | `vecrank` | `JohansenResult.to_stata_table()` exists (`tseries.py:1022-1032`) | **PRESENT** — the one matrix-shaped display in the package |
+| **`vec_rank` printed table** | `vec_rank` | `JohansenResult.to_stata_table()` exists (`tseries.py:1022-1032`) | **PRESENT** — the one matrix-shaped display in the package |
 | **`Root MSE` for `xtgls`** | `xtgls` | stored as NaN by design (`panel_iv.py:1076`); Stata also omits it (`p9_outputs.txt:472-482`) | Correctly omitted |
 
 ### 3.3 A specific renderer defect worth flagging

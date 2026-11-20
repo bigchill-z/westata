@@ -88,7 +88,7 @@ def test_all_unit_root_values_are_floats(random_walk) -> None:
 
 # ------------------------------------------------------- panel unit-root r()
 def test_ips_r_block(panel) -> None:
-    result = ws.XtUnitroot.from_formula(
+    result = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="ips"
     ).fit()
     r = result.r
@@ -106,7 +106,7 @@ def test_ips_r_block(panel) -> None:
 def test_llc_r_block(panel) -> None:
     """``llc`` reports ``r(tds)``/``r(p_tds)`` for the adjusted t* statistic."""
 
-    result = ws.XtUnitroot.from_formula(
+    result = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="llc"
     ).fit()
     r = result.r
@@ -121,10 +121,10 @@ def test_llc_r_block(panel) -> None:
 def test_the_two_panel_tests_do_not_share_statistic_names(panel) -> None:
     """A shared key would make a combined table ambiguous."""
 
-    ips = ws.XtUnitroot.from_formula(
+    ips = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="ips"
     ).fit()
-    llc = ws.XtUnitroot.from_formula(
+    llc = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="llc"
     ).fit()
 
@@ -133,7 +133,7 @@ def test_the_two_panel_tests_do_not_share_statistic_names(panel) -> None:
 
 
 def test_panel_details_are_carried_through(panel) -> None:
-    result = ws.XtUnitroot.from_formula(
+    result = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="ips"
     ).fit()
 
@@ -143,7 +143,7 @@ def test_panel_details_are_carried_through(panel) -> None:
 
 
 def test_panel_r_values_are_floats_or_the_test_macro(panel) -> None:
-    result = ws.XtUnitroot.from_formula(
+    result = ws.PanelUnitroot.from_formula(
         "y ~ 1", panel, entity="id", time="t", test="ips"
     ).fit()
 

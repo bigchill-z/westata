@@ -2,7 +2,9 @@
 
 > 本文件记录需用户决定的选项；若后续不再需要，及时更新。
 
-## 〇之十三、2026-11-18 westata 命名统一规范：规则已讨论定稿，待分批准施
+## 〇之十三、2026-11-18 westata 命名统一规范：0.3.41 已实施，待一个版本后清理旧别名
+
+**状态（2026-11-20）**：全部 136 项改名已在 0.3.41 落地（`scripts/naming_map.py` 为契约，`check_naming.py` 报 136/136 done、0 findings），全量 6764 passed。旧名作为弃用别名保留**一个版本**，下一次发布时按 R-N5 移除；届时需同步清理 `_compat.py`、`StataResults.__getattr__` 里的 estat 旧方法别名，以及 `check_api_conventions.py` 中标注「0.3.41 migration」的例外。本次改名已完成的细节见 CHANGELOG 0.3.41；**下方讨论记录保留仅作追溯**。
 
 用户要求先盘点 westata 全部类/函数名，再共同讨论统一命名方式。盘点已存
 `docs/NAMING_INVENTORY.md`（127 模块、221 类、795 模块级函数、顶层 253 导出）。
@@ -19,29 +21,29 @@
 > 「基于stata的名字修改，如OLS改为Regress」
 
 逐轮确认下来的现行规则（**尚未最终定稿，见下方待拍板**）：
-1. **词源 = Stata 命令名**：类名以对应 Stata 命令为唯一来源，`OLS → Regress`、
-   `QuantileRegression → QuantileRegress`、`PanelOLS → PanelRegress`。
-   **澄清（2026-11-18 纠偏）**：此前误称此方向「与 R1.2 一致、OLS 是违规」是错的。
+1. **词源 = Stata 命令名**：类名以对应 Stata 命令为唯一来源，`Regress → Regress`、
+   `QuantileRegress → QuantileRegress`、`PanelRegressFE → PanelRegress`。
+   **澄清（2026-11-18 纠偏）**：此前误称此方向「与 R1.2 一致、Regress 是违规」是错的。
    R1.2 第 59 行约束的是**命令函数**用 Stata snake_case，通篇未要求类名等于 Stata 命令；
-   `OLS` 在 §4.2/§7 被明确列为达标示例。因此这是一次**新的产品取向**（让 Python 类名也
+   `Regress` 在 §4.2/§7 被明确列为达标示例。因此这是一次**新的产品取向**（让 Python 类名也
    镜像 Stata 命令），需在规范中**新增条款**确立，而非援引 R1.2。既有 R1.2 不冲突但也不授权。
 2. **缩写展开**： cryptic Stata 前缀/缩写按统计语义展开为完整英文词：
    `xt→Panel`、`svy→Survey`、`rd→RegressionDiscontinuity`、`teffects→TreatmentEffects`、
    `q→Quantile`、`r→Robust`、`hdfe→HighDimFixedEffects`。
    **熟词保留（用户 2026-11-18 明确）**：`DID`、`IV` 算熟词，保留缩写不展开——
-   `Didregress→DIDRegress`、`IV2SLS` 原名保留、`XtIvreg→PanelIVRegress`（xt 展开、IV 保留）。
+   `DIDRegress→DIDRegress`、`IV2SLS` 原名保留、`PanelIVRegress→PanelIVRegress`（xt 展开、IV 保留）。
    用户选择「全改造：完全按统计术语命名」，但边界选「只改缩写/前缀型」——已是 Stata
    命令同形的 `Logit`/`Probit`/`Tobit` 等保持不动。
 3. **形态保持 statsmodels**：`from_formula(...).fit()`、duck-typed 结果、数值对齐 Stata
    均不变。README「statsmodels-style API」与新命名不冲突（名字镜像 Stata、接口镜像 statsmodels）。
 4. **结果类**：统一单数 `*Result`（`VARResults`/`VECMResults`/`ContrastResults` 一并改）。
-5. **兼容**：旧名保留一个版本 + `DeprecationWarning`；e-class 函数薄包装（`newey`/`prais`/
-   `synth`/`rdrobust`）同样标 deprecated，不删除。
+5. **兼容**：旧名保留一个版本 + `DeprecationWarning`；e-class 函数薄包装（`newey_west`/`prais`/
+   `synth`/`rd_robust`）同样标 deprecated，不删除。
 6. **`Xt*` / `Svy*` 类名**：用户明确要求改为 Python 名（不再作为例外保留）。
 
 ### 函数名范围：用户坚持「函数名也按缩写展开」（2026-11-18 最终表态）
 已向用户明确指出（AGENTS.md §0/§7 要求的纠偏义务，已完成）：函数名展开会**破坏 R1.2
-整条规则的基础**——`xtset→panel_set`、`varsoc→var_select_order`（及 `estat_` 后缀展开）
+整条规则的基础**——`panel_set→panel_set`、`var_select_order→var_select_order`（及 `estat_` 后缀展开）
 之后，用户无法从 Python 名反查 Stata 命令，而 README 的
 核心命题正是「在 Python 里跑是否得到 Stata 相同的数」。替代方案（只改类名、函数名保留）
 已给出，用户**明确选择坚持展开**。按 §0「若用户坚持，记录风险并给出最小可行替代」：
@@ -49,7 +51,7 @@
 - **记录的风险**：改名落地后，Python→Stata 反查能力在一个版本后消失（兼容期内还能靠旧别名
   反查）；这与 `docs/API_CONVENTIONS.md` R1.2 直接冲突，必须同步改写 R1.2，不能保留原文本。
 - **最小可行缓解**：① 旧函数名保留一个版本 + `DeprecationWarning`，兼容期内反查仍可用；
-  ② 每个新函数的 docstring 第一行写明对应的 Stata 命令（如 "Python name for Stata `xtset`"），
+  ② 每个新函数的 docstring 第一行写明对应的 Stata 命令（如 "Python name for Stata `panel_set`"），
   使 `help()` 仍可反查；③ 在 `docs/NAMING_CONVENTIONS.md` 与 GUIDE 增加「Stata 命令 → Python 名」
   对照表，作为长期反查入口。
 - **未验证**：以上缓解尚未实施，不得写成已完成。
@@ -57,21 +59,21 @@
 ### 逐族核实后的补充裁决（2026-11-18，5 个子智能体读源码核实 `_stata_command`/docstring 后）
 - **estat_* 函数（2026-11-18 澄清纠正）**：用户原意是 **`estat_` 前缀保留、后面的后缀按缩写展开**，
   不是整个函数名不展开（领队此前误解为整体保留，已纠正）。
-  - 后缀展开：`estat_ptrends→estat_parallel_trends`、`estat_esize→estat_effect_size`、
-    `estat_firststage→estat_first_stage`、`estat_hettest→estat_heteroskedasticity_test`、
-    `estat_imtest→estat_information_matrix_test`、`estat_overid→estat_overidentification`、
-    `estat_ovtest→estat_omitted_variables_test`、`estat_corrgram→estat_correlogram`、
-    `estat_weakrobust→estat_weak_instrument_robust`。
+  - 后缀展开：`estat_parallel_trends→estat_parallel_trends`、`estat_effect_size→estat_effect_size`、
+    `estat_first_stage→estat_first_stage`、`estat_heteroskedasticity_test→estat_heteroskedasticity_test`、
+    `estat_information_matrix_test→estat_information_matrix_test`、`estat_overidentification→estat_overidentification`、
+    `estat_omitted_variables_test→estat_omitted_variables_test`、`estat_correlogram→estat_correlogram`、
+    `estat_weak_instrument_robust→estat_weak_instrument_robust`。
   - 后缀保留：人名 `bgodfrey`/`moran`/`mundlak`/`szroeter`/`dwatson`（用户选「保留人名」）；
     熟词 `auc`/`gof`/`ic`/`vce`/`vif`（用户勾选全保留）；已是完整词的 `classification`/
     `endogenous`/`summarize`。
   - 早先的 `estat_*→estimate_*` 提议（fam-func 表）全部作废。
   - 实施注意：`estat_*` 是顶层函数 + 结果对象方法双向对齐（R5.7），改名须两侧同步。
 - **IV 族**：`IV2SLS`/`IVLIML`/`IVGMM` **保留原名**（用户明确，IV 与 2SLS/LIML/GMM 均为熟词缩写）。
-- **面板 xtreg 后缀**：用**短熟词后缀**——`PanelOLS→PanelRegressFE`、`RandomEffects→PanelRegressRE`、
-  `RandomEffectsMLE→PanelRegressMLE`、`BetweenOLS→PanelRegressBE`、
-  `FirstDifferenceOLS→PanelRegressFD`（fe/re/be/fd/mle 当熟词保留）。
-- **熟词扩充**：`RD`、`VECM` 也列为熟词保留——`Rdrobust→RDRobust`（避免 29 字符超长）、
+- **面板 xtreg 后缀**：用**短熟词后缀**——`PanelRegressFE→PanelRegressFE`、`PanelRegressRE→PanelRegressRE`、
+  `PanelRegressMLE→PanelRegressMLE`、`PanelRegressBE→PanelRegressBE`、
+  `PanelRegressFD→PanelRegressFD`（fe/re/be/fd/mle 当熟词保留）。
+- **熟词扩充**：`RD`、`VECM` 也列为熟词保留——`RDRobust→RDRobust`（避免 29 字符超长）、
   `VECM` 原名保留（与 VAR 并列）；Stata 命令 `vec` 仅在 docstring 标注。
 - **结果类的 Xt*/Svy* 前缀**：用户明确**也展开**为 `Panel*`/`Survey*`——
   `XtSetResult→PanelSetResult`、`XtDesResult→PanelDesResult`、`XtSumResult→PanelSumResult`、
@@ -79,13 +81,13 @@
   `Svylike*` 若存在同理。这**修订了早先「结果类一律保留原名」的规则**：结果类规则改为
   「统一后缀 + 前缀展开，但不把命令新名联动到结果类」。
 - **teffects 撞名**：用户选择「合并重复类」。**领队纠偏（AGENTS.md §0/§7）**：核实源码发现
-  `TeffectsRa`（teffects_ra.py，函数 teffects_ra() 的类形式）与 `RegressionAdjustment`
+  `TreatmentEffectsRa`（treatment_effects_ra.py，函数 treatment_effects_ra() 的类形式）与 `RegressionAdjustment`
   （treatreg_effects.py）是**两个独立实现**——不同模块、不同构造函数、不同影响函数方差算法
-  （见两处源码），`TeffectsNnmatch` 与 `NearestNeighbourMatching` 同理。直接合并属**功能重构**，
+  （见两处源码），`TreatmentEffectsNnmatch` 与 `NearestNeighbourMatching` 同理。直接合并属**功能重构**，
   会改变 API 与数值，超出本次改名范围，且无法保证与已对拍的 Stata 数值一致。
   按 §0「若用户坚持，记录风险并给出最小可行替代」：本次改名阶段**先不合并**，按推荐方案
-  「只改 Teffects* 包装类，语义类保留」处理（`TeffectsRa→TreatmentEffectsRa`、
-  `TeffectsNnmatch→TreatmentEffectsNnmatch`、`TeffectsPsmatch→TreatmentEffectsPsmatch`；
+  「只改 Teffects* 包装类，语义类保留」处理（`TreatmentEffectsRa→TreatmentEffectsRa`、
+  `TreatmentEffectsNnmatch→TreatmentEffectsNnmatch`、`TreatmentEffectsPsmatch→TreatmentEffectsPsmatch`；
   `RegressionAdjustment`/`NearestNeighbourMatching`/`IPW`/`AIPW` 保留），避免撞名且零功能改动。
   合并作为**独立的功能重构任务**另行评估，需先证明两组数值等价并有回归测试。此项**未实施**。
 
@@ -102,10 +104,10 @@
 ### 其余已定事项
 - **展开边界**：展开生僻前缀/缩写（xt/svy/rd/teffects/hdfe），保留行业熟词
   （**DID/IV/RD/VECM** 用户明确；VAR/ARIMA/GARCH/AR/MA 等 Stata 命令同形者亦保留）。
-  特例：用户明确 `OLS→Regress`（因 Stata 命令叫 regress 而非 ols），优先于「熟词保留」。
-  `IV2SLS`/`IVLIML`/`IVGMM` 原名保留；`Didregress→DIDRegress`；`XtIvreg→PanelIVRegress`。
+  特例：用户明确 `Regress→Regress`（因 Stata 命令叫 regress 而非 ols），优先于「熟词保留」。
+  `IV2SLS`/`IVLIML`/`IVGMM` 原名保留；`DIDRegress→DIDRegress`；`PanelIVRegress→PanelIVRegress`。
 - **兼容**：旧名（类与函数）保留一个版本 + `DeprecationWarning`；e-class 函数薄包装
-  （`newey`/`prais`/`synth`/`rdrobust`）同样标 deprecated，不删除。
+  （`newey_west`/`prais`/`synth`/`rd_robust`）同样标 deprecated，不删除。
 - **文档冲突需同步修订**：`docs/API_CONVENTIONS.md` R1.2 整条改写、README「API follows
   statsmodels」需补充命名层说明、`docs/API*.md` 由生成器重渲染、中英文 GUIDE 同步。
 
@@ -116,7 +118,7 @@
 **当前尚未修改任何公共名字，尚未写最终规范正文，所有工作产出仅为
 `docs/NAMING_INVENTORY.md`（盘点）与本决策记录。**
 
-改名使用规模（供决策参考）：`Rdrobust` 247 处、`Varbasic` 179、`VARResults` 91、
+改名使用规模（供决策参考）：`RDRobust` 247 处、`VarBasic` 179、`VARResults` 91、
 `VECMResults` 45、`RdRobustResult` 29、`TefectsRaResult` 26、`ContrastResults` 27、
 `IrFTable` 18、`SucestResult` 17。仓库规则要求：全量测试通过后须同步更新中英文
 README/GUIDE/API 文档、bump 版本并推 PyPI + GitHub——本次改名属多发布周期工程，非单个 PR。
@@ -133,7 +135,7 @@ README/GUIDE/API 文档、bump 版本并推 PyPI + GitHub——本次改名属�
     GitHub  : 12fb5bfe
     SHA256  : wheel 50dc78f9...347b25 / sdist 0138befb...1879c（与本地逐一核对一致）
 
-端到端验证：从 PyPI 安装 0.3.27 后，`estat_ovtest` 在 `exper2 = exper^2` 模型上返回
+端到端验证：从 PyPI 安装 0.3.27 后，`estat_omitted_variables_test` 在 `exper2 = exper^2` 模型上返回
 `df=8, ambiguous=True`，且输出含 `warning:` 行——确认发布包携带该功能。
 
 （注：发布前的 0.3.26 由并发会话打包，时间早于 `88581feb`，因此**不含**该告警。
@@ -714,7 +716,7 @@ Stata 丢弃 `x` 之后，`x^2` 就不再被张成（需要的 `x` 没了），�
 | 安装验证 | 从 PyPI 取 wheel 装入干净目录：`stata_param_names` 为 `[ltlan … ngca, t, _cons]`，`t` 系数 .0063068 与 Stata 一致 |
 | 构建方式 | 从 `HEAD` 的干净 worktree 构建 |
 
-内容：`PanelOLS` 按**公式书写顺序**报告系数（常数项在最后），与 Stata `e(b)` 一致。
+内容：`PanelRegressFE` 按**公式书写顺序**报告系数（常数项在最后），与 Stata `e(b)` 一致。
 此前面板估计器未记录 `_formula_rhs_order`，退回 patsy 的字母序，
 导致趋势项 `t` 排在斜率的**第一行**而非最后。数值从未错，只是行序错。
 
@@ -734,7 +736,7 @@ Stata 丢弃 `x` 之后，`x^2` 就不再被张成（需要的 `x` 没了），�
 | 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.19、检验 `F=12.511374209`、`.first_stage.nobs=420`、`d_ltlan=0.9807158` |
 | 构建方式 | 从 `HEAD` 的干净 worktree 构建 |
 
-内容：`ws.xtserial` 返回一阶差分回归（Stata `, output` 打印的那个），
+内容：`ws.panel_serial` 返回一阶差分回归（Stata `, output` 打印的那个），
 放在 `result.first_stage`（普通 `StataResults`），系数按 `d_<变量名>` 索引；
 `first_stage_table()` 返回渲染后的表，`keep_first_stage=False` 可不保留。
 对拍 StataNow 19.5：N=420、`R2=0.5797`、`RMSE=.11179`、`F(9,27)=902.61`，
@@ -758,12 +760,12 @@ Stata 丢弃 `x` 之后，`x^2` 就不再被张成（需要的 `x` 没了），�
 
 | 族 | robust 可用 | 回显 |
 |---|---|---|
-| `OLS` / `FEOLS` / `Areg` | ✅ | `HC1` |
+| `Regress` / `RegressHighDimFixedEffects` / `Areg` | ✅ | `HC1` |
 | `IV2SLS` / `IVLIML` / `IVGMM` | ✅ | `HC0` |
 | `Logit`/`Probit`/`Poisson`/`ologit` | ✅ | `ML_ROBUST` |
-| `PanelOLS` / `RandomEffects` | ✅ | `cluster` |
-| `QuantileRegression` | ✅ | `QREG_ROBUST` |
-| `Sureg` | ✅ | `SYSTEMS_ROBUST` |
+| `PanelRegressFE` / `PanelRegressRE` | ✅ | `cluster` |
+| `QuantileRegress` | ✅ | `QREG_ROBUST` |
+| `SeeminglyUnrelatedRegress` | ✅ | `SYSTEMS_ROBUST` |
 
 已修的具体缺陷：
 
@@ -774,13 +776,13 @@ Stata 丢弃 `x` 之后，`x^2` 就不再被张成（需要的 `x` 没了），�
    显式列出；`ml` 故意不在表内（ML 三明治需信息矩阵，`compute_cov` 做不出来）。
    新增估计族若忘记声明会立刻报错，而不是静默拿到 HC1。
 2. **决策 A**：新增 `ML_ROBUST` / `QREG_ROBUST` / `SYSTEMS_ROBUST` 三个规范值。
-3. **决策 B**：`PanelOLS` 族的 `robust`/`HC1` 回显 `cluster`。
-4. `FEOLS`/`Areg` 原先**拒绝** `robust` 并要求写 `HC1` → 现在接受，`bse` 与 `HC1`
+3. **决策 B**：`PanelRegressFE` 族的 `robust`/`HC1` 回显 `cluster`。
+4. `RegressHighDimFixedEffects`/`Areg` 原先**拒绝** `robust` 并要求写 `HC1` → 现在接受，`bse` 与 `HC1`
    逐位相同（`reghdfe, robust` 本来就是 HC1）。
-5. `Areg` 报错文案写死 `FEOLS` → 现在按 `type(self).__name__` 点名。
+5. `Areg` 报错文案写死 `RegressHighDimFixedEffects` → 现在按 `type(self).__name__` 点名。
 6. `Areg(cov_type="HC2"/"HC3")` 的 `results.cov_type` 停留在占位值 `HC1` →
    新增 `StataResults.relabel_cov_type`，现在正确显示 `HC2`/`HC3`。
-7. `RobustRegression` **静默吞掉**任何 `cov_type`（`bse` 逐位不变）→ 现在明确拒绝，
+7. `RobustRegress` **静默吞掉**任何 `cov_type`（`bse` 逐位不变）→ 现在明确拒绝，
    并说明「Stata 的 `rreg` 没有 `vce()`」。
 8. `Logit` 等 ML 族的 `cov_type="robust"` 曾被 `summary()` 判为「非伪似然」
    → 抽出 `_PSEUDO_LIKELIHOOD_COV_TYPES` 常量并纳入新标签。
@@ -799,11 +801,11 @@ Stata 丢弃 `x` 之后，`x^2` 就不再被张成（需要的 `x` 没了），�
 | GitHub | 已推送 `origin/main`（`a6e63e4`），tag `v0.3.18` 已推送 |
 | PyPI | 已发布：<https://pypi.org/project/westata/0.3.18/>，wheel 1031785 B、sdist 2217604 B |
 | 哈希校验 | PyPI 下载的 wheel SHA256 `172df371…fe6c8a` 与本地构建**完全一致** |
-| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.18、`ws.xtserial` 存在、lin_1992 上 `F=12.511374209`、`df_r=27`、`p=0.00148451303` |
+| 安装验证 | 从 PyPI 取 wheel 装入干净目录：`__version__` 0.3.18、`ws.panel_serial` 存在、lin_1992 上 `F=12.511374209`、`df_r=27`、`p=0.00148451303` |
 | 构建方式 | 从 `HEAD` 的干净 worktree 构建，避免打包工作区未提交改动 |
 
 **发布前已按工作区规则更新并校对中英文文档**：
-`GUIDE.md` / `GUIDE.zh-CN.md` 新增 `xtserial` 一节（含两个陷阱与可运行示例），
+`GUIDE.md` / `GUIDE.zh-CN.md` 新增 `panel_serial` 一节（含两个陷阱与可运行示例），
 `API.md` / `API.zh-CN.md` 由生成器重渲染（prose 覆盖 283/283），
 `GAP_REGISTER.md` 的 C12-11 与 B 类清单已更正。指南代码块已通过
 `tests/test_guide.py` 与 `tests/test_docs_zh.py` 的实际执行校验。
@@ -886,7 +888,7 @@ B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 
 | 决策 | 结果 |
 |---|---|
-| O1 是否补装 `xtserial` | **保持现状，不补装**（本机未装，文档中为"建议装"非"必装"）|
+| O1 是否补装 `panel_serial` | **保持现状，不补装**（本机未装，文档中为"建议装"非"必装"）|
 | O2 是否补装"不必装"的 `rd`/`psmatch2`/`xtbalance` | **维持不装** |
 | O3 示例数据集安放位置 | **维持现状** |
 | O4 可复现产物 `_stata_pkgs\` | **保留** |
@@ -898,18 +900,18 @@ B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 
 以下不是"等待用户拍板"的事项，而是**已做出并验证的技术判断**，登记在此以便追溯。
 
-### T1. `rdrobust` 自动带宽：停在"组合规则已实现"
+### T1. `rd_robust` 自动带宽：停在"组合规则已实现"
 
 - **现状**：三种组合规则（`mserd`/`msesum`/`msetwo`）已从 `rdbwselect.ado:499/527/537`
   精确转写，7 个守卫覆盖算术与符号方向。
 - **阻塞点**：`C[1..3]` 由 `rdrobust_bw()` 在 `l/lrdrobust.mlib` 中计算。
   `mata which` 确认位置；该文件 321 KB、**可打印字节仅 1.9%**，函数名是孤立字符串，
   前后皆二进制 —— 是编译字节码。注意这与 `synth` **不是同一类**：`synth` 的顶层算法
-  是可读的 `synth.ado`，只有数值子过程在库里（见 T6）；而 `rdrobust` 的带宽选择器
+  是可读的 `synth.ado`，只有数值子过程在库里（见 T6）；而 `rd_robust` 的带宽选择器
   **整体**在库里，ado 一侧只有参数设置。
-- **已采取**：`rdrobust` 仍拒绝自动选带宽（`UnsupportedError`），而非接入一个
+- **已采取**：`rd_robust` 仍拒绝自动选带宽（`UnsupportedError`），而非接入一个
   会返回 `h=0.0757`（Stata 是 `0.182`）的选择器。
-- **若需推进**：需要 `rdrobust` 官方源码或论文附录的完整 `C[1..3]` 定义。
+- **若需推进**：需要 `rd_robust` 官方源码或论文附录的完整 `C[1..3]` 定义。
 
 ### T2. `nbreg` 的多起点选择阈值
 
@@ -923,16 +925,16 @@ B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 ### T3. 未实现的条目（已确认为能力边界）— **2026-11-09 起仅存历史价值**
 
 > ⚠️ **本节对 `synth` 的「能力边界」判断已被实测证伪并关闭**；B 档已立项。
-> 详见文件头「〇」节与 `docs/GAP_REGISTER.md` §3.6.4。其余条目（xtserial / arimasoc /
-> rdrobust 自动带宽 / teffects 方差）不受本次决策影响，仍按各自记录处理。
+> 详见文件头「〇」节与 `docs/GAP_REGISTER.md` §3.6.4。其余条目（panel_serial / arimasoc /
+> rd_robust 自动带宽 / teffects 方差）不受本次决策影响，仍按各自记录处理。
 
 | 条目 | 状态 | 依据 |
 |---|---|---|
 | `synth` / `synth2` | ~~未实现~~ → **B 档立项（2026-11-09）** | ~~顶层算法可读，六个数值子过程在 `lsynth_mata_subr` 库中~~。实测更正：`e(V_matrix)` 可导出、`regsval` 为确定性纯函数可辨识、4 个内核已白盒化；边界收窄为 `nested` 的 `ml` 收敛点 + QP 数值行为 + harness 形态 |
-| `xtserial` | 未实现 | 本机 Stata 未装，`r(111)` |
+| `panel_serial` | 未实现 | 本机 Stata 未装，`r(111)` |
 | `arimasoc` | 未实现 | — |
-| `rdrobust` 自动带宽 | 部分 | 见 T1 |
-| `teffects` AI-robust 方差 | 未实现 | 六种影响函数形式试过，均差 2.9–3.4%，见 `teffects_ra.py` 文档 |
+| `rd_robust` 自动带宽 | 部分 | 见 T1 |
+| `teffects` AI-robust 方差 | 未实现 | 六种影响函数形式试过，均差 2.9–3.4%，见 `treatment_effects_ra.py` 文档 |
 | `teffects psmatch` 推断量 | 未实现 | 需完整 Abadie-Imbens 影响函数，docstring 已排除两种简化 |
 
 ### T4. `teffects aipw` 点估计低 2.53（阻塞点已定位到可读源码）
@@ -955,7 +957,7 @@ B 档范围内全部已拍板并执行；扩展范围见上方「〇之二」。
 ```
 
 `muj` 的导数含 `(1 - 1/p)`，说明 **`muj` 与 `pop` 是联合 GMM 估计的**，
-而不是「先 OLS 拟合、再对 augmented 取均值」。
+而不是「先 Regress 拟合、再对 augmented 取均值」。
 
 本包走的是后者，因此**落在另一个点**。修正项 `-6.58` / `-4.05` 不是 bug，
 而是两个估计点之间的差。
@@ -1095,7 +1097,7 @@ L338  est scalar sigma_e = `s_e'
 3. `_panel_decomposition` 里的 `resid` 在该处**不是** within 残差
    （实测其平方和与对应 FE 的 `e(rss)` 不符）。
 
-**正确的接入点**：在 `RandomEffects.fit` 内部显式跑一次 within 回归取 rmse，
+**正确的接入点**：在 `PanelRegressRE.fit` 内部显式跑一次 within 回归取 rmse，
 并把结果传进 `_panel_decomposition`；或把 FE 的 `resid` 显式传进去。
 两者都是小改动，但必须先确定 `_long_design` 的行序来源，**不能再靠猜列**。
 
@@ -1139,7 +1141,7 @@ L338  est scalar sigma_e = `s_e'
 **1. 内部代码没有直接读取这些键。**
 
 用正则扫全库的 `["key"]` / `.get("key")` 形式，命中项绝大多数属于**其他命令**
-（`hdfe`、`systems`、`newey`、`did`），而 `panel.py` 里的命中全是**写入**：
+（`hdfe`、`systems`、`newey_west`、`did`），而 `panel.py` 里的命中全是**写入**：
 
 ```
 panel.py:1416  e["sum_w"] = float(nobs)        写入
@@ -1230,7 +1232,7 @@ egress D. | 4（含 _cons） | [-0.1048258, -0.0621289, 1.0405411, 0.0075628] |
 - **需先决定**：d 应对齐 
 egress D.（带截距）还是维持现状（无截距、纯组内差分）。
   差分后仍有常数项 = 各组共同的时间趋势，去掉它是有偏的，倾向对齐 Stata。
-- **未处理原因**：修它会改动 FirstDifferenceOLS 的默认设计矩阵，影响 etable、predict
+- **未处理原因**：修它会改动 PanelRegressFD 的默认设计矩阵，影响 etable、predict
   与多个夹具，需单独一轮并逐一复核。
 
 ### T10 补充：linearmodels 禁止差分回归带常数，需替换 backend（第 59 轮）
@@ -1238,12 +1240,12 @@ egress D.（带截距）还是维持现状（无截距、纯组内差分）。
 上一节推断「加截距」是正确做法。第 59 轮**已验证这是对的**：
 
 `
-手动 OLS:  [0.0075628, -0.1048258, -0.0621289, 1.0405411]
+手动 Regress:  [0.0075628, -0.1048258, -0.0621289, 1.0405411]
 Stata:     [-0.1048258, -0.0621289, 1.0405411, 0.0075628]   ← 逐位一致
 n = 768
 `
 
-**但实现路径被堵住**：linearmodels.panel.FirstDifferenceOLS 直接拒绝常数：
+**但实现路径被堵住**：linearmodels.panel.PanelRegressFD 直接拒绝常数：
 
 `
 ValueError: Constants are not allowed in first difference regressions.
@@ -1254,7 +1256,7 @@ ValueError: Constants are not allowed in first difference regressions.
 
 **可行的三条路**：
 
-1. 不用 backend，自己实现差分 OLS（手动版已证明能得到逐位一致的结果，
+1. 不用 backend，自己实现差分 Regress（手动版已证明能得到逐位一致的结果，
    但需要一并处理 cov_type、predict、etable 的对接）；
 2. 保留 backend 做协方差，把常数的贡献事后重参数化（Schur 补）；
 3. 维持现状并在 e(cmd) 与文档中明确标注「不等于 Stata 的任何命令」。
@@ -1283,7 +1285,7 @@ ValueError: Constants are not allowed in first difference regressions.
 
 **结论：必须整体重拟合**，不能包装。这意味着：
 
-1. 自己实现差分 OLS（含常数列），拿到 params；
+1. 自己实现差分 Regress（含常数列），拿到 params；
 2. 协方差：非稳健情形已验证逐位一致（sigma2 * inv(D'D)）；
    稳健/聚类分支需要另行推导；
 3. 
@@ -1297,7 +1299,7 @@ esid、itted、df_r（765 → 764）、predict（816 → 768）随之调整；
 这是本轮最重要的发现，它**缩小了缺口范围**。
 
 `
-rdrobust(y, x, bandwidth=0.2808754677, bias_bandwidth=0.4908484209)
+rd_robust(y, x, bandwidth=0.2808754677, bias_bandwidth=0.4908484209)
 tau = 0.7111570135      Stata tau_cl = 0.7111570135   ← 逐位一致
 se  = nan               Stata se_tau_cl = 0.1099186153
 `
@@ -1323,7 +1325,7 @@ d_exponent(1) = 0.2 | 有 |
 
 - **此前记录说「带宽是唯一缺口」，不准确**：标准误同样缺，且两者独立。
 
-### T1 再补充：`rdrobust` 的标准误是 NN 方差，不是标准 sandwich（第 64 轮实测）
+### T1 再补充：`rd_robust` 的标准误是 NN 方差，不是标准 sandwich（第 64 轮实测）
 
 Stata 的表头明确了算法：
 
@@ -1378,7 +1380,7 @@ Eff. Number of obs | 79   70
 
 ### T1 四补充：HC0 方差已实现并精确，NN 仍是缺口（第 66 轮）
 
-**突破口是帮助文件，不是试错**：`rdrobust.sthlp:158-171` 写明
+**突破口是帮助文件，不是试错**：`rd_robust.sthlp:158-171` 写明
 
 ```
 vce(hc0)  heteroskedasticity-robust plug-in residuals variance estimator WITHOUT WEIGHTS
@@ -1389,7 +1391,7 @@ Default is vce(nn 3).
 **"without weights" 指的是距离要按带宽归一**（`distance / h`），不是缺少权重向量。
 这一处归一化就是第 64/65 轮五次尝试都差 1.3%–257% 的原因。
 
-**已实现并逐项验证**（`rdrobust(y, x, h=0.2808754677, b=0.4908484209)`）：
+**已实现并逐项验证**（`rd_robust(y, x, h=0.2808754677, b=0.4908484209)`）：
 
 | 量 | westata | Stata `vce(hc0)` |
 |---|---|---|
@@ -1428,7 +1430,7 @@ Default is vce(nn 3).
 
 - **HC1 也未实现**：每侧乘 `nh/(nh-2)` 给 `0.1089594542`，乘整样本 `n/(n-2)` 给
   `0.1082308289`，而 Stata 是 `0.1083685245`——**夹在两者之间**，说明每侧自由度的处理
-  不是整数倍，需要 `rdrobust` 的确切定义而不是再试系数。
+  不是整数倍，需要 `rd_robust` 的确切定义而不是再试系数。
 
 ### T1 六补充：NN 的配对方式被证否三次，需要论文原文（第 68 轮）
 
@@ -1485,7 +1487,7 @@ Stata 显示 `222` 与 `223`，是 `222.5` 的取整差异。
 - **结论**：`tebalance summarize` 的算法本身可用，缺的是
   1. `IPW`/`AIPW` 结果要**暴露权重**；
   2. 平衡表的权重列要按 `N/2` 归一，而不是原样求和。
-- **未处理**：需要先给 `StataResults` 增加权重暴露，再改 `tebalance_summarize` 的求和口径，
+- **未处理**：需要先给 `StataResults` 增加权重暴露，再改 `treatment_balance_summarize` 的求和口径，
   两处改动需一起验证。
 
 ### T12. 报告 C17-04「`test canal_post post`」的写法与两边实现都不符（第 72 轮）
@@ -1503,7 +1505,7 @@ r(111): canal_post not found
 **没有名为 `post` 的参数**，`canal_post` 也不能直接写。`[ATET]canal_post`、
 `[ATET:r1vs0.canal_post]`、`1.ATET:r1vs0.canal_post` 三种写法**全部报错**。
 
-**本包侧**：`Didregress` 的参数只有 `canal_post`（一个），`post` 已被 `time` 设定吸收，
+**本包侧**：`DIDRegress` 的参数只有 `canal_post`（一个），`post` 已被 `time` 设定吸收，
 `test canal_post post` 抛 `KeyError: coefficient 'post' not found`。
 
 - 所以这一条**不是「布局不同」也不是「近似」**，而是**报告所依据的 Stata 命令在两种实现里都不成立**。
@@ -1531,7 +1533,7 @@ r(111): canal_post not found
 **没有 `test`。** 这印证了第 72 轮的发现：`test canal_post post` 之所以两边都报错，
 是因为它不是 `didregress` 的有效后估计命令。
 
-**本包现状**：五个 `estat` **全部未实现**（`hasattr(ws, 'estat_ptrends')` 等均为 `False`）。
+**本包现状**：五个 `estat` **全部未实现**（`hasattr(ws, 'estat_parallel_trends')` 等均为 `False`）。
 这是真实的能力缺口，比 C17-04 的写法问题更值得处理。
 
 **已取得的参考输出**（`estat ptrends`，合成面板，`n_g=60`、`n_t=15`、20 个处理组）：
@@ -1601,18 +1603,18 @@ _pretreat、组数、交互项系数，再决定分母自由度的口径。
 - **同时注意**：`first_stage()`（系数表）与 `estat firststage`（汇总统计 + 最小特征值）
   是**两个不同入口**，两者都已实现，报告条目对应的是后者。
 
-### T15. ~~`varsoc` 数值全对但缺少 79 宽边框~~ → **第 185–186 轮已修复**
+### T15. ~~`var_select_order` 数值全对但缺少 79 宽边框~~ → **第 185–186 轮已修复**
 
 报告 C14-04 评 0.1429。边框、行宽、LL/LR/df/p/FPE 五列位置均已对齐，
-`varsoc` 在 n = 100/200/300/900/1500 **5/5 逐字符一致**。守卫见
+`var_select_order` 在 n = 100/200/300/900/1500 **5/5 逐字符一致**。守卫见
 `tests/test_varsoc_large_n.py`、`test_varsoc_row_fields.py`、`test_varsoc_criteria_geometry.py`。
 
-### T16. ~~`varsoc` 的 FPE 数值偏 1%，与 Stata 定义不同~~ → **不是缺陷**
+### T16. ~~`var_select_order` 的 FPE 数值偏 1%，与 Stata 定义不同~~ → **不是缺陷**
 
 原记录说 FPE 差 1%。实测是**格式差异**而非数值：FPE 列右对齐到第 45 列、星号不计宽，
 按此实现后 5/5 样本一致。参见 T20 与 `tests/test_varsoc_criteria_geometry.py`。
 
-### T20. ~~`varsoc` 剩余差异：非行列字段是「固定终点浮动」~~ → **第 194 轮已解决**
+### T20. ~~`var_select_order` 剩余差异：非行列字段是「固定终点浮动」~~ → **第 194 轮已解决**
 
 报告 C14-04。**根因是 `rstrip("*")` 缺失** —— 三次尝试都从含星号的整段文本计算宽度，
 导致含星行多 1 列、短值行错位。
@@ -1631,9 +1633,9 @@ _pretreat、组数、交互项系数，再决定分母自由度的口径。
 **验证**：n = 100/200/300/900/1500，**5/5 逐字符一致**。
 守卫见 `tests/test_varsoc_criteria_geometry.py`（13 项）。
 
-### T17. `vecstable` 数值精确，框线可加，但列内对齐位置未测准（第 84 轮）
+### T17. `vec_stable` 数值精确，框线可加，但列内对齐位置未测准（第 84 轮）
 
-报告 C14-08 评 0.0833。按新目标（只求现有功能的输出与 Stata 一致），本轮核对了 `vecstable`。
+报告 C14-08 评 0.0833。按新目标（只求现有功能的输出与 Stata 一致），本轮核对了 `vec_stable`。
 
 **数值完全一致**（rank-1、lags(2)、200 点合成系统）：
 
@@ -1645,7 +1647,7 @@ _pretreat、组数、交互项系数，再决定分母自由度的口径。
 | 模 | `.159178` | `.159178` |
 | 单位模 | `1` | `1` |
 
-**已确认的几何**（`vecstable` 输出，每行 44 字符，`|` 在 2/27/42 列）：
+**已确认的几何**（`vec_stable` 输出，每行 44 字符，`|` 在 2/27/42 列）：
 
 ```
 '  +----------------------------------------+'
@@ -1773,12 +1775,12 @@ Det(Sigma_ml)  = .9545594                          SBIC              = 5.786585
   表头插入后失效，已改为查找 `Equation` 开头的行。
 - **下一步**：先定 `Sample` 索引基准（`tsset` 的 1-based vs 内部 0-based），再处理 `Det` 因子。
 
-### T15 补充二：`varsoc` 外框的完整几何已测准，但列宽改动会破坏守卫（第 94 轮）
+### T15 补充二：`var_select_order` 外框的完整几何已测准，但列宽改动会破坏守卫（第 94 轮）
 
 本轮按实测重建了外框，**框架部分正确**，但**列宽收尾未完成**，且改动触发了 4 个依赖旧布局的守卫，
 故整体回退。
 
-**已测准的几何**（`varsoc y1 y2, maxlag(2)`，200 期）：
+**已测准的几何**（`var_select_order y1 y2, maxlag(2)`，200 期）：
 
 ```
  3 len=78 '   Sample: 3 thru 200                                      Number of obs = 198'
@@ -2066,7 +2068,7 @@ trend='c'             ll -271.316650   rank 4      ← 与 Stata 完全一致
 > 我差点把「0.76 的似然差」记成似然定义差异 —— 它根本不存在。
 > 教训：**比对前先确认两侧的默认设定相同**，这是 error.md 应当增加的一条。
 
-### T26. `varstable` 的复数行对齐：**已定位为底层数值差异，非格式**（第 175–177 轮）
+### T26. `var_stable` 的复数行对齐：**已定位为底层数值差异，非格式**（第 175–177 轮）
 
 报告 C14-08 评 0.0833。n=60 上 11 行完全一致；换样本后第 6–7 行不一致。
 
@@ -2131,7 +2133,7 @@ W: '          x2 |      1.01    0.988100'
 
 - **状态**：保留现状。`%.6f` 是本包能给出的最接近值。
 - **影响**：`estat vif` 在少数数据上 1/VIF 末位会与 Stata 差 1。
-- **性质**：与 VECM 系数（T22）、`varstable` 特征值（T26）同类 —— **底层数值路径差异**。
+- **性质**：与 VECM 系数（T22）、`var_stable` 特征值（T26）同类 —— **底层数值路径差异**。
 - **已确认无格式可修**：`%.6f` 对 `0.98809952` 必然是 `0.988100`，对 `0.98809949` 必然是
   `0.988099`。差异完全由数值本身决定。
 
@@ -2170,12 +2172,12 @@ W: '          x2 |      1.01    0.988100'
 - **下一步**：读 `dfuller.ado` 的表头打印语句（`findfile dfuller.ado`），
   而不是继续从输出反推。
 
-### T26（第 190 轮更新）. `varstable` 格式：**源码已找到，规则比输出反推更复杂**
+### T26（第 190 轮更新）. `var_stable` 格式：**源码已找到，规则比输出反推更复杂**
 
 按第 189 轮的新规则（两次对不上就读源码），本轮用 `findfile` 三层追踪找到了真正的实现：
 
 ```
-varstable.ado        -> 只是 wrapper
+var_stable.ado        -> 只是 wrapper
 varstable_w2.ado     -> 再 wrapper，导出 r(Re)/r(Im)/r(Modulus)
 varstable_w.ado      -> 真正实现（287 行）
 ```
@@ -2212,7 +2214,7 @@ local c_el : display "-" %10.7g  -1*`complex'[1,`i'] "{it:i}"
 **两种规则各自只对一半**，说明 `_tab` 的行为是「按 13 列宽**动态**选择精度」，
 而不是固定的 `%8.7g`。
 
-- **状态**：**回退**，23 个 varstable 测试通过。
+- **状态**：**回退**，23 个 var_stable 测试通过。
 - **下一步**：需要读 `_tab` 自身的实现（`findfile _tab.ado` 或它是 Mata 类），
   弄清 `.numfmt` + `.width` 的交互。**这仍是源码问题，不该继续从输出反推。**
 - **本轮净产出**：0 行代码改动，但把「未知」缩小到了**一个具体的类**（`_tab`）。
@@ -2277,7 +2279,7 @@ Stata    'Logistic regression                                     Number of obs 
 - **状态**：**未修改**。已确认差异性质是**纯布局**（值全对）。
 - **下一步**：`grep "Logistic regression"` 找到 banner 拼装点，再追 `Number of obs` 的宽度参数
   （应为 13 而非 14，且 `= ` 紧跟其后）。
-- **注意**：这条与 T15–T20 不同，`varsoc` 等表已全部对齐，此为**离散模型专属**问题。
+- **注意**：这条与 T15–T20 不同，`var_select_order` 等表已全部对齐，此为**离散模型专属**问题。
 
 **第 203 轮补充：已排除的候选位置**
 
@@ -2610,7 +2612,7 @@ def _cluster_row(label_text, value_text, right_aligned):
 
 ```python
 df.loc[0, "lnq"] *= 100
-model = ws.OLS.from_formula("lntc ~ lnq + lnpl + lnpk + lnpf", df).fit()
+model = ws.Regress.from_formula("lntc ~ lnq + lnpl + lnpk + lnpf", df).fit()
 lev = model.predict(kind="lev")
 lev = df["lev"].describe(); lev["max"] / lev["mean"]
 ```
@@ -2642,7 +2644,7 @@ lev = df["lev"].describe(); lev["max"] / lev["mean"]
 - `mean`/`describe` 被大量命令共用（`summarize`、`estat summarize`、各模型的 `e()`）
 - 改动会波及所有依赖求和顺序的输出，风险大于 1.2e-8 的收益
 
-与已记录的 `estat vif` 第 9 位有效数字、`varstable` n≥300 特征值同类，属**末位数值路径差异**。
+与已记录的 `estat vif` 第 9 位有效数字、`var_stable` n≥300 特征值同类，属**末位数值路径差异**。
 
 ### 证据强度（诚实标注）
 

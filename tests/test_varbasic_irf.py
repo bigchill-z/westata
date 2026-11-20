@@ -164,7 +164,7 @@ def test_the_class_form_agrees_with_the_function(panel) -> None:
     """R2.7 requires an estimation command to have a class; it must give the same answer."""
 
     by_function = ws.varbasic(panel, "dlny", lags=1, time="year")
-    by_class = ws.Varbasic(panel, "dlny", lags=1, time="year").fit()
+    by_class = ws.VarBasic(panel, "dlny", lags=1, time="year").fit()
     assert by_function.ll == by_class.ll
     assert str(ws.irf_table(by_function)) == str(ws.irf_table(by_class))
 

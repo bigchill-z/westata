@@ -46,7 +46,7 @@ def frame():
 def test_r2_decomposes_into_mss_and_rss(frame) -> None:
     """``r2 = mss / (mss + rss)`` -- the two sums of squares must agree with it."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
 
     expected = e["mss"] / (e["mss"] + e["rss"])
@@ -61,7 +61,7 @@ def test_the_gaussian_loglik_follows_from_rss(frame) -> None:
     identity would break even though both numbers look reasonable on their own.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
     n = float(e["N"])
 
@@ -104,7 +104,7 @@ def test_n_minus_df_r_equals_rank_where_df_r_exists(frame) -> None:
     ``tobit`` defines ``df_r = N - df_m`` so its sum is ``N`` by construction.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
 
     assert e["N"] - e["df_r"] == e["rank"]
@@ -144,8 +144,8 @@ def test_n_minus_df_r_equals_rank_without_an_intercept_too(frame) -> None:
     relation holds on both sides of the intercept question.
     """
 
-    with_constant = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().e
-    without = ws.OLS.from_formula("y ~ x1 + x2 - 1", frame).fit().e
+    with_constant = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().e
+    without = ws.Regress.from_formula("y ~ x1 + x2 - 1", frame).fit().e
 
     assert with_constant["N"] - with_constant["df_r"] == with_constant["rank"] == 3
     assert without["N"] - without["df_r"] == without["rank"] == 2
@@ -166,7 +166,7 @@ def test_panel_df_r_counts_the_absorbed_groups(frame) -> None:
     panel = frame.assign(
         firm=np.repeat(np.arange(60), 5), year=np.tile(np.arange(5), 60)
     )
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", panel, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -242,8 +242,8 @@ def test_truncreg_and_intreg_report_k_aux(frame) -> None:
     censored = frame.assign(w=np.maximum(frame["y"], 0.5))
     bounds = censored.assign(lo=censored["w"], hi=censored["w"])
 
-    truncreg = ws.Truncreg.from_formula("w ~ x1", censored, lower=0).fit()
-    intreg = ws.Intreg.from_formula("lo hi ~ x1", bounds).fit()
+    truncreg = ws.TruncatedRegress.from_formula("w ~ x1", censored, lower=0).fit()
+    intreg = ws.IntervalRegress.from_formula("lo hi ~ x1", bounds).fit()
 
     for result in (truncreg, intreg):
         assert result.e["k_aux"] == 1, result.model_name
@@ -370,7 +370,7 @@ def test_truncreg_reports_observations_before_truncation() -> None:
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
 
-    e = ws.Truncreg.from_formula("y ~ x1", frame, lower=0).fit().e
+    e = ws.TruncatedRegress.from_formula("y ~ x1", frame, lower=0).fit().e
 
     assert e["N_bf"] == n
     assert e["N"] < n  # some rows fell below the truncation point
@@ -398,7 +398,7 @@ def test_intreg_counts_each_censoring_kind() -> None:
         {"lo": lower, "hi": upper, "x1": rng.normal(size=n)}
     )
 
-    e = ws.Intreg.from_formula("lo hi ~ x1", frame).fit().e
+    e = ws.IntervalRegress.from_formula("lo hi ~ x1", frame).fit().e
 
     assert e["N_unc"] == 150
     assert e["N_lc"] == 50
@@ -422,7 +422,7 @@ def test_intreg_se_sigma_is_the_delta_method() -> None:
         {"lo": values, "hi": values, "x1": rng.normal(size=n)}
     )
 
-    result = ws.Intreg.from_formula("lo hi ~ x1", frame).fit()
+    result = ws.IntervalRegress.from_formula("lo hi ~ x1", frame).fit()
     e = result.e
     # ``.iloc`` is required under pandas 3, where ``Series[int]`` is label-based
     # and the index here holds parameter names, not positions.
@@ -446,7 +446,7 @@ def test_truncreg_has_no_se_sigma() -> None:
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
 
-    assert "se_sigma" not in ws.Truncreg.from_formula(
+    assert "se_sigma" not in ws.TruncatedRegress.from_formula(
         "y ~ x1", frame, lower=0
     ).fit().e
 
@@ -551,7 +551,7 @@ def test_r2_and_ll_are_internally_consistent_for_panel_fits(frame) -> None:
     panel = frame.assign(
         firm=np.repeat(np.arange(60), 5), year=np.tile(np.arange(5), 60)
     )
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", panel, entity="firm", time="year"
     ).fit()
     e = result.e

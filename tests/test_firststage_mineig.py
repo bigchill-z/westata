@@ -64,7 +64,7 @@ def test_mineig_scales_the_partial_r2_by_the_degrees_of_freedom() -> None:
     """
 
     frame = _frame()
-    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
+    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_first_stage()
 
     partial = float(first_stage.partial_r2[0])
     expected = (
@@ -84,7 +84,7 @@ def test_mineig_satisfies_the_partial_f_identity() -> None:
     """
 
     frame = _frame()
-    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
+    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_first_stage()
 
     # With one instrument the Cragg-Donald statistic coincides with the first-stage F, so
     # this test compares the two rather than re-deriving the eigenvalue.
@@ -95,7 +95,7 @@ def test_mineig_satisfies_the_partial_f_identity() -> None:
 
 def test_the_three_quantities_agree_to_machine_precision() -> None:
     frame = _frame(seed=7)
-    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
+    first_stage = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_first_stage()
 
     mineig = first_stage.mineig
     partial = float(first_stage.partial_r2[0])
@@ -115,7 +115,7 @@ def test_the_identity_holds_with_included_exogenous_regressors() -> None:
 
     frame = _frame(n_instr=1, n_endog=1, include_exog=True)
     first_stage = (
-        ws.IV2SLS.from_formula("y ~ w + [x1 ~ z1]", frame).fit().estat_firststage()
+        ws.IV2SLS.from_formula("y ~ w + [x1 ~ z1]", frame).fit().estat_first_stage()
     )
 
     partial = float(first_stage.partial_r2[0])
@@ -136,7 +136,7 @@ def test_mineig_is_a_non_negative_statistic() -> None:
     for seed in (1, 2, 3):
         frame = _frame(seed=seed)
         first_stage = (
-            ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_firststage()
+            ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", frame).fit().estat_first_stage()
         )
         assert first_stage.mineig >= 0.0, seed
 
@@ -153,7 +153,7 @@ def test_mineig_matches_a_hand_built_eigenvalue_with_two_endogenous() -> None:
     frame = _frame(n_instr=2, n_endog=2, seed=11)
     first_stage = (
         ws.IV2SLS.from_formula("y ~ [x1 + x2 ~ z1 + z2]",
-                               frame).fit().estat_firststage()
+                               frame).fit().estat_first_stage()
     )
 
     n = len(frame)
@@ -191,7 +191,7 @@ def test_mineig_differs_from_any_partial_r2_with_two_endogenous() -> None:
     frame = _frame(n_instr=2, n_endog=2, seed=11)
     first_stage = (
         ws.IV2SLS.from_formula("y ~ [x1 + x2 ~ z1 + z2]",
-                               frame).fit().estat_firststage()
+                               frame).fit().estat_first_stage()
     )
 
     assert not np.any(
@@ -257,7 +257,7 @@ def test_partial_r2_matches_the_restriction_definition(
     """
 
     frame = _frame(n_instr=n_instr, n_endog=n_endog, include_exog=with_exog)
-    first_stage = ws.IV2SLS.from_formula(formula, frame).fit().estat_firststage()
+    first_stage = ws.IV2SLS.from_formula(formula, frame).fit().estat_first_stage()
 
     included = (
         np.column_stack([frame["w"]]) if with_exog else np.empty((len(frame), 0))
@@ -284,7 +284,7 @@ def test_the_partial_f_matches_its_definition(
     """``F = (partial_r2/df_num) / ((1 - partial_r2)/df_denom)``."""
 
     frame = _frame(n_instr=n_instr, n_endog=n_endog, include_exog=with_exog)
-    first_stage = ws.IV2SLS.from_formula(formula, frame).fit().estat_firststage()
+    first_stage = ws.IV2SLS.from_formula(formula, frame).fit().estat_first_stage()
 
     df_num = float(n_instr)
     df_denom = float(first_stage.df_denom[0])
@@ -305,7 +305,7 @@ def test_r2_and_partial_r2_coincide_only_without_included_exogenous() -> None:
     """
 
     without = _frame(n_instr=1, n_endog=1, include_exog=False)
-    plain = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", without).fit().estat_firststage()
+    plain = ws.IV2SLS.from_formula("y ~ [x1 ~ z1]", without).fit().estat_first_stage()
     assert float(plain.r2[0]) == pytest.approx(float(plain.partial_r2[0]), rel=1e-12)
 
     # Build an included regressor that carries real explanatory power for x1.
@@ -318,6 +318,6 @@ def test_r2_and_partial_r2_coincide_only_without_included_exogenous() -> None:
     y = 1.0 + 2.0 * x1 + 0.3 * w + u
     frame = pd.DataFrame({"y": y, "x1": x1, "z1": z1, "w": w})
 
-    rich = ws.IV2SLS.from_formula("y ~ w + [x1 ~ z1]", frame).fit().estat_firststage()
+    rich = ws.IV2SLS.from_formula("y ~ w + [x1 ~ z1]", frame).fit().estat_first_stage()
 
     assert not np.isclose(float(rich.r2[0]), float(rich.partial_r2[0]), rtol=1e-2)

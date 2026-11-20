@@ -138,7 +138,7 @@ def test_cutoff_outside_the_unit_interval_is_refused(logit_fit) -> None:
 
 def test_non_binary_models_are_refused(logit_fit) -> None:
     frame, _ = logit_fit
-    ols = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    ols = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     with pytest.raises(NotImplementedError, match="binary-outcome"):
         ols.estat_classification()

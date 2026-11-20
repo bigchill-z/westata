@@ -54,7 +54,7 @@ def fitted():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("nsw_dw.dta is not available")
-    return ws.teffects_psmatch(frame["re78"], frame["treat"], frame[COVARIATES])
+    return ws.treatment_effects_psmatch(frame["re78"], frame["treat"], frame[COVARIATES])
 
 
 def test_the_point_estimate_matches_stata(fitted) -> None:

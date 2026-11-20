@@ -26,11 +26,11 @@ import pytest
 import westata as ws
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.estimators.panel_iv import (
-    PanelUnitRootResult,
-    XtGls,
-    XtIvreg,
-    XtPcse,
-    XtUnitroot,
+    PanelUnitRootResults,
+    PanelGls,
+    PanelIVRegress,
+    PanelPcse,
+    PanelUnitroot,
 )
 
 # --------------------------------------------------------------- fixture data
@@ -162,7 +162,7 @@ def test_xtivreg_fe_matches_stata_coefficients() -> None:
     (se .0502034), _cons 1.014978 (se .0387732).
     """
 
-    result = XtIvreg.from_formula(
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="fe"
     ).fit()
 
@@ -199,7 +199,7 @@ def test_xtivreg_fe_matches_hand_built_within_2sls() -> None:
     projected = instruments @ np.linalg.lstsq(instruments, design, rcond=None)[0]
     beta = np.linalg.lstsq(projected, yt, rcond=None)[0]
 
-    result = XtIvreg.from_formula(
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", frame, entity="firm", time="year", method="fe"
     ).fit()
 
@@ -222,7 +222,7 @@ def test_xtivreg_re_matches_stata_coefficients() -> None:
     """``xtivreg, re`` is G2SLS.  Stata: endog 1.120466 (se .065102),
     w .5286517 (se .0482393), _cons 1.014533 (se .0486261)."""
 
-    result = XtIvreg.from_formula(
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="re"
     ).fit()
 
@@ -239,7 +239,7 @@ def test_xtivreg_re_matches_stata_coefficients() -> None:
 def test_xtivreg_re_theta_matches_stata() -> None:
     """Stata reports ``e(theta) = .2064715`` for this panel."""
 
-    result = XtIvreg.from_formula(
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="re"
     ).fit()
     assert float(result.e["theta"]) == pytest.approx(0.20647146, rel=1e-6)
@@ -249,8 +249,8 @@ def test_xtivreg_fe_and_re_differ() -> None:
     """The two transforms are different estimators, not two spellings of one."""
 
     frame = iv_panel()
-    fe = XtIvreg.from_formula("y ~ w + (endog = z)", frame, entity="firm", time="year", method="fe").fit()
-    re = XtIvreg.from_formula("y ~ w + (endog = z)", frame, entity="firm", time="year", method="re").fit()
+    fe = PanelIVRegress.from_formula("y ~ w + (endog = z)", frame, entity="firm", time="year", method="fe").fit()
+    re = PanelIVRegress.from_formula("y ~ w + (endog = z)", frame, entity="firm", time="year", method="re").fit()
     assert not np.allclose(float(fe.params["endog"]), float(re.params["endog"]), rtol=1e-4)
 
 
@@ -263,7 +263,7 @@ def test_xtivreg_formula_parser_separates_the_three_pieces() -> None:
     frame["z2"] = rng.normal(size=len(frame))
     frame["endog2"] = 0.4 * frame["z2"] + rng.normal(size=len(frame))
 
-    model = XtIvreg.from_formula(
+    model = PanelIVRegress.from_formula(
         "y ~ w + w2 + (endog + endog2 = z + z2)",
         frame,
         entity="firm",
@@ -295,7 +295,7 @@ def test_xtivreg_formula_parser_separates_the_three_pieces() -> None:
 
 
 def test_xtivreg_parser_accepts_a_single_exogenous_regressor() -> None:
-    model = XtIvreg.from_formula(
+    model = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year"
     )
     assert model._exog_names == ["Intercept", "w"]
@@ -305,12 +305,12 @@ def test_xtivreg_parser_accepts_a_single_exogenous_regressor() -> None:
 
 def test_xtivreg_rejects_a_missing_instrument_block() -> None:
     with pytest.raises(ConsistencyError, match="instrument block"):
-        XtIvreg.from_formula("y ~ w", iv_panel(), entity="firm", time="year")
+        PanelIVRegress.from_formula("y ~ w", iv_panel(), entity="firm", time="year")
 
 
 def test_xtivreg_rejects_trailing_terms_after_the_block() -> None:
     with pytest.raises(ConsistencyError, match="must come last"):
-        XtIvreg.from_formula(
+        PanelIVRegress.from_formula(
             "y ~ w + (endog = z) + w2", iv_panel(), entity="firm", time="year"
         )
 
@@ -321,7 +321,7 @@ def test_xtivreg_rejects_an_unidentified_model() -> None:
     frame = iv_panel().copy()
     frame["endog2"] = np.random.default_rng(11).normal(size=len(frame))
     with pytest.raises(ConsistencyError, match="instruments"):
-        XtIvreg.from_formula(
+        PanelIVRegress.from_formula(
             "y ~ w + (endog + endog2 = z)", frame, entity="firm", time="year"
         )
 
@@ -329,13 +329,13 @@ def test_xtivreg_rejects_an_unidentified_model() -> None:
 @pytest.mark.parametrize("method", ["between", "be", "fd", "ec2sls"])
 def test_xtivreg_rejects_unimplemented_methods(method: str) -> None:
     with pytest.raises(UnsupportedError):
-        XtIvreg.from_formula(
+        PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method=method
         )
 
 
 def test_xtivreg_rejects_robust_cov_types() -> None:
-    model = XtIvreg.from_formula("y ~ w + (endog = z)", iv_panel(), entity="firm", time="year")
+    model = PanelIVRegress.from_formula("y ~ w + (endog = z)", iv_panel(), entity="firm", time="year")
     for cov_type in ("robust", "HC1", "cluster"):
         with pytest.raises(UnsupportedError):
             model.fit(cov_type=cov_type)
@@ -350,8 +350,8 @@ def test_xtgls_heteroskedastic_matches_stata_not_ols() -> None:
     """
 
     frame = count_panel()
-    result = XtGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = PanelGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     assert float(result.params["x1"]) == pytest.approx(0.6798471, abs=5e-7)
     assert float(result.params["Intercept"]) == pytest.approx(1.431659, abs=5e-6)
@@ -371,8 +371,8 @@ def test_xtgls_heteroskedastic_equals_ols_on_a_homoskedastic_panel() -> None:
     """
 
     frame = homoskedastic_panel()
-    result = XtGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = PanelGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     np.testing.assert_allclose(
         result.params[["Intercept", "x1"]].to_numpy(),
@@ -409,7 +409,7 @@ def test_xtgls_matches_the_manual_formula() -> None:
     beta_gls = np.linalg.solve(bread, rhs)
     cov_gls = np.linalg.inv(bread)
 
-    result = XtGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    result = PanelGls.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
     np.testing.assert_allclose(
         result.params[["x1", "Intercept"]].to_numpy(), beta_gls, rtol=1e-9, atol=0.0
     )
@@ -431,16 +431,16 @@ def test_xtgls_iid_nmk_is_regress() -> None:
     """
 
     frame = count_panel()
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
     nobs, k = len(frame), 2
 
-    with_nmk = XtGls.from_formula(
+    with_nmk = PanelGls.from_formula(
         "y ~ x1", frame, entity="firm", time="year", panels="iid", nmk=True
     ).fit()
     np.testing.assert_allclose(with_nmk.params.to_numpy(), plain.params.to_numpy(), rtol=1e-12)
     np.testing.assert_allclose(with_nmk.bse.to_numpy(), plain.bse.to_numpy(), rtol=1e-12)
 
-    without_nmk = XtGls.from_formula(
+    without_nmk = PanelGls.from_formula(
         "y ~ x1", frame, entity="firm", time="year", panels="iid"
     ).fit()
     np.testing.assert_allclose(
@@ -455,19 +455,19 @@ def test_xtgls_iid_nmk_is_regress() -> None:
 
 def test_xtgls_panels_correlated_runs_on_a_balanced_panel() -> None:
     frame = count_panel()
-    result = XtGls.from_formula(
+    result = PanelGls.from_formula(
         "y ~ x1", frame, entity="firm", time="year", panels="correlated"
     ).fit()
     assert np.all(np.isfinite(result.params.to_numpy()))
     assert np.all(np.isfinite(result.bse.to_numpy()))
     assert result.e["n_cv"] == N_CNT_FIRMS * (N_CNT_FIRMS + 1) // 2
     # Heteroskedasticity plus cross-sectional correlation is a different estimator.
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
     assert not np.allclose(result.bse.to_numpy(), plain.bse.to_numpy(), rtol=1e-3)
 
 
 def test_xtgls_reports_panel_counts() -> None:
-    result = XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit()
+    result = PanelGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit()
     assert result.e["N_g"] == N_CNT_FIRMS
     assert result.e["N_t"] == N_CNT_YEARS
     assert result.e["n_cf"] == 2
@@ -502,7 +502,7 @@ def test_xtgls_implements_common_ar1() -> None:
             )
     frame = pd.DataFrame(rows)
 
-    result = XtGls.from_formula(
+    result = PanelGls.from_formula(
         "y ~ x1 + x2", frame, entity="id", time="t", panels="heteroskedastic", corr="ar1"
     ).fit()
 
@@ -523,12 +523,12 @@ def test_xtgls_rejects_panel_specific_ar1() -> None:
     """
 
     with pytest.raises(UnsupportedError, match="psar1"):
-        XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year", corr="psar1")
+        PanelGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year", corr="psar1")
 
 
 def test_xtgls_rejects_unknown_panel_specification() -> None:
     with pytest.raises(UnsupportedError, match="panels"):
-        XtGls.from_formula(
+        PanelGls.from_formula(
             "y ~ x1", count_panel(), entity="firm", time="year", panels="definitely-not"
         )
 
@@ -536,7 +536,7 @@ def test_xtgls_rejects_unknown_panel_specification() -> None:
 def test_xtgls_correlated_requires_a_balanced_panel() -> None:
     frame = count_panel().drop(index=[0, 5]).reset_index(drop=True)
     with pytest.raises(ConsistencyError, match="balanced"):
-        XtGls.from_formula(
+        PanelGls.from_formula(
             "y ~ x1", frame, entity="firm", time="year", panels="correlated"
         ).fit()
 
@@ -546,8 +546,8 @@ def test_xtpcse_coefficients_equal_ols() -> None:
     """No autocorrelation means OLS point estimates (``[XT] xtpcse``)."""
 
     frame = count_panel()
-    result = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     np.testing.assert_allclose(
         result.params[["Intercept", "x1"]].to_numpy(),
@@ -581,8 +581,8 @@ def test_xtpcse_balanced_without_time_matches_stata() -> None:
     """
 
     frame = count_panel()
-    without_time = XtPcse.from_formula("y ~ x1", frame, entity="firm").fit()
-    with_time = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    without_time = PanelPcse.from_formula("y ~ x1", frame, entity="firm").fit()
+    with_time = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
 
     np.testing.assert_allclose(
         without_time.bse.to_numpy(), with_time.bse.to_numpy(), rtol=0.0, atol=0.0
@@ -606,7 +606,7 @@ def test_xtpcse_unbalanced_without_time_is_rejected() -> None:
     dropped = frame.drop(index=[5, 40, 300]).reset_index(drop=True)
     assert dropped.groupby("firm").size().nunique() > 1  # genuinely unbalanced
     with pytest.raises(ConsistencyError, match="time"):
-        XtPcse.from_formula("y ~ x1", dropped, entity="firm").fit()
+        PanelPcse.from_formula("y ~ x1", dropped, entity="firm").fit()
 
 
 def test_xtpcse_standard_errors_match_stata_vce() -> None:
@@ -636,7 +636,7 @@ def test_xtpcse_standard_errors_match_stata_vce() -> None:
             meat += sigma[i, j] * (X[index_i].T @ X[index_j])
     reference_cov = bread @ meat @ bread
 
-    result = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    result = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
 
     assert float(result.params["x1"]) == pytest.approx(0.7533126, abs=5e-7)
     assert float(result.bse["x1"]) == pytest.approx(0.0564318, rel=1e-5)
@@ -659,8 +659,8 @@ def test_xtpcse_standard_errors_match_stata_vce() -> None:
 
 def test_xtpcse_reports_r2_and_wald() -> None:
     frame = count_panel()
-    result = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
     # OLS point estimates mean the same R2 as regress.
     assert float(result.e["r2"]) == pytest.approx(float(plain.e["r2"]), rel=1e-10)
     assert float(result.e["chi2"]) > 0.0
@@ -669,11 +669,11 @@ def test_xtpcse_reports_r2_and_wald() -> None:
 
 def test_xtpcse_nonrobust_covariance_is_ols() -> None:
     frame = count_panel()
-    pcse = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    nonrobust = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit(
+    pcse = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    nonrobust = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit(
         cov_type="nonrobust"
     )
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
     np.testing.assert_allclose(nonrobust.params.to_numpy(), plain.params.to_numpy(), rtol=1e-12)
     np.testing.assert_allclose(nonrobust.bse.to_numpy(), plain.bse.to_numpy(), rtol=1e-12)
     assert pcse.cov_type == "pcse"
@@ -682,7 +682,7 @@ def test_xtpcse_nonrobust_covariance_is_ols() -> None:
 
 def test_xtpcse_rejects_autocorrelation() -> None:
     with pytest.raises(UnsupportedError, match="correlation"):
-        XtPcse.from_formula(
+        PanelPcse.from_formula(
             "y ~ x1", count_panel(), entity="firm", time="year", correlation="ar1"
         )
 
@@ -691,11 +691,11 @@ def test_xtpcse_rejects_autocorrelation() -> None:
 def test_xtunitroot_ips_matches_stata_statistics() -> None:
     """Stata: t-bar -2.0685, t-tilde-bar -1.5727, Z-t-tilde-bar -4.2953 (p 0.0000)."""
 
-    outcome = XtUnitroot.from_formula(
+    outcome = PanelUnitroot.from_formula(
         "y ~ 1", dynamic_panel(), entity="firm", time="year", test="ips"
     ).fit()
 
-    assert isinstance(outcome, PanelUnitRootResult)
+    assert isinstance(outcome, PanelUnitRootResults)
     assert outcome.test == "ips"
     assert outcome.name == "Z-t-tilde-bar"
     assert np.isfinite(outcome.statistic)
@@ -728,7 +728,7 @@ def test_xtunitroot_ips_t_bar_is_the_mean_adf_t() -> None:
         se = np.sqrt(sigma2 * np.linalg.inv(X.T @ X)[0, 0])
         t_values.append(beta[0] / se)
 
-    outcome = XtUnitroot.from_formula(
+    outcome = PanelUnitroot.from_formula(
         "y ~ 1", frame, entity="firm", time="year", test="ips"
     ).fit()
     assert outcome.details["t-bar"] == pytest.approx(float(np.mean(t_values)), rel=1e-10)
@@ -738,7 +738,7 @@ def test_xtunitroot_ips_t_bar_is_the_mean_adf_t() -> None:
 def test_xtunitroot_llc_matches_stata_statistics() -> None:
     """Stata: Unadjusted t -21.7694, Adjusted t* -15.1701 (p 0.0000)."""
 
-    outcome = XtUnitroot.from_formula(
+    outcome = PanelUnitroot.from_formula(
         "y ~ 1", dynamic_panel(), entity="firm", time="year", test="llc"
     ).fit()
 
@@ -769,8 +769,8 @@ def test_xtunitroot_llc_rejects_a_unit_root_far_less_strongly_than_ips() -> None
             rows.append((firm, year, value))
     frame = pd.DataFrame(rows, columns=["firm", "year", "y"])
 
-    ips = XtUnitroot.from_formula("y ~ 1", frame, entity="firm", time="year", test="ips").fit()
-    llc = XtUnitroot.from_formula("y ~ 1", frame, entity="firm", time="year", test="llc").fit()
+    ips = PanelUnitroot.from_formula("y ~ 1", frame, entity="firm", time="year", test="ips").fit()
+    llc = PanelUnitroot.from_formula("y ~ 1", frame, entity="firm", time="year", test="llc").fit()
     assert ips.statistic < 0.0 and ips.pvalue < 0.05
     assert llc.statistic < 0.0 and llc.pvalue < 0.05
 
@@ -781,14 +781,14 @@ def test_xtunitroot_rejects_an_unbalanced_panel(test: str) -> None:
 
     frame = dynamic_panel().drop(index=[0, 4, 40]).reset_index(drop=True)
     with pytest.raises(ConsistencyError, match="balanced"):
-        XtUnitroot.from_formula(
+        PanelUnitroot.from_formula(
             "y ~ 1", frame, entity="firm", time="year", test=test
         ).fit()
 
 
 def test_xtunitroot_rejects_unknown_test() -> None:
     with pytest.raises(UnsupportedError, match="ips"):
-        XtUnitroot.from_formula(
+        PanelUnitroot.from_formula(
             "y ~ 1", dynamic_panel(), entity="firm", time="year", test="madwu"
         )
 
@@ -796,7 +796,7 @@ def test_xtunitroot_rejects_unknown_test() -> None:
 @pytest.mark.parametrize("option", ["trend", "noconstant", "demean"])
 def test_xtunitroot_rejects_unimplemented_options(option: str) -> None:
     with pytest.raises(UnsupportedError):
-        XtUnitroot.from_formula(
+        PanelUnitroot.from_formula(
             "y ~ 1", dynamic_panel(), entity="firm", time="year", **{option: True}
         )
 
@@ -806,11 +806,11 @@ def test_xtunitroot_rejects_a_short_series() -> None:
         {"firm": [1, 1, 1, 2, 2, 2], "year": [1, 2, 3, 1, 2, 3], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
     )
     with pytest.raises(ConsistencyError, match="too short|balanced"):
-        XtUnitroot.from_formula("y ~ 1", tiny, entity="firm", time="year", test="ips").fit()
+        PanelUnitroot.from_formula("y ~ 1", tiny, entity="firm", time="year", test="ips").fit()
 
 
 def test_xtunitroot_result_renders() -> None:
-    outcome = XtUnitroot.from_formula(
+    outcome = PanelUnitroot.from_formula(
         "y ~ 1", dynamic_panel(), entity="firm", time="year", test="ips"
     ).fit()
     text = str(outcome)
@@ -822,14 +822,14 @@ def test_xtunitroot_result_renders() -> None:
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: XtIvreg.from_formula(
+        lambda: PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="fe"
         ).fit(),
-        lambda: XtIvreg.from_formula(
+        lambda: PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="re"
         ).fit(),
-        lambda: XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
-        lambda: XtPcse.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
+        lambda: PanelGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
+        lambda: PanelPcse.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
     ],
     ids=["xtivreg_fe", "xtivreg_re", "xtgls", "xtpcse"],
 )
@@ -855,14 +855,14 @@ def test_e_contains_the_standard_keys(build) -> None:
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: XtIvreg.from_formula(
+        lambda: PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="fe"
         ).fit(),
-        lambda: XtIvreg.from_formula(
+        lambda: PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="re"
         ).fit(),
-        lambda: XtGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
-        lambda: XtPcse.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
+        lambda: PanelGls.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
+        lambda: PanelPcse.from_formula("y ~ x1", count_panel(), entity="firm", time="year").fit(),
     ],
     ids=["xtivreg_fe", "xtivreg_re", "xtgls", "xtpcse"],
 )
@@ -879,16 +879,16 @@ def test_summary_renders_in_stata_style(build) -> None:
 
 def test_model_names_match_the_stata_commands() -> None:
     names = {
-        "xtivreg, fe": XtIvreg.from_formula(
+        "xtivreg, fe": PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="fe"
         ).fit().model_name,
-        "xtivreg, re": XtIvreg.from_formula(
+        "xtivreg, re": PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm", time="year", method="re"
         ).fit().model_name,
-        "xtgls": XtGls.from_formula(
+        "xtgls": PanelGls.from_formula(
             "y ~ x1", count_panel(), entity="firm", time="year"
         ).fit().model_name,
-        "xtpcse": XtPcse.from_formula(
+        "xtpcse": PanelPcse.from_formula(
             "y ~ x1", count_panel(), entity="firm", time="year"
         ).fit().model_name,
     }
@@ -897,7 +897,7 @@ def test_model_names_match_the_stata_commands() -> None:
 
 
 def test_xtunitroot_model_name_is_the_stata_command() -> None:
-    assert XtUnitroot._stata_command == "xtunitroot"
+    assert PanelUnitroot._stata_command == "xtunitroot"
 
 
 # --------------------------------------------------------------- input handling
@@ -905,7 +905,7 @@ def test_missing_values_are_dropped_listwise() -> None:
     frame = iv_panel()
     frame.loc[3, "endog"] = np.nan
     frame.loc[17, "z"] = np.nan
-    result = XtIvreg.from_formula(
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", frame, entity="firm", time="year", method="fe"
     ).fit()
     assert result.nobs == len(frame) - 2
@@ -914,14 +914,14 @@ def test_missing_values_are_dropped_listwise() -> None:
 def test_duplicate_panel_cells_are_rejected() -> None:
     frame = pd.concat([iv_panel(), iv_panel().iloc[[0]]], ignore_index=True)
     with pytest.raises(ConsistencyError, match="repeated"):
-        XtIvreg.from_formula(
+        PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", frame, entity="firm", time="year"
         )
 
 
 def test_missing_panel_column_is_reported() -> None:
     with pytest.raises(ConsistencyError, match="firm_id"):
-        XtIvreg.from_formula(
+        PanelIVRegress.from_formula(
             "y ~ w + (endog = z)", iv_panel(), entity="firm_id", time="year"
         )
 
@@ -929,7 +929,7 @@ def test_missing_panel_column_is_reported() -> None:
 def test_row_order_does_not_change_results() -> None:
     frame = count_panel().sample(frac=1.0, random_state=7).reset_index(drop=True)
     reference = count_panel()
-    shuffled = XtPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
-    ordered = XtPcse.from_formula("y ~ x1", reference, entity="firm", time="year").fit()
+    shuffled = PanelPcse.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    ordered = PanelPcse.from_formula("y ~ x1", reference, entity="firm", time="year").fit()
     np.testing.assert_allclose(shuffled.params.to_numpy(), ordered.params.to_numpy(), rtol=1e-12)
     np.testing.assert_allclose(shuffled.bse.to_numpy(), ordered.bse.to_numpy(), rtol=1e-12)

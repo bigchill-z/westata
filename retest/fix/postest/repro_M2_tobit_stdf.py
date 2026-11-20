@@ -204,7 +204,7 @@ def main() -> int:
         st.quiet("predict double r_stdp, stdp")
         st.quiet("predict double r_stdf, stdf")
         try:
-            truncreg = ws.Truncreg.from_formula(
+            truncreg = ws.TruncatedRegress.from_formula(
                 "y ~ x1 + x2", truncated, lower=1.0
             ).fit()
         except Exception as exc:  # noqa: BLE001 - another group owns this model
@@ -236,7 +236,7 @@ def main() -> int:
         st.quiet("predict double i_stdp, stdp")
         st.quiet("predict double i_stdf, stdf")
         try:
-            intreg = ws.Intreg.from_formula("lo hi ~ x1 + x2", interval).fit()
+            intreg = ws.IntervalRegress.from_formula("lo hi ~ x1 + x2", interval).fit()
         except Exception as exc:  # noqa: BLE001 - another group owns this model
             intreg = None
             print(
@@ -252,7 +252,7 @@ def main() -> int:
         st.quiet("regress mpg weight foreign")
         st.quiet("predict double g_stdp, stdp")
         st.quiet("predict double g_stdf, stdf")
-        ols = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+        ols = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
         print("\n[regress mpg weight foreign]  (must be unchanged: e(rmse) branch)")
         report("regress", ols, st.var("g_stdp"), st.var("g_stdf"), worst)
 

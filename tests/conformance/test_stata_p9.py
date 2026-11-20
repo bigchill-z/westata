@@ -83,8 +83,8 @@ def dynamic_panel(n_firms: int = 90, n_years: int = 9, seed: int = 79) -> pd.Dat
 
 
 def test_xtlogit_fe_matches_stata_exactly():
-    XtLogit = _require("XtLogit")
-    result = XtLogit.from_formula(
+    PanelLogit = _require("PanelLogit")
+    result = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="fe"
     ).fit()
 
@@ -96,8 +96,8 @@ def test_xtlogit_fe_matches_stata_exactly():
 def test_xtlogit_fe_uses_statas_sample_size():
     """Conditioning drops the groups without outcome variation: 960 -> 912."""
 
-    XtLogit = _require("XtLogit")
-    result = XtLogit.from_formula(
+    PanelLogit = _require("PanelLogit")
+    result = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="fe"
     ).fit()
     # The estimation sample is reported under the standard e(N) key.
@@ -105,8 +105,8 @@ def test_xtlogit_fe_uses_statas_sample_size():
 
 
 def test_xtlogit_pa_reports_no_likelihood():
-    XtLogit = _require("XtLogit")
-    result = XtLogit.from_formula(
+    PanelLogit = _require("PanelLogit")
+    result = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="pa"
     ).fit()
     # GEE is not a likelihood, so there is no e(ll) to compare with one.
@@ -117,8 +117,8 @@ def test_xtlogit_pa_reports_no_likelihood():
 
 
 def test_xtpoisson_fe_matches_stata():
-    XtPoisson = _require("XtPoisson")
-    result = XtPoisson.from_formula(
+    PanelPoisson = _require("PanelPoisson")
+    result = PanelPoisson.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="fe"
     ).fit()
     # Stata: x1 .5041803 (se .0344352)
@@ -129,8 +129,8 @@ def test_xtpoisson_fe_matches_stata():
 
 
 def test_xtivreg_fe_matches_stata_exactly():
-    XtIvreg = _require("XtIvreg")
-    result = XtIvreg.from_formula(
+    PanelIVRegress = _require("PanelIVRegress")
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", method="fe"
     ).fit()
 
@@ -141,8 +141,8 @@ def test_xtivreg_fe_matches_stata_exactly():
 
 
 def test_xtivreg_re_matches_stata_within_a_percent():
-    XtIvreg = _require("XtIvreg")
-    result = XtIvreg.from_formula(
+    PanelIVRegress = _require("PanelIVRegress")
+    result = PanelIVRegress.from_formula(
         "y ~ w + (endog = z)", iv_panel(), entity="firm", method="re"
     ).fit()
 
@@ -164,9 +164,9 @@ def test_xtgls_matches_stata_and_is_not_merely_ols():
     wrong, not the estimator.
     """
 
-    XtGls = _require("XtGls")
+    PanelGls = _require("PanelGls")
     frame = count_panel()
-    result = XtGls.from_formula(
+    result = PanelGls.from_formula(
         "y ~ x1", frame, entity="firm", panels="heteroskedastic"
     ).fit()
 
@@ -174,7 +174,7 @@ def test_xtgls_matches_stata_and_is_not_merely_ols():
     assert float(result.params["Intercept"]) == pytest.approx(1.431659, rel=1e-4)
 
     # And it must differ from OLS, or the GLS weighting is doing nothing.
-    plain = ws.OLS.from_formula("y ~ x1", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1", frame).fit()
     assert float(result.params["x1"]) != pytest.approx(
         float(plain.params["x1"]), rel=1e-4
     )
@@ -184,8 +184,8 @@ def test_xtgls_matches_stata_and_is_not_merely_ols():
 
 
 def test_xtpcse_matches_stata_coefficients():
-    XtPcse = _require("XtPcse")
-    result = XtPcse.from_formula("y ~ x1", count_panel(), entity="firm").fit()
+    PanelPcse = _require("PanelPcse")
+    result = PanelPcse.from_formula("y ~ x1", count_panel(), entity="firm").fit()
     # Stata: x1 .7533126, _cons 1.572686
     assert float(result.params["x1"]) == pytest.approx(0.7533126, rel=1e-4)
     assert float(result.params["Intercept"]) == pytest.approx(1.572686, rel=1e-4)
@@ -203,8 +203,8 @@ def test_xtabond_matches_stata_coefficients_and_instrument_count():
     laid out the way Stata lays it out.
     """
 
-    XtAbond = _require("XtAbond")
-    result = XtAbond.from_formula(
+    PanelAbond = _require("PanelAbond")
+    result = PanelAbond.from_formula(
         "y ~ x1", dynamic_panel(), entity="firm", time="year", lags=1
     ).fit()
 
@@ -217,8 +217,8 @@ def test_xtabond_matches_stata_coefficients_and_instrument_count():
 def test_xtabond_omits_the_overidentification_statistics():
     """Sargan/Hansen/AR are left out rather than approximated."""
 
-    XtAbond = _require("XtAbond")
-    result = XtAbond.from_formula(
+    PanelAbond = _require("PanelAbond")
+    result = PanelAbond.from_formula(
         "y ~ x1", dynamic_panel(), entity="firm", time="year", lags=1
     ).fit()
     for key in ("sargan", "hansen", "ar1", "ar2"):

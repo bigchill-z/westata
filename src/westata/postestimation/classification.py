@@ -41,7 +41,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-__all__ = ["ClassificationResult", "estat_classification"]
+__all__ = ["ClassificationResults", "estat_classification"]
 
 #: Commands Stata's ``logit_estat`` routes ``classification`` from.
 _SUPPORTED = frozenset({"logit", "probit", "logistic"})
@@ -81,7 +81,7 @@ def _percent_text(value: float) -> str:
     return f"{float(value):.2f}%"
 
 
-class ClassificationResult:
+class ClassificationResults:
     """The ``estat classification`` table and its nine percentages.
 
     Attributes
@@ -152,7 +152,7 @@ class ClassificationResult:
 
     def __repr__(self) -> str:
         return (
-            f"<ClassificationResult cutoff={self.cutoff:g} "
+            f"<ClassificationResults cutoff={self.cutoff:g} "
             f"correct={self.percent_correct:.2f}% "
             f"sens={self.sensitivity:.2f}% spec={self.specificity:.2f}%>"
         )
@@ -306,7 +306,7 @@ def estat_classification(
     cutoff: float = 0.5,
     y: Any = None,
     probabilities: Any = None,
-) -> ClassificationResult:
+) -> ClassificationResults:
     """Stata's ``estat classification`` after ``logit``/``probit``.
 
     Parameters
@@ -387,7 +387,7 @@ def estat_classification(
         columns=pd.Index(["D", "~D", "Total"], name="True"),
     )
 
-    return ClassificationResult(
+    return ClassificationResults(
         table=table,
         cutoff=threshold,
         percent_correct=_percent(a + d, a + b + c + d),

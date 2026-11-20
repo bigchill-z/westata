@@ -44,8 +44,8 @@ def _frame(n: int = 200, seed: int = 3700):
 @pytest.fixture(scope="module")
 def two_models():
     frame = _frame()
-    first = ws.OLS.from_formula("y ~ x1", frame).fit()
-    second = ws.OLS.from_formula("y ~ x2", frame).fit()
+    first = ws.Regress.from_formula("y ~ x1", frame).fit()
+    second = ws.Regress.from_formula("y ~ x2", frame).fit()
     return frame, first, second
 
 
@@ -55,7 +55,7 @@ def test_regress_predicts_scores() -> None:
     residual in a linear model."""
 
     frame = _frame()
-    fitted = ws.OLS.from_formula("y ~ x1", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     scores = np.asarray(fitted.predict(kind="score"), dtype=float)
     residuals = np.asarray(fitted.predict(kind="residuals"), dtype=float)
@@ -201,8 +201,8 @@ def test_different_sample_sizes_are_refused() -> None:
 
     frame = _frame(n=200)
     other = _frame(n=150, seed=3702)
-    first = ws.OLS.from_formula("y ~ x1", frame).fit()
-    second = ws.OLS.from_formula("y ~ x2", other).fit()
+    first = ws.Regress.from_formula("y ~ x1", frame).fit()
+    second = ws.Regress.from_formula("y ~ x2", other).fit()
 
     with pytest.raises(ValueError, match="same estimation sample"):
         first.suest(second)
@@ -242,7 +242,7 @@ def test_three_models_are_supported() -> None:
 
     frame = _frame()
     models = [
-        ws.OLS.from_formula(f"y ~ {name}", frame).fit()
+        ws.Regress.from_formula(f"y ~ {name}", frame).fit()
         for name in ("x1", "x2", "x3")
     ]
 
@@ -310,8 +310,8 @@ def test_a_cross_model_equality_can_be_tested(two_models) -> None:
             "x": shared,
         }
     )
-    first = ws.OLS.from_formula("y1 ~ x", frame).fit()
-    second = ws.OLS.from_formula("y2 ~ x", frame).fit()
+    first = ws.Regress.from_formula("y1 ~ x", frame).fit()
+    second = ws.Regress.from_formula("y2 ~ x", frame).fit()
 
     tested = first.suest(second, names=["a", "b"]).test("a:x = b:x")
 
@@ -366,8 +366,8 @@ def _clustered_fixture():
     )
     return (
         frame,
-        ws.OLS.from_formula("y1 ~ x", frame).fit(),
-        ws.OLS.from_formula("y2 ~ x", frame).fit(),
+        ws.Regress.from_formula("y1 ~ x", frame).fit(),
+        ws.Regress.from_formula("y2 ~ x", frame).fit(),
     )
 
 

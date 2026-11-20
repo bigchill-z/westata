@@ -36,7 +36,7 @@ def fitted():
             "x1": rng.normal(size=n),
         }
     )
-    return ws.OLS.from_formula("y ~ x1", frame).fit()
+    return ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 @pytest.mark.parametrize("form", ["eyex", "dyex", "eydx"])
@@ -114,7 +114,7 @@ def test_the_ratio_forms_refuse_an_out_of_domain_response() -> None:
     frame = pd.DataFrame(
         {"y": covariate + rng.normal(size=n), "x1": covariate}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     prediction = np.asarray(result.predict(), dtype=float)
 
     assert np.any(prediction <= 0.0)  # guard: this fixture must be out of domain
@@ -275,7 +275,7 @@ def test_the_group_factors_really_differ() -> None:
     rng = np.random.default_rng(827)
     x1 = np.concatenate([rng.normal(0, 1, 100), rng.normal(5, 1, 100)])
     frame = pd.DataFrame({"y": 1.0 + 0.8 * x1 + rng.normal(size=200), "x1": x1})
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     groups = np.array(["a"] * 100 + ["b"] * 100)
 
     rows = result.margins(dyex="x1", over=groups)

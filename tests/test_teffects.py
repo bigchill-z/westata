@@ -39,7 +39,7 @@ from westata.estimators.treatreg_effects import (
     IPW,
     NearestNeighbourMatching,
     RegressionAdjustment,
-    TreatmentEffectResult,
+    TreatmentEffectResults,
 )
 
 # Stata reference values (p11_outputs.txt).
@@ -564,7 +564,7 @@ def test_nearest_neighbour_matching_atet_is_supported():
 def test_every_estimator_returns_a_treatment_effect_result(estimator, kwargs):
     result = estimator.from_formula("y", "treated", treatment_frame(), **kwargs).fit()
 
-    assert isinstance(result, TreatmentEffectResult)
+    assert isinstance(result, TreatmentEffectResults)
     assert result.estimand in ("ATE", "ATET")
     assert np.isfinite(result.estimate)
     assert np.isfinite(result.std_err) and result.std_err > 0.0

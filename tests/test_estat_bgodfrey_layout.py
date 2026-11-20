@@ -35,7 +35,7 @@ def rendered():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("icecream.dta is not available")
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "consumption ~ temp + price + income", frame
     ).fit()
     return str(ws.estat_bgodfrey(fitted))

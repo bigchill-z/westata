@@ -59,7 +59,7 @@ def fitted():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
 
 
 def test_stata_params_matches_e_b_in_order(fitted) -> None:

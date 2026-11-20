@@ -49,7 +49,7 @@ def frames():
 
 def test_ols_starts_with_one_blank_line(frames) -> None:
     frame, _ = frames
-    rendered = str(ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit().summary(style="stata"))
+    rendered = str(ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit().summary(style="stata"))
     assert rendered.startswith("\n")
     assert not rendered.startswith("\n\n")
 

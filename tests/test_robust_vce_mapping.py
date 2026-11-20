@@ -45,14 +45,14 @@ def frame():
 def test_regress_robust_is_hc1(frame) -> None:
     """`reg vce(robust)` applies n/(n-k), which is HC1."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
     assert float(fitted.bse["s"]) == pytest.approx(STATA_REGRESS_ROBUST_SE_S, abs=1e-12)
 
 
 def test_regress_hc0_does_not_match_the_stata_robust(frame) -> None:
     """The wrong flavour is close enough to look right -- 0.2% off, in the third digit."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC0")
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC0")
     wrong = float(fitted.bse["s"])
     assert wrong != pytest.approx(STATA_REGRESS_ROBUST_SE_S, abs=1e-9)
     # ... but within 1%, which is exactly why the mix-up goes unnoticed.
@@ -80,7 +80,7 @@ def test_iv_hc1_does_not_match_the_stata_robust(frame) -> None:
 def test_the_two_families_pick_opposite_flavours(frame) -> None:
     """The whole point: `cov_type="robust"` resolves differently per family."""
 
-    ols = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="robust")
+    ols = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="robust")
     iv = ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", frame).fit(
         cov_type="robust"
     )
@@ -91,7 +91,7 @@ def test_the_two_families_pick_opposite_flavours(frame) -> None:
 def test_the_canonical_name_is_stored_not_the_alias(frame) -> None:
     """Echoing "robust" back would reproduce the confusion the docs exist to prevent."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="robust")
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="robust")
     assert fitted.cov_type != "robust"
 
 
@@ -143,11 +143,11 @@ def test_panel_robust_equals_clustering_on_the_entity() -> None:
         }
     )
 
-    classical = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit()
-    robust = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
+    classical = ws.PanelRegressFE.from_formula("y ~ x1", frame, entity="sid", time="t").fit()
+    robust = ws.PanelRegressFE.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
         cov_type="robust"
     )
-    clustered = ws.PanelOLS.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
+    clustered = ws.PanelRegressFE.from_formula("y ~ x1", frame, entity="sid", time="t").fit(
         cov_type="cluster", cov_kwds={"groups": frame["sid"]}
     )
 

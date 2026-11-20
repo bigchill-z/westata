@@ -80,9 +80,9 @@ def main():
     Er = s.est("xtreg y x1 x2, fe vce(robust)")
     Ec = s.est("xtreg y x1 x2, fe vce(cluster id)")
     print(f"       Stata max|V_robust - V_cluster| = {np.max(np.abs(Er.V - Ec.V)):.3e}")
-    fe = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
+    fe = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
         cov_type="robust")
-    fec = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
+    fec = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
         cov_type="cluster", cov_kwds={"clusters": df["id"].to_numpy()})
     print(f"       westata max|V_robust - V_cluster| = "
           f"{np.max(np.abs(np.asarray(fe.cov_params()) - np.asarray(fec.cov_params()))):.3e}")
@@ -117,7 +117,7 @@ def main():
         s.q("xtset id t")
         for cmd, sel in cmds:
             E = s.est(cmd)
-            res = ws.XtPcse.from_formula("y ~ x1 + x2", frame, entity="id",
+            res = ws.PanelPcse.from_formula("y ~ x1 + x2", frame, entity="id",
                                         time=time_col, selection=sel).fit()
             pairs = [("x1", "x1"), ("x2", "x2"), ("_cons", "Intercept")]
             b, _ = cmp_b(E, res, pairs)
@@ -129,8 +129,8 @@ def main():
             out[f"xtpcse_{tag}_{sel}"] = max(b, se, V)
     # balanced panel WITHOUT time= (the regression the captain reported)
     frame = balanced()
-    res_a = ws.XtPcse.from_formula("y ~ x1 + x2", frame, entity="id").fit()
-    res_b = ws.XtPcse.from_formula("y ~ x1 + x2", frame, entity="id", time="t").fit()
+    res_a = ws.PanelPcse.from_formula("y ~ x1 + x2", frame, entity="id").fit()
+    res_b = ws.PanelPcse.from_formula("y ~ x1 + x2", frame, entity="id", time="t").fit()
     print(f"       balanced no-time vs time= : max abs coef diff="
           f"{np.max(np.abs(res_a.params.to_numpy()-res_b.params.to_numpy())):.3e} "
           f"max abs se diff={np.max(np.abs(res_a.bse.to_numpy()-res_b.bse.to_numpy())):.3e}")
@@ -143,7 +143,7 @@ def main():
     report("xtpcse balanced no time= vs Stata", b, se, tier(b), tier(se))
     out["xtpcse_balanced_notime"] = max(b, se)
     try:
-        ws.XtPcse.from_formula("y ~ x1 + x2", unbalanced(), entity="id").fit()
+        ws.PanelPcse.from_formula("y ~ x1 + x2", unbalanced(), entity="id").fit()
         print("       unbalanced without time=: NO ERROR (unexpected)")
         out["xtpcse_unbalanced_guard"] = 1.0
     except Exception as exc:
@@ -157,7 +157,7 @@ def main():
         s.send(dy)
         s.q("xtset firm year")
         E = s.est(f"xtabond y x1, lags({lags})")
-        res = ws.XtAbond.from_formula("y ~ x1", dy, entity="firm", time="year",
+        res = ws.PanelAbond.from_formula("y ~ x1", dy, entity="firm", time="year",
                                      lags=lags).fit()
         names = list(res.param_names)
         want = [f"L{k}.y" for k in range(1, lags + 1)] + ["x1"]
@@ -176,7 +176,7 @@ def main():
     s.send(dy)
     s.q("xtset firm year")
     E = s.est("xtabond y x1, lags(1) vce(robust)")
-    res = ws.XtAbond.from_formula("y ~ x1", dy, entity="firm", time="year",
+    res = ws.PanelAbond.from_formula("y ~ x1", dy, entity="firm", time="year",
                                  lags=1).fit(cov_type="robust")
     pairs = [("L1.y", "L1.y"), ("x1", "x1")]
     b, _ = cmp_b(E, res, pairs)
@@ -193,7 +193,7 @@ def main():
     s.q("xtset id t")
     Ed = s.est("xtnbreg yc x1 x2, fe")
     Es = s.est("xtnbreg yc x1 x2, fe ltolerance(1e-8)")
-    res = ws.XtNbreg.from_formula("yc ~ x1 + x2", cn, entity="id", time="t").fit()
+    res = ws.PanelNbRegress.from_formula("yc ~ x1 + x2", cn, entity="id", time="t").fit()
     pairs = [("x1", "x1"), ("x2", "x2")]
     for tag, E in (("default", Ed), ("ltol 1e-8", Es)):
         b, _ = cmp_b(E, res, pairs)

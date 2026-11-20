@@ -41,7 +41,7 @@ from westata.postestimation.names import is_constant_name
 #: The constant-name test lives in `names.py` (R6.1).
 _is_constant = is_constant_name
 
-__all__ = ["OvTestResult", "estat_ovtest"]
+__all__ = ["OvTestResults", "estat_omitted_variables_test"]
 
 
 #: The RESET test always uses the 2nd, 3rd and 4th powers.
@@ -49,7 +49,7 @@ _POWERS = (2, 3, 4)
 
 
 
-class OvTestResult:
+class OvTestResults:
     """Ramsey's RESET test.
 
     Attributes
@@ -100,7 +100,7 @@ class OvTestResult:
 
     def __repr__(self) -> str:
         return (
-            f"<OvTestResult F({self.df:g}, {self.df_denom:g})="
+            f"<OvTestResults F({self.df:g}, {self.df_denom:g})="
             f"{self.statistic:.4g} p={self.pvalue:.4g}>"
         )
 
@@ -321,11 +321,11 @@ def _fitted_label(result: Any) -> str:
     return f"fitted values of {response}" if response else "fitted values"
 
 
-def estat_ovtest(
+def estat_omitted_variables_test(
     result: Any,
     *,
     rhs: bool = False,
-) -> OvTestResult:
+) -> OvTestResults:
     """Stata's ``estat ovtest`` (Ramsey RESET).
 
     Parameters
@@ -443,7 +443,7 @@ def estat_ovtest(
         design_full = np.column_stack([matrix, extra])
         tested = list(range(matrix.shape[1], design_full.shape[1]))
         statistic, df_num, df_denom = _fit_and_test(y, design_full, tested)
-        return OvTestResult(
+        return OvTestResults(
             statistic=statistic,
             df=df_num,
             df_denom=df_denom,
@@ -580,7 +580,7 @@ def estat_ovtest(
         )
     design_full = np.column_stack(_design_columns)
     statistic, df_num, df_denom = _fit_and_test(y, design_full, _tested)
-    return OvTestResult(
+    return OvTestResults(
         statistic=statistic,
         df=df_num,
         df_denom=df_denom,

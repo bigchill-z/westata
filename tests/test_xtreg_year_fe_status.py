@@ -53,7 +53,7 @@ def panel():
     for year in years:
         frame[f"yr{year}"] = (frame["year"] == year).astype(float)
     formula = "y ~ k1 + " + " + ".join(f"yr{year}" for year in years)
-    fitted = ws.PanelOLS.from_formula(formula, frame, entity="sid", time="year").fit()
+    fitted = ws.PanelRegressFE.from_formula(formula, frame, entity="sid", time="year").fit()
     return frame, fitted
 
 

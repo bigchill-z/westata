@@ -48,11 +48,11 @@ UNIVERSAL = ("estat_summarize", "estat_vce", "estat_ic")
 @pytest.mark.parametrize(
     "builder",
     [
-        lambda f: ws.OLS.from_formula("y ~ x1 + x2", f).fit(),
+        lambda f: ws.Regress.from_formula("y ~ x1 + x2", f).fit(),
         lambda f: ws.Logit.from_formula("yb ~ x1", f).fit(),
         lambda f: ws.Poisson.from_formula("ycnt ~ x1", f).fit(),
     ],
-    ids=["OLS", "Logit", "Poisson"],
+    ids=["Regress", "Logit", "Poisson"],
 )
 @pytest.mark.parametrize("method", UNIVERSAL)
 def test_the_universal_commands_work_everywhere(frame, builder, method) -> None:
@@ -84,7 +84,7 @@ def test_vif_refuses_outside_the_linear_models(frame, builder) -> None:
 def test_vif_works_for_the_linear_models(frame) -> None:
     """The positive side of the same rule."""
 
-    assert ws.OLS.from_formula("y ~ x1 + x2", frame).fit().estat_vif().mean_vif > 0.0
+    assert ws.Regress.from_formula("y ~ x1 + x2", frame).fit().estat_vif().mean_vif > 0.0
 
 
 def test_the_dispatch_files_confirm_the_matrix() -> None:
@@ -125,7 +125,7 @@ def test_iv_is_not_a_linear_model_for_vif(frame) -> None:
     )
 
     iv = ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z]", iv_frame).fit()
-    ols = ws.OLS.from_formula("y ~ x1 + x2", iv_frame).fit()
+    ols = ws.Regress.from_formula("y ~ x1 + x2", iv_frame).fit()
 
     # The OLS model has a VIF; the IV model must not report the same one.
     assert ols.estat_vif().mean_vif > 0.0

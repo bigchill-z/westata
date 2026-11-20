@@ -42,19 +42,19 @@ def frame():
 
 
 def test_hettest_runs_on_an_absorbed_fit(frame) -> None:
-    fitted = ws.FEOLS.from_formula("y ~ x + z | g", frame).fit()
-    rendered = str(ws.estat_hettest(fitted))
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x + z | g", frame).fit()
+    rendered = str(ws.estat_heteroskedasticity_test(fitted))
     assert "chi2(1)" in rendered
 
 
 def test_the_absorbed_intercept_is_not_treated_as_a_missing_coefficient(frame) -> None:
     """Three design columns, two coefficients: the intercept has no estimate and contributes 0."""
 
-    fitted = ws.FEOLS.from_formula("y ~ x + z | g", frame).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x + z | g", frame).fit()
     assert len(fitted.params) == 2
     assert fitted.design_matrix[0].shape[1] == 3
     # And the command still produces a statistic rather than raising on the width mismatch.
-    assert "Prob > chi2" in str(ws.estat_hettest(fitted))
+    assert "Prob > chi2" in str(ws.estat_heteroskedasticity_test(fitted))
 
 
 def test_vif_still_refuses_a_non_linear_fit(frame) -> None:

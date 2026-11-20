@@ -76,7 +76,7 @@ def test_ordinary_labels_are_not_robust(label: object) -> None:
     assert not is_robust(label), f"{label!r} is not robust but is_robust() says yes"
 
 
-@pytest.mark.parametrize("label", ["HAC", "newey", "neweywest", "NeweyWest"])
+@pytest.mark.parametrize("label", ["HAC", "newey_west", "neweywest", "NeweyWest"])
 def test_hac_labels_are_recognised(label: str) -> None:
     assert is_hac(label)
 
@@ -100,23 +100,23 @@ def test_hettest_refuses_every_label_the_estimators_can_produce() -> None:
     """
 
     frame = _frame()
-    model = ws.OLS.from_formula("y ~ x + w", frame)
+    model = ws.Regress.from_formula("y ~ x + w", frame)
 
     # `robust` resolves to HC1 for OLS, and hettest must refuse it.
     with pytest.raises(ValueError, match="robust"):
-        ws.estat_hettest(model.fit(cov_type="robust"))
+        ws.estat_heteroskedasticity_test(model.fit(cov_type="robust"))
 
     # The plain fit is allowed through.
-    ws.estat_hettest(model.fit())
+    ws.estat_heteroskedasticity_test(model.fit())
 
 
 def test_imtest_refuses_a_clustered_fit() -> None:
     """`imtest` rejects clustered/weighted estimation (imtest.ado:18-25)."""
 
     frame = _frame()
-    model = ws.OLS.from_formula("y ~ x + w", frame)
+    model = ws.Regress.from_formula("y ~ x + w", frame)
     with pytest.raises(ValueError, match="cluster|robust"):
-        ws.estat_imtest(
+        ws.estat_information_matrix_test(
             model.fit(cov_type="cluster", cov_kwds={"groups": frame["firm"]})
         )
 
@@ -135,13 +135,13 @@ def test_overid_allows_2sls_robust_but_refuses_liml_robust() -> None:
     tsls = ws.IV2SLS.from_formula("y ~ [x ~ z + z2]", frame).fit(cov_type="robust")
     assert tsls.cov_type == "HC0"
     # 2SLS: allowed, and it reports the Wooldridge score test.
-    score = ws.estat_overid(tsls)
+    score = ws.estat_overidentification(tsls)
     assert "score" in str(getattr(score, "test", "")).lower() or score is not None
 
     # LIML: refused (ivregress_estat.ado:354-357).
     liml = ws.IVLIML.from_formula("y ~ [x ~ z + z2]", frame).fit(cov_type="robust")
     with pytest.raises(ValueError, match="LIML"):
-        ws.estat_overid(liml)
+        ws.estat_overidentification(liml)
 
 
 def test_bgodfrey_refuses_a_robust_fit() -> None:
@@ -153,7 +153,7 @@ def test_bgodfrey_refuses_a_robust_fit() -> None:
     """
 
     frame = _frame()
-    fit = ws.OLS.from_formula("y ~ x", frame).fit(cov_type="robust")
+    fit = ws.Regress.from_formula("y ~ x", frame).fit(cov_type="robust")
     assert fit.cov_type == "HC1"
     with pytest.raises(Exception, match="robust"):
         ws.estat_bgodfrey(fit)
@@ -180,7 +180,7 @@ def test_panel_robust_reports_cluster_not_robust() -> None:
     """R3.7.3: xtreg's vce(robust) IS vce(cluster panelvar), so say `cluster`."""
 
     frame = _frame()
-    model = ws.PanelOLS.from_formula("y ~ x", frame, entity="firm", time="year")
+    model = ws.PanelRegressFE.from_formula("y ~ x", frame, entity="firm", time="year")
     robust = model.fit(cov_type="robust")
     cluster = model.fit(cov_type="cluster", cov_kwds={"groups": frame["firm"]})
     assert robust.cov_type == "cluster"
@@ -191,7 +191,7 @@ def test_feols_accepts_stat_as_own_spelling() -> None:
     """`reghdfe, robust` is HC1; requiring `HC1` was a westata-only burden."""
 
     frame = _frame()
-    model = ws.FEOLS.from_formula("y ~ x + w | firm", frame)
+    model = ws.RegressHighDimFixedEffects.from_formula("y ~ x + w | firm", frame)
     spelled = model.fit(cov_type="robust")
     explicit = model.fit(cov_type="HC1")
     assert spelled.cov_type == "HC1"
@@ -206,7 +206,7 @@ def test_rreg_refuses_cov_type_instead_of_ignoring_it() -> None:
     """
 
     frame = _frame()
-    model = ws.RobustRegression.from_formula("y ~ x + w", frame)
+    model = ws.RobustRegress.from_formula("y ~ x + w", frame)
     with pytest.raises(Exception, match="vce|not available"):
         model.fit(cov_type="robust")
     # The ordinary call still works.

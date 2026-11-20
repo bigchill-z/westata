@@ -35,7 +35,7 @@ def rendered():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.format_ereturn_list(ws.OLS.from_formula("lnw ~ s", frame).fit())
+    return ws.format_ereturn_list(ws.Regress.from_formula("lnw ~ s", frame).fit())
 
 
 def test_the_name_field_is_twenty_two(rendered) -> None:

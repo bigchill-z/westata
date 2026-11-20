@@ -49,11 +49,11 @@ import pandas as pd
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["RcmResult", "rcm"]
+__all__ = ["RcmResults", "rcm"]
 
 
 @dataclass(frozen=True)
-class RcmResult(ResultSerialisation):
+class RcmResults(ResultSerialisation):
     """Regression control method outcome."""
 
     att: float
@@ -125,7 +125,7 @@ def _fit(design: np.ndarray, target: np.ndarray) -> np.ndarray:
     return coefficients
 
 
-class Rcm:
+class RegressionControlMethod:
     """``rcm depvar predictors, unit() time() trunit() trperiod()`` -- regression control.
 
     Class form of :func:`westata.rcm` (R2.7).  Stata passes variable names as options, so
@@ -204,7 +204,7 @@ class Rcm:
             max_predictors=max_predictors,
         )
 
-    def fit(self) -> RcmResult:
+    def fit(self) -> RcmResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _rcm_impl(
@@ -233,7 +233,7 @@ def rcm(
     criterion: str = "aicc",
     selected: Sequence[Any] | None = None,
     max_predictors: int | None = None,
-) -> RcmResult:
+) -> RcmResults:
     """Fit Stata's ``rcm`` -- thin wrapper over :class:`westata.Rcm`."""
 
     return _rcm_impl(
@@ -262,7 +262,7 @@ def _rcm_impl(
     criterion: str = "aicc",
     selected: Sequence[Any] | None = None,
     max_predictors: int | None = None,
-) -> RcmResult:
+) -> RcmResults:
     """Regression control method for one treated unit.
 
     ``response``/``predictors``/``unit``/``time`` are equal-length sequences describing a
@@ -378,7 +378,7 @@ def _rcm_impl(
     predicted = design_post @ coefficients
     att = float(np.mean(target_post - predicted))
 
-    return RcmResult(
+    return RcmResults(
         att=att,
         unit=str(treated_unit),
         treatment_period=float(treatment_period),

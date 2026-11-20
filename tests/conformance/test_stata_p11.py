@@ -180,12 +180,12 @@ def test_nearest_neighbour_matching_is_close_to_stata():
 
 
 def test_didregress_matches_stata():
-    Didregress = _require("Didregress")
+    DIDRegress = _require("DIDRegress")
     # The fixture command is ``didregress (y x1) (treated)``: Stata's first
     # block names the dependent variable *followed by covariates*, so the
     # covariate has to be in the formula.  A bare "y" means "no covariates"
     # (measured: ATET 1.1927931 vs 1.1543178 below), which is not this fixture.
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y x1", "treated", did_frame(), group="unit", time="period"
     ).fit()
 
@@ -210,15 +210,15 @@ def test_the_two_did_spellings_share_the_atet_but_not_the_standard_error():
     have forced one of the two correct standard errors to be wrong.
     """
 
-    Xtdidregress = _require("Xtdidregress")
-    Didregress = _require("Didregress")
+    PanelDIDRegress = _require("PanelDIDRegress")
+    DIDRegress = _require("DIDRegress")
     frame = did_frame()
 
     # Same fixture as above: ``(y x1)``, not a bare ``(y)``.
-    panel = Xtdidregress.from_formula(
+    panel = PanelDIDRegress.from_formula(
         "y x1", "treated", frame, group="unit", time="period"
     ).fit()
-    pooled = Didregress.from_formula(
+    pooled = DIDRegress.from_formula(
         "y x1", "treated", frame, group="unit", time="period"
     ).fit()
 
@@ -244,11 +244,11 @@ def test_didregress_rejects_a_time_invariant_treatment():
     silent zero coefficient would be far worse than an error.
     """
 
-    Didregress = _require("Didregress")
+    DIDRegress = _require("DIDRegress")
     frame = did_frame()
     # Replace the time-varying treatment with the constant group indicator.
     frame = frame.assign(treated=frame["group"])
     with pytest.raises(Exception):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y", "treated", frame, group="unit", time="period"
         ).fit()

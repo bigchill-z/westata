@@ -1,4 +1,4 @@
-=== teffects_ra ===
+=== treatment_effects_ra ===
 COMMAND: teffects ra (y x1 x2) (treated)
 
 
@@ -98,7 +98,7 @@ POmean       |
 ------------------------------------------------------------------------------
 
 
-=== teffects_nnmatch ===
+=== treatment_effects_nnmatch ===
 COMMAND: teffects nnmatch (y x1 x2) (treated), nneighbor(1)
 
 

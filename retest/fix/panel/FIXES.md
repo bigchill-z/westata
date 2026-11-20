@@ -46,7 +46,7 @@ Stata 的 `.0083416`，18.4 倍）。
   报告系数（Stata 的 K），`auto_df=False` 才把 29 个效应算进 K，正是 Stata
   **未文档化**的 `dfadj` 口径（差 9.36%）。
 - `_stata_clustered_df_resid`：聚类时 `e(df_r) = G − 1`（旧代码留 `N − K`）。
-  `RandomEffects` 覆写为"保持 `N − K`"，因为 `xtreg, re` 根本不报 `e(df_r)`。
+  `PanelRegressRE` 覆写为"保持 `N − K`"，因为 `xtreg, re` 根本不报 `e(df_r)`。
 - `_stata_clustered_scalar_df`：`e(rmse)`/`e(r2_a)` 在聚类下用
   `N − rank`（实测 `rss/rmse² = 177.0000`），非聚类用 `df_r`。
 - 新增 `e(df_b)`、`e(rss)`。
@@ -57,7 +57,7 @@ westata 保留 `df_m = 斜率数`，使打印的 `F(2, 29)` 标签与统计量�
 写 `e(df_m)`，summary 会打印成 `F(1, 29)` 而数值是 `F(2, 29)` 的——那是新的
 静默错数。见"需要 Lead 裁决"。
 
-### P3 — `panel_iv.py::XtPcse`
+### P3 — `panel_iv.py::PanelPcse`
 
 旧 `_aligned_slices()`：`common = min(len)` 再 `index[:common]`，按**行号**截断，
 Σ 和 meat 都被截。且 `pairwise` 分支根本不存在。
@@ -72,7 +72,7 @@ westata 保留 `df_m = 斜率数`，使打印的 `F(2, 29)` 标签与统计量�
 - **回归修复**：`time=None` 且面板平衡时按行序推断期（Stata 无 `tis` 时的行为），
   不再误报 r(459)；非平衡且无 `time` 才拒绝并提示传 `time=`。
 
-### P4 — `panel_dynamic.py::XtAbond`
+### P4 — `panel_dynamic.py::PanelAbond`
 
 - `e(sig2)`：`rss / (2 * (N − rank))`。差分误差 `Δε` 方差是 `2σ²`，旧代码少除 2，
   整个 `V` 放大 2 倍、SE 放大 √2。
@@ -88,7 +88,7 @@ westata 保留 `df_m = 斜率数`，使打印的 `F(2, 29)` 标签与统计量�
   差分 GMM 不用它。`e(instruments)`/`e(zrank)` 报 Stata 的
   "Number of instruments"，`e(instruments_difference)` 报实际使用的矩阵列数。
 
-### P5 — `panel_nonlinear.py::XtNbreg`
+### P5 — `panel_nonlinear.py::PanelNbRegress`
 
 旧实现最大化的是**条件 Poisson** 核（`Σy·x'b − S·ln Σexp(x'b)`），所以它与
 自己的 `xtpoisson, fe` 逐位相同（`.35845684 / .06584633`），而 Stata 的
@@ -116,7 +116,7 @@ westata 保留 `df_m = 斜率数`，使打印的 `F(2, 29)` 标签与统计量�
 | `tests/test_panel_nonlinear.py::test_xtnbreg_fe_matches_stata` | `.5041909`(abs 1e-4)/`se .0344353`(1e-5)，并称"核就是 Poisson 核" | 对 Stata **收紧容差**的 `.50418027`(1e-6)/`se .034435192`(1e-6)/`ll −775.440679`(1e-5)；另外保留对默认打印值 `abs=5e-5` 的显式残差 | `xtnbreg y x1, fe` 与 `xtnbreg y x1, fe ltolerance(1e-8)`，100×7 |
 | `tests/test_panel_nonlinear.py::test_xtnbreg_fe_is_labelled_a_quasi_likelihood` | `estimator == "conditional_quasi_ml"` | `estimator == "hhg_conditional_ml"` | 目标函数换成了真 HHG 核 |
 | `tests/test_panel_nonlinear.py::test_xtnbreg_fe_agrees_with_the_poisson_kernel` | 断言与 `xtpoisson, fe` 的系数、`ll` 各差 ≤1e-5（"就是 Poisson 核"） | 改名 `..._differs_from_the_poisson_kernel`：系数只做 1e-3 的粗对照，**严格断言两者是不同估计量**（label 不同、NB 有 `_cons` 而 Poisson 没有） | `xtnbreg` vs `xtpoisson`, 30×6：`.35844983/.05989124` vs `.35845684/.05784733` |
-| `tests/test_panel_iv.py::test_xtpcse_balanced_without_time_matches_stata`（新增） | — | 平衡面板不传 `time=` 与传 `time="year"` 逐位相同，且等于 Stata | `xtset firm year` + `xtpcse y x1`，100×7：`x1 .75331259`(se `.05643178`)、`_cons 1.57268563`(se `.03729976`)、`e(n_sigma)=7` |
+| `tests/test_panel_iv.py::test_xtpcse_balanced_without_time_matches_stata`（新增） | — | 平衡面板不传 `time=` 与传 `time="year"` 逐位相同，且等于 Stata | `panel_set firm year` + `xtpcse y x1`，100×7：`x1 .75331259`(se `.05643178`)、`_cons 1.57268563`(se `.03729976`)、`e(n_sigma)=7` |
 | `tests/test_panel_iv.py::test_xtpcse_unbalanced_without_time_is_rejected`（新增） | — | 非平衡且无 `time=` 时 `ConsistencyError`（提示传 `time=`） | 位置配对会拿甲的第 3 期对乙的第 5 期，不是协方差 |
 
 ## 未修 / 未达 A 的
@@ -147,7 +147,7 @@ westata 保留 `df_m = 斜率数`，使打印的 `F(2, 29)` 标签与统计量�
 **6.98e-09**、`e(ll)` 差 **3.5e-09**，已达标。**这不是能力回退**，不需要
 `UnsupportedError`。
 
-这个 `ltolerance` 依赖**已经写进 `XtNbreg` 的 docstring**（"Agreement, and why
+这个 `ltolerance` 依赖**已经写进 `PanelNbRegress` 的 docstring**（"Agreement, and why
 the tolerance matters" 一节），并明确写了"不要当 bug 再修一遍"，避免下一个人
 重复这一轮。
 
@@ -179,7 +179,7 @@ westata 报参数向量自身的量：`e(df_m)` = 斜率数（2）、`e(rank)` =
 | `e(df_r)` | 29 | 29 | 0 |
 | `e(F)` | 303.80 | 303.80 | 0（相对差 6.5e-16） |
 
-**Lead 裁决：保留此做法。** `panel.py` 的模块 docstring 与 `PanelOLS` 类 docstring
+**Lead 裁决：保留此做法。** `panel.py` 的模块 docstring 与 `PanelRegressFE` 类 docstring
 各有一节 "Known deviations: `e(df_m)` and `e(rank)` under a clustered VCE"，
 含三组实测：
 
@@ -206,10 +206,10 @@ xtreg y x1 x2 z, fe vce(cluster id)         2      3       3      F(3,29)=254.47
 
 | # | 事项 | 裁决 | 落地 |
 |---|---|---|---|
-| 1 | 聚类下 `e(df_m)` 与 `e(rank)`：保留 westata 自洽口径，还是复刻 Stata（`df_m`=斜率−1、`rank`=斜率） | **保留 westata 做法**（`df_m` = 斜率数、`rank` = `len(e(b))` = 斜率数+1，另加 `e(df_b)`）。理由：Stata 的 `e()` 在此自相矛盾（它的 `e(df_m)` 与它自己打印的 `F(df_b, df_r)` 打架），复刻会让 summary 打出 `F(1,29)` 而数值是 `F(2,29)`——把标签错换成数错更糟；`e(rank)` 被结果容器与 postestimation 当作 `e(b)`/`e(V)` 的尺寸使用，缩小它会静默改变其他标量 | `panel.py` 模块 docstring 与 `PanelOLS` 类 docstring 的 "Known deviations: `e(df_m)` and `e(rank)` under a clustered VCE"，含 `e(df_m)/e(df_b)/e(rank)` 三组对照；回归测试 `test_clustered_df_m_and_rank_are_documented_deviations` |
-| 2 | `xtnbreg, fe` 判据 | **改为"对 `ltolerance(1e-8)` 比斜率到 1e-6"，B 档** | 本文件 P5 条目；`XtNbreg` docstring "Agreement, and why the tolerance matters" |
+| 1 | 聚类下 `e(df_m)` 与 `e(rank)`：保留 westata 自洽口径，还是复刻 Stata（`df_m`=斜率−1、`rank`=斜率） | **保留 westata 做法**（`df_m` = 斜率数、`rank` = `len(e(b))` = 斜率数+1，另加 `e(df_b)`）。理由：Stata 的 `e()` 在此自相矛盾（它的 `e(df_m)` 与它自己打印的 `F(df_b, df_r)` 打架），复刻会让 summary 打出 `F(1,29)` 而数值是 `F(2,29)`——把标签错换成数错更糟；`e(rank)` 被结果容器与 postestimation 当作 `e(b)`/`e(V)` 的尺寸使用，缩小它会静默改变其他标量 | `panel.py` 模块 docstring 与 `PanelRegressFE` 类 docstring 的 "Known deviations: `e(df_m)` and `e(rank)` under a clustered VCE"，含 `e(df_m)/e(df_b)/e(rank)` 三组对照；回归测试 `test_clustered_df_m_and_rank_are_documented_deviations` |
+| 2 | `xtnbreg, fe` 判据 | **改为"对 `ltolerance(1e-8)` 比斜率到 1e-6"，B 档** | 本文件 P5 条目；`PanelNbRegress` docstring "Agreement, and why the tolerance matters" |
 | 3 | `test_stata_p9.py` 里 xtabond 仪器数的旧注释「28 GMM + D.x1 + 常数」是错的 | **Lead 自己改**（不在我作用域） | — |
-| 4 | `xtpcse` 的 `time=` 是否一律必填 | **保持"平衡可省、非平衡必填"**，与 Stata 无 `tis` 时的行为一致 | `XtPcse` docstring "When ``time=`` may be omitted"：平衡按行序推断期（依赖 entity-major/period-minor 行序，由 `_as_frame` 保证）、非平衡无 `time` 报错并提示、有 `time` 但无共同期时报 Stata `r(459)` 等价错误并建议 `pairwise` |
+| 4 | `xtpcse` 的 `time=` 是否一律必填 | **保持"平衡可省、非平衡必填"**，与 Stata 无 `tis` 时的行为一致 | `PanelPcse` docstring "When ``time=`` may be omitted"：平衡按行序推断期（依赖 entity-major/period-minor 行序，由 `_as_frame` 保证）、非平衡无 `time` 报错并提示、有 `time` 但无共同期时报 Stata `r(459)` 等价错误并建议 `pairwise` |
 
 另：`xtabond` 的 `e(instruments)`（= Stata 的 `e(zrank)`，"Number of
 instruments"）与 `e(instruments_difference)`（实际矩阵列数）的区别，已写进

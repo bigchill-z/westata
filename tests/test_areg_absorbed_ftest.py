@@ -119,12 +119,12 @@ def test_reghdfe_keeps_its_own_dof_convention(fitted) -> None:
     object used, which is visible in its reported df_a.
     """
 
-    assert ws.FEOLS._absorb_df_drops_constant is False
+    assert ws.RegressHighDimFixedEffects._absorb_df_drops_constant is False
     assert float(fitted.e["df_a"]) == 562.0
     # reghdfe on the same data reports the full count, so the two commands really do differ.
     frame = pd.read_stata(DATA, convert_categoricals=False)
     sample = frame[["maize", "disaster", "county"]].dropna()
-    reghdfe = ws.FEOLS("maize ~ disaster | county", sample).fit()
+    reghdfe = ws.RegressHighDimFixedEffects("maize ~ disaster | county", sample).fit()
     assert float(reghdfe.e["df_a"]) == 563.0
 
 

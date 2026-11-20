@@ -38,12 +38,12 @@ def _frame(n: int = 200, seed: int = 1600):
 
 @pytest.fixture(scope="module")
 def qreg_fit():
-    return ws.QuantileRegression.from_formula("y ~ x1", _frame()).fit()
+    return ws.QuantileRegress.from_formula("y ~ x1", _frame()).fit()
 
 
 @pytest.fixture(scope="module")
 def sqreg_fit():
-    return ws.Sqreg.from_formula(
+    return ws.SimultaneousQuantileRegress.from_formula(
         "y ~ x1", _frame(), quantiles=(0.25, 0.5, 0.75)
     ).fit()
 
@@ -131,10 +131,10 @@ def test_both_estimators_predict_the_same_linear_index_at_the_median() -> None:
     """
 
     frame = _frame()
-    median_sqreg = ws.Sqreg.from_formula(
+    median_sqreg = ws.SimultaneousQuantileRegress.from_formula(
         "y ~ x1", frame, quantiles=(0.5,)
     ).fit()
-    plain = ws.QuantileRegression.from_formula("y ~ x1", frame).fit()
+    plain = ws.QuantileRegress.from_formula("y ~ x1", frame).fit()
 
     assert np.allclose(
         np.asarray(median_sqreg.predict(kind="xb"), dtype=float),
@@ -209,7 +209,7 @@ def test_stddp_uses_the_equations_NOT_a_sum_of_standard_errors(sqreg_fit) -> Non
 def test_stddp_needs_two_quantiles() -> None:
     """A single-quantile ``sqreg`` has no second equation to difference against."""
 
-    single = ws.Sqreg.from_formula(
+    single = ws.SimultaneousQuantileRegress.from_formula(
         "y ~ x1", _frame(), quantiles=(0.5,)
     ).fit()
 

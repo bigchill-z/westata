@@ -68,8 +68,8 @@ def test_estat_ptrends_returns_the_linear_trend_test() -> None:
             rows.append((unit, period, treated, float(0.3 * treated + 0.01 * unit)))
     frame = pd.DataFrame(rows, columns=["unit", "period", "d", "y"])
 
-    fit = ws.Didregress.from_formula("y", "d", frame, group="unit", time="period").fit()
-    reported = ws.estat_ptrends(fit)
+    fit = ws.DIDRegress.from_formula("y", "d", frame, group="unit", time="period").fit()
+    reported = ws.estat_parallel_trends(fit)
 
     assert reported["df_numerator"] == 1.0, "the test is ONE linear-trend interaction"
     assert reported["df_denominator"] == 59.0, "Stata uses n_groups - 1"
@@ -97,7 +97,7 @@ def test_didregress_has_no_test_postestimation_command() -> None:
     frame["unit"] = (frame.index % 100).astype(int)
     frame["period"] = (frame.index // 100).astype(int)
 
-    fitted = ws.Didregress.from_formula(
+    fitted = ws.DIDRegress.from_formula(
         "re78", "post", frame, group="unit", time="period"
     ).fit()
 

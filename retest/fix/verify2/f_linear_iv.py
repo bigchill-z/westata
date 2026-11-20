@@ -123,21 +123,21 @@ def main():
     s.run("sysuse auto, clear")
     s.send(ds)
     cases = [
-        ("regress mpg weight foreign", {}, ws.OLS, "mpg ~ weight + foreign"),
+        ("regress mpg weight foreign", {}, ws.Regress, "mpg ~ weight + foreign"),
         ("regress mpg weight foreign, vce(robust)", {"cov_type": "HC1"},
-         ws.OLS, "mpg ~ weight + foreign"),
+         ws.Regress, "mpg ~ weight + foreign"),
         ("regress mpg weight foreign, vce(cluster gid)",
          {"cov_type": "cluster", "cov_kwds": {"groups": ds["gid"].to_numpy()}},
-         ws.OLS, "mpg ~ weight + foreign"),
+         ws.Regress, "mpg ~ weight + foreign"),
         ("regress mpg weight foreign [pweight=w]",
-         {"cov_type": "HC1"}, ws.OLS, "mpg ~ weight + foreign"),
-        ("regress mpg weight foreign [aweight=w]", {}, ws.OLS,
+         {"cov_type": "HC1"}, ws.Regress, "mpg ~ weight + foreign"),
+        ("regress mpg weight foreign [aweight=w]", {}, ws.Regress,
          "mpg ~ weight + foreign"),
-        ("regress mpg weight foreign [fweight=w]", {}, ws.OLS,
+        ("regress mpg weight foreign [fweight=w]", {}, ws.Regress,
          "mpg ~ weight + foreign"),
-        ("regress mpg weight foreign, noconstant", {}, ws.OLS,
+        ("regress mpg weight foreign, noconstant", {}, ws.Regress,
          "mpg ~ weight + foreign - 1"),
-        ("regress mpg", {}, ws.OLS, "mpg ~ 1"),
+        ("regress mpg", {}, ws.Regress, "mpg ~ 1"),
     ]
     for cmd, kw, cls, form in cases:
         # weights are passed via the model's weight= keyword below

@@ -33,14 +33,14 @@ def _frame(n: int = 140, seed: int = 7001):
 
 # --------------------------------------------------------------- the recording
 def test_bsqreg_records_a_seed() -> None:
-    fitted = ws.Bsqreg.from_formula("y ~ x", _frame()).fit(reps=15)
+    fitted = ws.BootstrappedQuantileRegress.from_formula("y ~ x", _frame()).fit(reps=15)
 
     assert "seed" in fitted.e
     assert isinstance(fitted.e["seed"], int)
 
 
 def test_sqreg_records_a_seed() -> None:
-    fitted = ws.Sqreg.from_formula("y ~ x", _frame(), quantiles=(0.25, 0.5)).fit(reps=10)
+    fitted = ws.SimultaneousQuantileRegress.from_formula("y ~ x", _frame(), quantiles=(0.25, 0.5)).fit(reps=10)
 
     assert "seed" in fitted.e
 
@@ -48,7 +48,7 @@ def test_sqreg_records_a_seed() -> None:
 def test_the_recorded_seed_is_an_integer() -> None:
     """It has to be passable back to ``fit(seed=...)``, so an int not a numpy scalar."""
 
-    fitted = ws.Bsqreg.from_formula("y ~ x", _frame()).fit(reps=10)
+    fitted = ws.BootstrappedQuantileRegress.from_formula("y ~ x", _frame()).fit(reps=10)
 
     assert type(fitted.e["seed"]) is int
 
@@ -58,7 +58,7 @@ def test_the_recorded_seed_reproduces_the_fit() -> None:
     """THE point of recording it: replaying the seed gives identical standard errors."""
 
     frame = _frame()
-    model = ws.Bsqreg.from_formula("y ~ x", frame)
+    model = ws.BootstrappedQuantileRegress.from_formula("y ~ x", frame)
 
     first = model.fit(reps=15)
     replay = model.fit(reps=15, seed=first.e["seed"])
@@ -70,7 +70,7 @@ def test_the_recorded_seed_reproduces_the_fit() -> None:
 
 def test_the_replay_reproduces_the_covariance_not_just_the_se() -> None:
     frame = _frame()
-    model = ws.Bsqreg.from_formula("y ~ x", frame)
+    model = ws.BootstrappedQuantileRegress.from_formula("y ~ x", frame)
 
     first = model.fit(reps=15)
     replay = model.fit(reps=15, seed=first.e["seed"])
@@ -90,7 +90,7 @@ def test_two_unseeded_fits_differ_but_are_each_reproducible() -> None:
     """
 
     frame = _frame()
-    model = ws.Bsqreg.from_formula("y ~ x", frame)
+    model = ws.BootstrappedQuantileRegress.from_formula("y ~ x", frame)
 
     first = model.fit(reps=15)
     second = model.fit(reps=15)
@@ -106,14 +106,14 @@ def test_two_unseeded_fits_differ_but_are_each_reproducible() -> None:
 def test_an_explicit_seed_is_kept_verbatim() -> None:
     """``e(seed)`` reports what the caller asked for, not a re-derived value."""
 
-    fitted = ws.Bsqreg.from_formula("y ~ x", _frame()).fit(reps=10, seed=12345)
+    fitted = ws.BootstrappedQuantileRegress.from_formula("y ~ x", _frame()).fit(reps=10, seed=12345)
 
     assert fitted.e["seed"] == 12345
 
 
 # ------------------------------------------------------------ not collateral
 def test_reps_is_still_recorded_alongside_it() -> None:
-    fitted = ws.Bsqreg.from_formula("y ~ x", _frame()).fit(reps=12)
+    fitted = ws.BootstrappedQuantileRegress.from_formula("y ~ x", _frame()).fit(reps=12)
 
     assert fitted.e["reps"] == 12
 
@@ -121,7 +121,7 @@ def test_reps_is_still_recorded_alongside_it() -> None:
 def test_the_estimates_are_unchanged_in_shape() -> None:
     """Recording a seed must not disturb the fit itself."""
 
-    fitted = ws.Bsqreg.from_formula("y ~ x", _frame()).fit(reps=10)
+    fitted = ws.BootstrappedQuantileRegress.from_formula("y ~ x", _frame()).fit(reps=10)
 
     assert len(fitted.params) == 2
     assert np.all(np.isfinite(np.asarray(fitted.params, dtype=float)))

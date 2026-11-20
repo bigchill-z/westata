@@ -55,7 +55,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def two_way(panel):
-    model = ws.PanelOLS.from_formula(FORMULA, panel, entity="st_abb", time="year")
+    model = ws.PanelRegressFE.from_formula(FORMULA, panel, entity="st_abb", time="year")
     return model.fit(time_effects=True)
 
 
@@ -74,7 +74,7 @@ def test_the_two_way_standard_errors_match_stata(two_way) -> None:
 def test_the_year_effects_actually_change_the_estimate(panel) -> None:
     """Otherwise this guard would pass on the entity-only fit by accident."""
 
-    model = ws.PanelOLS.from_formula(FORMULA, panel, entity="st_abb", time="year")
+    model = ws.PanelRegressFE.from_formula(FORMULA, panel, entity="st_abb", time="year")
     entity_only = model.fit()
     two_way = model.fit(time_effects=True)
     assert float(entity_only.params["lnk1"]) == pytest.approx(ENTITY_ONLY_LNK1, abs=1e-7)
@@ -86,8 +86,8 @@ def test_time_effects_are_a_fit_keyword_not_i_dot_syntax() -> None:
 
     import inspect
 
-    from westata.estimators.panel import PanelOLS
+    from westata.estimators.panel import PanelRegressFE
 
-    signature = inspect.signature(PanelOLS.fit)
+    signature = inspect.signature(PanelRegressFE.fit)
     assert "time_effects" in signature.parameters
     assert not hasattr(ws, "xtreg")

@@ -101,7 +101,7 @@ def test_xtreg_predict_now_works_with_statats_definition(frame) -> None:
     judgement call, and predict should offer it.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -119,7 +119,7 @@ def test_xtreg_xb_excludes_the_panel_effect(frame) -> None:
     wrongly included the effect.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -137,7 +137,7 @@ def test_xtreg_xb_excludes_the_panel_effect(frame) -> None:
 def test_xtreg_offers_the_documented_fe_types(frame) -> None:
     """``xtreg_postestimation.sthlp:127-134`` lists these for FE."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -148,7 +148,7 @@ def test_xtreg_offers_the_documented_fe_types(frame) -> None:
 
 
 def test_xtreg_xbu_is_xb_plus_u(frame) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -162,7 +162,7 @@ def test_xtreg_xbu_is_xb_plus_u(frame) -> None:
 def test_xtreg_ue_is_u_plus_the_within_residual(frame) -> None:
     """``ue = u_i + e_it`` -- the combined residual (``sthlp:129``)."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -176,7 +176,7 @@ def test_xtreg_ue_is_u_plus_the_within_residual(frame) -> None:
 def test_xtreg_u_is_constant_within_each_entity(frame) -> None:
     """``u_i`` is a fixed error component: one value per entity, by definition."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -194,7 +194,7 @@ def test_xtreg_u_reproduces_the_stored_sigma_u(frame) -> None:
     fitted values.  If the split were wrong these two would not agree.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -216,7 +216,7 @@ def test_xtreg_component_types_are_not_offered_for_random_effects(frame) -> None
     model treats differently, so the registry keeps them out.
     """
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -244,7 +244,7 @@ def test_reghdfe_predict_uses_the_areg_semantics(frame) -> None:
     linear estimator that could not predict at all.
     """
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", frame).fit()
 
     predicted = np.asarray(result.predict(kind="xb"), dtype=float)
 
@@ -264,7 +264,7 @@ def test_the_xtreg_refusal_names_the_estimator(frame) -> None:
     type it does not have.  The message must still name the model.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -276,13 +276,13 @@ def test_the_xtreg_refusal_names_the_estimator(frame) -> None:
 # ----------------------------------------------------------- the working column
 @pytest.mark.parametrize(
     "label",
-    ["OLS", "Logit", "Probit", "Poisson", "NBreg", "OrderedLogit"],
+    ["Regress", "Logit", "Probit", "Poisson", "NBreg", "OrderedLogit"],
 )
 def test_xb_works_across_the_linear_and_ml_family(frame, label) -> None:
     """Recording which columns DO work, so a future refactor notices a loss."""
 
     estimators = {
-        "OLS": lambda: ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
+        "Regress": lambda: ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
         "Logit": lambda: ws.Logit.from_formula("yb ~ x1 + x2", frame).fit(),
         "Probit": lambda: ws.Probit.from_formula("yb ~ x1 + x2", frame).fit(),
         "Poisson": lambda: ws.Poisson.from_formula("yc ~ x1", frame).fit(),
@@ -304,7 +304,7 @@ def test_xb_works_across_the_linear_and_ml_family(frame, label) -> None:
 def test_ols_leverage_types_stay_in_range(frame) -> None:
     """``hat``/``leverage`` must lie in [0, 1]; outside means the wrong formula."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     for kind in ("hat", "leverage"):
         values = np.asarray(result.predict(kind=kind), dtype=float)

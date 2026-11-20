@@ -49,8 +49,8 @@ def models():
         }
     )
     return (
-        ws.OLS.from_formula("y ~ x1", frame).fit(),
-        ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
+        ws.Regress.from_formula("y ~ x1", frame).fit(),
+        ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
     )
 
 

@@ -22,11 +22,11 @@ import pytest
 
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.estimators.panel_nonlinear import (
-    XtLogit,
-    XtNbreg,
-    XtPoisson,
-    XtProbit,
-    XtTobit,
+    PanelLogit,
+    PanelNbRegress,
+    PanelPoisson,
+    PanelProbit,
+    PanelTobit,
 )
 
 # Stata's printed values (p9_outputs.txt).  Kept as module constants so each
@@ -126,56 +126,56 @@ def censored_panel(
 # test below only reads the result object.
 @pytest.fixture(scope="module")
 def fe_result():
-    return XtLogit.from_formula(
+    return PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="fe"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def re_result():
-    return XtLogit.from_formula(
+    return PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="re"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def pa_result():
-    return XtLogit.from_formula(
+    return PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="pa"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def probit_result():
-    return XtProbit.from_formula(
+    return PanelProbit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="re"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def poisson_fe_result():
-    return XtPoisson.from_formula(
+    return PanelPoisson.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="fe"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def poisson_re_result():
-    return XtPoisson.from_formula(
+    return PanelPoisson.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="re"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def nbreg_fe_result():
-    return XtNbreg.from_formula(
+    return PanelNbRegress.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="fe"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def tobit_result():
-    return XtTobit.from_formula(
+    return PanelTobit.from_formula(
         "y ~ x1", censored_panel(), entity="firm", lower=0.5
     ).fit()
 
@@ -248,10 +248,10 @@ def test_xtlogit_fe_excludes_an_all_zero_group():
     victim = int(frame["firm"].iloc[0])
     frame.loc[frame["firm"] == victim, "y"] = 0.0
 
-    with_zero = XtLogit.from_formula(
+    with_zero = PanelLogit.from_formula(
         "y ~ x1 + x2", frame, entity="firm", method="fe"
     ).fit()
-    without = XtLogit.from_formula(
+    without = PanelLogit.from_formula(
         "y ~ x1 + x2", frame[frame["firm"] != victim], entity="firm", method="fe"
     ).fit()
 
@@ -273,7 +273,7 @@ def test_xtlogit_fe_refuses_a_sample_with_no_variation():
     frame = binary_panel(n_firms=30, n_years=4, seed=5)
     frame["y"] = 1.0
     with pytest.raises(ConsistencyError, match="no group has variation"):
-        XtLogit.from_formula("y ~ x1", frame, entity="firm", method="fe").fit()
+        PanelLogit.from_formula("y ~ x1", frame, entity="firm", method="fe").fit()
 
 
 def test_xtlogit_fe_has_no_intercept(fe_result):
@@ -346,8 +346,8 @@ def test_xtlogit_re_and_fe_agree_when_there_is_no_individual_effect():
     latent = 0.6 * x1 - 0.4 * x2 + rng.logistic(size=n)  # no firm effect
     frame = pd.DataFrame({"firm": firm, "x1": x1, "x2": x2, "y": (latent > 0).astype(float)})
 
-    fe = XtLogit.from_formula("y ~ x1 + x2", frame, entity="firm", method="fe").fit()
-    re = XtLogit.from_formula("y ~ x1 + x2", frame, entity="firm", method="re").fit()
+    fe = PanelLogit.from_formula("y ~ x1 + x2", frame, entity="firm", method="fe").fit()
+    re = PanelLogit.from_formula("y ~ x1 + x2", frame, entity="firm", method="re").fit()
 
     # The random-effect variance collapses towards zero: that is *why* the two
     # agree, so it is asserted rather than assumed.
@@ -398,7 +398,7 @@ def test_xtlogit_pa_robust_variance_is_available_and_different():
     worst possible outcome, so the two are compared here.
     """
 
-    model = XtLogit.from_formula(
+    model = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="pa"
     )
     plain = model.fit()
@@ -441,7 +441,7 @@ def test_xtprobit_rejects_fe_and_pa():
     frame = binary_panel(n_firms=30, n_years=5, seed=3)
     for method in ("fe", "pa"):
         with pytest.raises(UnsupportedError, match="xtprobit"):
-            XtProbit.from_formula("y ~ x1", frame, entity="firm", method=method)
+            PanelProbit.from_formula("y ~ x1", frame, entity="firm", method=method)
 
 
 # -------------------------------------------------------------- xtpoisson fe
@@ -627,15 +627,15 @@ def test_xttobit_with_a_very_low_limit_approximates_xtreg_re():
     censoring count is small but not zero.
     """
 
-    from westata.estimators.panel import RandomEffects
+    from westata.estimators.panel import PanelRegressRE
 
     frame = censored_panel(n_firms=60, n_years=6, seed=17)
     floor = float(frame["y"].min()) - 50.0
 
-    tobit = XtTobit.from_formula(
+    tobit = PanelTobit.from_formula(
         "y ~ x1", frame, entity="firm", lower=floor
     ).fit(intpoints=20)
-    linear = RandomEffects.from_formula(
+    linear = PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -661,27 +661,27 @@ def test_xttobit_with_a_very_low_limit_approximates_xtreg_re():
 def test_xttobit_rejects_a_specification_with_no_limits():
     frame = censored_panel(n_firms=20, n_years=4, seed=2)
     with pytest.raises(ConsistencyError, match="censoring limit"):
-        XtTobit.from_formula("y ~ x1", frame, entity="firm", lower=None, upper=None)
+        PanelTobit.from_formula("y ~ x1", frame, entity="firm", lower=None, upper=None)
 
 
 def test_xttobit_rejects_an_inverted_limit_pair():
     frame = censored_panel(n_firms=20, n_years=4, seed=2)
     with pytest.raises(ConsistencyError, match="below"):
-        XtTobit.from_formula("y ~ x1", frame, entity="firm", lower=2.0, upper=1.0)
+        PanelTobit.from_formula("y ~ x1", frame, entity="firm", lower=2.0, upper=1.0)
 
 
 # ------------------------------------------------ the shared e() contract
 @pytest.mark.parametrize(
     "factory, label",
     [
-        (lambda: XtLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="fe"), "xtlogit, fe"),
-        (lambda: XtLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="re"), "xtlogit, re"),
-        (lambda: XtLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="pa"), "xtlogit, pa"),
-        (lambda: XtProbit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm"), "xtprobit, re"),
-        (lambda: XtTobit.from_formula("y ~ x1", censored_panel(), entity="firm", lower=0.5), "xttobit"),
-        (lambda: XtPoisson.from_formula("y ~ x1", count_panel(), entity="firm", method="fe"), "xtpoisson, fe"),
-        (lambda: XtPoisson.from_formula("y ~ x1", count_panel(), entity="firm", method="re"), "xtpoisson, re"),
-        (lambda: XtNbreg.from_formula("y ~ x1", count_panel(), entity="firm", method="fe"), "xtnbreg, fe"),
+        (lambda: PanelLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="fe"), "xtlogit, fe"),
+        (lambda: PanelLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="re"), "xtlogit, re"),
+        (lambda: PanelLogit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm", method="pa"), "xtlogit, pa"),
+        (lambda: PanelProbit.from_formula("y ~ x1 + x2", binary_panel(), entity="firm"), "xtprobit, re"),
+        (lambda: PanelTobit.from_formula("y ~ x1", censored_panel(), entity="firm", lower=0.5), "xttobit"),
+        (lambda: PanelPoisson.from_formula("y ~ x1", count_panel(), entity="firm", method="fe"), "xtpoisson, fe"),
+        (lambda: PanelPoisson.from_formula("y ~ x1", count_panel(), entity="firm", method="re"), "xtpoisson, re"),
+        (lambda: PanelNbRegress.from_formula("y ~ x1", count_panel(), entity="firm", method="fe"), "xtnbreg, fe"),
     ],
 )
 def test_every_model_reports_the_stata_contract(factory, label):
@@ -723,11 +723,11 @@ def test_every_model_reports_the_stata_contract(factory, label):
 @pytest.mark.parametrize(
     "factory, label",
     [
-        (lambda: XtLogit.from_formula("y ~ x1", binary_panel(n_firms=40, seed=9), entity="firm", method="between"), "xtlogit"),
-        (lambda: XtProbit.from_formula("y ~ x1", binary_panel(n_firms=40, seed=9), entity="firm", method="fe"), "xtprobit"),
-        (lambda: XtPoisson.from_formula("y ~ x1", count_panel(n_firms=40, seed=9), entity="firm", method="pa"), "xtpoisson"),
-        (lambda: XtNbreg.from_formula("y ~ x1", count_panel(n_firms=40, seed=9), entity="firm", method="re"), "xtnbreg"),
-        (lambda: XtTobit.from_formula("y ~ x1", censored_panel(n_firms=40, seed=9), entity="firm", method="fe"), "xttobit"),
+        (lambda: PanelLogit.from_formula("y ~ x1", binary_panel(n_firms=40, seed=9), entity="firm", method="between"), "xtlogit"),
+        (lambda: PanelProbit.from_formula("y ~ x1", binary_panel(n_firms=40, seed=9), entity="firm", method="fe"), "xtprobit"),
+        (lambda: PanelPoisson.from_formula("y ~ x1", count_panel(n_firms=40, seed=9), entity="firm", method="pa"), "xtpoisson"),
+        (lambda: PanelNbRegress.from_formula("y ~ x1", count_panel(n_firms=40, seed=9), entity="firm", method="re"), "xtnbreg"),
+        (lambda: PanelTobit.from_formula("y ~ x1", censored_panel(n_firms=40, seed=9), entity="firm", method="fe"), "xttobit"),
     ],
 )
 def test_unsupported_methods_raise(factory, label):
@@ -742,7 +742,7 @@ def test_unsupported_cov_type_raises_rather_than_pretending(fe_result):
     silent numerical lie, so it must raise.
     """
 
-    model = XtLogit.from_formula(
+    model = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="fe"
     )
     with pytest.raises(UnsupportedError, match="cov_type"):
@@ -751,6 +751,6 @@ def test_unsupported_cov_type_raises_rather_than_pretending(fe_result):
 
 def test_missing_entity_column_is_reported_clearly():
     with pytest.raises(ConsistencyError, match="not found in data"):
-        XtLogit.from_formula(
+        PanelLogit.from_formula(
             "y ~ x1", binary_panel(), entity="nosuchfirm", method="fe"
         )

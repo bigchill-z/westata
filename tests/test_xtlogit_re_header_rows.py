@@ -46,7 +46,7 @@ def _panel():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t").fit()
+    return ws.PanelLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t").fit()
 
 
 def test_the_header_names_the_outcome(fitted) -> None:

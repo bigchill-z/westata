@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from westata.errors import ConsistencyError
-from westata.estimators.did import Didregress, Xtdidregress
+from westata.estimators.did import DIDRegress, PanelDIDRegress
 from westata.estimators.treatreg_effects import (
     AIPW,
     IPW,
@@ -158,7 +158,7 @@ def test_didregress_matches_stata():
     test below.
     """
 
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     assert float(result.params["treated"]) == pytest.approx(1.18613, rel=1e-4)
@@ -172,7 +172,7 @@ def test_didregress_bare_outcome_uses_no_covariate():
     ``didregress (y) (treated), group(unit) time(period)``.
     """
 
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y", "treated", _did(), group="unit", time="period"
     )
     assert model.covariates == []
@@ -192,7 +192,7 @@ def test_didregress_standard_error_is_the_right_order():
     the gap is recorded rather than tuned, and the registry keeps this at E2.
     """
 
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     assert float(result.bse["treated"]) == pytest.approx(0.0590465, rel=1.5e-1)
@@ -200,10 +200,10 @@ def test_didregress_standard_error_is_the_right_order():
 
 def test_xtdidregress_agrees_with_didregress():
     frame = _did()
-    panel = Xtdidregress.from_formula(
+    panel = PanelDIDRegress.from_formula(
         "y", "treated", frame, group="unit", time="period"
     ).fit()
-    pooled = Didregress.from_formula(
+    pooled = DIDRegress.from_formula(
         "y", "treated", frame, group="unit", time="period"
     ).fit()
     assert float(panel.params["treated"]) == pytest.approx(
@@ -220,7 +220,7 @@ def test_didregress_rejects_a_time_invariant_treatment():
 
     frame = _did().assign(treated=lambda data: data["group"])
     with pytest.raises(ConsistencyError, match="collinear"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -228,7 +228,7 @@ def test_didregress_rejects_a_time_invariant_treatment():
 def test_didregress_absorbs_rather_than_dummies():
     """The design must not carry one column per unit."""
 
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y x1", "treated", _did(), group="unit", time="period"
     ).fit()
     design, names = result.design_matrix

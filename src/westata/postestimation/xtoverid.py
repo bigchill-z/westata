@@ -80,11 +80,11 @@ import numpy as np
 import pandas as pd
 from scipy import stats as scipy_stats
 
-__all__ = ["XtOveridResult", "xtoverid"]
+__all__ = ["PanelOveridResults", "panel_overid"]
 
 
 @dataclass
-class XtOveridResult:
+class PanelOveridResults:
     """The Sargan-Hansen test of overidentifying restrictions.
 
     Attributes
@@ -273,7 +273,7 @@ def _clustered_vcov(
     return factor * (bread @ meat @ bread)
 
 
-def xtoverid(result: Any) -> XtOveridResult:
+def panel_overid(result: Any) -> PanelOveridResults:
     """Stata's ``xtoverid`` -- the Sargan-Hansen test of overidentifying restrictions.
 
     Parameters
@@ -422,7 +422,7 @@ def xtoverid(result: Any) -> XtOveridResult:
     df = float(len(positions))
     pvalue = float(scipy_stats.chi2.sf(statistic, df))
 
-    return XtOveridResult(
+    return PanelOveridResults(
         statistic=statistic,
         df=df,
         pvalue=pvalue,

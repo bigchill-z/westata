@@ -36,7 +36,7 @@ def factor_fit():
         frame = pd.read_stata(AUTO)
     except FileNotFoundError:  # pragma: no cover - the file ships with the repo
         pytest.skip("auto.dta is missing")
-    return ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame).fit()
+    return ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame).fit()
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +45,7 @@ def plain_fit():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_a_factor_level_can_be_referenced(factor_fit) -> None:

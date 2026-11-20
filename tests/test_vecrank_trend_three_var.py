@@ -65,7 +65,7 @@ def _synthetic() -> np.ndarray:
 
 @pytest.fixture(scope="module")
 def three_var():
-    return ws.vecrank(_synthetic(), lags=2, trend="trend")
+    return ws.vec_rank(_synthetic(), lags=2, trend="trend")
 
 
 def test_the_parameter_counts_scale(three_var) -> None:

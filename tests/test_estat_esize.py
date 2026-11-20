@@ -39,7 +39,7 @@ def _fit(*, n: int = 150, seed: int = 3000, signal: float = 0.8):
             "x2": rng.normal(size=n),
         }
     )
-    return frame, ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +51,7 @@ def fitted():
 def test_eta_squared_equals_r_squared(fitted) -> None:
     """``sthlp:602-603``: "eta-squared estimates ... equivalent to R-squared"."""
 
-    reported = fitted[1].estat_esize()
+    reported = fitted[1].estat_effect_size()
 
     assert reported.estimate == pytest.approx(
         float(fitted[1].e["r2"]), rel=1e-12
@@ -64,11 +64,11 @@ def test_eta_squared_is_mss_over_total(fitted) -> None:
     e = fitted[1].e
     expected = float(e["mss"]) / (float(e["mss"]) + float(e["rss"]))
 
-    assert fitted[1].estat_esize().estimate == pytest.approx(expected, rel=1e-12)
+    assert fitted[1].estat_effect_size().estimate == pytest.approx(expected, rel=1e-12)
 
 
 def test_the_interval_brackets_the_estimate(fitted) -> None:
-    reported = fitted[1].estat_esize()
+    reported = fitted[1].estat_effect_size()
 
     assert reported.ci_lower is not None
     assert reported.ci_upper is not None
@@ -78,7 +78,7 @@ def test_the_interval_brackets_the_estimate(fitted) -> None:
 def test_the_interval_is_within_the_unit_range(fitted) -> None:
     """An effect size is a share of variance and cannot escape [0, 1] in this form."""
 
-    reported = fitted[1].estat_esize()
+    reported = fitted[1].estat_effect_size()
 
     assert reported.ci_lower >= 0.0
     assert reported.ci_upper <= 1.0
@@ -92,8 +92,8 @@ def test_a_wider_level_gives_a_wider_interval(fitted) -> None:
     ``0.90`` / ``0.99``; passing 90 would ask for a 9000% interval.
     """
 
-    narrow = fitted[1].estat_esize(level=0.90)
-    wide = fitted[1].estat_esize(level=0.99)
+    narrow = fitted[1].estat_effect_size(level=0.90)
+    wide = fitted[1].estat_effect_size(level=0.99)
 
     assert np.isfinite(narrow.ci_upper) and np.isfinite(wide.ci_upper)
     assert wide.ci_lower <= narrow.ci_lower
@@ -108,7 +108,7 @@ def test_the_lower_bound_is_zero_not_nan_when_f_is_small(fitted) -> None:
     NaN.  This was a real defect: every ordinary fit reported ``ci_lower=nan``.
     """
 
-    reported = fitted[1].estat_esize()
+    reported = fitted[1].estat_effect_size()
     assert np.isfinite(reported.ci_lower), "ci_lower must be a number, not nan"
     assert reported.ci_lower >= 0.0
 
@@ -120,8 +120,8 @@ def test_the_interval_narrows_with_more_data() -> None:
     function of ``N`` rather than of the requested level alone.
     """
 
-    small = _fit(n=60, seed=3002)[1].estat_esize()
-    large = _fit(n=600, seed=3002)[1].estat_esize()
+    small = _fit(n=60, seed=3002)[1].estat_effect_size()
+    large = _fit(n=600, seed=3002)[1].estat_effect_size()
 
     assert (large.ci_upper - large.ci_lower) < (small.ci_upper - small.ci_lower)
 
@@ -138,7 +138,7 @@ def test_epsilon_is_the_adjusted_form(fitted) -> None:
     mean_square_error = rss / df_residual
     expected = (mss - df_effect * mean_square_error) / (mss + rss)
 
-    assert fitted[1].estat_esize(epsilon=True).estimate == pytest.approx(
+    assert fitted[1].estat_effect_size(epsilon=True).estimate == pytest.approx(
         expected, rel=1e-12
     )
 
@@ -159,7 +159,7 @@ def test_omega_adds_one_mean_square_to_the_denominator(fitted) -> None:
         (mss + rss) + mean_square_error
     )
 
-    assert fitted[1].estat_esize(omega=True).estimate == pytest.approx(
+    assert fitted[1].estat_effect_size(omega=True).estimate == pytest.approx(
         expected, rel=1e-12
     )
 
@@ -171,9 +171,9 @@ def test_eta_exceeds_epsilon_which_exceeds_omega(fitted) -> None:
     is asserted rather than eyeballed.
     """
 
-    eta = fitted[1].estat_esize().estimate
-    epsilon = fitted[1].estat_esize(epsilon=True).estimate
-    omega = fitted[1].estat_esize(omega=True).estimate
+    eta = fitted[1].estat_effect_size().estimate
+    epsilon = fitted[1].estat_effect_size(epsilon=True).estimate
+    omega = fitted[1].estat_effect_size(omega=True).estimate
 
     assert eta > epsilon > omega
 
@@ -182,7 +182,7 @@ def test_the_adjusted_forms_carry_no_interval(fitted) -> None:
     """``sthlp:610-612`` documents intervals for ETA-squared only."""
 
     for kwargs in ({"epsilon": True}, {"omega": True}):
-        reported = fitted[1].estat_esize(**kwargs)
+        reported = fitted[1].estat_effect_size(**kwargs)
         assert reported.ci_lower is None
         assert reported.ci_upper is None
 
@@ -192,7 +192,7 @@ def test_epsilon_and_omega_together_are_refused(fitted) -> None:
     """``esize.ado:14``: ``opts_exclusive "`epsilon' `omega'"``."""
 
     with pytest.raises(ValueError, match="mutually exclusive"):
-        fitted[1].estat_esize(epsilon=True, omega=True)
+        fitted[1].estat_effect_size(epsilon=True, omega=True)
 
 
 def test_a_non_linear_model_is_refused() -> None:
@@ -205,7 +205,7 @@ def test_a_non_linear_model_is_refused() -> None:
     logit = ws.Logit.from_formula("yb ~ x1", frame).fit()
 
     with pytest.raises(NotImplementedError, match="regress or anova"):
-        logit.estat_esize()
+        logit.estat_effect_size()
 
 
 # ---------------------------------------------------------------- the r() names
@@ -216,12 +216,12 @@ def test_to_dict_reports_only_the_computed_kind(fitted) -> None:
     estimate the command produced.
     """
 
-    assert set(fitted[1].estat_esize().to_dict()) == {"eta2"}
-    assert set(fitted[1].estat_esize(epsilon=True).to_dict()) == {"epsilon2"}
-    assert set(fitted[1].estat_esize(omega=True).to_dict()) == {"omega2"}
+    assert set(fitted[1].estat_effect_size().to_dict()) == {"eta2"}
+    assert set(fitted[1].estat_effect_size(epsilon=True).to_dict()) == {"epsilon2"}
+    assert set(fitted[1].estat_effect_size(omega=True).to_dict()) == {"omega2"}
 
 
 def test_the_rendered_text_names_the_estimate(fitted) -> None:
-    assert "Eta-squared" in str(fitted[1].estat_esize())
-    assert "Epsilon-squared" in str(fitted[1].estat_esize(epsilon=True))
-    assert "Omega-squared" in str(fitted[1].estat_esize(omega=True))
+    assert "Eta-squared" in str(fitted[1].estat_effect_size())
+    assert "Epsilon-squared" in str(fitted[1].estat_effect_size(epsilon=True))
+    assert "Omega-squared" in str(fitted[1].estat_effect_size(omega=True))

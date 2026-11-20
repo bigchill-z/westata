@@ -207,7 +207,7 @@ def check_regress(oracle: StataOracle) -> Comparison:
         "regress",
         "mpg ~ weight + foreign (nonrobust)",
         ["regress mpg weight foreign"],
-        lambda: ws.OLS.from_formula("mpg ~ weight + foreign", df).fit(),
+        lambda: ws.Regress.from_formula("mpg ~ weight + foreign", df).fit(),
         {"N": "N", "df_r": "df_r", "r2": "r2", "r2_a": "r2_a", "rmse": "rmse"},
     )
 
@@ -220,7 +220,7 @@ def check_regress_robust(oracle: StataOracle) -> Comparison:
         "regress, robust",
         "mpg ~ weight + foreign, vce(robust) -> HC1",
         ["regress mpg weight foreign, vce(robust)"],
-        lambda: ws.OLS.from_formula("mpg ~ weight + foreign", df).fit(cov_type="HC1"),
+        lambda: ws.Regress.from_formula("mpg ~ weight + foreign", df).fit(cov_type="HC1"),
     )
 
 
@@ -230,7 +230,7 @@ def check_regress_cluster(oracle: StataOracle) -> Comparison:
     df["grp"] = (np.arange(len(df)) % 7).astype(int)
 
     def westata():
-        return ws.OLS.from_formula("mpg ~ weight + foreign", df).fit(
+        return ws.Regress.from_formula("mpg ~ weight + foreign", df).fit(
             cov_type="cluster", cov_kwds={"groups": df["grp"]}
         )
 
@@ -253,7 +253,7 @@ def check_regress_factor(oracle: StataOracle) -> Comparison:
     # Compare the identified coefficients by matching the non-base levels.
     oracle.run("regress mpg weight i.foreign")
     capture = oracle.capture()
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "mpg ~ weight + C(foreign, base=0)", df
     ).fit()
 
@@ -308,7 +308,7 @@ def check_test_joint(oracle: StataOracle) -> Comparison:
     output = oracle.get_output("test weight foreign")
 
     df = pd.read_stata(ROOT / "tests" / "data" / "auto.dta", convert_categoricals=False)
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", df).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", df).fit()
     outcome = result.test("weight foreign")
 
     import re
@@ -340,7 +340,7 @@ def check_lincom(oracle: StataOracle) -> Comparison:
     import re
 
     df = pd.read_stata(ROOT / "tests" / "data" / "auto.dta", convert_categoricals=False)
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", df).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", df).fit()
     outcome = result.lincom("weight + 1000*foreign")
 
     comparison = Comparison(command="lincom", detail="weight + 1000*foreign")

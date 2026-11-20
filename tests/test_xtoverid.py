@@ -32,7 +32,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.xtoverid import XtOveridResult, xtoverid
+from westata.postestimation.xtoverid import PanelOveridResults, panel_overid
 
 DATA = r"D:\myCodeProject\test_westata\data\lin_1992.dta"
 
@@ -94,7 +94,7 @@ def frame():
 def _fit(frame, regressors, cov_type):
     formula = "ltvfo ~ " + " + ".join(regressors)
     kwargs = {} if cov_type is None else {"cov_type": cov_type}
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         formula, frame, entity="province", time="t"
     ).fit(**kwargs)
 
@@ -103,7 +103,7 @@ def _fit(frame, regressors, cov_type):
 def test_the_statistic_matches_stata(frame, case: str) -> None:
     regressors, cov_type, expected_j, expected_df, _ = STATA_CASES[case]
     fit = _fit(frame, regressors, cov_type)
-    result = xtoverid(fit)
+    result = panel_overid(fit)
 
     # Relative, not absolute: these statistics span 3 to 221, so one absolute tolerance
     # would be far too tight at the top and meaningless at the bottom. The measured
@@ -119,14 +119,14 @@ def test_the_degrees_of_freedom_match_stata(frame, case: str) -> None:
 
     regressors, cov_type, _, expected_df, _ = STATA_CASES[case]
     fit = _fit(frame, regressors, cov_type)
-    assert xtoverid(fit).df == float(expected_df), case
+    assert panel_overid(fit).df == float(expected_df), case
 
 
 @pytest.mark.parametrize("case", sorted(STATA_CASES))
 def test_the_p_value_matches_stata(frame, case: str) -> None:
     regressors, cov_type, _, _, expected_p = STATA_CASES[case]
     fit = _fit(frame, regressors, cov_type)
-    result = xtoverid(fit)
+    result = panel_overid(fit)
     if expected_p == 0.0:
         # Stata prints 0.000000000000 here; the true tail is below that display floor.
         assert result.pvalue < 1e-12
@@ -142,8 +142,8 @@ def test_the_robust_case_is_not_the_conventional_one(frame) -> None:
     """
 
     regressors = ["ltlan", "ltwlab", "ltpow", "ltfer", "hrs", "mci", "ngca"]
-    plain = xtoverid(_fit(frame, regressors, None)).statistic
-    robust = xtoverid(_fit(frame, regressors, "robust")).statistic
+    plain = panel_overid(_fit(frame, regressors, None)).statistic
+    robust = panel_overid(_fit(frame, regressors, "robust")).statistic
     assert robust > 4.0 * plain
 
 
@@ -151,7 +151,7 @@ def test_the_printed_block_matches_stata(frame) -> None:
     """The three lines a live ``xtoverid`` prints, verbatim."""
 
     fit = _fit(frame, ["ltlan", "ltwlab", "ltpow", "ltfer", "hrs", "mci", "ngca"], None)
-    rendered = str(xtoverid(fit))
+    rendered = str(panel_overid(fit))
     assert rendered.splitlines() == [
         "Test of overidentifying restrictions: fixed vs random effects",
         "Cross-section time-series model: xtreg re",
@@ -163,15 +163,15 @@ def test_to_dict_uses_the_r_names_the_ado_returns(frame) -> None:
     """``xtoverid.ado:273-275`` sets exactly ``r(j)``, ``r(jp)`` and ``r(jdf)``."""
 
     fit = _fit(frame, ["ltlan", "ltwlab"], None)
-    table = xtoverid(fit).to_dict()
+    table = panel_overid(fit).to_dict()
     assert set(table) == {"j", "jp", "jdf"}
     assert table["jdf"] == 2.0
 
 
 def test_the_result_is_a_frozen_dataclass_like_its_siblings(frame) -> None:
     fit = _fit(frame, ["ltlan", "ltwlab"], None)
-    result = xtoverid(fit)
-    assert isinstance(result, XtOveridResult)
+    result = panel_overid(fit)
+    assert isinstance(result, PanelOveridResults)
     assert result.description == "fixed vs random effects"
     assert result.model == "xtreg re"
 
@@ -179,14 +179,14 @@ def test_the_result_is_a_frozen_dataclass_like_its_siblings(frame) -> None:
 # --------------------------------------------------------------- refusals
 def test_ftest_is_refused_for_a_non_panel_result() -> None:
     auto = pd.read_stata("tests/data/auto.dta")
-    ols = ws.OLS.from_formula("mpg ~ weight", auto).fit()
+    ols = ws.Regress.from_formula("mpg ~ weight", auto).fit()
     with pytest.raises(NotImplementedError, match="only after xtreg"):
-        xtoverid(ols)
+        panel_overid(ols)
 
 
 @pytest.mark.parametrize(
     "estimator",
-    [ws.PanelOLS, ws.BetweenOLS, ws.FirstDifferenceOLS],
+    [ws.PanelRegressFE, ws.PanelRegressBE, ws.PanelRegressFD],
 )
 def test_xtreg_estimators_other_than_re_are_refused(frame, estimator) -> None:
     """``xtoverid.ado:97-104`` narrows ``xtreg`` to ``e(model) == "re"``."""
@@ -195,7 +195,7 @@ def test_xtreg_estimators_other_than_re_are_refused(frame, estimator) -> None:
         "ltvfo ~ ltlan + ltwlab", frame, entity="province", time="t"
     ).fit()
     with pytest.raises(ValueError, match="not compatible with xtreg model"):
-        xtoverid(fit)
+        panel_overid(fit)
 
 
 def test_a_degenerate_re_fit_is_refused(frame) -> None:
@@ -205,7 +205,7 @@ def test_a_degenerate_re_fit_is_refused(frame) -> None:
     # Force the degenerate state the ado tests for, without needing a real pooled fit.
     fit.e["sigma_u"] = 0.0
     with pytest.raises(ValueError, match="degenerate"):
-        xtoverid(fit)
+        panel_overid(fit)
 
 
 def test_a_weighted_fit_is_refused(frame) -> None:
@@ -214,7 +214,7 @@ def test_a_weighted_fit_is_refused(frame) -> None:
     fit = _fit(frame, ["ltlan", "ltwlab"], None)
     fit.weight_type = "aweight"
     with pytest.raises(NotImplementedError, match="does not support weights"):
-        xtoverid(fit)
+        panel_overid(fit)
 
 
 def test_an_unbalanced_fit_is_refused_rather_than_guessed(frame) -> None:
@@ -226,20 +226,20 @@ def test_an_unbalanced_fit_is_refused_rather_than_guessed(frame) -> None:
     """
 
     trimmed = frame.drop(index=frame.index[0])
-    fit = ws.RandomEffects.from_formula(
+    fit = ws.PanelRegressRE.from_formula(
         "ltvfo ~ ltlan + ltwlab", trimmed, entity="province", time="t"
     ).fit()
     assert "theta" not in fit.e
     with pytest.raises(ValueError, match=r"stores no e\(theta\)"):
-        xtoverid(fit)
+        panel_overid(fit)
 
 
 def test_a_model_with_no_slopes_is_refused(frame) -> None:
-    fit = ws.RandomEffects.from_formula(
+    fit = ws.PanelRegressRE.from_formula(
         "ltvfo ~ 1", frame, entity="province", time="t"
     ).fit()
     with pytest.raises(ValueError, match="no regressors"):
-        xtoverid(fit)
+        panel_overid(fit)
 
 
 # ------------------------------------------------------------- internals
@@ -247,22 +247,22 @@ def test_the_added_regressors_are_within_deviations(frame) -> None:
     """The tested terms are ``x - xbar``, one per slope -- not the slopes themselves."""
 
     fit = _fit(frame, ["ltlan", "ltwlab"], None)
-    result = xtoverid(fit)
+    result = panel_overid(fit)
     assert result.tested == ["__xtoverid_dev_ltlan", "__xtoverid_dev_ltwlab"]
 
 
 def test_the_statistic_is_scale_invariant_to_the_generated_names(frame) -> None:
     """The restriction names are internal labels; the number must not depend on them."""
 
-    a = xtoverid(_fit(frame, ["ltlan", "ltwlab", "ltpow"], None)).statistic
-    b = xtoverid(_fit(frame, ["ltlan", "ltwlab", "ltpow"], None)).statistic
+    a = panel_overid(_fit(frame, ["ltlan", "ltwlab", "ltpow"], None)).statistic
+    b = panel_overid(_fit(frame, ["ltlan", "ltwlab", "ltpow"], None)).statistic
     assert a == b
 
 
 def test_a_single_regressor_gives_one_degree_of_freedom(frame) -> None:
     """``df == 1`` is the tightest possible check that the count follows the slopes."""
 
-    result = xtoverid(_fit(frame, ["ltlan"], None))
+    result = panel_overid(_fit(frame, ["ltlan"], None))
     assert result.df == 1.0
     assert np.isfinite(result.statistic)
 
@@ -273,5 +273,5 @@ def test_more_regressors_never_reduce_the_degrees_of_freedom(frame) -> None:
     lengths = []
     for count in (1, 2, 3):
         regressors = ["ltlan", "ltwlab", "ltpow"][:count]
-        lengths.append(xtoverid(_fit(frame, regressors, None)).df)
+        lengths.append(panel_overid(_fit(frame, regressors, None)).df)
     assert lengths == [1.0, 2.0, 3.0]

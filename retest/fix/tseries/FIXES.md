@@ -22,11 +22,11 @@ cd D:\myCodeProject\statapy
 | V1a | VAR 标准误（每方程 ML 自由度） | 5.055e-03 / 8.496e-03 | **2.760e-16 / 5.019e-16** | `var y1 y2, lags(1)` / `lags(1/2)` | 已修复 A |
 | V1b | VAR `e(Sigma)` | 1.014e-02 / 1.706e-02 | **4.770e-15 / 1.677e-13** | 同上 | 已修复 A |
 | V1c | VAR `e(V)` 全矩阵 | 1.014e-02 / 1.706e-02 | **6.760e-15 / 1.757e-13** | 同上 | 已修复 A |
-| V2 | Granger 默认返回 F，Stata 是 Wald chi2 | F(1,592)=20.68 vs chi2=20.89；chi2 未归一 1.003e-02 / 1.678e-02 | **1.570e-15 / 1.689e-15**（p 值 1.54e-14） | `vargranger` | 已修复 A |
+| V2 | Granger 默认返回 F，Stata 是 Wald chi2 | F(1,592)=20.68 vs chi2=20.89；chi2 未归一 1.003e-02 / 1.678e-02 | **1.570e-15 / 1.689e-15**（p 值 1.54e-14） | `var_granger` | 已修复 A |
 | V3 | `dfuller` 打印的 1/5/10% 临界值 | 2.362e-03～4.133e-03 | **≤1.295e-16**（6 组；3 组为 0.0） | `dfuller ..., lags(2) [trend|noconstant]` 等 6 条 | 已修复 A |
 | V3b | `pperron` 打印临界值（同一张表） | 2.3e-03 | **0.0**（4 组） | `pperron y_rw [trend|lags(3)]` | 已修复 A |
-| V4 | `vecrank` 临界值表（Stata Johansen 1995 vs Osterwald-Lenum） | trace 5% 差 2.168e-02（constant）/ 7.542e-02（none）/ 2.714e-02（trend）；max-eig 同量级 | **0.000e+00**（constant / none / trend × trace / max-eig，6 组全 0） | `vecrank yc1 yc2, lags(2) trend(...) max` | 已修复 A |
-| V4b | `vecrank` 选阶在边界数据上翻 | 8/8 组边界数据翻（statsmodels 表选 1，Stata 选 2） | **0/8 翻**（与 Stata 一致） | `vecrank yb1 yb2, lags(2) trend(constant) max` | 已修复（结论级） |
+| V4 | `vec_rank` 临界值表（Stata Johansen 1995 vs Osterwald-Lenum） | trace 5% 差 2.168e-02（constant）/ 7.542e-02（none）/ 2.714e-02（trend）；max-eig 同量级 | **0.000e+00**（constant / none / trend × trace / max-eig，6 组全 0） | `vec_rank yc1 yc2, lags(2) trend(...) max` | 已修复 A |
+| V4b | `vec_rank` 选阶在边界数据上翻 | 8/8 组边界数据翻（statsmodels 表选 1，Stata 选 2） | **0/8 翻**（与 Stata 一致） | `vec_rank yb1 yb2, lags(2) trend(constant) max` | 已修复（结论级） |
 | V5 | `arima` 的 `e(N)` 在 `d=1` 差 1 | 300 vs 299（差 d+D·s） | **精确相等**（6 个模型：300/299/299/298/298/296 全中） | `arima y_rw, arima(0,1,1)` 等 6 条 | 已修复 A |
 | V6a | `arch` 标准误：继承 arch 包 robust，Stata 是 OPG | 2.782e-01 / 1.017e-01 | **1.511e-04 / 3.165e-04** | `arch yg, arch(1) garch(1)` / `arch(1)` | 已修复 B（目标 ≤1e-2） |
 | V6b | `arch` presample h₀ 不同导致目标函数不同 | 参数 1.068e-02 | **1.780e-04**（GARCH(1,1)）/ 4.433e-04（ARCH(1)，原本就是 C 档） | 同上 | 已修复 B |
@@ -52,13 +52,13 @@ cd D:\myCodeProject\statapy
 
 ### V2 Granger 默认统计量
 
-**根因**：`granger_causality()` 硬写 `kind="f"`。Stata `vargranger` 打印 **Wald chi2**
+**根因**：`granger_causality()` 硬写 `kind="f"`。Stata `var_granger` 打印 **Wald chi2**
 （`df = #causing × lags`）。还有第二层：Wald 形式用 ML 残差协方差，statsmodels 用无偏的，
 所以还要乘 `T/(T−k_eq)`。
 
 **改法**：默认走 `kind="wald"`，统计量乘 `1/ml_factor`，p 值与临界值用 `chi2(df)` 重算，
 返回 `CausalityTestResults(method="Wald")`。`statistic="F"` 保留 statsmodels 原样（`df2 = k(T−k_eq)`），
-并在 docstring 说明它**不是** `vargranger` 的量。实测 VAR(1) `18.1080077246501` vs Stata
+并在 docstring 说明它**不是** `var_granger` 的量。实测 VAR(1) `18.1080077246501` vs Stata
 `18.10800772465012`。
 
 ### V3 dfuller 打印的临界值
@@ -73,7 +73,7 @@ cd D:\myCodeProject\statapy
 
 `repro_v3_dfuller.py` 同时断言"模块里的表 == ado 里的表"（54 个数逐个比对），所以改表会立刻失败。
 
-### V4 vecrank 临界值表
+### V4 vec_rank 临界值表
 
 **根因**：`VECM.johansen()` 的临界值取自 `statsmodels.coint_johansen().cvt/.cvm`
 （Osterwald-Lenum）；Stata 的 `_vecgetcv.ado::_VECGETCV_` 硬编码 **Johansen (1995)** 的
@@ -83,14 +83,14 @@ K−r=2：**14.07** vs **14.2639**。
 **改法**：抄入 `_VECRANK_TRACE_CV95/99` 与 `_VECRANK_MAXEIG_CV95/99`（列序按 ado 注释：
 none / rconstant / constant / rtrend / trend），`_vecrank_critical()` 按行 `K−r` 取表。
 **统计量公式一行未动**。新增 `JohansenResult.select_rank(statistic=..., level=...)`，
-把 `vecrank` 的打星规则（最小的使统计量 ≤ 5% 临界值的 r）显式化。
+把 `vec_rank` 的打星规则（最小的使统计量 ≤ 5% 临界值的 r）显式化。
 
 **边界数据**：扫 seed 得到 8 组 `trace(r=1) ∈ (3.76, 3.8415)` 的协整对（seed 5/128/211/237/248/287/320/470）。
-用 statsmodels 表 → 8 组全部选 rank 1；换 Stata 表 → 8 组全部选 rank 2，与 `vecrank` 一致。
+用 statsmodels 表 → 8 组全部选 rank 1；换 Stata 表 → 8 组全部选 rank 2，与 `vec_rank` 一致。
 其中 seed=248 是现场 Stata 证据：`trace = [95.9056, 3.8369]`，临界值 `[15.41, 3.76]`，r=1 无星号。
 
 **顺带修掉的一处**（同一函数内、属 V4 的"只换表不换公式"必读项）：`det_order=1` 时原实现
-只在残差里去了趋势、**没把趋势列放进差分回归**，于是 `vecrank ..., trend(trend)` 给
+只在残差里去了趋势、**没把趋势列放进差分回归**，于是 `vec_rank ..., trend(trend)` 给
 92.1075 而 Stata 是 92.2870。补上趋势列后 92.2870（max-eig 90.6871）逐位一致。这一改
 只影响 `det_order=1`；`det_order=-1/0` 的统计量不变（`repro_v4` 里三档都打印了统计量相对差）。
 
@@ -136,8 +136,8 @@ none / rconstant / constant / rtrend / trend），`_vecrank_critical()` 按行 `
 | 项 | 实测残差 | 原因 | 建议下一步 |
 |---|---|---|---|
 | V6 参数与 SE 停在 ~2e-4 | 参数 1.780e-04，SE 1.511e-04 | **不是公式差异**。`repro_v6_arch.py` 用 Stata 的递推在两组参数点上求值：Stata 自己报的 `e(ll)=-824.3779300106`，比它自己的递推在**它自己参数点**上给出的 `-824.3780305032` **高 1.00e-04**；westata 在另一参数点上给出 `-824.3780321`，与 Stata 的递推只差 1.6e-06。即：两边都在同一个最优附近，Stata 停得更早、且它报的 ll 与朴素递推略有 1e-4 的口径差（Stata 首期条件观测处理，`e(condobs)=0` 的确切含义仍未完全分解）。 | 若 Lead 要求 ≤1e-6，需要拿到 Stata `arch` 的首期处理细节（可能要 `set trace on` 逐行读 `arch_*` mata），成本高、收益是第 4 位小数。**建议保持 B 档并保留这段归因**。 |
-| `vecrank` 的 `trend(rconstant)` / `trend(rtrend)` 统计量 | 未实现 | 这两种设定把确定性项**限制在协整关系内**，是另一个估计问题；`_johansen_statistics` 只做无约束版。REPORT 也未测。 | 若要支持，需要按 Johansen 的 "case 2/case 4" 做受限回归，工作量独立成项。 |
-| `vecrank` 的 90% 临界值列 | `nan` | Stata 的 ado 只有 95%/99% 两套矩阵。填别的表就是"把错数换成另一个错数"。 | 保持 `nan`（已文档化，见 `_vecrank_critical` docstring）；`select_rank(level=0.10)` 显式 `ValueError`。打印层用 `to_stata_table()` 渲染 `None`。**Lead 已裁决：同意保留 NaN** |
+| `vec_rank` 的 `trend(rconstant)` / `trend(rtrend)` 统计量 | 未实现 | 这两种设定把确定性项**限制在协整关系内**，是另一个估计问题；`_johansen_statistics` 只做无约束版。REPORT 也未测。 | 若要支持，需要按 Johansen 的 "case 2/case 4" 做受限回归，工作量独立成项。 |
+| `vec_rank` 的 90% 临界值列 | `nan` | Stata 的 ado 只有 95%/99% 两套矩阵。填别的表就是"把错数换成另一个错数"。 | 保持 `nan`（已文档化，见 `_vecrank_critical` docstring）；`select_rank(level=0.10)` 显式 `ValueError`。打印层用 `to_stata_table()` 渲染 `None`。**Lead 已裁决：同意保留 NaN** |
 | `arima` 的 `cov_type` | 仍只接受 `"nonrobust"` | 属接口缺口（旧 NOTES §未覆盖 6），不在这 6 个缺陷里。 | 另开任务；Stata 侧 `vce(robust)/vce(opg)` 可测。 |
 
 > **V6 判定的一句话**：目标 **SE ≤1e-2 已达成**（2.782e-01 → 1.511e-04），**1e-9 不可达且原因已知**
@@ -150,14 +150,14 @@ none / rconstant / constant / rtrend / trend），`_vecrank_critical()` 按行 `
 
 | 测试 | 旧断言 | 新断言 | 依据（Stata 捕获，2026-10-24） |
 |---|---|---|---|
-| `test_var_granger_default_is_the_stata_wald_chi2_not_f` | 只断言 `outcome is not None`（旧默认返回 F 也算通过） | 默认 `method=="Wald"`、`df==1`；`chi2 == F·T/(T−k_eq)`（rel 1e-12）；`statistic="F"` 仍是 F 且 `df2 = 2(T−k_eq)` | `var y1 y2, lags(1)` + `vargranger`：chi2 = 18.10800772465012 / 33.61050577858357，df = 1 |
+| `test_var_granger_default_is_the_stata_wald_chi2_not_f` | 只断言 `outcome is not None`（旧默认返回 F 也算通过） | 默认 `method=="Wald"`、`df==1`；`chi2 == F·T/(T−k_eq)`（rel 1e-12）；`statistic="F"` 仍是 F 且 `df2 = 2(T−k_eq)` | `var y1 y2, lags(1)` + `var_granger`：chi2 = 18.10800772465012 / 33.61050577858357，df = 1 |
 | `test_var_reports_stata_ml_degrees_of_freedom` | （无） | `k_per_equation==3`、`ml_factor==(T−3)/T`、`bse` 比 == `sqrt((T−k_eq)/T)`、`e(Sigma)` 比 == `(T−k_eq)/T` | `var y1 y2, lags(1)`：`e(N)=299`，SE 比 0.9949706303122452 |
 | `test_var_ml_false_reproduces_stata_dfk` | （无） | `ml=False` 的 `e(Sigma)` 与 `bse` 等于 Stata `var ..., dfk`（rtol 1e-13）；系数与默认完全相同 | `var y1 y2, lags(1)` / `var y1 y2, lags(1) dfk`（600 obs, seed 7）：`e(Sigma)` = 0.8549362620862754 … vs 0.8592396325330185 … |
-| `test_johansen_uses_stat_critical_values_for_the_constant_case` | （无） | 5% trace cv = 15.41 / 3.76；max-eig = 14.07 / 3.76；99% = 20.04；90% 列是 `nan` | `vecrank ..., lags(2) trend(constant) max` |
+| `test_johansen_uses_stat_critical_values_for_the_constant_case` | （无） | 5% trace cv = 15.41 / 3.76；max-eig = 14.07 / 3.76；99% = 20.04；90% 列是 `nan` | `vec_rank ..., lags(2) trend(constant) max` |
 | `test_select_rank_returns_the_rank_and_refuses_untabulated_levels` | （无） | 默认用 5% 列；返回值是 r（∈{0,1,2}）而非索引；`level=0.10` 抛 `ValueError` | 按 Lead 裁决 4 的接口契约；斜率来自 Stata 表 |
 | `test_to_stata_table_renders_missing_critical_values_as_none` | （无） | 5% 数值与 `to_frame()` 相同；非有限值渲染为 `None`，有限值仍是 `float`；`to_frame()` 仍是 `float64` + `np.isnan` 可用 | 按 Lead 裁决 1②；数值层来自 Stata 表 |
-| `test_johansen_rank_decision_matches_vecrank_on_borderline_data` | （无） | `3.76 < trace[1] < 3.8415` 且 `select_rank()==2`（trace 与 max-eig 都是） | `vecrank yb1 yb2, lags(2) trend(constant)`：trace = 95.9056 / 3.8369，cv 15.41 / 3.76 |
-| `test_johansen_trend_specification_adds_the_trend_to_the_regression` | （无） | `det_order=1` 时 trace[0] ≈ 92.2870、max-eig[0] ≈ 90.6871、cv = 18.17 | `vecrank yc1 yc2, lags(2) trend(trend) max` |
+| `test_johansen_rank_decision_matches_vecrank_on_borderline_data` | （无） | `3.76 < trace[1] < 3.8415` 且 `select_rank()==2`（trace 与 max-eig 都是） | `vec_rank yb1 yb2, lags(2) trend(constant)`：trace = 95.9056 / 3.8369，cv 15.41 / 3.76 |
+| `test_johansen_trend_specification_adds_the_trend_to_the_regression` | （无） | `det_order=1` 时 trace[0] ≈ 92.2870、max-eig[0] ≈ 90.6871、cv = 18.17 | `vec_rank yc1 yc2, lags(2) trend(trend) max` |
 | `test_adf_printed_critical_values_follow_dfuller_ado_table` | （无） | `regression="c"`：N=297 时 cv = −3.45624 / −2.87812 / −2.57；`"ct"`：−3.98812 / −3.42812；统计量与 p 仍等于 statsmodels 的原值 | `dfuller y_rw, lags(2)` / `lags(2) trend` |
 | `test_adf_critical_values_interpolate_like_the_ado` | （无） | N=299 → −3.45608；N=295 → −3.4564（同一线性段的两个点） | `dfuller y_rw, lags(0)` / `dfuller y_ar, lags(4)` |
 | `test_arima_reports_statas_estimation_sample_size` | （无） | `d=1`→`e["N"]==299` 且 `nobs==300`；SARIMA(0,1,1,4)→296；`d=0`→==残差长度 | `arima y_rw, arima(0,1,1)`；`arima y_s, ... sarima(0,1,1,4)` |
@@ -172,10 +172,10 @@ none / rconstant / constant / rtrend / trend），`_vecrank_critical()` 按行 `
 
 | # | 裁决 | 落实位置 |
 |---|---|---|
-| 1 | vecrank 90% 列保留 `nan`；①docstring 写明"Stata 不提供该列，不是缺失计算" ②打印层用 `None` 渲染而非 `nan` 字符串 | ① `_vecrank_critical()` docstring 新增五句说明；② 新增 `JohansenResult.to_frame(render_missing=False)` + `to_stata_table()`，数值层仍是 `np.nan`（`dtype=float64`），渲染层才转 `None`。测试：`test_to_stata_table_renders_missing_critical_values_as_none` |
+| 1 | vec_rank 90% 列保留 `nan`；①docstring 写明"Stata 不提供该列，不是缺失计算" ②打印层用 `None` 渲染而非 `nan` 字符串 | ① `_vecrank_critical()` docstring 新增五句说明；② 新增 `JohansenResult.to_frame(render_missing=False)` + `to_stata_table()`，数值层仍是 `np.nan`（`dtype=float64`），渲染层才转 `None`。测试：`test_to_stata_table_renders_missing_critical_values_as_none` |
 | 2 | V6 留 B 档；docstring 写清残差；FIXES 标注"≤1e-2 达成、1e-9 不可达且已知原因" | `GARCH` class docstring 改写：给出 1.8e-4/1.5e-4 实测残差、Stata `e(ll)` 比自身递推高 1.00e-04、westata 距 Stata 递推 1.6e-06 三点证据；本文件「未修 / 未达 A」表加粗结论行 |
 | 3 | `cov_params` 默认 ML 批准；docstring 第一行写明，并加 `ml=False == dfk` 的测试 | `VARResults.cov_params` docstring 首行即"默认与 Stata `var` 一致（每方程 ML 自由度）；要 `var ..., dfk` 用小样本版本请 `fit(ml=False)`"；测试：`test_var_ml_false_reproduces_stata_dfk`（Stata 全精度常量，rtol 1e-13） |
-| 4 | `select_rank()` 批准；docstring 写明用 5% 临界值、返回 `r` 而非索引；`to_frame()` 旁加注释指向它 | `select_rank` docstring 重写（明确"返回 `r` 的值，不是索引"、"5% 与 `vecrank` 默认一致"）；`to_frame` docstring 首段指向 `select_rank`。测试：`test_select_rank_returns_the_rank_and_refuses_untabulated_levels` |
+| 4 | `select_rank()` 批准；docstring 写明用 5% 临界值、返回 `r` 而非索引；`to_frame()` 旁加注释指向它 | `select_rank` docstring 重写（明确"返回 `r` 的值，不是索引"、"5% 与 `vec_rank` 默认一致"）；`to_frame` docstring 首段指向 `select_rank`。测试：`test_select_rank_returns_the_rank_and_refuses_untabulated_levels` |
 
 ## pytest 结果
 

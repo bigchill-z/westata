@@ -347,7 +347,7 @@ with Stata() as st:
          dict(lower=0.0, upper=2.0)),
     ]:
         cap = st.estimate(cmd)
-        res = ws.Truncreg.from_formula(f"{lhs} ~ x1 + x2", tobit_df, **kw).fit()
+        res = ws.TruncatedRegress.from_formula(f"{lhs} ~ x1 + x2", tobit_df, **kw).fit()
         rec.add(compare(
             name, renamed(cap, ["x1", "x2", "Intercept", "/sigma"]), res,
             rename={"sigma": "/sigma"},
@@ -361,7 +361,7 @@ with Stata() as st:
     st.send(intreg_df)
     assert st.nobs() == len(intreg_df)
     cap = st.estimate("intreg lo hi x1 x2")
-    res_i = ws.Intreg.from_formula("lo hi ~ x1 + x2", intreg_df).fit()
+    res_i = ws.IntervalRegress.from_formula("lo hi ~ x1 + x2", intreg_df).fit()
     rec.add(compare(
         "intreg interval model",
         renamed(cap, ["x1", "x2", "Intercept", "/lnsigma"]), res_i,
@@ -463,7 +463,7 @@ with Stata() as st:
 
     # ============================================================== ETREGRESS
     cap = st.estimate("etregress y x1, treat(s = z1 z2) twostep")
-    res_e = ws.Etregress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit()
+    res_e = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit()
     rec.add(compare(
         "etregress twostep",
         renamed(cap, ["y:x1", "y:s", "y:Intercept", "treat:z1", "treat:z2",
@@ -488,7 +488,7 @@ with Stata() as st:
     ))
 
     cap_ml_e = st.estimate("etregress y x1, treat(s = z1 z2)")
-    res_ml_e = ws.Etregress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit(
+    res_ml_e = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(s ~ z1 + z2)", sel_df).fit(
         method="ml")
     rec.add(compare(
         "etregress ml",
@@ -538,7 +538,7 @@ with Stata() as st:
     st.send(q_df)
     assert st.nobs() == len(q_df)
     cap = st.estimate("qreg y x1 x2")
-    res_q = ws.QuantileRegression.from_formula("y ~ x1 + x2", q_df, quantile=0.5).fit()
+    res_q = ws.QuantileRegress.from_formula("y ~ x1 + x2", q_df, quantile=0.5).fit()
     rec.add(compare(
         "qreg median", renamed(cap, ["x1", "x2", "Intercept"]), res_q,
         scalars=("N", "sum_adev", "sum_rdev", "r2_p", "q", "q_v", "sparsity", "bwidth"),
@@ -548,14 +548,14 @@ with Stata() as st:
     ))
 
     cap = st.estimate("qreg y x1 x2, quantile(.25)")
-    res_q25 = ws.QuantileRegression.from_formula("y ~ x1 + x2", q_df, quantile=0.25).fit()
+    res_q25 = ws.QuantileRegress.from_formula("y ~ x1 + x2", q_df, quantile=0.25).fit()
     rec.add(compare(
         "qreg quantile(.25)", renamed(cap, ["x1", "x2", "Intercept"]), res_q25,
         scalars=("N", "sum_adev", "sum_rdev", "r2_p", "q", "q_v", "sparsity"),
     ))
 
     cap = st.estimate("qreg y x1 x2, vce(robust)")
-    res_qr = ws.QuantileRegression.from_formula("y ~ x1 + x2", q_df, quantile=0.5).fit(
+    res_qr = ws.QuantileRegress.from_formula("y ~ x1 + x2", q_df, quantile=0.5).fit(
         cov_type="robust")
     rec.add(compare(
         "qreg vce(robust) median", renamed(cap, ["x1", "x2", "Intercept"]), res_qr,
@@ -566,7 +566,7 @@ with Stata() as st:
     ))
 
     cap = st.estimate("qreg y x1 x2, quantile(.25) vce(robust)")
-    res_qr25 = ws.QuantileRegression.from_formula("y ~ x1 + x2", q_df, quantile=0.25).fit(
+    res_qr25 = ws.QuantileRegress.from_formula("y ~ x1 + x2", q_df, quantile=0.25).fit(
         cov_type="robust")
     rec.add(compare(
         "qreg vce(robust) quantile(.25)",
@@ -581,7 +581,7 @@ with Stata() as st:
     cap_sq, stub_sq = pooled_bootstrap(
         st, "sqreg y x1 x2, quantile(.25 .5) reps(REPS)",
         order=[2, 0, 1, 5, 3, 4],                 # cons,x1,x2 (q.25) then (q.5)
-        westata_fit=lambda reps, seed: ws.Sqreg.from_formula(
+        westata_fit=lambda reps, seed: ws.SimultaneousQuantileRegress.from_formula(
             "y ~ x1 + x2", q_df, quantiles=(0.25, 0.5)).fit(reps=reps, seed=seed),
         reps=500, seeds=(101, 202, 303, 404),
     )
@@ -599,7 +599,7 @@ with Stata() as st:
     cap_bs, stub_bs = pooled_bootstrap(
         st, "bsqreg y x1 x2, quantile(.5) reps(REPS)",
         order=[2, 0, 1],
-        westata_fit=lambda reps, seed: ws.Bsqreg.from_formula(
+        westata_fit=lambda reps, seed: ws.BootstrappedQuantileRegress.from_formula(
             "y ~ x1 + x2", q_df, quantile=0.5).fit(reps=reps, seed=seed),
         reps=500, seeds=(101, 202, 303, 404),
     )
@@ -615,7 +615,7 @@ with Stata() as st:
     def rreg_point(st, df, cmd, formula, stata_order, label, dep, cols):
         st.send(df)
         cap = st.estimate(cmd)
-        res = ws.RobustRegression.from_formula(formula, df).fit()
+        res = ws.RobustRegress.from_formula(formula, df).fit()
         order = {"x1": 0, "x2": 1, "weight": 0, "length": 1, "_cons": 2}
         sse = np.sqrt(np.diag(cap.V))
         sb = np.asarray(cap.b)
@@ -671,7 +671,7 @@ with Stata() as st:
                           "y", ["x1", "x2"])
     w_stata = st.var("wt")
     X = np.column_stack([np.ones(n_q), qx1, qx2])
-    w_ws = ws.RobustRegression.from_formula("y ~ x1 + x2", q_df)._biweight_weights(
+    w_ws = ws.RobustRegress.from_formula("y ~ x1 + x2", q_df)._biweight_weights(
         qy - X @ np.asarray(res.params))
     weight_rel = float(np.max(np.abs(w_stata - w_ws)) / float(np.max(np.abs(w_stata))))
     weight_cmp = Comparison(

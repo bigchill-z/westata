@@ -89,7 +89,7 @@ def check_xtreg_fe(o: StataOracle) -> Outcome:
     o.run("xtset firm year")
     o.run("xtreg y x1 x2, fe")
     cap = o.capture()
-    res = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
+    res = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="firm", time="year").fit()
     perm = align(res, cap.names)
     return Outcome(
         "xtreg, fe",
@@ -109,7 +109,7 @@ def check_xtreg_re(o: StataOracle) -> Outcome:
     o.run("xtset firm year")
     o.run("xtreg y x1 x2, re")
     cap = o.capture()
-    res = ws.RandomEffects.from_formula(
+    res = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     perm = align(res, cap.names)
@@ -131,7 +131,7 @@ def check_xtreg_be(o: StataOracle) -> Outcome:
     o.run("xtset firm year")
     o.run("xtreg y x1 x2, be")
     cap = o.capture()
-    res = ws.BetweenOLS.from_formula(
+    res = ws.PanelRegressBE.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     perm = align(res, cap.names)
@@ -159,7 +159,7 @@ def check_xtreg_fd(o: StataOracle) -> Outcome:
     o.run("gen dx2 = D.x2")
     o.run("regress dy dx1 dx2, noconstant")
     cap = o.capture()
-    res = ws.FirstDifferenceOLS.from_formula(
+    res = ws.PanelRegressFD.from_formula(
         "y ~ x1 + x2", df, entity="firm", time="year"
     ).fit()
     # The Stata side works on dx1/dx2 columns, so the names need translating.
@@ -178,7 +178,7 @@ def check_areg(o: StataOracle) -> Outcome:
     o.send_data(df)
     o.run("areg y x1 x2, absorb(firm)")
     cap = o.capture()
-    res = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit()
+    res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit()
     # areg reports the absorbed effect's constant as _cons; westata reports only
     # the slopes for an absorbed model, so compare the slopes.
     slope_names = [name for name in cap.names if name != "_cons"]

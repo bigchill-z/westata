@@ -229,8 +229,8 @@ def test_rmse_uses_the_full_rank_denominator_like_reghdfe():
 
     frame = _nq2011_frame()
     formula = _nq2011_formula()
-    plain = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit()
-    clustered = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit(
+    plain = ws.RegressHighDimFixedEffects.from_formula(f"{formula} | isocode", frame).fit()
+    clustered = ws.RegressHighDimFixedEffects.from_formula(f"{formula} | isocode", frame).fit(
         cov_type="cluster", cov_kwds={"cluster": "isocode"}
     )
 
@@ -268,7 +268,7 @@ def test_feols_matches_the_reghdfe_fixture_bit_for_bit():
     scalars = capture["scalars"]
 
     frame = _reghdfe_panel_frame()
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit(
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", frame).fit(
         cov_type="cluster", cov_kwds={"cluster": frame["firm"]}
     )
 

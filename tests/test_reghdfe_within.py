@@ -58,7 +58,7 @@ def test_the_fixture_identity_holds_on_statas_own_numbers() -> None:
 
 
 def test_tss_within_equals_the_fe_only_residual_sum_of_squares(panel) -> None:
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
     tss_within = result.e["tss_within"]
 
     # Independently: demean y by entity means and take the sum of squares.
@@ -71,13 +71,13 @@ def test_tss_within_equals_the_fe_only_residual_sum_of_squares(panel) -> None:
 def test_tss_within_differs_from_the_centred_total(panel) -> None:
     """A common mistake is to reuse the ordinary total sum of squares."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
 
     assert not np.isclose(result.e["tss_within"], result.e["tss"], rtol=1e-6)
 
 
 def test_r2_within_is_one_minus_rss_over_tss_within(panel) -> None:
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
     e = result.e
 
     assert e["r2_within"] == pytest.approx(
@@ -86,13 +86,13 @@ def test_r2_within_is_one_minus_rss_over_tss_within(panel) -> None:
 
 
 def test_r2_within_differs_from_r2(panel) -> None:
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
 
     assert not np.isclose(result.e["r2_within"], result.e["r2"], rtol=1e-6)
 
 
 def test_r2_a_within_matches_its_definition(panel) -> None:
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
     e = result.e
 
     expected = 1.0 - (1.0 - e["r2_within"]) * (e["N"] - 1.0) / e["df_r"]
@@ -102,7 +102,7 @@ def test_r2_a_within_matches_its_definition(panel) -> None:
 def test_two_way_absorption_still_produces_the_block(panel) -> None:
     """Multi-way absorption must not fall back to one demeaning pass."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
 
     assert "tss_within" in result.e
     assert np.isfinite(result.e["tss_within"])
@@ -112,8 +112,8 @@ def test_two_way_absorption_still_produces_the_block(panel) -> None:
 def test_two_way_tss_within_is_below_one_way(panel) -> None:
     """Absorbing more effects can only shrink the residual sum of squares."""
 
-    one_way = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
-    two_way = ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
+    one_way = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    two_way = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
 
     assert two_way.e["tss_within"] <= one_way.e["tss_within"]
 
@@ -122,14 +122,14 @@ def test_two_way_tss_within_is_below_one_way(panel) -> None:
 def test_sumweights_mirrors_sum_w(panel) -> None:
     """``reghdfe`` spells ``e(sum_w)`` as ``e(sumweights)`` too."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
 
     assert result.e["sumweights"] == result.e["sum_w"]
     assert result.e["sumweights"] == float(result.nobs)
 
 
 def test_converged_and_ic_are_recorded(panel) -> None:
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
 
     assert result.e["converged"] == 1.0
     assert result.e["ic"] == 1.0
@@ -138,7 +138,7 @@ def test_converged_and_ic_are_recorded(panel) -> None:
 def test_report_constant_is_zero_without_a_reported_constant(panel) -> None:
     """The absorbed effects subsume the constant, so none is reported."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
 
     assert result.e["report_constant"] == 0.0
 
@@ -160,8 +160,8 @@ def test_the_absorbed_bookkeeping_block_is_recorded(panel) -> None:
     23 deferred them believing they needed reghdfe's iterative solver; they do not.
     """
 
-    one_way = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", panel).fit()
-    two_way = ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
+    one_way = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", panel).fit()
+    two_way = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", panel).fit()
 
     for key in (
         "N_hdfe",

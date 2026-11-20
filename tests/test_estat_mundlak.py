@@ -53,7 +53,7 @@ def _panel(*, correlated: bool, seed: int, entities: int = 60, periods: int = 6)
 @pytest.fixture(scope="module")
 def correlated():
     frame = _panel(correlated=True, seed=950)
-    return frame, ws.RandomEffects.from_formula(
+    return frame, ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -61,7 +61,7 @@ def correlated():
 @pytest.fixture(scope="module")
 def uncorrelated():
     frame = _panel(correlated=False, seed=952)
-    return frame, ws.RandomEffects.from_formula(
+    return frame, ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -71,7 +71,7 @@ def _manual_mundlak(frame: pd.DataFrame):
 
     augmented = frame.copy()
     augmented["x1bar"] = augmented.groupby("firm")["x1"].transform("mean")
-    refit = ws.RandomEffects.from_formula(
+    refit = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x1bar", augmented, entity="firm", time="year"
     ).fit()
     names = list(refit.param_names)
@@ -165,7 +165,7 @@ def test_two_regressors_give_two_degrees_of_freedom() -> None:
             "year": np.tile(np.arange(periods), entities),
         }
     )
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", frame, entity="firm", time="year"
     ).fit()
 
@@ -196,7 +196,7 @@ def test_a_non_panel_result_is_refused() -> None:
     frame = pd.DataFrame({"y": rng.normal(size=100), "x": rng.normal(size=100)})
 
     with pytest.raises(NotImplementedError, match="xtreg"):
-        ws.OLS.from_formula("y ~ x", frame).fit().estat_mundlak(entity="x")
+        ws.Regress.from_formula("y ~ x", frame).fit().estat_mundlak(entity="x")
 
 
 def test_a_storer_callback_bypasses_the_entity_requirement(correlated) -> None:
@@ -207,7 +207,7 @@ def test_a_storer_callback_bypasses_the_entity_requirement(correlated) -> None:
 
     def storer(augmented: pd.DataFrame):
         seen["frame"] = augmented
-        return ws.RandomEffects.from_formula(
+        return ws.PanelRegressRE.from_formula(
             "y ~ x1 + __mundlak_x1", augmented, entity="firm", time="year"
         ).fit()
 

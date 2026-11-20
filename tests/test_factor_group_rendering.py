@@ -45,7 +45,7 @@ def fitted():
         frame = pd.read_stata(AUTO)
     except FileNotFoundError:  # pragma: no cover - the file ships with the repo
         pytest.skip("auto.dta is missing")
-    return ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame).fit()
+    return ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame).fit()
 
 
 @pytest.fixture(scope="module")

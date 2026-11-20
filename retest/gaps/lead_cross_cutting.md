@@ -14,10 +14,10 @@
 
 | 估计器 | `rss` | `mss` | `tss` | 证据 |
 |---|---|---|---|---|
-| `OLS` | ✅ | ✅ | ❌ | `estimators/linear.py:311-327` 的 `e` 字典含 `rss`/`mss`，无 `tss` |
+| `Regress` | ✅ | ✅ | ❌ | `estimators/linear.py:311-327` 的 `e` 字典含 `rss`/`mss`，无 `tss` |
 | `ivregress 2sls` | ✅ | ✅ | ✅ | `estimators/iv.py:824-826` |
 | `nl` | ✅ | ✅ | ✅ | `estimators/nonlinear.py:1332-1334` |
-| `reghdfe` (`FEOLS`) | ❌ | ❌ | ❌ | `estimators/hdfe.py:520,522` **算出了 `tss`，但 `e` 字典（536-546 行）三个都没存** |
+| `reghdfe` (`RegressHighDimFixedEffects`) | ❌ | ❌ | ❌ | `estimators/hdfe.py:520,522` **算出了 `tss`，但 `e` 字典（536-546 行）三个都没存** |
 | `svy: regress` | ❌ | ❌ | ❌ | `estimators/survey.py:1055-1056` **算出 `tss`，`fit()` 只回 `r2`/`F`/`p`（1071 行）** |
 | `xtreg, fe/re/be/fd` | ✅ | ❌ | ❌ | `estimators/panel.py:753` |
 | `xtivreg` | ✅ | ✅ | ❌ | `estimators/panel_iv.py:1550-1551` **算出 `tss`，没存** |
@@ -71,7 +71,7 @@ westata 的现状：
 
 ### 1.1 `summary(style="stata")` 已渲染的块
 
-实测 `OLS` 与 `logit` 的 `stata` 风格输出（`results/summary.py:132-245`）：
+实测 `Regress` 与 `logit` 的 `stata` 风格输出（`results/summary.py:132-245`）：
 
 ```
 Number of obs         =         74
@@ -142,7 +142,7 @@ check-function 伪 R²），而渲染器按键名推断模型类别。修法有�
 `sqreg` 还多一个 per-quantile Pseudo R2 块（`p8_outputs.txt:126-128`）。
 
 `rreg` 的 Stata 头部块又是另一种（`p8_outputs.txt:181-183`）：F 与 Prob>F **在右侧**，
-没有 R²/Adj R²/Root MSE 三行。westata 实测把 `rreg` 当 OLS 渲染，打印了 R² 三行。
+没有 R²/Adj R²/Root MSE 三行。westata 实测把 `rreg` 当 Regress 渲染，打印了 R² 三行。
 
 **这一节的结论**：westata 的 `stata` 渲染器是**单一模板**（R²/RMSE/F 或
 ll/PseudoR²/chi2 二选一），而 Stata 至少有 **5 种**头部块形态：
@@ -405,7 +405,7 @@ GAP_REGISTER §2 自己列了 `estat vce`/`summarize`/`firststage`/`classificati
 
 ### C7. 残差诊断与影响分析整块缺失
 
-实测 `OLS` 结果对象：`ssr`/`ess`/`centered_tss`/`uncentered_tss`/`mse_model`/`mse_resid`/
+实测 `Regress` 结果对象：`ssr`/`ess`/`centered_tss`/`uncentered_tss`/`mse_model`/`mse_resid`/
 `mse_total`/`scale`/`durbin_watson`/`omnibus`/`jb`/`skew`/`kurtosis`/`condition_number`/
 `normalized_cov_params`/`resid_pearson`/`wresid`/`influence`/`get_influence` **全部 `False`**。
 
@@ -421,7 +421,7 @@ statsmodels 全有。**这是 statsmodels 兼容面的缺口**——`westata` �
 
 | 项 | 改动 | 收益 |
 |---|---|---|
-| `OLS` 存 `tss` | `linear.py:311-327` 加一行 | 与 `areg`/`reghdfe`/`xtreg` 的 Stata 行为对齐 |
+| `Regress` 存 `tss` | `linear.py:311-327` 加一行 | 与 `areg`/`reghdfe`/`xtreg` 的 Stata 行为对齐 |
 | `reghdfe` 存 `tss`/`tss_within`/`mss`/`rss` | `hdfe.py:536-546` 加三行 | Stata fixture 实证有这三个键 |
 | `svy: regress` 存 `tss` | `survey.py:1055,1071` | 同上 |
 | `xtreg` 存 `tss` | `panel.py:741-754` | `xtreg_fe.json`/`xtreg_be.json` 实证有 |

@@ -22,8 +22,8 @@
 | L1 | IV `vce(robust)` 标签（文档写 HC1，实为 HC0） | 1.09e-2 | **5.4e-15** | A |
 | L2 | `IVLIML` 的 `vce(cluster)` 恒加 CR1 | 4.53e-2 | **1.1e-14** | A |
 | L3 | `IVGMM` + `vce(cluster)` 未聚类权重矩阵 W（点估计也变） | **3.58e-2** | **4.6e-16** | A |
-| L4 | `OLS.e['F']` 不随 `cov_type` 变 | 5.5e-2 / 1.5e-1 / 1.3e-1 | **≤1.4e-14** | A |
-| L5 | `OLS.e['df_r']` 在 cluster 下存 N−K | 71（Stata 11） | **11 = G−1** | A |
+| L4 | `Regress.e['F']` 不随 `cov_type` 变 | 5.5e-2 / 1.5e-1 / 1.3e-1 | **≤1.4e-14** | A |
+| L5 | `Regress.e['df_r']` 在 cluster 下存 N−K | 71（Stata 11） | **11 = G−1** | A |
 | L6 | `e()` 覆盖缺口 | 全缺 | `rss/mss/sum_w/N_clust/ll_0` 等 **≤6.1e-16** | A |
 | P1 | `xtreg,fe vce(robust)` 映射成 HC1 | 3.821 | **6.2e-16** | A |
 | P2 | `xtreg,fe vce(cluster)` 的 K 算成 32 | 3.821 | **6.2e-16** | A |
@@ -61,7 +61,7 @@
 | V1 | VAR 的 SE/`e(Sigma)`/`e(V)` 差每方程自由度 | 5.1e-3 / 1.7e-2 | **2.8e-16 / 1.8e-13** | A |
 | V2 | Granger 默认返回 F（Stata 是 Wald chi2） | 1.0e-2 | **1.6e-15** | A |
 | V3 | `dfuller` 打印临界值 | 2.4e-3 ~ 4.1e-3 | **≤1.3e-16** | A |
-| V4 | `vecrank` 临界值表（Osterwald-Lenum vs Johansen） | 2.2e-2 ~ 7.5e-2 | **0.0**（6 组）；边界 8/8 翻转 → **0/8** | A |
+| V4 | `vec_rank` 临界值表（Osterwald-Lenum vs Johansen） | 2.2e-2 ~ 7.5e-2 | **0.0**（6 组）；边界 8/8 翻转 → **0/8** | A |
 | V5 | `arima` 的 `e(N)` 在 d=1 差 1 | 300 vs 299 | **精确相等**（6 个模型） | A |
 | V6 | `arch` 继承 arch 包 robust（Stata 是 OPG）+ presample h₀ | SE 2.78e-1 | **1.5e-4**；参数 1.8e-4 | B |
 
@@ -88,7 +88,7 @@
 | `ologit` 的 `e(V)` 根因是"numpy 视图别名 + 交叉块未变换" | 两条都确认；**另有一处更深的原因**：Jacobian 的解析形式本身也要改（`cut_k = theta_0 + Σ_{j≤k} exp(theta_j)`） | 上轮结论成立但**不完整**，补齐后才到 2.8e-11 |
 | `frontier` 的残差来自数值 Hessian 步长 | **Hessian 修好后残差来自停机点**（在 Stata 点上 9.7e-7，在我们点上 2.5e-5） | 上轮归因**已被替换** |
 | `jackknife` 的 SE 差源自 Stata 单精度存储 | 复核：`Fraction` 精确真值下 westata 差 **6.4e-15**、Stata 差 5.11e-7；float32 往返复现 Stata 到 2.2e-16 | 一致（westata 更准，不是缺陷） |
-| `vecrank` 的选阶翻转"机制清楚、未独立复现" | 本轮**造了 8 组边界数据**（`trace(r=1)∈(3.76,3.8415)`），旧表 **8/8 翻**，换 Stata 表后 **0/8** | 已独立复现并修复 |
+| `vec_rank` 的选阶翻转"机制清楚、未独立复现" | 本轮**造了 8 组边界数据**（`trace(r=1)∈(3.76,3.8415)`），旧表 **8/8 翻**，换 Stata 表后 **0/8** | 已独立复现并修复 |
 
 **verifier2 的独立复核结论：7 组里没有一条"只改测试、数值没变"的假修复**。
 它另外列了 3 处"档位措辞要谨慎"（poisson AME 的 SE 是 A 但点估计是 B、frontier 的 A 只指 Hessian、
@@ -106,7 +106,7 @@ zip 的 `predict,xb` 是 C 不是声明的 B），本文已按这些措辞修正
 | `xtreg, fe` | `vce(robust)` 现在等价于 `vce(cluster panelvar)`（Stata 语义） | 常数项 SE 从差 18 倍变为 **1e-15** |
 | `didregress` | `covariates=None` 不再自动加时变协变量；要旧行为用 `covariates="all"` | ATET 位移 1.85e-4 消失 |
 | `VARResults.cov_params` | 默认改为 **ML**（Stata 的 `var`）；`ml=False` = Stata 的 `var ..., dfk` | 与旧输出不同，docstring 首行已写明 |
-| `VARResults.granger_causality` | 默认返回 **Wald chi2**（Stata 的 `vargranger`）；`statistic="F"` 保留旧行为 | F → chi2 |
+| `VARResults.granger_causality` | 默认返回 **Wald chi2**（Stata 的 `var_granger`）；`statistic="F"` 保留旧行为 | F → chi2 |
 | `GARCH.fit` | 默认 `cov_type="opg"` + `presample="stata"`（Stata 的约定） | SE 2.78e-1 → 1.5e-4 |
 | `hausman` | 非正定差仍**刻意** clamp 到 0（Stata 打印 −2.3542） | p 与 df 相同；docstring 写明理由 |
 | `nl` | 未收敛现在**默认抛** `ConvergenceError`（`strict=False` 可退回警告） | 会打断"跑完再看"的用法 |

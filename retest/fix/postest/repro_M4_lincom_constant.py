@@ -93,7 +93,7 @@ def main() -> int:
             f"    {'expression':<30}{'Stata b':>18}{'Stata se':>16}"
             f"{'westata b':>18}{'westata se':>16}{'rel b':>10}{'rel se':>10}"
         )
-        ols = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+        ols = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
         for expression in LINCOM:
             st.quiet(f"lincom {expression}")
             stata_b = float(st.scalar("r(estimate)"))

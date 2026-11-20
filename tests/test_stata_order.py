@@ -40,7 +40,7 @@ def _fixture(name: str) -> dict:
 
 # ------------------------------------------------------------ names and order
 def test_stata_param_names_put_the_constant_last(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_param_names[-1] == "_cons"
     # And the patsy spelling is gone.
@@ -50,7 +50,7 @@ def test_stata_param_names_put_the_constant_last(auto) -> None:
 def test_stata_param_names_follow_the_written_order(auto) -> None:
     """``weight + foreign`` must stay in that order, not patsy's alphabetical one."""
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_param_names == ["weight", "foreign", "_cons"]
 
@@ -58,34 +58,34 @@ def test_stata_param_names_follow_the_written_order(auto) -> None:
 def test_reversing_the_formula_reverses_the_names(auto) -> None:
     """The order is read from the formula, not from the data or the alphabet."""
 
-    result = ws.OLS.from_formula("mpg ~ foreign + weight", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ foreign + weight", auto).fit()
 
     assert result.stata_param_names == ["foreign", "weight", "_cons"]
 
 
 def test_names_match_the_fixture_exactly(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_param_names == _fixture("regress_auto.json")["names"]
 
 
 # ------------------------------------------------------------- values
 def test_stata_params_reproduce_the_fixture_coefficients(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     expected = np.asarray(_fixture("regress_auto.json")["b"], dtype=float)
 
     np.testing.assert_allclose(result.stata_params.to_numpy(), expected, rtol=1e-10)
 
 
 def test_stata_cov_params_reproduce_the_fixture_variance(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     expected = np.asarray(_fixture("regress_auto.json")["V"], dtype=float)
 
     np.testing.assert_allclose(result.stata_cov_params, expected, rtol=1e-10)
 
 
 def test_robust_fixture_also_aligns(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
     fixture = _fixture("regress_auto_robust.json")
 
     assert result.stata_param_names == fixture["names"]
@@ -104,7 +104,7 @@ def test_robust_fixture_also_aligns(auto) -> None:
 def test_the_unnamed_order_and_the_stata_order_hold_the_same_numbers(auto) -> None:
     """Reordering is a permutation, not a recomputation."""
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert sorted(result.stata_params.to_numpy()) == pytest.approx(
         sorted(np.asarray(result.params, dtype=float))
@@ -116,7 +116,7 @@ def test_the_unnamed_order_and_the_stata_order_hold_the_same_numbers(auto) -> No
 
 
 def test_covariance_stays_symmetric_and_positive(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     covariance = result.stata_cov_params
 
     assert np.allclose(covariance, covariance.T)
@@ -132,7 +132,7 @@ def test_raw_params_would_mislead_a_naive_comparison(auto) -> None:
     reconsidered -- which is the right moment to reconsider them.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
     fixture = np.asarray(_fixture("regress_auto.json")["b"], dtype=float)
     raw = np.asarray(result.params, dtype=float)
 
@@ -150,7 +150,7 @@ def test_a_result_without_a_formula_still_puts_cons_last(auto) -> None:
     X = np.column_stack(
         [np.ones(len(auto)), auto["weight"].to_numpy(float)]
     )
-    result = ws.OLS(y, X, param_names=["Intercept", "weight"]).fit()
+    result = ws.Regress(y, X, param_names=["Intercept", "weight"]).fit()
 
     assert result.stata_param_names == ["weight", "_cons"]
 
@@ -164,7 +164,7 @@ def test_a_bare_factor_column_is_named_after_the_variable(auto) -> None:
     -- not be treated as an ambiguous factor expansion.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_factor_terms == []
     assert result.stata_param_names == ["weight", "foreign", "_cons"]
@@ -183,7 +183,7 @@ def test_an_explicit_C_term_is_refused_rather_than_guessed(auto) -> None:
     Stata's ``e(b)`` when none exists, so the accessors refuse instead.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     assert result.stata_factor_terms == ["foreign"]
     with pytest.raises(NotImplementedError, match="factor"):
@@ -193,14 +193,14 @@ def test_an_explicit_C_term_is_refused_rather_than_guessed(auto) -> None:
 def test_the_covariance_accessor_refuses_the_same_cases(auto) -> None:
     """A matrix whose rows silently mismatch Stata's would be worse than an error."""
 
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     with pytest.raises(NotImplementedError, match="factor"):
         _ = result.stata_cov_params
 
 
 def test_the_refusal_names_the_offending_term(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     with pytest.raises(NotImplementedError) as excinfo:
         _ = result.stata_param_names
@@ -211,7 +211,7 @@ def test_the_refusal_names_the_offending_term(auto) -> None:
 
 
 def test_plain_results_are_unaffected_by_the_factor_rule(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight + length", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + length", auto).fit()
 
     assert result.stata_factor_terms == []
     assert result.stata_param_names == ["weight", "length", "_cons"]
@@ -240,7 +240,7 @@ def test_a_bare_multi_level_column_is_refused() -> None:
     table rather than an error.
     """
 
-    result = ws.FEOLS.from_formula(
+    result = ws.RegressHighDimFixedEffects.from_formula(
         "y ~ x1 + g | firm", _multi_level_frame()
     ).fit()
 
@@ -257,7 +257,7 @@ def test_a_binary_explicit_factor_is_still_refused(auto) -> None:
     prefix is what marks it as a genuine level expansion.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
 
     assert result.stata_factor_terms == ["foreign"]
 
@@ -265,7 +265,7 @@ def test_a_binary_explicit_factor_is_still_refused(auto) -> None:
 def test_a_bare_binary_column_still_works(auto) -> None:
     """The exclusion must not over-reach: one level column is an ordinary dummy."""
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_factor_terms == []
     assert result.stata_param_names == _fixture("regress_auto.json")["names"]
@@ -275,7 +275,7 @@ def test_reghdfe_with_only_numeric_regressors_is_unaffected() -> None:
     """``reghdfe``'s own fixtures use plain numeric regressors."""
 
     frame = _multi_level_frame()
-    result = ws.FEOLS.from_formula("y ~ x1 | firm", frame).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", frame).fit()
 
     assert result.stata_factor_terms == []
     assert result.stata_param_names == ["x1"]
@@ -289,7 +289,7 @@ def test_reghdfe_preserves_the_written_order_without_a_recorded_formula() -> Non
     """
 
     frame = _multi_level_frame()
-    forward = ws.FEOLS.from_formula("y ~ x1 | firm", frame).fit()
+    forward = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", frame).fit()
 
     assert getattr(forward, "_formula_rhs_order", None) is None
     assert forward.stata_param_names == ["x1"]
@@ -303,15 +303,15 @@ def test_interaction_terms_use_statats_hash_separator(auto) -> None:
     renaming is safe rather than a guess about Stata's layout.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight * length", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight * length", auto).fit()
 
     assert "weight#length" in result.stata_param_names
     assert not any(":" in name for name in result.stata_param_names)
 
 
 def test_interaction_order_follows_the_formula(auto) -> None:
-    forward = ws.OLS.from_formula("mpg ~ weight * length", auto).fit()
-    reverse = ws.OLS.from_formula("mpg ~ length * weight", auto).fit()
+    forward = ws.Regress.from_formula("mpg ~ weight * length", auto).fit()
+    reverse = ws.Regress.from_formula("mpg ~ length * weight", auto).fit()
 
     assert forward.stata_param_names == [
         "weight",
@@ -328,7 +328,7 @@ def test_interaction_order_follows_the_formula(auto) -> None:
 
 
 def test_stata_params_after_an_interaction_stay_finite(auto) -> None:
-    result = ws.OLS.from_formula("mpg ~ weight * length", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight * length", auto).fit()
 
     values = result.stata_params.to_numpy()
 
@@ -348,7 +348,7 @@ def test_a_numeric_three_valued_column_is_a_continuous_regressor(auto) -> None:
     coefficient and must pass.
     """
 
-    result = ws.OLS.from_formula("mpg ~ weight + rep78", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + rep78", auto).fit()
 
     assert result.stata_factor_terms == []
     assert result.stata_param_names == ["weight", "rep78", "_cons"]
@@ -395,7 +395,7 @@ def test_ordinal_cut_points_come_after_the_slopes(auto) -> None:
 def test_auxiliary_parameters_do_not_disturb_the_plain_ols_order(auto) -> None:
     """Regression guard: the aux rule must not move ordinary regressors."""
 
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
 
     assert result.stata_param_names == _fixture("regress_auto.json")["names"]
 

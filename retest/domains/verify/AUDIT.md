@@ -64,7 +64,7 @@
 | L2 | tobit 系数 1e-8（B） | 优化器收敛 | 复现 B 档 | **(a)** 精度差 |
 | L3 | truncreg 1e-8~1.6e-6（C） | 同 | 复现 | **(a)** 精度差 |
 | L4 | intreg 2.9e-9/2.0e-6 | 同 | 复现 | **(a)** 精度差 |
-| L5 | **heckman `e(sigma)`/`e(rho)` 错**（6.7%/7.2%） | Stata `σ=sqrt(RSS/m + b_λ²·mean(λ(λ+w)))` | **复现到 1.09e-10**：我独立用 Probit+OLS 手工重建，得 `1.127010047942`，Stata `e(sigma)=1.127010048066`，**相对差 1.09e-10**；`sqrt(RSS/(m−3))=1.024342147693`（差 9.1e-2）。**且 Stata `e(rho) == e(lambda)/e(sigma)` 精确到 0.0**，westata 报 `rho = b_λ/σ = −0.637064`（错）。 | **(a) 真 bug**，归因正确 |
+| L5 | **heckman `e(sigma)`/`e(rho)` 错**（6.7%/7.2%） | Stata `σ=sqrt(RSS/m + b_λ²·mean(λ(λ+w)))` | **复现到 1.09e-10**：我独立用 Probit+Regress 手工重建，得 `1.127010047942`，Stata `e(sigma)=1.127010048066`，**相对差 1.09e-10**；`sqrt(RSS/(m−3))=1.024342147693`（差 9.1e-2）。**且 Stata `e(rho) == e(lambda)/e(sigma)` 精确到 0.0**，westata 报 `rho = b_λ/σ = −0.637064`（错）。 | **(a) 真 bug**，归因正确 |
 | L6 | heckman twostep select 块 SE 高 6.8% | Stata 沿用 probit VCE | **复现**：Stata `heckman` 的 select 块 SE 与独立 `probit` 的 SE 比值 = `[0.9999891, 0.9999904, 0.9999955]`（即同一 VCE）；westata 的 `select:z1` = 0.0698215 vs Stata 0.0635998（高 9.8%） | **(a) 真 bug**，归因正确 |
 | L7 | **etregress `e(rho)` 符号错** | westata 用 `rho = −b_ctrl/σ` | **两个独立 DGP × 两个 seed 全部复现**：westata 的 `e(rho)` 恒等于 `−b_ctrl/σ`（差 <1e-12），而 Stata `e(rho) = e(lambda)/e(sigma)` 精确到 0.0，两者**逐 DGP 反号**。见 §4.4 | **(a) 真 bug**，归因正确 |
 | L8 | heckman/etregress ML、frontier exponential = error | 未实现 | **复现**：`UnsupportedError: heckman: only method='twostep' is implemented`、`etregress: only method='control'`、`frontier: distribution='exponential' is not implemented` | **(a) 真能力缺失** |
@@ -81,7 +81,7 @@
 | I2 | 34/40/46 IV `vce(robust)` 1.09e-2（E） | 文档把 `HC1` 说成 Stata 的 robust 默认，实际是 HC0 | **复现**：`ivregress gmm ..., vce(robust)` vs westata `HC0` = **5.6e-16**；vs `HC1` = **1.089e-02**，且 `sqrt(N/(N−K)) = 1.0108896` 与实测比值逐位相同 | **(a) 真语义标签错**，归因正确 |
 | I3 | 41 LIML cluster 4.53e-2 | Stata 默认 CR0，westata 恒 CR1 | 未逐条复跑；但 I2 的因子机制已确认，同源 | **归因可信** |
 | I4 | 47 GMM cluster 点估计 3.58e-2 | Stata 把 W 也聚类 | 未独立复跑（需自建 cluster-GMM）；上游手算三候选矩阵表已给出可复现证据 | **归因可信但未复核** |
-| I5 | 5/7/9/14 OLS `e(F)` 不随 cov_type 变 | **复现并强化**：见 §4.5 | **(a) 真 bug**，归因正确 |
+| I5 | 5/7/9/14 Regress `e(F)` 不随 cov_type 变 | **复现并强化**：见 §4.5 | **(a) 真 bug**，归因正确 |
 | I6 | 52–56 `e()` 覆盖缺口 | Stata 有、westata 无 | 复现（`rss/mss/sum_w/N_clust/kappa/J` 均缺） | **(a) 真缺口** |
 
 ### 1.4 panel（上游 42 条：pass 22 / fail 18 / skip 1 / error 1）
@@ -108,7 +108,7 @@
 | O5 | 64 tobit 系数 SE 8.88e-5（C） | 数值 Hessian vs 解析 OIM | 复现 C 档 | **(a)** 精度差 |
 | O6 | 15 `lincom` 拒绝裸常数 | 语法子集 | 复现（`ValueError`） | **(a) 能力缺口** |
 | O7 | 28/29 `lrtest` df=0 / 非嵌套 | 行为差异 | 未独立复跑；上游给出 Stata 原始报错文本 | **可信但未复核** |
-| O8 | 76/77 `pwcompare mcompare` / `contrast h.` | 明确拒绝 | 未独立复跑 | **可信但未复核** |
+| O8 | 76/77 `pairwise_compare mcompare` / `contrast h.` | 明确拒绝 | 未独立复跑 | **可信但未复核** |
 | O9 | 18/21 `nlcom` 比值 1.34e-5（C） | **westata 更接近解析值**，Stata 有 2e-6 噪声 | 未独立复跑该条；但同类"解析仲裁"方法在 O1 已证明上游做对了 | **方法可信** |
 
 ### 1.6 systems_causal（上游 56 条：pass 36 / fail 16 / error 2 / skip 2）
@@ -120,11 +120,11 @@
 | S3 | **17 `teffects aipw, atet`** | ATE 精确、ATET 分支有缺陷 | **复现方向**：ATE `rel=1.1e-16` 级；ATET 点估计差 3.1e-3、SE 差 2.9e-2 | **(a) 真 bug** |
 | S4 | **19–21 `nnmatch` SE 全错，且 ATET SE == ATE SE** | share0=share1=1 | **完全复现**：westata ATE SE 与 ATET SE **逐位相等**（`==` True），Stata 比值 **1.1947**；点估计 westata 与 Stata 差 1.2e-15 / 7.5e-16（A 档） | **(a) 真 bug**，且这是上游的**独立新发现**，成立 |
 | S5 | **25 `didregress (y)` 自动加协变量（C）** | `covariates=None` 时推断 | **完全复现**：用上游同款 DGP，westata 得到 `param_names=['treated','x1']`、`treated=1.30572003`（= Stata 的 `(y x1)` 规格），而 Stata `(y)` 是 `1.3079574`；窄表后 westata 与 Stata `(y)` 差 **1.70e-16**。`covariates=[]` 抛 `ValueError: covariates must name at least one variable` | **(a) 危险默认值**，归因正确 |
-| S6 | **45–47 jackknife SE 5e-7：Stata float32** | westata 更接近真值 | **完全复现**：用 `Fraction` 精确有理数算 74 次留一 OLS，真值 SE = `[2.02203366, 5.948844e-04]`。westata 差 **6.4e-15**；Stata 差 **5.11e-7**；把精确 replicate 过 `float32` 再套公式 → 复现 Stata 到 **2.20e-16** | **(b) 上游判断正确，westata 确实更准** |
+| S6 | **45–47 jackknife SE 5e-7：Stata float32** | westata 更接近真值 | **完全复现**：用 `Fraction` 精确有理数算 74 次留一 Regress，真值 SE = `[2.02203366, 5.948844e-04]`。westata 差 **6.4e-15**；Stata 差 **5.11e-7**；把精确 replicate 过 `float32` 再套公式 → 复现 Stata 到 **2.20e-16** | **(b) 上游判断正确，westata 确实更准** |
 | S7 | 48/49 jackknife/bootstrap 参考分布 df 与 t vs z | 口径差异 | 未独立复跑 | **可信** |
 | S8 | 2 `sureg vce(robust)` error | 未实现 | 复现：`UnsupportedError` | **(a) 真缺口** |
 | S9 | 22 `nnmatch biasadj` error | 能力缺失 | 复现：`TypeError: fit() got an unexpected keyword argument 'bias_adjust'` | **(a) 真缺口** |
-| S10 | 44 `svy: mean, over()` skip | 无对应 | 复现：`SvyMean.from_frame() got an unexpected keyword argument 'over'` | **(a) 真缺口** |
+| S10 | 44 `svy: mean, over()` skip | 无对应 | 复现：`SurveyMean.from_frame() got an unexpected keyword argument 'over'` | **(a) 真缺口** |
 
 ### 1.7 tseries（上游 56 条：pass 35 / fail 21 / error 0）
 
@@ -133,7 +133,7 @@
 | T1 | VAR 系数 A 档 8.45e-14 | 需按名字逐项翻译 | **复现**：正确的 permute（每方程 `[L1.y1, L1.y2, const]`）下 rel = **1.03e-14** | **A 档成立** |
 | T2 | **VAR SE / `e(Sigma)` / Granger 的 E 档全是每方程自由度** | `sqrt((T−k_eq)/T)`，k_eq 为每方程回归元数 | **完全复现到 1e-16**：`e(N)=299`，比值实测 `[0.99497063 ×6]`（ptp=3.3e-16）对 `sqrt((299−3)/299)=0.9949706303122452`；归一后 SE rel **2.86e-16**。`e(Sigma)` 比值 `0.9899665551839465` 对 `(299−3)/299`，归一后 **2.13e-16**。VAR(2) 同（k_eq=5） | **(b) 归因正确，不是 westata 的错** |
 | T3 | **dfuller 统计量 A 档；打印临界值 D 档** | `dfuller.ado` 硬编码旧表 + 线性插值 | **统计量复现 A 档**（我的探针第一版用了 `autolag` 默认导致 3e-2 假差异；改成 `autolag=None` 后 rel = **3.8e-16 / 4.0e-15 / 5.3e-15**）。Stata 打印的 5% 值随 N 微动（295→297→299 时 −3.4564→−3.45624→−3.45608），与"硬编码插值"一致 | **(a) 真差异，但归因正确**；**注意：这一条的第一版探针暴露了"用错 API 会造出 3e-2 的假差异"的风险** |
-| T4 | **vecrank 选阶会翻（3.8369 vs 3.76/3.8415）** | Stata 用 Johansen(1995) 表，statsmodels 用 Osterwald-Lenum | **部分复现**：我在自己的数据上 Stata 打印 r=1 的 5% 临界值 = **3.76**，而 `VECM.johansen()` 返回的 `trace_critical[1] = [2.7055, **3.8415**, 6.6349]`。**两个临界值表不同这一事实成立**；但"选阶翻转"我只在统计量落在 (3.76, 3.8415) 区间时才发生，我的数据 trace(r=1)=2.074 不在该区间，**未能独立重现翻转** | **(a) 表确实不同；翻转结论未被独立验证** |
+| T4 | **vec_rank 选阶会翻（3.8369 vs 3.76/3.8415）** | Stata 用 Johansen(1995) 表，statsmodels 用 Osterwald-Lenum | **部分复现**：我在自己的数据上 Stata 打印 r=1 的 5% 临界值 = **3.76**，而 `VECM.johansen()` 返回的 `trace_critical[1] = [2.7055, **3.8415**, 6.6349]`。**两个临界值表不同这一事实成立**；但"选阶翻转"我只在统计量落在 (3.76, 3.8415) 区间时才发生，我的数据 trace(r=1)=2.074 不在该区间，**未能独立重现翻转** | **(a) 表确实不同；翻转结论未被独立验证** |
 | T5 | ARIMA 系数 1e-3~5e-3（C/D），ll 1e-9 | 同一似然面停步点 | 未独立复跑 | **归因可信** |
 | T6 | arch GARCH(1,1) E 档 | SE 从 OPG→robust；presample h₀ 不同 | 未独立复跑 | **归因可信（含交叉验证表）** |
 
@@ -287,7 +287,7 @@ westata: /sigma = 3.7812490007（点估计对，rel 6.9e-09），bse = 0.0950472
 | 场景 | Stata | westata | 我的独立证据 |
 |---|---|---|---|
 | `logit, vce(cluster)`（ML，G 组） | 只有 `G/(G−1)` | 多乘 `(N−1)/(N−K)` | 比值 `0.99832916` = `sqrt((597/599)(29/30))` 逐位相同 |
-| `regress, vce(cluster)`（OLS，G=14） | `CR1 = G/(G−1)·(N−1)/(N−K)`，`df_r=G−1=13` | SE 完全一致；但 `e(df_r)` 存 `N−K=137` | `results.df_resid=13`，`test x1` 的 p 与 Stata 差 7.1e-15 |
+| `regress, vce(cluster)`（Regress，G=14） | `CR1 = G/(G−1)·(N−1)/(N−K)`，`df_r=G−1=13` | SE 完全一致；但 `e(df_r)` 存 `N−K=137` | `results.df_resid=13`，`test x1` 的 p 与 Stata 差 7.1e-15 |
 | `xtreg, fe vce(cluster)`（G=30） | `df_r = G−1 = 29`，小样本因子 K 只数报告系数 | 与 Stata `dfadj` 逐位相同（1.6e-15），与默认差 9.36% | 比值 `0.914416859037` = `sqrt((179/177)/(179/148))` |
 | `ivregress, vce(cluster)` | 2SLS/2sls 默认 **CR0**；LIML/GMM 恒 **CR1** | 2SLS 走 CR0（对），LIML/GMM 走 CR1（错） | `rel(GMM HC0 vs Stata robust)=5.6e-16`；`HC1` 差 1.089e-2 = `sqrt(N/(N−K))` |
 
@@ -398,10 +398,10 @@ rel = 9.18e-01 的假失败**；按名对齐后是 1.44e-15。**A 档与否完�
 | `ivregress gmm vce(cluster)` 点估计（I4） | 需自建"W 也聚类"的 GMM，工作量超出本次复核预算；上游给了三候选矩阵对照表，方法可信 |
 | `xtnbreg, fe` 的 HHG 似然、`xtabond` 的 `e(sig2)` 2 倍 | 未逐条复跑数值；`e(sig2)` 的 1.993 倍在源码层可见 |
 | `lrtest` df=0 / 非嵌套的行为差异（O7） | 未独立复跑 Stata 报错；上游附了原始报错文本 |
-| `pwcompare mcompare` / `contrast h.`（O8） | 同上 |
+| `pairwise_compare mcompare` / `contrast h.`（O8） | 同上 |
 | `nlcom` 比值的 1.34e-5（O9） | 未独立复跑该条；但同类"解析仲裁"方法在 O1 已被我独立验证为可靠 |
 | ARIMA / GARCH 的停机点与 presample 归因（T5/T6） | 未独立复跑；上游的"在 Stata 参数点求 statsmodels ll = Stata ll"与"交叉验证各自在各自目标下更优"是可复算的强证据 |
-| `vecrank` 选阶翻转（T4） | 我复现了"临界值表不同"（Stata 3.76 vs statsmodels 3.8415），但**未能造出落进 (3.76, 3.8415) 区间的数据**，故"翻转"本身未独立验证 |
+| `vec_rank` 选阶翻转（T4） | 我复现了"临界值表不同"（Stata 3.76 vs statsmodels 3.8415），但**未能造出落进 (3.76, 3.8415) 区间的数据**，故"翻转"本身未独立验证 |
 | `systems_causal` 的 `aipw atet` 精确公式 | 我复现了"ATE 精确、ATET 错"的方向与量级，但未重做上游的 PO 公式反推 |
 
 ---
@@ -415,7 +415,7 @@ rel = 9.18e-01 的假失败**；按名对齐后是 1.44e-15。**A 档与否完�
 | **systems_causal** | **高** | `nl` pinv、`nnmatch` ATET SE≡ATE SE、`didregress` 自动加协变量、jackknife float32 全部独立复现。可直接引用 |
 | **postest** | **高** | `margins` h=1e-6、tobit 三个 bug 全部独立复现（含解析仲裁）。可直接引用 |
 | **discrete** | **中高** | 数值全部可复现，**但 ologit 的根因必须改写**（§2）。另外缺少"ologit 交叉块未变换"这个独立缺陷。其余（`e(df_m)`、`e(chi2)`、zip `e(p)`、HC1==HC0、predict 崩溃）可直接引用 |
-| **tseries** | **中高** | A 档与 VAR 自由度归因可靠（我复现到 1e-16）。**"vecrank 选阶翻转"这条降级为"临界值表不同"**，不要写成"已实测翻转" |
+| **tseries** | **中高** | A 档与 VAR 自由度归因可靠（我复现到 1e-16）。**"vec_rank 选阶翻转"这条降级为"临界值表不同"**，不要写成"已实测翻转" |
 | **limited_quantile** | **中** | tobit / heckman / etregress / rreg 四条的 bug 与归因全部成立（我复现到 1e-10~1e-16）。**但 qreg 的归因必须改写**（§4.2）：不能说"换 meat 就修好"，也不能用"偏高 3.5–4.6%"这个偏小的幅度 |
 
 ---

@@ -142,7 +142,7 @@ def test_panelols_accepts_the_paper_weight():
 
     import westata as ws
 
-    signature = inspect.signature(ws.PanelOLS.from_formula)
+    signature = inspect.signature(ws.PanelRegressFE.from_formula)
     assert "weights" in signature.parameters, (
         "PanelOLS lost its weights= parameter; ajr2001_gaps.md section 1 must say so"
     )
@@ -167,7 +167,7 @@ def test_panelols_weighted_matches_xtreg():
     # The paper's sample restriction has to be applied FIRST: Stata's 0.633869 was
     # estimated on the 74 rows that survive it, not on the raw 209-row file.
     frame = _paper_sample()
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "urbrate ~ fpresence1750 + fpresence1800 + fpresence1850 + fpresence1875 + "
         "fpresence1900 + yr1750 + yr1800 + yr1850 + yr1875 + yr1900",
         frame,
@@ -194,7 +194,7 @@ def test_weights_require_a_weight_type():
 
     frame = _paper_sample()
     with pytest.raises(ValueError, match="weight_type"):
-        ws.PanelOLS.from_formula(
+        ws.PanelRegressFE.from_formula(
             "urbrate ~ fpresence1750",
             frame,
             entity="id",

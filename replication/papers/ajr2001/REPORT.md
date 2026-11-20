@@ -19,7 +19,7 @@
 | 用作者自己的命令跑，Stata 与 westata 一致吗？ | **是，精确一致。** 5 列 × 10 个参数，系数最大相对差 **5.2e-13**，聚类标准误 **4.0e-14** |
 | 联合检验（论文每列都报）一致吗？ | **是**，Wald F 统计量逐位相同 |
 | 数据能获取吗？ | **能**，作者完整归档（dta + do + readme），无网络依赖 |
-| 有新的 westata 问题吗？ | **发现 1 条，已修复**：`PanelOLS`（文档指定的 `xtreg` 对应物）原先不接受权重，而本篇 5 列中 4 列是加权的。现已支持 `weights=`/`weight_type=`，加权拟合与 Stata 逐位相同 |
+| 有新的 westata 问题吗？ | **发现 1 条，已修复**：`PanelRegressFE`（文档指定的 `xtreg` 对应物）原先不接受权重，而本篇 5 列中 4 列是加权的。现已支持 `weights=`/`weight_type=`，加权拟合与 Stata 逐位相同 |
 
 ---
 
@@ -30,9 +30,9 @@
 | | 估计量 |
 |---|---|
 | ADH | 加权 2SLS + 单维聚类 |
-| CK | 无权重 OLS（小样本） |
-| AD | 加权 OLS + 州固定效应 |
-| NQ | 加权 OLS + 国/年固定效应（`areg`） |
+| CK | 无权重 Regress（小样本） |
+| AD | 加权 Regress + 州固定效应 |
+| NQ | 加权 Regress + 国/年固定效应（`areg`） |
 | ADHM | 加权 2SLS + **双维**聚类 |
 
 **AJR 引入了两个没测过的东西**：
@@ -175,26 +175,26 @@ F 相同意味着 `e(V)` 在数值上也一致，不只是对角线。
 
 ---
 
-## 4. 本章的核心发现：`PanelOLS` 原先不接受权重（已修复）
+## 4. 本章的核心发现：`PanelRegressFE` 原先不接受权重（已修复）
 
 ### 4.1 现象（修复前）
 
-论文的命令是 `xtreg, fe [aweight=...]`。文档把 `xtreg` 映射到 `PanelOLS`，但它原先
+论文的命令是 `xtreg, fe [aweight=...]`。文档把 `xtreg` 映射到 `PanelRegressFE`，但它原先
 接受不了权重：
 
 ```python
-ws.PanelOLS.from_formula("urbrate ~ x", df, entity="id", time="year",
+ws.PanelRegressFE.from_formula("urbrate ~ x", df, entity="id", time="year",
                          weights=df.totalpop1750)
-# TypeError: PanelOLS.from_formula() got an unexpected keyword argument 'weights'
+# TypeError: PanelRegressFE.from_formula() got an unexpected keyword argument 'weights'
 ```
 
-`PanelOLS.from_formula` 的签名曾是 `(formula, data, *, entity, time, subset=None)`——
+`PanelRegressFE.from_formula` 的签名曾是 `(formula, data, *, entity, time, subset=None)`——
 **没有 `weights`**。
 
 **现在**签名是 `(formula, data, *, entity, time, subset=None, weights=None,
 weight_type=None)`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 
-| 量 | westata `PanelOLS`（加权） | Stata `xtreg` |
+| 量 | westata `PanelRegressFE`（加权） | Stata `xtreg` |
 |---|---|---|
 | `fpresence1900` 系数 | 0.633869 | 0.633869 |
 | 聚类标准误 | 0.40751063 | 0.40751063 |
@@ -202,7 +202,7 @@ weight_type=None)`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 ### 4.2 影响（修复前）
 
 本篇 5 个复现规格中 **4 个是加权的**。用文档指定的对应物，只能做 1 列，其余必须绕道
-`FEOLS`。
+`RegressHighDimFixedEffects`。
 
 ### 4.3 三个估计器与三个不同的 Stata 命令
 
@@ -210,8 +210,8 @@ weight_type=None)`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 
 | 估计器 | 接受权重 | 正确的对照命令 | 加权聚类 SE |
 |---|---|---|---|
-| `PanelOLS` | ✓ | `xtreg, fe` | **0.40751063** ✅ |
-| `FEOLS` | ✓ | `xtreg` / `reghdfe` | **0.40751063** ✅ |
+| `PanelRegressFE` | ✓ | `xtreg, fe` | **0.40751063** ✅ |
+| `RegressHighDimFixedEffects` | ✓ | `xtreg` / `reghdfe` | **0.40751063** ✅ |
 | `Areg` | ✓ | **`areg`** | **0.45292274** ✅ |
 
 初版把 `Areg` 与 `xtreg` 对照，写出"偏 11%"，并据此把它当成缺陷。实测 Stata 的两个命令：
@@ -224,7 +224,7 @@ weight_type=None)`，加权拟合与 Stata `xtreg, fe` 逐位相同：
 **它们本来就不同**。`Areg` 报 .45292274 是对的，它对齐的是 `areg`。错的不是实现，
 是参照系——`Areg` 声称替代 `areg`，拿它比 `xtreg` 必然差 11%。
 
-> 本次复现**仍然用 `FEOLS`**，理由是它与 `xtreg, fe` 同源、口径一致；这不是"不得不"，
+> 本次复现**仍然用 `RegressHighDimFixedEffects`**，理由是它与 `xtreg, fe` 同源、口径一致；这不是"不得不"，
 > 而是"本来就是同一个命令的对应物"。
 
 ### 4.4 分级：P2
@@ -293,7 +293,7 @@ cd D:/myCodeProject/statapy
 1. 系数与聚类标准误对齐到 1e-9；
 2. **联合 Wald F 统计量一致**（验证整个协方差矩阵，不只是对角线）；
 3. 两侧样本量一致（样本限制若写错会先在这里暴露）；
-4. `PanelOLS` **仍然拒绝权重**（若哪天支持了，gaps 文档需改成"已修复"）。
+4. `PanelRegressFE` **仍然拒绝权重**（若哪天支持了，gaps 文档需改成"已修复"）。
 
 ---
 
@@ -304,5 +304,5 @@ cd D:/myCodeProject/statapy
 > 归档里没有作者 log，AER 原文在付费墙后，因此基准只能是 Stata 自己的输出。
 > 这条边界比任何数字都更需要放在前面——它决定了这次复现能声称什么。
 >
-> 附带发现：文档把 `xtreg` 映射到 `PanelOLS`，而 `PanelOLS` 原先**不接受权重**，导致本篇
+> 附带发现：文档把 `xtreg` 映射到 `PanelRegressFE`，而 `PanelRegressFE` 原先**不接受权重**，导致本篇
 > 4/5 的加权列用不了它。**现已修复**，加权拟合与 Stata 逐位相同（§4）。

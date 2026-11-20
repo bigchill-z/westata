@@ -94,7 +94,7 @@ def test_the_diagnostics_are_a_separate_output() -> None:
     fitted = ws.IV2SLS.from_formula(
         "lnw ~ s + expr + [tenure ~ rns + smsa]", frame
     ).fit()
-    diagnostics = str(fitted.estat_firststage())
+    diagnostics = str(fitted.estat_first_stage())
     assert "First-stage regression summary statistics" in diagnostics
     assert "Partial" in diagnostics
     assert "tenure |  0.0559" in diagnostics

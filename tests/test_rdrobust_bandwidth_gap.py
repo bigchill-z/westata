@@ -1,4 +1,4 @@
-"""rdrobust's automatic bandwidth: recorded reference values and the current refusal.
+"""rd_robust's automatic bandwidth: recorded reference values and the current refusal.
 
 The report lists "rdrobust has no automatic bandwidth" among its three remaining blockers. This
 module records exactly what Stata produces on the senate data, and pins the refusal, so the gap is
@@ -50,7 +50,7 @@ def test_automatic_bandwidth_is_refused_with_a_reason(senate) -> None:
     """No silent guess: the selector is unimplemented and says so."""
 
     with pytest.raises(ws.UnsupportedError) as caught:
-        ws.rdrobust(senate["vote"], senate["margin"])
+        ws.rd_robust(senate["vote"], senate["margin"])
     message = str(caught.value)
     assert "bandwidth" in message
     assert "not implemented" in message
@@ -59,7 +59,7 @@ def test_automatic_bandwidth_is_refused_with_a_reason(senate) -> None:
 def test_an_explicit_bandwidth_still_works(senate) -> None:
     """The refusal must not block the supported path."""
 
-    result = ws.rdrobust(senate["vote"], senate["margin"], bandwidth=STATA_H)
+    result = ws.rd_robust(senate["vote"], senate["margin"], bandwidth=STATA_H)
     assert np.isfinite(result.tau)
 
 

@@ -72,7 +72,7 @@ def _difference_in_differences() -> dict:
     # Same quantity as a regression coefficient, as a cross-check.
     import westata as ws
 
-    fit = ws.OLS.from_formula("d_fte ~ nj", balanced.reset_index(drop=True)).fit()
+    fit = ws.Regress.from_formula("d_fte ~ nj", balanced.reset_index(drop=True)).fit()
     index = list(fit.param_names).index("nj")
 
     zero_temp = frame.loc[frame["fte"].notna() & frame["d_fte_zero_temp"].notna()]

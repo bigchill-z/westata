@@ -36,7 +36,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def weighted(frame):
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf",
         frame,
         weights="q",
@@ -61,10 +61,10 @@ def test_analytic_weights_keep_the_row_count(frame, weighted) -> None:
 def test_analytic_weights_change_the_estimates(frame) -> None:
     """If they did not, the weights would be entering nothing."""
 
-    unweighted = ws.OLS.from_formula(
+    unweighted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf", frame
     ).fit()
-    weighted = ws.OLS.from_formula(
+    weighted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf",
         frame,
         weights="q",

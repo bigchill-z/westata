@@ -38,7 +38,7 @@ def test_lags_one_is_still_exact(frame) -> None:
     """The running test that round 14 should have kept: this must never regress."""
 
     values = frame[["dinf", "unem"]].dropna().to_numpy()
-    rendered = str(ws.vecrank(values, lags=1))
+    rendered = str(ws.vec_rank(values, lags=1))
     assert "172.5034" in rendered
     assert "1.2744" in rendered
     assert "0.64575" in rendered
@@ -47,7 +47,7 @@ def test_lags_one_is_still_exact(frame) -> None:
 
 def test_lags_two_matches_stata(frame) -> None:
     values = frame[["dinf", "unem"]].dropna().to_numpy()
-    rendered = str(ws.vecrank(values, lags=2))
+    rendered = str(ws.vec_rank(values, lags=2))
     assert "183.0918" in rendered
     assert "7.7811" in rendered
     assert "0.65664" in rendered

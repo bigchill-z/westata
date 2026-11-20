@@ -1,6 +1,6 @@
 # westata 类/函数改名定稿映射
 
-> 状态：**规则已定稿，映射已逐族核实，尚未实施**。每个 Stata 命令均由
+> 状态：**规则已定稿，映射已逐族核实，已于 0.3.41 实施**。每个 Stata 命令均由
 > 5 个子智能体读取源码中的 `_stata_command` / `@model_name` / docstring 核实（非猜测）。
 > 规则见 [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md)；决策记录见
 > [options.md 〇之十三](../options.md)；原始盘点见 [NAMING_INVENTORY.md](NAMING_INVENTORY.md)。
@@ -23,14 +23,14 @@
    `2SLS`/`LIML`/`GMM`、`FE`/`RE`/`BE`/`FD`/`MLE`、`nnmatch`/`psmatch`/`ra` 等作为熟词后缀保留。
    `estat_*` 后缀中的人名 `bgodfrey`/`moran`/`mundlak`/`szroeter`/`dwatson` 与
    `auc`/`gof`/`ic`/`vce`/`vif` 亦为熟词（规则 5）。
-4. 特殊：`OLS→Regress`（Stata `regress`）；`regress→Regress`；`qreg→QuantileRegress`；
+4. 特殊：`Regress→Regress`（Stata `regress`）；`regress→Regress`；`qreg→QuantileRegress`；
    `rreg→RobustRegress`。
 5. **`estat_` 前缀保留，后缀按缩写展开**（用户 2026-11-18 澄清纠正）：
-   `estat_ptrends→estat_parallel_trends`、`estat_esize→estat_effect_size`、
-   `estat_firststage→estat_first_stage`、`estat_hettest→estat_heteroskedasticity_test`、
-   `estat_imtest→estat_information_matrix_test`、`estat_overid→estat_overidentification`、
-   `estat_ovtest→estat_omitted_variables_test`、`estat_corrgram→estat_correlogram`、
-   `estat_weakrobust→estat_weak_instrument_robust`。
+   `estat_parallel_trends→estat_parallel_trends`、`estat_effect_size→estat_effect_size`、
+   `estat_first_stage→estat_first_stage`、`estat_heteroskedasticity_test→estat_heteroskedasticity_test`、
+   `estat_information_matrix_test→estat_information_matrix_test`、`estat_overidentification→estat_overidentification`、
+   `estat_omitted_variables_test→estat_omitted_variables_test`、`estat_correlogram→estat_correlogram`、
+   `estat_weak_instrument_robust→estat_weak_instrument_robust`。
    后缀是人名（`bgodfrey`/`moran`/`mundlak`/`szroeter`/`dwatson`）或熟词
    （`auc`/`gof`/`ic`/`vce`/`vif`）者整体保留。
    **实施注意**：`estat_*` 同时是顶层函数与结果对象方法（API_CONVENTIONS R5.7 双向对齐），改名须两侧同步。
@@ -49,18 +49,18 @@
 
 | 现名 | Stata 命令（源码证据） | 定稿新名 |
 |---|---|---|
-| `OLS` | `regress`（linear.py:264 docstring, :845 model_name） | **`Regress`** |
+| `Regress` | `regress`（linear.py:264 docstring, :845 model_name） | **`Regress`** |
 | `IV2SLS` | `ivregress 2sls`（iv.py:407） | **`IV2SLS`**（保留，规则 3） |
 | `IVLIML` | `ivregress liml`（iv.py:1377） | **`IVLIML`**（保留） |
 | `IVGMM` | `ivregress gmm`（iv.py:1405） | **`IVGMM`**（保留） |
-| `FEOLS` | `reghdfe`（hdfe.py:234 `_command_name`） | **`RegressHighDimFixedEffects`** |
+| `RegressHighDimFixedEffects` | `reghdfe`（hdfe.py:234 `_command_name`） | **`RegressHighDimFixedEffects`** |
 | `Areg` | `areg`（hdfe.py:1667） | **`Areg`**（已是命令 PascalCase，保留） |
-| `PanelOLS` | `xtreg, fe`（panel.py:396） | **`PanelRegressFE`** |
-| `RandomEffects` | `xtreg, re`（panel.py:2060） | **`PanelRegressRE`** |
-| `RandomEffectsMLE` | `xtreg, mle`（panel.py:2555） | **`PanelRegressMLE`** |
-| `BetweenOLS` | `xtreg, be`（panel.py:2744） | **`PanelRegressBE`** |
-| `FirstDifferenceOLS` | `xtreg, fd`（panel.py:2827） | **`PanelRegressFD`** |
-| `Newey` | `newey`（newey.py:419 docstring） | **`Newey`**（保留） |
+| `PanelRegressFE` | `xtreg, fe`（panel.py:396） | **`PanelRegressFE`** |
+| `PanelRegressRE` | `xtreg, re`（panel.py:2060） | **`PanelRegressRE`** |
+| `PanelRegressMLE` | `xtreg, mle`（panel.py:2555） | **`PanelRegressMLE`** |
+| `PanelRegressBE` | `xtreg, be`（panel.py:2744） | **`PanelRegressBE`** |
+| `PanelRegressFD` | `xtreg, fd`（panel.py:2827） | **`PanelRegressFD`** |
+| `Newey` | `newey_west`（newey_west.py:419 docstring） | **`Newey`**（保留） |
 | `Prais` | `prais`（prais.py:33 docstring） | **`Prais`**（保留） |
 | `NeweyWestResult` / `PraisResult` | 结果类 | → `NeweyWestResults` / `PraisResults`（规则 6 统一复数，见 §5） |
 
@@ -74,15 +74,15 @@
 | `OrderedLogit` / `OrderedProbit` / `MultinomialLogit` | `ologit` / `oprobit` / `mlogit`（discrete.py） | 保留（已按规则展开） |
 | `ZeroInflatedPoisson` / `ZeroInflatedNegativeBinomial` | `zip` / `zinb`（counts.py:916/933） | 保留（已展开） |
 | `TruncatedPoisson` / `TruncatedNegativeBinomial` | `ztp`/`tpoisson`、`tnbreg`（counts.py:1085/1094） | 保留（已展开） |
-| `Truncreg` | `truncreg`（limited.py:698） | **`TruncatedRegress`** |
-| `Intreg` | `intreg`（limited.py:915） | **`IntervalRegress`** |
+| `TruncatedRegress` | `truncreg`（limited.py:698） | **`TruncatedRegress`** |
+| `IntervalRegress` | `intreg`（limited.py:915） | **`IntervalRegress`** |
 | `Heckman` | `heckman`（limited.py:1572） | 保留（命令同形） |
-| `Etregress` | `etregress`（limited.py:2098） | **`EndogenousTreatmentRegress`** |
+| `EndogenousTreatmentRegress` | `etregress`（limited.py:2098） | **`EndogenousTreatmentRegress`** |
 | `Tobit` | `tobit`（tobit.py:98） | 保留（命令同形） |
-| `QuantileRegression` | `qreg`（quantile.py:313） | **`QuantileRegress`** |
-| `RobustRegression` | `rreg`（quantile.py:625） | **`RobustRegress`** |
-| `Sqreg` | `sqreg`（quantile_boot.py:56 "Simultaneous-quantile regression"） | **`SimultaneousQuantileRegress`** |
-| `Bsqreg` | `bsqreg`（quantile_boot.py:337 "Bootstrapped quantile regression"） | **`BootstrappedQuantileRegress`** |
+| `QuantileRegress` | `qreg`（quantile.py:313） | **`QuantileRegress`** |
+| `RobustRegress` | `rreg`（quantile.py:625） | **`RobustRegress`** |
+| `SimultaneousQuantileRegress` | `sqreg`（quantile_boot.py:56 "Simultaneous-quantile regression"） | **`SimultaneousQuantileRegress`** |
+| `BootstrappedQuantileRegress` | `bsqreg`（quantile_boot.py:337 "Bootstrapped quantile regression"） | **`BootstrappedQuantileRegress`** |
 | `Nl` | `nl`（nonlinear.py:943） | **`Nl`**（保留，命令即 `nl`） |
 | `Frontier` | `frontier`（nonlinear.py:1336） | 保留（命令同形） |
 
@@ -90,25 +90,25 @@
 
 | 现名 | Stata 命令（源码证据） | 定稿新名 |
 |---|---|---|
-| `XtAbond` | `xtabond`（panel_dynamic.py:203） | **`PanelAbond`** |
-| `XtDpd` / `XtDpdSys` | `xtdpd` / `xtdpdsys`（:522/:534） | **`PanelDpd`** / **`PanelDpdSys`** |
+| `PanelAbond` | `xtabond`（panel_dynamic.py:203） | **`PanelAbond`** |
+| `PanelDpd` / `PanelDpdSys` | `xtdpd` / `xtdpdsys`（:522/:534） | **`PanelDpd`** / **`PanelDpdSys`** |
 | `DynamicPanelInstruments` | 无命令（helper） | 保留 |
-| `XtIvreg` | `xtivreg`（panel_iv.py:531） | **`PanelIVRegress`** |
-| `XtGls` / `XtPcse` / `XtUnitroot` | `xtgls`/`xtpcse`/`xtunitroot`（:1074/:1568/:2120） | **`PanelGls`** / **`PanelPcse`** / **`PanelUnitroot`** |
-| `XtLogit`/`XtProbit`/`XtTobit`/`XtPoisson` | `xtlogit`…（panel_nonlinear.py） | **`PanelLogit`** / **`PanelProbit`** / **`PanelTobit`** / **`PanelPoisson`** |
-| `XtNbreg` | `xtnbreg`（:1936） | **`PanelNbRegress`**（nb→nb 熟词, reg→Regress） |
-| `Didregress` | `didregress`（did.py:461） | **`DIDRegress`** |
-| `Xtdidregress` | `xtdidregress`（did.py:975） | **`PanelDIDRegress`** |
+| `PanelIVRegress` | `xtivreg`（panel_iv.py:531） | **`PanelIVRegress`** |
+| `PanelGls` / `PanelPcse` / `PanelUnitroot` | `xtgls`/`xtpcse`/`xtunitroot`（:1074/:1568/:2120） | **`PanelGls`** / **`PanelPcse`** / **`PanelUnitroot`** |
+| `PanelLogit`/`PanelProbit`/`PanelTobit`/`PanelPoisson` | `xtlogit`…（panel_nonlinear.py） | **`PanelLogit`** / **`PanelProbit`** / **`PanelTobit`** / **`PanelPoisson`** |
+| `PanelNbRegress` | `xtnbreg`（:1936） | **`PanelNbRegress`**（nb→nb 熟词, reg→Regress） |
+| `DIDRegress` | `didregress`（did.py:461） | **`DIDRegress`** |
+| `PanelDIDRegress` | `xtdidregress`（did.py:975） | **`PanelDIDRegress`** |
 | `SurveyDesign` | `svyset`（survey.py:149，设计对象） | **`SurveyDesign`**（保留，语义清晰；非估计类） |
 | `SurveyLayout` | 无命令 | 保留 |
-| `SvyMean`/`SvyTotal`/`SvyProportion`/`SvyRegress`/`SvyLogit` | `svy: mean`/`total`/`proportion`/`regress`/`logit` | **`SurveyMean`**/ **`SurveyTotal`**/ **`SurveyProportion`**/ **`SurveyRegress`**/ **`SurveyLogit`** |
-| `TeffectsRa` | `teffects ra`（teffects_ra.py:140） | **`TreatmentEffectsRa`** |
-| `TeffectsNnmatch` | `teffects nnmatch`（nnmatch.py:83） | **`TreatmentEffectsNnmatch`** |
-| `TeffectsPsmatch` | `teffects psmatch`（psmatch.py:195） | **`TreatmentEffectsPsmatch`** |
+| `SurveyMean`/`SurveyTotal`/`SurveyProportion`/`SurveyRegress`/`SurveyLogit` | `svy: mean`/`total`/`proportion`/`regress`/`logit` | **`SurveyMean`**/ **`SurveyTotal`**/ **`SurveyProportion`**/ **`SurveyRegress`**/ **`SurveyLogit`** |
+| `TreatmentEffectsRa` | `teffects ra`（treatment_effects_ra.py:140） | **`TreatmentEffectsRa`** |
+| `TreatmentEffectsNnmatch` | `teffects nnmatch`（nnmatch.py:83） | **`TreatmentEffectsNnmatch`** |
+| `TreatmentEffectsPsmatch` | `teffects psmatch`（psmatch.py:195） | **`TreatmentEffectsPsmatch`** |
 | `IPW`/`AIPW`/`RegressionAdjustment`/`NearestNeighbourMatching` | teffects ipw/aipw/ra/nnmatch | 保留（独立估计器，见规则 7） |
-| `Rdrobust` | `rdrobust`（rdrobust.py:330） | **`RDRobust`**（RD 熟词保留） |
+| `RDRobust` | `rd_robust`（rd_robust.py:330） | **`RDRobust`**（RD 熟词保留） |
 | `Synth` / `Synth2` | `synth` / `synth2`（命令本身） | 保留（命令同形） |
-| `Rcm` | `rcm` = regression control method（rcm.py:1,129） | **`RegressionControlMethod`** |
+| `RegressionControlMethod` | `rcm` = regression control method（rcm.py:1,129） | **`RegressionControlMethod`** |
 
 ## 4. 时序 / 系统 / 重抽样 / varbasic（fam-ts 核实）
 
@@ -116,12 +116,12 @@
 |---|---|---|
 | `ARIMA` / `VAR` / `GARCH` | `arima` / `var` / `arch`（tseries.py） | 保留（熟词；GARCH 见下注） |
 | `VECM` | `vec`（tseries.py:2809） | **`VECM`**（保留，规则 3 熟词扩充） |
-| `Sureg` | `sureg`（systems.py:407） | **`SeeminglyUnrelatedRegress`** |
-| `Mvreg` | `mvreg`（systems.py:774） | **`MultivariateRegress`** |
-| `Eivreg` | `eivreg`（systems.py:1009） | **`ErrorsInVariablesRegress`** |
+| `SeeminglyUnrelatedRegress` | `sureg`（systems.py:407） | **`SeeminglyUnrelatedRegress`** |
+| `MultivariateRegress` | `mvreg`（systems.py:774） | **`MultivariateRegress`** |
+| `ErrorsInVariablesRegress` | `eivreg`（systems.py:1009） | **`ErrorsInVariablesRegress`** |
 | `Manova` | `manova`（systems.py:1603） | 保留（命令同形） |
 | `Bootstrap` / `Jackknife` / `Permute` | 同名命令（resample.py） | 保留 |
-| `Varbasic` | `varbasic`（varbasic.py:1,476） | **`VarBasic`**（大小写规范；VAR 熟词保留） |
+| `VarBasic` | `varbasic`（varbasic.py:1,476） | **`VarBasic`**（大小写规范；VAR 熟词保留） |
 
 > **GARCH 辨析**：`GARCH._stata_command = "arch"`（tseries.py:4205），但 Stata 的 `arch` 命令覆盖
 > ARCH/GARCH/EGARCH 整个条件异方差族，且 docstring 写明 "GARCH / EGARCH volatility model"；
@@ -188,31 +188,31 @@
 
 | 现名 | 定稿新名 | 依据 |
 |---|---|---|
-| `xtset` / `xtdes` / `xtsum` | **`panel_set`** / **`panel_describe`** / **`panel_summarize`** | xt→panel |
-| `newey` | **`newey_west`** | 命令 `newey` = Newey-West（薄包装保留作弃用别名） |
-| `teffects_ra` / `teffects_nnmatch` / `teffects_psmatch` | **`treatment_effects_ra`** / **`treatment_effects_nnmatch`** / **`treatment_effects_psmatch`** | teffects→treatment_effects |
-| `rdrobust` | **`rd_robust`** | rd→rd（熟词保留），加分隔（薄包装保留作弃用别名） |
-| `xtserial` / `xtoverid` / `xttest0` | **`panel_serial`** / **`panel_overid`** / **`panel_test0`** | xt→panel |
-| `varsoc` | **`var_select_order`** | soc→select_order |
-| `vargranger` / `varlmar` / `varstable` / `varwle` | **`var_granger`** / **`var_lmar`** / **`var_stable`** / **`var_wle`** | 熟词 VAR 保留 + 分隔 |
-| `veclmar` / `vecrank` / `vecstable` | **`vec_lmar`** / **`vec_rank`** / **`vec_stable`** | 熟词 VEC 保留 + 分隔 |
-| `dfgls` | **`df_gls`** | DF 熟词 + 分隔 |
-| `pwcompare` | **`pairwise_compare`** | pw→pairwise |
-| `tebalance_summarize` | **`treatment_balance_summarize`** | te→treatment |
+| `panel_set` / `panel_describe` / `panel_summarize` | **`panel_set`** / **`panel_describe`** / **`panel_summarize`** | xt→panel |
+| `newey_west` | **`newey_west`** | 命令 `newey_west` = Newey-West（薄包装保留作弃用别名） |
+| `treatment_effects_ra` / `treatment_effects_nnmatch` / `treatment_effects_psmatch` | **`treatment_effects_ra`** / **`treatment_effects_nnmatch`** / **`treatment_effects_psmatch`** | teffects→treatment_effects |
+| `rd_robust` | **`rd_robust`** | rd→rd（熟词保留），加分隔（薄包装保留作弃用别名） |
+| `panel_serial` / `panel_overid` / `panel_test0` | **`panel_serial`** / **`panel_overid`** / **`panel_test0`** | xt→panel |
+| `var_select_order` | **`var_select_order`** | soc→select_order |
+| `var_granger` / `var_lmar` / `var_stable` / `var_wle` | **`var_granger`** / **`var_lmar`** / **`var_stable`** / **`var_wle`** | 熟词 VAR 保留 + 分隔 |
+| `vec_lmar` / `vec_rank` / `vec_stable` | **`vec_lmar`** / **`vec_rank`** / **`vec_stable`** | 熟词 VEC 保留 + 分隔 |
+| `df_gls` | **`df_gls`** | DF 熟词 + 分隔 |
+| `pairwise_compare` | **`pairwise_compare`** | pw→pairwise |
+| `treatment_balance_summarize` | **`treatment_balance_summarize`** | te→treatment |
 
 #### estat_* 后缀展开（`estat_` 前缀保留；用户 2026-11-18 澄清）
 
 | 现名 | 定稿新名 | 依据 |
 |---|---|---|
-| `estat_ptrends` | **`estat_parallel_trends`** | ptrends→parallel_trends |
-| `estat_esize` | **`estat_effect_size`** | esize→effect_size |
-| `estat_firststage` | **`estat_first_stage`** | firststage→first_stage |
-| `estat_hettest` | **`estat_heteroskedasticity_test`** | hettest→heteroskedasticity_test |
-| `estat_imtest` | **`estat_information_matrix_test`** | imtest→information_matrix_test |
-| `estat_overid` | **`estat_overidentification`** | overid→overidentification |
-| `estat_ovtest` | **`estat_omitted_variables_test`** | ovtest→omitted_variables_test |
-| `estat_corrgram` | **`estat_correlogram`** | corrgram→correlogram |
-| `estat_weakrobust` | **`estat_weak_instrument_robust`** | weakrobust→weak_instrument_robust |
+| `estat_parallel_trends` | **`estat_parallel_trends`** | ptrends→parallel_trends |
+| `estat_effect_size` | **`estat_effect_size`** | esize→effect_size |
+| `estat_first_stage` | **`estat_first_stage`** | firststage→first_stage |
+| `estat_heteroskedasticity_test` | **`estat_heteroskedasticity_test`** | hettest→heteroskedasticity_test |
+| `estat_information_matrix_test` | **`estat_information_matrix_test`** | imtest→information_matrix_test |
+| `estat_overidentification` | **`estat_overidentification`** | overid→overidentification |
+| `estat_omitted_variables_test` | **`estat_omitted_variables_test`** | ovtest→omitted_variables_test |
+| `estat_correlogram` | **`estat_correlogram`** | corrgram→correlogram |
+| `estat_weak_instrument_robust` | **`estat_weak_instrument_robust`** | weakrobust→weak_instrument_robust |
 
 ### 6.2 保持原名
 
@@ -220,7 +220,7 @@
   `estat_gof`、`estat_ic`、`estat_vce`、`estat_vif`（熟词）；`estat_bgodfrey`、
   `estat_moran`、`estat_mundlak`、`estat_szroeter`、`estat_dwatson`（人名）；
   `estat_classification`、`estat_endogenous`、`estat_summarize`（已是完整词）。
-  注意 `estat_dwatson`/`estat_corrgram` 在 Stata 里其实是 `dwatson`/`corrgram`（无 estat 前缀），
+  注意 `estat_dwatson`/`estat_correlogram` 在 Stata 里其实是 `dwatson`/`corrgram`（无 estat 前缀），
   本包沿用了 `estat_` 命名；dwatson 属人名保留，corrgram 后缀按上表展开。
 - 熟词/命令同形/描述性函数：`dfuller` `pperron` `kpss` `unitroot` `levin_lin_chu`
   `im_pesaran_shin` `prais` `prais_winsten` `synth` `synth2` `rcm` `linktest` `suest`
@@ -235,8 +235,8 @@
 - **`GARCH` 的 `_stata_command` 是 `arch`**：已辨析保留 `GARCH`（见 §4 注）。
 - **`TruncatedPoisson` 有两个命令**：`ztp`（默认）与 `tpoisson`（有上下界时动态切换，
   counts.py:990-994）；现名覆盖两者，不改名。
-- **`Rdrobust`/`rdrobust` 是完整 Stata 命令/包名**（Calonico-Cattaneo-Titiunik），
-  本按熟词 RD 处理（`RDRobust`/`rd_robust`）；若希望完全保留命令同形，可维持 `Rdrobust`，
+- **`RDRobust`/`rd_robust` 是完整 Stata 命令/包名**（Calonico-Cattaneo-Titiunik），
+  本按熟词 RD 处理（`RDRobust`/`rd_robust`）；若希望完全保留命令同形，可维持 `RDRobust`，
   待用户确认。
 - **teffects 合并**：用户选「合并重复类」，但源码证实是两个独立实现（见 options.md 纠偏记录），
   本次按「只改 Teffects* 包装类」执行，合并列为独立功能重构任务。
@@ -246,7 +246,7 @@
 ## 8. 实施校验清单（未执行）
 
 - [ ] 机械校验器：把规则 0 的 7 条落成可判定检查（仿 check_api_conventions.py）。
-- [ ] 冲突检查：全树 grep 新旧名，确认无未预期撞名（尤其 `*Result` 单复数、`Rdrobust`）。
+- [ ] 冲突检查：全树 grep 新旧名，确认无未预期撞名（尤其 `*Result` 单复数、`RDRobust`）。
 - [ ] 每批改名后：`pytest -q` 全量（当前基线 6655 passed）+ `retest/` 约 180 处按名调用。
 - [ ] 文档：README/README.zh-CN、GUIDE 中英、API 中英（生成器重渲染）、API_CONVENTIONS R1.2 改写。
 - [ ] 发布：bump 版本，PyPI + GitHub；弃用别名保留一个版本。

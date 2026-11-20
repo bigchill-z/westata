@@ -47,12 +47,12 @@ def frame():
 
 @pytest.fixture(scope="module")
 def simple(frame):
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 @pytest.fixture(scope="module")
 def extended(frame):
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", frame).fit()
 
 
 def test_dwatson_is_callable(simple) -> None:

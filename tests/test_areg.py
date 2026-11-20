@@ -114,7 +114,7 @@ def test_an_empty_absorb_is_rejected() -> None:
 def test_slopes_match_reghdfe(fitted) -> None:
     """Same within model for the SLOPES; only the intercept and identity differ."""
 
-    other = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", _frame()).fit()
+    other = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", _frame()).fit()
 
     # areg appends _cons; compare the slopes only.
     np.testing.assert_allclose(
@@ -126,7 +126,7 @@ def test_slopes_match_reghdfe(fitted) -> None:
 
 
 def test_slope_standard_errors_match_reghdfe(fitted) -> None:
-    other = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", _frame()).fit()
+    other = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", _frame()).fit()
 
     np.testing.assert_allclose(
         np.asarray(fitted.bse, dtype=float)[:-1],
@@ -194,7 +194,7 @@ def test_the_second_title_lists_every_absorbed_variable() -> None:
 def test_reghdfe_still_reports_its_own_identity() -> None:
     """Adding ``Areg`` must not change what ``FEOLS`` says about itself."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 | firm", _frame()).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", _frame()).fit()
 
     assert result.model_name == "reghdfe"
     assert result.e["cmd"] == "reghdfe"
@@ -206,7 +206,7 @@ def test_the_two_commands_disagree_on_identity() -> None:
     """Guard: a shared identity would mean the subclass does nothing."""
 
     areg = ws.Areg.from_formula("y ~ x1", _frame(), absorb="firm").fit()
-    reghdfe = ws.FEOLS.from_formula("y ~ x1 | firm", _frame()).fit()
+    reghdfe = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", _frame()).fit()
 
     assert areg.e["cmd"] != reghdfe.e["cmd"]
     assert areg.model_name != reghdfe.model_name
@@ -278,7 +278,7 @@ def test_the_intercept_is_not_zero() -> None:
 def test_reghdfe_still_reports_no_intercept() -> None:
     """The subclass must not leak the constant into ``FEOLS``."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", _panel()).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", _panel()).fit()
 
     assert "_cons" not in list(result.param_names)
 
@@ -328,7 +328,7 @@ def test_the_absorbed_variable_line_is_the_second_line() -> None:
 def test_reghdfe_prints_no_absorbed_variable_line() -> None:
     """The subtitle is areg-only; leaking it into FEOLS would be a new inconsistency."""
 
-    result = ws.FEOLS.from_formula("y ~ x1 | firm", _panel()).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", _panel()).fit()
 
     assert "Absorbed variable" not in result.summary(style="stata")
 
@@ -436,7 +436,7 @@ def test_reghdfe_still_refuses_hc2() -> None:
     """The refusal belongs to FEOLS and must not have been removed by this change."""
 
     with pytest.raises(ValueError, match="HC2"):
-        ws.FEOLS.from_formula("y ~ x1 | firm", _frame()).fit(cov_type="HC2")
+        ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", _frame()).fit(cov_type="HC2")
 
 
 # --------------------------------------------------- noabsorb (noabsorbtest)
@@ -486,7 +486,7 @@ def test_noabsorb_is_areg_only() -> None:
 
     import inspect
 
-    assert "noabsorb" not in inspect.signature(ws.FEOLS.from_formula).parameters
+    assert "noabsorb" not in inspect.signature(ws.RegressHighDimFixedEffects.from_formula).parameters
 
 
 # ------------------------------------- clustered SE across ABSORB/CLUSTER pairings
@@ -565,7 +565,7 @@ def test_reghdfe_keeps_its_own_multiway_value() -> None:
     """
 
     frame = _pair_panel()
-    fitted = ws.FEOLS.from_formula("y ~ x1 | a", frame).fit(
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | a", frame).fit(
         cov_type="cluster", cov_kwds={"cluster": frame[["a", "b"]]}
     )
 

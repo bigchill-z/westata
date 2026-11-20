@@ -276,7 +276,7 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
 
     rows: list[tuple[str, str, object]] = [
         ("regress", "regress y x1 x2",
-         lambda: ws.OLS.from_formula("y ~ x1 + x2", PANEL).fit()),
+         lambda: ws.Regress.from_formula("y ~ x1 + x2", PANEL).fit()),
         ("logit", "logit ybin x1 x2",
          lambda: ws.Logit.from_formula("ybin ~ x1 + x2", PANEL).fit()),
         ("probit", "probit ybin x1 x2",
@@ -292,16 +292,16 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("tobit", "tobit y x1 x2, ll(-1)",
          lambda: ws.Tobit.from_formula("y ~ x1 + x2", PANEL, lower=-1.0).fit()),
         ("truncreg", "truncreg y x1 x2, ll(-1)",
-         lambda: ws.Truncreg.from_formula("y ~ x1 + x2", PANEL, lower=-1.0).fit()),
+         lambda: ws.TruncatedRegress.from_formula("y ~ x1 + x2", PANEL, lower=-1.0).fit()),
         ("zip", "zip ycount x1 x2, inflate(x1)",
          lambda: ZeroInflatedPoisson.from_formula(
              "ycount ~ x1 + x2", PANEL, inflate="x1").fit()),
         ("qreg", "qreg y x1, quantile(.5)",
-         lambda: ws.QuantileRegression.from_formula("y ~ x1", PANEL).fit()),
+         lambda: ws.QuantileRegress.from_formula("y ~ x1", PANEL).fit()),
         ("regress_robust", "regress y x1 x2, vce(robust)",
-         lambda: ws.OLS.from_formula("y ~ x1 + x2", PANEL).fit(cov_type="HC1")),
+         lambda: ws.Regress.from_formula("y ~ x1 + x2", PANEL).fit(cov_type="HC1")),
         ("regress_cluster", "regress y x1 x2, vce(cluster unit)",
-         lambda: ws.OLS.from_formula("y ~ x1 + x2", PANEL).fit(
+         lambda: ws.Regress.from_formula("y ~ x1 + x2", PANEL).fit(
              cov_type="cluster", cov_kwds={"cluster": PANEL["unit"]})),
         ("logit_robust", "logit ybin x1, vce(robust)",
          lambda: ws.Logit.from_formula("ybin ~ x1", PANEL).fit(cov_type="HC1")),
@@ -318,20 +318,20 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         # newey requires REGULARLY spaced time, which a panel is not (period repeats).
         # The single-series frame is the right input, and Stata's newey agrees.
         ("newey", "newey y x1, lag(2)",
-         lambda: ws.newey("y ~ x1", TSSERIES, lag=2,
+         lambda: ws.newey_west("y ~ x1", TSSERIES, lag=2,
                           time=TSSERIES["t"].to_numpy())),
         ("ivregress_liml", "ivregress liml y x1 (x2 = z)",
          lambda: ws.IVLIML.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
         ("ivregress_gmm", "ivregress gmm y x1 (x2 = z)",
          lambda: ws.IVGMM.from_formula("y ~ x1 + [x2 ~ z]", PANEL).fit()),
         ("svy_proportion", "svy: proportion ybin",
-         lambda: ws.SvyProportion.from_frame(["ybin"], CROSS, DESIGN).fit()),
+         lambda: ws.SurveyProportion.from_frame(["ybin"], CROSS, DESIGN).fit()),
         ("xtivreg_re", "xtivreg y x1 (x2 = z), re",
-         lambda: ws.XtIvreg.from_formula(
+         lambda: ws.PanelIVRegress.from_formula(
              "y ~ x1 + (x2 = z)", PANEL, entity="unit", time="period",
              method="re").fit()),
         ("xtpoisson_re", "xtpoisson ycount x1, re",
-         lambda: ws.XtPoisson.from_formula(
+         lambda: ws.PanelPoisson.from_formula(
              "ycount ~ x1", PANEL, entity="unit", method="re").fit()),
         # --- second batch: the families not covered by the first scan ---
         # ysel, not y: the outcome must be shifted by the selection for rho to be
@@ -340,44 +340,44 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.Heckman.from_formula(
              "ysel ~ x1 + select(selected ~ x1 + x2)", SELECTED).fit()),
         ("intreg", "intreg lo hi x1",
-         lambda: ws.Intreg.from_formula("lo hi ~ x1", INTERVAL).fit()),
+         lambda: ws.IntervalRegress.from_formula("lo hi ~ x1", INTERVAL).fit()),
         # method="ml" because a bare ``etregress`` in Stata runs MAXIMUM LIKELIHOOD. The
         # package's own default is the control-function estimator, so comparing Stata's
         # default against westata's default compares two different estimators; the header
         # then differs for a legitimate reason and says nothing about layout.
         ("etregress", "etregress y x1, treat(treated = x1 x2)",
-         lambda: ws.Etregress.from_formula(
+         lambda: ws.EndogenousTreatmentRegress.from_formula(
              "y ~ x1 + treat(treated ~ x1 + x2)", PANEL).fit(method="ml")),
         ("sqreg", "sqreg y x1, quantiles(.25 .5 .75)",
-         lambda: ws.Sqreg.from_formula("y ~ x1", PANEL).fit()),
+         lambda: ws.SimultaneousQuantileRegress.from_formula("y ~ x1", PANEL).fit()),
         ("bsqreg", "bsqreg y x1, quantile(.5)",
-         lambda: ws.Bsqreg.from_formula("y ~ x1", PANEL).fit()),
+         lambda: ws.BootstrappedQuantileRegress.from_formula("y ~ x1", PANEL).fit()),
         ("rreg", "rreg y x1",
-         lambda: ws.RobustRegression.from_formula("y ~ x1", PANEL).fit()),
+         lambda: ws.RobustRegress.from_formula("y ~ x1", PANEL).fit()),
         ("eivreg", "eivreg y x1 x2, reliab(x1 0.7)",
-         lambda: ws.Eivreg.from_formula("y ~ x1 + x2", PANEL,
+         lambda: ws.ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", PANEL,
                                         reliab={"x1": 0.7}).fit()),
         ("xtlogit_fe", "xtlogit ybin x1, fe",
-         lambda: ws.XtLogit.from_formula("ybin ~ x1", PANEL, entity="unit",
+         lambda: ws.PanelLogit.from_formula("ybin ~ x1", PANEL, entity="unit",
                                          method="fe").fit()),
         ("svy_mean", "svy: mean y",
-         lambda: ws.SvyMean.from_frame(["y"], CROSS, DESIGN).fit()),
+         lambda: ws.SurveyMean.from_frame(["y"], CROSS, DESIGN).fit()),
         ("svy_total", "svy: total y",
-         lambda: ws.SvyTotal.from_frame(["y"], CROSS, DESIGN).fit()),
+         lambda: ws.SurveyTotal.from_frame(["y"], CROSS, DESIGN).fit()),
         ("svy_logit", "svy: logit ybin x1",
-         lambda: ws.SvyLogit.from_frame(CROSS, "ybin ~ x1", DESIGN).fit()),
+         lambda: ws.SurveyLogit.from_frame(CROSS, "ybin ~ x1", DESIGN).fit()),
         ("xtpcse", "xtpcse y x1",
-         lambda: ws.XtPcse.from_formula("y ~ x1", PANEL, entity="unit",
+         lambda: ws.PanelPcse.from_formula("y ~ x1", PANEL, entity="unit",
                                         time="period").fit()),
         ("xtgls", "xtgls y x1, panels(heteroskedastic)",
-         lambda: ws.XtGls.from_formula("y ~ x1", PANEL, entity="unit",
+         lambda: ws.PanelGls.from_formula("y ~ x1", PANEL, entity="unit",
                                        time="period",
                                        panels="heteroskedastic").fit()),
         ("xtreg_fe", "xtreg y x1, fe",
-         lambda: ws.PanelOLS.from_formula("y ~ x1", PANEL, entity="unit",
+         lambda: ws.PanelRegressFE.from_formula("y ~ x1", PANEL, entity="unit",
                                           time="period").fit()),
         ("didregress", "didregress (y x1) (treated), group(unit) time(period)",
-         lambda: ws.Didregress.from_formula(
+         lambda: ws.DIDRegress.from_formula(
              "y", "treated", PANEL, group="unit", time="period",
              covariates=["x1"]).fit()),
         # --- third batch: everything else the registry knows about ---
@@ -395,16 +395,16 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
         ("manova", "manova y ybin = grp",
          lambda: ws.Manova.from_formula("y ybin = grp", _manova_frame()).fit()),
         ("mvreg", "mvreg y ybin = x1",
-         lambda: ws.Mvreg.from_formula("y ybin = x1", PANEL).fit()),
+         lambda: ws.MultivariateRegress.from_formula("y ybin = x1", PANEL).fit()),
         ("areg", "areg y x1, absorb(unit)",
          lambda: ws.Areg.from_formula("y ~ x1", PANEL, absorb="unit").fit()),
         ("xtabond", "xtabond y x1",
-         lambda: ws.XtAbond.from_formula(
+         lambda: ws.PanelAbond.from_formula(
              "y ~ x1", PANEL, entity="unit", time="period").fit()),
         ("sureg", "sureg (y x1) (ybin x1)",
-         lambda: ws.Sureg.from_formula(["y ~ x1", "ybin ~ x1"], PANEL).fit()),
+         lambda: ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "ybin ~ x1"], PANEL).fit()),
         ("reghdfe", "reghdfe y x1, absorb(unit)",
-         lambda: ws.FEOLS.from_formula("y ~ x1 | unit", PANEL).fit()),
+         lambda: ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | unit", PANEL).fit()),
         ("tnbreg", "tnbreg ypos x1, ll(0)",
          lambda: ws.TruncatedNegativeBinomial.from_formula(
              "ypos ~ x1", PANEL, lower=0).fit()),
@@ -421,36 +421,36 @@ def _specs():  # noqa: C901 - a flat table is clearer than a hierarchy here
          lambda: ws.TruncatedPoisson.from_formula(
              "ypos ~ x1", PANEL, lower=1.0).fit()),
         ("xtdidregress", "xtdidregress (y x1) (treated), group(unit) time(period)",
-         lambda: ws.Xtdidregress.from_formula(
+         lambda: ws.PanelDIDRegress.from_formula(
              "y", "treated", PANEL, group="unit", time="period",
              covariates=["x1"]).fit()),
         ("xtivreg_fe", "xtivreg y x1 (x2 = z), fe",
-         lambda: ws.XtIvreg.from_formula(
+         lambda: ws.PanelIVRegress.from_formula(
              "y ~ x1 + (x2 = z)", PANEL, entity="unit", time="period",
              method="fe").fit()),
         ("xtlogit_re", "xtlogit ybin x1, re",
-         lambda: ws.XtLogit.from_formula(
+         lambda: ws.PanelLogit.from_formula(
              "ybin ~ x1", PANEL, entity="unit", method="re").fit()),
         ("xtlogit_pa", "xtlogit ybin x1, pa",
-         lambda: ws.XtLogit.from_formula(
+         lambda: ws.PanelLogit.from_formula(
              "ybin ~ x1", PANEL, entity="unit", method="pa").fit()),
         ("xtnbreg_fe", "xtnbreg ycount x1, fe",
-         lambda: ws.XtNbreg.from_formula(
+         lambda: ws.PanelNbRegress.from_formula(
              "ycount ~ x1", PANEL, entity="unit", method="fe").fit()),
         ("xtpoisson_fe", "xtpoisson ycount x1, fe",
-         lambda: ws.XtPoisson.from_formula(
+         lambda: ws.PanelPoisson.from_formula(
              "ycount ~ x1", PANEL, entity="unit", method="fe").fit()),
         ("xtprobit_re", "xtprobit ybin x1, re",
-         lambda: ws.XtProbit.from_formula(
+         lambda: ws.PanelProbit.from_formula(
              "ybin ~ x1", PANEL, entity="unit", method="re").fit()),
         ("xttobit", "xttobit y x1, ll(-1)",
-         lambda: ws.XtTobit.from_formula(
+         lambda: ws.PanelTobit.from_formula(
              "y ~ x1", PANEL, entity="unit", lower=-1.0).fit()),
         ("xtreg_re", "xtreg y x1, re",
-         lambda: ws.RandomEffects.from_formula(
+         lambda: ws.PanelRegressRE.from_formula(
              "y ~ x1", PANEL, entity="unit", time="period").fit()),
         ("xtreg_be", "xtreg y x1, be",
-         lambda: ws.BetweenOLS.from_formula(
+         lambda: ws.PanelRegressBE.from_formula(
              "y ~ x1", PANEL, entity="unit", time="period").fit()),
     ]
     return rows

@@ -66,7 +66,7 @@ def _frame(n: int = 250, seed: int = 5000):
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.OLS.from_formula("y ~ x1 + x2", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", _frame()).fit()
 
 
 # -------------------------------------------------------------- the documented set

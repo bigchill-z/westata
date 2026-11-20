@@ -52,9 +52,9 @@ def main() -> int:
                 fit_kw["cov_kwds"] = {"groups": df["gid"]}
             formula = "mpg ~ 0 + weight + foreign" if label == "noconstant" else "mpg ~ weight + foreign"
             if weight_type is None:
-                res = ws.OLS.from_formula(formula, df).fit(**fit_kw)
+                res = ws.Regress.from_formula(formula, df).fit(**fit_kw)
             else:
-                res = ws.OLS.from_formula(
+                res = ws.Regress.from_formula(
                     formula, df, weights=df["w"], weight_type=weight_type
                 ).fit(**fit_kw)
             cap = st.estimate(cmd)
@@ -118,7 +118,7 @@ def main() -> int:
 
         # G - 1 vs N - K must be visibly different for this data (G = 12, N = 74).
         cap = st.estimate("regress mpg weight foreign, vce(cluster gid)")
-        res = ws.OLS.from_formula("mpg ~ weight + foreign", df).fit(
+        res = ws.Regress.from_formula("mpg ~ weight + foreign", df).fit(
             cov_type="cluster", cov_kwds={"groups": df["gid"]}
         )
         print(f"\n-- separation check: Stata e(df_r)={cap.scalars['df_r']!r} "

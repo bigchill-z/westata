@@ -37,7 +37,7 @@ def _fitted():
 
 # ---------------------------------------------------------------- estat firststage
 def test_estat_firststage_is_the_summary_shape() -> None:
-    lines = str(ws.estat_firststage(_fitted())).splitlines()
+    lines = str(ws.estat_first_stage(_fitted())).splitlines()
     text = "\n".join(lines)
     assert "First-stage regression summary statistics" in text
     assert "Minimum eigenvalue statistic" in text
@@ -49,14 +49,14 @@ def test_estat_firststage_is_the_summary_shape() -> None:
 def test_estat_firststage_has_no_coefficient_rows() -> None:
     """It is a diagnostics panel, not a regression table."""
 
-    text = str(ws.estat_firststage(_fitted()))
+    text = str(ws.estat_first_stage(_fitted()))
     assert "Coefficient" not in text
     assert "Std. err." not in text
     assert "[95% conf. interval]" not in text
 
 
 def test_estat_firststage_carries_the_measured_statistics() -> None:
-    text = str(ws.estat_firststage(_fitted()))
+    text = str(ws.estat_first_stage(_fitted()))
     # R-sq, adjusted R-sq, partial R-sq, F(2,750), Prob > F -- all from the live capture.
     assert "0.3066" in text
     assert "0.3001" in text
@@ -66,7 +66,7 @@ def test_estat_firststage_carries_the_measured_statistics() -> None:
 
 
 def test_estat_firststage_is_twenty_two_lines() -> None:
-    lines = str(ws.estat_firststage(_fitted())).splitlines()
+    lines = str(ws.estat_first_stage(_fitted())).splitlines()
     while lines and lines[-1] == "":
         lines.pop()
     assert len(lines) == 22, len(lines)
@@ -89,7 +89,7 @@ def test_first_stage_has_no_critical_value_panel() -> None:
 
 # ---------------------------------------------------------------- they are not substitutes
 def test_the_two_outputs_are_different() -> None:
-    summary = str(ws.estat_firststage(_fitted()))
+    summary = str(ws.estat_first_stage(_fitted()))
     table = str(_fitted().first_stage())
     assert summary != table
     assert "summary statistics" in summary and "summary statistics" not in table

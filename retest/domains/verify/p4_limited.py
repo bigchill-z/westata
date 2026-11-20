@@ -43,7 +43,7 @@ with S() as s:
     print("  coefficients (robust == default):", np.round(b, 10))
     print("  Stata names:", nm)
     print("  Stata robust se =", np.round(np.sqrt(np.diag(V)), 10))
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=0.25).fit(cov_type="robust")
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=0.25).fit(cov_type="robust")
     print("  westata robust se =", np.round(np.asarray(q.bse), 10),
           " names", list(q.param_names))
     # reorder westata -> stata
@@ -114,7 +114,7 @@ with S() as s:
     print(f"  rmse*sqrt(diag((X'X)^-1))            = {np.round(se_law,10)}"
           f"   rel = {rel(se_law, np.sqrt(np.diag(V))):.4e}")
     print(f"  cross-check: rmse^2*(n-k) == rss ?  {rmse**2*(n2-3):.10f} vs {rss:.10f}")
-    rr = ws.RobustRegression.from_formula("y ~ x1 + x2", d2).fit()
+    rr = ws.RobustRegress.from_formula("y ~ x1 + x2", d2).fit()
     pn = list(rr.param_names)
     order = [pn.index(k) for k in ("x1", "x2", "Intercept")]
     print(f"  westata rreg se = {np.round(np.asarray(rr.bse)[order],10)}")
@@ -192,7 +192,7 @@ with S() as s:
     for k in ("rho", "sigma", "lambda", "selambda", "ll", "ll_p", "N"):
         print(f"     e({k}) = {s.e(k)}")
     print(f"  e(lambda)/e(sigma) = {s.e('lambda')/s.e('sigma'):.10f}  vs e(rho) = {s.e('rho')}")
-    et = ws.Etregress.from_formula("y ~ z2 + t", d4, treat="t ~ z1 + z2").fit()
+    et = ws.EndogenousTreatmentRegress.from_formula("y ~ z2 + t", d4, treat="t ~ z1 + z2").fit()
     print(f"  westata params = {list(et.param_names)}")
     print(f"  westata b = {np.round(np.asarray(et.params),10)}")
     print(f"  westata e = {{k: et.e.get(k) for k in ('rho','sigma','lambda')}}".replace("{k: et.e.get(k) for k in ('rho','sigma','lambda')}", str({k: et.e.get(k) for k in ('rho','sigma','lambda')})))

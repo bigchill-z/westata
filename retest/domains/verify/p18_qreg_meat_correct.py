@@ -26,7 +26,7 @@ import westata as ws
 
 
 def test(tag, df, tau):
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     rr = q.fit(cov_type="robust")
     sp = q._sparsity
     X = q._X                                   # cols (x1, x2, 1) as built by patsy? check

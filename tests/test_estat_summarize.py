@@ -25,7 +25,7 @@ import westata as ws
 def fit():
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length"]].dropna()
-    return frame, ws.OLS.from_formula("mpg ~ weight + length", frame).fit()
+    return frame, ws.Regress.from_formula("mpg ~ weight + length", frame).fit()
 
 
 def test_table_matches_numpy(fit) -> None:
@@ -250,7 +250,7 @@ def _weighted_fit():
     y = 1.0 + 2.0 * x + rng.normal(size=n)
     w = rng.uniform(0.5, 3.0, size=n)
     frame = pd.DataFrame({"y": y, "x": x})
-    return frame, w, ws.OLS.from_formula(
+    return frame, w, ws.Regress.from_formula(
         "y ~ x", frame, weights=w, weight_type="aweight"
     ).fit()
 
@@ -279,7 +279,7 @@ def test_an_unweighted_fit_reports_the_plain_mean() -> None:
     x = rng.normal(size=n)
     y = 1.0 + 2.0 * x + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x": x})
-    result = ws.OLS.from_formula("y ~ x", frame).fit()
+    result = ws.Regress.from_formula("y ~ x", frame).fit()
 
     rendered = result.estat_summarize()
 
@@ -314,7 +314,7 @@ def test_a_plain_result_has_no_weight_spec() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=50), "x": rng.normal(size=50)}
     )
-    result = ws.OLS.from_formula("y ~ x", frame).fit()
+    result = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert getattr(result, "weight_spec", None) is None
 
@@ -329,7 +329,7 @@ def test_summarize_restricts_to_the_estimation_sample() -> None:
     frame = pd.DataFrame({"y": y, "x": x})
     frame.loc[0:19, "x"] = np.nan  # 20 dropped
 
-    result = ws.OLS.from_formula("y ~ x", frame).fit()
+    result = ws.Regress.from_formula("y ~ x", frame).fit()
     rendered = result.estat_summarize()
 
     assert result.nobs == 80
@@ -352,7 +352,7 @@ def test_fweight_reproduces_every_column_of_the_expanded_data() -> None:
     frame = pd.DataFrame({"y": y, "x": x})
     counts = rng.integers(1, 4, size=n).astype(float)
 
-    result = ws.OLS.from_formula("y ~ x", frame).fit()
+    result = ws.Regress.from_formula("y ~ x", frame).fit()
     weighted = result.estat_summarize(weights=counts, weight_type="fweight")
     expanded = np.repeat(x, counts.astype(int))
 
@@ -374,7 +374,7 @@ def test_fweight_on_a_non_integer_multiplier_is_rejected_or_handled() -> None:
     """
 
     frame = pd.DataFrame({"y": [1.0, 2.0, 3.0], "x": [1.0, 2.0, 3.0]})
-    result = ws.OLS.from_formula("y ~ x", frame).fit()
+    result = ws.Regress.from_formula("y ~ x", frame).fit()
 
     rendered = result.estat_summarize(
         weights=np.array([0.5, 1.0, 2.5]), weight_type="fweight"
@@ -405,7 +405,7 @@ def test_summarize_works_for_mvreg() -> None:
     """
 
     frame = _multi_frame()
-    result = ws.Mvreg.from_formula("y x1 = x2", frame).fit()
+    result = ws.MultivariateRegress.from_formula("y x1 = x2", frame).fit()
 
     rendered = result.estat_summarize()
 
@@ -422,7 +422,7 @@ def test_summarize_works_for_sureg() -> None:
     """
 
     frame = _multi_frame()
-    result = ws.Sureg.from_formula(["y ~ x1", "x1 ~ x2"], frame).fit()
+    result = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "x1 ~ x2"], frame).fit()
 
     rendered = result.estat_summarize()
 
@@ -434,7 +434,7 @@ def test_summarize_still_lists_the_response_first_for_ols() -> None:
     """Regression guard: the multi-equation parse must not reorder plain fits."""
 
     frame = _multi_frame()
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     rendered = result.estat_summarize()
 
@@ -445,7 +445,7 @@ def test_summarize_with_unmatched_names_refuses_clearly() -> None:
     """An unmappable name must produce a message naming the column."""
 
     frame = _multi_frame()
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     with pytest.raises(ValueError, match="not in the data"):
         result.estat_summarize(variables=["not_a_column"])
@@ -472,7 +472,7 @@ def test_summarize_works_after_reghdfe() -> None:
     """
 
     frame = _absorbed_frame()
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", frame).fit()
 
     rendered = result.estat_summarize()
 
@@ -482,7 +482,7 @@ def test_summarize_works_after_reghdfe() -> None:
 
 def test_vif_works_after_reghdfe() -> None:
     frame = _absorbed_frame()
-    result = ws.FEOLS.from_formula("y ~ x1 + x2 | firm", frame).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", frame).fit()
 
     rendered = result.estat_vif()
 

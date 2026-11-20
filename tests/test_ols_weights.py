@@ -15,7 +15,7 @@ import pytest
 import statsmodels.api as sm
 
 from westata.errors import ConsistencyError, WeightError
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 
 def _data(n: int = 40, seed: int = 7) -> pd.DataFrame:
@@ -31,12 +31,12 @@ def test_fweight_matches_expanded_ols():
     rng = np.random.default_rng(11)
     counts = rng.integers(1, 5, size=len(df)).astype(float)
 
-    weighted = OLS.from_formula(
+    weighted = Regress.from_formula(
         "y ~ x1 + x2", df, weights=counts, weight_type="fweight"
     ).fit()
 
     expanded = df.loc[df.index.repeat(counts.astype(int))].reset_index(drop=True)
-    unweighted = OLS.from_formula("y ~ x1 + x2", expanded).fit()
+    unweighted = Regress.from_formula("y ~ x1 + x2", expanded).fit()
 
     np.testing.assert_allclose(weighted.params.to_numpy(), unweighted.params.to_numpy(), rtol=1e-12)
     np.testing.assert_allclose(weighted.bse.to_numpy(), unweighted.bse.to_numpy(), rtol=1e-12)
@@ -49,7 +49,7 @@ def test_aweight_matches_statsmodels_wls():
     rng = np.random.default_rng(13)
     w = rng.uniform(0.5, 3.0, size=len(df))
 
-    res = OLS.from_formula("y ~ x1 + x2", df, weights=w, weight_type="aweight").fit()
+    res = Regress.from_formula("y ~ x1 + x2", df, weights=w, weight_type="aweight").fit()
 
     X = sm.add_constant(df[["x1", "x2"]], has_constant="add")
     ref = sm.WLS(df["y"], X, weights=w).fit()
@@ -66,7 +66,7 @@ def test_pweight_implies_robust_by_default():
     rng = np.random.default_rng(17)
     w = rng.uniform(0.5, 3.0, size=len(df))
 
-    res = OLS.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit()
+    res = Regress.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit()
 
     assert res.cov_type == "HC1"
     X = sm.add_constant(df[["x1", "x2"]], has_constant="add")
@@ -80,7 +80,7 @@ def test_pweight_explicit_nonrobust_is_rejected():
     # Stata cannot express "pweight with a nonrobust VCE", so westata refuses
     # rather than inventing a number.
     with pytest.raises(ConsistencyError, match="pweight implies"):
-        OLS.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit(
+        Regress.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit(
             cov_type="nonrobust"
         )
 
@@ -88,7 +88,7 @@ def test_pweight_explicit_nonrobust_is_rejected():
 def test_pweight_explicit_hc3_is_respected():
     df = _data()
     w = np.linspace(0.5, 3.0, len(df))
-    res = OLS.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit(
+    res = Regress.from_formula("y ~ x1 + x2", df, weights=w, weight_type="pweight").fit(
         cov_type="HC3"
     )
     assert res.cov_type == "HC3"
@@ -97,18 +97,18 @@ def test_pweight_explicit_hc3_is_respected():
 def test_weights_without_type_raise():
     df = _data()
     with pytest.raises(WeightError, match="weight_type"):
-        OLS.from_formula("y ~ x1 + x2", df, weights=np.ones(len(df)))
+        Regress.from_formula("y ~ x1 + x2", df, weights=np.ones(len(df)))
 
 
 def test_weight_type_without_weights_raises():
     df = _data()
     with pytest.raises(WeightError, match="without weights"):
-        OLS.from_formula("y ~ x1 + x2", df, weight_type="aweight")
+        Regress.from_formula("y ~ x1 + x2", df, weight_type="aweight")
 
 
 def test_wrong_weight_length_raises():
     df = _data()
     with pytest.raises(WeightError, match="entries"):
-        OLS.from_formula(
+        Regress.from_formula(
             "y ~ x1 + x2", df, weights=np.ones(len(df) - 1), weight_type="aweight"
         )

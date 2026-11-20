@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 
 def _cluster_data(n_clusters: int = 6, per_cluster: int = 8, seed: int = 3):
@@ -53,7 +53,7 @@ def _cluster_data(n_clusters: int = 6, per_cluster: int = 8, seed: int = 3):
 
 def test_cluster_stores_g_minus_1_in_e_df_r_like_stata():
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": df["g"]}
     )
 
@@ -77,7 +77,7 @@ def test_cluster_pvalues_use_g_minus_1_not_n_minus_k():
     from scipy import stats
 
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": df["g"]}
     )
 
@@ -93,7 +93,7 @@ def test_cluster_pvalues_use_g_minus_1_not_n_minus_k():
 
 def test_cluster_summary_reports_g_minus_1_in_the_f_test():
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": df["g"]}
     )
     text = res.summary(style="stata")
@@ -112,7 +112,7 @@ def test_cluster_e_f_is_the_wald_statistic_of_that_vce():
     """
 
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": df["g"]}
     )
     names = list(res.param_names)
@@ -122,13 +122,13 @@ def test_cluster_e_f_is_the_wald_statistic_of_that_vce():
     expected = float(b @ np.linalg.solve(V, b) / len(slopes))
     assert res.e["F"] == pytest.approx(expected, rel=1e-12)
 
-    plain = OLS.from_formula("y ~ x1 + x2", df).fit()
+    plain = Regress.from_formula("y ~ x1 + x2", df).fit()
     assert res.e["F"] != pytest.approx(plain.e["F"], rel=1e-6)
 
 
 def test_nonrobust_keeps_df_resid_equal_to_e_df_r():
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit()
+    res = Regress.from_formula("y ~ x1 + x2", df).fit()
     assert res.df_resid == res.e["df_r"] == len(df) - 3
     assert "N_clust" not in res.e
 
@@ -136,6 +136,6 @@ def test_nonrobust_keeps_df_resid_equal_to_e_df_r():
 @pytest.mark.parametrize("cov_type", ["HC0", "HC1", "HC2", "HC3"])
 def test_heteroskedastic_variants_use_n_minus_k(cov_type):
     df = _cluster_data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(cov_type=cov_type)
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(cov_type=cov_type)
     assert res.df_resid == len(df) - 3
     assert res.e["df_r"] == len(df) - 3

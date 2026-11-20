@@ -62,7 +62,7 @@ def grilic():
 def test_c12_02_fe_robust_standard_errors_are_exact(munnell) -> None:
     """Scored 0.0 in the report; identical to `xtreg ..., fe vce(robust)` to ten decimals."""
 
-    fitted = ws.PanelOLS.from_formula(
+    fitted = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", munnell, entity="sid", time="year"
     ).fit(cov_type="robust")
 
@@ -77,7 +77,7 @@ def test_c12_02_fe_robust_standard_errors_are_exact(munnell) -> None:
 
 
 def test_c12_03_theta_is_exact(munnell) -> None:
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", munnell, entity="sid", time="year"
     ).fit()
     assert float(fitted.e["theta"]) == pytest.approx(0.8857362899, abs=1e-9)
@@ -87,7 +87,7 @@ def test_c10_02_estat_firststage_matches_stata(grilic) -> None:
     """The summary table, not the coefficient table -- the report's item refers to this one."""
 
     fitted = ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", grilic).fit()
-    rendered = str(fitted.estat_firststage())
+    rendered = str(fitted.estat_first_stage())
 
     assert "0.1049" in rendered  # R-squared
     assert "0.1013" in rendered  # Adjusted R-squared
@@ -101,7 +101,7 @@ def test_c10_01_the_coefficient_table_is_a_separate_entry_point(grilic) -> None:
     fitted = ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", grilic).fit()
 
     coefficients = str(fitted.first_stage())
-    summary = str(fitted.estat_firststage())
+    summary = str(fitted.estat_first_stage())
 
     assert "Coefficient" in coefficients
     assert "Partial" in summary

@@ -46,15 +46,15 @@
 |---|---|---|---|
 | `Number of obs` | p8_outputs.txt:125 | `e(N)`（quantile_boot.py:144） | ✅ |
 | **`bootstrap(200) SEs` 标签** | p8_outputs.txt:126 | ❌ `cov_type="bootstrap"`（quantile_boot.py:163）但无渲染标签 | ❌ 新渲染 |
-| **per-quantile `Pseudo R2` 块**（`.25 Pseudo R2 = 0.6424` × 3 行） | **p8_outputs.txt:126-128** | ❌ **完全没有**——`Sqreg.fit` 的 `e` 字典（quantile_boot.py:143-151）只有 `N/df_m/df_r/quantiles/reps/rank/vce`，**连 sum_adev/sum_rdev/r2_p 都没有** | ❌ **算了未存**（父类 `QuantileRegression.fit` 会算，见 quantile.py:397-403，但 `Sqreg` 自己不复用） |
+| **per-quantile `Pseudo R2` 块**（`.25 Pseudo R2 = 0.6424` × 3 行） | **p8_outputs.txt:126-128** | ❌ **完全没有**——`SimultaneousQuantileRegress.fit` 的 `e` 字典（quantile_boot.py:143-151）只有 `N/df_m/df_r/quantiles/reps/rank/vce`，**连 sum_adev/sum_rdev/r2_p 都没有** | ❌ **算了未存**（父类 `QuantileRegress.fit` 会算，见 quantile.py:397-403，但 `SimultaneousQuantileRegress` 自己不复用） |
 | `q25/q50/q75` 分组表头 | p8_outputs.txt:134-147 | ❌ `param_names` 用 `q0.25:` 前缀（quantile_boot.py:135），无分组渲染 | ❌ 新渲染 |
 | **`e(reps)`** | 手册 | ✅ quantile_boot.py:148 | ✅ |
 | **`Bootstrap replications (200): ...done` 进度行** | p8_outputs.txt:120-123 | ❌ | ❌ 新渲染（纯 display） |
 | `e(cmdline)` 等 macros | var.json:98-113 | ❌ | ❌ |
 
 **`bsqreg` 额外**：Stata 打印 `Raw sum of deviations` / `Min sum of deviations` / `Pseudo R2` 完整块
-（p8_outputs.txt:159-161），而 `Bsqreg.fit`（quantile_boot.py:333-348）只把 `q` 塞进父 `e`，
-**同样一行都没有**（父 `Sqreg.e` 本就没有）。判定：**算了未存**（同一份残差，父类已有公式）。
+（p8_outputs.txt:159-161），而 `BootstrappedQuantileRegress.fit`（quantile_boot.py:333-348）只把 `q` 塞进父 `e`，
+**同样一行都没有**（父 `SimultaneousQuantileRegress.e` 本就没有）。判定：**算了未存**（同一份残差，父类已有公式）。
 
 ### 1.3 `rreg`（`quantile.py:584-761`）
 
@@ -623,7 +623,7 @@ Lead 复核时枚举了 7350 个简单闭式都等于 7/5，证实它**不具鉴
 | `Log likelihood = -96.054179` | ✅ | `e(ll)`（nonlinear.py:1632） |
 | **`LR test of sigma_u=0: chibar2(01) = 23.60 Prob >= chibar2 = 0.000`** | ✅ | `e(lr_chi2)` + `e(p_lr)`，其中 `p_lr = 0.5*chi2.sf(lr, 1)`（nonlinear.py:1637-1639），注释明写 "Stata's test is one-sided at the sigma_u = 0 boundary: chibar2(01)"（nonlinear.py:1638） |
 | `sigma_v`/`sigma_u`/`sigma2`/`lambda` 四行派生统计 | ✅ `e()` | nonlinear.py:1640-1646 |
-| `e(ll_0)`（OLS 对数似然，LR 的分母） | ✅ | nonlinear.py:1633，`ll_ols` 在 nonlinear.py:1611-1615 |
+| `e(ll_0)`（Regress 对数似然，LR 的分母） | ✅ | nonlinear.py:1633，`ll_ols` 在 nonlinear.py:1611-1615 |
 | `Iteration k: Log likelihood = ...` | ❌ | 无 |
 | **表内 4 行派生统计的渲染**（Stata 把它们打印在系数表内，p10_outputs.txt:165-168） | ❌ | 它们是 `e()` 标量而非参数，`summary()` 不渲染 |
 
@@ -729,7 +729,7 @@ teffects     : (无 .e) estimand estimate std_err z pvalue ci_lower ci_upper
 
 ### 5.2 一处需要单独排查的数值异常（非展示问题）
 
-实跑 `Eivreg.from_formula("y1 ~ x1 + x2", frame, reliab={"x1": 0.7}).fit()` 得到
+实跑 `ErrorsInVariablesRegress.from_formula("y1 ~ x1 + x2", frame, reliab={"x1": 0.7}).fit()` 得到
 `e(r2) = 1.12706`、`e(rmse) = 0.0`——R² > 1 且 RMSE 为 0。
 根因在 `sigma2 = (y'y - n b'Ab)/(n-k)`（systems.py:962）与 `r2 = 1 - sigma2·dof/tss`（systems.py:964）：
 当 `reliab` 使 `A = X'X/n - S` 的修正足够大时，`y'y - n b'Ab` 可能为负。

@@ -35,7 +35,7 @@ for tau in (0.25, 0.5, 0.75):
         if Vc is None: continue
         print(f"  {lbl:30s} rel={rel(np.sqrt(np.diag(Vc)), np.sqrt(np.diag(Vr))):.4e}"
               f"  se={np.round(np.sqrt(np.diag(Vc)),10)}")
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     ri = q.fit(cov_type="iid")
     spw = q._sparsity; Xw = q._X
     order=[list(ri.param_names).index(k) for k in ("x1","x2","Intercept")]

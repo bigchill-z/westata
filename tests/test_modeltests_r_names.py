@@ -35,8 +35,8 @@ def models():
             "x2": rng.normal(size=n),
         }
     )
-    full = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
-    restricted = ws.OLS.from_formula("y ~ x1", frame).fit()
+    full = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
+    restricted = ws.Regress.from_formula("y ~ x1", frame).fit()
     return frame, full, restricted
 
 
@@ -103,10 +103,10 @@ def panel_models():
             "year": np.tile(np.arange(periods), entities),
         }
     )
-    fe = ws.PanelOLS.from_formula(
+    fe = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
-    re = ws.RandomEffects.from_formula(
+    re = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
     return frame, fe, re

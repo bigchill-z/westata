@@ -67,9 +67,9 @@ def test_the_two_directions_are_not_symmetric(fitted) -> None:
 def test_vargranger_reports_statas_values_and_rows(fitted) -> None:
     """The numbers and the row-to-equation mapping, which is what Stata's table conveys."""
 
-    from westata.postestimation.vargranger import vargranger
+    from westata.postestimation.vargranger import var_granger
 
-    table = vargranger(fitted)
+    table = var_granger(fitted)
     pairs = {(row.equation, row.excluded): row.chi2 for row in table.rows}
     assert pairs[("dinf", "unem")] == pytest.approx(48.123, abs=5e-4)
     assert pairs[("dinf", "ALL")] == pytest.approx(48.123, abs=5e-4)
@@ -78,9 +78,9 @@ def test_vargranger_reports_statas_values_and_rows(fitted) -> None:
 
 
 def test_vargranger_renders_the_heading_and_all_four_data_rows(fitted) -> None:
-    from westata.postestimation.vargranger import vargranger
+    from westata.postestimation.vargranger import var_granger
 
-    rendered = str(vargranger(fitted))
+    rendered = str(var_granger(fitted))
     assert "Granger causality Wald tests" in rendered
     assert rendered.count("ALL") == 2
     assert "48.123" in rendered
@@ -97,7 +97,7 @@ def test_vargranger_matches_stata_character_for_character(fitted) -> None:
     why a single width formula kept drifting by one space.
     """
 
-    from westata.postestimation.vargranger import vargranger
+    from westata.postestimation.vargranger import var_granger
 
     expected = [
         "   Granger causality Wald tests",
@@ -111,5 +111,5 @@ def test_vargranger_matches_stata_character_for_character(fitted) -> None:
         "  |              unem                ALL |   9.009     2    0.011    |",
         "  +------------------------------------------------------------------+",
     ]
-    rendered = str(vargranger(fitted)).splitlines()
+    rendered = str(var_granger(fitted)).splitlines()
     assert rendered == expected

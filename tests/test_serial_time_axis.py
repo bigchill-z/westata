@@ -56,14 +56,14 @@ def _load(drop: bool = False) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def full_fit():
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "consumption ~ temp + price + income", _load()
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def gapped_fit():
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "consumption ~ temp + price + income", _load(drop=True)
     ).fit()
 
@@ -115,7 +115,7 @@ def test_no_note_without_a_gap(full_fit) -> None:
 def test_two_gaps_are_counted(full_fit) -> None:
     frame = _load()
     trimmed = frame[~frame.time.isin([5, 12])].reset_index(drop=True)
-    fit = ws.OLS.from_formula("consumption ~ temp + price + income", trimmed).fit()
+    fit = ws.Regress.from_formula("consumption ~ temp + price + income", trimmed).fit()
     assert ws.estat_bgodfrey(fit, lags=1, time="time").n_gaps == 2
     assert "Number of gaps in sample = 2" in str(ws.estat_dwatson(fit, time="time"))
 
@@ -138,7 +138,7 @@ def test_wntestq_with_a_gap_matches_stata(gapped_fit) -> None:
 
 
 def test_corrgram_with_a_gap_matches_stata(gapped_fit) -> None:
-    grid = ws.estat_corrgram(gapped_fit, lags=4, time="time")
+    grid = ws.estat_correlogram(gapped_fit, lags=4, time="time")
     for row, (ac, pac, q) in zip(grid.rows, GAPPED_CORRGRAM):
         assert row.ac == pytest.approx(ac, abs=5e-5), f"AC at lag {row.lag}"
         assert row.pac == pytest.approx(pac, abs=5e-5), f"PAC at lag {row.lag}"
@@ -149,12 +149,12 @@ def test_corrgram_note_wording_is_singular_then_plural(full_fit) -> None:
     frame = _load()
     one = frame[frame.time != 5].reset_index(drop=True)
     two = frame[~frame.time.isin([5, 12])].reset_index(drop=True)
-    fit_one = ws.OLS.from_formula("consumption ~ temp + price + income", one).fit()
-    fit_two = ws.OLS.from_formula("consumption ~ temp + price + income", two).fit()
-    assert str(ws.estat_corrgram(fit_one, lags=2, time="time")).startswith(
+    fit_one = ws.Regress.from_formula("consumption ~ temp + price + income", one).fit()
+    fit_two = ws.Regress.from_formula("consumption ~ temp + price + income", two).fit()
+    assert str(ws.estat_correlogram(fit_one, lags=2, time="time")).startswith(
         "(note: time series has 1 gap)"
     )
-    assert str(ws.estat_corrgram(fit_two, lags=2, time="time")).startswith(
+    assert str(ws.estat_correlogram(fit_two, lags=2, time="time")).startswith(
         "(note: time series has 2 gaps)"
     )
 
@@ -216,9 +216,9 @@ def test_the_default_lag_count_follows_n_over_two_minus_two_capped(
 
     rng = np.random.default_rng(nobs)
     frame = pd.DataFrame({"y": rng.normal(size=nobs)})
-    fit = ws.OLS.from_formula("y ~ 1", frame).fit()
+    fit = ws.Regress.from_formula("y ~ 1", frame).fit()
     assert ws.wntestq(fit).df == expected
-    assert ws.estat_corrgram(fit).rows[-1].lag == expected
+    assert ws.estat_correlogram(fit).rows[-1].lag == expected
 
 
 def test_the_default_does_not_depend_on_the_parameter_count() -> None:
@@ -227,8 +227,8 @@ def test_the_default_does_not_depend_on_the_parameter_count() -> None:
     rng = np.random.default_rng(5)
     frame = pd.DataFrame({f"x{index}": rng.normal(size=30) for index in range(1, 7)})
     frame["u"] = rng.normal(size=30)
-    one = ws.OLS.from_formula("u ~ x1", frame).fit()
-    six = ws.OLS.from_formula("u ~ x1 + x2 + x3 + x4 + x5 + x6", frame).fit()
+    one = ws.Regress.from_formula("u ~ x1", frame).fit()
+    six = ws.Regress.from_formula("u ~ x1 + x2 + x3 + x4 + x5 + x6", frame).fit()
     assert ws.wntestq(one).df == ws.wntestq(six).df == 13
 
 
@@ -237,7 +237,7 @@ def test_the_small_n_floor_is_one() -> None:
 
     rng = np.random.default_rng(9)
     frame = pd.DataFrame({"y": rng.normal(size=5)})
-    fit = ws.OLS.from_formula("y ~ 1", frame).fit()
+    fit = ws.Regress.from_formula("y ~ 1", frame).fit()
     assert ws.wntestq(fit).df == 1
 
 
@@ -248,7 +248,7 @@ def test_a_clustered_vce_is_refused(full_fit) -> None:
     """``vce(cluster)`` sets ``e(vcetype) = Robust``, which ``bgodfrey.ado:5-10`` rejects."""
 
     frame = _load()
-    robust = ws.OLS.from_formula("consumption ~ temp + price + income", frame).fit(
+    robust = ws.Regress.from_formula("consumption ~ temp + price + income", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame["time"] % 3}
     )
     with pytest.raises(Exception, match="does not work after regress, robust"):
@@ -265,8 +265,8 @@ def test_a_panel_fit_is_refused() -> None:
         for period in range(1, 11)
     ]
     frame = pd.DataFrame(rows)
-    fit = ws.PanelOLS.from_formula("y ~ x", frame, entity="id", time="t").fit()
-    for command in (ws.estat_bgodfrey, ws.estat_dwatson, ws.estat_corrgram, ws.wntestq):
+    fit = ws.PanelRegressFE.from_formula("y ~ x", frame, entity="id", time="t").fit()
+    for command in (ws.estat_bgodfrey, ws.estat_dwatson, ws.estat_correlogram, ws.wntestq):
         with pytest.raises(Exception, match="multiple panels"):
             command(fit)
 
@@ -276,7 +276,7 @@ def test_an_absorbed_fit_is_not_a_regress_fit(full_fit) -> None:
 
     frame = _load()
     frame["unit"] = np.arange(len(frame)) % 5
-    absorbed = ws.FEOLS.from_formula("consumption ~ temp + price | unit", frame).fit()
+    absorbed = ws.RegressHighDimFixedEffects.from_formula("consumption ~ temp + price | unit", frame).fit()
     with pytest.raises(Exception, match="not valid"):
         ws.estat_bgodfrey(absorbed)
 
@@ -289,7 +289,7 @@ def test_every_serial_command_is_reachable_from_the_result(full_fit) -> None:
 
     assert full_fit.estat_bgodfrey(lags=1).rows[0].chi2 == pytest.approx(4.237, abs=5e-4)
     assert full_fit.estat_dwatson().d == pytest.approx(1.021169, abs=1e-6)
-    assert full_fit.estat_corrgram(lags=2).rows[-1].lag == 2
+    assert full_fit.estat_correlogram(lags=2).rows[-1].lag == 2
     assert full_fit.wntestq(lags=3).df == 3
 
 
@@ -299,7 +299,7 @@ def test_wntestq_accepts_a_bare_series() -> None:
     values = np.random.default_rng(6).normal(size=40)
     by_values = ws.wntestq(values)
     frame = pd.DataFrame({"y": values})
-    by_result = ws.wntestq(ws.OLS.from_formula("y ~ 1", frame).fit())
+    by_result = ws.wntestq(ws.Regress.from_formula("y ~ 1", frame).fit())
     # The fit's residuals are de-meaned, which barely moves Q here; the point of the test
     # is that the raw-array path exists at all rather than raising ConsistencyError.
     assert by_values.df == by_result.df

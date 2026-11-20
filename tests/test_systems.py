@@ -31,7 +31,7 @@ import pytest
 
 import westata as ws
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.systems import Eivreg, Manova, ManovaResult, Mvreg, Sureg
+from westata.estimators.systems import ErrorsInVariablesRegress, Manova, ManovaResults, MultivariateRegress, SeeminglyUnrelatedRegress
 
 # --------------------------------------------------------------------- fixtures
 def _sur(n: int = 400, seed: int = 101) -> pd.DataFrame:
@@ -127,7 +127,7 @@ MVREG_SE = {
 def test_sureg_matches_stata_coefficients():
     """Coefficients to 1e-12 -- they match Stata's e(b) to machine precision."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     for name, expected in SUR_B.items():
         assert float(result.params[name]) == pytest.approx(expected, rel=1e-10), name
 
@@ -139,7 +139,7 @@ def test_sureg_matches_stata_standard_errors():
     rounding (1e-5), not to the estimator.
     """
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     for name, expected in SUR_SE.items():
         assert float(result.bse[name]) == pytest.approx(expected, rel=1e-5), name
 
@@ -147,7 +147,7 @@ def test_sureg_matches_stata_standard_errors():
 def test_sureg_covariance_is_full_not_block_diagonal():
     """A block-diagonal VCE would mean the equations were treated as unrelated."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     covariance = np.asarray(result.cov_params(), dtype=float)
 
     assert covariance.shape == (6, 6)
@@ -179,14 +179,14 @@ def test_sureg_matches_stata_vce_elementwise():
              0.00015505582641183255, 8.469985662978559e-05, 0.002373576004081216],
         ]
     )
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     np.testing.assert_allclose(np.asarray(result.cov_params()), stata_v, rtol=1e-10, atol=1e-14)
 
 
 def test_sureg_parameter_names_are_equation_prefixed():
     """Both equations have a constant, so the prefix is required, not cosmetic."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert result.param_names == ["y1:x1", "y1:x2", "y1:_cons", "y2:x2", "y2:x3", "y2:_cons"]
     assert len(set(result.param_names)) == 6
 
@@ -194,7 +194,7 @@ def test_sureg_parameter_names_are_equation_prefixed():
 def test_sureg_constant_answers_to_both_stata_and_patsy_spellings():
     """The canonical name is Stata's ``_cons``; ``Intercept`` still resolves."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert float(result.params["y1:_cons"]) == float(result.params["y1:Intercept"])
     assert float(result.bse["y2:_cons"]) == float(result.bse["y2:Intercept"])
     assert float(result.tvalues["y1:_cons"]) == float(result.tvalues["y1:Intercept"])
@@ -215,7 +215,7 @@ def test_sureg_constant_answers_to_both_stata_and_patsy_spellings():
 def test_sureg_parameter_order_follows_stata():
     """e(b) column order: slopes then ``_cons``, equation by equation."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert list(result.params.index) == result.param_names
     # Directly comparable with Stata's e(b) without a permutation.
     np.testing.assert_allclose(
@@ -259,9 +259,9 @@ def test_sureg_coefficients_equal_per_equation_ols_when_errors_are_uncorrelated(
     v = u1 - X2 @ np.linalg.lstsq(X2, u1, rcond=None)[0]
     frame["y2"] = X2 @ b2 + (u2 - v * (v @ u2) / (v @ v))
 
-    result = Sureg.from_formula(["y1 ~ x1", "y2 ~ x2"], frame).fit()
-    first = ws.OLS.from_formula("y1 ~ x1", frame).fit()
-    second = ws.OLS.from_formula("y2 ~ x2", frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1", "y2 ~ x2"], frame).fit()
+    first = ws.Regress.from_formula("y1 ~ x1", frame).fit()
+    second = ws.Regress.from_formula("y2 ~ x2", frame).fit()
 
     correlation = float(np.asarray(result.e["corr"])[0, 1])
     assert abs(correlation) < 1e-12, "the constructed residuals are not orthogonal"
@@ -284,9 +284,9 @@ def test_sureg_standard_errors_differ_from_ols_when_errors_are_correlated():
     """
 
     frame = _sur()
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame).fit()
-    first = ws.OLS.from_formula("y1 ~ x1 + x2", frame).fit()
-    second = ws.OLS.from_formula("y2 ~ x2 + x3", frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame).fit()
+    first = ws.Regress.from_formula("y1 ~ x1 + x2", frame).fit()
+    second = ws.Regress.from_formula("y2 ~ x2 + x3", frame).fit()
 
     correlation = float(np.asarray(result.e["corr"])[0, 1])
     assert 0.5 < correlation < 0.6
@@ -305,7 +305,7 @@ def test_sureg_standard_errors_differ_from_ols_when_errors_are_correlated():
 def test_sureg_rejects_iterated_estimation():
     """``iterate=True`` is Stata's isure, which is out of scope and says so."""
 
-    model = Sureg.from_formula(["y1 ~ x1", "y2 ~ x2"], _sur())
+    model = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1", "y2 ~ x2"], _sur())
     with pytest.raises(UnsupportedError, match="iterate"):
         model.fit(iterate=True)
 
@@ -323,7 +323,7 @@ def test_sureg_handles_three_equations():
     frame["y2"] = -1.0 + 1.5 * frame["b"] + 0.8 * shared
     frame["y3"] = 0.5 + 0.7 * frame["c"] - 0.4 * shared
 
-    result = Sureg.from_formula(["y1 ~ a", "y2 ~ b", "y3 ~ c"], frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ a", "y2 ~ b", "y3 ~ c"], frame).fit()
     assert result.param_names == ["y1:a", "y1:_cons", "y2:b", "y2:_cons", "y3:c", "y3:_cons"]
     assert result.cov_params().shape == (6, 6)
     correlation = np.asarray(result.e["corr"], dtype=float)
@@ -340,7 +340,7 @@ def test_sureg_handles_three_equations():
 def test_sureg_reports_stata_fit_statistics():
     """e(ll), e(r2), e(rmse) and e(chi2) per equation, from Stata."""
 
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], _sur()).fit()
     assert float(result.e["ll"]) == pytest.approx(-1042.83530993779, rel=1e-10)
     assert float(result.e["r2_1"]) == pytest.approx(0.8122297261145611, rel=1e-10)
     assert float(result.e["r2_2"]) == pytest.approx(0.599515039818118, rel=1e-10)
@@ -357,24 +357,24 @@ def test_sureg_rejects_equations_with_different_samples():
     frame = _sur()
     frame.loc[:4, "x3"] = np.nan
     with pytest.raises(ConsistencyError, match="same observations"):
-        Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame)
+        SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame)
 
 
 def test_sureg_rejects_a_robust_vce_rather_than_returning_the_wrong_one():
-    model = Sureg.from_formula(["y1 ~ x1", "y2 ~ x2"], _sur())
+    model = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1", "y2 ~ x2"], _sur())
     with pytest.raises(UnsupportedError, match="cov_type"):
         model.fit(cov_type="HC1")
 
 
 # ------------------------------------------------------------------------ mvreg
 def test_mvreg_matches_stata_coefficients():
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     for name, expected in MVREG_B.items():
         assert float(result.params[name]) == pytest.approx(expected, rel=1e-10), name
 
 
 def test_mvreg_matches_stata_standard_errors():
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     for name, expected in MVREG_SE.items():
         assert float(result.bse[name]) == pytest.approx(expected, rel=1e-5), name
 
@@ -392,9 +392,9 @@ def test_mvreg_coefficients_equal_per_equation_ols_but_the_vce_differs():
     """
 
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
-    first = ws.OLS.from_formula("y1 ~ x1 + x2 + x3", frame).fit()
-    second = ws.OLS.from_formula("y2 ~ x1 + x2 + x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    first = ws.Regress.from_formula("y1 ~ x1 + x2 + x3", frame).fit()
+    second = ws.Regress.from_formula("y2 ~ x1 + x2 + x3", frame).fit()
 
     # Coefficients are identical to per-equation OLS.
     for name in ("x1", "x2", "x3"):
@@ -429,7 +429,7 @@ def test_mvreg_coefficients_equal_per_equation_ols_but_the_vce_differs():
 
 
 def test_mvreg_shares_one_design_so_its_names_carry_the_outcome_prefix():
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     assert result.param_names == [
         "y1:x1", "y1:x2", "y1:x3", "y1:_cons",
         "y2:x1", "y2:x2", "y2:x3", "y2:_cons",
@@ -444,8 +444,8 @@ def test_mvreg_and_sureg_differ_by_specification_not_by_bug():
     """
 
     frame = _sur()
-    sureg = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame).fit()
-    mvreg = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    sureg = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x2 + x3"], frame).fit()
+    mvreg = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     # y1 under sureg omits x3; under mvreg it includes it, so the estimates move.
     assert float(sureg.params["y1:x1"]) != pytest.approx(
@@ -456,7 +456,7 @@ def test_mvreg_and_sureg_differ_by_specification_not_by_bug():
 
 
 def test_mvreg_reports_per_equation_fit_statistics():
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     assert float(result.e["F_y1"]) == pytest.approx(575.2300094917224, rel=1e-9)
     assert float(result.e["F_y2"]) == pytest.approx(198.29447572298326, rel=1e-9)
     # Stata stores these as per-equation macros -- e(r2) = " .8134 .6004" -- so
@@ -478,7 +478,7 @@ def test_mvreg_stores_sigma_under_statats_name():
     """
 
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     sigma = result.e["Sigma"]
     assert len(sigma) == 2 and len(sigma[0]) == 2
@@ -506,7 +506,7 @@ def test_mvreg_keeps_the_lowercase_sigma_alias():
     """``e["sigma"]`` stays available for callers written against it, and must
     hold the same matrix as Stata's ``e(Sigma)``."""
 
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
 
     np.testing.assert_allclose(
         np.asarray(result.e["Sigma"]), np.asarray(result.e["sigma"])
@@ -516,7 +516,7 @@ def test_mvreg_keeps_the_lowercase_sigma_alias():
 def test_mvreg_carries_the_documented_macros():
     """``mvreg.sthlp:172-196`` lists the macros an eclass command carries."""
 
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
     e = result.e
 
     assert e["cmd"] == "mvreg"
@@ -538,7 +538,7 @@ def test_mvreg_predict_program_is_reg3_p():
     wrong identifier that never raises an error.
     """
 
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", _sur()).fit()
 
     assert result.e["predict"] == "reg3_p"
     assert "difference" in result.predict_types
@@ -548,7 +548,7 @@ def test_mvreg_predict_difference_is_xb1_minus_xb2():
     """``reg3_p.ado:126-127``: ``gen varn = xb1 - xb2``."""
 
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     difference = np.asarray(
         result.predict(kind="difference", equation=1, equation2=2), dtype=float
@@ -564,7 +564,7 @@ def test_sureg_predict_is_equation_aware():
     """``sureg.ado:14,45`` routes through ``reg3``, so predict is ``reg3_p``."""
 
     frame = _sur()
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
 
     assert result.e["predict"] == "reg3_p"
     assert "difference" in result.predict_types
@@ -579,7 +579,7 @@ def test_sureg_predict_xb_uses_the_sureg_coefficients():
     """
 
     frame = _sur()
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
 
     predicted = np.asarray(result.predict(kind="xb", equation=1), dtype=float)
     design = np.asarray(result._equation_design[0], dtype=float)
@@ -590,7 +590,7 @@ def test_sureg_predict_xb_uses_the_sureg_coefficients():
 
 def test_sureg_predict_residuals_reconstruct_the_response():
     frame = _sur()
-    result = Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
 
     reconstructed = np.asarray(result.predict(kind="xb", equation=1), dtype=float) + np.asarray(
         result.predict(kind="residuals", equation=1), dtype=float
@@ -603,7 +603,7 @@ def test_sureg_predict_handles_equations_with_different_regressors():
     """Each equation keeps its OWN design, so the column counts may differ."""
 
     frame = _sur()
-    result = Sureg.from_formula(["y1 ~ x1", "y2 ~ x1 + x2 + x3"], frame).fit()
+    result = SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1", "y2 ~ x1 + x2 + x3"], frame).fit()
 
     first = np.asarray(result.predict(kind="xb", equation=1), dtype=float)
     second = np.asarray(result.predict(kind="xb", equation=2), dtype=float)
@@ -617,11 +617,11 @@ def test_mvreg_predict_xb_matches_a_separate_ols_fit():
     """The equation's fitted values must equal a standalone OLS of that outcome."""
 
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     for equation, outcome in ((1, "y1"), (2, "y2")):
         predicted = np.asarray(result.predict(kind="xb", equation=equation), dtype=float)
-        separate = ws.OLS.from_formula(f"{outcome} ~ x1 + x2 + x3", frame).fit()
+        separate = ws.Regress.from_formula(f"{outcome} ~ x1 + x2 + x3", frame).fit()
         np.testing.assert_allclose(
             predicted, np.asarray(separate.fittedvalues, dtype=float), rtol=1e-10
         )
@@ -629,7 +629,7 @@ def test_mvreg_predict_xb_matches_a_separate_ols_fit():
 
 def test_mvreg_predict_defaults_to_the_first_equation():
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     np.testing.assert_allclose(
         np.asarray(result.predict(kind="xb"), dtype=float),
@@ -639,7 +639,7 @@ def test_mvreg_predict_defaults_to_the_first_equation():
 
 def test_mvreg_predict_residuals_reconstruct_the_response():
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     reconstructed = np.asarray(result.predict(kind="xb", equation=2), dtype=float) + np.asarray(
         result.predict(kind="residuals", equation=2), dtype=float
@@ -650,7 +650,7 @@ def test_mvreg_predict_residuals_reconstruct_the_response():
 
 def test_mvreg_predict_stdp_is_positive_and_finite():
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     stdp = np.asarray(result.predict(kind="stdp"), dtype=float)
 
@@ -667,7 +667,7 @@ def test_mvreg_predict_refuses_single_equation_diagnostics():
     """
 
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     with pytest.raises(ValueError, match="multiple-equation"):
         result.predict(kind="cooksd")
@@ -675,7 +675,7 @@ def test_mvreg_predict_refuses_single_equation_diagnostics():
 
 def test_mvreg_predict_refuses_an_equation_out_of_range():
     frame = _sur()
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     with pytest.raises(ValueError, match="out of range"):
         result.predict(kind="xb", equation=3)
@@ -683,7 +683,7 @@ def test_mvreg_predict_refuses_an_equation_out_of_range():
 
 def test_mvreg_rejects_a_missing_equals_sign():
     with pytest.raises(ConsistencyError, match="="):
-        Mvreg.from_formula("y1 y2 ~ x1 x2", _sur())
+        MultivariateRegress.from_formula("y1 y2 ~ x1 x2", _sur())
 
 
 def test_mvreg_applies_listwise_deletion_to_every_equation():
@@ -695,7 +695,7 @@ def test_mvreg_applies_listwise_deletion_to_every_equation():
 
     frame = _sur()
     frame.loc[:3, "x3"] = np.nan
-    result = Mvreg.from_formula("y1 y2 = x1 x2 x3", frame).fit()
+    result = MultivariateRegress.from_formula("y1 y2 = x1 x2 x3", frame).fit()
 
     assert result.e["N"] == 396
     assert result.nobs == 792  # stacked: k_eq * N
@@ -707,7 +707,7 @@ def test_mvreg_applies_listwise_deletion_to_every_equation():
 def test_eivreg_matches_stata_coefficients():
     """``reliab=0.7`` must undo the attenuation: x1 2.073214, not OLS's 1.451249."""
 
-    result = Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
     assert float(result.params["x1"]) == pytest.approx(2.0732139575219293, rel=1e-10)
     assert float(result.params["x2"]) == pytest.approx(-0.4678675417372797, rel=1e-10)
     assert float(result.params["_cons"]) == pytest.approx(0.8649386902679352, rel=1e-10)
@@ -716,7 +716,7 @@ def test_eivreg_matches_stata_coefficients():
 def test_eivreg_matches_stata_standard_errors():
     """The measurement-error correction has to enter the score, not just beta."""
 
-    result = Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
     assert float(result.bse["x1"]) == pytest.approx(0.0757645, rel=1e-5)
     assert float(result.bse["x2"]) == pytest.approx(0.0730309, rel=1e-5)
     assert float(result.bse["_cons"]) == pytest.approx(0.0703323, rel=1e-5)
@@ -730,7 +730,7 @@ def test_eivreg_matches_the_full_stata_vce():
             [0.0001984852773324549, 0.00019616770101510504, 0.0049466256851059326],
         ]
     )
-    result = Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
     np.testing.assert_allclose(np.asarray(result.cov_params()), stata_v, rtol=1e-9, atol=1e-13)
 
 
@@ -738,8 +738,8 @@ def test_eivreg_with_perfect_reliability_reduces_to_ols():
     """``reliab=1.0`` zeroes the correction, so the estimator *is* OLS."""
 
     frame = _eiv()
-    result = Eivreg.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     assert float(result.params["x1"]) == pytest.approx(float(plain.params["x1"]), abs=1e-10)
     assert float(result.params["x2"]) == pytest.approx(float(plain.params["x2"]), abs=1e-10)
@@ -759,15 +759,15 @@ def test_eivreg_with_perfect_reliability_keeps_statas_smaller_vce():
     """
 
     frame = _eiv()
-    result = Eivreg.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", frame, reliab={"x1": 1.0}).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     assert float(result.bse["x1"]) == pytest.approx(0.0530382, rel=1e-5)
     assert float(result.bse["x1"]) != pytest.approx(float(plain.bse["x1"]), rel=1e-5)
 
 
 def test_eivreg_reports_stata_fit_statistics():
-    result = Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": 0.7}).fit()
     assert float(result.e["rmse"]) == pytest.approx(0.8357141596188606, rel=1e-10)
     assert float(result.e["r2"]) == pytest.approx(0.8639837035435246, rel=1e-10)
     assert float(result.e["F"]) == pytest.approx(407.77933077539274, rel=1e-9)
@@ -797,7 +797,7 @@ def test_eivreg_matches_stata_with_two_noisy_regressors():
         }
     )
 
-    result = Eivreg.from_formula("y ~ o1 + o2 + x3", frame, reliab={"o1": 0.7, "o2": 0.8}).fit()
+    result = ErrorsInVariablesRegress.from_formula("y ~ o1 + o2 + x3", frame, reliab={"o1": 0.7, "o2": 0.8}).fit()
 
     assert float(result.params["o1"]) == pytest.approx(2.220854, rel=1e-6)
     assert float(result.params["o2"]) == pytest.approx(-0.591144, rel=1e-6)
@@ -810,20 +810,20 @@ def test_eivreg_matches_stata_with_two_noisy_regressors():
 
 def test_eivreg_requires_reliab():
     with pytest.raises(ConsistencyError, match="reliab is required"):
-        Eivreg.from_formula("y ~ x1 + x2", _eiv())
+        ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv())
 
 
 def test_eivreg_rejects_a_reliability_for_a_non_regressor():
     """Stata r(111) "x1 not independent variable" -- a typo must not be ignored."""
 
     with pytest.raises(ConsistencyError, match="not regressors"):
-        Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"nonexistent": 0.9})
+        ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"nonexistent": 0.9})
 
 
 @pytest.mark.parametrize("value", [0.0, -0.1, 1.5])
 def test_eivreg_rejects_an_out_of_range_reliability(value):
     with pytest.raises(ConsistencyError, match="reliability"):
-        Eivreg.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": value})
+        ErrorsInVariablesRegress.from_formula("y ~ x1 + x2", _eiv(), reliab={"x1": value})
 
 
 # ------------------------------------------------------------------------ manova
@@ -844,7 +844,7 @@ def test_manova_rao_f_matches_stata():
     assert float(outcome.F) == pytest.approx(62.15, abs=5e-3)
     assert float(outcome.F) == pytest.approx(62.15049200342134, rel=1e-9)
     assert float(outcome.p) < 1e-10
-    assert isinstance(outcome, ManovaResult)
+    assert isinstance(outcome, ManovaResults)
 
 
 def test_manova_rao_f_matches_stata_on_a_second_design():

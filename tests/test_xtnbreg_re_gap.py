@@ -57,7 +57,7 @@ def _counts():
 def test_fe_is_supported_and_exact() -> None:
     """The FE variant is implemented; only the RE method is missing."""
 
-    fitted = ws.XtNbreg.from_formula(
+    fitted = ws.PanelNbRegress.from_formula(
         "n ~ x1", _counts(), entity="sid", time="t", method="fe"
     ).fit()
     assert fitted is not None
@@ -67,7 +67,7 @@ def test_re_is_rejected_with_a_clear_error() -> None:
     """If this starts passing, the estimator was implemented -- update the gap record."""
 
     with pytest.raises(ws.errors.UnsupportedError) as caught:
-        ws.XtNbreg.from_formula(
+        ws.PanelNbRegress.from_formula(
             "n ~ x1", _counts(), entity="sid", time="t", method="re"
         )
     message = str(caught.value)

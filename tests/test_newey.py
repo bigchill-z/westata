@@ -40,8 +40,8 @@ def frame():
 def test_point_estimates_are_plain_ols(frame) -> None:
     """``newey.ado:96`` fits with ``_regress``; the VCE must not move ``b``."""
 
-    new = ws.newey("y ~ x1 + x2", frame, lag=2, time=frame["t"])
-    ols = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    new = ws.newey_west("y ~ x1 + x2", frame, lag=2, time=frame["t"])
+    ols = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.asarray(new.params, dtype=float),
@@ -53,8 +53,8 @@ def test_point_estimates_are_plain_ols(frame) -> None:
 def test_variance_matches_the_ols_hac_path(frame) -> None:
     """``ws.newey`` is a surface over the existing HAC engine, so they must agree."""
 
-    new = ws.newey("y ~ x1 + x2", frame, lag=2, time=frame["t"])
-    ols = ws.OLS.from_formula("y ~ x1 + x2", frame).fit(
+    new = ws.newey_west("y ~ x1 + x2", frame, lag=2, time=frame["t"])
+    ols = ws.Regress.from_formula("y ~ x1 + x2", frame).fit(
         cov_type="HAC", cov_kwds={"maxlags": 2}
     )
 
@@ -73,9 +73,9 @@ def test_lag_zero_matches_hc1_not_hc0(frame) -> None:
     """
 
     n = len(frame)
-    new = ws.newey("y ~ x1", frame, lag=0, time=frame["t"])
-    hc1 = ws.OLS.from_formula("y ~ x1", frame).fit(cov_type="HC1")
-    hc0 = ws.OLS.from_formula("y ~ x1", frame).fit(cov_type="HC0")
+    new = ws.newey_west("y ~ x1", frame, lag=0, time=frame["t"])
+    hc1 = ws.Regress.from_formula("y ~ x1", frame).fit(cov_type="HC1")
+    hc0 = ws.Regress.from_formula("y ~ x1", frame).fit(cov_type="HC0")
 
     np.testing.assert_allclose(
         np.asarray(new.cov_params(), dtype=float),
@@ -109,8 +109,8 @@ def test_a_longer_lag_changes_the_variance() -> None:
     y = 1.0 + x + u
     data = pd.DataFrame({"y": y, "x": x, "t": np.arange(n)})
 
-    short = np.diag(np.asarray(ws.newey("y ~ x", data, lag=0, time=data["t"]).cov_params()))
-    long = np.diag(np.asarray(ws.newey("y ~ x", data, lag=5, time=data["t"]).cov_params()))
+    short = np.diag(np.asarray(ws.newey_west("y ~ x", data, lag=0, time=data["t"]).cov_params()))
+    long = np.diag(np.asarray(ws.newey_west("y ~ x", data, lag=5, time=data["t"]).cov_params()))
 
     assert not np.allclose(short, long, rtol=1e-6)
     # The intercept variance is the one that grows on this data.
@@ -121,7 +121,7 @@ def test_a_longer_lag_changes_the_variance() -> None:
 def test_e_collection_is_neweys_own(frame) -> None:
     """``newey.sthlp:156-187`` lists the scalars AND the macros."""
 
-    result = ws.newey("y ~ x1 + x2", frame, lag=2, time=frame["t"])
+    result = ws.newey_west("y ~ x1 + x2", frame, lag=2, time=frame["t"])
 
     scalars = {"N", "df_m", "df_r", "F", "p", "lag", "rank"}
     macros = {
@@ -146,7 +146,7 @@ def test_predict_macro_names_a_real_program(frame) -> None:
     this pins the newey spelling against its ado line.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     assert result.e["predict"] == "newey_p"
     assert result.e["estat_cmd"] == "newey_estat"
@@ -160,7 +160,7 @@ def test_the_macros_were_not_only_python_attributes(frame) -> None:
     ``result.e["predict"]`` raised KeyError even though the predict worked.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     for key in ("predict", "estat_cmd", "cmd", "title", "vcetype"):
         assert key in result.e, key
@@ -168,8 +168,8 @@ def test_the_macros_were_not_only_python_attributes(frame) -> None:
 
 
 def test_the_wtype_macro_appears_only_for_aweight(frame) -> None:
-    plain = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
-    weighted = ws.newey(
+    plain = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
+    weighted = ws.newey_west(
         "y ~ x1",
         frame,
         lag=1,
@@ -188,20 +188,20 @@ def test_the_wtype_macro_appears_only_for_aweight(frame) -> None:
 def test_regress_only_keys_are_absent(frame, absent) -> None:
     """``mat post`` creates a fresh ``e()``; these keys must not leak through."""
 
-    result = ws.newey("y ~ x1 + x2", frame, lag=2, time=frame["t"])
+    result = ws.newey_west("y ~ x1 + x2", frame, lag=2, time=frame["t"])
 
     assert absent not in result.e
 
 
 def test_lag_is_reported(frame) -> None:
-    result = ws.newey("y ~ x1", frame, lag=3, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=3, time=frame["t"])
 
     assert float(result.e["lag"]) == 3.0
     assert result.lag == 3
 
 
 def test_the_title_and_vcetype_match_the_help_file(frame) -> None:
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     assert result.title == NEWEY_TITLE
     assert "Newey" in result.vcetype
@@ -212,7 +212,7 @@ def test_e_p_is_the_model_test_pvalue(frame) -> None:
 
     from scipy import stats
 
-    result = ws.newey("y ~ x1 + x2", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1 + x2", frame, lag=1, time=frame["t"])
 
     expected = stats.f.sf(float(result.e["F"]), float(result.e["df_m"]), float(result.e["df_r"]))
     assert float(result.e["p"]) == pytest.approx(float(expected), rel=1e-12)
@@ -223,21 +223,21 @@ def test_lag_is_required(frame) -> None:
     """``newey.sthlp:55``: the option has no default."""
 
     with pytest.raises(ValueError, match="lag"):
-        ws.newey("y ~ x1", frame, lag=None, time=frame["t"])
+        ws.newey_west("y ~ x1", frame, lag=None, time=frame["t"])
 
 
 def test_a_negative_lag_is_rejected(frame) -> None:
     """``newey.ado:24-27``."""
 
     with pytest.raises(ValueError, match="lag"):
-        ws.newey("y ~ x1", frame, lag=-1, time=frame["t"])
+        ws.newey_west("y ~ x1", frame, lag=-1, time=frame["t"])
 
 
 def test_only_aweights_are_accepted(frame) -> None:
     """``newey.ado:15`` declares ``[aw/]`` -- no other weight type."""
 
     with pytest.raises(NotImplementedError, match="aweight"):
-        ws.newey(
+        ws.newey_west(
             "y ~ x1",
             frame,
             lag=1,
@@ -250,7 +250,7 @@ def test_only_aweights_are_accepted(frame) -> None:
 def test_aweight_is_supported(frame) -> None:
     weights = np.linspace(0.5, 3.0, len(frame))
 
-    result = ws.newey(
+    result = ws.newey_west(
         "y ~ x1", frame, lag=1, time=frame["t"], weights=weights, weight_type="aweight"
     )
 
@@ -261,11 +261,11 @@ def test_noconstant_without_regressors_is_rejected(frame) -> None:
     """``newey.ado:55-58``."""
 
     with pytest.raises(ValueError, match="noconstant"):
-        ws.newey("y ~ 1", frame, lag=1, time=frame["t"], noconstant=True)
+        ws.newey_west("y ~ 1", frame, lag=1, time=frame["t"], noconstant=True)
 
 
 def test_noconstant_drops_the_intercept(frame) -> None:
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"], noconstant=True)
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"], noconstant=True)
 
     assert "_cons" not in list(result.stata_param_names)
 
@@ -300,7 +300,7 @@ def test_tflag_two_is_refused_even_with_force(frame) -> None:
     irregular = frame.assign(t=np.arange(len(frame)) * 3)
 
     with pytest.raises(ValueError, match="greater than 1"):
-        ws.newey("y ~ x1", irregular, lag=1, time=irregular["t"], force=True)
+        ws.newey_west("y ~ x1", irregular, lag=1, time=irregular["t"], force=True)
 
 
 def test_tflag_one_requires_force() -> None:
@@ -315,10 +315,10 @@ def test_tflag_one_requires_force() -> None:
     )
 
     with pytest.raises(ValueError, match="not regularly spaced"):
-        ws.newey("y ~ x", data, lag=1, time=data["t"])
+        ws.newey_west("y ~ x", data, lag=1, time=data["t"])
 
     # ... and succeeds once force is given.
-    result = ws.newey("y ~ x", data, lag=1, time=data["t"], force=True)
+    result = ws.newey_west("y ~ x", data, lag=1, time=data["t"], force=True)
     assert np.all(np.isfinite(np.asarray(result.cov_params())))
 
 
@@ -334,7 +334,7 @@ def test_a_single_observation_has_no_spacing_to_check() -> None:
 def test_newey_p_types_are_available(frame, kind) -> None:
     """``newey_p.ado:20``: ``local myopts XB Index STDP REsiduals``."""
 
-    result = ws.newey("y ~ x1 + x2", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1 + x2", frame, lag=1, time=frame["t"])
 
     values = np.asarray(result.predict(kind=kind), dtype=float)
 
@@ -348,7 +348,7 @@ def test_index_is_a_synonym_for_xb(frame) -> None:
     Refusing ``index`` would reject something Stata accepts.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     np.testing.assert_allclose(
         np.asarray(result.predict(kind="index"), dtype=float),
@@ -364,7 +364,7 @@ def test_regress_influence_diagnostics_are_refused(frame, kind) -> None:
     ``vce(ols)``.  ``newey`` is a HAC estimator, so ``newey_p`` never lists them.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     with pytest.raises(ValueError, match="newey_p"):
         result.predict(kind=kind)
@@ -373,7 +373,7 @@ def test_regress_influence_diagnostics_are_refused(frame, kind) -> None:
 def test_fitted_is_not_offered(frame) -> None:
     """``newey_p.ado:20`` lists ``XB`` but not ``fitted``."""
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     with pytest.raises(ValueError, match="newey_p"):
         result.predict(kind="fitted")
@@ -384,7 +384,7 @@ def test_estat_durbinalt_refuses(frame) -> None:
     """``newey_estat.ado:14-16`` runs the Durbin alternative test and demands
     ``force``; it is not implemented for newey results."""
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     with pytest.raises(NotImplementedError, match="durbinalt"):
         result.estat("durbinalt")
@@ -397,7 +397,7 @@ def test_estat_ic_refuses_because_newey_has_no_loglikelihood(frame) -> None:
     outcome: ``estat ic`` is defined as ``-2*e(ll) + 2*e(df)``.
     """
 
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     assert "ll" not in result.e
     with pytest.raises(ValueError, match="log-likelihood"):
@@ -408,7 +408,7 @@ def test_estat_ic_refuses_because_newey_has_no_loglikelihood(frame) -> None:
 def test_the_table_reports_the_maximum_lag(frame) -> None:
     """``newey.ado:250``: "Maximum lag = <lag>" occupies the F line's left column."""
 
-    text = str(ws.newey("y ~ x1", frame, lag=2, time=frame["t"]))
+    text = str(ws.newey_west("y ~ x1", frame, lag=2, time=frame["t"]))
 
     assert "Maximum lag = 2" in text
 
@@ -421,7 +421,7 @@ def test_the_table_omits_regress_goodness_of_fit(frame) -> None:
     ``R-squared: .`` / ``Adj R-squared: .`` -- rows Stata never shows for newey.
     """
 
-    text = str(ws.newey("y ~ x1", frame, lag=1, time=frame["t"]))
+    text = str(ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"]))
 
     assert "R-squared" not in text
     assert "Adj R-squared" not in text
@@ -429,7 +429,7 @@ def test_the_table_omits_regress_goodness_of_fit(frame) -> None:
 
 
 def test_the_table_shows_the_f_test(frame) -> None:
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
     text = str(result)
 
     assert "Prob > F" in text
@@ -441,8 +441,8 @@ def test_the_table_shows_the_f_test(frame) -> None:
 
 
 def test_str_renders_a_table_while_repr_stays_short(frame) -> None:
-    result = ws.newey("y ~ x1", frame, lag=1, time=frame["t"])
+    result = ws.newey_west("y ~ x1", frame, lag=1, time=frame["t"])
 
     assert "Number of obs" in str(result)
-    assert "NeweyWestResult" in repr(result)
+    assert "NeweyWestResults" in repr(result)
     assert "\n" not in repr(result)

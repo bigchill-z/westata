@@ -36,9 +36,9 @@ with Stata() as st:
         kw = dict(kw)
         cap = st.estimate(cmd)
         res = (
-            ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(**kw)
+            ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(**kw)
             if wt is None
-            else ws.OLS.from_formula(
+            else ws.Regress.from_formula(
                 "mpg ~ weight + foreign", auto, weights=auto["w"], weight_type=wt
             ).fit(**kw)
         )

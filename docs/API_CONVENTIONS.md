@@ -15,11 +15,11 @@
 
 | 症状 | 实测证据 |
 |---|---|
-| 同一动作两种写法，一种静默接受错误类型 | `ws.OLS("price ~ weight", df)` 抛 `ValueError: could not convert string to float`；`ws.FEOLS("price ~ weight", df)` **接受**并返回一个 `FEOLS` 模型对象（`__init__` 把 `formula` 当第一个参数），两者的第一个位置参数含义不同，见 §2.2 |
-| 第 1 个位置参数不是 `cov_type`，`fit("HC1")` 被当成布尔值吃掉 | `PanelOLS.fit("HC1")` 返回 `cov_type='nonrobust'`，标准误与非稳健完全相同（`panel.py:535`） |
+| 同一动作两种写法，一种静默接受错误类型 | `ws.Regress("price ~ weight", df)` 抛 `ValueError: could not convert string to float`；`ws.RegressHighDimFixedEffects("price ~ weight", df)` **接受**并返回一个 `RegressHighDimFixedEffects` 模型对象（`__init__` 把 `formula` 当第一个参数），两者的第一个位置参数含义不同，见 §2.2 |
+| 第 1 个位置参数不是 `cov_type`，`fit("HC1")` 被当成布尔值吃掉 | `PanelRegressFE.fit("HC1")` 返回 `cov_type='nonrobust'`，标准误与非稳健完全相同（`panel.py:535`） |
 | 默认值各写各的 | `fit(maxiter=)` 出现 6 种取值（100/200/500/1000/2000/缺省），`fit(tol=)` 13 处显式 `1e-10`，51 处无此参数 |
-| 参数能收下但永远不生效 | `XtUnitroot.fit(zzz=[1,2,3])` 正常返回 `PanelUnitRootResult`（`panel_iv.py:2241`）；`im_pesaran_shin(level=...)` 收下后从不使用 |
-| 同名参数两种单位 | `level=0.95`（`margins`/`nlcom`/`lincom_as_stata`）与 `level=95.0`（`estat_esize`/`estat_weakrobust`）并存 |
+| 参数能收下但永远不生效 | `PanelUnitroot.fit(zzz=[1,2,3])` 正常返回 `PanelUnitRootResult`（`panel_iv.py:2241`）；`im_pesaran_shin(level=...)` 收下后从不使用 |
+| 同名参数两种单位 | `level=0.95`（`margins`/`nlcom`/`lincom_as_stata`）与 `level=95.0`（`estat_effect_size`/`estat_weak_instrument_robust`）并存 |
 | 同一 DataFrame 参数三种叫法 | `data`（50 个 `from_formula`）、`frame`（`prais`/`synth2`/`im_pesaran_shin`/`levin_lin_chu`）、`table`（`to_latex`/`to_markdown`） |
 | 子包导出名在顶层不存在 | `from westata.results import *` 直接 `AttributeError: render_estimates_table`（`results/__init__.py:14-15`） |
 | 结果对象能力不齐 | 18 个 `*Result` 没有 `to_dict()`/`to_frame()`，却 18 个都有 `summary()` |
@@ -56,11 +56,11 @@
 
 命名优先级：**Stata 命令名/选项名 → 该命令的统计术语 → 通用英文词**。
 
-- 命令函数用 Stata 拼写的 snake_case：`estat_vce`、`estat_firststage`、
+- 命令函数用 Stata 拼写的 snake_case：`estat_vce`、`estat_first_stage`、
   `hausman`、`lincom`、`margins`、`predict`。已达标，保持。
 - 选项名同形：`corc`、`sigmamore`、`sigmaless`、`forcenonrobust`、
   `nomiss0`、`atmeans`、`nolog`。这是**唯一**允许保留 Stata 否定式的地方（见 R3.1）。
-- 例外：`estat_esize`/`estat_weakrobust` 这类既有函数名保持不动（改名收益低于成本），
+- 例外：`estat_effect_size`/`estat_weak_instrument_robust` 这类既有函数名保持不动（改名收益低于成本），
   但其**参数**必须符合本规范。
 
 ### R1.3 一个概念只有一个名字
@@ -81,7 +81,7 @@
 
 发现现有实现在语义上错了（不只是命名不好看），按 §7 记录并修正，不允许
 「为了兼容就这样」。反向亦同：**不允许为了让校验器通过而改语义**。
-例：`XtUnitroot.fit(**kwargs)` 应改为拒收未知参数并抛 `TypeError`，
+例：`PanelUnitroot.fit(**kwargs)` 应改为拒收未知参数并抛 `TypeError`，
 而不是把 `**_ignored` 改名成 `**kwargs` 继续忽略。
 
 ---
@@ -115,13 +115,13 @@ def fit(self, cov_type=None, cov_kwds=None, ssc=None, level=None, *, ...):
 
 ```python
 # 现状（panel.py:535）
-PanelOLS.fit(self, entity_effects=True, time_effects=False, cov_type=None, ...)
+PanelRegressFE.fit(self, entity_effects=True, time_effects=False, cov_type=None, ...)
 m.fit("HC1")   # 返回 cov_type='nonrobust'，与 m.fit() 完全一致
 ```
 
 `"HC1"` 被当成真值赋给 `entity_effects`，`cov_type` 得到 `None`；调用成功、
-数字错误。`RandomEffects`/`RandomEffectsMLE`/`BetweenOLS`/`FirstDifferenceOLS`
-同病，`Heckman`/`Etregress` 的第一个位置参数是 `method`，同类风险。
+数字错误。`PanelRegressRE`/`PanelRegressMLE`/`PanelRegressBE`/`PanelRegressFD`
+同病，`Heckman`/`EndogenousTreatmentRegress` 的第一个位置参数是 `method`，同类风险。
 
 **规则**：`fit()` 的位置参数只能是 `cov_type`、`cov_kwds`、`ssc`、`level`；
 其余一律 keyword-only。这样 `.fit("HC1")`、`.fit(None, {...})` 在 65 个类上同义。
@@ -134,37 +134,37 @@ m.fit("HC1")   # 返回 cov_type='nonrobust'，与 m.fit() 完全一致
 | `fit()` | `cov_type`, `cov_kwds`, `ssc`, `level`, `maxiter`, `tol`, `strict`, `reps`, `seed`, `start_params`, `intpoints`, `ml`, `iterate` | 只改变「怎么估/怎么报」，模型不变 |
 
 **为什么这条重要**：`Tobit.from_formula(..., lower=0).fit()` 是对的，
-`Tobit(...).fit(lower=0)` 不存在——用户必须能猜到。现状里 `Heckman`/`Etregress`
-的 `method` 在 `fit()`，而 `XtLogit`/`XtIvreg`/`XtGls`/`XtUnitroot` 的 `method`
+`Tobit(...).fit(lower=0)` 不存在——用户必须能猜到。现状里 `Heckman`/`EndogenousTreatmentRegress`
+的 `method` 在 `fit()`，而 `PanelLogit`/`PanelIVRegress`/`PanelGls`/`PanelUnitroot` 的 `method`
 在 `from_formula()`，同一概念两个位置（详见 §7 的 R2.2 条目）。
 
 **更严重的一处：两个类对「第一个位置参数」的含义根本不同。**
 
 ```python
-ws.OLS("price ~ weight", df)    # ValueError: could not convert string to float
-ws.FEOLS("price ~ weight", df)  # 接受，返回 FEOLS 模型对象
+ws.Regress("price ~ weight", df)    # ValueError: could not convert string to float
+ws.RegressHighDimFixedEffects("price ~ weight", df)  # 接受，返回 RegressHighDimFixedEffects 模型对象
 ```
 
-`OLS.__init__(endog, exog, ...)` 走矩阵接口，`FEOLS.__init__(formula, data, ...)`
+`Regress.__init__(endog, exog, ...)` 走矩阵接口，`RegressHighDimFixedEffects.__init__(formula, data, ...)`
 走 formula 接口。同样写成 `Model("公式", df)`，一个报错一个静默构造，
-而且 `FEOLS` 这条路径并未写进任何文档。规范：**`__init__` 恒为矩阵接口**，
+而且 `RegressHighDimFixedEffects` 这条路径并未写进任何文档。规范：**`__init__` 恒为矩阵接口**，
 formula 接口只有 `from_formula` 一条路（§2.1）。
 
 实测 65 个可估类的 `__init__` 首个位置参数，**7 个是 formula 式**
-（`Areg`、`BetweenOLS`、`FEOLS`、`FirstDifferenceOLS`、`PanelOLS`、
-`RandomEffects`、`RandomEffectsMLE`，全部来自 `panel.py`/`hdfe.py`），
-55 个是矩阵式，另 3 个既不是（`Intreg(lower, upper)`、`Permute(*args)`、
-`XtTobit(*args)`——后两个本身就是签名缺陷）。这不是小瑕疵：`PanelOLS.from_formula(...)` 与
-`PanelOLS("公式", df)` 两条路并存，而前者走 `build_design`（含因子变量展开、
+（`Areg`、`PanelRegressBE`、`RegressHighDimFixedEffects`、`PanelRegressFD`、`PanelRegressFE`、
+`PanelRegressRE`、`PanelRegressMLE`，全部来自 `panel.py`/`hdfe.py`），
+55 个是矩阵式，另 3 个既不是（`IntervalRegress(lower, upper)`、`Permute(*args)`、
+`PanelTobit(*args)`——后两个本身就是签名缺陷）。这不是小瑕疵：`PanelRegressFE.from_formula(...)` 与
+`PanelRegressFE("公式", df)` 两条路并存，而前者走 `build_design`（含因子变量展开、
 `subset`、权重切片），后者未必走同一条路径——同一模型两条构造路径，
 一旦发散就是「同一个类算出两个数」。
 
 另一处顺序矛盾在 survey 族：
 
 ```python
-SvyMean.__init__(self, variables, frame, design, ...)      # variables 在前
-SvyRegress.__init__(self, frame, formula, design, ...)     # frame 在前
-SvyRegress.from_frame(frame, formula, design)              # frame 在前
+SurveyMean.__init__(self, variables, frame, design, ...)      # variables 在前
+SurveyRegress.__init__(self, frame, formula, design, ...)     # frame 在前
+SurveyRegress.from_frame(frame, formula, design)              # frame 在前
 ```
 
 `from_frame` 的 `(frame, formula)` 与 R3.2 要求的 `(formula, data)` 顺序相反。
@@ -173,7 +173,7 @@ SvyRegress.from_frame(frame, formula, design)              # frame 在前
 **再拟合同一模型换稳健方差**必须是纯 `fit()` 操作：
 
 ```python
-model = ws.OLS.from_formula("y ~ x1 + x2", data)
+model = ws.Regress.from_formula("y ~ x1 + x2", data)
 robust = model.fit(cov_type="HC1")
 clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 ```
@@ -182,19 +182,19 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 
 | 现状 | 计数 |
 |---|---|
-| `data` | 50（全部 `from_formula`）+ `newey`/`varsoc`/`estat_summarize` |
+| `data` | 50（全部 `from_formula`）+ `newey_west`/`var_select_order`/`estat_summarize` |
 | `frame` | `prais`、`synth2`、`im_pesaran_shin`、`levin_lin_chu` |
 | `table` | `to_latex`、`to_markdown` |
 
 `table` 是正当例外（它收的是表格**结果**不是数据源）。`frame` 一律改为 `data`。
-`formula` 恒为第一个位置参数（`Sureg` 用 `equations`，见 R3.2）。
+`formula` 恒为第一个位置参数（`SeeminglyUnrelatedRegress` 用 `equations`，见 R3.2）。
 
 ### R2.4 数组与变量名分离
 
 矩阵接口 `__init__(endog, exog, ...)` 只收 `np.ndarray`；列名走 `param_names`。
 混收是 bug 温床：`Heckman.__init__` 同时收 `outcome_names`、`selection_names`、
-`selected`、`model_data`，而 `XtIvreg.__init__` 收 `exog_names`/`endog_names`/
-`instrument_names`/`codes`/`sizes`，`panel_dynamic.XtAbond` 又默认
+`selected`、`model_data`，而 `PanelIVRegress.__init__` 收 `exog_names`/`endog_names`/
+`instrument_names`/`codes`/`sizes`，`panel_dynamic.PanelAbond` 又默认
 `param_names=("L1.y",)`、`exog_names=("x1",)`——默认值里写着某个具体数据集
 的列名，换数据必错。矩阵接口的默认参数不允许出现具体变量名。
 
@@ -213,7 +213,7 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
    `TypeError`，实测 `from_formula(bogus=1)` → `TypeError: unexpected keyword
    argument(s): bogus`）。
 2. 有 `**kwargs` 且**从不提及** → **不合规**。实测三例：
-   `VECM.fit(bogus=1)`、`XtUnitroot.fit(zzz=[1,2,3])`、`MultinomialLogit.fit(bogus=1)`
+   `VECM.fit(bogus=1)`、`PanelUnitroot.fit(zzz=[1,2,3])`、`MultinomialLogit.fit(bogus=1)`
    全部正常返回。用户写错选项名会得到「成功但没生效」的结果，这是最难排查的一类。
 3. **禁止**「先收下、需要时再说」的占位签名。
 
@@ -239,7 +239,7 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 | `nomiss0` | `estat bgodfrey, nomiss0` | `bgodfrey.py:36,195,207` 引用 ado 行为 | **保留** |
 | `nosort` | `estat vif, nosort` | `vif.py:264-266`「Stata's `, nosort`」 | **保留** |
 | `noheader` | `estat summarize, noheader` | `summarize.py:305` 引 `sthlp:93` | **保留** |
-| `noconstant` | `newey ..., noconstant` / `xtunitroot ..., noconstant` | `newey.py:10` 逐字引用 syntax 行 | **保留** |
+| `noconstant` | `newey_west ..., noconstant` / `xtunitroot ..., noconstant` | `newey_west.py:10` 逐字引用 syntax 行 | **保留** |
 | `nowald` | `contrast ..., nowald` | `contrast.py:436` | **保留** |
 | `noabsorb` | `areg` 无此选项；本包自定义（`noabsorbtest` 语义） | `hdfe.py:954` 注释「Stata: `noabsorbtest`」 | 名不符实，改名 |
 | `nonrtolerance` | `synth` 内部收敛参数，非选项名 | `synth.py` | 改名 |
@@ -247,8 +247,8 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 | `noweights` | `estat summarize, noweights` | `summarize.py` | **保留** |
 | `normalise_counts` | 非 Stata 选项，拼写问题 | `tebalance.py:207` | 改美式 `normalize_*` |
 
-**真正的缺陷只有一处**：`dfgls` 的 `trend` 与 `notrend` 两个参数控制同一状态
-（`dfgls(series, *, trend=True, notrend=False)`，`notrend=True` 会覆盖 `trend`）。
+**真正的缺陷只有一处**：`df_gls` 的 `trend` 与 `notrend` 两个参数控制同一状态
+（`df_gls(series, *, trend=True, notrend=False)`，`notrend=True` 会覆盖 `trend`）。
 两个开关表达一个状态，`notrend=False` 是「看起来有意义实则无效」的调用。
 `notrend` 已删除，`trend=False` 是唯一写法（保留弃用别名一个版本）。
 
@@ -262,14 +262,14 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
 
 | 类别 | Stata 资产 | 本包形态 | 例 |
 |---|---|---|---|
-| 估计命令 | `e(b)`/`e(V)` | 类 + `from_formula(...).fit()` | `OLS`、`PanelOLS`、`newey`→`Newey` |
-| 检验命令 | 只有 `r()` 统计量 | 函数（直接返回结果） | `dfuller`、`kpss`、`vecrank`、`estat_*` |
+| 估计命令 | `e(b)`/`e(V)` | 类 + `from_formula(...).fit()` | `Regress`、`PanelRegressFE`、`newey_west`→`Newey` |
+| 检验命令 | 只有 `r()` 统计量 | 函数（直接返回结果） | `dfuller`、`kpss`、`vec_rank`、`estat_*` |
 
 理由：`fit()` 的语义是"跑出 `params`/`bse`"，检验命令没有这两样，硬造一个
-`fit()` 只是空壳（R1.5）。相反，`newey`/`prais` 在 Stata 里是**估计**命令
-（`newey y x, lag(1)` 输出系数表），却是全包 19 个估计命令里仅有的两个"只能当
-函数调"的——同一件事在别处是 `ws.OLS.from_formula(...).fit()`，在这里是
-`ws.newey(...)`，构造步骤有无不一。
+`fit()` 只是空壳（R1.5）。相反，`newey_west`/`prais` 在 Stata 里是**估计**命令
+（`newey_west y x, lag(1)` 输出系数表），却是全包 19 个估计命令里仅有的两个"只能当
+函数调"的——同一件事在别处是 `ws.Regress.from_formula(...).fit()`，在这里是
+`ws.newey_west(...)`，构造步骤有无不一。
 
 **规则**：
 
@@ -279,20 +279,20 @@ clustered = model.fit(cov_type="cluster", cov_kwds={"groups": data["firm"]})
    因为已有调用大量按位置传参；此时**必须**提供 `from_formula` 作为标准顺序入口，
    并在类 docstring 里写明两者相反。
 
-**已验证的例外**：`newey` 与 `prais` 的 `fit()` **不接受 `cov_type`**——Stata 的这两个
+**已验证的例外**：`newey_west` 与 `prais` 的 `fit()` **不接受 `cov_type`**——Stata 的这两个
 命令没有 `vce()` 选项，方差就是估计量本身，加一个 `cov_type` 参数等于承诺一个
 不存在的选择。
 
-**已全部完成**（2026-11-14）：`synth`、`synth2`、`rcm`、`rdrobust`、
-`teffects_ra`、`teffects_psmatch`、`teffects_nnmatch` 都补上了 `from_variables`
+**已全部完成**（2026-11-14）：`synth`、`synth2`、`rcm`、`rd_robust`、
+`treatment_effects_ra`、`treatment_effects_psmatch`、`treatment_effects_nnmatch` 都补上了 `from_variables`
 类形式，待办表已清空。
 
 **这两类命令用的是不同的构造入口，这一点必须分清**：
 
 | 命令形态 | 构造入口 | 例 |
 |---|---|---|
-| Stata 用公式 | `from_formula(formula, data, *, ...)` | `OLS`、`newey`、`prais` |
-| Stata 用变量列表 | `from_variables(outcome, ..., data, *, ...)` | `synth`、`rdrobust`、`teffects ra` |
+| Stata 用公式 | `from_formula(formula, data, *, ...)` | `Regress`、`newey_west`、`prais` |
+| Stata 用变量列表 | `from_variables(outcome, ..., data, *, ...)` | `synth`、`rd_robust`、`teffects ra` |
 
 `teffects ra (y x) (treat)` 是变量列表，写成 `from_formula` 就是 R3.2 要消除的
 "名字骗人"。
@@ -307,21 +307,21 @@ Stata 的 `e()`/`r()` 语义，那无法从代码推导，只能在 `TEST_COMMAN
 ### R3.2 `from_formula` 的前两个位置参数固定
 
 `(formula, data)`，此外无第三个位置参数。多方程用 `(equations, data)`
-（`Sureg`，允许）；非 formula 型命令（DiD、teffects 族）不得叫 `from_formula`：
+（`SeeminglyUnrelatedRegress`，允许）；非 formula 型命令（DiD、teffects 族）不得叫 `from_formula`：
 
 ```python
 # 现状：名字骗人
-ws.Didregress.from_formula(outcome, treatment, data, group=..., time=...)
+ws.DIDRegress.from_formula(outcome, treatment, data, group=..., time=...)
 ws.RegressionAdjustment.from_formula(outcome, treatment, data, covariates=...)
 ```
 
 改为 `from_variables(outcome, treatment, data, *, ...)`，并保留 `from_formula`
 作弃用别名一个版本。校验器只对「叫 `from_formula` 却首参不是 formula」报错。
 
-survey 族的 `from_frame` 同样受此约束：`SvyRegress.from_frame(frame, formula,
+survey 族的 `from_frame` 同样受此约束：`SurveyRegress.from_frame(frame, formula,
 design)`（`survey.py:1060`）把 `frame` 放在 `formula` 前面，与 `from_formula`
-相反。改为 `from_frame(formula, data, design)`；`SvyMean`/`SvyTotal`/
-`SvyProportion` 的 `from_frame(variables, frame, design)` 首参不是公式，
+相反。改为 `from_frame(formula, data, design)`；`SurveyMean`/`SurveyTotal`/
+`SurveyProportion` 的 `from_frame(variables, frame, design)` 首参不是公式，
 按同一原则改名为 `from_variables(variables, data, design)`。
 
 ### R3.3 `level` 是分数，不是百分数；`alpha` 只用于 statsmodels 兼容层
@@ -331,10 +331,10 @@ design)`（`survey.py:1060`）把 `frame` 放在 `formula` 前面，与 `from_fo
 | `level` | **分数**，`0 < level < 1`，默认 `0.95` | 全部 |
 | `alpha` | 分数，显著性水平 | 仅 `conf_int(alpha=)`（statsmodels 形状） |
 
-现状两处违反：`estat_esize(level=95.0)`（`esize.py:134`，且 `EffectSizeResult`
+现状两处违反：`estat_effect_size(level=95.0)`（`esize.py:134`，且 `EffectSizeResult`
 自存 `level=95.0` 后在 `esize.py:72` 用 `(100 - level)/2` 反算）、
-`estat_weakrobust(level=95.0)`（`weakrobust.py:235`）。
-一旦有人对 `estat_esize` 传 `0.95`，`(100-0.95)/2 = 49.5%`，静默给出错区间。
+`estat_weak_instrument_robust(level=95.0)`（`weakrobust.py:235`）。
+一旦有人对 `estat_effect_size` 传 `0.95`，`(100-0.95)/2 = 49.5%`，静默给出错区间。
 
 `im_pesaran_shin(level=0.05)`（`xtunitroot_ips.py:180`）是第三种语义：
 它收 `level` 但函数体**从未引用**，是死参数（实测 `level` 改动不改变任何输出）。
@@ -345,8 +345,8 @@ design)`（`survey.py:1060`）把 `frame` 放在 `formula` 前面，与 `from_fo
 `subset` 收布尔 Series / 布尔数组，语义 = 先在**整帧**上过滤再建设计矩阵，
 与 `df.loc[subset]` 等价。已由 `test_subset_is_uniform.py` 固定住 41 个
 `from_formula`。缺口：14 个 DataFrame 型公共函数没有 `subset`
-（`synth`、`synth2`、`prais`、`newey`、`summarize`、`estat_summarize`、
-`im_pesaran_shin`、`levin_lin_chu`、`varsoc`、`vecrank`…）。补齐前，
+（`synth`、`synth2`、`prais`、`newey_west`、`summarize`、`estat_summarize`、
+`im_pesaran_shin`、`levin_lin_chu`、`var_select_order`、`vec_rank`…）。补齐前，
 文档必须点明哪些命令没有 `subset`。
 
 ### R3.5 `weights` + `weight_type` 两参数成对出现，`weight_type` 必填
@@ -363,7 +363,7 @@ weight_type="fweight"` 的另一套拼法（`discrete.py:507`）——同一件�
 
 词表唯一来源 `vce.dispatch.SUPPORTED_COV_TYPES`：
 `("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster", "HAC")`，
-外加别名（大写、`newey`…）。各估计族**只允许在其上收窄，不允许另立词表**。
+外加别名（大写、`newey_west`…）。各估计族**只允许在其上收窄，不允许另立词表**。
 
 现状：`did.py:134`、`hdfe.py:84`、`discrete.py:95`、`panel.py` 各自维护一份词表，
 `dispatch.py:52` 又有一份 `_normalize_cov_type`，四份实现，彼此不一致
@@ -382,7 +382,7 @@ weight_type="fweight"` 的另一套拼法（`discrete.py:507`）——同一件�
 
 Stata 用户在 `regress`、`ivregress`、`logit`、`xtreg`、`reghdfe` 上写的都是
 **同一个词** `vce(robust)`。Stata 在内部解析成哪一套，是 Stata 的事，用户不需要
-知道。westata 目前把这份内部知识泄漏给了用户：`FEOLS` 拒绝 `robust` 并要求写
+知道。westata 目前把这份内部知识泄漏给了用户：`RegressHighDimFixedEffects` 拒绝 `robust` 并要求写
 `HC1`，`IV2SLS` 的 `robust` 又悄悄等于 `HC0`。**这是 westata 独有的负担，不是
 Stata 的语义。**
 
@@ -412,12 +412,12 @@ Stata 的语义。**
 
 | 族 | 现状 | Stata 实际 | 修法 |
 |---|---|---|---|
-| `FEOLS` / `Areg` | 抛错并提示"改用 HC1" | `reghdfe, robust` **就是** HC1 | `_COV_ALIASES` 加 `"ROBUST": "HC1"`，删掉 `_UNSUPPORTED_COV_TYPES["ROBUST"]` 那条 |
-| `RobustRegression` | 静默吞掉 | `rreg` 无 `vce()` | 明确拒绝，且提示"rreg 不支持 vce()"，不要静默 |
+| `RegressHighDimFixedEffects` / `Areg` | 抛错并提示"改用 HC1" | `reghdfe, robust` **就是** HC1 | `_COV_ALIASES` 加 `"ROBUST": "HC1"`，删掉 `_UNSUPPORTED_COV_TYPES["ROBUST"]` 那条 |
+| `RobustRegress` | 静默吞掉 | `rreg` 无 `vce()` | 明确拒绝，且提示"rreg 不支持 vce()"，不要静默 |
 
-`FEOLS` 这一条尤其没有道理：`_UNSUPPORTED_COV_TYPES["ROBUST"]` 的文案自己写着
+`RegressHighDimFixedEffects` 这一条尤其没有道理：`_UNSUPPORTED_COV_TYPES["ROBUST"]` 的文案自己写着
 "use cov_type='HC1' (Stata's vce(robust) default)"——**它承认两者是同一个东西，
-却拒绝那个正确写法、要求用户写内部名字**。实测 `FEOLS(cov_type="HC1").cov_type`
+却拒绝那个正确写法、要求用户写内部名字**。实测 `RegressHighDimFixedEffects(cov_type="HC1").cov_type`
 返回 `'HC1'`，与 Stata 的 `robust` 数值相同，说明实现早就有了，缺的只是一个键。
 
 **真缺失——Stata 有 `vce(robust)`，westata 没实现：**
@@ -426,8 +426,8 @@ Stata 的语义。**
 |---|---|---|
 | `Tobit` | `only cov_type='nonrobust' is implemented` | Stata `tobit, vce(robust)` 存在 |
 | `Heckman` | `only cov_type='nonrobust' is implemented` | Stata `heckman, vce(robust)` 存在 |
-| `XtIvreg` | `cov_type='robust' is not implemented ... Stata offers vce(robust)` | 报错自己承认 Stata 有 |
-| `XtGls` | 同上 | 同上 |
+| `PanelIVRegress` | `cov_type='robust' is not implemented ... Stata offers vce(robust)` | 报错自己承认 Stata 有 |
+| `PanelGls` | 同上 | 同上 |
 
 这四类**不能靠改别名解决**，需要实现 ML/cluster 三明治。在实现之前，
 报错信息必须**明确说"该命令尚未实现 robust，不是不支持"**，并给出可用的替代，
@@ -435,25 +435,25 @@ Stata 的语义。**
 
 #### R3.7.6 同一输入必须在所有族回显**同一个规范拼写**
 
-规范值是共享词汇（R3.6），因此 `result.cov_type` 在 `OLS` 与 `Logit` 上必须是同一个
+规范值是共享词汇（R3.6），因此 `result.cov_type` 在 `Regress` 与 `Logit` 上必须是同一个
 字符串。实测违反过一处：`discrete.py` 的标签映射表用大写键 `"HC1"`，而上游
 `_canonical_cov` 返回的已经是小写 `"hc1"`，查表落空后直接把小写值透传——
 
 ```python
-ws.OLS(..., cov_type="HC1").fit().cov_type     # 'HC1'
+ws.Regress(..., cov_type="HC1").fit().cov_type     # 'HC1'
 ws.Logit(..., cov_type="HC1").fit().cov_type   # 'hc1'   <- 修复前
 ```
 
 **这个缺陷只有跨族对比才看得见**：单独看 `Logit` 的输出，`'hc1'` 并不刺眼。
 校验器 `check_r3_cov_echo_case` 因此把 `HC1` 在 5 个族里逐一比对
-（`PanelOLS` 例外，它按 R3.7.3 必须回显 `cluster`）。
+（`PanelRegressFE` 例外，它按 R3.7.3 必须回显 `cluster`）。
 
 #### 实施顺序（回答"以后只用 robust"）
 
-1. **立刻（纯别名，零风险）**：`FEOLS`/`Areg` 接受 `robust`→`HC1`；
-   修 `Areg` 报错文案写成 `FEOLS` 的 bug（R3.7.4）。
+1. **立刻（纯别名，零风险）**：`RegressHighDimFixedEffects`/`Areg` 接受 `robust`→`HC1`；
+   修 `Areg` 报错文案写成 `RegressHighDimFixedEffects` 的 bug（R3.7.4）。
 2. **立刻（标签，零风险）**：R3.7.2 的 9 处回显规范化。
-3. **中期（补实现）**：`Tobit`/`Heckman`/`XtIvreg`/`XtGls` 的 `robust`。
+3. **中期（补实现）**：`Tobit`/`Heckman`/`PanelIVRegress`/`PanelGls` 的 `robust`。
    这四个族需要真正实现三明治，属于功能开发，不是重构。
 4. **文档**：README/GUIDE 的主路径改成只写 `cov_type="robust"`，
    `HC1`/`HC0` 移到"高级用法"一节并注明"一般用不到"。
@@ -469,36 +469,36 @@ Stata 的 `vce(robust)` 在数学上确实不是同一个估计量，因此"逐�
 
 | 估计族 | 代表类 | `"robust"` 解析为 | 与 HC 的关系 | 证据 |
 |---|---|---|---|---|
-| OLS/线性 | `OLS`、`newey` | `HC1` | = HC1，≠ HC0 | 实测 `robust==HC1` 为 True |
+| Regress/线性 | `Regress`、`newey_west` | `HC1` | = HC1，≠ HC0 | 实测 `robust==HC1` 为 True |
 | IV | `IV2SLS`/`IVLIML`/`IVGMM` | `HC0` | = HC0，≠ HC1 | `iv.py:266-267`；实测 |
 | 离散/计数（ML） | `Logit`/`Poisson`/`ologit` | **`robust`（自成一类）** | ≠ HC0 **且** ≠ HC1 | `discrete.py:154-155`：`n/(n-1)`，非 `n/(n-k)` |
-| 面板 | `PanelOLS`/`RandomEffects`… | **`cluster(panelvar)`** | 无 HC 对应 | `panel.py:203,220`；实测 `robust==cluster(firm)` 为 True |
-| HDFE | `FEOLS`、`Areg` | **拒绝（假拒绝，应接受→HC1）** | 要求写 `HC1` | `hdfe.py:114` |
-| 系统 | `Sureg`/`Mvreg` | `robust`（`sureg` 专属三明治） | 无 HC 对应 | `systems.py:321-324` |
-| 分位数 | `QuantileRegression` | `robust`（`qreg` 专属） | 无 HC 对应 | `quantile.py:483-484` |
-| 分位数·自助 | `Sqreg`/`Bsqreg` | `bootstrap`（协方差来自重抽样） | 无 HC 对应 | 实测回显 `'bootstrap'` |
-| 稳健回归 | `RobustRegression` | **静默降级为默认值** | — | 实测：任何 `cov_type` 都被忽略 |
-| 面板 IV/GLS/PCSE | `XtIvreg`/`XtGls` | **拒绝（真缺失）** | — | `panel_iv.py:381-385` |
-| 面板非线性 | `XtLogit` 等 | **拒绝（真缺失）** | — | `UnsupportedError` |
-| 症状方差 | `Eivreg` | **拒绝（真缺失）** | — | 实测 `UnsupportedError` |
+| 面板 | `PanelRegressFE`/`PanelRegressRE`… | **`cluster(panelvar)`** | 无 HC 对应 | `panel.py:203,220`；实测 `robust==cluster(firm)` 为 True |
+| HDFE | `RegressHighDimFixedEffects`、`Areg` | **拒绝（假拒绝，应接受→HC1）** | 要求写 `HC1` | `hdfe.py:114` |
+| 系统 | `SeeminglyUnrelatedRegress`/`MultivariateRegress` | `robust`（`sureg` 专属三明治） | 无 HC 对应 | `systems.py:321-324` |
+| 分位数 | `QuantileRegress` | `robust`（`qreg` 专属） | 无 HC 对应 | `quantile.py:483-484` |
+| 分位数·自助 | `SimultaneousQuantileRegress`/`BootstrappedQuantileRegress` | `bootstrap`（协方差来自重抽样） | 无 HC 对应 | 实测回显 `'bootstrap'` |
+| 稳健回归 | `RobustRegress` | **静默降级为默认值** | — | 实测：任何 `cov_type` 都被忽略 |
+| 面板 IV/GLS/PCSE | `PanelIVRegress`/`PanelGls` | **拒绝（真缺失）** | — | `panel_iv.py:381-385` |
+| 面板非线性 | `PanelLogit` 等 | **拒绝（真缺失）** | — | `UnsupportedError` |
+| 症状方差 | `ErrorsInVariablesRegress` | **拒绝（真缺失）** | — | 实测 `UnsupportedError` |
 | Tobit | `Tobit` | **拒绝（真缺失）** | — | 实测 `UnsupportedError` |
 
 **这张表本身就是问题**：用户必须记住 5 种不同的 `robust` 语义，其中 3 种彼此
-数值不同；而在 `FEOLS`/`XtIvreg` 上同一个词直接报错。这不是「Stata 就是这样」——
+数值不同；而在 `RegressHighDimFixedEffects`/`PanelIVRegress` 上同一个词直接报错。这不是「Stata 就是这样」——
 Stata 里 `vce(robust)` 在每个命令上都有**唯一且已文档化**的含义，westata 只是
 把这个含义各自编码了一遍，没有一个地方能回答「`robust` 到底是什么」。
 
 更糟的两处（实测）：
 
 ```python
-# 1. RobustRegression 把 cov_type 整个吞掉，数值不变
-a = ws.RobustRegression.from_formula("y~x", df).fit()
-b = ws.RobustRegression.from_formula("y~x", df).fit(cov_type="robust")
+# 1. RobustRegress 把 cov_type 整个吞掉，数值不变
+a = ws.RobustRegress.from_formula("y~x", df).fit()
+b = ws.RobustRegress.from_formula("y~x", df).fit(cov_type="robust")
 a.cov_type, b.cov_type        # ('nonrobust', 'nonrobust')
 np.allclose(a.bse, b.bse)     # True   <-- bse 与默认逐位相同
 
-# 2. Sqreg/Bsqreg 回显 'bootstrap'，这个词不在 SUPPORTED_COV_TYPES 里
-ws.Sqreg.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'bootstrap'
+# 2. SimultaneousQuantileRegress/BootstrappedQuantileRegress 回显 'bootstrap'，这个词不在 SUPPORTED_COV_TYPES 里
+ws.SimultaneousQuantileRegress.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'bootstrap'
 ```
 
 #### 规范
@@ -509,7 +509,7 @@ ws.Sqreg.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'boots
 
 | 估计族 | `"robust"` → 规范值 | Stata 对应 | 公式 |
 |---|---|---|---|
-| 线性/OLS | `HC1` | `regress, vce(robust)` | `n/(n-k) · (X'X)⁻¹ X'ΩX (X'X)⁻¹` |
+| 线性/Regress | `HC1` | `regress, vce(robust)` | `n/(n-k) · (X'X)⁻¹ X'ΩX (X'X)⁻¹` |
 | IV | `HC0` | `ivregress, vce(robust)` | 无 `n/(n-k)`；`small` 才加 |
 | 离散/计数 ML | `ML_ROBUST`（新名） | `logit ... , vce(robust)` | `n/(n-1) · H⁻¹ (Σ s s') H⁻¹` |
 | 面板 | `cluster`（panelvar） | `xtreg, vce(robust)` ≡ `vce(cluster panelvar)` | CR1 |
@@ -519,9 +519,9 @@ ws.Sqreg.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'boots
 | 系统/分位数 | `SYSTEMS_ROBUST` / `QREG_ROBUST` | 各有专属 ado | 见各自 docstring |
 
 **新增规范值 `ML_ROBUST`**（离散/计数的 ML 三明治）的理由：它现在是
-`cov_type="robust"` 这个**字符串**，与 OLS 的 HC1 同名不同值。用户从 `Logit`
-换到 `OLS`、把 `cov_type="robust"` 抄过去，得到的是两种完全不同的 VCE，
-而结果对象回显的都是 `"robust"`——`OLS` 那边回显 `HC1`（已规范化），
+`cov_type="robust"` 这个**字符串**，与 Regress 的 HC1 同名不同值。用户从 `Logit`
+换到 `Regress`、把 `cov_type="robust"` 抄过去，得到的是两种完全不同的 VCE，
+而结果对象回显的都是 `"robust"`——`Regress` 那边回显 `HC1`（已规范化），
 `Logit` 这边回显 `"robust"`（未规范化），两者看起来「一样」，实则不同。
 
 #### 这些 `robust` 在数学上是不是同一个估计量？
@@ -534,7 +534,7 @@ ws.Sqreg.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'boots
 
 | 族 | 因子 | 说明 |
 |---|---|---|
-| `regress`（→ HC1） | `n/(n-k)` | 标准 OLS 小样本修正 |
+| `regress`（→ HC1） | `n/(n-k)` | 标准 Regress 小样本修正 |
 | `ivregress`（→ HC0） | `1` | IV 不加修正；`small` 才加 |
 | `logit`/`probit`/`poisson`/`nbreg`（→ **`ML_ROBUST`**） | **`n/(n-1)`** | ML 只修正均值，不修正参数个数 |
 
@@ -552,8 +552,8 @@ ws.Sqreg.from_formula("y~x", df, quantiles=(0.25,0.5)).fit().cov_type   # 'boots
 **第二层——完全不同的估计量。** `xtreg, vce(robust)` **就是**
 `vce(cluster panelvar)`（`[XT] xtreg` 明文："Specifying vce(robust) is
 equivalent to specifying vce(cluster panelvar)"）。它算的是**聚类**三明治，
-与异方差稳健无关。实测 `PanelOLS(robust).bse` 与
-`PanelOLS(cluster, groups=panelvar).bse` 逐位相同。`xtreg` 因此不提供纯 HC
+与异方差稳健无关。实测 `PanelRegressFE(robust).bse` 与
+`PanelRegressFE(cluster, groups=panelvar).bse` 逐位相同。`xtreg` 因此不提供纯 HC
 选项，`HC0` 被拒绝是正确行为（`panel_iv.py` 与 `panel.py` 都如此）。
 
 **第三层——命令专属三明治。** `qreg`/`sqreg` 用 `tau(1-tau) J⁻¹(X'X)J⁻¹`，
@@ -578,12 +578,12 @@ equivalent to specifying vce(cluster panelvar)"）。它算的是**聚类**三�
 | 类 | 修复前回显 | 现在回显 | 性质 |
 |---|---|---|---|
 | `Logit` / `Probit` / `Poisson` / `OrderedLogit` | `'robust'` | **`ML_ROBUST`** | 未规范化 |
-| `PanelOLS` / `RandomEffects` | `'robust'` | **`cluster`** | 未规范化 |
-| `QuantileRegression` | `'robust'` | **`QREG_ROBUST`** | 未规范化 |
-| `Sureg` | `'robust'` | **`SYSTEMS_ROBUST`** | 未规范化 |
-| `RobustRegression` | `'nonrobust'`（吞掉） | **明确拒绝** | 静默吞掉 |
+| `PanelRegressFE` / `PanelRegressRE` | `'robust'` | **`cluster`** | 未规范化 |
+| `QuantileRegress` | `'robust'` | **`QREG_ROBUST`** | 未规范化 |
+| `SeeminglyUnrelatedRegress` | `'robust'` | **`SYSTEMS_ROBUST`** | 未规范化 |
+| `RobustRegress` | `'nonrobust'`（吞掉） | **明确拒绝** | 静默吞掉 |
 
-对比达标的：`OLS` → `'HC1'`，`IV2SLS` → `'HC0'`，`Sqreg`/`Bsqreg` → `'bootstrap'`。
+对比达标的：`Regress` → `'HC1'`，`IV2SLS` → `'HC0'`，`SimultaneousQuantileRegress`/`BootstrappedQuantileRegress` → `'bootstrap'`。
 
 **这次改动踩到一个必须记住的坑**：改标签没有改任何数值，但**五个后估计模块各自
 写了一份 `cov_type in ("hc0","hc1","robust",...)` 的字符串判断**，改标签后它们
@@ -598,7 +598,7 @@ equivalent to specifying vce(cluster panelvar)"）。它算的是**聚类**三�
 `vce(cluster panelvar)`，结果对象回显 `"robust"`：
 
 ```python
-m = ws.PanelOLS.from_formula("y ~ x", panel, entity="firm", time="year")
+m = ws.PanelRegressFE.from_formula("y ~ x", panel, entity="firm", time="year")
 m.fit(cov_type="HC1").cov_type   # 修复前 -> 'robust'；现在 -> 'cluster'
 m.fit(cov_type="HC0")            # -> UnsupportedError（正确：xtreg 没有 HC0）
 ```
@@ -606,20 +606,20 @@ m.fit(cov_type="HC0")            # -> UnsupportedError（正确：xtreg 没有 H
 已核对：`robust` 与 `HC1`、与 `cluster(groups=panelvar)` 给出逐位相同的 `bse`，
 所以三者确实是同一个估计量；问题只在**标签**。这违反 R1.5「不能将错就错」：
 用户在 `etable` 里看到 `cov_type=robust` 无法知道那是聚类协方差，会把它与
-`OLS(cov_type="robust")`（=HC1）当作可比，而 `panel.py` 自己的注释记录了
+`Regress(cov_type="robust")`（=HC1）当作可比，而 `panel.py` 自己的注释记录了
 `areg` 与 `xtreg` 在同数据上常数项 SE 相差 18.4 倍。
 
 规范：`panel` 族在 `robust`/`HC1` 下回显 `"cluster"`（并让 `cov_kwds` 的空值
 有意义：标签由 panelvar 自动填入）。`HC0` 继续拒绝，这是正确行为。
 
 **R3.7.4 报错文案必须点名调用者用的类。** `Areg(...).fit(cov_type="robust")`
-报的是 `FEOLS` 错误（`hdfe.py:114` 的文案写死）：
+报的是 `RegressHighDimFixedEffects` 错误（`hdfe.py:114` 的文案写死）：
 
 ```
-ValueError: cov_type 'robust' is not supported by FEOLS: use cov_type='HC1' ...
+ValueError: cov_type 'robust' is not supported by RegressHighDimFixedEffects: use cov_type='HC1' ...
 ```
 
-用户调用的是 `Areg`，看到的是 `FEOLS`。规则：错误信息里的类名/命令名来自
+用户调用的是 `Areg`，看到的是 `RegressHighDimFixedEffects`。规则：错误信息里的类名/命令名来自
 被调用的实例（`self._stata_command` 或 `type(self).__name__`），不能写死。
 同类问题见 R6.4。
 
@@ -650,7 +650,7 @@ ValueError: cov_type 'robust' is not supported by FEOLS: use cov_type='HC1' ...
 `conf_int`/`cov_params`/`summary`），且**未通过** `isinstance` 检查
 （实测 `isinstance(ws.prais(df, "price ~ weight"), ResultsProtocol)` → `False`）。
 `VARResults`、`VECMResults` 同样为 `False`。只有 9 个走 `StataResults` 的类
-（`OLS`/`IV2SLS`/`FEOLS`/`PanelOLS`/`Logit`/`Tobit`/`QuantileRegression`/`ARIMA`…）
+（`Regress`/`IV2SLS`/`RegressHighDimFixedEffects`/`PanelRegressFE`/`Logit`/`Tobit`/`QuantileRegress`/`ARIMA`…）
 与 `NeweyWestResult`（转发 `_results`）为 `True`。
 规范：**所有估计结果继承同一基类或显式实现 `ResultsProtocol`**，
 `isinstance(result, ResultsProtocol)` 必须为真。（`ResultsProtocol` 是
@@ -685,7 +685,7 @@ def conf_int(self, alpha: float | None = None) -> pd.DataFrame:  # index=参数�
 | `to_matrix()` | `np.ndarray` | 矩阵结果（仅 `MTestResult` 有，保留） |
 | `render()` | `str` | 屏幕文本，与 `summary()` 二选一 |
 
-禁止 `by_equation()`（`varwle.py`）这类一次性访问器替代 `to_frame()`；
+禁止 `by_equation()`（`var_wle.py`）这类一次性访问器替代 `to_frame()`；
 它可以存在，但不能**替代**。
 
 ---
@@ -732,7 +732,7 @@ def conf_int(self, alpha: float | None = None) -> pd.DataFrame:  # index=参数�
 | helper | 份数 | 位置 |
 |---|---|---|
 | `_is_constant` | **11** | `panel_iv.py` + `postestimation/{endog_regf,endog_score,endogenous,firststage,hettest,imtest,overid,ovtest,summarize,vif}.py` |
-| `_stata_number` | 4 | `first_stage_table.py`, `summary_stats.py`, `vecstable.py`, `results/summary.py` |
+| `_stata_number` | 4 | `first_stage_table.py`, `summary_stats.py`, `vec_stable.py`, `results/summary.py` |
 | `_require_iv` | 4 | `endogenous.py`, `firststage.py`, `overid.py`, `weakrobust.py` |
 | `_numerical_hessian` | 3 | `nonlinear.py`, `panel_nonlinear.py`, `tobit.py` |
 | `_ols` | 3 | `panel_iv.py`, `resample.py`, `firststage.py` |
@@ -787,8 +787,8 @@ HC1，`panel.py` 映射到聚类协方差，`hdfe.py` 转发到自己的 `_COV_A
 
 README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后的 `estat vce`；
 移植 Stata 代码的调用者会期望 `ws.estat_vce(result)`。实测有 6 个函数曾是
-**仅方法**形式（`estat_auc`/`estat_esize`/`estat_moran`/`estat_mundlak`/
-`estat_szroeter`/`estat_weakrobust`），第二种写法直接 `AttributeError`。
+**仅方法**形式（`estat_auc`/`estat_effect_size`/`estat_moran`/`estat_mundlak`/
+`estat_szroeter`/`estat_weak_instrument_robust`），第二种写法直接 `AttributeError`。
 
 现在 21 个 `estat_*` 在两侧完全对齐，校验器逐名比对。
 
@@ -824,6 +824,7 @@ README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后
 | R2.3 DataFrame 叫 `frame` | 0 | 0 | 0 | ✅ 阶段三 |
 | R2.5 非 snake_case | 14 | 14 | 0 | ✅ 阶段三（Stata 选项名与线性代数记号） |
 | R2.6 `**kwargs` 收下即丢 | 0 | 0 | 0 | ✅ 阶段一 |
+| R2.7 估计命令缺类形式 | 9 | 9 | 0 | ✅ 0.3.41 改名：重命名后的 e-class 函数仍无类形式，与改名前状态相同 |
 | R3.1 `noX` 开关 | 0 | 0 | 0 | ✅ 阶段三（Stata 选项名按 R1.2 保留） |
 | R3.2 `from_formula` 名字骗人 | 5 | 5 | 0 | ✅ 阶段三（主入口改名，4 条为弃用别名） |
 | R3.3 `level` 单位不一 | 0 | 0 | 0 | ✅ 阶段一 |
@@ -835,22 +836,22 @@ README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后
 | R5.2 子包导出未上浮 | 0 | 0 | 0 | ✅ 阶段二 |
 | R5.3 BOM | 0 | 0 | 0 | ✅ 阶段二 |
 | R6.1 helper 重复 ≥3 | **0** | 0 | 0 | ✅ 阶段四 |
-| **合计** | **29** | **29** | **0** | |
+| **合计** | **38** | **38** | **0** | |
 
 **阶段一（会算错数/静默失效）与阶段二（可用性）已完成。** 关键实测：
 
 | 规则 | 修复前 | 修复后 |
 |---|---|---|
-| R2.1 | `PanelOLS.fit("HC1")` 把字符串赋给 `entity_effects`，返回非稳健 SE `0.060844` | `0.000409`（正确生效） |
-| R2.6 | `VECM.fit(bogus=1)`、`XtUnitroot.fit(zzz=[1,2,3])` 正常返回 | 抛 `TypeError` |
-| R3.3 | `estat_esize(level=0.95)` 算 `(100-0.95)/2 = 49.5%` | 分数单位，正确 |
+| R2.1 | `PanelRegressFE.fit("HC1")` 把字符串赋给 `entity_effects`，返回非稳健 SE `0.060844` | `0.000409`（正确生效） |
+| R2.6 | `VECM.fit(bogus=1)`、`PanelUnitroot.fit(zzz=[1,2,3])` 正常返回 | 抛 `TypeError` |
+| R3.3 | `estat_effect_size(level=0.95)` 算 `(100-0.95)/2 = 49.5%` | 分数单位，正确 |
 | R4.1 | 22 个结果类无提取方法，18 个只有 `__str__` | 全部提供 `to_dict`/`to_frame` |
 | R5.1 | `from westata.results import *` 抛 `AttributeError` | 正常 |
 | R5.2 | 35 个公共名在子包可见、顶层不可见 | 顶层导出 167 → 196 |
 
 顺带修掉两个**预先存在**的缺陷：
 
-1. `estat_esize().ci_lower` 恒为 `nan`：`_noncentral_f_bounds` 在 F 较小时
+1. `estat_effect_size().ci_lower` 恒为 `nan`：`_noncentral_f_bounds` 在 F 较小时
    `lower_gap` 全定义域为正、无零点，`brentq` 失败返回 `nan`。数学上正确下界是
    0（效应量为 0），不是缺失值。
 2. `VARResults.params` 是 Stata 的**方程×变量表**（DataFrame），
@@ -861,7 +862,7 @@ README 的主路径是 `result.estat_vce()`，而 Stata 的写法是估计之后
 
 「已登记例外」= `scripts/check_api_conventions.py` 的 `ALLOWED` 表，每条例外都写明
 依据：R2.5 的 12 条（线性代数层的 `X`/`Xw`/`resid` 8 条 + statsmodels 形状的 `R` 4 条）、
-R3.2 的 1 条（多方程构造 `Sureg(equations, data)`）、
+R3.2 的 1 条（多方程构造 `SeeminglyUnrelatedRegress(equations, data)`）、
 R4.1 的 4 条与 R4.2/R4.3 的 5 条（`ContrastResults`/`VECMResults`/`VARResults`/`IrfResult` 是
 statsmodels 兼容层，`StoredResults` 是 `e()`/`r()` 标量映射）。
 例外不是豁免通道：新增例外必须在本文件对应规则下说明理由，
@@ -877,15 +878,15 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 
 `PraisResult` 自建了 `params`/`bse`/`conf_int`/`cov_params`/`summary`，看起来像
 估计结果却少了三个属性；`VARResults` 缺 8 个。用户用 `statsmodels` 习惯遍历一组
-结果对象时会在这里崩——`res.pvalues` 在 `OLS` 上有、在 `VAR` 上没有。
+结果对象时会在这里崩——`res.pvalues` 在 `Regress` 上有、在 `VAR` 上没有。
 
 除此之外，以下偏离**校验器覆盖不到**，但同样是规范违背，需人工核对：
 
 | 问题 | 证据 |
 |---|---|
 | 同一 `fit()` 默认值五花八门 | `maxiter` 6 种取值；`tol` 13 处显式 + 51 处缺省；`strict` 33 处缺省、31 处 `False`、1 处 `True`（`Nl`） |
-| 同一 `method=` 两个位置 | `Heckman`/`Etregress`/`MultinomialLogit` 在 `fit()`；`XtLogit`/`XtProbit`/`XtTobit`/`XtPoisson`/`XtNbreg`/`XtIvreg`/`XtGls`/`XtUnitroot` 在 `from_formula()` |
-| 只有 5/65 个类支持 `fit(level=)` | `OLS`/`IV2SLS`/`IVLIML`/`Areg`/`FEOLS`；其余要改置信水平只能用 `conf_int(alpha=)`，而 `fit(level=)` 与 `conf_int(alpha=)` 是同一件事的两种拼法 |
+| 同一 `method=` 两个位置 | `Heckman`/`EndogenousTreatmentRegress`/`MultinomialLogit` 在 `fit()`；`PanelLogit`/`PanelProbit`/`PanelTobit`/`PanelPoisson`/`PanelNbRegress`/`PanelIVRegress`/`PanelGls`/`PanelUnitroot` 在 `from_formula()` |
+| 只有 5/65 个类支持 `fit(level=)` | `Regress`/`IV2SLS`/`IVLIML`/`Areg`/`RegressHighDimFixedEffects`；其余要改置信水平只能用 `conf_int(alpha=)`，而 `fit(level=)` 与 `conf_int(alpha=)` 是同一件事的两种拼法 |
 | 估计结果类不带 `ResultsProtocol` | 实测 `PraisResult`/`VARResults`/`VECMResults` 三者 `isinstance(..., ResultsProtocol)` 为 `False`，其余为 `True` |
 | 版本字符串双源 | `pyproject.toml` 与 `__init__.py` 的 fallback `"0.3.1"`（实际 0.3.11） |
 
@@ -932,33 +933,33 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 
 ### 阶段一：会算错数或静默失效（R2.1 / R2.6 / R3.3 / R3.7）—— ✅ 全部完成
 
-1. ✅ `PanelOLS` / `RandomEffects` / `RandomEffectsMLE` 的 `fit()` 改为
+1. ✅ `PanelRegressFE` / `PanelRegressRE` / `PanelRegressMLE` 的 `fit()` 改为
    `(cov_type, cov_kwds, ssc, *, entity_effects, time_effects)`。
-   `BetweenOLS` / `FirstDifferenceOLS` 继承 `RandomEffects.fit`，一并生效。
+   `PanelRegressBE` / `PanelRegressFD` 继承 `PanelRegressRE.fit`，一并生效。
    这会**破坏** `fit(False)` 这类旧调用——按 §0 总原则，宁可破坏也不保留会算错数的
    签名。实测修复前后：`fit("HC1")` 由「返回非稳健 SE 0.060844」变为
    「正确返回稳健 SE 0.000409」。
-2. ✅ `Heckman` / `Etregress` 的 `fit()` 改为 `(cov_type, *, method, ...)`。
-   `method` 没有移到 `from_formula`（与 `XtLogit` 不同）：这两个类还能从裸数组
+2. ✅ `Heckman` / `EndogenousTreatmentRegress` 的 `fit()` 改为 `(cov_type, *, method, ...)`。
+   `method` 没有移到 `from_formula`（与 `PanelLogit` 不同）：这两个类还能从裸数组
    构造，没有 formula 调用可挂。关键是不再让 `fit("robust")` 被读成
    `method="robust"` 并报「method 未实现」——那会把用户指向错误的参数。
-3. ✅ `VECM.fit` / `XtUnitroot.fit` / `MultinomialLogit.fit` 去掉吞参，
+3. ✅ `VECM.fit` / `PanelUnitroot.fit` / `MultinomialLogit.fit` 去掉吞参，
    未知参数抛 `TypeError`。`MultinomialLogit` 顺带补上了 `strict`——
    其余 ML 族都有，只有它收下即丢。
-4. ✅ `estat_esize` 的 `level` 改为分数（同步修 `EffectSizeResult` 内部的
-   `(1-level)*50` 显示）；`estat_weakrobust` 的 `level` **删除**而不是改单位——
+4. ✅ `estat_effect_size` 的 `level` 改为分数（同步修 `EffectSizeResult` 内部的
+   `(1-level)*50` 显示）；`estat_weak_instrument_robust` 的 `level` **删除**而不是改单位——
    它只服务于未实现的 `ci` 选项，任何取值都被丢弃，删掉比改单位诚实。
    `im_pesaran_shin` 的死参数 `level` 已在早前删除。
    顺带修掉预先存在的 `ci_lower=nan` 缺陷（见 §7）。
 5. ✅ **`cov_type` 规范化（R3.7）**
    - ✅ **5a** `Logit`/`Probit`/`Poisson`/`OrderedLogit`/零膨胀/截断族 的 `robust`
-     回显为 `ML_ROBUST`；`QuantileRegression` → `QREG_ROBUST`；`Sureg` → `SYSTEMS_ROBUST`。
-   - ✅ **5b** `PanelOLS` 族 的 `robust`/`HC1` 回显为 `cluster`。
-   - ✅ **5b′** `FEOLS`/`Areg` **接受** `robust`（→`HC1`），删除了那条
-     "use cov_type='HC1'" 的拒绝；`Areg` 报错文案不再写死 `FEOLS`。
+     回显为 `ML_ROBUST`；`QuantileRegress` → `QREG_ROBUST`；`SeeminglyUnrelatedRegress` → `SYSTEMS_ROBUST`。
+   - ✅ **5b** `PanelRegressFE` 族 的 `robust`/`HC1` 回显为 `cluster`。
+   - ✅ **5b′** `RegressHighDimFixedEffects`/`Areg` **接受** `robust`（→`HC1`），删除了那条
+     "use cov_type='HC1'" 的拒绝；`Areg` 报错文案不再写死 `RegressHighDimFixedEffects`。
    - ✅ **5b″** `Areg(cov_type="HC2"/"HC3")` 的 `results.cov_type` 不再停留在占位值
      `HC1`（新增 `StataResults.relabel_cov_type`）。
-   - ✅ **5b‴** `RobustRegression` 不再静默吞掉 `cov_type`，改为明确拒绝并说明
+   - ✅ **5b‴** `RobustRegress` 不再静默吞掉 `cov_type`，改为明确拒绝并说明
      "rreg 没有 vce()"。
    - ✅ **5c（已按用户选择实施，2026-11-13）** 取消 `vce.dispatch` 的全局
      `"ROBUST": "HC1"`（用户明确选择 C①）。现在：
@@ -995,7 +996,7 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
    - `PraisResult`：`to_dict` 读 12 个标量属性，`to_frame` 输出系数表；
    - `NeweyWestResult`：`StataResults` 本身不提供 `to_dict`（R4.1 例外），
      所以从 statsmodels 面自建，并补上 `lag`；`nan` 的量（`llf`/`r2`）**省略键**
-     而不是输出 `NaN`，因为 Stata 的 `newey` 本来就不报这些；
+     而不是输出 `NaN`，因为 Stata 的 `newey_west` 本来就不报这些；
    - `MarginsTable`：`list` 子类，`to_dict` 返回 `list[dict]`（每行一个），
      `to_frame` 输出多行表，不把多行压成一个 dict。
 3. ✅ 35 个未上浮的公共名分类处理：
@@ -1030,8 +1031,8 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
    （校验器新增 `STATA_NEGATIVE_OPTIONS` 表并逐条注明出处）。真正需要改的只有三处：
    - `noabsorb` → `absorb_test`（名不符实：关的是**检验**不是吸收）；
    - `normalise_counts` → `normalize_counts`（英式拼写，全仓库其余为美式）；
-   - `dfgls` 删除 `notrend`（与 `trend` 控制同一状态）。
-3. ✅ 4 个类的 `from_formula` → `from_variables`（`Didregress`/`RegressionAdjustment`/
+   - `df_gls` 删除 `notrend`（与 `trend` 控制同一状态）。
+3. ✅ 4 个类的 `from_formula` → `from_variables`（`DIDRegress`/`RegressionAdjustment`/
    `IPW`/`NearestNeighbourMatching`），保留弃用别名一个版本（`retest/` 有约 180 处调用）。
 
 顺带修掉一个**真实的静默缺陷**：`im_pesaran_shin` 与 `levin_lin_chu` 都计算了
@@ -1056,13 +1057,13 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
    少了 `"1"` 这个拼写。统一到 `postestimation/names.py` 的
    `CONSTANT_SPELLINGS` 后两处都修好。
 3. ✅ 矩阵接口默认值里的具体变量名（R2.4）已清理：
-   - `XtAbond.__init__` 的 `param_names=("L1.y",)` / `exog_names=("x1",)` → `None`，
+   - `PanelAbond.__init__` 的 `param_names=("L1.y",)` / `exog_names=("x1",)` → `None`，
      改为按 `lags` 和设计宽度推导；
-   - `XtUnitroot.__init__` 的 `variable_name="y"` → `None`（直接构造时结果为 `''`
+   - `PanelUnitroot.__init__` 的 `variable_name="y"` → `None`（直接构造时结果为 `''`
      而不是错误的 `y`；`from_formula` 仍传真实变量名）。
 
    两者都是「把首次开发所用数据集的列名写进默认值」——换数据就会得到错误的参数表。
-   修 `XtAbond` 时还发现 `exog_names` 的约定是「不含常数项」（`_X_names()` 会前置
+   修 `PanelAbond` 时还发现 `exog_names` 的约定是「不含常数项」（`_X_names()` 会前置
    `"Intercept"`），自动推导必须据此生成，否则 `fit` 里的位置索引会越界。
 
 ### 阶段六：补上检查器的盲区 —— ✅ 完成
@@ -1073,8 +1074,7 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 |---|---|---|---|
 | 只遍历 `__all__` | 未导出的结果类完全不可见 | 21 个公共结果类 | R5.2 扩展 |
 | 不检查返回注解 | `from_formula` 注解指向私有基类 | 11 个估计器 | R5.6 |
-| 只检查一侧 | `estat_*` 只有方法、没有函数 | 6 个命令 | R5.7 |
-| 不检查原始字节 | 文件损坏被 `.pyc` 掩盖 | 1 次事故 | R5.5 |
+| 只检查一侧 | `estat_*` 只有方法、没有函数 | 6 个命令 | 不检查原始字节 | 文件损坏被 `.pyc` 掩盖 | 1 次事故 | R5.5 |
 
 处理结果：
 
@@ -1085,8 +1085,8 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
   Python 3.10 没有 `typing.Self`，所以用 `TypeVar(bound=...)`；
 - **6 个 `estat_*`** 补齐函数形式，现在 21 个命令的方法与函数完全对齐。
 
-另修正 R2.4 的两处硬编码默认值（`XtAbond` 的 `("L1.y",)`/`("x1",)`、
-`XtUnitroot` 的 `variable_name="y"`），它们会把首次开发所用数据集的列名
+另修正 R2.4 的两处硬编码默认值（`PanelAbond` 的 `("L1.y",)`/`("x1",)`、
+`PanelUnitroot` 的 `variable_name="y"`），它们会把首次开发所用数据集的列名
 带给任何其他数据。
 
 
@@ -1145,7 +1145,6 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 | R5.3 BOM | ✅ | 是 |
 | R5.5 原始字节可编译 | ✅ | 是 |
 | R5.6 返回注解可命名 | ✅ | 是 |
-| R5.7 `estat_*` 双向对齐 | ✅（方法集合 vs 函数集合逐名比对） | 是 |
 | R5.8 方法签名可内省 | ✅（`(**kwargs)` 且无具名参数才触发） | 是 |
 | R6.1 helper 重复 | ✅（按「函数体是否相同」区分复制 / 同名不同义 / 委托包装） | 是 |
 
@@ -1161,10 +1160,13 @@ VARResults  : 缺 conf_int, df_model, df_resid, llf, pvalues, rsquared, rsquared
 每条规则都要能在一个故意违规的合成模块上触发。
 
 「近似」的含义：校验器只能看到**声明**，看不到**行为**。因此 §7 里那些
-「实测」条目（`XtUnitroot.fit(zzz=[1,2,3])` 正常返回）都附了可直接复制的
+「实测」条目（`PanelUnitroot.fit(zzz=[1,2,3])` 正常返回）都附了可直接复制的
 调用，人工核对时按原样执行即可。
 
 ---
+
+| 只检查一侧 | `estat_*` 只有方法、没有函数 | 6 个命令 | R5.7 |
+| R5.7 `estat_*` 双向对齐 | ✅（方法集合 vs 函数集合逐名比对） | 是 |
 
 ## 10. 与既有文档的关系
 

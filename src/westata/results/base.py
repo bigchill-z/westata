@@ -71,6 +71,21 @@ def _ereturn_macro(value: object) -> str:
     return '"' + text + '"'
 
 
+#: R-N5 compat: estat_* methods renamed in 0.3.41 keep their old spelling for one release.
+#: Bound through __getattr__ so the method set itself stays clean.
+_DEPRECATED_ESTAT = {
+    "estat_ptrends": "estat_parallel_trends",
+    "estat_esize": "estat_effect_size",
+    "estat_firststage": "estat_first_stage",
+    "estat_hettest": "estat_heteroskedasticity_test",
+    "estat_imtest": "estat_information_matrix_test",
+    "estat_overid": "estat_overidentification",
+    "estat_ovtest": "estat_omitted_variables_test",
+    "estat_corrgram": "estat_correlogram",
+    "estat_weakrobust": "estat_weak_instrument_robust",
+}
+
+
 class StataResults:
     """Estimation results with a statsmodels-compatible API.
 
@@ -101,6 +116,22 @@ class StataResults:
         Optional Stata ``e()`` scalars.  They are merged over the computed
         defaults ``N``, ``df_m`` and ``df_r`` (an explicit ``e()`` value wins).
     """
+
+    def __getattr__(self, name: str) -> Any:
+        """Deprecated estat_* aliases: old method names still resolve for one release."""
+
+        new_name = _DEPRECATED_ESTAT.get(name)
+        if new_name is not None:
+            import warnings
+
+            warnings.warn(
+                f"StataResults.{name} is deprecated; use {new_name} instead. "
+                "The old name will be removed in the next release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return getattr(self, new_name)
+        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
 
     def __init__(
         self,
@@ -636,7 +667,7 @@ class StataResults:
 
         return estat_vif(self, uncentered=uncentered, nosort=nosort)
 
-    def estat_hettest(
+    def estat_heteroskedasticity_test(
         self,
         *,
         method: str = 'normal',
@@ -652,9 +683,9 @@ class StataResults:
         and after a ``noconstant`` fit.
         """
 
-        from westata.postestimation.hettest import estat_hettest
+        from westata.postestimation.hettest import estat_heteroskedasticity_test
 
-        return estat_hettest(self, method=method, variables=variables, rhs=rhs, mtest=mtest)
+        return estat_heteroskedasticity_test(self, method=method, variables=variables, rhs=rhs, mtest=mtest)
 
     def suest(
         self,
@@ -696,7 +727,7 @@ class StataResults:
 
         return estat_moran(self, errorlag, weights=weights)
 
-    def estat_esize(
+    def estat_effect_size(
         self,
         *,
         epsilon: bool = False,
@@ -709,9 +740,9 @@ class StataResults:
         is ``R^2`` and carries a noncentral-F interval.
         """
 
-        from westata.postestimation.esize import estat_esize
+        from westata.postestimation.esize import estat_effect_size
 
-        return estat_esize(self, epsilon=epsilon, omega=omega, level=level)
+        return estat_effect_size(self, epsilon=epsilon, omega=omega, level=level)
 
     def estat_szroeter(
         self,
@@ -730,12 +761,12 @@ class StataResults:
 
         return estat_szroeter(self, variables, rhs=rhs, mtest=mtest)
 
-    def estat_ovtest(self, *, rhs: bool = False) -> Any:
+    def estat_omitted_variables_test(self, *, rhs: bool = False) -> Any:
         """Stata's ``estat ovtest`` -- Ramsey RESET test for omitted variables."""
 
-        from westata.postestimation.ovtest import estat_ovtest
+        from westata.postestimation.ovtest import estat_omitted_variables_test
 
-        return estat_ovtest(self, rhs=rhs)
+        return estat_omitted_variables_test(self, rhs=rhs)
 
     def estat_ic(self, *, n: float | None = None, df: float | None = None) -> Any:
         """Stata's ``estat ic`` -- AIC, BIC, AICc and CAIC.
@@ -785,7 +816,7 @@ class StataResults:
 
         return estat_bgodfrey(self, lags=lags, nomiss0=nomiss0, time=time, delta=delta)
 
-    def estat_corrgram(
+    def estat_correlogram(
         self,
         *,
         lags: int | None = None,
@@ -799,9 +830,9 @@ class StataResults:
         ``ws.estat_corrgram(...)`` and ``result.estat_corrgram()`` stay symmetrical.
         """
 
-        from westata.postestimation.serial import estat_corrgram
+        from westata.postestimation.serial import estat_correlogram
 
-        return estat_corrgram(self, lags=lags, time=time, delta=delta)
+        return estat_correlogram(self, lags=lags, time=time, delta=delta)
 
     def wntestq(
         self,
@@ -816,7 +847,7 @@ class StataResults:
 
         return wntestq(self, lags=lags, time=time, delta=delta)
 
-    def estat_firststage(self, *, all: bool = False, forcenonrobust: bool = False) -> Any:
+    def estat_first_stage(self, *, all: bool = False, forcenonrobust: bool = False) -> Any:
         """Stata's ``estat firststage`` -- IV first-stage diagnostics.
 
         Reports each endogenous regressor's first-stage R-squared, adjusted
@@ -825,9 +856,9 @@ class StataResults:
         partial R-squared.
         """
 
-        from westata.postestimation.firststage import estat_firststage
+        from westata.postestimation.firststage import estat_first_stage
 
-        return estat_firststage(self, all=all, forcenonrobust=forcenonrobust)
+        return estat_first_stage(self, all=all, forcenonrobust=forcenonrobust)
 
     def first_stage(self) -> str:
         """Stata's ``ivregress ..., first`` -- the first-stage regression table.
@@ -846,16 +877,16 @@ class StataResults:
 
         return render_first_stage(self)
 
-    def estat_overid(self, *, lags: int | None = None, forcenonrobust: bool = False) -> Any:
+    def estat_overidentification(self, *, lags: int | None = None, forcenonrobust: bool = False) -> Any:
         """Stata's ``estat overid`` -- overidentification restrictions test.
 
         Reports Sargan (with Basmann's finite-sample variant) for 2SLS/LIML and
         Hansen's J for GMM.
         """
 
-        from westata.postestimation.overid import estat_overid
+        from westata.postestimation.overid import estat_overidentification
 
-        return estat_overid(self, lags=lags, forcenonrobust=forcenonrobust)
+        return estat_overidentification(self, lags=lags, forcenonrobust=forcenonrobust)
 
     def estat_mundlak(
         self,
@@ -876,7 +907,7 @@ class StataResults:
 
         return estat_mundlak(self, storer=storer, entity=entity, time=time)
 
-    def estat_weakrobust(
+    def estat_weak_instrument_robust(
         self,
         *,
         ar: bool | None = None,
@@ -891,9 +922,9 @@ class StataResults:
         :func:`westata.postestimation.weakrobust.estat_weakrobust`.
         """
 
-        from westata.postestimation.weakrobust import estat_weakrobust
+        from westata.postestimation.weakrobust import estat_weak_instrument_robust
 
-        return estat_weakrobust(self, ar=ar, clr=clr, betanull=betanull)
+        return estat_weak_instrument_robust(self, ar=ar, clr=clr, betanull=betanull)
 
     def estat_endogenous(self, *, lags: int | None = None) -> Any:
         """Stata's ``estat endogenous`` -- Durbin-Wu endogeneity test."""
@@ -915,16 +946,16 @@ class StataResults:
 
         return estat_classification(self, cutoff=cutoff, y=y, probabilities=probabilities)
 
-    def estat_ptrends(self) -> dict[str, float]:
+    def estat_parallel_trends(self) -> dict[str, float]:
         """Stata's ``estat ptrends`` -- the parallel-trends test for DiD.
 
         Only defined after ``didregress``/``xtdidregress``; see
         :func:`westata.estimators.did.estat_ptrends`.
         """
 
-        from westata.estimators.did import estat_ptrends
+        from westata.estimators.did import estat_parallel_trends
 
-        return estat_ptrends(self)
+        return estat_parallel_trends(self)
 
     def estat_auc(self) -> Any:
         """Stata's ``estat auc`` -- the area under the ROC curve.
@@ -936,12 +967,12 @@ class StataResults:
 
         return estat_auc(self)
 
-    def estat_imtest(self, *, white: bool = False, design: Any = None) -> Any:
+    def estat_information_matrix_test(self, *, white: bool = False, design: Any = None) -> Any:
         """Stata's ``estat imtest`` -- Cameron & Trivedi's IM-test."""
 
-        from westata.postestimation.imtest import estat_imtest
+        from westata.postestimation.imtest import estat_information_matrix_test
 
-        return estat_imtest(self, white=white, design=design)
+        return estat_information_matrix_test(self, white=white, design=design)
 
     def estat_summarize(
         self,
@@ -1381,12 +1412,12 @@ class StataResults:
 
         return contrast(self, term, method, level=level, nowald=nowald)
 
-    def pwcompare(self, term: str, *, level: float = 0.95, adjust: str | None = None) -> Any:
+    def pairwise_compare(self, term: str, *, level: float = 0.95, adjust: str | None = None) -> Any:
         """All pairwise level differences (Stata `pwcompare`)."""
 
-        from westata.postestimation.contrast import pwcompare
+        from westata.postestimation.contrast import pairwise_compare
 
-        return pwcompare(self, term, level=level, adjust=adjust)
+        return pairwise_compare(self, term, level=level, adjust=adjust)
 
     def nlcom(self, expression: str, *, level: float = 0.95, eform: bool = False) -> Any:
         """Nonlinear combination of parameters (Stata `nlcom`)."""

@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from westata.postestimation.varsoc import varsoc
+from westata.postestimation.varsoc import var_select_order
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -41,7 +41,7 @@ def selection():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
     values = frame[["dinf", "unem"]].dropna().to_numpy()
-    return varsoc(values, maxlag=4)
+    return var_select_order(values, maxlag=4)
 
 
 def test_sample_size_matches_stata(selection) -> None:
@@ -91,8 +91,8 @@ def test_scoring_each_order_on_its_own_sample_would_be_wrong() -> None:
 
     frame = pd.read_stata(DATA, convert_categoricals=False)
     values = frame[["dinf", "unem"]].dropna().to_numpy()
-    shared = varsoc(values, maxlag=4)
+    shared = var_select_order(values, maxlag=4)
     assert shared.nobs == len(values) - 4
     # A different maxlag rescales the WHOLE table, which is itself the shared-sample effect.
-    smaller = varsoc(values, maxlag=2)
+    smaller = var_select_order(values, maxlag=2)
     assert smaller.rows[2].aic != pytest.approx(shared.rows[2].aic, abs=1e-12)

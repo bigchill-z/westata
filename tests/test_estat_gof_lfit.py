@@ -488,7 +488,7 @@ def test_the_e_property_falls_back_to_response_name() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     # OLS does not put depvar in its e() dict directly.
     result.response_name = "y_from_attribute"
@@ -513,7 +513,7 @@ def test_panel_estimators_record_e_depvar() -> None:
         }
     )
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -539,8 +539,8 @@ def _depvar_frame():
 
 DEPVAR_CASES = {
     "Tobit": (lambda f: ws.Tobit.from_formula("y ~ x1", f).fit(), "y"),
-    "Truncreg": (lambda f: ws.Truncreg.from_formula("w ~ x1", f, lower=0).fit(), "w"),
-    "Intreg": (lambda f: ws.Intreg.from_formula("lo hi ~ x1", f).fit(), "lo hi"),
+    "TruncatedRegress": (lambda f: ws.TruncatedRegress.from_formula("w ~ x1", f, lower=0).fit(), "w"),
+    "IntervalRegress": (lambda f: ws.IntervalRegress.from_formula("lo hi ~ x1", f).fit(), "lo hi"),
     "OrderedLogit": (
         lambda f: ws.OrderedLogit.from_formula("rep ~ x1", f).fit(),
         "rep",
@@ -549,12 +549,12 @@ DEPVAR_CASES = {
         lambda f: ws.OrderedProbit.from_formula("rep ~ x1", f).fit(),
         "rep",
     ),
-    "QuantileRegression": (
-        lambda f: ws.QuantileRegression.from_formula("y ~ x1", f).fit(),
+    "QuantileRegress": (
+        lambda f: ws.QuantileRegress.from_formula("y ~ x1", f).fit(),
         "y",
     ),
-    "RobustRegression": (
-        lambda f: ws.RobustRegression.from_formula("y ~ x1", f).fit(),
+    "RobustRegress": (
+        lambda f: ws.RobustRegress.from_formula("y ~ x1", f).fit(),
         "y",
     ),
 }
@@ -584,7 +584,7 @@ def test_intreg_records_both_interval_columns() -> None:
     """
 
     frame = _depvar_frame()
-    result = ws.Intreg.from_formula("lo hi ~ x1", frame).fit()
+    result = ws.IntervalRegress.from_formula("lo hi ~ x1", frame).fit()
 
     assert result.e["depvar"] == "lo hi"
     assert " " in result.e["depvar"]

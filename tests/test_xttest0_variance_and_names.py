@@ -65,7 +65,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def fitted(panel):
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2", panel, entity="st_abb", time="year"
     ).fit(cov_type="robust")
 
@@ -75,27 +75,27 @@ def test_the_e_row_is_the_fits_own_sigma_e_squared(fitted) -> None:
     """Stata's `e` row is e(sigma_e)^2 = .0037374, not within-residuals/(N-n) = .003851."""
 
     expected = float((fitted.e or {})["sigma_e"]) ** 2
-    result = ws.xttest0(fitted)
+    result = ws.panel_test0(fitted)
     assert abs(result.var_e - expected) < 1e-12, result.var_e
     assert "   .0037374 " in str(result), str(result)
 
 
 def test_the_u_row_is_sigma_u_squared(fitted) -> None:
     expected = float((fitted.e or {})["sigma_u"]) ** 2
-    assert abs(ws.xttest0(fitted).var_u - expected) < 1e-12
+    assert abs(ws.panel_test0(fitted).var_u - expected) < 1e-12
 
 
 def test_the_lm_statistic_is_unchanged(fitted) -> None:
     """The statistic never depended on the variance block: Stata reports 4278.48."""
 
-    result = ws.xttest0(fitted)
+    result = ws.panel_test0(fitted)
     assert round(result.chibar2, 2) == 4278.48
     assert result.pvalue < 1e-4
 
 
 # ---------------------------------------------------------------- 2. the cell precision
 def test_variance_cells_fit_eight_characters(fitted) -> None:
-    rendered = str(ws.xttest0(fitted))
+    rendered = str(ws.panel_test0(fitted))
     assert ".0037374 " in rendered, rendered
     assert ".003737434" not in rendered, rendered
     # The SD column keeps its own precision.
@@ -109,7 +109,7 @@ def test_the_fit_records_the_panel_names(fitted) -> None:
 
 
 def test_the_equation_line_names_the_panel_variable(fitted) -> None:
-    rendered = str(ws.xttest0(fitted))
+    rendered = str(ws.panel_test0(fitted))
     assert "lny[st_abb,t] = Xb + u[st_abb] + e[st_abb,t]" in rendered, rendered
     assert "[id,t]" not in rendered, rendered
 
@@ -118,20 +118,20 @@ def test_an_arbitrary_entity_name_also_works(panel) -> None:
     """The user's own figure used `province`; any name must reach the equation line."""
 
     frame = panel.rename(columns={"st_abb": "province"})
-    model = ws.RandomEffects.from_formula(
+    model = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2", frame, entity="province", time="year"
     ).fit(cov_type="robust")
-    rendered = str(ws.xttest0(model))
+    rendered = str(ws.panel_test0(model))
     assert "lny[province,t]" in rendered, rendered
 
 
 # ---------------------------------------------------------------- 4. no entity= needed
 def test_no_entity_argument_is_required(fitted) -> None:
-    result = ws.xttest0(fitted)
+    result = ws.panel_test0(fitted)
     assert result.nobs == 816
     assert result.entities == 48
     assert result.periods == 17
 
 
 def test_the_leading_blank_line_is_present(fitted) -> None:
-    assert str(ws.xttest0(fitted)).splitlines()[0] == ""
+    assert str(ws.panel_test0(fitted)).splitlines()[0] == ""

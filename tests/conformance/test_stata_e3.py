@@ -75,7 +75,7 @@ def _rel(actual: np.ndarray, expected: np.ndarray) -> float:
 
 def test_regress_matches_stata_to_machine_precision():
     capture = _load("regress_auto")
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", _auto()).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", _auto()).fit()
 
     permutation = _align(result, capture.names)
     # Measured: 5.1e-15 on coefficients, 6.8e-16 on standard errors.
@@ -87,7 +87,7 @@ def test_regress_matches_stata_to_machine_precision():
 
 def test_regress_scalars_match_stata():
     capture = _load("regress_auto")
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", _auto()).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", _auto()).fit()
 
     assert result.e["N"] == capture.scalars["N"]
     assert result.e["df_r"] == capture.scalars["df_r"]
@@ -101,7 +101,7 @@ def test_regress_scalars_match_stata():
 
 def test_regress_robust_matches_stata():
     capture = _load("regress_auto_robust")
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", _auto()).fit(
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", _auto()).fit(
         cov_type="HC1"
     )
     permutation = _align(result, capture.names)
@@ -113,7 +113,7 @@ def test_regress_robust_matches_stata():
 
 def test_regress_factor_matches_stata_after_dropping_the_base_level():
     capture = _load("regress_auto_factor")
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "mpg ~ weight + C(foreign, base=0)", _auto()
     ).fit()
 

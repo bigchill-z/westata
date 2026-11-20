@@ -14,9 +14,9 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from westata.estimators.hdfe import FEOLS
+from westata.estimators.hdfe import RegressHighDimFixedEffects
 from westata.estimators.iv import IV2SLS
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 
 def _data(n: int = 80, seed: int = 5) -> pd.DataFrame:
@@ -30,7 +30,7 @@ def _data(n: int = 80, seed: int = 5) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def ols_result():
-    return OLS.from_formula("y ~ x1 + x2 + x3", _data()).fit()
+    return Regress.from_formula("y ~ x1 + x2 + x3", _data()).fit()
 
 
 def _manual_wald(params, cov, R, r):
@@ -269,7 +269,7 @@ def test_hdfe_result_supports_test_and_lincom():
     )
     df = pd.DataFrame({"y": y, "x1": x1, "x2": x2, "firm": entity})
 
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit()
     outcome = res.test("x1 x2")
     assert outcome.df == 2
     assert np.isfinite(outcome.pvalue)
@@ -300,7 +300,7 @@ _AUTO = Path(__file__).parent / "data" / "auto.dta"
 
 def _auto_fit():
     frame = pd.read_stata(_AUTO, convert_categoricals=False)
-    return OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    return Regress.from_formula("mpg ~ weight + foreign", frame).fit()
 
 
 def test_lincom_accepts_a_bare_constant():
@@ -317,7 +317,7 @@ def test_lincom_constant_does_not_change_the_standard_error():
     """Stata's constraint is ``... = -10``: the constant never enters ``L V L'``."""
 
     frame = pd.read_stata(_AUTO, convert_categoricals=False)
-    result = OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    result = Regress.from_formula("mpg ~ weight + foreign", frame).fit()
 
     with_constant = result.lincom("2*weight - 3*foreign + 10")
     without = result.lincom("2*weight - 3*foreign")

@@ -32,7 +32,7 @@ from scipy import stats
 
 import westata as ws
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.limited import Etregress, Heckman, Intreg, Truncreg
+from westata.estimators.limited import EndogenousTreatmentRegress, Heckman, IntervalRegress, TruncatedRegress
 
 FIXTURES = Path(__file__).resolve().parent / "conformance" / "stata_fixtures"
 P6P7_OUTPUTS = FIXTURES / "p6p7_outputs.txt"
@@ -192,7 +192,7 @@ def test_etregress_rho_has_stata_sign():
     """
 
     frame = _two_step_frame()
-    result = Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit()
+    result = EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit()
 
     assert float(result.e["rho"]) == pytest.approx(ETREGRESS_STATA["rho"], rel=1e-8)
     assert float(result.e["sigma"]) == pytest.approx(
@@ -211,10 +211,10 @@ def test_etregress_rho_has_stata_sign():
 
 def test_truncreg_with_wide_limits_reduces_to_ols():
     frame = _truncated()
-    truncated = Truncreg.from_formula(
+    truncated = TruncatedRegress.from_formula(
         "y ~ x1 + x2", frame, lower=-1e6, upper=1e6
     ).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         truncated.params[["x1", "x2", "Intercept"]].to_numpy(),
@@ -226,7 +226,7 @@ def test_truncreg_with_wide_limits_reduces_to_ols():
 
 def test_truncreg_loglikelihood_matches_a_hand_written_formula():
     frame = _truncated(n=120)
-    model = Truncreg.from_formula("y ~ x1 + x2", frame, lower=0.0)
+    model = TruncatedRegress.from_formula("y ~ x1 + x2", frame, lower=0.0)
 
     # Evaluate at an arbitrary point (not the optimum, so the check cannot pass
     # by accident through the fitted parameters).
@@ -251,7 +251,7 @@ def test_truncreg_loglikelihood_matches_a_hand_written_formula():
 
 
 def test_truncreg_reports_sigma_like_stata():
-    result = Truncreg.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
+    result = TruncatedRegress.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
     assert "sigma" not in result.param_names
     assert "/sigma" in result.param_names
     assert float(result.e["sigma"]) == pytest.approx(
@@ -261,12 +261,12 @@ def test_truncreg_reports_sigma_like_stata():
 
 def test_truncreg_requires_a_limit():
     with pytest.raises(ConsistencyError, match="truncation limit"):
-        Truncreg.from_formula("y ~ x1", _truncated(), lower=None, upper=None)
+        TruncatedRegress.from_formula("y ~ x1", _truncated(), lower=None, upper=None)
 
 
 def test_truncreg_rejects_inverted_limits():
     with pytest.raises(ConsistencyError, match="below upper"):
-        Truncreg.from_formula("y ~ x1", _truncated(), lower=5.0, upper=1.0)
+        TruncatedRegress.from_formula("y ~ x1", _truncated(), lower=5.0, upper=1.0)
 
 
 def test_truncreg_drops_observations_outside_the_limits():
@@ -277,7 +277,7 @@ def test_truncreg_drops_observations_outside_the_limits():
     assert below > 0
 
     with pytest.warns(RuntimeWarning, match="truncated"):
-        result = Truncreg.from_formula("y ~ x1", frame, lower=0.5).fit()
+        result = TruncatedRegress.from_formula("y ~ x1", frame, lower=0.5).fit()
 
     # ``n_truncated`` is OUR diagnostic, not a Stata macro (``truncreg.sthlp`` has
     # no such key; ``e(N_bf)`` covers the pre-truncation count).  It is asserted via
@@ -289,11 +289,11 @@ def test_truncreg_drops_observations_outside_the_limits():
 
 def test_truncreg_refuses_a_sample_entirely_outside_the_limits():
     with pytest.raises(ConsistencyError, match="nothing left to estimate"):
-        Truncreg.from_formula("y ~ x1", _truncated(n=200), lower=1e6)
+        TruncatedRegress.from_formula("y ~ x1", _truncated(n=200), lower=1e6)
 
 
 def test_truncreg_populates_e_and_renders():
-    result = Truncreg.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
+    result = TruncatedRegress.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
     for key in REQUIRED_E_KEYS:
         assert key in result.e, key
     assert np.isfinite(float(result.e["ll"]))
@@ -313,8 +313,8 @@ def test_intreg_with_point_intervals_reduces_to_ols():
     frame["lo"] = frame["y"]
     frame["hi"] = frame["y"]
 
-    interval = Intreg.from_formula("lo hi ~ x1 + x2", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    interval = IntervalRegress.from_formula("lo hi ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         interval.params[["x1", "x2", "Intercept"]].to_numpy(),
@@ -330,7 +330,7 @@ def test_intreg_point_interval_uses_the_density_not_a_zero_probability():
     frame = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.5], "x": [0.0, 1.0, 2.0, 3.0]})
     frame["lo"] = frame["y"]
     frame["hi"] = frame["y"]
-    model = Intreg.from_formula("lo hi ~ x", frame)
+    model = IntervalRegress.from_formula("lo hi ~ x", frame)
     value = model._loglike(np.array([0.0, 1.0, np.log(0.5)]))
     assert np.isfinite(value)
 
@@ -343,7 +343,7 @@ def test_intreg_reports_lnsigma_like_stata():
     name, not as an e() scalar.
     """
 
-    result = Intreg.from_formula("lo hi ~ x1", _intervals()).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x1", _intervals()).fit()
     names = list(result.param_names)
     assert "/lnsigma" in names
     assert "/sigma" not in names
@@ -364,7 +364,7 @@ def test_intreg_censoring_bookkeeping_matches_the_data():
     """
 
     frame = _intervals()
-    result = Intreg.from_formula("lo hi ~ x1", frame).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x1", frame).fit()
     assert result.e["N_lc"] == int(np.isneginf(frame["lo"]).sum())
     assert result.e["N_rc"] == int(np.isposinf(frame["hi"]).sum())
     assert result.e["N_int"] == int(
@@ -380,12 +380,12 @@ def test_intreg_rejects_inverted_bounds():
     frame.loc[0, "lo"] = 10.0
     frame.loc[0, "hi"] = 1.0
     with pytest.raises(ConsistencyError, match="lower bound"):
-        Intreg.from_formula("lo hi ~ x1", frame)
+        IntervalRegress.from_formula("lo hi ~ x1", frame)
 
 
 def test_intreg_lhs_must_have_two_columns():
     with pytest.raises(ConsistencyError, match="two columns"):
-        Intreg.from_formula("lo ~ x1", _intervals())
+        IntervalRegress.from_formula("lo ~ x1", _intervals())
 
 
 def test_intreg_handles_mixed_censoring_and_point_intervals():
@@ -404,7 +404,7 @@ def test_intreg_handles_mixed_censoring_and_point_intervals():
     upper = np.where(np.arange(n) % 7 == 0, np.inf, latent)
     frame = pd.DataFrame({"lo": lower, "hi": upper, "x": x})
 
-    result = Intreg.from_formula("lo hi ~ x", frame).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x", frame).fit()
 
     assert np.all(np.isfinite(result.params.to_numpy()))
     assert np.all(np.isfinite(result.bse.to_numpy()))
@@ -437,11 +437,11 @@ def test_intreg_refuses_a_sample_with_no_information():
     frame["lo"] = -np.inf
     frame["hi"] = np.inf
     with pytest.raises(ConsistencyError, match="no information"):
-        Intreg.from_formula("lo hi ~ x1", frame)
+        IntervalRegress.from_formula("lo hi ~ x1", frame)
 
 
 def test_intreg_populates_e_and_renders():
-    result = Intreg.from_formula("lo hi ~ x1", _intervals()).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x1", _intervals()).fit()
     for key in REQUIRED_E_KEYS:
         assert key in result.e, key
     text = result.summary(style="stata")
@@ -627,7 +627,7 @@ def test_heckman_populates_e_and_renders():
 
 def test_etregress_control_function_recovers_the_treatment_effect():
     frame = _treatment()
-    result = Etregress.from_formula("y ~ x + treat(t ~ z)", frame).fit(
+    result = EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", frame).fit(
         method="control"
     )
     # DGP: treatment effect 2.5, slope on x 0.5. Control function is consistent.
@@ -637,7 +637,7 @@ def test_etregress_control_function_recovers_the_treatment_effect():
 
 def test_etregress_uses_every_observation_not_only_the_treated():
     frame = _treatment()
-    result = Etregress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
+    result = EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
     # etregress is not a selection model: the outcome is observed everywhere.
     assert result.e["N"] == len(frame)
     assert result.nobs == len(frame)
@@ -671,7 +671,7 @@ def test_etregress_ml_matches_stata():
         {"y": 1.0 + 0.9 * x1 + v, "x1": x1, "z1": z1, "z2": z2, "t": treated}
     )
 
-    result = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit(method="ml")
+    result = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit(method="ml")
 
     assert float(result.e["ll"]) == pytest.approx(-1124.693682764672, rel=1e-12)
     assert float(result.e["rho"]) == pytest.approx(0.4240986539296641, rel=1e-6)
@@ -688,7 +688,7 @@ def test_etregress_ml_matches_stata():
 
 
 def test_etregress_populates_e_and_renders():
-    result = Etregress.from_formula("y ~ x + treat(t ~ z)", _treatment()).fit()
+    result = EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", _treatment()).fit()
     for key in REQUIRED_E_KEYS:
         assert key in result.e, key
     assert result.model_name == "etregress"
@@ -700,8 +700,8 @@ def test_etregress_does_not_duplicate_the_treatment_regressor():
     # "y ~ x + t + treat(t ~ z)" and "y ~ x + treat(t ~ z)" must both work: the
     # treatment indicator is added to the outcome equation exactly once.
     frame = _treatment()
-    explicit = Etregress.from_formula("y ~ x + t + treat(t ~ z)", frame).fit()
-    implicit = Etregress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
+    explicit = EndogenousTreatmentRegress.from_formula("y ~ x + t + treat(t ~ z)", frame).fit()
+    implicit = EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", frame).fit()
     assert explicit.param_names == implicit.param_names
     np.testing.assert_allclose(
         explicit.params.to_numpy(), implicit.params.to_numpy(), rtol=1e-10
@@ -747,7 +747,7 @@ def test_truncreg_matches_captured_stata_output():
     """StataNow 19.5: truncreg y x1 x2, ll(0) on ``truncated_frame``."""
 
     block = _stata_block("truncreg")
-    result = Truncreg.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
+    result = TruncatedRegress.from_formula("y ~ x1 + x2", _truncated(), lower=0.0).fit()
 
     stata = {
         name: _stata_row(block, name) for name in ("x1", "x2", "_cons", "/sigma")
@@ -771,7 +771,7 @@ def test_intreg_matches_captured_stata_output():
     """StataNow 19.5: intreg lo hi x1 on ``interval_frame``."""
 
     block = _stata_block("intreg")
-    result = Intreg.from_formula("lo hi ~ x1", _intervals()).fit()
+    result = IntervalRegress.from_formula("lo hi ~ x1", _intervals()).fit()
 
     for stata_name, ours in {
         "x1": "x1",

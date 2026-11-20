@@ -54,7 +54,7 @@ def values():
 def test_all_five_trends_match_stata_at_k3(values, trend: str) -> None:
     """Params, rank-0 trace and the critical-value tabulation, all measured at k=3."""
 
-    result = ws.vecrank(values, lags=2, trend=trend)
+    result = ws.vec_rank(values, lags=2, trend=trend)
     expected = K3_EXPECTED[trend]
     assert [row.params for row in result.rows] == expected["params"], trend
     assert float(result.rows[0].trace) == pytest.approx(expected["trace0"], abs=5e-4), trend
@@ -70,8 +70,8 @@ def test_all_five_trends_match_stata_at_k3(values, trend: str) -> None:
 def test_show_max_does_not_change_the_trace_table(values, trend: str) -> None:
     """`max` is a display flag; the first table must be identical either way."""
 
-    plain = str(ws.vecrank(values, lags=2, trend=trend))
-    with_max = str(ws.vecrank(values, lags=2, trend=trend, show_max=True))
+    plain = str(ws.vec_rank(values, lags=2, trend=trend))
+    with_max = str(ws.vec_rank(values, lags=2, trend=trend, show_max=True))
     first_table = with_max.split("------Eigenvalue-----")[0]
     # The max table is appended after the trace table's closing rule.
     assert "Maximum" in with_max

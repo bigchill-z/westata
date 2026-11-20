@@ -26,7 +26,7 @@ def fitted():
     n = 50
     frame = pd.DataFrame({"x": rng.normal(size=n)})
     frame["y"] = 1.0 + 0.8 * frame["x"] + rng.normal(size=n)
-    return ws.OLS.from_formula("y ~ x", frame).fit()
+    return ws.Regress.from_formula("y ~ x", frame).fit()
 
 
 def test_resid_is_still_a_positional_ndarray(fitted) -> None:

@@ -51,7 +51,7 @@ def values():
 
 
 def test_the_max_table_renders(values) -> None:
-    rendered = str(ws.vecrank(values, lags=2, show_max=True))
+    rendered = str(ws.vec_rank(values, lags=2, show_max=True))
     for line in STATA_MAX_TABLE:
         assert line in rendered, line
 
@@ -59,7 +59,7 @@ def test_the_max_table_renders(values) -> None:
 def test_without_the_flag_only_the_trace_table_prints(values) -> None:
     """``max`` is a display switch, not a different computation."""
 
-    plain = str(ws.vecrank(values, lags=2))
+    plain = str(ws.vec_rank(values, lags=2))
     assert "------Eigenvalue-----" not in plain
     assert "        .    183.0918" in plain
 
@@ -71,7 +71,7 @@ def test_the_maximum_statistic_differs_from_the_trace(values) -> None:
     that the two statistics are genuinely different quantities.
     """
 
-    result = ws.vecrank(values, lags=2)
+    result = ws.vec_rank(values, lags=2)
     assert result.rows[0].maximum == pytest.approx(175.3107, abs=1e-3)
     assert result.rows[0].trace == pytest.approx(183.0918, abs=1e-3)
     assert abs(result.rows[0].maximum - result.rows[0].trace) > 7.0
@@ -87,7 +87,7 @@ def test_the_maximum_statistic_is_minus_n_log_one_minus_lambda(values) -> None:
     here stops a future "fix" from quietly reshuffling the rows.
     """
 
-    result = ws.vecrank(values, lags=2)
+    result = ws.vec_rank(values, lags=2)
     nobs = result.nobs
     rows = result.rows
     for index in range(len(rows) - 1):
@@ -102,7 +102,7 @@ def test_the_maximum_statistic_is_minus_n_log_one_minus_lambda(values) -> None:
 def test_the_maximum_critical_values_are_the_eigenvalue_table(values) -> None:
     """14.07 / 3.76 -- the maximum-eigenvalue critical values, NOT the trace's 15.41 / 3.76."""
 
-    result = ws.vecrank(values, lags=2)
+    result = ws.vec_rank(values, lags=2)
     critical = [
         round(float(row.maximum_critical), 2)
         for row in result.rows

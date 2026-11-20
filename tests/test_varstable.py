@@ -30,7 +30,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.varstable import varstable
+from westata.postestimation.varstable import var_stable
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -56,25 +56,25 @@ def fitted_var():
 def test_varstable_reports_one_eigenvalue_per_lag_times_equation(fitted_var) -> None:
     """4 = lags(2) * equations(2); eigvals(coefs) would give 2."""
 
-    stability = varstable(fitted_var)
+    stability = var_stable(fitted_var)
     assert len(stability.eigenvalues) == 4
 
 
 def test_varstable_modulus_matches_stata(fitted_var) -> None:
-    stability = varstable(fitted_var)
+    stability = var_stable(fitted_var)
     for got, expected in zip(stability.modulus, STATA_MODULUS):
         assert got == pytest.approx(expected, abs=5e-6), (got, expected)
 
 
 def test_varstable_eigenvalues_match_stata(fitted_var) -> None:
-    stability = varstable(fitted_var)
+    stability = var_stable(fitted_var)
     for got, expected in zip(stability.eigenvalues, STATA_EIGENVALUES):
         assert complex(got).real == pytest.approx(expected.real, abs=5e-7)
         assert complex(got).imag == pytest.approx(expected.imag, abs=5e-7)
 
 
 def test_varstable_flags_the_var_as_stable(fitted_var) -> None:
-    assert varstable(fitted_var).stable is True
+    assert var_stable(fitted_var).stable is True
 
 
 def test_vargranger_matches_stata(fitted_var) -> None:

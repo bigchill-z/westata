@@ -68,7 +68,7 @@ with S() as s:
 
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
-    r_auto = ws.Didregress.from_formula("y", "treated", Dd, group="unit", time="period").fit()
+    r_auto = ws.DIDRegress.from_formula("y", "treated", Dd, group="unit", time="period").fit()
     msgs = [str(w.message) for w in caught]
 print("  westata covariates=None with an extra time-varying numeric column:")
 print(f"    param_names={list(r_auto.param_names)}")
@@ -76,7 +76,7 @@ print(f"    params={np.round(np.asarray(r_auto.params),10)}")
 print(f"    bse={np.round(np.asarray(r_auto.bse),10)}")
 print(f"    warnings: {msgs}")
 narrow = Dd[["unit", "period", "treated", "y"]]
-r_narrow = ws.Didregress.from_formula("y", "treated", narrow, group="unit", time="period").fit()
+r_narrow = ws.DIDRegress.from_formula("y", "treated", narrow, group="unit", time="period").fit()
 print(f"  westata on the narrow table:")
 print(f"    param_names={list(r_narrow.param_names)}")
 print(f"    params={np.round(np.asarray(r_narrow.params),10)}")
@@ -88,7 +88,7 @@ kat_auto = float(np.asarray(r_auto.params)[list(r_auto.param_names).index("treat
 print(f"    rel(westata narrow, Stata (y))    = {rel([kat], b_narrow[i_n]):.4e}")
 print(f"    rel(westata auto,   Stata (y))    = {rel([kat_auto], b_narrow[i_n]):.4e}")
 try:
-    ws.Didregress.from_formula("y", "treated", Dd, group="unit", time="period",
+    ws.DIDRegress.from_formula("y", "treated", Dd, group="unit", time="period",
                                covariates=[]).fit()
     print("  covariates=[] accepted")
 except Exception as exc:

@@ -72,7 +72,7 @@ def frame():
 
 
 BUILDERS = {
-    "regress": lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(),
+    "regress": lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(),
     "logit": lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),
     "probit": lambda frame: ws.Probit.from_formula("yb ~ x", frame).fit(),
     "poisson": lambda frame: ws.Poisson.from_formula("yp ~ x", frame).fit(),

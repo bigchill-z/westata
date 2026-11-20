@@ -117,7 +117,7 @@ with S() as s:
             kw = {}
             if cov == "cluster":
                 kw = {"cov_kwds": {"groups": P["gid"].to_numpy()}}
-            m = ws.OLS.from_formula("y ~ x1 + x2", P).fit(cov_type=cov, **kw) if cov else \
-                ws.OLS.from_formula("y ~ x1 + x2", P).fit()
+            m = ws.Regress.from_formula("y ~ x1 + x2", P).fit(cov_type=cov, **kw) if cov else \
+                ws.Regress.from_formula("y ~ x1 + x2", P).fit()
             print(f"             westata e(F)={m.e.get('F')}  rel vs Stata={rel([m.e.get('F')],[F_s]):.3e}"
                   f"   results.F={getattr(m,'fvalue',None)}")

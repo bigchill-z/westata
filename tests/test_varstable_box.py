@@ -64,7 +64,7 @@ def rendered():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
     fitted = ws.VAR(frame[["dinf", "unem"]].to_numpy(float), lags=2, names=["dinf", "unem"]).fit()
-    return str(ws.varstable(fitted))
+    return str(ws.var_stable(fitted))
 
 
 def test_every_line_matches_stata(rendered) -> None:

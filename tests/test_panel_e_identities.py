@@ -34,14 +34,14 @@ def panel_frame():
 
 @pytest.fixture(scope="module")
 def fe_result(panel_frame):
-    return ws.PanelOLS.from_formula(
+    return ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", panel_frame, entity="firm", time="year"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def re_result(panel_frame):
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", panel_frame, entity="firm", time="year"
     ).fit()
 
@@ -134,7 +134,7 @@ def test_the_between_r2_of_a_single_regressor_matches_stata(panel_frame) -> None
     comment that used to say "keeps it from being fixed" is gone -- it was protecting a bug.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 
@@ -171,7 +171,7 @@ def test_the_sigma_components_reproduce_the_total_variance(fe_result) -> None:
 def test_between_estimator_fits_one_observation_per_entity(panel_frame) -> None:
     """``xtreg, be`` runs on the entity means, so its sample is the entity count."""
 
-    result = ws.BetweenOLS.from_formula(
+    result = ws.PanelRegressBE.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 
@@ -221,7 +221,7 @@ def test_an_unbalanced_panel_stores_the_theta_distribution(
     with no population behind it.
     """
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1", unbalanced_frame, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -235,7 +235,7 @@ def test_an_unbalanced_panel_stores_the_theta_distribution(
 def test_the_theta_distribution_is_ordered(unbalanced_frame) -> None:
     """min <= p5 <= p50 <= p95 <= max, and all inside [0, 1]."""
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1", unbalanced_frame, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -261,7 +261,7 @@ def test_the_theta_distribution_follows_the_group_sizes(unbalanced_frame) -> Non
     right entities.
     """
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1", unbalanced_frame, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -295,9 +295,9 @@ def test_only_random_effects_stores_theta(panel_frame, label) -> None:
     """
 
     estimators = {
-        "fe": ws.PanelOLS,
-        "be": ws.BetweenOLS,
-        "fd": ws.FirstDifferenceOLS,
+        "fe": ws.PanelRegressFE,
+        "be": ws.PanelRegressBE,
+        "fd": ws.PanelRegressFD,
     }
     result = estimators[label].from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
@@ -315,25 +315,25 @@ def test_random_effects_does_store_theta(re_result) -> None:
 
 # --------------- every panel estimator's feature flags are explicit
 PANEL_FLAGS = {
-    "PanelOLS": {
+    "PanelRegressFE": {
         "_stores_theta": False,
         "_stores_absorbed": True,
         "_stores_mss": False,
         "_stores_ll_0": True,
     },
-    "RandomEffects": {
+    "PanelRegressRE": {
         "_stores_theta": True,
         "_stores_absorbed": False,
         "_stores_mss": False,
         "_stores_ll_0": False,
     },
-    "BetweenOLS": {
+    "PanelRegressBE": {
         "_stores_theta": False,
         "_stores_absorbed": False,
         "_stores_mss": True,
         "_stores_ll_0": True,
     },
-    "FirstDifferenceOLS": {
+    "PanelRegressFD": {
         "_stores_theta": False,
         "_stores_absorbed": False,
         "_stores_mss": False,
@@ -370,16 +370,16 @@ def test_no_panel_result_reports_a_component_it_cannot_have(
     """End-to-end: the flags must show up as the right e() keys."""
 
     fitted = {
-        "fe": ws.PanelOLS.from_formula(
+        "fe": ws.PanelRegressFE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit(),
-        "re": ws.RandomEffects.from_formula(
+        "re": ws.PanelRegressRE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit(),
-        "be": ws.BetweenOLS.from_formula(
+        "be": ws.PanelRegressBE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit(),
-        "fd": ws.FirstDifferenceOLS.from_formula(
+        "fd": ws.PanelRegressFD.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit(),
     }
@@ -406,7 +406,7 @@ SIGMA_KEYS = ("sigma_u", "sigma_e", "sigma", "rho", "corr", "ui")
 
 @pytest.mark.parametrize("label", ["fe", "re"])
 def test_fe_and_re_store_the_sigma_family(panel_frame, label) -> None:
-    estimators = {"fe": ws.PanelOLS, "re": ws.RandomEffects}
+    estimators = {"fe": ws.PanelRegressFE, "re": ws.PanelRegressRE}
     result = estimators[label].from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
@@ -428,7 +428,7 @@ def test_be_and_fd_store_no_sigma_family(panel_frame, label) -> None:
     ``xtreg, fd`` differences the data, which removes the entity effect outright.
     """
 
-    estimators = {"be": ws.BetweenOLS, "fd": ws.FirstDifferenceOLS}
+    estimators = {"be": ws.PanelRegressBE, "fd": ws.PanelRegressFD}
     result = estimators[label].from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
@@ -440,10 +440,10 @@ def test_be_and_fd_store_no_sigma_family(panel_frame, label) -> None:
 def test_the_sigma_flag_is_declared_for_every_panel_estimator() -> None:
     """Pin the flag itself, so an inherited default cannot reappear."""
 
-    assert ws.PanelOLS._stores_sigma is True
-    assert ws.RandomEffects._stores_sigma is True
-    assert ws.BetweenOLS._stores_sigma is False
-    assert ws.FirstDifferenceOLS._stores_sigma is False
+    assert ws.PanelRegressFE._stores_sigma is True
+    assert ws.PanelRegressRE._stores_sigma is True
+    assert ws.PanelRegressBE._stores_sigma is False
+    assert ws.PanelRegressFD._stores_sigma is False
 
 
 def test_between_stores_r2_b(panel_frame) -> None:
@@ -454,7 +454,7 @@ def test_between_stores_r2_b(panel_frame) -> None:
     this one.
     """
 
-    result = ws.BetweenOLS.from_formula(
+    result = ws.PanelRegressBE.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 
@@ -476,7 +476,7 @@ def test_fd_r2_within_and_overall_are_a_recorded_gap(panel_frame) -> None:
     "defined and matching".
     """
 
-    result = ws.FirstDifferenceOLS.from_formula(
+    result = ws.PanelRegressFD.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 

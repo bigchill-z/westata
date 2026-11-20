@@ -47,7 +47,7 @@ def positive():
 
 @pytest.fixture(scope="module")
 def fitted(positive):
-    return ws.OLS.from_formula("y ~ x1 + x2", positive).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", positive).fit()
 
 
 def test_eyex_matches_stata(fitted) -> None:
@@ -68,7 +68,7 @@ def test_eyex_refuses_a_response_with_negative_fitted_values() -> None:
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("nerlove.dta is not available")
 
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf", frame
     ).fit()
     with pytest.raises(Exception) as caught:
@@ -86,7 +86,7 @@ def test_dydx_works_where_eyex_does_not() -> None:
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("nerlove.dta is not available")
 
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf", frame
     ).fit()
     result = fitted.margins(dydx="lnq")

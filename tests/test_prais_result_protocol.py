@@ -6,7 +6,7 @@ exposed no public method at all, so
 
     result.conf_int()
 
-raised ``AttributeError: 'PraisResult' object has no attribute 'conf_int'`` while every estimator
+raised ``AttributeError: 'PraisResults' object has no attribute 'conf_int'`` while every estimator
 that returns a `StataResults` answered it happily. Porting statsmodels code across the two surfaces
 therefore failed on this one class.
 

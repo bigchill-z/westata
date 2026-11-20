@@ -8,7 +8,7 @@ from my_stata import S, rel
 import westata as ws
 
 def test(tag, df, tau):
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     ri = q.fit(cov_type="iid"); rr = q.fit(cov_type="robust")
     sp = q._sparsity; X = q._X
     pn = list(rr.param_names)

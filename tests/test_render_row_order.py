@@ -55,7 +55,7 @@ def _coefficient_rows(rendered: str) -> list[str]:
 def test_cons_is_printed_last(frame) -> None:
     """Stata's placement: ``_cons`` closes the coefficient block."""
 
-    rendered = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
     rows = _coefficient_rows(rendered)
 
     assert rows[-1] == "_cons", rows
@@ -65,7 +65,7 @@ def test_cons_is_printed_last(frame) -> None:
 def test_the_intercept_is_labelled_cons_not_intercept(frame) -> None:
     """patsy calls it ``Intercept``; Stata calls it ``_cons``."""
 
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1", frame).fit().summary(style="stata")
 
     assert "_cons" in rendered
     assert "Intercept" not in rendered
@@ -74,7 +74,7 @@ def test_the_intercept_is_labelled_cons_not_intercept(frame) -> None:
 def test_the_slopes_keep_their_own_order(frame) -> None:
     """Only the constant moves; the regressors stay in formula order."""
 
-    rendered = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
     rows = _coefficient_rows(rendered)
 
     assert rows == ["x1", "x2", "_cons"]
@@ -87,7 +87,7 @@ def test_each_row_keeps_its_own_numbers_after_reordering(frame) -> None:
     estimate -- a table that looks structurally correct and is numerically wrong.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     rendered = result.summary(style="stata")
 
     # Locate the ``_cons`` row and check its coefficient cell against the stored
@@ -103,7 +103,7 @@ def test_each_row_keeps_its_own_numbers_after_reordering(frame) -> None:
 def test_a_model_without_an_intercept_has_no_cons_row(frame) -> None:
     """No intercept, no ``_cons`` -- and nothing else should be relabelled."""
 
-    rendered = ws.OLS.from_formula("y ~ x1 + x2 - 1", frame).fit().summary(
+    rendered = ws.Regress.from_formula("y ~ x1 + x2 - 1", frame).fit().summary(
         style="stata"
     )
     rows = _coefficient_rows(rendered)
@@ -140,7 +140,7 @@ def test_the_statsmodels_style_keeps_patsy_names(frame) -> None:
 
     # Explicit style: this test is about the statsmodels surface, and summary() now defaults to
     # Stata's layout.
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="statsmodels")
+    rendered = ws.Regress.from_formula("y ~ x1", frame).fit().summary(style="statsmodels")
 
     assert "Intercept" in rendered
     assert "_cons" not in rendered
@@ -160,7 +160,7 @@ def interaction_result():
             "x2": x2,
         }
     )
-    return ws.OLS.from_formula("y ~ x1*x2", frame).fit()
+    return ws.Regress.from_formula("y ~ x1*x2", frame).fit()
 
 
 def test_the_coefficient_table_uses_the_hash_separator(interaction_result) -> None:
@@ -255,7 +255,7 @@ def test_the_anova_table_is_printed_for_an_ols_fit(frame) -> None:
     the same block.
     """
 
-    rendered = ws.OLS.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1 + x2", frame).fit().summary(style="stata")
 
     for label in ("Source |", "Model |", "Residual |", "Total |"):
         assert label in rendered, label
@@ -268,7 +268,7 @@ def test_the_anova_table_replaces_the_stacked_header(frame) -> None:
     "Number of obs" and "R-squared", which Stata never does.
     """
 
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1", frame).fit().summary(style="stata")
 
     assert rendered.count("Number of obs") == 1
     assert rendered.count("R-squared") == 2  # "R-squared" and "Adj R-squared"
@@ -282,7 +282,7 @@ def test_the_anova_sums_of_squares_match_the_stored_scalars(frame) -> None:
     ``mss``, so the total is derived rather than read.
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
     rendered = result.summary(style="stata")
 
@@ -310,7 +310,7 @@ def test_the_total_row_has_n_minus_one_degrees_of_freedom(frame) -> None:
     ``Total`` df equal to the sample size only because ``nl`` has no constant).
     """
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
     rendered = result.summary(style="stata")
     total_line = next(line for line in rendered.splitlines() if "Total |" in line)
@@ -322,7 +322,7 @@ def test_the_total_row_has_n_minus_one_degrees_of_freedom(frame) -> None:
 def test_each_mean_square_is_the_ratio_of_its_row(frame) -> None:
     """``MS`` is ``SS / df`` in every row -- three independent checks."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     e = result.e
     rendered = result.summary(style="stata")
 
@@ -358,7 +358,7 @@ def test_a_quantile_fit_gets_no_anova_table(frame) -> None:
     """``qreg`` stores no sums of squares in Stata's sense."""
 
     rendered = (
-        ws.QuantileRegression.from_formula("y ~ x1", frame).fit().summary(style="stata")
+        ws.QuantileRegress.from_formula("y ~ x1", frame).fit().summary(style="stata")
     )
 
     assert "Source |" not in rendered
@@ -380,7 +380,7 @@ def panel_result():
             "year": np.tile(np.arange(periods), entities),
         }
     )
-    return ws.PanelOLS.from_formula(
+    return ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -436,7 +436,7 @@ def test_the_rho_identity_holds_in_the_rendered_block(panel_result) -> None:
 def test_a_non_panel_fit_gets_no_panel_block(frame) -> None:
     """``regress`` has no ``sigma_u``, so the block must not appear."""
 
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1", frame).fit().summary(style="stata")
 
     assert "sigma_u |" not in rendered
     assert "corr(u_i, Xb)" not in rendered

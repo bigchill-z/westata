@@ -51,7 +51,7 @@ def sample():
 
 def test_default_atet_matches_stata(sample) -> None:
     y, d, x = sample
-    result = ws.teffects_psmatch(y, d, x)
+    result = ws.treatment_effects_psmatch(y, d, x)
     assert result.ate == pytest.approx(2639.8646, abs=5e-3)
     assert result.treated == 185
     assert result.controls == 260
@@ -60,7 +60,7 @@ def test_default_atet_matches_stata(sample) -> None:
 
 def test_nn4_atet_matches_stata(sample) -> None:
     y, d, x = sample
-    result = ws.teffects_psmatch(y, d, x, nneighbor=4)
+    result = ws.treatment_effects_psmatch(y, d, x, nneighbor=4)
     assert result.ate == pytest.approx(2330.1077, abs=5e-3)
 
 
@@ -68,8 +68,8 @@ def test_the_tie_counts_match_statas_header(sample) -> None:
     """requested=1 gives min=1/max=8; requested=4 gives min=4/max=11."""
 
     y, d, x = sample
-    one = ws.teffects_psmatch(y, d, x, nneighbor=1)
-    four = ws.teffects_psmatch(y, d, x, nneighbor=4)
+    one = ws.treatment_effects_psmatch(y, d, x, nneighbor=1)
+    four = ws.treatment_effects_psmatch(y, d, x, nneighbor=4)
     assert (one.matches_min, one.matches_max) == (1, 8)
     assert (four.matches_min, four.matches_max) == (4, 11)
 
@@ -96,7 +96,7 @@ def test_the_standard_error_is_reported_as_unavailable(sample) -> None:
     """AI robust needs a local-linear variance estimator; a guess is not published."""
 
     y, d, x = sample
-    result = ws.teffects_psmatch(y, d, x)
+    result = ws.treatment_effects_psmatch(y, d, x)
     assert not result.variance_matches_stata
     assert np.isnan(result.se)
     assert np.isnan(result.z)
@@ -106,7 +106,7 @@ def test_the_standard_error_is_reported_as_unavailable(sample) -> None:
 def test_the_table_matches_stata_layout(sample) -> None:
     y, d, x = sample
     rendered = [
-        line for line in str(ws.teffects_psmatch(y, d, x, outcome="re78")).splitlines()
+        line for line in str(ws.treatment_effects_psmatch(y, d, x, outcome="re78")).splitlines()
         if line.strip()
     ]
     expected = [
@@ -134,4 +134,4 @@ def test_bad_treatment_coding_is_refused(sample) -> None:
     y, d, x = sample
     bad = np.where(d > 0, 1, 2)
     with pytest.raises(Exception):
-        ws.teffects_psmatch(y, bad, x)
+        ws.treatment_effects_psmatch(y, bad, x)

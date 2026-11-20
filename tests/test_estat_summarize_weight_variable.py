@@ -37,7 +37,7 @@ def weighted_case():
             "w": weights,
         }
     )
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "y ~ x1", frame, weights=weights, weight_type="fweight"
     ).fit()
     return frame, weights, result
@@ -106,7 +106,7 @@ def test_an_unweighted_fit_needs_no_exemption() -> None:
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     table = result.estat_summarize().table
 
     for name in ("y", "x1"):

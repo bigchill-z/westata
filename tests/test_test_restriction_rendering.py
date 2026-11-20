@@ -34,7 +34,7 @@ def fitted():
     frame = pd.DataFrame(
         {"y": 1.0 + 0.8 * x1 - 0.3 * x2 + rng.normal(size=n), "x1": x1, "x2": x2}
     )
-    return ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 def test_a_single_restriction_is_printed(fitted) -> None:

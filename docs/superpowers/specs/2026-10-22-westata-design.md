@@ -46,7 +46,7 @@
 
 - N1：不实现 Stata 命令语法解析器（不解析 `reg y x, cluster(id)` 字符串）。API 只有 Python 风格。
 - N2：不做数据管理工具（`gen`/`replace`/`merge`/`reshape`），数据操作交给 pandas。
-- N3：不实现 Mata、`dsge`、`mgarch`、`sspace`、`ucm`、`heckman`、`csdid`、`rdrobust`、`synth`、`xtabond2`。
+- N3：不实现 Mata、`dsge`、`mgarch`、`sspace`、`ucm`、`heckman`、`csdid`、`rd_robust`、`synth`、`xtabond2`。
 - N4：不做 GUI、不做 CLI。
 - N5：不承诺跨版本向后兼容（0.x 阶段 API 可变）。
 - N6：在 `tobit`、`margins` 等自研模块上，不承诺 bit-level 一致，只承诺声明容差内一致。
@@ -66,7 +66,7 @@
 
 | 族 | 命令 | 目标等级 |
 |---|---|---|
-| A 应用微观 | `regress`（OLS/WLS，robust/cluster，`i.` 因子，三种权重） | E3 |
+| A 应用微观 | `regress`（Regress/WLS，robust/cluster，`i.` 因子，三种权重） | E3 |
 | A | `ivregress 2sls` / `liml` / `gmm` | E2 |
 | A | `areg`、`reghdfe` | E3 |
 | A | `xtreg, fe` / `re` / `be` / `fd` | E2 |
@@ -77,7 +77,7 @@
 | B | `vec`（Johansen） | E1 |
 | B | `arch`（GARCH/EGARCH/GJR） | E1 |
 | B | `dfuller` / `pperron` / `kpss` | E2 |
-| B | `newey` | E3 |
+| B | `newey_west` | E3 |
 | D 离散/受限 | `logit`、`probit` | E2 |
 | D | `tobit`（左右截断，自研） | E2 |
 | D | `poisson`、`nbreg` | E2 |
@@ -86,7 +86,7 @@
 
 ### 4.2 排除（首期）
 
-`xtabond2`、`csdid`、`rdrobust`、`synth`、`heckman`、`margins` 全组合（`contrast`/`expression`/任意 `predict` 组合）、`dsge`、`mgarch`、`sspace`、`ucm`、Mata、Stata 命令语法解析、数据管理命令。
+`xtabond2`、`csdid`、`rd_robust`、`synth`、`heckman`、`margins` 全组合（`contrast`/`expression`/任意 `predict` 组合）、`dsge`、`mgarch`、`sspace`、`ucm`、Mata、Stata 命令语法解析、数据管理命令。
 
 ---
 
@@ -95,7 +95,7 @@
 单一用户：作者本人（应用研究者）。核心流程：
 
 1. 用 `pandas.read_stata`（或 `ws.read_stata`）读入数据。
-2. 用 statsmodels 风格公式建模：`ws.OLS.from_formula("y ~ x1 + C(region)", data=df)`。
+2. 用 statsmodels 风格公式建模：`ws.Regress.from_formula("y ~ x1 + C(region)", data=df)`。
 3. `.fit(cov_type="cluster", cov_kwds={"groups": ...})` 得到结果。
 4. 用 results 的 statsmodels 属性做后续分析；用 `ws.etable([...])` 拼论文表。
 5. 需要时 `results.margins(...)`、`results.wald_test(...)`、`results.predict(...)`。
@@ -124,9 +124,9 @@ src/westata/
 │   └── dispatch.py      # cov_type/cov_kwds → 具体估计器
 ├── estimators/
 │   ├── base.py          # 统一模型协议
-│   ├── linear.py        # OLS/WLS/IV2SLS/IVLIML/IVGMM
-│   ├── hdfe.py          # FEOLS（PyFixest 后端）
-│   ├── panel.py         # PanelOLS/RandomEffects/BetweenOLS/FirstDifferenceOLS
+│   ├── linear.py        # Regress/WLS/IV2SLS/IVLIML/IVGMM
+│   ├── hdfe.py          # RegressHighDimFixedEffects（PyFixest 后端）
+│   ├── panel.py         # PanelRegressFE/PanelRegressRE/PanelRegressBE/PanelRegressFD
 │   ├── discrete.py      # Logit/Probit/Poisson/NegativeBinomial/Ordered*/MNLogit
 │   ├── tobit.py         # 自研 Tobit
 │   └── tseries.py       # ARIMA/VAR/VECM/ARCH + 单位根
@@ -183,7 +183,7 @@ src/westata/
 | HC3 | `û_i²/(1-h_i)²` | — |
 | Cluster (CR1) | `(N-1)/(N-K) · G/(G-1) · sandwich` | `vce(cluster id)` |
 | 双向聚类 | CGM：`V1 + V2 - V12` | `vce(cluster id1 id2)` |
-| HAC | Newey-West + Bartlett 核，滞后按 Stata 默认规则 | `newey` |
+| HAC | Newey-West + Bartlett 核，滞后按 Stata 默认规则 | `newey_west` |
 | Driscoll-Kraay | 面板 HAC | `xtscc`（仅作参考） |
 
 - `ssc` 对象集中管理小样本修正：`ws.ssc(adj=True, cluster_adj=True, df="stata")`。
@@ -231,16 +231,16 @@ src/westata/
 
 | Stata 命令 | westata 入口 | 后端 | 关键一致性点 |
 |---|---|---|---|
-| `regress` | `ws.OLS` / `ws.WLS` | statsmodels + `ws.vce` | HC1、cluster、权重、df |
+| `regress` | `ws.Regress` / `ws.WLS` | statsmodels + `ws.vce` | HC1、cluster、权重、df |
 | `ivregress 2sls` | `ws.IV2SLS` | linearmodels `IV2SLS` | df、R² 定义、小样本修正 |
 | `ivregress liml` | `ws.IVLIML` | linearmodels `IVLIML` | 同上 |
 | `ivregress gmm` | `ws.IVGMM` | linearmodels `IVGMM` | 加权矩阵、两步估计 |
-| `areg` | `ws.FEOLS(absorb=...)` | PyFixest | 单固定效应 df |
-| `reghdfe` | `ws.FEOLS` | PyFixest | `ssc`、`dofadjustments` |
-| `xtreg, fe` | `ws.PanelOLS` | linearmodels | 组内变换、df、F 检验 |
-| `xtreg, re` | `ws.RandomEffects` | linearmodels | Swamy-Arora 默认 |
-| `xtreg, be` | `ws.BetweenOLS` | linearmodels | 组间变换 |
-| `xtreg, fd` | `ws.FirstDifferenceOLS` | linearmodels | 一阶差分 |
+| `areg` | `ws.RegressHighDimFixedEffects(absorb=...)` | PyFixest | 单固定效应 df |
+| `reghdfe` | `ws.RegressHighDimFixedEffects` | PyFixest | `ssc`、`dofadjustments` |
+| `xtreg, fe` | `ws.PanelRegressFE` | linearmodels | 组内变换、df、F 检验 |
+| `xtreg, re` | `ws.PanelRegressRE` | linearmodels | Swamy-Arora 默认 |
+| `xtreg, be` | `ws.PanelRegressBE` | linearmodels | 组间变换 |
+| `xtreg, fd` | `ws.PanelRegressFD` | linearmodels | 一阶差分 |
 | `logit` | `ws.Logit` | statsmodels `Logit` | Newton、observed info、z 检验 |
 | `probit` | `ws.Probit` | statsmodels `Probit` | 同上 |
 | `tobit` | `ws.Tobit` | 自研 | 左右截断、Newton、观测信息 |
@@ -253,7 +253,7 @@ src/westata/
 | `vec` | `ws.VECM` | statsmodels | Johansen 秩检验 |
 | `arch` | `ws.ARCH` | arch | 分布假设、报告 |
 | `dfuller`/`pperron`/`kpss` | `ws.unitroot` | arch / statsmodels | 滞后默认值、临界值 |
-| `newey` | `ws.OLS(...).fit(cov_type="HAC")` | `ws.vce` | Bartlett 核、默认滞后 |
+| `newey_west` | `ws.Regress(...).fit(cov_type="HAC")` | `ws.vce` | Bartlett 核、默认滞后 |
 | `test` / `lincom` | `results.wald_test()` / `lincom()` | — | 线性组合语义 |
 | `margins` | `results.margins()` | 自研 | delta method、因子变量 |
 | `esttab` | `ws.etable()` | — | 表格格式 |
@@ -265,8 +265,8 @@ src/westata/
 ```python
 import westata as ws
 
-# 1) 基本 OLS，statsmodels 风格
-m = ws.OLS.from_formula("wage ~ tenure + C(race) + hours", data=df)
+# 1) 基本 Regress，statsmodels 风格
+m = ws.Regress.from_formula("wage ~ tenure + C(race) + hours", data=df)
 res = m.fit()
 res.params; res.bse; res.tvalues; res.conf_int()
 res.summary()                  # statsmodels 风格
@@ -274,7 +274,7 @@ res.summary(style="stata")     # Stata 风格
 res.e["r2_a"], res.e["df_r"]   # Stata e() 标量
 
 # 2) 稳健/聚类 + 权重
-m = ws.OLS.from_formula(
+m = ws.Regress.from_formula(
     "wage ~ tenure + C(race)", data=df,
     weights=df["w"], weight_type="pweight",
 )
@@ -285,12 +285,12 @@ res = m.fit(
 )
 
 # 3) 面板
-m = ws.PanelOLS.from_formula("wage ~ tenure + union", data=panel)
+m = ws.PanelRegressFE.from_formula("wage ~ tenure + union", data=panel)
 res = m.fit(entity_effects=True, time_effects=False,
             cov_type="cluster", cov_kwds={"groups": panel["industry"]})
 
 # 4) 高维固定效应
-res = ws.FEOLS.from_formula("y ~ x1 + x2 | firm + year", data=df).fit(
+res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", data=df).fit(
     cov_type="cluster", cov_kwds={"groups": df["firm"]})
 
 # 5) 离散选择 + 后估计
@@ -336,7 +336,7 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 
 ### 10.4 推断分布
 
-- OLS / WLS / 面板 FE：t 分布，`df_resid = N - K`（聚类时按 `G - 1`）。
+- Regress / WLS / 面板 FE：t 分布，`df_resid = N - K`（聚类时按 `G - 1`）。
 - **IV（`ivregress`）用 z 分布**：Stata 的 `ivregress` 输出 `Wald chi2(k)` 与 `P>|z|`，系数表统计量为 `z`，不是 `t`。证据：`[R] ivregress` Example 1（`Wald chi2(2) = 90.76`，系数表列 `z`、`P>|z|`）。
 - logit / probit / Poisson / NB / tobit / ordered：z 分布（正态）。
 - 具体以 Stata 对应命令的输出为准，写入证据表。
@@ -427,7 +427,7 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 | 依赖 | 用途 | 许可证 |
 |---|---|---|
 | numpy / pandas / scipy | 基础 | BSD |
-| statsmodels | OLS/离散/时序 | BSD-3 |
+| statsmodels | Regress/离散/时序 | BSD-3 |
 | linearmodels | IV/面板 | BSD-3 |
 | pyfixest | HDFE | MIT |
 | arch | GARCH/单位根 | NCSA |
@@ -462,13 +462,13 @@ ws.etable([res1, res2, res3], se=True, stars=True)
 
 | 阶段 | 产出 | 周期（1 人） |
 |---|---|---|
-| P0 骨架 | 包结构、`vce/`、`OLS` 全链路、结果容器、conformance harness、2 条 E3 证据 | 3–4 周 |
+| P0 骨架 | 包结构、`vce/`、`Regress` 全链路、结果容器、conformance harness、2 条 E3 证据 | 3–4 周 |
 | P1 微观 | IV / HDFE / 面板 FE/RE/BE/FD、因子变量、权重 | 2–3 月 |
 | P2 离散 | logit/probit/poisson/nb/ordered、自研 tobit、margins 子集 | 2–3 月 |
 | P3 时序 | ARIMA/VAR/VECM/GARCH/单位根 | 1.5–2 月 |
 | P4 交付 | etable、文档、证据表完善 | 1 月 |
 
-**P0 是硬门**：若 OLS + 聚类 SE 无法与公开 Stata 输出在 1e-10 内吻合，后续一致性目标整体降级重估。
+**P0 是硬门**：若 Regress + 聚类 SE 无法与公开 Stata 输出在 1e-10 内吻合，后续一致性目标整体降级重估。
 
 ---
 

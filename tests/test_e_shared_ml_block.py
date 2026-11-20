@@ -136,7 +136,7 @@ def test_areg_arithmetic_extras(auto) -> None:
     against the right fixture in ``tests/test_hdfe.py``.
     """
 
-    result = ws.FEOLS.from_formula("mpg ~ weight + length | foreign", auto).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("mpg ~ weight + length | foreign", auto).fit()
     e = result.e
 
     # ar2 duplicates r2_a under areg's spelling.
@@ -156,7 +156,7 @@ def test_areg_arithmetic_extras(auto) -> None:
 def test_areg_p_is_the_f_upper_tail(auto) -> None:
     from scipy import stats
 
-    result = ws.FEOLS.from_formula("mpg ~ weight + length | foreign", auto).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("mpg ~ weight + length | foreign", auto).fit()
     e = result.e
 
     assert e["p"] == pytest.approx(
@@ -174,7 +174,7 @@ def test_areg_absorb_block_is_now_implemented(auto) -> None:
     fails here.
     """
 
-    result = ws.FEOLS.from_formula("mpg ~ weight + length | foreign", auto).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("mpg ~ weight + length | foreign", auto).fit()
     e = result.e
 
     assert {"r2_c", "F_absorb", "p_absorb"} <= set(e)
@@ -204,7 +204,7 @@ def test_areg_f_absorb_formula(auto) -> None:
     convention is checked against the fixtures separately.
     """
 
-    result = ws.FEOLS.from_formula("mpg ~ weight + length | foreign", auto).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("mpg ~ weight + length | foreign", auto).fit()
     e = result.e
 
     expected = ((e["r2"] - e["r2_c"]) / e["df_a"]) / (
@@ -216,7 +216,7 @@ def test_areg_f_absorb_formula(auto) -> None:
 def test_areg_p_absorb_is_the_upper_tail(auto) -> None:
     from scipy import stats
 
-    result = ws.FEOLS.from_formula("mpg ~ weight + length | foreign", auto).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("mpg ~ weight + length | foreign", auto).fit()
     e = result.e
 
     assert e["p_absorb"] == pytest.approx(

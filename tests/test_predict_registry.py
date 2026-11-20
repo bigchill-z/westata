@@ -55,7 +55,7 @@ def _fit(model_name: str, frame):
     """One fitted model per registered name; ``None`` when it needs setup we skip."""
 
     builders = {
-        "regress": lambda: ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
+        "regress": lambda: ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
         "ivregress 2sls": lambda: ws.IV2SLS.from_formula(
             "y ~ x1 + [x2 ~ z1]", frame
         ).fit(),
@@ -75,19 +75,19 @@ def _fit(model_name: str, frame):
         "zip": lambda: ws.ZeroInflatedPoisson.from_formula(
             "ycnt ~ x1", frame, inflate="x2"
         ).fit(),
-        "newey": lambda: ws.newey(
+        "newey": lambda: ws.newey_west(
             "y ~ x1 + x2", frame, lag=1, time=frame["t"]
         )._results,
-        "xtreg, fe": lambda: ws.PanelOLS.from_formula(
+        "xtreg, fe": lambda: ws.PanelRegressFE.from_formula(
             "y ~ x1", frame, entity="firm", time="year"
         ).fit(),
-        "xtreg, re": lambda: ws.RandomEffects.from_formula(
+        "xtreg, re": lambda: ws.PanelRegressRE.from_formula(
             "y ~ x1", frame, entity="firm", time="year"
         ).fit(),
-        "xtreg, be": lambda: ws.BetweenOLS.from_formula(
+        "xtreg, be": lambda: ws.PanelRegressBE.from_formula(
             "y ~ x1", frame, entity="firm", time="year"
         ).fit(),
-        "xtreg, fd": lambda: ws.FirstDifferenceOLS.from_formula(
+        "xtreg, fd": lambda: ws.PanelRegressFD.from_formula(
             "y ~ x1", frame, entity="firm", time="year"
         ).fit(),
         # The quantile family.  These four were MISSING from this table, so
@@ -95,10 +95,10 @@ def _fit(model_name: str, frame):
         # skip is exactly why round 184's bug (the whole qreg family had no registered
         # predict types at all) survived: the one test that would have caught it never
         # ran.  A skip reads as "not applicable", not as "untested".
-        "qreg": lambda: ws.QuantileRegression.from_formula("y ~ x1 + x2", frame).fit(),
-        "iqreg": lambda: ws.QuantileRegression.from_formula("y ~ x1 + x2", frame).fit(),
-        "bsqreg": lambda: ws.Bsqreg.from_formula("y ~ x1 + x2", frame).fit(),
-        "sqreg": lambda: ws.Sqreg.from_formula(
+        "qreg": lambda: ws.QuantileRegress.from_formula("y ~ x1 + x2", frame).fit(),
+        "iqreg": lambda: ws.QuantileRegress.from_formula("y ~ x1 + x2", frame).fit(),
+        "bsqreg": lambda: ws.BootstrappedQuantileRegress.from_formula("y ~ x1 + x2", frame).fit(),
+        "sqreg": lambda: ws.SimultaneousQuantileRegress.from_formula(
             "y ~ x1 + x2", frame, quantiles=(0.25, 0.5)
         ).fit(),
     }
@@ -159,11 +159,11 @@ SELECTION_MODELS = {
     "heckman": lambda f: ws.Heckman.from_formula(
         "w ~ x1 + select(yb ~ x1 + x2)", f
     ).fit(),
-    "etregress": lambda f: ws.Etregress.from_formula(
+    "etregress": lambda f: ws.EndogenousTreatmentRegress.from_formula(
         "w ~ x1 + treat(yb ~ x1 + x2)", f
     ).fit(),
-    "intreg": lambda f: ws.Intreg.from_formula("lo hi ~ x1", f).fit(),
-    "truncreg": lambda f: ws.Truncreg.from_formula("w ~ x1", f, lower=0).fit(),
+    "intreg": lambda f: ws.IntervalRegress.from_formula("lo hi ~ x1", f).fit(),
+    "truncreg": lambda f: ws.TruncatedRegress.from_formula("w ~ x1", f, lower=0).fit(),
 }
 
 #: Count models: they need a count column (and ztp/tnbreg need it truncated at 1),
@@ -258,7 +258,7 @@ def test_xtreg_fd_design_matches_its_coefficient_count(frame) -> None:
     registry still listed the types, the failure looked like a user error.
     """
 
-    result = ws.FirstDifferenceOLS.from_formula(
+    result = ws.PanelRegressFD.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 

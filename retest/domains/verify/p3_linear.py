@@ -68,7 +68,7 @@ with S() as s:
     s.send(A)
     b, V, nm = s.est("regress mpg weight foreign")
     print("   Stata names:", nm, " N=", s.e("N"), " df_r=", s.e("df_r"))
-    m = ws.OLS.from_formula("mpg ~ weight + foreign", A).fit()
+    m = ws.Regress.from_formula("mpg ~ weight + foreign", A).fit()
     print("   westata nobs =", m.nobs, " param_names =", list(m.param_names))
     al(b, V, nm, m, "regress")
 
@@ -106,17 +106,17 @@ with S() as s:
         b, V, nm = s.est(f"regress y x1 x2 [{wt}=w]")
         N_e, dfr, r2 = s.e("N"), s.e("df_r"), s.e("r2")
         print(f"\n   [{wt}] Stata e(N)={N_e} e(df_r)={dfr} e(r2)={r2:.10f} se={np.round(np.sqrt(np.diag(V)),10)}")
-        m = ws.OLS.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(), **wkw).fit()
+        m = ws.Regress.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(), **wkw).fit()
         print(f"        westata nobs={m.nobs} df_resid={m.df_resid} e(N)={m.e.get('N')} e(df_r)={m.e.get('df_r')}")
         al(b, V, nm, m, f"regress [{wt}=w]")
         print(f"        westata r2 = {m.rsquared:.10f}  (Stata {r2:.10f})  rel={rel([m.rsquared],[r2]):.3e}")
     # pweight robust
     b, V, nm = s.est("regress y x1 x2 [pweight=w]")
     print(f"\n   [pweight] implied VCE type: e(vce)={s.e('vce')}")
-    m = ws.OLS.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(), weight_type="pweight").fit()
+    m = ws.Regress.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(), weight_type="pweight").fit()
     al(b, V, nm, m, "regress [pweight=w] (default VCE)")
     b2, V2, nm2 = s.est("regress y x1 x2 [pweight=w], vce(robust)")
-    m2 = ws.OLS.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
+    m2 = ws.Regress.from_formula("y ~ x1 + x2", P, weights=P["w"].to_numpy(),
                                                    weight_type="pweight").fit(cov_type="HC1")
     al(b2, V2, nm2, m2, "regress [pweight=w], vce(robust) vs HC1")
 
@@ -126,7 +126,7 @@ with S() as s:
     s.send(P)
     b, V, nm = s.est("regress y x1 x2, vce(cluster gid)")
     print(f"   Stata e(df_r)={s.e('df_r')} e(N_clust)={s.e('N_clust')} G={G} N-K={n-3}")
-    m = ws.OLS.from_formula("y ~ x1 + x2", P).fit(cov_type="cluster", cov_kwds={"groups": P["gid"].to_numpy()})
+    m = ws.Regress.from_formula("y ~ x1 + x2", P).fit(cov_type="cluster", cov_kwds={"groups": P["gid"].to_numpy()})
     print(f"   westata df_resid={m.df_resid} e(df_r)={m.e.get('df_r')} e(N_clust)={m.e.get('N_clust')}")
     al(b, V, nm, m, "regress cluster")
     s.quiet("test x1")

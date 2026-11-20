@@ -104,8 +104,8 @@ def test_the_closed_store_rule_moves_the_estimate():
     strict = frame.loc[strict_mask].reset_index(drop=True)
     assert len(strict) == 351
 
-    fit_correct = ws.OLS.from_formula("d_fte ~ nj", correct).fit()
-    fit_strict = ws.OLS.from_formula("d_fte ~ nj", strict).fit()
+    fit_correct = ws.Regress.from_formula("d_fte ~ nj", correct).fit()
+    fit_strict = ws.Regress.from_formula("d_fte ~ nj", strict).fit()
     i = [str(n) for n in fit_correct.param_names].index("nj")
     b_correct = float(__import__("numpy").asarray(fit_correct.params, dtype=float)[i])
     b_strict = float(__import__("numpy").asarray(fit_strict.params, dtype=float)[i])

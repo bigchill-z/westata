@@ -53,8 +53,8 @@ def frame():
 
 MULTI_EQUATION = {
     "tobit": lambda f: ws.Tobit.from_formula("y ~ x1", f).fit(),
-    "truncreg": lambda f: ws.Truncreg.from_formula("w ~ x1", f, lower=0).fit(),
-    "intreg": lambda f: ws.Intreg.from_formula("lo hi ~ x1", f).fit(),
+    "truncreg": lambda f: ws.TruncatedRegress.from_formula("w ~ x1", f, lower=0).fit(),
+    "intreg": lambda f: ws.IntervalRegress.from_formula("lo hi ~ x1", f).fit(),
     "ologit": lambda f: ws.OrderedLogit.from_formula("rep ~ x1", f).fit(),
     "nbreg": lambda f: ws.NegativeBinomial.from_formula("ycnt ~ x1", f).fit(),
 }

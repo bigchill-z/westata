@@ -43,7 +43,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def fitted(frame):
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_the_joint_restriction_matches_stata(fitted) -> None:
@@ -91,7 +91,7 @@ def test_lincom_estimate_is_the_linear_combination(fitted) -> None:
 def test_the_robust_form_of_a_restriction_matches_stata(frame) -> None:
     """C06-02: the same restriction under HC1, which the command name selects."""
 
-    robust = ws.OLS.from_formula(
+    robust = ws.Regress.from_formula(
         "lnw ~ s + expr + tenure", frame
     ).fit(cov_type="HC1")
     result = robust.test("s = expr")

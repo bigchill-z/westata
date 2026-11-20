@@ -48,7 +48,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def fitted():
     frame = pd.read_stata(LIN).copy()
-    return ws.RandomEffectsMLE.from_formula(
+    return ws.PanelRegressMLE.from_formula(
         FORMULA, frame, entity="province", time="t"
     ).fit()
 

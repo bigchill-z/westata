@@ -35,7 +35,7 @@ def _row(n: int) -> str:
             "id": np.arange(n) // 10,
         }
     )
-    fitted = ws.FEOLS.from_formula("y ~ x | id", frame).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | id", frame).fit()
     rendered = str(ws.estat_ic(fitted))
     return next(line for line in rendered.splitlines() if line.strip().startswith("."))
 

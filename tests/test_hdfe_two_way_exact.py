@@ -40,7 +40,7 @@ def panel():
 def test_the_absorbed_two_way_fit_matches_stata(panel) -> None:
     """C12-09/C12-10: entity and year effects absorbed together."""
 
-    fitted = ws.FEOLS.from_formula(
+    fitted = ws.RegressHighDimFixedEffects.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor | sid + year", panel
     ).fit()
 
@@ -53,10 +53,10 @@ def test_absorbing_the_year_effects_changes_the_coefficients(panel) -> None:
     """The one-way fit is the same command without `+ year`; if these agreed, the second
     dimension would be doing nothing."""
 
-    two_way = ws.FEOLS.from_formula(
+    two_way = ws.RegressHighDimFixedEffects.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor | sid + year", panel
     ).fit()
-    one_way = ws.FEOLS.from_formula(
+    one_way = ws.RegressHighDimFixedEffects.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor | sid", panel
     ).fit()
 
@@ -68,7 +68,7 @@ def test_absorbing_the_year_effects_changes_the_coefficients(panel) -> None:
 def test_the_absorbed_fit_uses_every_row(panel) -> None:
     """Both dimensions are inside the same 816-row panel, so no observation is lost."""
 
-    fitted = ws.FEOLS.from_formula(
+    fitted = ws.RegressHighDimFixedEffects.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor | sid + year", panel
     ).fit()
     assert int(fitted.nobs) == int(len(panel))

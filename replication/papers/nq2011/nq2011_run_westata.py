@@ -110,14 +110,14 @@ def main() -> int:
 
         # ``reghdfe``-equivalent, kept as the comparison point: same estimation, different
         # identity and no reported constant.
-        fe = ws.FEOLS.from_formula(f"{formula} | isocode", frame).fit(
+        fe = ws.RegressHighDimFixedEffects.from_formula(f"{formula} | isocode", frame).fit(
             cov_type="cluster", cov_kwds={"cluster": "isocode"}
         )
         payload["feols"][spec.id] = _serialise(fe)
         print(f"[westata FEOLS]    {spec.id}: N={fe.nobs}", flush=True)
 
         # xtreg-equivalent: same design through the panel estimator.
-        po = ws.PanelOLS.from_formula(
+        po = ws.PanelRegressFE.from_formula(
             formula, frame, entity="isocode", time="year"
         ).fit(cov_type="cluster", cov_kwds={"groups": frame["isocode"]})
         payload["panelols"][spec.id] = _serialise(po)

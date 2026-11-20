@@ -74,7 +74,7 @@ def test_sigma_u_stays_small_when_the_random_effect_is_absent(
     and its log-likelihood matches the pooled logit, which is the correct limit.
     """
 
-    result = ws.XtLogit.from_formula(
+    result = ws.PanelLogit.from_formula(
         "ybin ~ x1", weak_frame, entity="unit", method="re"
     ).fit()
     sigma_u = float(result.e["sigma_u"])
@@ -99,7 +99,7 @@ def test_sigma_u_converges_as_quadrature_points_grow(strong_frame: pd.DataFrame)
 
     estimates = []
     for points in (12, 20, 40):
-        result = ws.XtLogit.from_formula(
+        result = ws.PanelLogit.from_formula(
             "ybin ~ x", strong_frame, entity="id", method="re"
         ).fit(intpoints=points)
         estimates.append(float(result.e["sigma_u"]))

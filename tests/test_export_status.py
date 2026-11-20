@@ -42,8 +42,8 @@ def table():
         pytest.skip("grilic.dta is not available")
     return ws.etable(
         [
-            ws.OLS.from_formula("lnw ~ s", frame).fit(),
-            ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit(),
+            ws.Regress.from_formula("lnw ~ s", frame).fit(),
+            ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit(),
         ],
         model_names=["m1", "m2"],
     )

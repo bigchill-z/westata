@@ -157,7 +157,7 @@ def main() -> int:
         ("without year dummies", []),
     ):
         formula = f"{spec.depvar} ~ " + " + ".join([*spec.all_regressors, *extra]) + " | isocode"
-        fit = ws.FEOLS.from_formula(formula, frame).fit(
+        fit = ws.RegressHighDimFixedEffects.from_formula(formula, frame).fit(
             cov_type="cluster", cov_kwds={"cluster": "isocode"}
         )
         index = [str(n) for n in fit.param_names].index("ln_wpot_1900")

@@ -59,7 +59,7 @@ def _xvx(X: np.ndarray, V: np.ndarray) -> np.ndarray:
 
 
 def test_stdp_squared_equals_diag_xvx():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     X, _names = res.design_matrix
 
     expected = _xvx(np.asarray(X, dtype=float), res.cov_params())
@@ -71,7 +71,7 @@ def test_stdp_squared_equals_diag_xvx():
 def test_stdp_matches_matrix_diagonal_product():
     """Cross-check against the naive ``diag(X @ V @ X.T)`` formulation."""
 
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     X = np.asarray(res.design_matrix[0], dtype=float)
     V = res.cov_params()
 
@@ -82,7 +82,7 @@ def test_stdp_matches_matrix_diagonal_product():
 
 
 def test_stdp_is_positive_and_finite():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     stdp = res.predict(kind="stdp")
     assert stdp.shape == (len(res.design_matrix[0]),)
     assert np.all(np.isfinite(stdp))
@@ -92,8 +92,8 @@ def test_stdp_is_positive_and_finite():
 def test_stdp_uses_the_estimated_vce_not_the_coefficient_se():
     """A robust VCE must flow into stdp, so stdp != |x_is| * bse_i in general."""
 
-    plain = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
-    robust = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit(cov_type="HC1")
+    plain = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
+    robust = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit(cov_type="HC1")
     X = np.asarray(robust.design_matrix[0], dtype=float)
 
     expected = _xvx(X, robust.cov_params())
@@ -109,7 +109,7 @@ def test_stdp_uses_the_estimated_vce_not_the_coefficient_se():
 
 
 def test_stdf_squared_minus_stdp_squared_is_rmse_squared():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     stdp = res.predict(kind="stdp")
     stdf = res.predict(kind="stdf")
 
@@ -120,14 +120,14 @@ def test_stdf_squared_minus_stdp_squared_is_rmse_squared():
 
 
 def test_stdf_is_larger_than_stdp():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     assert np.all(res.predict(kind="stdf") > res.predict(kind="stdp"))
 
 
 def test_stdf_without_rmse_falls_back_to_rss_over_n():
     """When ``e(rmse)`` is absent, the residual variance is ``rss / N``."""
 
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     del res.e["rmse"]
 
     resid = np.asarray(res.resid, dtype=float)
@@ -359,12 +359,12 @@ def test_reghdfe_no_longer_registers_predict_types():
 
 
 def test_xb_still_equals_fittedvalues_for_ols():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     np.testing.assert_allclose(res.predict(kind="xb"), res.fittedvalues, rtol=1e-12)
 
 
 def test_other_kinds_are_unaffected():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     np.testing.assert_allclose(res.predict(kind="fitted"), res.fittedvalues, rtol=1e-12)
     np.testing.assert_allclose(
         res.predict(kind="residuals"), np.asarray(res.resid), rtol=1e-12
@@ -372,7 +372,7 @@ def test_other_kinds_are_unaffected():
 
 
 def test_unknown_kind_still_raises_unsupported():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     with pytest.raises(UnsupportedError, match="predict"):
         res.predict(kind="scores")
 
@@ -381,7 +381,7 @@ def test_unknown_kind_still_raises_unsupported():
 
 
 def test_shape_mismatch_raises_value_error():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     X = np.asarray(res.design_matrix[0], dtype=float)
     too_few = X[:, :2]  # 2 columns instead of 3
 
@@ -455,7 +455,7 @@ def test_regress_stdf_is_unchanged_by_the_innovation_variance_chain():
     """``regress`` still takes the ``e(rmse)`` branch: 11.60805298."""
 
     frame = _auto()
-    result = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit()
     gap = result.predict(kind="stdf") ** 2 - result.predict(kind="stdp") ** 2
     assert gap[0] == pytest.approx(11.60805298, rel=1e-8)
     assert gap[0] == pytest.approx(float(result.e["rmse"]) ** 2, rel=1e-12)

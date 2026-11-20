@@ -38,7 +38,7 @@ from scipy import stats as scipy_stats
 
 
 @dataclass
-class MoranResult:
+class MoranResults:
     """Moran's I test for spatial correlation.
 
     Attributes
@@ -166,7 +166,7 @@ def estat_moran(
     errorlag: Any = None,
     *,
     weights: Any = None,
-) -> MoranResult:
+) -> MoranResults:
     """Stata's ``estat moran``.
 
     Parameters
@@ -236,7 +236,7 @@ def estat_moran(
     morans_i, expected, standard_error = _moran_statistic(residuals, combined)
     z_value = (morans_i - expected) / standard_error
     statistic = float(z_value ** 2)
-    return MoranResult(
+    return MoranResults(
         statistic=statistic,
         df=1.0,
         pvalue=float(scipy_stats.chi2.sf(statistic, 1)),

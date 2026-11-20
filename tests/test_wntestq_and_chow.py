@@ -35,7 +35,7 @@ def fitted():
             "x2": rng.normal(size=n),
         }
     )
-    return ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 def test_the_portmanteau_q_matches_stata(fitted) -> None:
@@ -67,7 +67,7 @@ def test_a_chow_test_is_a_joint_test_on_the_interaction(fitted) -> None:
     frame["x1_post"] = frame["x1"] * frame["post"]
     frame["x2_post"] = frame["x2"] * frame["post"]
 
-    broken = ws.OLS.from_formula(
+    broken = ws.Regress.from_formula(
         "y ~ x1 + x2 + post + x1_post + x2_post", frame
     ).fit()
     joint = broken.test("x1_post x2_post post")
@@ -80,6 +80,6 @@ def test_a_short_series_is_rejected_rather_than_mis_reported() -> None:
 
     rng = np.random.default_rng(1)
     frame = pd.DataFrame({"y": rng.normal(size=8), "x": rng.normal(size=8)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     with pytest.raises(Exception):
         ws.wntestq(fitted, lags=30)

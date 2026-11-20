@@ -44,7 +44,7 @@ def _frame(n: int = 300, seed: int = 7) -> pd.DataFrame:
 def test_sureg_with_a_shared_outcome_name_produces_unique_parameters():
     """The case that crashed: two equations on the same dependent column."""
 
-    result = ws.Sureg.from_formula(["y ~ x1", "y ~ x2"], _frame()).fit()
+    result = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "y ~ x2"], _frame()).fit()
     names = list(result.param_names)
     assert len(names) == len(set(names)), f"duplicate parameter names: {names}"
     assert "y:x1" in names
@@ -54,7 +54,7 @@ def test_sureg_with_a_shared_outcome_name_produces_unique_parameters():
 def test_sureg_keeps_plain_names_when_outcomes_differ():
     """The ordinary case must be untouched, or the fix renamed everything."""
 
-    result = ws.Sureg.from_formula(["y ~ x1", "y2 ~ x2"], _frame()).fit()
+    result = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "y2 ~ x2"], _frame()).fit()
     names = list(result.param_names)
     assert len(names) == len(set(names))
     assert names == ["y:x1", "y:_cons", "y2:x2", "y2:_cons"]
@@ -69,12 +69,12 @@ def test_sureg_name_disambiguation_does_not_change_the_estimates():
     """
 
     frame = _frame()
-    shared = ws.Sureg.from_formula(["y ~ x1", "y ~ x2"], frame).fit()
+    shared = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "y ~ x2"], frame).fit()
 
     # Same two regressions, but the second outcome column is duplicated under a new name so no label collides.
     renamed = frame.copy()
     renamed["y_dup"] = frame["y"]
-    control = ws.Sureg.from_formula(["y ~ x1", "y_dup ~ x2"], renamed).fit()
+    control = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "y_dup ~ x2"], renamed).fit()
 
     np.testing.assert_allclose(
         np.asarray(shared.params, dtype=float),

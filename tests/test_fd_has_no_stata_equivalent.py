@@ -53,7 +53,7 @@ def fitted():
     frame = frame.copy()
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
-    return ws.FirstDifferenceOLS.from_formula(
+    return ws.PanelRegressFD.from_formula(
         FORMULA, frame, entity="sid", time="year"
     ).fit()
 

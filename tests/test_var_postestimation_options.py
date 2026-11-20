@@ -88,7 +88,7 @@ def _stata(frame: pd.DataFrame, command: str) -> list[str]:
 
 # ---------------------------------------------------------------- the four accepted options
 def test_the_plain_table_matches(frame) -> None:
-    ours = _lines(str(ws.varsoc(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3)))
+    ours = _lines(str(ws.var_select_order(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3)))
     assert ours == _stata(frame, "varsoc a b, maxlag(3)")
 
 
@@ -97,7 +97,7 @@ def test_exog_enters_every_equation(frame) -> None:
 
     ours = _lines(
         str(
-            ws.varsoc(
+            ws.var_select_order(
                 frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, exog=frame[["x"]]
             )
         )
@@ -108,7 +108,7 @@ def test_exog_enters_every_equation(frame) -> None:
 def test_exog_names_come_from_the_frame(frame) -> None:
     """A generated x1/x2 would print a footnote Stata never shows."""
 
-    result = ws.varsoc(
+    result = ws.var_select_order(
         frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=2, exog=frame[["x"]]
     )
     assert result.exog_names == ("x",)
@@ -117,7 +117,7 @@ def test_exog_names_come_from_the_frame(frame) -> None:
 
 def test_noconstant_matches(frame) -> None:
     ours = _lines(
-        str(ws.varsoc(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
+        str(ws.var_select_order(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
     )
     assert ours == _stata(frame, "varsoc a b, maxlag(3) noconstant")
 
@@ -127,7 +127,7 @@ def test_noconstant_with_exog_keeps_the_lag_zero_row(frame) -> None:
 
     ours = _lines(
         str(
-            ws.varsoc(
+            ws.var_select_order(
                 frame[["a", "b"]].to_numpy(),
                 names=["a", "b"],
                 maxlag=2,
@@ -142,7 +142,7 @@ def test_noconstant_with_exog_keeps_the_lag_zero_row(frame) -> None:
 
 def test_noconstant_alone_drops_the_lag_zero_row(frame) -> None:
     ours = _lines(
-        str(ws.varsoc(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
+        str(ws.var_select_order(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
     )
     assert not any(line.strip().startswith("|   0 |") for line in ours)
 
@@ -153,7 +153,7 @@ def test_the_noconstant_first_row_carries_dots(frame) -> None:
     rows = [
         line
         for line in _lines(
-            str(ws.varsoc(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
+            str(ws.var_select_order(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
         )
         if line.strip().startswith("|   1 |")
     ]
@@ -166,7 +166,7 @@ def test_the_noconstant_first_row_carries_dots(frame) -> None:
 def test_the_empty_exogenous_label_keeps_its_space(frame) -> None:
     """Stata prints `    Exogenous: ` with a trailing space when noconstant empties it."""
 
-    text = str(ws.varsoc(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
+    text = str(ws.var_select_order(frame[["a", "b"]].to_numpy(), names=["a", "b"], maxlag=3, constant=False))
     assert "    Exogenous: " in text
 
 
@@ -176,7 +176,7 @@ def test_rejected_options_are_not_offered() -> None:
 
     import inspect
 
-    parameters = set(inspect.signature(ws.varsoc).parameters)
+    parameters = set(inspect.signature(ws.var_select_order).parameters)
     for absent in ("noforsc", "dots", "dfk", "sep"):
         assert absent not in parameters
 
@@ -188,24 +188,24 @@ def fitted(frame):
 
 
 def test_varlmar_matches(frame, fitted) -> None:
-    assert _lines(str(ws.varlmar(fitted))) == [
+    assert _lines(str(ws.var_lmar(fitted))) == [
         line for line in _stata(frame, "quietly var a b, lags(1/2)\nvarlmar")
     ]
 
 
 def test_varstable_matches(frame, fitted) -> None:
-    assert _lines(str(ws.varstable(fitted))) == [
+    assert _lines(str(ws.var_stable(fitted))) == [
         line for line in _stata(frame, "quietly var a b, lags(1/2)\nvarstable")
     ]
 
 
 def test_varwle_matches(frame, fitted) -> None:
-    assert _lines(str(ws.varwle(fitted))) == [
+    assert _lines(str(ws.var_wle(fitted))) == [
         line for line in _stata(frame, "quietly var a b, lags(1/2)\nvarwle")
     ]
 
 
 def test_vargranger_matches(frame, fitted) -> None:
-    assert _lines(str(ws.vargranger(fitted))) == [
+    assert _lines(str(ws.var_granger(fitted))) == [
         line for line in _stata(frame, "quietly var a b, lags(1/2)\nvargranger")
     ]

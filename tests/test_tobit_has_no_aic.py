@@ -92,7 +92,7 @@ def test_regress_does_store_the_keys() -> None:
 
     rng = np.random.default_rng(8404)
     frame = pd.DataFrame({"y": rng.normal(size=250), "x": rng.normal(size=250)})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert "aic" in fitted.e
     assert "bic" in fitted.e

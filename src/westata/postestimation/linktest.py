@@ -32,7 +32,7 @@ from scipy import stats as scipy_stats
 
 
 @dataclass
-class LinkTestResult:
+class LinkTestResults:
     """Pregibon's link test.
 
     Attributes
@@ -112,10 +112,10 @@ def _refit(result: Any, frame: pd.DataFrame, response: str, added: list[str]) ->
 
     model_name = str(getattr(result, "model_name", "") or "").strip().lower()
     if model_name in ("regress",):
-        from westata.estimators.linear import OLS
+        from westata.estimators.linear import Regress
 
         formula = f"{response} ~ " + " + ".join(added)
-        return OLS.from_formula(formula, frame).fit()
+        return Regress.from_formula(formula, frame).fit()
     if model_name in ("logit", "logistic"):
         from westata.estimators.discrete import Logit
 
@@ -139,7 +139,7 @@ def _refit(result: Any, frame: pd.DataFrame, response: str, added: list[str]) ->
     )
 
 
-def linktest(result: Any) -> LinkTestResult:
+def linktest(result: Any) -> LinkTestResults:
     """Stata's ``linktest``.
 
     Parameters
@@ -219,7 +219,7 @@ def linktest(result: Any) -> LinkTestResult:
     )
 
     hat_position = names.index("_hat") if "_hat" in names else None
-    return LinkTestResult(
+    return LinkTestResults(
         t_statistic=float(t_statistic),
         df=degrees_of_freedom,
         pvalue=pvalue,

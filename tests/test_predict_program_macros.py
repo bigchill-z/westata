@@ -149,7 +149,7 @@ def test_regress_records_no_predict_program(frame) -> None:
     than an absent key); the premise was wrong because of the spelling.
     """
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
 
     assert fitted.e["predict"] == "regres_p"
     assert not (BASE / "r" / "regress_p.ado").exists()

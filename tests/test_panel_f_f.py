@@ -119,7 +119,7 @@ def test_f_f_is_never_negative(effect) -> None:
     """
 
     frame = _panel_frame(entity_effect=effect, seed=311)
-    e = ws.PanelOLS.from_formula(
+    e = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().e
 
@@ -137,10 +137,10 @@ def test_a_strong_entity_effect_gives_a_large_f_f() -> None:
     strong = _panel_frame(entity_effect=3.0, seed=313)
     weak = _panel_frame(entity_effect=0.0, seed=313)
 
-    strong_f = ws.PanelOLS.from_formula(
+    strong_f = ws.PanelRegressFE.from_formula(
         "y ~ x1", strong, entity="firm", time="year"
     ).fit().e["F_f"]
-    weak_f = ws.PanelOLS.from_formula(
+    weak_f = ws.PanelRegressFE.from_formula(
         "y ~ x1", weak, entity="firm", time="year"
     ).fit().e["F_f"]
 
@@ -155,10 +155,10 @@ def test_r2_c_is_the_pooled_ols_r_squared() -> None:
     """
 
     frame = _panel_frame(entity_effect=1.0, seed=317)
-    e = ws.PanelOLS.from_formula(
+    e = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().e
-    pooled = ws.OLS.from_formula("y ~ x1", frame).fit().e["r2"]
+    pooled = ws.Regress.from_formula("y ~ x1", frame).fit().e["r2"]
 
     assert e["r2_c"] == pytest.approx(pooled, rel=1e-10)
 
@@ -167,7 +167,7 @@ def test_df_a_is_the_number_of_entities_minus_one() -> None:
     """``e(df_a)`` is the absorbed degrees of freedom."""
 
     frame = _panel_frame(entity_effect=1.0, seed=319)
-    e = ws.PanelOLS.from_formula(
+    e = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().e
 
@@ -178,7 +178,7 @@ def test_the_random_effects_estimator_has_no_f_f() -> None:
     """``F_f`` belongs to the absorbed-effects block, which is fixed effects only."""
 
     frame = _panel_frame(entity_effect=1.0, seed=323)
-    e = ws.RandomEffects.from_formula(
+    e = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().e
 
@@ -195,7 +195,7 @@ def test_the_test_is_printed_below_the_table() -> None:
     """
 
     frame = _panel_frame(entity_effect=1.0, seed=331)
-    rendered = ws.PanelOLS.from_formula(
+    rendered = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().summary(style="stata")
 
@@ -209,7 +209,7 @@ def test_the_rendered_statistic_is_the_stored_value() -> None:
     from westata.results.summary import _stata_coef
 
     frame = _panel_frame(entity_effect=1.0, seed=337)
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -226,7 +226,7 @@ def test_the_test_line_sits_after_the_coefficient_table() -> None:
     """Stata reports it BELOW the results table, after the decomposition block."""
 
     frame = _panel_frame(entity_effect=1.0, seed=347)
-    rendered = ws.PanelOLS.from_formula(
+    rendered = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().summary(style="stata")
     lines = rendered.splitlines()
@@ -242,7 +242,7 @@ def test_the_degrees_of_freedom_pair_is_dfa_and_dfr() -> None:
     """``F(df_a, df_r)`` -- the absorbed df and the residual df."""
 
     frame = _panel_frame(entity_effect=1.0, seed=349)
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
     e = result.e
@@ -255,7 +255,7 @@ def test_a_random_effects_fit_prints_no_such_test() -> None:
     """No ``F_f`` means no line -- not a blank one."""
 
     frame = _panel_frame(entity_effect=1.0, seed=353)
-    rendered = ws.RandomEffects.from_formula(
+    rendered = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit().summary(style="stata")
 
@@ -266,7 +266,7 @@ def test_an_ols_fit_prints_no_panel_test() -> None:
     """``regress`` has neither ``sigma_u`` nor ``F_f``, so neither block appears."""
 
     frame = _panel_frame(entity_effect=1.0, seed=359)
-    rendered = ws.OLS.from_formula("y ~ x1", frame).fit().summary(style="stata")
+    rendered = ws.Regress.from_formula("y ~ x1", frame).fit().summary(style="stata")
 
     assert "F test that all u_i=0" not in rendered
     assert "sigma_u |" not in rendered

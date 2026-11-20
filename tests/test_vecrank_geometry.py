@@ -66,7 +66,7 @@ def rendered():
         frame = pd.read_stata(DATA)[["dinf", "unem"]].dropna()
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("macro_swatson.dta is not available")
-    return str(ws.vecrank(frame[["dinf", "unem"]].to_numpy(float), lags=2))
+    return str(ws.vec_rank(frame[["dinf", "unem"]].to_numpy(float), lags=2))
 
 
 def test_every_line_matches_stata(rendered) -> None:
@@ -138,11 +138,11 @@ def test_all_five_trend_specifications_are_supported() -> None:
         "trend": ([8, 11, 12], 183.6114),
     }
     for trend, (params, trace) in expected.items():
-        result = ws.vecrank(values, lags=2, trend=trend)
+        result = ws.vec_rank(values, lags=2, trend=trend)
         assert result.deterministic == trend
         assert [row.params for row in result.rows] == params, trend
         assert float(result.rows[0].trace) == pytest.approx(trace, abs=5e-4), trend
 
     # An unknown spelling still refuses, rather than silently falling back to a default.
     with pytest.raises(ws.UnsupportedError):
-        ws.vecrank(values, lags=2, trend="not_a_case")
+        ws.vec_rank(values, lags=2, trend="not_a_case")

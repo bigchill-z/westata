@@ -196,10 +196,10 @@ not an excuse for a wrong fixed point.
 | V1a | VAR SE | VAR(1) se 1.32e-16; VAR(2) se 3.78e-16 | **A, confirmed** |
 | V1b | `e(Sigma)` | 7.98e-16 / 6.38e-16 | **A, confirmed** |
 | V1c | `e(V)` full matrix | 7.18e-16 / 9.27e-15 | **A, confirmed** |
-| V2 | `vargranger` Wald chi2 | against the exact equivalent Stata `test`: 2.60e-15 / 6.98e-16, `method="Wald"`, df matches | **A, confirmed** |
+| V2 | `var_granger` Wald chi2 | against the exact equivalent Stata `test`: 2.60e-15 / 6.98e-16, `method="Wald"`, df matches | **A, confirmed** |
 | V3 | `dfuller` printed criticals | 1.29e-16 / 1.30e-16 / 0.0 / 0.0 and the printed statistics 1.1e-16–5e-16 from before | **A, and the statistic is untouched** |
 | V3b | `pperron` criticals | 0.0 / 1.11e-16 (must be read from `r(cvalues)`, not `r(cv_#)`) | **A, confirmed** |
-| V4 | `vecrank` criticals | 5% trace `[15.41 3.76]`, max-eig `[14.07 3.76]`, 90% column all NaN, `select_rank` refuses `level=0.10` | **confirmed, values exactly Stata's** |
+| V4 | `vec_rank` criticals | 5% trace `[15.41 3.76]`, max-eig `[14.07 3.76]`, 90% column all NaN, `select_rank` refuses `level=0.10` | **confirmed, values exactly Stata's** |
 | V5 | `arima e(N)` | `d=1` → 299 vs Stata 299 (exact), `nobs` still 300 | **exact, and `nobs` semantics preserved** |
 | V6 | `arch` OPG + presample | `e(vcetype)="OPG"` on both sides; SE `[.03739572 .03319876 .03761874 .0582153]` vs Stata `[.03739721 .03761863 .05821383 .03319755]` → **≈4e-5 relative** | **B, confirmed** |
 | G5 | `var ..., dfk` switch | se 2.03e-16, `e(Sigma)` 2.77e-16, coefficients bit-identical between `ml=True/False` | **A, confirmed** |
@@ -391,7 +391,7 @@ Stated plainly so the Lead does not treat this document as covering them:
   the `e(p)` convention itself.
 * `qreg`/`rreg` **separate** `e(sum_adev)` check-function semantics.
 * `xtabond` Sargan/Hansen/AR(1)/AR(2) — still absent, as the group declared.
-* `vecrank` `trend(rconstant)`/`trend(rtrend)` — unimplemented, as declared.
+* `vec_rank` `trend(rconstant)`/`trend(rtrend)` — unimplemented, as declared.
 * `pperron`'s `Z(rho)` row of `r(cvalues)` — I only compared the `Z(t)` row.
 * `nnmatch` (S4) — the group itself grades it C and says the remaining gap is in
   `σ²_i`; I did not re-derive Abadie-Imbens, so I neither confirm nor refute the

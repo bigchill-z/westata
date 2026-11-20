@@ -34,11 +34,11 @@ import numpy as np
 from westata.errors import ConsistencyError
 from westata.results.summary import stata_number
 
-__all__ = ["VecStableResult", "vecstable"]
+__all__ = ["VecStableResults", "vec_stable"]
 
 
 @dataclass(frozen=True)
-class VecStableResult:
+class VecStableResults:
     """``vecstable``: eigenvalues of a VECM's companion matrix."""
 
     eigenvalues: tuple[complex, ...]
@@ -161,7 +161,7 @@ def _format_complex(value: complex) -> str:
     return _trim(real) + " " + sign + "  " + _trim(abs(imaginary)) + "i"
 
 
-def vecstable(result: Any) -> VecStableResult:
+def vec_stable(result: Any) -> VecStableResults:
     """Eigenvalues of the VECM's companion matrix, as ``vecstable``.
 
     ``result`` must be a fitted VECM exposing ``alpha``, ``beta`` and ``gamma``, with
@@ -226,7 +226,7 @@ def vecstable(result: Any) -> VecStableResult:
     values = np.linalg.eigvals(companion)
     magnitudes = np.abs(values)
     order = np.argsort(-magnitudes, kind="stable")
-    return VecStableResult(
+    return VecStableResults(
         eigenvalues=tuple(complex(values[i]) for i in order),
         modulus=tuple(float(magnitudes[i]) for i in order),
     )

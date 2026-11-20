@@ -101,7 +101,7 @@ def test_ols_multiway_says_it_matches_stock_stata(frame) -> None:
     would make a built-in feature sound exotic."""
 
     messages = _messages_for(
-        lambda: ws.OLS.from_formula("y ~ x", frame).fit(
+        lambda: ws.Regress.from_formula("y ~ x", frame).fit(
             cov_type="cluster", cov_kwds={"groups": frame[["grp_a", "grp_b"]]}
         )
     )
@@ -114,7 +114,7 @@ def test_ols_does_not_claim_to_be_non_stock(frame) -> None:
     """Guard against collapsing both notes into one pessimistic message."""
 
     messages = _messages_for(
-        lambda: ws.OLS.from_formula("y ~ x", frame).fit(
+        lambda: ws.Regress.from_formula("y ~ x", frame).fit(
             cov_type="cluster", cov_kwds={"groups": frame[["grp_a", "grp_b"]]}
         )
     )
@@ -136,7 +136,7 @@ def test_the_two_notes_are_not_identical(frame) -> None:
     )
     ols = " ".join(
         _messages_for(
-            lambda: ws.OLS.from_formula("y ~ x", frame).fit(
+            lambda: ws.Regress.from_formula("y ~ x", frame).fit(
                 cov_type="cluster", cov_kwds={"groups": frame[["grp_a", "grp_b"]]}
             )
         )
@@ -151,7 +151,7 @@ def test_one_way_clustering_does_not_warn(frame) -> None:
     documented stock behaviour and should not gain noise."""
 
     messages = _messages_for(
-        lambda: ws.OLS.from_formula("y ~ x", frame).fit(
+        lambda: ws.Regress.from_formula("y ~ x", frame).fit(
             cov_type="cluster", cov_kwds={"groups": frame["grp_a"]}
         )
     )
@@ -162,7 +162,7 @@ def test_one_way_clustering_does_not_warn(frame) -> None:
 
 def test_no_clustering_does_not_warn(frame) -> None:
     messages = _messages_for(
-        lambda: ws.OLS.from_formula("y ~ x", frame).fit()
+        lambda: ws.Regress.from_formula("y ~ x", frame).fit()
     )
     joined = " ".join(messages).lower()
 

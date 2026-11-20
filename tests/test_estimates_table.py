@@ -48,8 +48,8 @@ def models():
     frame = pd.read_stata(DATA)
     # regress, r is HC1; ivregress, r is HC0 -- see the module docstring.
     return [
-        ws.OLS.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
-        ws.OLS.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
+        ws.Regress.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
+        ws.Regress.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
             cov_type="HC1"
         ),
         ws.IV2SLS.from_formula(
@@ -160,7 +160,7 @@ def test_se_false_omits_the_error_rows_and_legend(models) -> None:
     import pandas as pd
 
     frame = pd.read_stata(DATA)
-    a = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
+    a = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
     rendered = ws.render_estimates_table([a, a], model_names=["a", "b"], se=False)
     assert "Legend" not in rendered
     assert len(rendered.splitlines()) < len(

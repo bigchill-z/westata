@@ -42,12 +42,12 @@ def _linear(*, curvature: float = 0.0, n: int = 400, seed: int = 3600):
 
 @pytest.fixture(scope="module")
 def well_specified():
-    return ws.OLS.from_formula("y ~ x", _linear(curvature=0.0)).fit()
+    return ws.Regress.from_formula("y ~ x", _linear(curvature=0.0)).fit()
 
 
 @pytest.fixture(scope="module")
 def misspecified():
-    return ws.OLS.from_formula("y ~ x", _linear(curvature=1.5, seed=3602)).fit()
+    return ws.Regress.from_formula("y ~ x", _linear(curvature=1.5, seed=3602)).fit()
 
 
 # ---------------------------------------------------------------- the procedure
@@ -61,7 +61,7 @@ def test_the_hatsq_coefficient_is_from_a_refit(well_specified) -> None:
     frame = pd.DataFrame(well_specified.model_data).reset_index(drop=True)
     linear = np.asarray(well_specified.predict(kind="xb"), dtype=float)
     augmented = frame.assign(_hat=linear, _hatsq=linear ** 2)
-    refit = ws.OLS.from_formula("y ~ _hat + _hatsq", augmented).fit()
+    refit = ws.Regress.from_formula("y ~ _hat + _hatsq", augmented).fit()
     expected = float(np.asarray(refit.params, dtype=float)[
         list(refit.param_names).index("_hatsq")
     ])
@@ -75,7 +75,7 @@ def test_the_t_statistic_is_coefficient_over_standard_error(well_specified) -> N
     frame = pd.DataFrame(well_specified.model_data).reset_index(drop=True)
     linear = np.asarray(well_specified.predict(kind="xb"), dtype=float)
     augmented = frame.assign(_hat=linear, _hatsq=linear ** 2)
-    refit = ws.OLS.from_formula("y ~ _hat + _hatsq", augmented).fit()
+    refit = ws.Regress.from_formula("y ~ _hat + _hatsq", augmented).fit()
     position = list(refit.param_names).index("_hatsq")
     expected = float(np.asarray(refit.params, dtype=float)[position]) / float(
         np.asarray(refit.bse, dtype=float)[position]
@@ -189,7 +189,7 @@ def test_the_commands_stat_lists_are_refused(name: str) -> None:
     if name in ("zip", "zinb"):
         result = ws.ZeroInflatedPoisson.from_formula("ycnt ~ x", frame).fit()
     elif name == "eivreg":
-        result = ws.Eivreg.from_formula(
+        result = ws.ErrorsInVariablesRegress.from_formula(
             "y ~ x", frame, reliab={"x": 0.9}
         ).fit()
     elif name == "sureg":
@@ -198,12 +198,12 @@ def test_the_commands_stat_lists_are_refused(name: str) -> None:
         # fixtures are built directly instead of skipping, because a skip here would
         # leave the refusal untested (the lesson from round 189).
         multi = frame.assign(y2=rng.normal(size=n), x2=rng.normal(size=n))
-        result = ws.Sureg.from_formula(["y ~ x", "y2 ~ x2"], multi).fit()
+        result = ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x", "y2 ~ x2"], multi).fit()
     elif name == "mvreg":
         # ``mvreg`` uses Stata's ``outcomes = regressors`` spelling, not ``~``:
         # "mvreg: the formula must separate the outcomes from the regressors with '='".
         multi = frame.assign(y2=rng.normal(size=n), x2=rng.normal(size=n))
-        result = ws.Mvreg.from_formula("y y2 = x x2", multi).fit()
+        result = ws.MultivariateRegress.from_formula("y y2 = x x2", multi).fit()
     else:  # pragma: no cover - the parametrisation is fixed
         pytest.fail(f"no builder for {name}")
 

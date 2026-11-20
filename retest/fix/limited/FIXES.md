@@ -166,7 +166,7 @@ westata 写 `rho = -b_ctrl/sigma`，两个 DGP 都恰好互为相反数。改法
    用全样本 N 会差 1.7e-4。反解：`3/m = 386.0000001`（n=400 数据），四组数据 × 两档容差
    都是这个结论。
 
-改法：`RobustRegression._iterate` 按 `rreg.ado` 逐句转录（含上面的顺序），
+改法：`RobustRegress._iterate` 按 `rreg.ado` 逐句转录（含上面的顺序），
 `fit` 用 `y_adj = xb + (λ·s/aa)(e/s)w` 做**未加权**回归，`rss/mss/rmse/r2/F` 全部取自它，
 `cov = rmse²(X'X)⁻¹`。自洽约束 `rmse²·(n−k) = rss` 由构造保证（测试断言到 1e-12）。
 `tolerance` 现在是一个参数，默认 0.01（Stata 默认值）。
@@ -234,7 +234,7 @@ westata 写 `rho = -b_ctrl/sigma`，两个 DGP 都恰好互为相反数。改法
 
 那 10 个失败**没有一个引用本组的估计量**（逐个 grep：`test_stata_p11.py`、
 `test_stata_p9.py`、`test_discrete.py`、`test_panel.py`、`test_panel_dynamic.py` 里
-`Tobit/QuantileRegression/RobustRegression/Heckman/Etregress/Truncreg/Intreg` 的引用数为 0）。
+`Tobit/QuantileRegress/RobustRegress/Heckman/EndogenousTreatmentRegress/TruncatedRegress/IntervalRegress` 的引用数为 0）。
 按归属：
 
 | 失败 | 归属组 | 现场 |

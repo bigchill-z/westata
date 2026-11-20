@@ -14,29 +14,29 @@
 
 | 类别 | 数量 | 代表名字 |
 |---|---:|---|
-| **A. Stata `estat` 命令** | 22 | `estat_vce` `estat_hettest` `estat_summarize` `estat_auc` … |
-| **B. Stata `xt*` 面板命令** | 23 | `XtAbond` `XtGls` `XtLogit` `xtset` `xtdes` `xtsum` `xtserial` … |
-| **C. Stata `svy*` 调查命令** | 5 | `SurveyDesign` `SvyMean` `SvyRegress` `SvyLogit` … |
-| **D. Stata `var`/`vec` 时序命令** | 20 | `VAR` `VECM` `varbasic` `Varbasic` `varsoc` `vecrank` `VarGrangerResult` … |
+| **A. Stata `estat` 命令** | 22 | `estat_vce` `estat_heteroskedasticity_test` `estat_summarize` `estat_auc` … |
+| **B. Stata `xt*` 面板命令** | 23 | `PanelAbond` `PanelGls` `PanelLogit` `panel_set` `panel_describe` `panel_summarize` `panel_serial` … |
+| **C. Stata `svy*` 调查命令** | 5 | `SurveyDesign` `SurveyMean` `SurveyRegress` `SurveyLogit` … |
+| **D. Stata `var`/`vec` 时序命令** | 20 | `VAR` `VECM` `varbasic` `VarBasic` `var_select_order` `vec_rank` `VarGrangerResult` … |
 | **E. 结果对象 `*Result(s)`** | 54 | `AucResult` `StataResults` `EReturn` `RdRobustResult` `TefectsRaResult` … |
 | **F. 表格/行对象 `*Table/*Row`** | 5 | `IrFTable` `MarginsTable` `PwCompareTable` `SummarizeTable` `SzroeterTable` |
-| **G. Stata `teffects` 族** | 6 | `TeffectsRa` `TeffectsPsmatch` `TeffectsNnmatch` + 同名函数 |
-| **H. 其他（统计术语 / 通用词 / Stata 单词命令）** | 114 | `OLS` `Logit` `newey` `prais` `synth` `margins` `predict` `etable` … |
+| **G. Stata `teffects` 族** | 6 | `TreatmentEffectsRa` `TreatmentEffectsPsmatch` `TreatmentEffectsNnmatch` + 同名函数 |
+| **H. 其他（统计术语 / 通用词 / Stata 单词命令）** | 114 | `Regress` `Logit` `newey_west` `prais` `synth` `margins` `predict` `etable` … |
 
 ### 1.1 三套词汇并存的具体例子
 
 | 概念 | Stata 原名写法 | 统计术语写法 | 通用/其他写法 |
 |---|---|---|---|
-| 最小二乘 | `regress` → 无 `Regress` 类 | — | `OLS` `PanelOLS` `FEOLS` `Areg` `BetweenOLS` |
+| 最小二乘 | `regress` → 无 `Regress` 类 | — | `Regress` `PanelRegressFE` `RegressHighDimFixedEffects` `Areg` `PanelRegressBE` |
 | 异方差稳健方差 | `vce(robust)` | `cov_hc` `cov_hac` | `cov_type="robust"` / 内部 `HC1` `ML_ROBUST` |
-| 逻辑回归 | `logit` | `Logit` | `XtLogit` `SvyLogit` `MultinomialLogit` `OrderedLogit` |
+| 逻辑回归 | `logit` | `Logit` | `PanelLogit` `SurveyLogit` `MultinomialLogit` `OrderedLogit` |
 | 汇总统计 | `summarize` | `SummarizeResult` | `summarize` `estat_summarize` `SummarizeTable` |
 | 边际效应 | `margins` | `MarginsResult` | `margins` `MarginsTable` `MarginsResult` |
 | 结果对象 | `e()` → `EReturn` | `*Result` | `StataResults` `*Results`（复数） |
 
-**同一命令的函数/类/结果类三种写法**（`rdrobust` 一案）：
+**同一命令的函数/类/结果类三种写法**（`rd_robust` 一案）：
 
-- 命令函数 `rdrobust()` → 命令类 `Rdrobust` → 结果类 `RdRobustResult`（一个词三种大小写）。
+- 命令函数 `rd_robust()` → 命令类 `RDRobust` → 结果类 `RdRobustResult`（一个词三种大小写）。
 
 ---
 
@@ -46,11 +46,11 @@
 
 | 现象 | 位置 | 说明 |
 |---|---|---|
-| `TefectsRaResult`（缺一个 f） | `estimators/teffects_ra.py` | 同模块命令类是 `TeffectsRa`，结果类拼成 `Tefects` |
+| `TefectsRaResult`（缺一个 f） | `estimators/treatment_effects_ra.py` | 同模块命令类是 `TreatmentEffectsRa`，结果类拼成 `Tefects` |
 | `IrFTable`（F 大写） | `varbasic.py` | 同模块 `IrfResult` 用 `Irf`，两者大小写不一致 |
-| `Rdrobust` / `RdRobustResult` / `rdrobust` | `estimators/rdrobust.py` | 一个词三种写法 |
+| `RDRobust` / `RdRobustResult` / `rd_robust` | `estimators/rd_robust.py` | 一个词三种写法 |
 | `SucestResult`（对应 `suest`） | `postestimation/suest.py` | 模块/函数叫 `suest`，结果类来源不明 |
-| `Varbasic`（对应 `varbasic`） | `varbasic.py` | 与 `VAR` / `VARResults` 放在一起尤其突兀 |
+| `VarBasic`（对应 `varbasic`） | `varbasic.py` | 与 `VAR` / `VARResults` 放在一起尤其突兀 |
 | `VARResults` / `VECMResults` / `ContrastResults`（复数） | 多处 | 绝大多数结果类用单数 `*Result` |
 | `StataResults` / `EReturn` | `results/base.py` `results/stata_return.py` | 基础类名直接以 Stata 命名，与 statsmodels 风格基类混用 |
 | `statsmodels_wald_test` | `postestimation/api.py` | 以「来源库」命名的公共函数，全树独一份 |
@@ -67,34 +67,34 @@
 
 | Stata 命令族 | 命令类 | 命令函数（薄包装/检验） | 结果类 |
 |---|---|---|---|
-| `regress` | `OLS` | — | `StataResults` |
-| `xtreg` | `PanelOLS` `RandomEffects` `BetweenOLS` `FirstDifferenceOLS` | — | `StataResults` |
-| `areg` / `reghdfe` | `FEOLS` `Areg` | — | `StataResults` |
+| `regress` | `Regress` | — | `StataResults` |
+| `xtreg` | `PanelRegressFE` `PanelRegressRE` `PanelRegressBE` `PanelRegressFD` | — | `StataResults` |
+| `areg` / `reghdfe` | `RegressHighDimFixedEffects` `Areg` | — | `StataResults` |
 | `ivregress` | `IV2SLS` `IVLIML` `IVGMM` | — | `StataResults` |
-| `newey` | `Newey` | `newey()` | `NeweyWestResult` |
+| `newey_west` | `Newey` | `newey_west()` | `NeweyWestResult` |
 | `prais` | `Prais` | `prais()` `prais_winsten()` | `PraisResult` |
 | `logit`/`probit`/`poisson`/`nbreg` | `Logit` `Probit` `Poisson` `NegativeBinomial` … | — | `StataResults` |
 | `ologit`/`oprobit`/`mlogit` | `OrderedLogit` `OrderedProbit` `MultinomialLogit` | — | `StataResults` |
-| `tobit`/`intreg`/`truncreg`/`heckman`/`etregress` | `Tobit` `Intreg` `Truncreg` `Heckman` `Etregress` | — | `StataResults` |
-| `qreg`/`rreg` | `QuantileRegression` `RobustRegression` | — | `StataResults` |
-| `sqreg`/`bsqreg` | `Sqreg` `Bsqreg` | — | `StataResults` |
-| `xtlogit`/`xtprobit`/`xttobit`/`xtpoisson`/`xtnbreg` | `XtLogit` `XtProbit` `XtTobit` `XtPoisson` `XtNbreg` | — | `StataResults` |
-| `xtivreg`/`xtgls`/`xtpcse`/`xtunitroot` | `XtIvreg` `XtGls` `XtPcse` `XtUnitroot` | `levin_lin_chu()` `im_pesaran_shin()` | `PanelUnitRootResult` |
-| `xtabond`/`xtdpd`/`xtdpdsys` | `XtAbond` `XtDpd` `XtDpdSys` | — | `StataResults` |
-| `didregress`/`xtdidregress` | `Didregress` `Xtdidregress` | — | `StataResults` |
-| `teffects ra/ipw/aipw/nnmatch/psmatch` | `TeffectsRa` `IPW` `AIPW` `TeffectsNnmatch` `TeffectsPsmatch` | `teffects_*()` | `TefectsRaResult` `TreatmentEffectResult` `NnmatchResult` `PsmatchResult` |
+| `tobit`/`intreg`/`truncreg`/`heckman`/`etregress` | `Tobit` `IntervalRegress` `TruncatedRegress` `Heckman` `EndogenousTreatmentRegress` | — | `StataResults` |
+| `qreg`/`rreg` | `QuantileRegress` `RobustRegress` | — | `StataResults` |
+| `sqreg`/`bsqreg` | `SimultaneousQuantileRegress` `BootstrappedQuantileRegress` | — | `StataResults` |
+| `xtlogit`/`xtprobit`/`xttobit`/`xtpoisson`/`xtnbreg` | `PanelLogit` `PanelProbit` `PanelTobit` `PanelPoisson` `PanelNbRegress` | — | `StataResults` |
+| `xtivreg`/`xtgls`/`xtpcse`/`xtunitroot` | `PanelIVRegress` `PanelGls` `PanelPcse` `PanelUnitroot` | `levin_lin_chu()` `im_pesaran_shin()` | `PanelUnitRootResult` |
+| `xtabond`/`xtdpd`/`xtdpdsys` | `PanelAbond` `PanelDpd` `PanelDpdSys` | — | `StataResults` |
+| `didregress`/`xtdidregress` | `DIDRegress` `PanelDIDRegress` | — | `StataResults` |
+| `teffects ra/ipw/aipw/nnmatch/psmatch` | `TreatmentEffectsRa` `IPW` `AIPW` `TreatmentEffectsNnmatch` `TreatmentEffectsPsmatch` | `teffects_*()` | `TefectsRaResult` `TreatmentEffectResult` `NnmatchResult` `PsmatchResult` |
 | `synth`/`synth2` | `Synth` `Synth2` | `synth()` `synth2()` | `SynthResult` `Synth2Result` |
-| `rdrobust` | `Rdrobust` | `rdrobust()` | `RdRobustResult` |
+| `rd_robust` | `RDRobust` | `rd_robust()` | `RdRobustResult` |
 | `var`/`vec`/`arima`/`garch` | `VAR` `VECM` `ARIMA` `GARCH` | `unitroot()` `dfuller()` `pperron()` | `VARResults` `VECMResults` `UnitRootResult` `JohansenResult` |
-| `varbasic` | `Varbasic` | `varbasic()` | `IrfResult` `IrFTable` `ImpulseResponse` |
-| `svy:*` | `SvyMean` `SvyTotal` `SvyProportion` `SvyRegress` `SvyLogit` | — | `StataResults` |
-| `suest`/`manova`/`sureg`/`mvreg`/`eivreg` | `Manova` `Sureg` `Mvreg` `Eivreg`（`suest` 仅有函数无类） | `suest()` | `SucestResult` `ManovaResult` `StataResults` |
+| `varbasic` | `VarBasic` | `varbasic()` | `IrfResult` `IrFTable` `ImpulseResponse` |
+| `svy:*` | `SurveyMean` `SurveyTotal` `SurveyProportion` `SurveyRegress` `SurveyLogit` | — | `StataResults` |
+| `suest`/`manova`/`sureg`/`mvreg`/`eivreg` | `Manova` `SeeminglyUnrelatedRegress` `MultivariateRegress` `ErrorsInVariablesRegress`（`suest` 仅有函数无类） | `suest()` | `SucestResult` `ManovaResult` `StataResults` |
 | `bootstrap`/`jackknife`/`permute` | `Bootstrap` `Jackknife` `Permute` | — | — |
 | `nl`/`frontier` | `Nl` `Frontier` | — | `StataResults` |
-| `rcm` | `Rcm` | `rcm()` | `RcmResult` |
+| `rcm` | `RegressionControlMethod` | `rcm()` | `RcmResult` |
 
 观察：同一族内部基本能保持一致（如 `Xt*` 家族），但**族与族之间**的构造方式不统一
-（有的既有类又有同名函数，如 `newey`/`prais`/`rdrobust`/`synth`；有的只有类；有的只有函数）。
+（有的既有类又有同名函数，如 `newey_west`/`prais`/`rd_robust`/`synth`；有的只有类；有的只有函数）。
 
 ---
 
@@ -104,8 +104,8 @@
 
 | 命名法 | 例子 | 说明 |
 |---|---|---|
-| **Stata 命令原名（snake_case）** | `estat_*`（22）、`xtset` `xtdes` `xtsum`、`varsoc` `vecrank`、`dfuller` `kpss`、`margins` `predict`、`summarize` | 可与 Stata 反查，占多数 |
-| **统计术语/动作（snake_case）** | `newey` `prais` `synth` `synth2` `rdrobust` `rcm` `suest` `linktest` `hausman` `lrtest`、`solve_lad` `build_design` `normalize_weights` | 无统一前缀，语义自解释 |
+| **Stata 命令原名（snake_case）** | `estat_*`（22）、`panel_set` `panel_describe` `panel_summarize`、`var_select_order` `vec_rank`、`dfuller` `kpss`、`margins` `predict`、`summarize` | 可与 Stata 反查，占多数 |
+| **统计术语/动作（snake_case）** | `newey_west` `prais` `synth` `synth2` `rd_robust` `rcm` `suest` `linktest` `hausman` `lrtest`、`solve_lad` `build_design` `normalize_weights` | 无统一前缀，语义自解释 |
 | **渲染/输出 `_as_stata` / `render_` / `to_`** | `etable_as_stata` `render_esttab` `render_estimates_table` `render_summary` `to_latex` `to_markdown` | 第三套后缀体系 |
 | **`from_*` 构造入口** | `from_formula`（各估计类）、`from_variables`、`from_frame` | 与 R2.7/R3.2 相关，非顶层 |
 

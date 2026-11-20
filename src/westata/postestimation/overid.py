@@ -56,12 +56,12 @@ from westata.postestimation.names import is_constant_name, require_iv_structure
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["OverIdResult", "estat_overid"]
+__all__ = ["OverIdResults", "estat_overidentification"]
 
 
 
 
-class OverIdResult:
+class OverIdResults:
     """The overidentification test.
 
     Attributes
@@ -106,7 +106,7 @@ class OverIdResult:
 
     def __repr__(self) -> str:
         return (
-            f"<OverIdResult {self.test} chi2({self.df:g})={self.statistic:.4f} "
+            f"<OverIdResults {self.test} chi2({self.df:g})={self.statistic:.4f} "
             f"p={self.pvalue:.4f}>"
         )
 
@@ -309,9 +309,9 @@ def _wooldridge_score(
     return float(khat.shape[0] - rss)
 
 
-def estat_overid(
+def estat_overidentification(
     result: Any, *, lags: int | None = None, forcenonrobust: bool = False
-) -> OverIdResult:
+) -> OverIdResults:
     """Stata's ``estat overid``.
 
     Parameters
@@ -367,7 +367,7 @@ def estat_overid(
                 "estat overid: this GMM result records no e(J), so Hansen's J "
                 "cannot be reported"
             ) from exc
-        return OverIdResult(
+        return OverIdResults(
             statistic=j_stat,
             df=float(restrictions),
             pvalue=float(stats.chi2.sf(j_stat, restrictions)),
@@ -438,7 +438,7 @@ def estat_overid(
         else:
             effective_lags = int(lags)
         score = _wooldridge_score(structure, resid, lags=effective_lags)
-        return OverIdResult(
+        return OverIdResults(
             statistic=score,
             df=float(restrictions),
             pvalue=float(stats.chi2.sf(score, restrictions)),
@@ -505,7 +505,7 @@ def estat_overid(
         basmann = None
         basmann_p = None
 
-    return OverIdResult(
+    return OverIdResults(
         statistic=sargan,
         df=float(restrictions),
         pvalue=float(stats.chi2.sf(sargan, restrictions)),

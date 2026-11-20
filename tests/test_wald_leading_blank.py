@@ -34,7 +34,7 @@ def fitted():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 @pytest.mark.parametrize("spec", ["s", "s expr", "s = expr"])
@@ -68,10 +68,10 @@ def test_every_block_renderer_starts_with_a_newline(grilic_module_fit=None) -> N
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
     blocks = {
-        "estat_ovtest": ws.estat_ovtest(ols),
-        "estat_hettest": ws.estat_hettest(ols, method="iid"),
+        "estat_omitted_variables_test": ws.estat_omitted_variables_test(ols),
+        "estat_heteroskedasticity_test": ws.estat_heteroskedasticity_test(ols, method="iid"),
         "estat_ic": ws.estat_ic(ols),
         "estat_vce": ws.estat_vce(ols),
         "estat_summarize": ws.estat_summarize(ols),

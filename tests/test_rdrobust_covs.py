@@ -51,13 +51,13 @@ def senate():
 
 
 def test_without_covariates_is_unchanged(senate) -> None:
-    result = ws.rdrobust(senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B)
+    result = ws.rd_robust(senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B)
     assert float(result.tau) == pytest.approx(7.414370281708, abs=1e-9)
     assert result.coef_covs is None
 
 
 def test_with_covariates_matches_stata(senate) -> None:
-    result = ws.rdrobust(
+    result = ws.rd_robust(
         senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B, covs=senate["cov1"]
     )
     assert float(result.tau) == pytest.approx(7.490617475565, abs=1e-9)
@@ -66,7 +66,7 @@ def test_with_covariates_matches_stata(senate) -> None:
 def test_the_joint_covariate_coefficient_matches_stata(senate) -> None:
     """One coefficient across both sides -- this is what e(coef_covs) reports."""
 
-    result = ws.rdrobust(
+    result = ws.rd_robust(
         senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B, covs=senate["cov1"]
     )
     coefficient = float(np.asarray(result.coef_covs).ravel()[0])
@@ -76,7 +76,7 @@ def test_the_joint_covariate_coefficient_matches_stata(senate) -> None:
 def test_the_effective_samples_match_stata(senate) -> None:
     """360 / 323; getting this wrong is the symptom of a missing side mask."""
 
-    result = ws.rdrobust(
+    result = ws.rd_robust(
         senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B, covs=senate["cov1"]
     )
     assert (result.nobs_effective_left, result.nobs_effective_right) == (360, 323)
@@ -85,8 +85,8 @@ def test_the_effective_samples_match_stata(senate) -> None:
 def test_the_covariate_really_changes_the_estimate(senate) -> None:
     """Guard against a silently ignored argument."""
 
-    plain = ws.rdrobust(senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B)
-    adjusted = ws.rdrobust(
+    plain = ws.rd_robust(senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B)
+    adjusted = ws.rd_robust(
         senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B, covs=senate["cov1"]
     )
     assert abs(float(plain.tau) - float(adjusted.tau)) > 0.05
@@ -96,6 +96,6 @@ def test_missing_covariate_values_are_refused(senate) -> None:
     covariates = senate["cov1"].to_numpy().copy()
     covariates[0] = np.nan
     with pytest.raises(Exception, match="missing"):
-        ws.rdrobust(
+        ws.rd_robust(
             senate["vote"], senate["margin"], bandwidth=H, bias_bandwidth=B, covs=covariates
         )

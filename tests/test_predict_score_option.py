@@ -95,7 +95,7 @@ def test_nbreg_offers_only_the_plural_and_still_refuses() -> None:
 # ------------------------------------------------------------------- the values
 def test_the_linear_score_is_the_residual() -> None:
     """``regress_postestimation.sthlp:193`` says so explicitly."""
-    fitted = ws.OLS.from_formula("y ~ x", _frame()).fit()
+    fitted = ws.Regress.from_formula("y ~ x", _frame()).fit()
 
     scores = np.asarray(fitted.predict(kind="score"), dtype=float)
 

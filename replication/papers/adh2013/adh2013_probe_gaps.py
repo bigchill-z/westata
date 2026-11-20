@@ -132,7 +132,7 @@ def ws_dataframe() -> pd.DataFrame:
     return frame
 
 DF = _frame()
-FIT = ws.OLS.from_formula("y ~ x1 + x2", DF).fit()
+FIT = ws.Regress.from_formula("y ~ x1 + x2", DF).fit()
 
 
 def _must_fail(label: str, call: Callable[[], object]) -> str:
@@ -197,16 +197,16 @@ def _cluster_key_inconsistent() -> str:
     """Which single key works per estimator, for ``cov_type="cluster"``?"""
 
     calls = {
-        "OLS": lambda kw: ws.OLS.from_formula("y ~ x1", DF).fit(
+        "OLS": lambda kw: ws.Regress.from_formula("y ~ x1", DF).fit(
             cov_type="cluster", cov_kwds=kw
         ),
         "IV2SLS": lambda kw: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z]", DF).fit(
             cov_type="cluster", cov_kwds=kw
         ),
-        "FEOLS": lambda kw: ws.FEOLS.from_formula("y ~ x1 | firm", DF).fit(
+        "FEOLS": lambda kw: ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", DF).fit(
             cov_type="cluster", cov_kwds=kw
         ),
-        "PanelOLS": lambda kw: ws.PanelOLS.from_formula(
+        "PanelOLS": lambda kw: ws.PanelRegressFE.from_formula(
             "y ~ x1", DF, entity="firm", time="year"
         ).fit(cov_type="cluster", cov_kwds=kw),
     }
@@ -327,7 +327,7 @@ GAPS: tuple[Gap, ...] = (
 def _control_two_way_hdfe() -> str:
     """Two-way clustering on HDFE works, so this raises ``Works`` and reports FIXED."""
 
-    ws.FEOLS.from_formula("y ~ x1 | firm + year", DF).fit(
+    ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm + year", DF).fit(
         cov_type="cluster", cov_kwds={"cluster": ["c1", "c2"]}
     )
     raise Works("two-way clustering on HDFE works, as expected")
@@ -349,7 +349,7 @@ def _control_bootstrap_seed() -> str:
 def _control_ols_subset() -> str:
     """``subset=`` works on OLS, so the P1 entry is about *coverage*, not absence."""
 
-    result = ws.OLS.from_formula("y ~ x1", DF, subset=DF["x1"] > 0).fit()
+    result = ws.Regress.from_formula("y ~ x1", DF, subset=DF["x1"] > 0).fit()
     if result.nobs >= len(DF):
         raise Works("OLS subset= was silently ignored")
     raise Works(f"OLS subset= restricts the sample as documented (nobs={result.nobs})")
@@ -457,7 +457,7 @@ def _control_feols_predict() -> str:
     """
 
     frame = ws_dataframe()
-    result = ws.FEOLS.from_formula("y ~ x1 | firm", frame).fit()
+    result = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", frame).fit()
     # Same distinction as the weighted-IV control: "works here" is weaker than "works for
     # a reader who clones HEAD". The check reads HEAD at RUN time rather than asserting a
     # fixed state, so it stays correct as commits land -- an earlier version of the prose

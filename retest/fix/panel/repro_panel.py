@@ -105,7 +105,7 @@ def defect_p1_p2() -> None:
         "   (dfadj 才是把被吸收效应计入 K 的口径)"
     )
 
-    model = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t")
+    model = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t")
     now = model.fit(cov_type="robust")
     now_se = np.array([now.bse[n] for n in order])
     # 改前：cov_type="robust" 映射成 HC1，等价于 Stata 的 areg + vce(robust)。
@@ -143,7 +143,7 @@ def defect_p3() -> None:
     # 旧实现（_aligned_slices 按行号截断、pairwise 未实现）：两种 selection 同值。
     before_se = np.array([0.0304356, 0.0409808, 0.0342562])
     for label, cap, selection in (("casewise", cw, "casewise"), ("pairwise", pw, "pairwise")):
-        res = ws.XtPcse.from_formula(
+        res = ws.PanelPcse.from_formula(
             "y ~ x1 + x2", df, entity="id", time="t", selection=selection
         ).fit()
         stata_se = np.array(
@@ -168,7 +168,7 @@ def defect_p3() -> None:
         st.send(bal)
         st.run("xtset id t")
         cap = st.estimate("xtpcse y x1 x2")
-    res = ws.XtPcse.from_formula("y ~ x1 + x2", bal, entity="id", time="t").fit()
+    res = ws.PanelPcse.from_formula("y ~ x1 + x2", bal, entity="id", time="t").fit()
     stata_se = np.array(
         [
             np.sqrt(np.diag(cap.V))[cap.names.index("_cons" if n == "Intercept" else n)]
@@ -192,7 +192,7 @@ def defect_p4() -> None:
         one_r = st.estimate("xtabond y x1 x2, lags(1) vce(robust)")
         two = st.estimate("xtabond y x1 x2, lags(2)")
     for lags, cap in ((1, one), (2, two)):
-        res = ws.XtAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t", lags=lags).fit()
+        res = ws.PanelAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t", lags=lags).fit()
         print(f"  lags({lags}) param_names = {list(res.param_names)}")
         stata_names = ["L.y"] + (["L2.y"] if lags == 2 else []) + ["x1", "x2"]
         idx = [cap.names.index(n) for n in stata_names]
@@ -210,7 +210,7 @@ def defect_p4() -> None:
             f"   相对差 {abs(2 * res.e['sig2'] - cap.scalars['sig2']) / cap.scalars['sig2']:.3f}"
             "   <- 旧缺陷 1.993 倍"
         )
-    resr = ws.XtAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t", lags=1).fit(
+    resr = ws.PanelAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t", lags=1).fit(
         cov_type="robust"
     )
     idx = [one_r.names.index(n) for n in ("L.y", "x1", "x2")]
@@ -234,7 +234,7 @@ def defect_p5() -> None:
         cap = st.estimate("xtnbreg yc x1 x2, fe")
         tight = st.estimate("xtnbreg yc x1 x2, fe ltolerance(1e-8)")
         poisson = st.estimate("xtpoisson yc x1 x2, fe")
-    res = ws.XtNbreg.from_formula("yc ~ x1 + x2", df, entity="id", method="fe").fit()
+    res = ws.PanelNbRegress.from_formula("yc ~ x1 + x2", df, entity="id", method="fe").fit()
     names = ["x1", "x2"]
     stata_b = np.array([cap.b[cap.names.index(n)] for n in names])
     stata_se = np.array([np.sqrt(np.diag(cap.V))[cap.names.index(n)] for n in names])

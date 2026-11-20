@@ -149,7 +149,7 @@ def run() -> int:
         print(f"Stata {st.version}: e(N) = {cap.nobs}, e(r2) = {cap.get('r2'):.6f}")
         print(f"Stata parameters ({len(cap.names)}): {', '.join(cap.names)}\n")
 
-    model = ws.OLS.from_formula(
+    model = ws.Regress.from_formula(
         formula,
         frame,
         weights=frame["timepwt48"],

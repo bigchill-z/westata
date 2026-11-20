@@ -26,8 +26,8 @@ import statsmodels.api as sm
 
 from westata.data.weights import normalize_weights
 from westata.errors import WeightError
-from westata.estimators.hdfe import FEOLS
-from westata.estimators.linear import OLS
+from westata.estimators.hdfe import RegressHighDimFixedEffects
+from westata.estimators.linear import Regress
 from westata.vce.dispatch import compute_cov
 
 
@@ -99,7 +99,7 @@ def test_single_fixed_effect_matches_dummy_variable_ols():
     X, _ = _dummy_design(df, ["firm"], ["x1", "x2"])
     ref = sm.OLS(df["y"], X).fit()
 
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit()
 
     assert list(res.params.index) == ["x1", "x2"]
     np.testing.assert_allclose(
@@ -121,7 +121,7 @@ def test_two_way_fixed_effects_match_two_way_demeaning():
     )
 
     beta, *_ = np.linalg.lstsq(x_tilde, y_tilde, rcond=None)
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
 
     np.testing.assert_allclose(res.params.to_numpy(), beta, rtol=0, atol=1e-10)
     assert res.df_resid == len(df) - (2 + 10 + 6 - 1)
@@ -130,9 +130,9 @@ def test_two_way_fixed_effects_match_two_way_demeaning():
 # ------------------------------------------------ 3. no fixed effects -> OLS
 def test_no_fixed_effects_matches_plain_ols():
     df = _panel()
-    ref = OLS.from_formula("y ~ x1 + x2", df).fit()
+    ref = Regress.from_formula("y ~ x1 + x2", df).fit()
 
-    res = FEOLS.from_formula("y ~ x1 + x2", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2", df).fit()
 
     assert list(res.params.index) == ["Intercept", "x1", "x2"]
     np.testing.assert_allclose(res.params.to_numpy(), ref.params.to_numpy(), rtol=0, atol=1e-12)
@@ -153,7 +153,7 @@ def test_cluster_inference_uses_g_minus_one_and_finite_standard_errors():
     df = _panel()
     n_clusters = df["cluster"].nunique()
 
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit(
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit(
         cov_type="cluster", cov_kwds={"cluster": "cluster"}
     )
 
@@ -170,7 +170,7 @@ def test_cluster_inference_uses_g_minus_one_and_finite_standard_errors():
 
 def test_cluster_covariance_is_westata_cr1_scaled_to_total_parameter_count():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit(
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit(
         cov_type="cluster", cov_kwds={"cluster": "cluster"}
     )
 
@@ -197,7 +197,7 @@ def test_cluster_covariance_is_westata_cr1_scaled_to_total_parameter_count():
 
 def test_nonrobust_covariance_matches_westata_iid_with_absorbed_df():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
 
     y_tilde = _demean_two_way(df["y"].to_numpy(), ["firm", "year"], df)
     x_tilde = np.column_stack(
@@ -218,7 +218,7 @@ def test_nonrobust_covariance_matches_westata_iid_with_absorbed_df():
 
 def test_hc1_scaling_uses_total_parameter_count():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit(cov_type="HC1")
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit(cov_type="HC1")
 
     n, k_total = len(df), int(res.e["rank"])
     # HC1 = N/(N-K) * HC0, with K counting absorbed fixed effects.
@@ -229,7 +229,7 @@ def test_hc1_scaling_uses_total_parameter_count():
 # ---------------------------------------------------------------- 5. e() keys
 def test_e_contains_all_required_scalars():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
 
     for key in ("N", "df_m", "df_r", "r2", "r2_a", "rmse", "F", "ll", "rank"):
         assert key in res.e, key
@@ -261,8 +261,8 @@ def test_r2_and_rmse_do_not_depend_on_the_covariance_but_df_r_does():
 
     df = _panel()
     df["cluster"] = np.random.default_rng(7).integers(0, 8, size=len(df))
-    plain = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
-    clustered = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit(
+    plain = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    clustered = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit(
         cov_type="cluster", cov_kwds={"cluster": "cluster"}
     )
 
@@ -284,8 +284,8 @@ def test_fixed_effect_nested_in_the_cluster_is_not_counted_in_the_df():
     # because the cluster absorbs it.  PyFixest's k_fixef="nonnested" does the
     # same, so e(rank) and e(df_r) shrink here while the slopes stay identical.
     df = _panel()  # cluster == firm // 2 is nested within the firm effect
-    plain = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
-    nested = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit(
+    plain = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    nested = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit(
         cov_type="cluster", cov_kwds={"cluster": "cluster"}
     )
 
@@ -300,7 +300,7 @@ def test_fixed_effect_nested_in_the_cluster_is_not_counted_in_the_df():
 
 def test_f_statistic_is_the_wald_test_of_the_slopes():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
 
     b = res.params.to_numpy()
     V = res.cov
@@ -312,7 +312,7 @@ def test_f_statistic_is_the_wald_test_of_the_slopes():
 # ------------------------------------------------------------- 6. summary
 def test_stata_summary_renders_coef_and_model_name():
     df = _panel()
-    fitted = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    fitted = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
     text = fitted.summary(style="stata")
 
     for token in ("Coefficient", "Std. err.", "P>|t|", "Number of obs"):
@@ -329,7 +329,7 @@ def test_absorbed_regressor_is_reported_and_warned():
     df["firm_mean"] = df.groupby("firm")["x1"].transform("mean")
 
     with pytest.warns(RuntimeWarning, match="firm_mean"):
-        res = FEOLS.from_formula("y ~ x1 + firm_mean | firm", df).fit()
+        res = RegressHighDimFixedEffects.from_formula("y ~ x1 + firm_mean | firm", df).fit()
 
     assert res.absorbed == ["firm_mean"]
     assert "firm_mean" not in res.params.index
@@ -340,14 +340,14 @@ def test_collinear_duplicate_regressor_is_reported():
     df["x1_copy"] = df["x1"]
 
     with pytest.warns(RuntimeWarning, match="x1_copy"):
-        res = FEOLS.from_formula("y ~ x1 + x1_copy | firm", df).fit()
+        res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x1_copy | firm", df).fit()
 
     assert res.absorbed == ["x1_copy"]
 
 
 def test_no_absorbed_columns_is_an_empty_list():
     df = _panel()
-    assert FEOLS.from_formula("y ~ x1 | firm", df).fit().absorbed == []
+    assert RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit().absorbed == []
 
 
 # ------------------------------------------------------- 8. error handling
@@ -355,7 +355,7 @@ def test_no_absorbed_columns_is_an_empty_list():
 def test_unknown_cov_type_raises_value_error(cov_type):
     df = _panel()
     with pytest.raises(ValueError, match="cov_type"):
-        FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type=cov_type)
+        RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit(cov_type=cov_type)
 
 
 def test_robust_is_accepted_as_statas_own_spelling():
@@ -368,8 +368,8 @@ def test_robust_is_accepted_as_statas_own_spelling():
     """
 
     df = _panel()
-    spelled = FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type="robust")
-    explicit = FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type="HC1")
+    spelled = RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit(cov_type="robust")
+    explicit = RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit(cov_type="HC1")
     assert spelled.cov_type == "HC1"
     assert np.allclose(spelled.bse, explicit.bse), (
         "cov_type='robust' and cov_type='HC1' must produce the same covariance: "
@@ -384,20 +384,20 @@ def test_hc2_hc3_are_rejected_rather_than_silently_approximated(cov_type):
     # either, so westata must say so instead of returning an approximation.
     df = _panel()
     with pytest.raises(ValueError, match=cov_type):
-        FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type=cov_type)
+        RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit(cov_type=cov_type)
 
 
 def test_cluster_requires_cluster_labels():
     df = _panel()
     with pytest.raises(ValueError, match="cluster"):
-        FEOLS.from_formula("y ~ x1 | firm", df).fit(cov_type="cluster")
+        RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit(cov_type="cluster")
 
 
 def test_cov_type_is_case_insensitive():
     df = _panel()
-    lower = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit(cov_type="cluster",
+    lower = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit(cov_type="cluster",
                                                              cov_kwds={"cluster": "cluster"})
-    upper = FEOLS.from_formula("y ~ x1 + x2 | firm", df).fit(cov_type="CLUSTER",
+    upper = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm", df).fit(cov_type="CLUSTER",
                                                              cov_kwds={"cluster": "cluster"})
     np.testing.assert_allclose(lower.cov, upper.cov, rtol=0, atol=0)
 
@@ -406,7 +406,7 @@ def test_cov_type_is_case_insensitive():
 def test_weights_require_an_explicit_weight_type():
     df = _panel()
     with pytest.raises(WeightError):
-        FEOLS.from_formula("y ~ x1 | firm", df, weights=np.ones(len(df)))
+        RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df, weights=np.ones(len(df)))
 
 
 def test_aweight_matches_statsmodels_wls_with_dummies():
@@ -417,7 +417,7 @@ def test_aweight_matches_statsmodels_wls_with_dummies():
     X, _ = _dummy_design(df, ["firm"], ["x1", "x2"])
     ref = sm.WLS(df["y"], X, weights=df["w"]).fit()
 
-    res = FEOLS.from_formula(
+    res = RegressHighDimFixedEffects.from_formula(
         "y ~ x1 + x2 | firm", df, weights=df["w"], weight_type="aweight"
     ).fit()
 
@@ -430,7 +430,7 @@ def test_pweight_defaults_to_robust_inference():
     df = _panel()
     df["w"] = np.random.default_rng(5).uniform(0.5, 2.0, size=len(df))
 
-    res = FEOLS.from_formula(
+    res = RegressHighDimFixedEffects.from_formula(
         "y ~ x1 + x2 | firm", df, weights=df["w"], weight_type="pweight"
     ).fit()
     assert res.cov_type == "HC1"
@@ -439,7 +439,7 @@ def test_pweight_defaults_to_robust_inference():
 # ----------------------------------------------------- 10. misc invariants
 def test_residuals_and_fitted_values_reconstruct_the_dependent_variable():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 + x2 | firm + year", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | firm + year", df).fit()
     assert res.nobs == len(df)
     np.testing.assert_allclose(
         res.fittedvalues + res.resid, df["y"].to_numpy(), rtol=0, atol=1e-8
@@ -448,6 +448,6 @@ def test_residuals_and_fitted_values_reconstruct_the_dependent_variable():
 
 def test_dist_is_t_and_model_name_is_reghdfe():
     df = _panel()
-    res = FEOLS.from_formula("y ~ x1 | firm", df).fit()
+    res = RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", df).fit()
     assert res.dist == "t"
     assert res.model_name == "reghdfe"

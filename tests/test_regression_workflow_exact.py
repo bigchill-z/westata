@@ -51,7 +51,7 @@ def costs():
 def test_the_multiple_regression_coefficients_match_stata(wages) -> None:
     """C05-01."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
     assert float(fitted.params["s"]) == pytest.approx(0.10264304, abs=1e-8)
     assert float(fitted.params["expr"]) == pytest.approx(0.03811890, abs=1e-8)
 
@@ -59,7 +59,7 @@ def test_the_multiple_regression_coefficients_match_stata(wages) -> None:
 def test_the_joint_test_matches_stata(wages) -> None:
     """C05-06: `test s expr tenure` reports F = 113.026860."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
     result = fitted.test("s expr tenure")
     assert float(result.statistic) == pytest.approx(113.026860, abs=1e-4)
 
@@ -67,7 +67,7 @@ def test_the_joint_test_matches_stata(wages) -> None:
 def test_a_single_restriction_against_a_value_matches(wages) -> None:
     """C05-04: `test s = 0.1` is a different hypothesis from `s = 0`."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr + tenure + smsa + rns", wages).fit()
     against_value = fitted.test("s = 0.1")
     against_zero = fitted.test("s = 0")
     assert float(against_value.statistic) != pytest.approx(
@@ -78,7 +78,7 @@ def test_a_single_restriction_against_a_value_matches(wages) -> None:
 def test_the_robust_standard_errors_match_stata(costs) -> None:
     """C06-01: `reg ..., robust` is HC1 and the package picks it from the command name."""
 
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf", costs
     ).fit(cov_type="robust")
 

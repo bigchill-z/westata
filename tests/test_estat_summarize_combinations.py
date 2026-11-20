@@ -30,7 +30,7 @@ def weighted_clustered():
     frame = pd.DataFrame(
         {"y": rng.normal(size=n), "x1": rng.normal(size=n)}
     )
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "y ~ x1", frame, weights=weights, weight_type="fweight"
     ).fit()
     groups = (np.arange(n) % 7).astype(int)

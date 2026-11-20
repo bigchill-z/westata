@@ -78,8 +78,8 @@ STATA_QREG = {
 
 @pytest.mark.parametrize("quantile", sorted(STATA_QREG))
 def test_qreg_coefficients_match_stata(quantile):
-    QuantileRegression = _require("QuantileRegression")
-    model = QuantileRegression.from_formula(
+    QuantileRegress = _require("QuantileRegress")
+    model = QuantileRegress.from_formula(
         "y ~ x1 + x2", quantile_frame(), quantile=quantile
     )
     result = model.fit()
@@ -92,8 +92,8 @@ def test_qreg_coefficients_match_stata(quantile):
 
 @pytest.mark.parametrize("quantile", sorted(STATA_QREG))
 def test_qreg_pseudo_r2_matches_stata(quantile):
-    QuantileRegression = _require("QuantileRegression")
-    result = QuantileRegression.from_formula(
+    QuantileRegress = _require("QuantileRegress")
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", quantile_frame(), quantile=quantile
     ).fit()
 
@@ -110,8 +110,8 @@ def test_qreg_standard_errors_match_stata(quantile):
     density of the residuals instead would shift these by ~29%.
     """
 
-    QuantileRegression = _require("QuantileRegression")
-    result = QuantileRegression.from_formula(
+    QuantileRegress = _require("QuantileRegress")
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", quantile_frame(), quantile=quantile
     ).fit()
 
@@ -124,7 +124,7 @@ def test_qreg_standard_errors_match_stata(quantile):
 def test_qreg_median_is_close_to_ols_on_homoskedastic_data():
     """On iid errors the conditional median equals the conditional mean."""
 
-    QuantileRegression = _require("QuantileRegression")
+    QuantileRegress = _require("QuantileRegress")
     rng = np.random.default_rng(11)
     n = 800
     x1 = rng.normal(size=n)
@@ -132,8 +132,8 @@ def test_qreg_median_is_close_to_ols_on_homoskedastic_data():
     y = 1.0 + 2.0 * x1 - 0.5 * x2 + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x1": x1, "x2": x2})
 
-    quantile = QuantileRegression.from_formula("y ~ x1 + x2", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    quantile = QuantileRegress.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         quantile.params[["Intercept", "x1", "x2"]].to_numpy(),
@@ -143,9 +143,9 @@ def test_qreg_median_is_close_to_ols_on_homoskedastic_data():
 
 
 def test_rreg_matches_stata_and_beats_ols():
-    RobustRegression = _require("RobustRegression")
+    RobustRegress = _require("RobustRegress")
     frame = outlier_frame()
-    robust = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    robust = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     # Stata: x1 2.014204, x2 -.5340517, _cons .9933214.
     assert float(robust.params["x1"]) == pytest.approx(2.014204, rel=1e-2)
@@ -153,7 +153,7 @@ def test_rreg_matches_stata_and_beats_ols():
     assert float(robust.params["Intercept"]) == pytest.approx(0.9933214, rel=2e-2)
 
     # The DGP slope is 2.0; OLS is dragged away by the 5% contamination.
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     assert abs(float(robust.params["x1"]) - 2.0) < abs(float(plain.params["x1"]) - 2.0)
 
 # ------------------------------------------------------- sqreg / bsqreg
@@ -162,9 +162,9 @@ def test_rreg_matches_stata_and_beats_ols():
 def test_sqreg_coefficients_match_stata():
     """The point estimates are qreg's, which are already verified above."""
 
-    Sqreg = _require("Sqreg")
+    SimultaneousQuantileRegress = _require("SimultaneousQuantileRegress")
     frame = quantile_frame()
-    result = Sqreg.from_formula(
+    result = SimultaneousQuantileRegress.from_formula(
         "y ~ x1 + x2", frame, quantiles=(0.25, 0.5, 0.75)
     ).fit(reps=20, seed=1)
 
@@ -177,9 +177,9 @@ def test_sqreg_coefficients_match_stata():
 
 
 def test_bsqreg_coefficients_match_stata():
-    Bsqreg = _require("Bsqreg")
+    BootstrappedQuantileRegress = _require("BootstrappedQuantileRegress")
     frame = quantile_frame()
-    result = Bsqreg.from_formula("y ~ x1 + x2", frame, quantile=0.5).fit(
+    result = BootstrappedQuantileRegress.from_formula("y ~ x1 + x2", frame, quantile=0.5).fit(
         reps=20, seed=1
     )
     x1, _, x2, _, cons, _, _ = STATA_QREG[0.5]
@@ -205,9 +205,9 @@ def test_sqreg_bootstrap_standard_errors_are_the_right_order():
     E2, not E3.
     """
 
-    Sqreg = _require("Sqreg")
+    SimultaneousQuantileRegress = _require("SimultaneousQuantileRegress")
     frame = quantile_frame()
-    result = Sqreg.from_formula(
+    result = SimultaneousQuantileRegress.from_formula(
         "y ~ x1 + x2", frame, quantiles=(0.25, 0.5, 0.75)
     ).fit(reps=200, seed=1)
 
@@ -230,8 +230,8 @@ def test_qreg_robust_standard_errors_match_stata_exactly():
     ``tau(1-tau)X'X``. The general-tau moment form is not directly evidenced.
     """
 
-    QuantileRegression = _require("QuantileRegression")
-    result = QuantileRegression.from_formula(
+    QuantileRegress = _require("QuantileRegress")
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", quantile_frame(), quantile=0.5
     ).fit(cov_type="robust")
 
@@ -242,7 +242,7 @@ def test_qreg_robust_standard_errors_match_stata_exactly():
 
     # The robust and iid columns must differ -- if they were identical the
     # "robust" label would be silently doing nothing.
-    iid = QuantileRegression.from_formula(
+    iid = QuantileRegress.from_formula(
         "y ~ x1 + x2", quantile_frame(), quantile=0.5
     ).fit(cov_type="iid")
     assert float(result.bse["x1"]) != pytest.approx(float(iid.bse["x1"]), rel=1e-6)
@@ -258,8 +258,8 @@ def test_rreg_standard_errors_are_close_but_not_exact():
     earlier version was 26-36% wrong, which this band would still catch.
     """
 
-    RobustRegression = _require("RobustRegression")
-    result = RobustRegression.from_formula("y ~ x1 + x2", outlier_frame()).fit()
+    RobustRegress = _require("RobustRegress")
+    result = RobustRegress.from_formula("y ~ x1 + x2", outlier_frame()).fit()
 
     assert float(result.bse["x1"]) == pytest.approx(0.0564219, rel=6e-2)
     assert float(result.bse["x2"]) == pytest.approx(0.0525755, rel=6e-2)

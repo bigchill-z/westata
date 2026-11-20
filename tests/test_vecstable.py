@@ -26,7 +26,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.vecstable import vecstable
+from westata.postestimation.vecstable import vec_stable
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -44,7 +44,7 @@ def fitted_vecm():
 
 
 def test_modulus_matches_stata(fitted_vecm) -> None:
-    result = vecstable(fitted_vecm)
+    result = vec_stable(fitted_vecm)
     assert len(result.modulus) == 4
     for got, expected in zip(result.modulus, STATA_MODULUS):
         assert got == pytest.approx(expected, abs=5e-6), (got, expected)
@@ -53,7 +53,7 @@ def test_modulus_matches_stata(fitted_vecm) -> None:
 def test_the_complex_pair_matches_stata(fitted_vecm) -> None:
     """-.2233155 +- .6276579i, which no real-valued formula would produce by accident."""
 
-    values = vecstable(fitted_vecm).eigenvalues
+    values = vec_stable(fitted_vecm).eigenvalues
     pair = [complex(v) for v in values if abs(complex(v).imag) > 1e-9]
     assert len(pair) == 2
     for value in pair:
@@ -64,7 +64,7 @@ def test_the_complex_pair_matches_stata(fitted_vecm) -> None:
 def test_the_imposed_unit_root_is_reported(fitted_vecm) -> None:
     """A VECM of rank 1 in 2 equations must show exactly one unit modulus."""
 
-    result = vecstable(fitted_vecm)
+    result = vec_stable(fitted_vecm)
     assert sum(1 for value in result.modulus if abs(value - 1.0) < 1e-9) == 1
     assert result.stable is True
 
@@ -72,7 +72,7 @@ def test_the_imposed_unit_root_is_reported(fitted_vecm) -> None:
 def test_the_companion_is_not_the_var_companion(fitted_vecm) -> None:
     """Guard the wrong-object trap: VAR(2) eigenvalues are different numbers."""
 
-    values = vecstable(fitted_vecm).modulus
+    values = vec_stable(fitted_vecm).modulus
     var_like = (0.82182, 0.797022, 0.668533, 0.668533)
     for expected in var_like:
         assert all(abs(value - expected) > 1e-3 for value in values)

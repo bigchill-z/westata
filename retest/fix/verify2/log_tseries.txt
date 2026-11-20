@@ -3,12 +3,12 @@
 E3. TSERIES V1-V6
 ====================================================================================================
 
-[E3a] V1 VAR SE / e(Sigma) / e(V) + V2 vargranger chi2
+[E3a] V1 VAR SE / e(Sigma) / e(V) + V2 var_granger chi2
   VAR(1)  b=5.112e-15(A) se=1.316e-16(A) e(Sigma)=7.981e-16(A) e(V)=7.181e-16(A)
   VAR(2)  b=1.103e-14(A) se=3.778e-16(A) e(Sigma)=6.379e-16(A) e(V)=9.269e-15(A)
-  vargranger y1<-y2: method=Wald df=1 Stata(equiv test)=23.260492259500 westata=23.260492259500 rel=2.597e-15(A) p_rel=1.415e-06
-  vargranger y2<-y1: method=Wald df=1 Stata(equiv test)=40.743237194781 westata=40.743237194781 rel=6.976e-16(A) p_rel=1.736e-10
-  Stata vargranger prints:
+  var_granger y1<-y2: method=Wald df=1 Stata(equiv test)=23.260492259500 westata=23.260492259500 rel=2.597e-15(A) p_rel=1.415e-06
+  var_granger y2<-y1: method=Wald df=1 Stata(equiv test)=40.743237194781 westata=40.743237194781 rel=6.976e-16(A) p_rel=1.736e-10
+  Stata var_granger prints:
       |                y1                 y2 |   23.26     1    0.000    |
       |                y1                ALL |   23.26     1    0.000    |
       |                y2                 y1 |  40.743     1    0.000    |
@@ -28,7 +28,7 @@ E3. TSERIES V1-V6
   pperron y_rw, trend                    stat=-2.6370155090845 westata_stat=-2.637015509084476 cv_stata=[-3.98804, -3.42804, -3.13] cv_westata=[-3.98804 -3.42804 -3.13   ]
        cv rel=1.114e-16 (A)
 
-[E3c] V4 vecrank critical values (Johansen table)
+[E3c] V4 vec_rank critical values (Johansen table)
   westata 5% trace cv = [15.41  3.76]
   westata 5% maxeig cv = [14.07  3.76]
   90% column is nan: True

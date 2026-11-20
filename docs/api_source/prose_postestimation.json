@@ -38,7 +38,7 @@
     "zh": "对因子变量估计均值做方差分析式对比（Stata `contrast`）。`term` 是该因子在设计矩阵中的前缀（`'C(g)'` 或 `'g'`），按数据变量匹配，因此 `'C(g)'` 也能找到用 `C(g, base='a')` 拟合出的列。`method='r'` 把各水平与参照水平比较，`'g'` 与未加权总均值比较（L 行），`'a'` 比较相邻水平；其他取值抛出 `UnsupportedError`，不会静默退回某个默认值。返回每个对比一个 `LincomResult`，按水平顺序排列；可调用为 `ws.contrast(result, term, method)` 或 `result.contrast(term, method)`。",
     "example": "ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]"
   },
-  "pwcompare": {
+  "pairwise_compare": {
     "stata": "pwcompare g",
     "en": "All pairwise differences between the levels of a factor variable (Stata `pwcompare`). Row (i, j) with j > i reports `level_j - level_i`, so a factor with L levels yields L*(L-1)/2 rows in that order; the example indexes the first of them because the return value is a list. `adjust` accepts only `None` -- Stata's `adjust(none)` -- because every real multiple-comparison correction is unimplemented, and anything else raises `UnsupportedError` rather than dropping the correction silently. Reachable as `ws.pwcompare(result, term)` or `result.pwcompare(term)`.",
     "zh": "因子变量各水平之间的全部两两差异（Stata `pwcompare`）。当 j > i 时第 (i, j) 行报告 `水平_j - 水平_i`，因此 L 个水平按此顺序给出 L*(L-1)/2 行；由于返回值是列表，示例取其中第一个。`adjust` 只接受 `None`——即 Stata 的 `adjust(none)`——因为所有真正的多重比较校正都未实现，传入其他值会抛出 `UnsupportedError`，而不是把校正悄悄丢掉。可调用为 `ws.pwcompare(result, term)` 或 `result.pwcompare(term)`。",
@@ -68,7 +68,7 @@
     "notes_en": "Non-IV results, GMM fits, and -- for a different reason -- LIML fits all raise `NotImplementedError`; `lags` on a non-HAC VCE raises `ValueError` (`lags() only valid with models with HAC VCEs`).",
     "notes_zh": "非 IV 结果、GMM 拟合，以及理由不同的 LIML 拟合，都会抛出 `NotImplementedError`；在非 HAC VCE 上给 `lags` 则抛出 `ValueError`（`lags() only valid with models with HAC VCEs`）。"
   },
-  "estat_firststage": {
+  "estat_first_stage": {
     "stata": "estat firststage",
     "en": "IV first-stage diagnostics (Stata `estat firststage`). For each endogenous regressor it reports the R-squared and adjusted R-squared of its regression on all exogenous variables, the partial R-squared of the excluded instruments, and the joint F of those instruments. With more than one endogenous regressor the report switches to Shea's partial R-squared unless `all=True`, and `forcenonrobust=True` reports the minimum-eigenvalue statistic and its critical values even under a robust VCE. Reachable as `ws.estat_firststage(result)` or `result.estat_firststage()`.",
     "zh": "工具变量的一阶段诊断（Stata `estat firststage`）。对每个内生回归元，报告其对外生变量回归的 R² 与调整 R²、被排除工具变量的偏 R²，以及这些工具变量的联合 F。内生回归元多于一个时，报告会切换为 Shea 偏 R²，除非给出 `all=True`；`forcenonrobust=True` 使得在稳健 VCE 下仍报告最小特征值统计量及其临界值。可调用为 `ws.estat_firststage(result)` 或 `result.estat_firststage()`。",
@@ -84,7 +84,7 @@
     "notes_en": "`y` and `mu` default to the retained response and fitted means; pass them explicitly when the result did not keep a usable residual.",
     "notes_zh": "`y` 与 `mu` 默认取结果中保留的响应值与拟合均值；当结果未保留可用的残差时请显式传入。"
   },
-  "estat_hettest": {
+  "estat_heteroskedasticity_test": {
     "stata": "estat hettest",
     "en": "Breusch-Pagan / Cook-Weisberg test for heteroskedasticity (Stata `estat hettest`). The auxiliary regression is of the standardised squared residual on the fitted values when `variables` is omitted -- that is what `hettest.ado:110-115` does with no varlist, and it is NOT the same test as `rhs=True`, which regresses on all of `e(b)`'s regressors (chi2(1) = 7.89 versus chi2(2) = 24.17 on `regress mpg weight foreign`). `variables` names source data variables (`'rep78'` is the raw 1-5 column, one degree of freedom) or, failing that, design columns (`'foreign[T.Foreign]'`). The DEFAULT statistic is `e(mss)/2` of that regression, not `N*R2`; `method='iid'` gives `N*R2` and `method='fstat'` the auxiliary F. Estimation weights are reused by the auxiliary regression, so `fweight`/`iweight` `e(N)` is `sum(w)`. A robust or clustered VCE, pweighted data and a `noconstant` fit are refused, as `hettest.ado` refuses them. All statistics verified against captured StataNow 19.5 output. Reachable as `ws.estat_hettest(result)` or `result.estat_hettest()`.",
     "zh": "Breusch-Pagan / Cook-Weisberg 异方差检验（Stata `estat hettest`）。省略 `variables` 时，辅助回归是标准化残差平方对**拟合值**的回归——这正是 `hettest.ado:110-115` 在没有变量列表时的行为，它与 `rhs=True`（对 `e(b)` 全部回归元回归）**不是**同一个检验（`regress mpg weight foreign` 上分别为 chi2(1)=7.89 与 chi2(2)=24.17）。`variables` 优先按原始数据变量名解析（`'rep78'` 就是原始 1-5 那一列，自由度 1），否则按设计矩阵列名解析（`'foreign[T.Foreign]'`）。**默认**统计量是该辅助回归的 `e(mss)/2`，而不是 `N*R2`；`method='iid'` 给出 `N*R2`，`method='fstat'` 给出辅助回归的 F。估计权重会被辅助回归复用，因此 `fweight`/`iweight` 的 `e(N)` 是 `sum(w)`。稳健或聚类 VCE、pweight 数据以及 `noconstant` 拟合都会被拒绝，与 `hettest.ado` 一致。全部统计量已对照 StataNow 19.5 的实际输出验证。可调用为 `ws.estat_hettest(result)` 或 `result.estat_hettest()`。",
@@ -92,13 +92,13 @@
     "notes_en": "`normal` combined with `iid`/`fstat` is rejected, matching Stata's `opts_exclusive`. `mtest()` requires a multi-regressor auxiliary regression: `hettest.ado:126-128` silently drops it when only one regressor is used, so the varlist-less call returns just the simultaneous test.",
     "notes_zh": "`normal` 与 `iid`/`fstat` 组合会被拒绝，与 Stata 的 `opts_exclusive` 一致。`mtest()` 要求辅助回归有多个回归元：`hettest.ado:126-128` 在只有一个回归元时会静默丢弃它，因此无变量列表的调用只返回联合检验。"
   },
-  "estat_imtest": {
+  "estat_information_matrix_test": {
     "stata": "estat imtest, white",
     "en": "Cameron & Trivedi's information-matrix test after `regress` (Stata `estat imtest`): a decomposition of the score test into heteroskedasticity, skewness and kurtosis components plus the total. `white=True` also computes White's original test, which is the heteroskedasticity component reported on its own. Weights and `cluster()` are refused because `imtest.ado` refuses them -- the statistic would then be computed from the unweighted residual geometry and mean something else -- and a non-`regress` result raises `NotImplementedError`. Reachable as `ws.estat_imtest(result)` or `result.estat_imtest()`.",
     "zh": "`regress` 之后 Cameron & Trivedi 的信息矩阵检验（Stata `estat imtest`）：把得分检验分解为异方差、偏度、峰度三个分量以及总和。`white=True` 另外计算 White 的原始检验，即单独报告的异方差分量。权重与 `cluster()` 会被拒绝，因为 `imtest.ado` 也拒绝它们——否则统计量会由未加权的残差几何算出，含义已经不同——非 `regress` 结果抛出 `NotImplementedError`。可调用为 `ws.estat_imtest(result)` 或 `result.estat_imtest()`。",
     "example": "ws.estat_imtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), white=True)"
   },
-  "estat_overid": {
+  "estat_overidentification": {
     "stata": "estat overid",
     "en": "Test of the overidentifying restrictions after an IV fit (Stata `estat overid`). For 2SLS and LIML it reports Sargan and its finite-sample Basmann variant, `N*(1 - rss_aux/rss_main)`, where the auxiliary regression is of the IV residuals on ALL instruments -- included exogenous variables plus excluded instruments -- and dividing by the auxiliary RSS instead would give a statistic with no distribution. For GMM it returns Hansen's J from `e(J)`, because Sargan assumes homoskedasticity and J does not. Exactly identified models, a clustered VCE, and a `lags` value on a non-HAC fit are all refused. Reachable as `ws.estat_overid(result)` or `result.estat_overid()`.",
     "zh": "工具变量拟合之后的过度识别约束检验（Stata `estat overid`）。对 2SLS 与 LIML 报告 Sargan 及其有限样本 Basmann 变体，`N*(1 - rss_aux/rss_main)`，其中辅助回归是 IV 残差对**全部**工具变量回归——包含外生变量与被排除工具变量——若改用辅助回归的残差平方和作分母，得到的统计量没有分布。对 GMM 返回 `e(J)` 中的 Hansen J，因为 Sargan 假定同方差而 J 不假定。恰好识别模型、聚类 VCE，以及在非 HAC 拟合上给 `lags` 都会被拒绝。可调用为 `ws.estat_overid(result)` 或 `result.estat_overid()`。",
@@ -106,7 +106,7 @@
     "notes_en": "`lags` is the HAC prewhitening truncation and defaults to 1 under a HAC VCE, 0 otherwise; Stata rejects a negative value and so does this.",
     "notes_zh": "`lags` 是 HAC 预白化截断阶数，HAC VCE 下默认为 1，否则为 0；Stata 拒绝负值，本实现同样拒绝。"
   },
-  "estat_ovtest": {
+  "estat_omitted_variables_test": {
     "stata": "estat ovtest",
     "en": "Ramsey's RESET test for omitted variables (Stata `estat ovtest`). By default the auxiliary regression adds the second, third and fourth powers of the fitted values RESCALED to [0, 1]; the rescaling is not cosmetic -- the fourth power of a fitted value in the hundreds makes the auxiliary design ill-conditioned, and dropping it changes the statistic. The test is the joint F on those three added terms. `rhs=True` takes Stata's alternative path and uses powers of the right-hand-side variables, where an indicator regressor contributes only its own level. Reachable as `ws.estat_ovtest(result)` or `result.estat_ovtest()`. A model fitted WITHOUT a constant is refused on both paths: `ovtest.ado:7` is `_isfit cons anovaok`, so Stata answers `not appropriate after regress, nocons` (r(301)) for `reg y x1 x2, noconstant` followed by `estat ovtest`. That is a precondition rather than an option check, and skipping it is dangerous: the unguarded default path returned `F(3, 195) = 64.86, p = 3.9e-29` for a fit Stata refuses to test. (`estat imtest` does accept a noconstant fit, so the rule is specific to the tests that presuppose a constant.) When the auxiliary design contains two columns that are the same direction -- which is what happens when a regressor is an exact polynomial of another, e.g. `exper2 = exper^2` beside `exper` -- `df` depends on the order the columns are swept. `OvTestResult.ambiguous` reports this and the printed block carries a warning line. Stata resolves that ordering internally before it sweeps, and the choice depends on variable STORAGE PRECISION as well as on the values: on one dataset the six powers are `float` or `double` depending on whether they were written through a `.dta` file or generated in memory, and `recast double` moved Stata's answer from `df = 8` to `df = 7` with F going from 3525.13 to 1.06. Given a fixed dataset Stata is deterministic -- six consecutive runs gave identical output -- but which column it omits cannot be predicted from the design alone. With the internal reordering disabled (`set tol r 0`) Stata's output matches this package's exactly.",
     "zh": "Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助回归加入**重标度到 [0, 1]** 的拟合值的二、三、四次幂；重标度并非装饰——量级上百的拟合值的四次幂会让辅助设计矩阵病态，去掉它会改变统计量。检验是这三个新增项的联合 F。`rhs=True` 走 Stata 的另一条路径，改用右端变量的幂，其中示性变量只贡献自身水平。可调用为 `ws.estat_ovtest(result)` 或 `result.estat_ovtest()`。 **不带常数项**的拟合两条路径都会拒绝：`ovtest.ado:7` 第一行就是 `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答 `not appropriate after regress, nocons`（r(301)）。这是先决条件而非选项检查，漏掉它很危险：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回 `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而接受 `noconstant` 拟合，所以这条规则只属于以常数项为前提的那些检验。） 当辅助设计阵中存在两列方向完全相同时——即某个回归量恰是另一个的精确多项式，例如 `exper2 = exper^2` 与 `exper` 并列——`df` 取决于列的扫掠顺序。`OvTestResult.ambiguous` 会标出这一点，打印的块里也有一行 warning。Stata 在扫掠前会在内部决定这个顺序，而该选择既取决于数值，也取决于变量的**存储精度**：同一份数据上，六个幂次是 `float` 还是 `double` 取决于它们来自 `.dta` 文件还是在内存中生成，`recast double` 就让 Stata 的答案从 `df = 8` 变成 `df = 7`，F 从 3525.13 变成 1.06。给定一份固定数据，Stata 是确定性的——连续 6 次运行输出完全相同——但它丢哪一列无法仅从设计阵推断。把内部重排关掉（`set tol r 0`）后，Stata 的输出与本包完全一致。",
@@ -138,7 +138,7 @@
     "notes_en": "Only `logit`/`probit` results are accepted: `ologit` sets no `e(estat_cmd)` and has no such subcommand.",
     "notes_zh": "只接受 `logit`/`probit` 结果：`ologit` 不设 `e(estat_cmd)`，没有该子命令。"
   },
-  "estat_esize": {
+  "estat_effect_size": {
     "stata": "estat esize",
     "en": "Effect sizes for a linear model (Stata `estat esize`): eta-squared, which is R-squared, by default; `epsilon=True` gives epsilon-squared and `omega=True` omega-squared, the two adjusted-R-squared analogues that differ only in the denominator, where omega adds one `MS_error` and is therefore the smaller and the less negative on a null effect. The two options are mutually exclusive, as `esize.ado`'s `opts_exclusive` enforces, and only the eta-squared interval is defined, from the noncentral F. Only `regress`/`areg`/`anova` fits are served. Use `result.estat_esize()` or `westata.postestimation.esize.estat_esize(result)`; like `estat auc` it is not re-exported into the top-level `ws` namespace.",
     "zh": "线性模型的效应量（Stata `estat esize`）：默认给出 eta 平方，也就是 R 平方；`epsilon=True` 给出 epsilon 平方，`omega=True` 给出 omega 平方，这两个调整 R 平方的类比只在分母上不同，omega 多加上一个 `MS_error`，因此更小、在零效应下也不那么负。两个选项互斥，由 `esize.ado` 的 `opts_exclusive` 强制；只有 eta 平方有区间定义，来自非中心 F 分布。只服务 `regress`/`areg`/`anova` 拟合。请用 `result.estat_esize()` 或 `westata.postestimation.esize.estat_esize(result)`；与 `estat auc` 一样，它没有被重新导出到顶层 `ws` 命名空间。",
@@ -170,7 +170,7 @@
     "notes_en": "Stata always performs multiple testing but adjusts nothing by default, so a single variable drops the adjusted p-value and reports `r(chi2)`/`r(df)`/`r(p)`, while several variables keep it in the `r(mtest)` matrix instead. Here one variable returns a single result and several return a table; the table's `to_dict()` flattens the p-value column to `{'p_<var>': ...}` and `to_frame()` keeps chi2, df and both p-values.",
     "notes_zh": "Stata 总是做多重检验但默认不做校正，因此单变量时丢弃校正后的 p 值并报告 `r(chi2)`/`r(df)`/`r(p)`，多变量时则把它放在 `r(mtest)` 矩阵里。此处单个变量返回单个结果，多个变量返回一张表；该表的 `to_dict()` 把 p 值列压平为 `{'p_<变量>': ...}`，`to_frame()` 则保留 chi2、df 与两个 p 值。"
   },
-  "estat_weakrobust": {
+  "estat_weak_instrument_robust": {
     "stata": "estat weakrobust",
     "en": "Weak-instrument-robust inference (Stata `estat weakrobust`): it reports the Anderson-Rubin test, whose distribution does not depend on instrument strength. That is Stata's default for a just-identified model; for an overidentified one Stata's default is Moreira's conditional likelihood-ratio test, and since CLR needs a simulated conditional distribution that is not implemented here, an overidentified fit must pass `ar=True` or the call raises `NotImplementedError` with that reason. `betanull` sets the null on the endogenous coefficients: a mapping, a positional sequence, or `None` for all zero. Use `result.estat_weakrobust()` or `westata.postestimation.weakrobust.estat_weakrobust(result, ar=True)`; it is not re-exported into `ws`.",
     "zh": "对弱工具变量稳健的推断（Stata `estat weakrobust`）：报告 Anderson-Rubin 检验，其分布不依赖工具变量的强度。这是 Stata 在恰好识别模型下的默认；对过度识别模型，Stata 的默认是 Moreira 的条件似然比检验，而 CLR 需要模拟条件分布、本包未实现，因此过度识别拟合必须传入 `ar=True`，否则以该理由抛出 `NotImplementedError`。`betanull` 设定内生系数上的原假设：可用映射、按位置对应的序列，或 `None` 表示全为零。请用 `result.estat_weakrobust()` 或 `westata.postestimation.weakrobust.estat_weakrobust(result, ar=True)`；它没有被重新导出到 `ws`。",
@@ -194,7 +194,7 @@
     "notes_en": "Estimate the components WITHOUT `vce(robust)`/`vce(cluster)`, as `suest.sthlp` advises: `suest` supplies the robust covariance itself, so a robust component would be doubly corrected.",
     "notes_zh": "按 `suest.sthlp` 的建议，各分量应在**不带** `vce(robust)`/`vce(cluster)` 的情况下估计：`suest` 自身就给出稳健协方差，带稳健分量的结果会被重复校正。"
   },
-  "newey": {
+  "newey_west": {
     "stata": "newey y x1 x2, lag(2)",
     "en": "Newey-West regression, `newey depvar indepvars, lag(#)` (Stata `newey`). This one is a FUNCTION, not a class: pass a formula and a frame and get a NeweyWestResult. `lag` is required and must be non-negative; `time=` plays the role of `tsset` and enables the `Checkt` spacing validation, with `force=True` allowing irregularly spaced values; only `aweight` is accepted. The `e()` collection is rewritten to `newey`'s own list, so the keys `regress` stores but `newey` does not (`r2`, `rss`, `mss`, `rmse`, `sigma`, `ll`, ...) are REMOVED rather than left behind.",
     "zh": "Newey-West 回归，`newey 被解释变量 解释变量, lag(#)`（Stata `newey`）。它是一个**函数**而非类：传入公式与数据框，得到 NeweyWestResult。`lag` 必填且不得为负；`time=` 扮演 `tsset` 的角色并启用 `Checkt` 间隔校验，`force=True` 允许时间取值不等间隔；只接受 `aweight`。`e()` 集合被改写为 `newey` 自己的清单，因此 `regress` 会存而 `newey` 不存的键（`r2`、`rss`、`mss`、`rmse`、`sigma`、`ll` 等）会被**删除**，而不是留在里面。",
@@ -292,7 +292,7 @@
     "zh": "Stata 原生 `summarize` 表：每个变量的非缺失数、均值、标准差、最小值与最大值，一行 71 个字符。这是**六列**形式；`estat_summarize` 是估计样本变体（无 Obs 列、表头不同），两者不能互相替代。数值按 `%9.0g` 打印，所以同一列中 `106.2666` 与 `29.61636` 的小数位不同。`weights` 切换为频数权重，此时 Obs 单元格按 Stata 的做法报告权重和。",
     "example": "ws.summarize(base, ['y', 'x1'])"
   },
-  "vargranger": {
+  "var_granger": {
     "stata": "vargranger",
     "en": "Granger causality Wald tests for a fitted VAR, as the boxed table Stata prints: one row per excluded variable under each equation's heading, then an ALL row that re-tests them jointly. Every row is 70 characters. The statistics come from the same Wald test `granger_causality` performs; note that `granger_causality(a, b)` reports the test in equation `a` excluding `b` -- the parameter is NAMED `causing` but holds the equation, and swapping them silently exchanges the two chi2 values.",
     "zh": "对已拟合 VAR 的格兰杰因果 Wald 检验，输出 Stata 的方框表：每个方程标题下逐个列出被排除变量，再加一行 ALL 做联合检验，每行 70 字符。统计量来自 `granger_causality` 所做的同一个 Wald 检验；注意 `granger_causality(a, b)` 表示**方程 a 排除 b**——参数名叫 `causing` 但装的是方程名，写反会静默对调两个 chi2 值。",
@@ -306,7 +306,7 @@
     "zh": "Stata `ereturn list` 的四个块：scalars、macros、matrices、functions——顺序固定，每块后跟一个空行。标量与宏用**不同的分隔符**（` =  ` 两个空格 对 一个空格加冒号），两块按**类型**划分：字符串进 macros、数字进 scalars，因此以后新增的宏不会被错误归档。标量值打印至多 16 位有效数字，无前导零、无尾随零。",
     "example": "ws.format_ereturn_list(ws.OLS.from_formula('y ~ x1', base).fit())"
   },
-  "tebalance_summarize": {
+  "treatment_balance_summarize": {
     "stata": "tebalance summarize",
     "en": "Covariate balance after a matching fit: each covariate's standardized difference and variance ratio, raw versus matched, plus the four observation counts. The formulas come from `_tebalance_summarize.ado`: standardized difference is `(m1 - m0) / sqrt((v1 + v0)/2)` and the variance ratio is `v1 / v0`, with the matched columns reweighting the control side by the matching weights. Pass the treated/control weights as `match_weights`.",
     "zh": "匹配后的协变量平衡性：每个变量的标准化差与方差比（原始与匹配后），以及四个观测计数。公式取自 `_tebalance_summarize.ado`：标准化差为 `(m1 - m0) / sqrt((v1 + v0)/2)`，方差比为 `v1 / v0`，匹配列用匹配权重重新加权对照组。把处理/对照权重作为 `match_weights` 传入。",
@@ -314,7 +314,7 @@
     "notes_en": "On the reference nsw_dw fit, seven of eight covariates reproduce Stata to every printed digit; the eighth (`age`) differs because the tie weights are distributed slightly differently, and that residual is documented rather than hidden.",
     "notes_zh": "在参考的 nsw_dw 拟合上，八个协变量中有七个与 Stata 逐位一致；第八个（`age`）因并列权重的分配方式略有不同而有残差，该差异被记录而非隐藏。"
   },
-  "teffects_psmatch": {
+  "treatment_effects_psmatch": {
     "stata": "teffects psmatch ..., atet",
     "en": "ATET by propensity-score nearest-neighbour matching. The propensity score comes from a logit of the treatment on the covariates (Stata's default treatment model). Ties matter: every control at the k-th smallest distance is a match, not just one, which is what makes the number match Stata. On the reference data the n(1) tie count reaches 8 and the n(4) count reaches 11, and those counts are reported.",
     "zh": "`teffects_psmatch` 做倾向得分最近邻匹配的 ATET。倾向得分来自处理变量对协变量的 logit（Stata 默认的处理模型）。并列（ties）是关键：第 k 小距离上的**所有**对照都算匹配，而不只取一个，这正是与 Stata 吻合的原因。参考数据上 `nneighbor=1` 的并列数可达 8、`nneighbor=4` 可达 11，这些计数会一并报告。",
@@ -322,7 +322,7 @@
     "notes_en": "The Abadie-Imbens AI-robust standard error is not reproduced, so se/z/p/ci are NaN rather than a plausible guess.",
     "notes_zh": "未复现 Abadie-Imbens 的 AI 稳健标准误，因此 se/z/p/ci 为 NaN，而不是一个看似合理的猜测值。"
   },
-  "teffects_nnmatch": {
+  "treatment_effects_nnmatch": {
     "stata": "teffects nnmatch ..., atet",
     "en": "ATET by nearest-neighbour matching on the Mahalanobis distance (Stata's default metric, `e(metric)` reads \"mahalanobis\"), using the inverse sample covariate covariance. The same tie rule as `teffects_psmatch` applies: all controls at the k-th smallest distance are used and averaged. `caliper` caps the distance; a treated unit with no control inside it raises rather than borrowing a distant one, which is Stata's \"no matches\" condition.",
     "zh": "在马氏距离（Stata 默认度量，`e(metric)` 为 \"mahalanobis\"）上做最近邻匹配的 ATET，使用样本协方差矩阵的逆。并列规则与 `teffects_psmatch` 相同：第 k 小距离上的所有对照都被使用并取平均。`caliper` 限定最大距离；处理组个体若在 caliper 内没有对照则报错，而不是借用远处的对照，这正是 Stata 的 \"no matches\" 情形。",
@@ -336,7 +336,7 @@
     "notes_en": "The automatic model search is NOT aligned with Stata. Stata's own choice fits the pre-period far worse than the exhaustive optimum, because its regression setup differs from any reconstruction attempted here; a test asserts the mismatch so the two paths are not mistaken for equivalent.",
     "notes_zh": "自动模型搜索**未**与 Stata 对齐。Stata 自身的选择在前期拟合上远差于穷举最优，因为它的回归设定与这里任何重建都不同；有一条测试显式断言这一不匹配，避免两条路径被误认为等价。"
   },
-  "rdrobust": {
+  "rd_robust": {
     "stata": "rdrobust depvar runvar, c(#)",
     "en": "Sharp regression-discontinuity estimate: two local polynomial fits, one each side of the cutoff, differenced at the cutoff. The POINT ESTIMATE is exact (verified on real data to nine significant digits). `bandwidth` must be supplied -- Stata's MSE-optimal selector is not implemented, so `None` raises rather than silently choosing one.",
     "zh": "尖锐断点回归估计：切点两侧各做一个局部多项式拟合，在切点处相减。**点估计精确**（在真实数据上验证到九位有效数字）。必须显式给出 `bandwidth`——Stata 的 MSE 最优带宽选择器未实现，所以 `None` 会报错而不是静默选一个。",
@@ -362,7 +362,7 @@
     "zh": "这不是一个导出的函数。`logit ..., or` 通过 `result.summary(style=\"stata\", odds_ratio=True)` 表达：对估计值、其标准误和两个区间端点取指数，并把列名改为 `Odds ratio`；z 与 P>|z| **不变**，因为它们由原始尺度计算。",
     "example": "print(ws.Logit.from_formula('yb ~ x1 + x2', base).fit().summary(style='stata', odds_ratio=True)[-400:])"
   },
-  "PraisResult": {
+  "PraisResults": {
     "stata": "prais depvar indepvars",
     "en": "Result of the Prais-Winsten AR(1) estimator. It exposes params/bse/pvalues/tvalues, rmse, both R-squareds, the Durbin-Watson statistics before and after the transformation, and records the estimated autocorrelation `rho`, the iteration count and whether the iteration converged, because the estimator is iterative and `maxiter`/`tolerance` control it.",
     "zh": "Prais-Winsten AR(1) 估计的结果。除常规接口外，它还记录估计出的自相关系数 `rho`、迭代次数以及是否收敛，因为该估计量是迭代的，由 `maxiter`/`tolerance` 控制。",
@@ -380,7 +380,7 @@
     "zh": "KPSS 平稳性检验——其原假设与旁边的单位根检验**相反**：`H0: 序列（趋势）平稳`。`trend=True` 围绕确定性趋势检验，`False` 围绕常数检验。p 值应读作**反对**平稳性的证据，这一点在紧邻 `dfuller` 使用时容易搞反。",
     "example": "print(ws.kpss(base['y'].to_numpy()))"
   },
-  "dfgls": {
+  "df_gls": {
     "stata": "dfgls varname",
     "en": "DF-GLS (Elliott-Rothenberg-Stock) unit-root test: a GLS-detrended Dickey-Fuller, which has better power than the ordinary ADF near the unit root. The reported statistic and critical values come from the ERS tables, not the Dickey-Fuller ones.",
     "zh": "`ws.dfgls` 是 DF-GLS（Elliott-Rothenberg-Stock）单位根检验：经 GLS 去趋势的 Dickey-Fuller，在接近单位根时比普通 ADF 有更好的功效。报告的统计量与临界值来自 ERS 表，而非 Dickey-Fuller 表。",
@@ -398,7 +398,7 @@
     "zh": "Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**原始回归元加上滞后残差**回归；包含原始回归元才能保证有效性，省掉它们就变成了另一个（无效的）检验。滞后取自**时间轴**而非行轴：传 `time=`（估计样本的列名，或期数值数组）即可复现 `tsset` 语义——某个期在样本里缺失时该行的滞后是缺失值，而不是把缺口两侧的行接起来。实测 `icecream.dta` 删去 `time == 5` 后，Stata 为 4.220，按行序则为 3.286。缺失的滞后默认补 0，`nomiss0` 则保持缺失。稳健或聚类 VCE 之后、跨多个单位的面板数据上、以及非 `regress` 拟合上都会拒绝，与 Stata 的 r(198)/r(459)/r(321) 一致。",
     "example": "print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
   },
-  "estat_corrgram": {
+  "estat_correlogram": {
     "stata": "estat corrgram",
     "en": "Correlogram: autocorrelations, partial autocorrelations, the Ljung-Box Q statistic and its p-value at each lag. The default order is `max(1, min(int(n/2) - 2, 40))` (`corrgram.ado:18`). The PAC is the coefficient on lag k in a regression of the residual on its first k lags WITH a constant (`pac.ado:128-156`), not the Yule-Walker recursion. `time=` supplies the `tsset` axis, so a gap makes those lags missing; Stata then prints `(note: time series has 1 gap)` and this reproduces it. A PAC that cannot be estimated prints `.` and draws no bar.",
     "zh": "相关图：各滞后阶的自相关、偏自相关、Ljung-Box Q 统计量及其 p 值。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`corrgram.ado:18`）。偏自相关是残差对其前 k 阶滞后**带常数项**回归中第 k 阶的系数（`pac.ado:128-156`），不是 Yule-Walker 递推。`time=` 提供 `tsset` 时间轴，缺口处滞后即为缺失；Stata 此时打印 `(note: time series has 1 gap)`，本包一致。无法估计的偏自相关打印 `.` 且不画条形。",
@@ -410,19 +410,19 @@
     "zh": "白噪声的混成（Ljung-Box）检验：序列到 `lags` 阶的自相关是否联合为零。与 `estat bgodfrey` 不同，它检验的是**序列**而非回归残差，因此传入数值序列，或一个你要取其残差的结果对象。默认阶数是 `max(1, min(int(n/2) - 2, 40))`（`ac.ado:71`），与上一次回归估了几个参数无关，且有 **40 的上限**——n = 758 时 Stata 报 chi2(40)，而不是 377。`time=` 给它 `tsset` 的时间轴；有缺口时那些配对从自协方差和中剔除，并多打一行 `(note: time series has N gaps)`。",
     "example": "print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))"
   },
-  "xttest0": {
+  "panel_test0": {
     "stata": "xttest0 (after xtreg, re)",
     "en": "Breusch-Pagan Lagrange-multiplier test for random effects: whether the panel variance component is zero. It is a test of `sigma_u = 0`, which is why it follows a RANDOM-effects fit -- a fixed-effects fit has already absorbed `u`, so the test does not apply.",
     "zh": "随机效应的 Breusch-Pagan 拉格朗日乘数检验：面板方差分量是否为零，即检验 `sigma_u = 0`。这是它必须跟在**随机效应**拟合之后的原因——固定效应已经吸收了 `u`，该检验不适用。",
     "example": "d = base.assign(firm=np.repeat(np.arange(20), 10), t=np.tile(np.arange(10), 20))\nf = ws.RandomEffects.from_formula('y ~ x1', d, entity='firm', time='t').fit()\nprint(ws.xttest0(f, entity=d['firm']))"
   },
-  "varsoc": {
+  "var_select_order": {
     "stata": "varsoc varlist, maxlag(#)",
     "en": "Lag-order selection criteria for a VAR: for each candidate order, the final prediction error, AIC, HQIC and SBIC, with the minimising order starred per criterion. The four criteria often disagree, and Stata stars each independently rather than picking one for you.",
     "zh": "`ws.varsoc` 给出 VAR 的滞后阶选择准则：对每个候选阶数给出最终预测误差、AIC、HQIC 与 SBIC，并按各准则分别给最小者加星。四个准则经常不一致，Stata 是各自加星而不是替你选一个。",
     "example": "print(ws.varsoc(base[['y1','y2']].to_numpy(), maxlag=2))"
   },
-  "vecrank": {
+  "vec_rank": {
     "stata": "vecrank varlist, lags(#)",
     "en": "Johansen cointegration rank test, with the trace and maximum-eigenvalue forms and their 5% critical values. `lags` counts the VAR lag order as Stata does; `lags(1)` is handled separately because at one lag there are no lagged differences to regress out, so both sides of the reduced-rank regression are residualised on a constant alone.",
     "zh": "Johansen 协整秩检验，含 trace 与最大特征值两种形式及其 5% 临界值。`lags` 按 Stata 的习惯计 VAR 的滞后阶数；`lags(1)` 单独处理，因为一阶滞后没有可剔除的滞后差分，简秩回归两侧都只对常数取残差。",
@@ -430,49 +430,49 @@
     "notes_en": "`trend` accepts only \"constant\"; the other Stata trend specifications are refused rather than approximated.",
     "notes_zh": "`trend` 只接受 \"constant\"；Stata 的其他趋势设定会被拒绝，而不是近似处理。"
   },
-  "varlmar": {
+  "var_lmar": {
     "stata": "varlmar",
     "en": "Lagrange-multiplier test for residual autocorrelation in a fitted VAR: for lags 1 to `mlag`, whether the residuals are autocorrelated at that order. The null is no autocorrelation at the given lag.",
     "zh": "已拟合 VAR 的残差自相关拉格朗日乘数检验：对 1 到 `mlag` 的每一阶，检验残差在该阶是否存在自相关。原假设为该阶无自相关。",
     "example": "print(ws.varlmar(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit(), mlag=1))"
   },
-  "varstable": {
+  "var_stable": {
     "stata": "varstable",
     "en": "Eigenvalue stability condition for a fitted VAR: the companion matrix's moduli beside their eigenvalues. The process is stable when every modulus lies strictly inside the unit circle, and Stata flags any that do not.",
     "zh": "`ws.varstable` 检查已拟合 VAR 的特征值稳定性条件：伴随矩阵各特征值的模与其特征值并列。当所有模都严格落在单位圆内时过程稳定，Stata 会把不满足的标出来。",
     "example": "print(ws.varstable(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))"
   },
-  "varwle": {
+  "var_wle": {
     "stata": "varwle",
     "en": "Wald lag-exclusion tests for a VAR: for each equation, whether each lag's coefficients are jointly zero, plus an ALL row. The statistic is a Wald chi2 built from the coefficient covariance, so it needs the full lag block rather than one coefficient at a time.",
     "zh": "`ws.varwle` 给出 VAR 的 Wald 滞后排除检验：对每个方程，检验每一阶的系数是否联合为零，另加一行 ALL。统计量由系数协方差构造的 Wald chi2，因此需要整个滞后块，而不是逐个系数。",
     "example": "print(ws.varwle(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))"
   },
-  "veclmar": {
+  "vec_lmar": {
     "stata": "veclmar",
     "en": "Lagrange-multiplier test for residual autocorrelation in a fitted VECM, the VECM counterpart of `varlmar`. Run on the differenced residuals, so the lag numbering refers to differences, not levels.",
     "zh": "已拟合 VECM 的残差自相关拉格朗日乘数检验，即 `varlmar` 的 VECM 对应物。它作用于差分后的残差，因此滞后编号指的是差分而不水平值。",
     "example": "print(ws.veclmar(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit(), mlag=1))"
   },
-  "vecstable": {
+  "vec_stable": {
     "stata": "vecstable",
     "en": "Eigenvalue stability condition for a fitted VECM. Note the VECM must actually have a short-run block to check: with `lags=1` there is none and the check raises rather than returning an empty table.",
     "zh": "已拟合 VECM 的特征值稳定性条件。注意该 VECM 必须确实存在短期块可供检验：`lags=1` 时没有短期块，检验会报错而不是返回空表。",
     "example": "print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))"
   },
-  "teffects_ra": {
+  "treatment_effects_ra": {
     "stata": "teffects ra (depvar covars) (treat)",
     "en": "Regression-adjustment treatment effect: fit the outcome model separately in the treated and control groups, then average the predicted difference over the estimand's population (`ate` over everyone, `atet` over the treated). The point estimate is exact; the standard error is not reproduced because the sandwich is computed inside Stata's builtin `gmm`, so se/z/p/ci are NaN.",
     "zh": "回归调整法处理效应：在处理组与对照组分别拟合结果模型，再对估计量的总体平均预测差（`ate` 对所有个体、`atet` 对处理组）。点估计精确；标准误未复现，因为 sandwich 由 Stata 内置 `gmm` 计算，因此 se/z/p/ci 为 NaN。",
     "example": "print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)"
   },
-  "AucResult": {
+  "AucResults": {
     "stata": "estat auc after logit/probit",
     "en": "The object `estat_auc` returns: the area under the ROC curve (`area`) and the number of observations it was computed on (`n`). Read the numbers with `to_dict()`; `str()` is not defined because Stata prints a one-line table rather than a block.",
     "zh": "`estat_auc` 返回的对象：ROC 曲线下面积（`area`）与计算所用的观测数（`n`）。用 `to_dict()` 取数；Stata 打印的是一行式表格而非整块，因此没有定义 `str()`。",
     "example": "r = ws.estat_auc(ws.Logit.from_formula('yb ~ x1', base).fit())\nprint(round(r.area, 6))"
   },
-  "BgTestResult": {
+  "BgTestResults": {
     "stata": "estat bgodfrey",
     "en": "The object `estat_bgodfrey` returns, one row per tested lag order: `to_frame()` gives the lag, the chi-square statistic and its p-value for each row.",
     "zh": "`estat_bgodfrey` 返回的对象，每个被检验的滞后阶一行：`to_frame()` 给出每行的滞后阶、卡方统计量与 p 值。",
@@ -496,73 +496,73 @@
     "zh": "`estat_corrgram` 返回的对象：每个滞后阶一行，含自相关、偏自相关及其 Q 统计量。`to_frame()` 给出表格，`to_dict()` 给出每行一个字典。",
     "example": "r = ws.estat_corrgram(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)\nprint(r.to_frame())"
   },
-  "DFGLSResult": {
+  "DFGLSResults": {
     "stata": "dfgls",
     "en": "The object `dfgls` returns: one cell per candidate lag order (`to_frame()` is the table Stata prints), plus `trend` (which deterministic case was run) and `variable`.",
     "zh": "`dfgls` 返回的对象：每个候选滞后阶一格（`to_frame()` 即 Stata 打印的表格），另有 `trend`（所跑的确定性情形）与 `variable`。",
     "example": "r = ws.dfgls(base.y.to_numpy())\nprint(r.to_frame().head(3))"
   },
-  "DurbinWatsonResult": {
+  "DurbinWatsonResults": {
     "stata": "estat dwatson",
     "en": "The object `estat_dwatson` returns: the Durbin-Watson statistic `d`, its degrees of freedom `df`, the sample size `nobs`, and `n_gaps` (missing periods the time axis had to skip).",
     "zh": "`estat_dwatson` 返回的对象：Durbin-Watson 统计量 `d`、自由度 `df`、样本量 `nobs`，以及 `n_gaps`（时间轴被迫跳过的缺失期数）。",
     "example": "r = ws.estat_dwatson(ws.OLS.from_formula('y ~ x1', base).fit())\nprint(round(r.d, 6))"
   },
-  "EffectSizeResult": {
+  "EffectSizeResults": {
     "stata": "estat esize",
     "en": "The object `estat_esize` returns: `kind` ('eta2'/'epsilon2'/'omega2'), the `estimate`, and for eta-squared the confidence bounds `ci_lower`/`ci_upper` at the requested `level` (a fraction, e.g. 0.95).",
     "zh": "`estat_esize` 返回的对象：`kind`（'eta2'/'epsilon2'/'omega2'）、`estimate`；对 eta-squared 还有按 `level`（分数，如 0.95）给出的置信界 `ci_lower`/`ci_upper`。",
     "example": "r = ws.estat_esize(ws.OLS.from_formula('y ~ x1 + x2', base).fit())\nprint(round(r.estimate, 6))"
   },
-  "EndogScoreResult": {
+  "EndogScoreResults": {
     "stata": "estat endogenous (score form)",
     "en": "The object `endog_score_test` returns. `to_dict()` gives the robust score statistic, its degrees of freedom and p-value; this is the form Stata uses when the VCE is robust or clustered.",
     "zh": "`endog_score_test` 返回的对象。`to_dict()` 给出稳健得分统计量、自由度与 p 值；这是 Stata 在 VCE 为稳健或聚类时采用的形式。",
     "example": "from westata.postestimation.endog_score import endog_score_test\nprint('see estat_endogenous for a runnable end-to-end example')"
   },
-  "KpssResult": {
+  "KpssResults": {
     "stata": "kpss",
     "en": "The object `kpss` returns: one row per tested lag (`to_frame()`), each with the KPSS statistic and its critical values for the `trend` case that was requested.",
     "zh": "`kpss` 返回的对象：每个被检验的滞后一行（`to_frame()`），每行含 KPSS 统计量与所请求 `trend` 情形下的临界值。",
     "example": "r = ws.kpss(base.y.to_numpy())\nprint(r.to_frame().head(3))"
   },
-  "LfitResult": {
+  "LfitResults": {
     "stata": "estat gof, lfit",
     "en": "The Hosmer-Lemeshow style goodness-of-fit result: `to_dict()` gives the Pearson chi-square, its p-value and the group count. It is the second object `estat_gof` can return, alongside `GofResult`.",
     "zh": "Hosmer-Lemeshow 式拟合优度结果：`to_dict()` 给出 Pearson 卡方、p 值与分组数。它是 `estat_gof` 除 `GofResult` 之外可能返回的第二种对象。",
     "example": "fit = ws.Logit.from_formula('yb ~ x1', base).fit()\nprint(ws.estat_gof(fit, group=10).to_dict())"
   },
-  "LinkTestResult": {
+  "LinkTestResults": {
     "stata": "linktest",
     "en": "The object `ws.linktest` returns: the hat and hatsq coefficients of the link test (`_hat`, `_hatsq`), their standard errors and the p-value of `_hatsq` -- the term that detects a link misspecification.",
     "zh": "`ws.linktest` 返回的对象：连接检验的 hat 与 hatsq 系数（`_hat`、`_hatsq`）、其标准误，以及 `_hatsq` 的 p 值——用于发现连接函数误设的那一项。",
     "example": "r = ws.linktest(ws.OLS.from_formula('y ~ x1', base).fit())\nprint(round(r.pvalue, 6))"
   },
-  "LmarResult": {
+  "LmarResults": {
     "stata": "varlmar / veclmar",
     "en": "The Lagrange-multiplier autocorrelation result for a VAR/VECM: `to_frame()` gives one row per tested lag with the LM statistic and p-value.",
     "zh": "VAR/VECM 的拉格朗日乘子自相关结果：`to_frame()` 给出每个被检验滞后一行，含 LM 统计量与 p 值。",
     "example": "r = ws.varlmar(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit(), mlag=1)\nprint(r.to_frame())"
   },
-  "MTestResult": {
+  "MTestResults": {
     "stata": "estat hettest, mtest(...)",
     "en": "The multiple-testing-adjusted heteroskedasticity test result: `to_dict()` per variable, `to_frame()` as a table, `to_matrix()` for the raw p-value matrix. `MTEST_METHODS` lists the adjustments Stata offers.",
     "zh": "多重检验校正后的异方差检验结果：逐变量 `to_dict()`、表格 `to_frame()`、原始 p 值矩阵 `to_matrix()`。`MTEST_METHODS` 列出 Stata 提供的校正方法。",
     "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.estat_hettest(fit, mtest='bonferroni')\nprint(r.to_dict())"
   },
-  "MoranResult": {
+  "MoranResults": {
     "stata": "estat moran",
     "en": "The Moran spatial-autocorrelation test result: `to_dict()` gives the Moran I statistic, the expected value under no autocorrelation, the standard deviation and the p-value.",
     "zh": "Moran 空间自相关检验结果：`to_dict()` 给出 Moran I 统计量、无自相关下的期望值、标准差与 p 值。",
     "example": "print('MoranResult is returned by estat_moran; see its entry for a runnable example')"
   },
-  "MundlakResult": {
+  "MundlakResults": {
     "stata": "estat mundlak",
     "en": "The Mundlak specification test result: which terms were tested, the chi-square statistic, its degrees of freedom and the p-value. A rejection means the random-effects estimator is inconsistent.",
     "zh": "Mundlak 设定检验结果：被检验的项、`chibar2` 统计量、其自由度与 `pvalue`。拒绝意味着随机效应估计量不一致。",
     "example": "print('MundlakResult is returned by estat_mundlak; see its entry for a runnable example')"
   },
-  "PortmanteauResult": {
+  "PortmanteauResults": {
     "stata": "wntestq",
     "en": "The portmanteau (Ljung-Box / Box-Pierce) result: the Q statistic, its degrees of freedom and p-value, for the lag order that was used.",
     "zh": "混成（Ljung-Box / Box-Pierce）检验结果：所采用滞后阶下的 `q` 统计量、`df` 自由度与 `pvalue`。",
@@ -574,13 +574,13 @@
     "zh": "由 `LincomResult` 组成的列表，每个成对比较一行，并能渲染 Stata 的整张成对比较表。`to_frame()` 给出逐比较的行。",
     "example": "fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()\nr = ws.pwcompare(fit, 'firm')\nprint(len(r))"
   },
-  "RegFResult": {
+  "RegFResults": {
     "stata": "estat endogenous (regression form)",
     "en": "The object `endog_regF_test` returns: the regression-based (Wooldridge) robust score statistic, its degrees of freedom and p-value.",
     "zh": "`endog_regF_test` 返回的对象：基于回归的（Wooldridge）稳健得分统计量、自由度与 p 值。",
     "example": "print('RegFResult is returned by endog_regf_test; see estat_endogenous for the command')"
   },
-  "SucestResult": {
+  "SuestResults": {
     "stata": "suest",
     "en": "The stacked result `ws.suest` returns: the combined `params`, `cov_params()` across the models, `to_dict()`/`to_frame()`, and `test`/`lincom` that work on the stacked parameter vector.",
     "zh": "`ws.suest` 返回的堆叠结果：合并后的 `params`、跨模型的 `cov_params()`、`to_dict()`/`to_frame()`，以及作用于堆叠参数向量的 `test`/`lincom`。",
@@ -592,7 +592,7 @@
     "zh": "`ws.summarize` 返回的表格：每个变量一行，含 `Obs`、`Mean`、`Std. dev.`、`Min`、`Max`。`to_dict()`/`to_frame()` 取数，`str()` 打印 Stata 版式。",
     "example": "r = ws.summarize(base, ['y', 'x1'])\nprint(r.to_frame())"
   },
-  "SzroeterResult": {
+  "SzroeterResults": {
     "stata": "estat szroeter",
     "en": "The Szroeter heteroskedasticity test result for a single variable: the statistic, degrees of freedom and p-value, in `to_dict()` form.",
     "zh": "单变量的 Szroeter 异方差检验结果：统计量、自由度与 p 值，以 `to_dict()` 形式给出。",
@@ -604,49 +604,49 @@
     "zh": "`estat_szroeter` 在同时检验多个变量时返回的表格：每个变量一行，用 `to_frame()` 取数。",
     "example": "fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()\nr = ws.estat_szroeter(fit, variables=['x1', 'x2'])\nprint(r.to_frame())"
   },
-  "VarGrangerResult": {
+  "VarGrangerResults": {
     "stata": "vargranger",
     "en": "The Granger-causality table: one row per (caused, causing) pair with the Wald chi-square, its degrees of freedom and p-value. `str()` prints Stata's boxed table.",
     "zh": "Granger 因果检验表：每个（被引起、引起）对一行，含 Wald 卡方、自由度与 p 值。`str()` 打印 Stata 的框线表。",
     "example": "r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())\nprint(len(r.rows))"
   },
-  "VarSocResult": {
+  "VarSocResults": {
     "stata": "varsoc",
     "en": "The lag-order selection table: one row per candidate lag with the AIC, HQIC, SBIC and FPE that Stata prints. `to_frame()` gives the numbers.",
     "zh": "滞后阶选择表：每个候选滞后一行，含 Stata 打印的 AIC、HQIC、SBIC、FPE。`to_frame()` 取数。",
     "example": "r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)\nprint(r.to_frame())"
   },
-  "VarStableResult": {
+  "VarStableResults": {
     "stata": "varstable",
     "en": "The stability check for a fitted VAR: the companion-matrix eigenvalues and whether the process is stable. `to_frame()` gives the eigenvalue table. `plot()` draws what Stata's `varstable, graph` draws: every eigenvalue as a point in the complex plane (real part on x, imaginary part on y) with the unit circle behind it, since a root on or outside that circle is what breaks stability. A bivariate VAR(2) therefore shows FOUR points, one per companion-matrix root, not one per equation. Options: `ax=` to draw into an existing axis, `figsize=`, `labels=True` (the modulus, Stata's `modlabel`) or `labels=\"distance\"` (Stata's `dlabel`), `title=`, `grid=`, `unit_circle=False`. `matplotlib` is imported inside the method, so it stays an optional dependency (`pip install \"westata[plot]\"`).",
     "zh": "对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。`plot()` 画出 Stata `varstable, graph` 的那张图：每个特征值在复平面上的一个点（横轴实部、纵轴虚部），背后是单位圆——落在圆上或圆外正是稳定性被破坏的情形。因此二元 VAR(2) 显示**四个**点，伴随矩阵每个根一个，而不是每个方程一个。可选：`ax=` 画入已有坐标轴、`figsize=`、`labels=True`（模，即 Stata 的 `modlabel`）或 `labels=\"distance\"`（Stata 的 `dlabel`）、`title=`、`grid=`、`unit_circle=False`。`matplotlib` 在方法内部才导入，因此仍是可选依赖（`pip install \"westata[plot]\"`）。",
     "example": "r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())\nprint(r.to_frame())"
   },
-  "VarWleResult": {
+  "VarWleResults": {
     "stata": "varwle",
     "en": "The Wald lag-exclusion test for a fitted VAR: `by_equation()` returns the per-equation statistics; one row per lag and equation.",
     "zh": "对拟合 VAR 的 Wald 滞后排除检验：`by_equation()` 返回逐方程统计量，每个滞后与方程一行。",
     "example": "r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())\nprint(len(r.by_equation()))"
   },
-  "VecRankResult": {
+  "VecRankResults": {
     "stata": "vecrank",
     "en": "The cointegration-rank test table: one row per null rank with the trace and max-eigenvalue statistics and their critical values. `to_frame()` gives the numbers.",
     "zh": "协整秩检验表：每个零假设秩一行，含迹统计量、最大特征值统计量及其临界值。`to_frame()` 取数。",
     "example": "r = ws.vecrank(base[['y', 'x1']].to_numpy(), lags=2)\nprint(r.to_frame().head(2))"
   },
-  "VecStableResult": {
+  "VecStableResults": {
     "stata": "vecstable",
     "en": "The stability check for a fitted VECM: the companion-matrix eigenvalues and their moduli. `to_frame()` gives the table.",
     "zh": "对拟合 VECM 的稳定性检验：伴随矩阵特征值及其模。`to_frame()` 给出表格。",
     "example": "r = ws.vecstable(ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit())\nprint(r.to_frame())"
   },
-  "WeakRobustResult": {
+  "WeakRobustResults": {
     "stata": "estat weakrobust",
     "en": "The weak-instrument-robust inference result: the Anderson-Rubin `statistic`, its `df`, the F form and the p-value.",
     "zh": "弱工具稳健推断结果：Anderson-Rubin 的 `statistic`、`df`、F 形式以及 p 值。",
     "example": "print('WeakRobustResult is returned by estat_weakrobust; see its entry')"
   },
-  "XtTest0Result": {
+  "PanelTest0Results": {
     "stata": "xttest0",
     "en": "The Breusch-Pagan LM test for random effects: `chibar2`, its p-value, and the variance components `var_u`, `var_e`, `var_y`.",
     "zh": "随机效应的 Breusch-Pagan LM 检验：`chibar2`、其 p 值，以及方差成分 `var_u`、`var_e`、`var_y`。",
@@ -664,37 +664,37 @@
     "zh": "由残差计算的稳健内生性得分检验。与 `endog_regf_test` 一样，这是 `estat endogenous` 的内部实现；请直接对已拟合的 IV 结果调用该命令。",
     "example": "print('endog_score_test takes an iv_structure dict; use estat_endogenous on a fitted result')"
   },
-  "estat_ptrends": {
+  "estat_parallel_trends": {
     "stata": "estat ptrends",
     "en": "The parallel-trends test for a `didregress`/`xtdidregress` fit: it compares the pre-treatment trend of the treated group with the controls and returns the statistic, its degrees of freedom and the p-value.",
     "zh": "`didregress`/`xtdidregress` 拟合的平行趋势检验：比较处理组与对照组的处理前趋势，返回统计量、自由度与 p 值。",
     "example": "print('estat_ptrends requires a didregress fit; see ws.Didregress for how to build one')"
   },
-  "RcmResult": {
+  "RcmResults": {
     "stata": "rcm",
     "en": "The object `ws.rcm` returns: the `att`, the selected `predictors`, the fitted `coefficients`, the pre/post years, the observed and `predicted` paths and the per-period `effects`.",
     "zh": "`ws.rcm` 返回的对象：`att`、入选的 `predictors`、拟合的 `coefficients`、前后年份、实际与 `predicted` 路径，以及逐期 `effects`。",
     "example": "print('RcmResult is returned by ws.rcm; it needs a unit/time panel')"
   },
-  "xtserial": {
+  "panel_serial": {
     "stata": "xtserial (user-written, Drukker)",
     "en": "Wooldridge's test for serial correlation in linear panel-data models, the user-written `xtserial` of that name. It differences the response and every regressor (no constant, clustered on the panel), regresses those residuals on their own lag the same way, and tests that the lag coefficient equals -0.5 -- because differencing an AR(1) error leaves `rho - 1`, which is -0.5 when there is no serial correlation. `entity` and `time` play the role of `xtset`. The lag runs on the (panel, time) axis, so a missing period makes the difference missing on both sides of the gap. The first-stage regression -- what Stata prints under `, output` -- is returned on `.first_stage` as an ordinary `StataResults` rather than discarded; `keep_first_stage=False` drops it. Measured on lin_1992.dta: `corr = -0.192578493`, `F = 12.511374217`, `df_r = 27`, `p = 0.001484513`, and the first stage gives N = 420, `r2 = 0.5797`, `F = 902.61`, against StataNow 19.5.",
     "zh": "Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。",
     "example": "d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)\nprint(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))"
   },
-  "XtSerialResult": {
+  "PanelSerialResults": {
     "stata": "xtserial",
     "en": "The Wooldridge panel serial-correlation test. The five `r()` scalars are `corr` (the differenced residual's lag coefficient, about -0.5 under the null), `f` with `df`/`df_r` for the Wald test that it equals -0.5, and `p`. Also `nobs` (the first-stage sample Stata prints), `n_panels`, and `first_stage` -- the differenced regression itself as a `StataResults` -- plus `first_stage_table()` for its rendered table. `str()` reproduces Stata's three-line test block.",
     "zh": "Wooldridge 面板序列相关检验的结果。五个 `r()` 标量为：`corr`（差分残差的滞后系数，原假设下约为 -0.5）、`f` 与 `df`/`df_r`（“该系数等于 -0.5”的 Wald 检验）以及 `p`。另有 `nobs`（Stata 打印的第一阶段样本量）、`n_panels`，以及 `first_stage`——差分回归本身，类型为 `StataResults`——和 `first_stage_table()`（其渲染后的表格）。`str()` 复现 Stata 的三行检验块。",
     "example": "d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)\nr = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')\nprint(round(r.f, 6), r.df_r)"
   },
-  "xtoverid": {
+  "panel_overid": {
     "stata": "xtoverid (user-written: Schaffer & Stillman)",
     "en": "The Sargan-Hansen test of overidentifying restrictions, after a random-effects panel fit -- Stata `xtreg ..., re` followed by the user-written `xtoverid` (2.1.8, Schaffer & Stillman). The command re-estimates the same equation with the WITHIN DEVIATIONS of every regressor added, then tests those added terms jointly to zero: a rejection means the random-effects estimator is inconsistent and the fixed-effects one is preferred. Returns an `XtOveridResult` carrying `statistic`, `df` and `pvalue`, which are Stata's `r(j)`, `r(jdf)` and `r(jp)`. The reference distribution is `chi2(df)`, with `df` equal to the number of slopes. Two details are load-bearing: the auxiliary equation is quasi-demeaned at the ORIGINAL `e(theta)` (the added columns have zero group mean, so re-estimating the variance components drifts them), and the VCE follows the original fit's `e(vcetype)` -- the same equation gives 53.285 under the conventional VCE and 221.225 under `cov_type=\"robust\"`. Only the `xtreg, re` branch is implemented; `xtreg, fe` is refused by the ado itself, and the `xtivreg`/`xtivreg2`/`xthtaylor` branches need `ivreg2` and an instrument set this package does not record, so they raise instead of approximating.",
     "zh": "过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type=\"robust\"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。",
     "example": "fit = ws.RandomEffects.from_formula(\"y ~ x1 + x2\", base, entity=\"firm\", time=\"year\").fit()\nws.xtoverid(fit).to_dict()"
   },
-  "XtOveridResult": {
+  "PanelOveridResults": {
     "stata": "r(j), r(jdf), r(jp) after xtoverid",
     "en": "The object `ws.xtoverid` returns. Fields: `statistic` (`r(j)`), `df` (`r(jdf)`, the number of overidentifying restrictions), `pvalue` (`r(jp)`), `tested` (the names of the coefficients constrained to zero), `description` (what the test compares -- \"fixed vs random effects\" for the `xtreg, re` case) and `model` (the estimator that was re-estimated). `str()` reproduces the three lines Stata prints; `to_dict()` gives the three `r()` names and `to_frame()` a one-row DataFrame.",
     "zh": "`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 \"fixed vs random effects\"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。",

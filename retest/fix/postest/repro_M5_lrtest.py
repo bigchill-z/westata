@@ -114,8 +114,8 @@ def main() -> int:
                 "nested: lrtest L1 B1 (larger first, the documented order)",
                 stata_outcome(st, "lrtest B1 L1"),
                 westata_outcome(lambda: ws.lrtest(
-                    ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(),
-                    ws.OLS.from_formula("mpg ~ weight", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight", auto).fit(),
                 )),
             )
         )
@@ -128,8 +128,8 @@ def main() -> int:
                 "reversed: lrtest L1 B1",
                 stata_outcome(st, "lrtest L1 B1"),
                 westata_outcome(lambda: ws.lrtest(
-                    ws.OLS.from_formula("mpg ~ weight", auto).fit(),
-                    ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(),
                 )),
             )
         )
@@ -142,8 +142,8 @@ def main() -> int:
                 "df = 0: same model twice",
                 stata_outcome(st, "lrtest L1 E2"),
                 westata_outcome(lambda: ws.lrtest(
-                    ws.OLS.from_formula("mpg ~ weight", auto).fit(),
-                    ws.OLS.from_formula("mpg ~ weight", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight", auto).fit(),
                 )),
                 note="Stata r(498); westata must raise ConsistencyError, not report p=1.0",
             )
@@ -157,8 +157,8 @@ def main() -> int:
                 "df = 0 by count only: different regressors, same k",
                 stata_outcome(st, "lrtest N3 L1"),
                 westata_outcome(lambda: ws.lrtest(
-                    ws.OLS.from_formula("mpg ~ foreign", auto).fit(),
-                    ws.OLS.from_formula("mpg ~ weight", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ foreign", auto).fit(),
+                    ws.Regress.from_formula("mpg ~ weight", auto).fit(),
                 )),
                 note="Stata checks the parameter count before the names",
             )
@@ -171,8 +171,8 @@ def main() -> int:
             "non-nested, different k: Stata reports a NEGATIVE LR",
             stata_outcome(st, "lrtest N2 L1"),
             westata_outcome(lambda: ws.lrtest(
-                ws.OLS.from_formula("mpg ~ foreign + length", auto).fit(),
-                ws.OLS.from_formula("mpg ~ weight", auto).fit(),
+                ws.Regress.from_formula("mpg ~ foreign + length", auto).fit(),
+                ws.Regress.from_formula("mpg ~ weight", auto).fit(),
             )),
             note="westata warns that the pair is not nested but still reports the number",
         )
@@ -181,8 +181,8 @@ def main() -> int:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             negative = ws.lrtest(
-                ws.OLS.from_formula("mpg ~ foreign + length", auto).fit(),
-                ws.OLS.from_formula("mpg ~ weight", auto).fit(),
+                ws.Regress.from_formula("mpg ~ foreign + length", auto).fit(),
+                ws.Regress.from_formula("mpg ~ weight", auto).fit(),
             )
         print(f"    westata statistic = {negative.statistic:.15g} (must be < 0)")
         print(f"    westata p         = {negative.pvalue:.15g} (chi2.sf of a negative)")

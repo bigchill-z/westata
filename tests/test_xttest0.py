@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.xttest0 import xttest0
+from westata.postestimation.xttest0 import panel_test0
 
 
 @pytest.fixture(scope="module")
@@ -45,19 +45,19 @@ def balanced_panel() -> pd.DataFrame:
 
 
 def test_chibar2_matches_stata(balanced_panel) -> None:
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", balanced_panel, entity="id", time="t"
     ).fit()
-    test = xttest0(result, entity=balanced_panel["id"])
+    test = panel_test0(result, entity=balanced_panel["id"])
     assert test.chibar2 == pytest.approx(252.58, abs=5e-3)
     assert test.pvalue == pytest.approx(0.0, abs=5e-5)
 
 
 def test_var_y_matches_stata(balanced_panel) -> None:
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", balanced_panel, entity="id", time="t"
     ).fit()
-    test = xttest0(result, entity=balanced_panel["id"])
+    test = panel_test0(result, entity=balanced_panel["id"])
     assert test.var_y == pytest.approx(3.557623, abs=1e-6)
 
 
@@ -69,10 +69,10 @@ def test_the_statistic_uses_pooled_not_random_effects_residuals(balanced_panel) 
     makes the difference between 252.58 and 0.27.
     """
 
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1 + x2", balanced_panel, entity="id", time="t"
     ).fit()
-    test = xttest0(result, entity=balanced_panel["id"])
+    test = panel_test0(result, entity=balanced_panel["id"])
     assert test.chibar2 > 100.0, test.chibar2
 
 
@@ -86,8 +86,8 @@ def test_unbalanced_panels_are_refused() -> None:
     x1 = rng.normal(size=n)
     y = 1.0 + 0.5 * x1 + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x1": x1, "id": ids, "t": np.concatenate([np.arange(s) for s in sizes])})
-    result = ws.RandomEffects.from_formula(
+    result = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="id", time="t"
     ).fit()
     with pytest.raises(Exception):
-        xttest0(result, entity=frame["id"])
+        panel_test0(result, entity=frame["id"])

@@ -236,7 +236,7 @@ with Stata() as st:
 
     # ---- 1. xtreg, fe
     cap_fe = st.estimate("xtreg y x1 x2, fe")
-    res_fe = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+    res_fe = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, fe（平衡）", cap_fe, res_fe, domain=DOMAIN, tolerance=EXACT,
         scalars=("N", "df_r", "r2", "rmse", "F"),
@@ -299,7 +299,7 @@ with Stata() as st:
     st.send(du)
     st.run("xtset id t")
     cap_feu = st.estimate("xtreg y x1 x2, fe")
-    res_feu = ws.PanelOLS.from_formula("y ~ x1 + x2", du, entity="id", time="t").fit()
+    res_feu = ws.PanelRegressFE.from_formula("y ~ x1 + x2", du, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, fe（非平衡）", cap_feu, res_feu, domain=DOMAIN, tolerance=EXACT,
         scalars=("N", "df_r", "r2", "rmse"),
@@ -324,7 +324,7 @@ with Stata() as st:
         command="xtreg y x1 x2, fd",
     )
     cap_fd = st.estimate("regress D.y D.x1 D.x2, noconstant")
-    res_fd = ws.FirstDifferenceOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+    res_fd = ws.PanelRegressFD.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, fd 的等价口径（regress D.y D.x1 D.x2, noconstant）",
         cap_fd, res_fd, domain=DOMAIN, tolerance=EXACT,
@@ -337,7 +337,7 @@ with Stata() as st:
 
     # ---- 4. xtreg, be
     cap_be = st.estimate("xtreg y x1 x2, be")
-    res_be = ws.BetweenOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+    res_be = ws.PanelRegressBE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, be", cap_be, res_be, domain=DOMAIN, tolerance=EXACT,
         scalars=("df_r", "r2"),
@@ -356,7 +356,7 @@ with Stata() as st:
 
     # ---- 5. xtreg, re（默认 GLS）
     cap_re = st.estimate("xtreg y x1 x2, re")
-    res_re = ws.RandomEffects.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+    res_re = ws.PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
     _wmap = {"x1": "x1", "x2": "x2", "_cons": "Intercept"}
     _w_idx = [res_re.param_names.index(_wmap[n]) for n in cap_re.names]
     _Vw = ordered(np.asarray(res_re.cov_params()), _w_idx)
@@ -388,7 +388,7 @@ with Stata() as st:
     st.send(du)
     st.run("xtset id t")
     cap_reu = st.estimate("xtreg y x1 x2, re")
-    res_reu = ws.RandomEffects.from_formula("y ~ x1 + x2", du, entity="id", time="t").fit()
+    res_reu = ws.PanelRegressRE.from_formula("y ~ x1 + x2", du, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, re（非平衡）", cap_reu, res_reu, domain=DOMAIN, tolerance=EXACT,
         scalars=("N", "rmse"),
@@ -404,7 +404,7 @@ with Stata() as st:
     st.run("xtset id t")
     cap_t0 = st.estimate("xtreg y x1 x2, re")
     cap_pool = st.estimate("regress y x1 x2")
-    res_t0 = ws.RandomEffects.from_formula("y ~ x1 + x2", d0, entity="id", time="t").fit()
+    res_t0 = ws.PanelRegressRE.from_formula("y ~ x1 + x2", d0, entity="id", time="t").fit()
     rec.add(compare(
         "xtreg, re 的 theta→0 边界（sigma_u=0 面板）", cap_t0, res_t0, domain=DOMAIN,
         tolerance=EXACT,
@@ -434,8 +434,8 @@ with Stata() as st:
     cap_cl = st.estimate("xtreg y x1 x2, fe vce(cluster id)")
     cap_dfadj = st.estimate("xtreg y x1 x2, fe vce(cluster id) dfadj")
     cap_areg = st.estimate("areg y x1 x2, absorb(id) vce(robust)")
-    res_hc1 = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(cov_type="HC1")
-    res_cl = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
+    res_hc1 = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(cov_type="HC1")
+    res_cl = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit(
         cov_type="cluster", cov_kwds={"clusters": df["id"].to_numpy()})
 
     rec.add(compare(
@@ -555,7 +555,7 @@ with Stata() as st:
 
     # ---- 12. xtgls
     cap = st.estimate("xtgls y x1 x2, panels(heteroskedastic)")
-    res = ws.XtGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
+    res = ws.PanelGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
                                 panels="heteroskedastic", corr="independent").fit()
     rec.add(compare(
         "xtgls, panels(heteroskedastic) corr(independent)", cap, res, domain=DOMAIN,
@@ -570,7 +570,7 @@ with Stata() as st:
     st.send(small)
     st.run("xtset id t")
     cap = st.estimate("xtgls y x1 x2, panels(correlated)")
-    res = ws.XtGls.from_formula("y ~ x1 + x2", small, entity="id", time="t",
+    res = ws.PanelGls.from_formula("y ~ x1 + x2", small, entity="id", time="t",
                                 panels="correlated").fit()
     rec.add(compare(
         "xtgls, panels(correlated)（6 个体 x 8 期，Sigma 满秩）", cap, res, domain=DOMAIN,
@@ -584,7 +584,7 @@ with Stata() as st:
     st.send(df)
     st.run("xtset id t")
     cap_big = st.estimate("xtgls y x1 x2, panels(correlated)")
-    res_big = ws.XtGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
+    res_big = ws.PanelGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
                                     panels="correlated").fit()
     rec.add(compare(
         "xtgls, panels(correlated)（30 个体 x 6 期，Sigma 秩亏）", cap_big, res_big,
@@ -599,7 +599,7 @@ with Stata() as st:
     ))
 
     cap_ar = st.estimate("xtgls y x1 x2, panels(heteroskedastic) corr(ar1)")
-    res_ar = ws.XtGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
+    res_ar = ws.PanelGls.from_formula("y ~ x1 + x2", df, entity="id", time="t",
                                    panels="heteroskedastic", corr="ar1").fit()
     rec.add(compare(
         "xtgls, corr(ar1)", cap_ar, res_ar, domain=DOMAIN,
@@ -610,7 +610,7 @@ with Stata() as st:
 
     # ---- 13. xtpcse
     cap = st.estimate("xtpcse y x1 x2")
-    res = ws.XtPcse.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+    res = ws.PanelPcse.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
     rec.add(compare(
         "xtpcse（平衡，casewise）", cap, res, domain=DOMAIN, tolerance=EXACT,
         scalars=("N", "N_g", "df_m", "r2", "chi2"),
@@ -624,9 +624,9 @@ with Stata() as st:
     cap_cw = st.estimate("xtpcse y x1 x2")
     cap_pw = st.estimate("xtpcse y x1 x2, pairwise")
     common = sorted(set.intersection(*[set(g.t) for _, g in du.groupby("id")]))
-    res_cw = ws.XtPcse.from_formula("y ~ x1 + x2", du, entity="id", time="t",
+    res_cw = ws.PanelPcse.from_formula("y ~ x1 + x2", du, entity="id", time="t",
                                     selection="casewise").fit()
-    res_pw = ws.XtPcse.from_formula("y ~ x1 + x2", du, entity="id", time="t",
+    res_pw = ws.PanelPcse.from_formula("y ~ x1 + x2", du, entity="id", time="t",
                                     selection="pairwise").fit()
     rec.add(compare(
         "xtpcse（非平衡，casewise）", cap_cw, res_cw, domain=DOMAIN, tolerance=EXACT,
@@ -665,7 +665,7 @@ with Stata() as st:
     st.run("xtset id t")
     for meth in ("fe", "re"):
         cap_iv = st.estimate(f"xtivreg y x2 (x1 = z), {meth}")
-        res_iv = ws.XtIvreg.from_formula("y ~ x2 + (x1 = z)", df, entity="id", time="t",
+        res_iv = ws.PanelIVRegress.from_formula("y ~ x2 + (x1 = z)", df, entity="id", time="t",
                                          method=meth).fit()
         extra = {
             "stata_e": {k: cap_iv.scalars.get(k) for k in
@@ -709,7 +709,7 @@ with Stata() as st:
 
     # ---- 15. xtlogit, fe（条件 logistic；重点核对样本 = 非全 0/全 1 的组）
     cap = st.estimate("xtlogit yb x1 x2, fe")
-    res = ws.XtLogit.from_formula("yb ~ x1 + x2", df, entity="id", method="fe").fit()
+    res = ws.PanelLogit.from_formula("yb ~ x1 + x2", df, entity="id", method="fe").fit()
     rec.add(compare(
         "xtlogit, fe（条件 logistic）", cap, res, domain=DOMAIN, tolerance=ITER,
         scalars=("N", "N_g", "N_drop", "N_group_drop", "ll"),
@@ -727,7 +727,7 @@ with Stata() as st:
 
     # ---- 16. xtlogit, pa
     cap = st.estimate("xtlogit yb x1 x2, pa")
-    res = ws.XtLogit.from_formula("yb ~ x1 + x2", df, entity="id", method="pa").fit()
+    res = ws.PanelLogit.from_formula("yb ~ x1 + x2", df, entity="id", method="pa").fit()
     rec.add(compare(
         "xtlogit, pa（GEE，exchangeable 工作相关）", cap, res, domain=DOMAIN, tolerance=ITER,
         scalars=("N", "N_g", "df_m"),
@@ -748,8 +748,8 @@ with Stata() as st:
 
     # ---- 17. xtlogit, re / xtprobit, re
     for label, wcls, cmd in (
-        ("xtlogit, re", ws.XtLogit, "xtlogit yb x1 x2, re"),
-        ("xtprobit, re", ws.XtProbit, "xtprobit yb x1 x2, re"),
+        ("xtlogit, re", ws.PanelLogit, "xtlogit yb x1 x2, re"),
+        ("xtprobit, re", ws.PanelProbit, "xtprobit yb x1 x2, re"),
     ):
         cap = st.estimate(cmd)
         res = wcls.from_formula("yb ~ x1 + x2", df, entity="id", method="re").fit()
@@ -771,7 +771,7 @@ with Stata() as st:
 
     # ---- 18. xttobit
     cap = st.estimate("xttobit ytob x1 x2, ll(0)")
-    res = ws.XtTobit.from_formula("ytob ~ x1 + x2", df, entity="id", lower=0).fit()
+    res = ws.PanelTobit.from_formula("ytob ~ x1 + x2", df, entity="id", lower=0).fit()
     rec.add(compare(
         "xttobit（随机效应 Tobit，ll(0)）", cap, res, domain=DOMAIN, tolerance=ITER,
         scalars=("N", "N_g", "ll", "sigma_u", "sigma_e", "rho"),
@@ -790,7 +790,7 @@ with Stata() as st:
     # ---- 19. xtpoisson fe / re
     for meth in ("fe", "re"):
         cap = st.estimate(f"xtpoisson yc x1 x2, {meth}")
-        res = ws.XtPoisson.from_formula("yc ~ x1 + x2", df, entity="id", method=meth).fit()
+        res = ws.PanelPoisson.from_formula("yc ~ x1 + x2", df, entity="id", method=meth).fit()
         rec.add(compare(
             f"xtpoisson, {meth}", cap, res, domain=DOMAIN, tolerance=ITER,
             scalars=("N", "N_g", "ll"),
@@ -810,7 +810,7 @@ with Stata() as st:
     # ---- 20. xtnbreg, fe
     cap_nb = st.estimate("xtnbreg yc x1 x2, fe")
     cap_po = st.estimate("xtpoisson yc x1 x2, fe")
-    res_nb = ws.XtNbreg.from_formula("yc ~ x1 + x2", df, entity="id", method="fe").fit()
+    res_nb = ws.PanelNbRegress.from_formula("yc ~ x1 + x2", df, entity="id", method="fe").fit()
     cap_nb_s = restrict(cap_nb, {"x1", "x2"})
     assert "_cons" not in cap_nb_s.names, cap_nb_s.names
     _cons_i = cap_nb.names.index("_cons")
@@ -869,8 +869,8 @@ with Stata() as st:
     cap_ab = st.estimate("xtabond y x1 x2, lags(1)")
     cap_abr = st.estimate("xtabond y x1 x2, lags(1) vce(robust)")
     cap_ab2 = st.estimate("xtabond y x1 x2, lags(2)")
-    res_ab = ws.XtAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=1).fit()
-    res_ab2 = ws.XtAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=2).fit()
+    res_ab = ws.PanelAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=1).fit()
+    res_ab2 = ws.PanelAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=2).fit()
     cap_ab_s = restrict(cap_ab, {"L.y", "x1", "x2"})
     cap_ab2_s = restrict(cap_ab2, {"L.y", "L2.y", "x1", "x2"})
     _ci = cap_ab.names.index("_cons")
@@ -950,7 +950,7 @@ with Stata() as st:
     st.send(df)
     st.run("xtset id t")
     cap_ab_static = st.estimate("xtabond y x1 x2, lags(1)")
-    res_ab_static = ws.XtAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t",
+    res_ab_static = ws.PanelAbond.from_formula("y ~ x1 + x2", df, entity="id", time="t",
                                             lags=1).fit()
     rec.add(compare(
         "xtabond 静态面板（无真实动态，弱识别压力测试）",
@@ -983,7 +983,7 @@ with Stata() as st:
                     "cv_1": st.scalar("r(cv_1)"), "cv_5": st.scalar("r(cv_5)"),
                     "cv_10": st.scalar("r(cv_10)"),
                 }
-                w = ws.XtUnitroot.from_formula("y ~ 1", data, entity="id", time="t",
+                w = ws.PanelUnitroot.from_formula("y ~ 1", data, entity="id", time="t",
                                                test="ips").fit()
                 west = {"t-bar": w.details["t-bar"],
                         "t-tilde-bar": w.details["t-tilde-bar"],
@@ -1001,7 +1001,7 @@ with Stata() as st:
                     "sbar": st.scalar("r(sbar)"), "Var_ep": st.scalar("r(Var_ep)"),
                     "mu_adj": st.scalar("r(mu_adj)"), "sig_adj": st.scalar("r(sig_adj)"),
                 }
-                w = ws.XtUnitroot.from_formula("y ~ 1", data, entity="id", time="t",
+                w = ws.PanelUnitroot.from_formula("y ~ 1", data, entity="id", time="t",
                                                test="llc").fit()
                 west = {"Unadjusted t": w.details["Unadjusted t"],
                         "Adjusted t*": w.statistic, "p": w.pvalue,

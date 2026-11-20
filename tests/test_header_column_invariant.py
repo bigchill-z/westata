@@ -64,7 +64,7 @@ def test_a_random_effects_fit_puts_the_equals_at_seventy() -> None:
         }
     )
     frame["hi"] = (frame["y"] > 0).astype(float)
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "hi ~ x", frame, entity="id", time="t", method="re"
     ).fit()
     rendered = str(fitted.summary(style="stata"))

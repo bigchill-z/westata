@@ -61,7 +61,7 @@ def _frame():
 def first_stage():
     frame = _frame()
     fit = ws.IV2SLS.from_formula("y ~ x + [endog ~ z1 + z2]", frame).fit()
-    return ws.estat_firststage(fit)
+    return ws.estat_first_stage(fit)
 
 
 STATA_LINES = [

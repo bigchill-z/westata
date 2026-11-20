@@ -62,7 +62,7 @@ from westata.postestimation.names import is_constant_name
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["HetTestResult", "estat_hettest"]
+__all__ = ["HetTestResults", "estat_heteroskedasticity_test"]
 
 
 #: Methods accepted by ``estat hettest``.
@@ -70,7 +70,7 @@ _METHODS = ("normal", "iid", "fstat")
 
 
 
-class HetTestResult:
+class HetTestResults:
     """The Breusch-Pagan/Cook-Weisberg heteroskedasticity test.
 
     Attributes
@@ -125,7 +125,7 @@ class HetTestResult:
 
     def __repr__(self) -> str:
         return (
-            f"<HetTestResult {self.method}: statistic={self.statistic:.6g} "
+            f"<HetTestResults {self.method}: statistic={self.statistic:.6g} "
             f"df={self.df:g} p={self.pvalue:.4g}>"
         )
 
@@ -449,7 +449,7 @@ def _stata_row_labels(result: Any, used_names: Sequence[str]) -> list[str]:
     return [mapping.get(name, name) for name in used_names]
 
 
-def estat_hettest(
+def estat_heteroskedasticity_test(
     result: Any,
     *,
     method: str = "normal",
@@ -660,7 +660,7 @@ def estat_hettest(
         import pandas as pd
 
         from westata.postestimation.mtest import (
-            MTestResult,
+            MTestResults,
             adjust_pvalues,
             mtest_statistics,
         )
@@ -678,14 +678,14 @@ def estat_hettest(
         )
         if method_key != "noadjust":
             frame["adjustp"] = adjust_pvalues(pvalues, method_key)
-        return MTestResult(frame, method_key)
+        return MTestResults(frame, method_key)
 
     if normalized == "iid":
         # ``chi2 = e(N)*e(r2)``; e(N) is the AUXILIARY regression's observation
         # count, which is the weighted count for a weighted fit.
         statistic = float(effective_n * r2)
         pvalue = float(stats.chi2.sf(statistic, df_m))
-        return HetTestResult(
+        return HetTestResults(
             method="iid",
             statistic=statistic,
             df=df_m,
@@ -703,7 +703,7 @@ def estat_hettest(
                 "estat hettest, fstat needs positive residual degrees of freedom"
             )
         f_stat = (mss / df_m) / (rss_aux / denominator) if rss_aux > 0 else float("inf")
-        return HetTestResult(
+        return HetTestResults(
             method="fstat",
             statistic=float(f_stat),
             df=df_m,
@@ -716,7 +716,7 @@ def estat_hettest(
 
     # Default: chi2 = e(mss)/2.
     statistic = float(mss / 2.0)
-    return HetTestResult(
+    return HetTestResults(
         method="normal",
         statistic=statistic,
         df=df_m,

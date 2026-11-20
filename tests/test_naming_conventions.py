@@ -30,14 +30,43 @@ import check_naming as checker  # noqa: E402
 import naming_map as nm  # noqa: E402
 
 
-def test_contract_is_clean_and_everything_is_pending() -> None:
+def test_contract_is_clean_and_everything_is_done() -> None:
+    """Post-migration: every contract entry has its NEW name in the source tree.
+
+    Before the 0.3.41 migration this asserted "all pending". A contract that still reported
+    pending after a completed migration would mean the checker stopped seeing the result
+    renames -- exactly what happened when result classes went from singular to plural and the
+    derivation lost them.
+    """
+
     report = checker.collect()
     assert report.blocking() == [], [f.where for f in report.blocking()]
     info = report.info["migration"]
     assert info["contract_total"] > 100, "the contract is suspiciously small"
-    assert info["pending"] == info["contract_total"], "source should not be renamed yet"
-    assert info["done"] == 0
+    assert info["pending"] == 0, f"renames still pending: {info['pending']}"
+    assert info["done"] == info["contract_total"], "every rename should be applied"
     assert info["stale_old_missing"] == 0, "no contract entry may reference a nonexistent name"
+
+
+def test_deprecated_aliases_cover_every_rename() -> None:
+    """R-N5: one release of old-name compatibility, bound directly (classes must stay classes)."""
+
+    import westata as ws
+    from westata._compat import RENAMED, RESULT_RENAMED
+
+    # Not every renamed definition was part of the public top-level namespace in 0.3.40
+    # (e.g. PanelDpd lives in estimators.panel_dynamic but was never exported at ws level).
+    # The alias promise covers exactly those names that ARE public -- a private helper that
+    # gets renamed needs no compat alias.
+    for old, new in RENAMED + RESULT_RENAMED:
+        if not hasattr(ws, new):
+            continue
+        assert hasattr(ws, old), f"deprecated alias {old} missing for public {new}"
+
+    # A class alias must BE the class, not a wrapper function: `OLS.from_formula()` and
+    # `isinstance(x, OLS)` must keep working for code written against the old name.
+    assert ws.OLS is ws.Regress
+    assert ws.AucResult is ws.AucResults
 
 
 def test_every_rule_can_fire(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,10 +93,13 @@ def test_every_rule_can_fire(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "R-N2" in rep.findings
     monkeypatch.undo()
 
-    # R-N3: a broken result derivation (target is not plural).
+    # R-N3: a broken result derivation (target is not plural). Inject a singular name into
+    # the defs view so the check has something to test even after migration pluralised them.
+    singular_defs = dict(defs)
+    singular_defs["FakeSingularResult"] = ["tests/fake.py:1"]
     monkeypatch.setattr(nm, "result_rename", lambda old: nm.Rename(old, old, "result"))
     rep = checker.Report()
-    checker.check_rn3(rep, defs)
+    checker.check_rn3(rep, singular_defs)
     assert "R-N3" in rep.findings
     monkeypatch.undo()
 

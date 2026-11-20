@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.synth import SynthResult, synth
+from westata.estimators.synth import SynthResults, synth
 
 UNITS = [1, 2, 3, 4, 5]
 YEARS = list(range(2000, 2009))
@@ -62,7 +62,7 @@ def _base(**kw):
 # ---------------------------------------------------------------------- A. unitnames
 def test_unitnames_puts_string_labels_on_the_weight_rows() -> None:
     res = _base(unitnames="unitname")
-    assert isinstance(res, SynthResult)
+    assert isinstance(res, SynthResults)
     # W_weights rows must be labelled with the string unit names, not numbers.
     assert res.W_weights.shape[1] == 2
     labels = list(res.W_weights[:, 0])
@@ -188,7 +188,7 @@ def test_keep_refuses_to_overwrite_unless_replace(tmp_path) -> None:
 # ------------------------------------------------- D. exposed optimiser tuning parameters
 def test_tuning_parameters_are_accepted() -> None:
     res = _base(margin=0.05, maxiter=500, sigf=7, bound=5)
-    assert isinstance(res, SynthResult)
+    assert isinstance(res, SynthResults)
     assert np.isfinite(res.RMSPE)
 
 
@@ -215,7 +215,7 @@ def test_invalid_tuning_parameters_are_rejected() -> None:
 # ------------------------------------------------------------ E. nested / allopt
 def test_nested_is_accepted_and_returns_a_result() -> None:
     res = _base(nested=True)
-    assert isinstance(res, SynthResult)
+    assert isinstance(res, SynthResults)
     assert np.isfinite(res.RMSPE)
     V = np.asarray(res.V_matrix)
     np.testing.assert_allclose(V, np.diag(np.diag(V)), atol=1e-12)
@@ -225,7 +225,7 @@ def test_nested_is_accepted_and_returns_a_result() -> None:
 
 def test_allopt_implies_nested() -> None:
     res = _base(allopt=True)
-    assert isinstance(res, SynthResult)
+    assert isinstance(res, SynthResults)
     assert np.isfinite(res.RMSPE)
 
 

@@ -110,9 +110,9 @@ STATA_REG_V = np.array(
 
 
 def test_svy_mean_matches_stata_at_full_precision():
-    SvyMean = _require("SvyMean")
+    SurveyMean = _require("SurveyMean")
     frame = survey_frame()
-    result = SvyMean.from_frame(["y"], frame, _design(frame)).fit()
+    result = SurveyMean.from_frame(["y"], frame, _design(frame)).fit()
 
     assert float(result.params.iloc[0]) == pytest.approx(STATA_MEAN_B, rel=1e-10)
     assert float(np.asarray(result.cov_params())[0, 0]) == pytest.approx(
@@ -121,9 +121,9 @@ def test_svy_mean_matches_stata_at_full_precision():
 
 
 def test_svy_regress_coefficients_match_stata_at_full_precision():
-    SvyRegress = _require("SvyRegress")
+    SurveyRegress = _require("SurveyRegress")
     frame = survey_frame()
-    result = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    result = SurveyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
 
     # Stata reports x1, x2, _cons in that order.
     values = np.asarray(result.params, dtype=float)
@@ -137,9 +137,9 @@ def test_svy_regress_variance_matches_stata_at_full_precision():
     matrix 167% wrong while the coefficients stay exact.
     """
 
-    SvyRegress = _require("SvyRegress")
+    SurveyRegress = _require("SurveyRegress")
     frame = survey_frame()
-    result = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    result = SurveyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
 
     covariance = np.asarray(result.cov_params(), dtype=float)
     np.testing.assert_allclose(covariance, STATA_REG_V, rtol=1e-10)
@@ -148,9 +148,9 @@ def test_svy_regress_variance_matches_stata_at_full_precision():
 def test_svy_regress_coefficients_equal_weighted_ols():
     """The point estimate is just weighted least squares; only the VCE is new."""
 
-    SvyRegress = _require("SvyRegress")
+    SurveyRegress = _require("SurveyRegress")
     frame = survey_frame()
-    survey = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    survey = SurveyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
 
     design = np.column_stack([frame["x1"], frame["x2"], np.ones(len(frame))])
     root = np.sqrt(frame["w"].to_numpy())
@@ -162,10 +162,10 @@ def test_svy_regress_coefficients_equal_weighted_ols():
 
 
 def test_equal_weights_reduce_to_ordinary_ols():
-    SvyRegress = _require("SvyRegress")
+    SurveyRegress = _require("SurveyRegress")
     frame = survey_frame().assign(w=1.0)
-    survey = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    survey = SurveyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.sort(np.asarray(survey.params, dtype=float)),
@@ -187,9 +187,9 @@ def test_svy_total_matches_stata_at_full_precision():
     distinguish a survey total from anything else.
     """
 
-    SvyTotal = _require("SvyTotal")
+    SurveyTotal = _require("SurveyTotal")
     frame = survey_frame()
-    result = SvyTotal.from_frame(["y"], frame, _design(frame)).fit()
+    result = SurveyTotal.from_frame(["y"], frame, _design(frame)).fit()
 
     assert float(result.params.iloc[0]) == pytest.approx(STATA_TOTAL_B, rel=1e-12)
     assert float(np.asarray(result.cov_params())[0, 0]) == pytest.approx(
@@ -198,17 +198,17 @@ def test_svy_total_matches_stata_at_full_precision():
 
 
 def test_svy_total_equals_the_weighted_sum():
-    SvyTotal = _require("SvyTotal")
+    SurveyTotal = _require("SurveyTotal")
     frame = survey_frame()
-    result = SvyTotal.from_frame(["y"], frame, _design(frame)).fit()
+    result = SurveyTotal.from_frame(["y"], frame, _design(frame)).fit()
     expected = float((frame["y"] * frame["w"]).sum())
     assert float(result.params.iloc[0]) == pytest.approx(expected, rel=1e-14)
 
 
 def test_degrees_of_freedom_is_psu_minus_strata():
-    SvyMean = _require("SvyMean")
+    SurveyMean = _require("SurveyMean")
     frame = survey_frame()
-    result = SvyMean.from_frame(["y"], frame, _design(frame)).fit()
+    result = SurveyMean.from_frame(["y"], frame, _design(frame)).fit()
 
     n_psu = frame[["stratum", "psu"]].drop_duplicates().shape[0]
     n_strata = frame["stratum"].nunique()
@@ -218,16 +218,16 @@ def test_degrees_of_freedom_is_psu_minus_strata():
 def test_fpc_makes_standard_errors_smaller():
     """(1 - n/N) < 1, so a finite population correction can only shrink V."""
 
-    SvyMean = _require("SvyMean")
+    SurveyMean = _require("SurveyMean")
     frame = survey_frame()
-    without = SvyMean.from_frame(["y"], frame, _design(frame)).fit()
+    without = SurveyMean.from_frame(["y"], frame, _design(frame)).fit()
 
     SurveyDesign = _require("SurveyDesign")
     with_fpc = SurveyDesign.from_frame(
         frame, psu="psu", strata="stratum", weights="w", fpc="fpc",
         singleunit="certainty",
     )
-    corrected = SvyMean.from_frame(["y"], frame, with_fpc).fit()
+    corrected = SurveyMean.from_frame(["y"], frame, with_fpc).fit()
 
     assert float(np.asarray(corrected.cov_params())[0, 0]) < float(
         np.asarray(without.cov_params())[0, 0]
@@ -238,13 +238,13 @@ def test_a_lone_psu_stratum_contributes_no_variance_under_certainty():
     """With singleunit(certainty) a stratum of one PSU has no within-stratum
     variance, so dropping every other PSU from one stratum must not change V."""
 
-    SvyMean = _require("SvyMean")
+    SurveyMean = _require("SurveyMean")
     frame = survey_frame()
-    baseline = SvyMean.from_frame(["y"], frame, _design(frame)).fit()
+    baseline = SurveyMean.from_frame(["y"], frame, _design(frame)).fit()
 
     # Keep a single PSU in stratum 1.
     trimmed = frame[~((frame["stratum"] == 1) & (frame["psu"] > 1))].reset_index(drop=True)
-    reduced = SvyMean.from_frame(["y"], trimmed, _design(trimmed)).fit()
+    reduced = SurveyMean.from_frame(["y"], trimmed, _design(trimmed)).fit()
 
     # V changes because the data changed, but it must stay finite and smaller than
     # an uncorrected formula would give; the key property is no error and no NaN.
@@ -286,9 +286,9 @@ def test_svy_logit_matches_stata():
     gradient of 8e-15. Asserting 1e-10 would assert something false about Stata.
     """
 
-    SvyLogit = _require("SvyLogit")
+    SurveyLogit = _require("SurveyLogit")
     frame = survey_frame()
-    result = SvyLogit.from_frame(frame, "binary ~ x1 + x2", _design(frame)).fit()
+    result = SurveyLogit.from_frame(frame, "binary ~ x1 + x2", _design(frame)).fit()
 
     # Stata's column order is x1, x2, _cons -- not Intercept first.
     assert list(result.param_names) == ["x1", "x2", "_cons"]
@@ -301,7 +301,7 @@ def test_svy_logit_matches_stata():
 
 
 def test_svy_regress_names_the_constant_as_stata_does():
-    SvyRegress = _require("SvyRegress")
+    SurveyRegress = _require("SurveyRegress")
     frame = survey_frame()
-    result = SvyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
+    result = SurveyRegress.from_frame(frame, "y ~ x1 + x2", _design(frame)).fit()
     assert list(result.param_names) == ["x1", "x2", "_cons"]

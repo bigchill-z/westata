@@ -141,7 +141,7 @@ def test_lags_is_refused_without_a_hac_vce(iv_pieces) -> None:
     fit = ws.IV2SLS.from_formula("y ~ [x ~ z1 + z2]", frame).fit(cov_type="HC1")
 
     with pytest.raises(ValueError, match="only valid with models with HAC"):
-        fit.estat_overid(lags=1)
+        fit.estat_overidentification(lags=1)
 
 
 def _frame(n):
@@ -257,10 +257,10 @@ def test_end_to_end_through_a_hac_vce() -> None:
         cov_type="HAC", cov_kwds={"maxlags": 3}
     )
 
-    default = fit.estat_overid()
-    lag0 = fit.estat_overid(lags=0)
-    lag1 = fit.estat_overid(lags=1)
-    lag3 = fit.estat_overid(lags=3)
+    default = fit.estat_overidentification()
+    lag0 = fit.estat_overidentification(lags=0)
+    lag1 = fit.estat_overidentification(lags=1)
+    lag3 = fit.estat_overidentification(lags=3)
 
     assert default.test == "Wooldridge score"
     assert default.statistic == pytest.approx(lag1.statistic)

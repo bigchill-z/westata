@@ -56,7 +56,7 @@ def _system(seed: int = 20261024, n: int = 400) -> pd.DataFrame:
 
 def test_sureg_robust_matches_stata_on_the_auto_data():
     auto = pd.read_stata(AUTO)
-    result = ws.Sureg.from_formula(
+    result = ws.SeeminglyUnrelatedRegress.from_formula(
         ["price ~ weight + mpg", "mpg ~ weight + foreign"], auto
     ).fit(cov_type="robust")
     np.testing.assert_allclose(
@@ -66,8 +66,8 @@ def test_sureg_robust_matches_stata_on_the_auto_data():
 
 def test_sureg_robust_differs_from_unadjusted():
     frame = _system()
-    adjusted = ws.Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
-    robust = ws.Sureg.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit(
+    adjusted = ws.SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit()
+    robust = ws.SeeminglyUnrelatedRegress.from_formula(["y1 ~ x1 + x2", "y2 ~ x1 + x2"], frame).fit(
         cov_type="robust"
     )
     assert not np.allclose(
@@ -85,5 +85,5 @@ def test_sureg_robust_differs_from_unadjusted():
 def test_other_system_commands_still_reject_robust():
     frame = _system()
     with pytest.raises(UnsupportedError, match="cov_type"):
-        ws.Mvreg.from_formula("y1 y2 = x1 + x2", frame).fit(cov_type="robust")
+        ws.MultivariateRegress.from_formula("y1 y2 = x1 + x2", frame).fit(cov_type="robust")
 

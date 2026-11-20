@@ -317,7 +317,7 @@ def run_sureg(st: Stata, auto: pd.DataFrame) -> None:
     st.run("sysuse auto, clear")
     command = "sureg (price weight mpg) (mpg weight foreign)"
     cap = st.estimate(command)
-    res = ws.Sureg.from_formula(
+    res = ws.SeeminglyUnrelatedRegress.from_formula(
         ["price ~ weight + mpg", "mpg ~ weight + foreign"], auto
     ).fit()
     add(positional(
@@ -355,7 +355,7 @@ def run_sureg(st: Stata, auto: pd.DataFrame) -> None:
     # implemented; see GAP_REGISTER 8.20.
     command_r = command + ", vce(robust)"
     cap_r = st.estimate(command_r)
-    res_r = ws.Sureg.from_formula(
+    res_r = ws.SeeminglyUnrelatedRegress.from_formula(
         ["price ~ weight + mpg", "mpg ~ weight + foreign"], auto
     ).fit(cov_type="robust")
     add(positional(
@@ -375,7 +375,7 @@ def run_mvreg(st: Stata, auto: pd.DataFrame) -> None:
     st.run("sysuse auto, clear")
     command = "mvreg price mpg = weight foreign"
     cap = st.estimate(command)
-    res = ws.Mvreg.from_formula("price mpg = weight foreign", auto).fit()
+    res = ws.MultivariateRegress.from_formula("price mpg = weight foreign", auto).fit()
     add(positional(
         "mvreg 2 outcomes, shared design",
         cap,
@@ -861,7 +861,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model = ws.Didregress.from_formula(
+        model = ws.DIDRegress.from_formula(
             "y x1", "treated", panel2, group="unit", time="period")
     did_compare(
         "didregress two-period, covariate, vce(cluster)",
@@ -878,7 +878,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     st.send(bare)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model = ws.Didregress.from_formula(
+        model = ws.DIDRegress.from_formula(
             "y", "treated", bare, group="unit", time="period")
     did_compare(
         "didregress two-period, no covariate, vce(cluster)",
@@ -892,7 +892,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     st.send(panel2)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        inferred = ws.Didregress.from_formula(
+        inferred = ws.DIDRegress.from_formula(
             "y", "treated", panel2, group="unit", time="period")
         inferred_res = inferred.fit()
     cap_plain = st.estimate("didregress (y) (treated), group(unit) time(period)")
@@ -914,7 +914,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
                "warnings": [str(record.message) for record in caught]},
     ))
 
-    class _Robust(ws.Didregress):
+    class _Robust(ws.DIDRegress):
         """didregress with cov_type pinned to HC1 (Stata's vce(robust))."""
 
         def fit(self, cov_type: str = "HC1"):  # noqa: D401 - thin wrapper
@@ -941,7 +941,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
         unadjusted_error = str(exc).strip().replace("\n", " ")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ws_unadjusted = ws.Didregress.from_formula(
+        ws_unadjusted = ws.DIDRegress.from_formula(
             "y x1", "treated", panel2, group="unit", time="period").fit(cov_type="nonrobust")
     REC.skip(
         "didregress vce(unadjusted)",
@@ -957,7 +957,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     st.send(panel5)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model5 = ws.Didregress.from_formula(
+        model5 = ws.DIDRegress.from_formula(
             "y", "treated", panel5, group="unit", time="period")
     did_compare(
         "didregress five-period staggered, vce(cluster)",
@@ -969,7 +969,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     st.run("xtset unit period")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        xt5 = ws.Xtdidregress.from_formula(
+        xt5 = ws.PanelDIDRegress.from_formula(
             "y", "treated", panel5, group="unit", time="period")
     did_compare(
         "xtdidregress five-period staggered, vce(cluster)",
@@ -982,7 +982,7 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     st.run("xtset unit period")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        xt2 = ws.Xtdidregress.from_formula(
+        xt2 = ws.PanelDIDRegress.from_formula(
             "y x1", "treated", panel2, group="unit", time="period")
     did_compare(
         "xtdidregress two-period, covariate, vce(cluster)",
@@ -998,11 +998,11 @@ def run_did(st: Stata, panel2: pd.DataFrame, panel5: pd.DataFrame) -> None:
     cap_x = st.estimate("xtdidregress (y x1) (treated), group(unit) time(period)")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res_d = ws.Didregress.from_formula(
+        res_d = ws.DIDRegress.from_formula(
             "y x1", "treated", panel2, group="unit", time="period").fit()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res_x = ws.Xtdidregress.from_formula(
+        res_x = ws.PanelDIDRegress.from_formula(
             "y x1", "treated", panel2, group="unit", time="period").fit()
     add(manual(
         "didregress vs xtdidregress dof convention",
@@ -1047,44 +1047,44 @@ def run_svy(st: Stata, sv: pd.DataFrame, lone: pd.DataFrame) -> None:
         add(comp)
 
     svy_compare("svy: mean (pw + strata)", "svy: mean y x1",
-                ws.SvyMean.from_frame(["y", "x1"], sv, design))
+                ws.SurveyMean.from_frame(["y", "x1"], sv, design))
     svy_compare("svy: total (pw + strata)", "svy: total y x1",
-                ws.SvyTotal.from_frame(["y", "x1"], sv, design))
+                ws.SurveyTotal.from_frame(["y", "x1"], sv, design))
     svy_compare("svy: proportion 3 levels (pw + strata)", "svy: proportion grp",
-                ws.SvyProportion.from_frame(["grp"], sv, design),
+                ws.SurveyProportion.from_frame(["grp"], sv, design),
                 rename={"0bn.grp": "grp=0", "1.grp": "grp=1", "2.grp": "grp=2"},
                 raw=True,
                 notes=["Stata stores the level-0 proportion as '0bn.grp', which is "
                        "the base-level spelling; it is a genuine estimate here, so "
                        "the capture keeps every row and renames it explicitly."])
     svy_compare("svy: proportion binary (pw + strata)", "svy: proportion f",
-                ws.SvyProportion.from_frame(["f"], sv, design),
+                ws.SurveyProportion.from_frame(["f"], sv, design),
                 rename={"0bn.f": "f=0", "1.f": "f=1"}, raw=True)
     svy_compare("svy: regress (pw + strata)", "svy: regress y x1",
-                ws.SvyRegress.from_frame(sv, "y ~ x1", design))
+                ws.SurveyRegress.from_frame(sv, "y ~ x1", design))
     svy_compare("svy: regress with i.factor (pw + strata)", "svy: regress y x1 i.f",
-                ws.SvyRegress.from_frame(sv, "y ~ x1 + C(f)", design))
+                ws.SurveyRegress.from_frame(sv, "y ~ x1 + C(f)", design))
     svy_compare("svy: logit (pw + strata)", "svy: logit gbin x1",
-                ws.SvyLogit.from_frame(sv, "gbin ~ x1", design),
+                ws.SurveyLogit.from_frame(sv, "gbin ~ x1", design),
                 notes=["westata reports a linearised (Taylor) VCE for svy: logit; "
                        "Stata's default is the same linearisation."])
 
     # ---- design variants: self-weight, no strata, fpc
     st.run("svyset psu")
     svy_compare("svy: mean self-weight, single stratum", "svy: mean y",
-                ws.SvyMean.from_frame(["y"], sv, ws.SurveyDesign.from_frame(sv, psu="psu")),
+                ws.SurveyMean.from_frame(["y"], sv, ws.SurveyDesign.from_frame(sv, psu="psu")),
                 notes=["No pweight: every observation counts once on both sides."])
 
     st.run("svyset psu, strata(h)")
     svy_compare("svy: mean no weights + strata (self-weight per PSU)",
                 "svy: mean y",
-                ws.SvyMean.from_frame(
+                ws.SurveyMean.from_frame(
                     ["y"], sv, ws.SurveyDesign.from_frame(sv, psu="psu", strata="h")))
 
     st.run("svyset psu [pw=w], strata(h) fpc(fpc)")
     svy_compare("svy: mean with fpc (population PSUs)",
                 "svy: mean y",
-                ws.SvyMean.from_frame(
+                ws.SurveyMean.from_frame(
                     ["y"], sv,
                     ws.SurveyDesign.from_frame(sv, psu="psu", strata="h",
                                                weights="w", fpc="fpc")),
@@ -1095,7 +1095,7 @@ def run_svy(st: Stata, sv: pd.DataFrame, lone: pd.DataFrame) -> None:
     st.send(lone)
     st.run("svyset psu [pw=w], strata(h)")
     cap = st.estimate("svy: mean y")
-    res = ws.SvyMean.from_frame(
+    res = ws.SurveyMean.from_frame(
         ["y"], lone,
         ws.SurveyDesign.from_frame(lone, psu="psu", strata="h", weights="w",
                                    singleunit="missing")).fit()
@@ -1127,7 +1127,7 @@ def run_svy(st: Stata, sv: pd.DataFrame, lone: pd.DataFrame) -> None:
 
     st.run("svyset psu [pw=w], strata(h) singleunit(centered)")
     svy_compare("svy: singleunit(centered) with lone PSUs", "svy: mean y",
-                ws.SvyMean.from_frame(
+                ws.SurveyMean.from_frame(
                     ["y"], lone,
                     ws.SurveyDesign.from_frame(lone, psu="psu", strata="h",
                                                weights="w", singleunit="centered")),

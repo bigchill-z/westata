@@ -35,7 +35,7 @@ def fitted():
         frame = pd.read_stata(GRILIC).dropna(subset=["lnw", "s", "expr"])
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
 
 
 def test_the_fitted_values_match_stata(fitted) -> None:

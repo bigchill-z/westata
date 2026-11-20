@@ -62,9 +62,9 @@ def frame():
 @pytest.fixture(scope="module")
 def fits(frame):
     return {
-        "ols": ws.OLS.from_formula("y ~ x + z", frame).fit(),
+        "ols": ws.Regress.from_formula("y ~ x + z", frame).fit(),
         "logit": ws.Logit.from_formula("binary ~ x + z", frame).fit(),
-        "feols": ws.FEOLS.from_formula("y_panel ~ x + z | g", frame).fit(),
+        "feols": ws.RegressHighDimFixedEffects.from_formula("y_panel ~ x + z | g", frame).fit(),
         "var": ws.VAR(frame[["y", "x"]], lags=2).fit(),
     }
 
@@ -95,7 +95,7 @@ def test_serial_correlation_tests_refuse_a_var(fits) -> None:
 
 
 def test_hettest_and_ovtest_refuse_a_non_linear_fit(fits) -> None:
-    for command in (ws.estat_hettest, ws.estat_ovtest):
+    for command in (ws.estat_heteroskedasticity_test, ws.estat_omitted_variables_test):
         with pytest.raises(Exception):
             command(fits["logit"])
         # ...and both work on a linear one, including an absorbed fit (round 133).

@@ -47,7 +47,7 @@ def frame() -> pd.DataFrame:
 def test_the_model_cell_is_a_dot(frame) -> None:
     """Stata prints ``.`` there, so westata prints ``.`` there."""
 
-    rendered = str(ws.OLS.from_formula("y ~ x1", frame).fit().estat_ic())
+    rendered = str(ws.Regress.from_formula("y ~ x1", frame).fit().estat_ic())
     rows = [
         line
         for line in rendered.splitlines()
@@ -60,14 +60,14 @@ def test_the_model_cell_is_a_dot(frame) -> None:
 
 
 def test_the_title_line_matches_stata(frame) -> None:
-    rendered = str(ws.OLS.from_formula("y ~ x1", frame).fit().estat_ic())
+    rendered = str(ws.Regress.from_formula("y ~ x1", frame).fit().estat_ic())
     assert "Akaike's information criterion and Bayesian information criterion" in rendered
 
 
 def test_the_note_matches_stata(frame) -> None:
     """Stata's note mentions BIC only; AICc and CAIC are not in this table at all."""
 
-    rendered = str(ws.OLS.from_formula("y ~ x1", frame).fit().estat_ic())
+    rendered = str(ws.Regress.from_formula("y ~ x1", frame).fit().estat_ic())
     assert "Note: BIC uses N = number of observations. See [R] IC note." in rendered
     assert "AICc" not in rendered
     assert "CAIC" not in rendered
@@ -76,7 +76,7 @@ def test_the_note_matches_stata(frame) -> None:
 def test_aicc_and_caic_remain_available_as_attributes(frame) -> None:
     """They are not printed, but the numbers are still computed and useful."""
 
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
     table = ws.estat_ic(result)
     assert np.isfinite(table.aicc)
     assert np.isfinite(table.caic)
@@ -85,7 +85,7 @@ def test_aicc_and_caic_remain_available_as_attributes(frame) -> None:
 def test_the_table_has_seven_columns(frame) -> None:
     """Model, N, ll(null), ll(model), df, AIC, BIC -- not nine."""
 
-    rendered = str(ws.OLS.from_formula("y ~ x1", frame).fit().estat_ic())
+    rendered = str(ws.Regress.from_formula("y ~ x1", frame).fit().estat_ic())
     header = [line for line in rendered.splitlines() if "Model" in line][0]
     for column in ("Model", "N", "ll(null)", "ll(model)", "df", "AIC", "BIC"):
         assert column in header, column

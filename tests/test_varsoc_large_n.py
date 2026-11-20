@@ -45,7 +45,7 @@ def tables():
                 "b": np.cumsum(rng.normal(size=n)),
             }
         )
-        out[n] = [line for line in str(ws.varsoc(frame, maxlag=4)).splitlines() if line.strip()]
+        out[n] = [line for line in str(ws.var_select_order(frame, maxlag=4)).splitlines() if line.strip()]
     return out
 
 

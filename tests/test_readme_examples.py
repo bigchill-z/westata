@@ -100,7 +100,7 @@ def test_factor_levels_are_referencable_in_tests() -> None:
     import westata as ws
 
     frame = pd.read_stata(REPO / "tests" / "data" / "auto.dta")
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame).fit()
 
     # Exact reference to a factor level.
     outcome = result.test("C(foreign)[T.Foreign]")

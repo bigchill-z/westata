@@ -118,9 +118,9 @@ with S() as s:
     print(f"  Stata pairwise se = {np.sqrt(np.diag(V_pw))}")
     print(f"  Stata casewise==pairwise? {np.allclose(V_cw, V_pw)}"
           f"  ratio={np.sqrt(np.diag(V_pw))/np.sqrt(np.diag(V_cw))}")
-m_cw = ws.XtPcse.from_formula("y ~ x1 + x2", P, entity="id", time="t",
+m_cw = ws.PanelPcse.from_formula("y ~ x1 + x2", P, entity="id", time="t",
                               selection="casewise").fit()
-m_pw = ws.XtPcse.from_formula("y ~ x1 + x2", P, entity="id", time="t",
+m_pw = ws.PanelPcse.from_formula("y ~ x1 + x2", P, entity="id", time="t",
                               selection="pairwise").fit()
 print(f"  westata casewise se = {np.asarray(m_cw.bse)}")
 print(f"  westata pairwise se = {np.asarray(m_pw.bse)}")

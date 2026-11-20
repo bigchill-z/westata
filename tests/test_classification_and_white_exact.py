@@ -56,7 +56,7 @@ def logit_fit(frame):
 
 @pytest.fixture(scope="module")
 def ols_fit(frame):
-    return ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
 
 
 def test_the_classification_cells_match_stata(logit_fit) -> None:
@@ -78,17 +78,17 @@ def test_the_classification_table_has_twenty_three_lines(logit_fit) -> None:
 
 
 def test_the_white_test_matches_stata(ols_fit) -> None:
-    rendered = str(ws.estat_imtest(ols_fit, white=True))
+    rendered = str(ws.estat_information_matrix_test(ols_fit, white=True))
     assert "White's test" in rendered
     assert "H0: Homoskedasticity" in rendered
 
 
 def test_the_white_test_reports_its_degrees_of_freedom(ols_fit) -> None:
-    rendered = str(ws.estat_imtest(ols_fit, white=True))
+    rendered = str(ws.estat_information_matrix_test(ols_fit, white=True))
     # Three regressors give five second-order terms: three squares and two cross products.
     assert "chi2(5)" in rendered
 
 
 def test_the_white_test_has_fifteen_lines(ols_fit) -> None:
-    rendered = str(ws.estat_imtest(ols_fit, white=True))
+    rendered = str(ws.estat_information_matrix_test(ols_fit, white=True))
     assert len([line for line in rendered.splitlines() if line.strip()]) == 15

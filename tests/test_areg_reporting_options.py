@@ -102,7 +102,7 @@ def test_the_summary_header_names_the_level() -> None:
 def test_level_applies_to_ols_too() -> None:
     """The option is not Areg-specific; it was missing from the whole package."""
 
-    result = ws.OLS.from_formula("y ~ x1", _panel()).fit(level=90)
+    result = ws.Regress.from_formula("y ~ x1", _panel()).fit(level=90)
 
     assert result.level == pytest.approx(0.90)
 

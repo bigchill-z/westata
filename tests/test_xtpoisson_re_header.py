@@ -48,7 +48,7 @@ def _counts():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtPoisson.from_formula(
+    return ws.PanelPoisson.from_formula(
         "n ~ x1", _counts(), entity="sid", time="t", method="re"
     ).fit()
 
@@ -103,7 +103,7 @@ def test_the_logit_variant_keeps_its_gaussian_and_integration_rows() -> None:
         {"y": y, "x1": x1, "sid": sid, "t": np.tile(np.arange(n_obs), n_grp)}
     )
     rendered = str(
-        ws.XtLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
+        ws.PanelLogit.from_formula("y ~ x1", frame, entity="sid", time="t", method="re")
         .fit()
         .summary(style="stata")
     )

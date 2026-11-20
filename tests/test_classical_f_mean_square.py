@@ -34,7 +34,7 @@ def frame():
 def test_the_classical_f_matches_stat_as_sixteen_digits(frame) -> None:
     """From a live `regress lnw s expr`: 160.1647735969879704."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
     # "Sixteen digits" is asserted to MACHINE PRECISION, not as bit equality.
     # ``==`` compared the last representable bit, and the value moved from
     # ...8797 to ...8798 when numpy/pandas changed the order of the same
@@ -48,7 +48,7 @@ def test_the_classical_f_matches_stat_as_sixteen_digits(frame) -> None:
 def test_it_equals_the_mean_square_ratio(frame) -> None:
     """e(F) = (e(mss)/e(df_m)) / (e(rss)/e(df_r)), recomputable from the other macros."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
     macros = fitted.e
     expected = (float(macros["mss"]) / float(macros["df_m"])) / (
         float(macros["rss"]) / float(macros["df_r"])
@@ -62,15 +62,15 @@ def test_a_robust_fit_does_not_use_the_ratio(frame) -> None:
     If this ever starts matching the ratio, the covariance-type gate has been lost.
     """
 
-    classical = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
-    robust = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
+    classical = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
+    robust = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
     assert float(robust.e["F"]) != pytest.approx(float(classical.e["F"]), rel=1e-6)
 
 
 def test_the_robust_f_is_the_wald_of_its_own_matrix(frame) -> None:
     """One identity for every non-classical covariance: b'V^-1 b / df_m over the slopes."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1")
     names = list(fitted.param_names)
     slopes = [index for index, name in enumerate(names) if name != "Intercept"]
     beta = np.asarray(fitted.params, dtype=float)[slopes]

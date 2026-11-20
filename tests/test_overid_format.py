@@ -41,7 +41,7 @@ def _overid(frame, instruments):
     result = ws.IV2SLS.from_formula(
         f"lnw ~ expr + tenure + rns + smsa + [s ~ {instruments}]", frame
     ).fit()
-    return str(result.estat_overid())
+    return str(result.estat_overidentification())
 
 
 def test_a_two_digit_statistic_keeps_four_decimals(frame) -> None:
@@ -80,6 +80,6 @@ def test_the_number_itself_is_unchanged(frame) -> None:
     result = ws.IV2SLS.from_formula(
         "lnw ~ expr + tenure + rns + smsa + [s ~ mrt + iq]", frame
     ).fit()
-    outcome = result.estat_overid()
+    outcome = result.estat_overidentification()
     assert float(outcome.statistic) == pytest.approx(14.5335, abs=5e-4)
     assert float(outcome.basmann) == pytest.approx(14.6807, abs=5e-4)

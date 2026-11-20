@@ -49,7 +49,7 @@ with S() as s:
     b4, V_areg, nm4 = s.est("areg y x1 x2, absorb(id) vce(robust)")
     print(f"  areg absorb(id) vce(robust) se = {np.sqrt(np.diag(V_areg))}")
 
-po = ws.PanelOLS.from_formula("y ~ x1 + x2", P, entity="id", time="t")
+po = ws.PanelRegressFE.from_formula("y ~ x1 + x2", P, entity="id", time="t")
 r_rob = po.fit(cov_type="robust")
 r_cl = po.fit(cov_type="cluster", cov_kwds={"clusters": P["id"].to_numpy()})
 r_cl_g = po.fit(cov_type="cluster", cov_kwds={"groups": P["id"].to_numpy()})

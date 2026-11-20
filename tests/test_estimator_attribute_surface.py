@@ -54,9 +54,9 @@ def fits():
     frame["binary"] = (frame["y"] > 0).astype(float)
     frame["y_panel"] = frame["y"] + frame["g"] * 0.1
     return {
-        "ols": ws.OLS.from_formula("y ~ x + z", frame).fit(),
+        "ols": ws.Regress.from_formula("y ~ x + z", frame).fit(),
         "logit": ws.Logit.from_formula("binary ~ x + z", frame).fit(),
-        "feols": ws.FEOLS.from_formula("y_panel ~ x + z | g", frame).fit(),
+        "feols": ws.RegressHighDimFixedEffects.from_formula("y_panel ~ x + z | g", frame).fit(),
         "var": ws.VAR(frame[["y", "x"]], lags=2).fit(),
     }
 

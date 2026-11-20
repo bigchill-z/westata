@@ -62,7 +62,7 @@ def m1():
     # over() on a linear model
     cmd = "regress mpg weight i.foreign"
     E = s.est(cmd)
-    lin = ws.OLS.from_formula("mpg ~ weight + C(foreign)", ds).fit()
+    lin = ws.Regress.from_formula("mpg ~ weight + C(foreign)", ds).fit()
     s.q("margins, over(foreign)")
     sbv = np.asarray(s.mats("r(b)")).reshape(-1)
     svv = np.sqrt(np.diag(np.asarray(s.mats("r(V)"))))
@@ -151,7 +151,7 @@ def m2_m7():
     # Numeric foreign, so the coefficient carries Stata's own name in the design
     # (westata's lincom cannot address a factor by its ``C(x)[T.1]`` label --
     # pre-existing, unrelated to M4).
-    ols = ws.OLS.from_formula("mpg ~ weight + foreign", ds).fit()
+    ols = ws.Regress.from_formula("mpg ~ weight + foreign", ds).fit()
     # Stata's `foreign` is westata's `C(foreign)[T.1]`; map the name for the call
     # only (the Stata side keeps Stata's spelling).
     name_map: dict[str, str] = {}

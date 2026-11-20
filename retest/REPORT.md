@@ -64,7 +64,7 @@
 >   （`ologit` 的 `e(V)` 一个转换错误，连带 cut 的 SE、z、CI、`e(df_m)`、`e(chi2)` 全部 fail）。
 > 真正的**独立缺陷**数量见 §3，共 **24 个**。
 
-> **证据可信度分级**（verifier 复核后）：linear_iv / panel / systems_causal / postest = **高**（可直接引用）；discrete / tseries = **中高**（数值可复现，但 ologit 与 vecrank 的**归因/口径已按复核结果改写**）；limited_quantile = **中**（tobit/heckman/etregress/rreg 成立，qreg 的归因已改写）。
+> **证据可信度分级**（verifier 复核后）：linear_iv / panel / systems_causal / postest = **高**（可直接引用）；discrete / tseries = **中高**（数值可复现，但 ologit 与 vec_rank 的**归因/口径已按复核结果改写**）；limited_quantile = **中**（tobit/heckman/etregress/rreg 成立，qreg 的归因已改写）。
 
 **一句话结论**：westata 在**线性、面板线性、多方程、复杂抽样、单位根**这些闭式可解的部分
 做到了真正的机器精度（1e-15 量级），这部分可以作为 Stata 的可信替代；
@@ -83,7 +83,7 @@
   （含 `t(G-1)` 的 p 值）、四种权重（`fweight`/`aweight`/`pweight`/`iweight`，含加权 meat）、
   `if` 子样本 —— 全部 ≤ 1.1e-15。
 - `areg`（分类 FE、数值型的"连续"FE、robust、嵌套/非嵌套 cluster）、
-  `reghdfe`（单维、双向、robust、cluster）、`FEOLS` 双向 —— ≤ 1.1e-15。
+  `reghdfe`（单维、双向、robust、cluster）、`RegressHighDimFixedEffects` 双向 —— ≤ 1.1e-15。
   **本机 `reghdfe` 6.14.1 已装**，所以这一块是与真 `reghdfe` 对拍，不是用 `areg` 替代。
 - `ivregress 2sls`（恰好识别 / 过度识别 / robust / cluster）、
   `ivregress liml`、`ivregress gmm`（**两步 GMM 的 `e(V)` 全 9 元素 4.4e-15**）、
@@ -101,13 +101,13 @@
   加 `small` 才是 HC1（westata `HC1` 差 6.0e-15）。但 `iv.py:586/624` 把 HC1 写成 `vce(robust)` 的对应项
   → 按文档选 HC1 会系统性偏大 `sqrt(N/(N-K))` = 1.0109。
 - `IVLIML` 的 `vce(cluster)` **恒加 CR1**，Stata 默认 CR0 → SE 差 4.53e-2（比值 1.045296408534764 与公式逐位吻合）。
-- `OLS.e['F']` **不随 `cov_type` 变**（恒为经典 R² 型 F），robust 差 5.6e-2、cluster 差 **37.5%**；
-  `OLS.e['df_r']` 在 cluster 下存 `N-K=137`，而 Stata 存 `G-1=13`（**但 `results.df_resid` 和 p 值是对的**）。
+- `Regress.e['F']` **不随 `cov_type` 变**（恒为经典 R² 型 F），robust 差 5.6e-2、cluster 差 **37.5%**；
+  `Regress.e['df_r']` 在 cluster 下存 `N-K=137`，而 Stata 存 `G-1=13`（**但 `results.df_resid` 和 p 值是对的**）。
 
-> **防误判提示**：`areg ... vce(cluster gid)` 与 `reghdfe`/`FEOLS` 同规格差 4.86e-2。
+> **防误判提示**：`areg ... vce(cluster gid)` 与 `reghdfe`/`RegressHighDimFixedEffects` 同规格差 4.86e-2。
 > 这**不是 westata 的错**——areg 把吸收的 13 个虚拟变量计入 `K`（K=16），reghdfe 按
 > `dofadjustments(nested)` 记 K=3。闭式复算三方都对得上（1e-15）。谁拿 areg 的 SE 当基准
-> 去测 FEOLS，都会误判出一个 5% 的假 bug。
+> 去测 RegressHighDimFixedEffects，都会误判出一个 5% 的假 bug。
 
 ### 2.2 panel（`xtreg` 族 / xt 非线性 / 单位根）— 线性部分极准，vce 与非线性二阶量有问题
 
@@ -181,7 +181,7 @@ nbreg 1.82e-4→1.50e-8）。
 **整条 A 档 20 条**：VAR(1)/VAR(2) 系数、`vec` 三组（alpha/beta/ll）、`dfuller` 五组（统计量与 MacKinnon p）、
 `pperron` 四组。
 
-**最值得上报的一条是"结论级"的风险：`vecrank` 的临界值表与 Stata 不同。** Stata 用 Johansen(1995) 表
+**最值得上报的一条是"结论级"的风险：`vec_rank` 的临界值表与 Stata 不同。** Stata 用 Johansen(1995) 表
 （r=1 时临界值 **3.76**），statsmodels 用 Osterwald-Lenum（**3.8415**）。领域组造出一组
 `trace(r=1)=3.8369` 的边界数据（正好卡在两者之间），据此判断**选阶会翻（Stata 选 rank 2，westata 选 rank 1）**。
 verifier 独立确认了**两侧的临界值表确实不同**（Stata 打印 3.76 vs `VECM.johansen()` 返回 3.8415），
@@ -196,7 +196,7 @@ verifier 独立确认了**两侧的临界值表确实不同**（Stata 打印 3.7
 - **VAR 的 SE / `e(Sigma)` / Granger**（E 档）：全部是**每方程**自由度因子 `(T−k_eq)/T`
   （k_eq 是每方程回归元数，不是全系统 k——用全 k 会得到 0.9~9.6 的假差异）。归一后 2e-15。
   Granger 另有一层：`granger_causality()` 默认返回 statsmodels `kind="f"` 的 F 统计量，
-  Stata `vargranger` 是 **Wald chi2**。
+  Stata `var_granger` 是 **Wald chi2**。
 - **`dfuller` 打印临界值**（D）：统计量与 p 值全 A 档；临界值差是 Stata 硬编码 6 点表线性插值，
   照抄后可复算到 1.28e-16。不影响结论。
 - **`arch`/GARCH**（E，参数 1.07e-2、SE 2.78e-1）：两个独立成因都量化了——
@@ -245,7 +245,7 @@ verifier 独立确认了**两侧的临界值表确实不同**（Stata 打印 3.7
 ### 2.7 postest（test / lincom / nlcom / lrtest / hausman / contrast / margins / predict / etable）
 
 **整条 A 档 43 条**：`test` 8 个变体（含 F 形式与 logit 的 Wald chi2 形式）、`lincom` 4 个、
-`nlcom` 3 个、`testnl` 2 个、`lrtest` 2 个、`hausman`、`contrast` 6 个、`pwcompare`、
+`nlcom` 3 个、`testnl` 2 个、`lrtest` 2 个、`hausman`、`contrast` 6 个、`pairwise_compare`、
 regress 的 `predict xb/stdp/stdf/residuals`、logit 的 `pr/xb/stdp`、`etable` vs `esttab` 20 格全 0
 （`test`/`margins` 这类都同时比了**统计量、df、p 值**三项）。
 
@@ -294,8 +294,8 @@ regress 的 `predict xb/stdp/stdf/residuals`、logit 的 `pr/xb/stdp`、`etable`
 |---|---|---|
 | 13 | IV 的 `HC1` 标签与 Stata 默认（HC0）不符 | 1.09e-2 |
 | 14 | `IVLIML` 的 cluster 恒加 CR1（Stata 默认 CR0） | 4.53e-2 |
-| 15 | `OLS.e['F']` 不随 `cov_type` 变 | 37.5%（cluster） |
-| 16 | `OLS.e['df_r']` 在 cluster 下存 N−K 而非 G−1 | — |
+| 15 | `Regress.e['F']` 不随 `cov_type` 变 | 37.5%（cluster） |
+| 16 | `Regress.e['df_r']` 在 cluster 下存 N−K 而非 G−1 | — |
 | 17 | `gmm, vce(cluster)` 的 W 未聚类 | 点估计 3.6e-2 |
 | 18 | `e(df_m)` 把辅助参数算进去（nbreg/ologit/oprobit） | 100% |
 | 19 | `zip/zinb` 的 `e(p)` 用 df_m 而非 `e(rank)-1` | 1.15e+2 |
@@ -411,7 +411,7 @@ pweight / 2SLS / GMM（含全 `e(V)` 5.53e-15）/ `eivreg` / `xtreg fe` / `xtreg
 - `jackknife` 的"westata 更准"成立：`Fraction` 精确真值下 westata 差 **6.4e-15**、Stata 差 5.11e-7。
 
 **未复核项（如实记录，没当作已验证）**：`sqreg`/`bsqreg` 的 2–3%、`gmm` cluster 的点估计、
-`xtnbreg`/`xtabond` 的具体数值、`lrtest`/`pwcompare` 的行为差异、`nlcom` 比值、ARIMA/GARCH 的归因。
+`xtnbreg`/`xtabond` 的具体数值、`lrtest`/`pairwise_compare` 的行为差异、`nlcom` 比值、ARIMA/GARCH 的归因。
 这些在 `AUDIT.md` §6 逐条列了原因。
 
 ---
@@ -420,12 +420,12 @@ pweight / 2SLS / GMM（含全 `e(V)` 5.53e-15）/ `eivreg` / `xtreg fe` / `xtreg
 
 **可以放心用（整条 A 档，1e-15 量级）**：
 
-- `regress` 全家（含四种权重、`i.` 因子、robust、cluster、子样本）、`areg`、`reghdfe`/`FEOLS`
+- `regress` 全家（含四种权重、`i.` 因子、robust、cluster、子样本）、`areg`、`reghdfe`/`RegressHighDimFixedEffects`
 - `ivregress 2sls/liml/gmm`（**除 `gmm + vce(cluster)`**）
 - `xtreg fe/re/be/fd`、`xtivreg fe/re`、`xtgls`（hetero / 满秩 correlated）、`xtpcse`（平衡）
 - `xtunitroot ips/llc`
 - `sureg`、`mvreg`、`manova`、`svy:` 全系列、`didregress`/`xtdidregress`、`teffects ra/ipw` 的 ATE
-- `test`、`lincom`、`nlcom`、`contrast`、`pwcompare`、`etable`
+- `test`、`lincom`、`nlcom`、`contrast`、`pairwise_compare`、`etable`
 - VAR/VECM/dfuller/pperron、bootstrap（同种子可逐次复现）
 
 **可以用但不要引用超过 4 位有效数字的 SE**（B/C 档）：
@@ -441,12 +441,12 @@ pweight / 2SLS / GMM（含全 `e(V)` 5.53e-15）/ `eivreg` / `xtreg fe` / `xtreg
 | 有序模型的 cut 推断 | `ologit/oprobit` 的 `bse` | 只用点估计；cut 的 SE 要用正确 Jacobian **并补 slope×cut 交叉块**重算 |
 | Tobit 的 σ 检验 | `Tobit` 的 `bse['/sigma']` | 除以 σ 手工修正 |
 | Logit/Probit/NB 的稳健推断 | `fit(cov_type='HC0'/'HC1')` | 会抛异常；改用 cluster（也要注意 G/(G-1) 因子） |
-| 面板 FE 的稳健/聚类 SE | `PanelOLS.fit(cov_type=...)` | 与 Stata 差 9–1800% |
-| 非平衡面板的 `xtpcse` | `XtPcse` | **只在平衡面板用**（平衡时 A 档 1.4e-15；非平衡 SE 差 28%–42%，pairwise 未实现） |
+| 面板 FE 的稳健/聚类 SE | `PanelRegressFE.fit(cov_type=...)` | 与 Stata 差 9–1800% |
+| 非平衡面板的 `xtpcse` | `PanelPcse` | **只在平衡面板用**（平衡时 A 档 1.4e-15；非平衡 SE 差 28%–42%，pairwise 未实现） |
 | `nl` 不给初值 | `Nl.from_formula(...).fit()` | 显式给 `start=` |
 | GARCH 的 z 统计量 | `GARCH` 的 SE | 与 Stata OPG 差 28% |
-| 协整选阶 | `vecrank` | 临界值表不同（3.76 vs 3.8415），**边界样本会翻转**；靠边界的结论要用 Stata 复核 |
-| `rreg` 的 SE | `RobustRegression` | 用 Stata 的闭式 |
+| 协整选阶 | `vec_rank` | 临界值表不同（3.76 vs 3.8415），**边界样本会翻转**；靠边界的结论要用 Stata 复核 |
+| `rreg` 的 SE | `RobustRegress` | 用 Stata 的闭式 |
 | `teffects aipw, atet` | `AIPW(estimand='atet')` | 只用 ATE |
 
 ---
@@ -470,16 +470,16 @@ pweight / 2SLS / GMM（含全 `e(V)` 5.53e-15）/ `eivreg` / `xtreg fe` / `xtreg
    `permute` **不能**逐次复现（Stata 的 shuffle 顺序未公开），只能比分布。
 
 **复核不充分、不能当作已验证的**（verifier 明确列出）：`sqreg`/`bsqreg` 的 2–3% 差、
-`gmm + vce(cluster)` 的点估计、`xtnbreg`/`xtabond` 的具体数值、`lrtest`/`pwcompare` 的行为差异、
+`gmm + vce(cluster)` 的点估计、`xtnbreg`/`xtabond` 的具体数值、`lrtest`/`pairwise_compare` 的行为差异、
 `nlcom` 比值、ARIMA/GARCH 的归因——这些是**单个领域组报告过、但没有第二个人独立复算过**的。
 
 **明确没测的**（各领域 NOTES 的"未覆盖"章节逐条列了原因，共 60+ 项），主要几类：
 
 - 面板：`xtreg cre/mle/pa`、`xtregar`、`xtgls igls`、`corr(psar1)`、`xtnbreg re`、有洞面板的 fd
-- 时间序列：EGARCH/GJR/t 分布、`archm`、`vec` 的 `rank(2)`、`vecrank` 的其它 trend、`dfgls`、3+ 方程 VAR
+- 时间序列：EGARCH/GJR/t 分布、`archm`、`vec` 的 `rank(2)`、`vec_rank` 的其它 trend、`df_gls`、3+ 方程 VAR
 - 离散：`tpoisson` 一般截断、权重、`estat gof/lroc/linktest`、`mlogit`
 - 受限：`tobit` 的 `margins, predict(e())`、`rreg` 的 `e(rss)` 精确公式（试了 12 种加权形式未统一）
-- 后估计：`margins, expression()`/`vce(unconditional)`、`suest`、`pwcompare` 的 Holm/Šidák/Tukey
+- 后估计：`margins, expression()`/`vce(unconditional)`、`suest`、`pairwise_compare` 的 Holm/Šidák/Tukey
 - 系统：`svy: mean, over()`（子总体估计）、`didregress vce(unadjusted)`（Stata 19.5 自己拒绝）
 
 **这些问题无法在本次判断**，需要下一轮补测。
@@ -555,7 +555,7 @@ westata 在**闭式可解的线性代数部分**（线性回归、面板线性�
 另外有 3 处**归因**在独立复核后被改写——不是数值错，是"为什么错"错了，
 **按原归因去修会修错地方**：`ologit` 是 numpy 视图别名（不是转置）且还有一块交叉项从未变换；
 `qreg robust` 换 meat 并不能普适修好（bread 也参与，异方差下偏差可达 128%）；
-`vecrank` 是临界值表不同（3.76 vs 3.8415），边界会翻，但不是每条数据都翻。
+`vec_rank` 是临界值表不同（3.76 vs 3.8415），边界会翻，但不是每条数据都翻。
 
 旧 registry 的 87 条 E3 里，核心数值大部分经独立复核成立，
 但**至少 8 条属于漏检或高估**（tobit 的 σ SE、heckman 的 σ、etregress 的 rho 符号与 SE、

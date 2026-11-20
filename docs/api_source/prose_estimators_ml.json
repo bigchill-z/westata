@@ -104,7 +104,7 @@
     "notes_en": "`tobit` stores NO `e(aic)`; `estat_ic` computes AIC and BIC on demand instead, so the criterion is still available. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'e'`, `'ystar'`, `'pr'` and `'residuals'`; `'e'` and `'ystar'` take `lower=`/`upper=` for the censoring limits, and `'pr'` without them returns 1 for every observation because the default interval covers the whole line. Only `cov_type='nonrobust'` is implemented.",
     "notes_zh": "`tobit` 不存 `e(aic)`；`estat_ic` 会按需计算 AIC 与 BIC，因此准则仍然可用。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'e'`、`'ystar'`、`'pr'` 与 `'residuals'`；`'e'` 与 `'ystar'` 用 `lower=`/`upper=` 传入删失界限，而不传时 `'pr'` 对每个观测都返回 1，因为默认区间覆盖整条实轴。只实现了 `cov_type='nonrobust'`。"
   },
-  "Truncreg": {
+  "TruncatedRegress": {
     "stata": "truncreg y x1 x2, ll(0)",
     "en": "Truncated regression -- Stata's `truncreg`. Each observation contributes the normal density divided by the probability of lying inside the limits, and at least one limit is required. Observations at or outside the limits are dropped from the estimation sample and the count is reported: `e(N_bf)` is the number of observations before truncation, so `e(N_bf) - e(N)` is how many were dropped, which is what Stata prints as `(N obs truncated)`.",
     "zh": "截断回归，即 Stata 的 `truncreg`。每个观测贡献正态密度除以落在限制区间内的概率，且至少要给出一个限制。处于或超出限制的观测被从估计样本中剔除并报告个数：`e(N_bf)` 是截断前的观测数，因此 `e(N_bf) - e(N)` 即被剔除的个数，也就是 Stata 打印的 `(N obs truncated)`。",
@@ -112,7 +112,7 @@
     "notes_en": "Unlike `TruncatedPoisson`, this class drops the out-of-range rows itself and warns instead of raising, because `truncreg`'s sample really is defined by the limits. The dropped count is an attribute on the model (`_n_truncated`) and is NOT stored in `e()`: `e()` follows `truncreg.sthlp`, which has no such scalar -- use `e(N_bf) - e(N)`. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'residuals'` and `'fitted'`.",
     "notes_zh": "与 `TruncatedPoisson` 相反，本类会自行剔除越界的行并给出警告，而不是报错，因为 `truncreg` 的样本本就由限制定义。被剔除的个数是模型上的属性（`_n_truncated`），并**不**存入 `e()`：`e()` 遵循 `truncreg.sthlp`，其中没有这个标量——请用 `e(N_bf) - e(N)`。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'residuals'` 与 `'fitted'`。"
   },
-  "Intreg": {
+  "IntervalRegress": {
     "stata": "intreg lo hi x1",
     "en": "Interval regression -- Stata's `intreg`, written with the two-sided formula `'lo hi ~ x'`. Only the interval is known for each observation: `lower < upper` is interval-censored, `lower == upper` an exactly observed value, and a missing bound means that side is censored. `e(N_int)`, `e(N_lc)`, `e(N_rc)` and `e(N_unc)` count the four kinds, `/lnsigma` is estimated and `e(sigma)` derived.",
     "zh": "区间回归，即 Stata 的 `intreg`，用双边公式 `'lo hi ~ x'` 书写。每个观测只知区间：`lower < upper` 为区间删失，`lower == upper` 为精确观测值，某一端缺失表示该侧删失。`e(N_int)`、`e(N_lc)`、`e(N_rc)` 与 `e(N_unc)` 统计这四类，`/lnsigma` 被估计，`e(sigma)` 由之导出。",
@@ -128,7 +128,7 @@
     "notes_en": "The two-step result stores NO `e(aic)` (the two-step estimator is not an ML fit of the joint model) and `e(N_selected)`/`e(N_nonselected)` split the sample, while `e(N)` is the full sample size even though the printed `Number of obs` is the selected count. On the ML path `e(aic)` IS stored and equals `-2*e(ll) + 2*k`, agreeing with `estat_ic`. Standard errors are the two-step M-estimator sandwich, not naive OLS ones. `predict` offers `'xb'`, `'stdp'`, `'stdf'`, `'fitted'`, `'psel'`, `'ycond'`, `'yexpected'`, `'mills'` and `'nshazard'`.",
     "notes_zh": "两步法结果不存 `e(aic)`（两步估计量不是联合模型的 ML 拟合），`e(N_selected)`/`e(N_nonselected)` 划分样本，而 `e(N)` 是全样本量，尽管打印的 `Number of obs` 是选中样本数。在 ML 路径上 `e(aic)` 会被存下，且等于 `-2*e(ll) + 2*k`，与 `estat_ic` 一致。标准误是两步 M 估计的夹心形式，而非朴素 OLS 标准误。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'fitted'`、`'psel'`、`'ycond'`、`'yexpected'`、`'mills'` 与 `'nshazard'`。"
   },
-  "Etregress": {
+  "EndogenousTreatmentRegress": {
     "stata": "etregress ytreat x1, treat(treat = x3)",
     "en": "Endogenous treatment regression by the control-function method -- Stata's `etregress`, written `'y ~ x + treat(t ~ z)'`. A probit treatment equation is estimated on the full sample and its generalized residual is added to the outcome regression, which absorbs the correlation between the two errors; unlike `Heckman`, `y` is observed for treated and control units alike, so every row enters the outcome equation. The treatment indicator is added to the outcome equation automatically, and naming it there as well does not duplicate it.",
     "zh": "用控制函数法实现的内生处理回归，即 Stata 的 `etregress`，写作 `'y ~ x + treat(t ~ z)'`。处理方程是在全样本上的 probit，其广义残差被加入结果回归，从而吸收两个误差项之间的相关；与 `Heckman` 不同，处理组与对照组的 `y` 都可观测，因此每一行都进入结果方程。处理指示变量会被自动加入结果方程，若在公式中再写一次也不会重复。",
@@ -144,7 +144,7 @@
     "notes_en": "There is no `e(aic)` or `e(bic)`, and the model test is a Wald statistic (`e(chi2type)='Wald'`), with the likelihood-ratio statistic against the no-inefficiency model in `e(lr_chi2)` and its p-value in `e(p_lr)`. `predict` registers no types for `frontier`, so all prediction goes through the macros or by hand.",
     "notes_zh": "没有 `e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量（`e(chi2type)='Wald'`），对「无无效率项」模型的似然比统计量存于 `e(lr_chi2)`，其 p 值存于 `e(p_lr)`。`predict` 未为 `frontier` 注册任何类型，因此预测只能经由宏或手工完成。"
   },
-  "XtLogit": {
+  "PanelLogit": {
     "stata": "xtlogit yb x1, fe",
     "en": "Panel logit -- Stata's `xtlogit`, with `method='fe'`, `'re'` or `'pa'`, and `model_name` set to `'xtlogit, fe'`, `'xtlogit, re'` or `'xtlogit, pa'` accordingly. `fe` is Chamberlain's conditional likelihood: groups whose outcome never varies are dropped, `e(N_drop)` and `e(N_group_drop)` record the cost, there is no intercept and the model test is an LR. `re` is an integrated likelihood with a Gaussian random effect by adaptive Gauss-Hermite quadrature, storing `/lnsig2u` as a parameter plus `e(sigma_u)` and `e(rho)`.",
     "zh": "面板 logit，即 Stata 的 `xtlogit`，`method` 可为 `'fe'`、`'re'` 或 `'pa'`，`model_name` 相应设为 `'xtlogit, fe'`、`'xtlogit, re'` 或 `'xtlogit, pa'`。`fe` 是 Chamberlain 条件似然：结果从不变化的组被剔除，`e(N_drop)` 与 `e(N_group_drop)` 记录其代价，模型无截距，检验为 LR。`re` 是带高斯随机效应的积分似然，用自适应 Gauss-Hermite 求积，把 `/lnsig2u` 作为参数存下，并给出 `e(sigma_u)` 与 `e(rho)`。",
@@ -152,7 +152,7 @@
     "notes_en": "`method='pa'` is a GEE with an exchangeable working correlation and is NOT a likelihood: it stores no `e(ll)`, `e(ll_0)`, `e(r2_p)`, `e(aic)` or `e(bic)`, its model test is a Wald statistic and `e(estimator)='gee'` marks it. `e(ll_0)` on the `fe` path is the intercept-only logit on the retained observations, which is what makes the LR statistic comparable. `predict` registers no types for any of the three.",
     "notes_zh": "`method='pa'` 是带可交换工作相关的 GEE，**不是**似然：它不存 `e(ll)`、`e(ll_0)`、`e(r2_p)`、`e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量，并以 `e(estimator)='gee'` 标记。`fe` 路径上的 `e(ll_0)` 是在保留样本上仅含常数项的 logit，这正是 LR 统计量可比的原因。三者都没有注册任何 `predict` 类型。"
   },
-  "XtProbit": {
+  "PanelProbit": {
     "stata": "xtprobit ybp x1, re",
     "en": "Panel probit -- Stata's `xtprobit`, random effects only. It is the same integral as `xtlogit, re` with the normal CDF in place of the logistic one, and it stores `/lnsig2u` as a parameter plus `e(sigma_u)` and `e(rho)`. Any other `method` raises `UnsupportedError`: Stata offers no fixed-effects or population-averaged `xtprobit` in this shape, because there is no sufficient statistic to condition on for the probit.",
     "zh": "面板 probit，即 Stata 的 `xtprobit`，仅有随机效应。它与 `xtlogit, re` 是同一个积分，只把逻辑分布换成正态分布函数；把 `/lnsig2u` 作为参数存下，并给出 `e(sigma_u)` 与 `e(rho)`。其他任何 `method` 都会抛出 `UnsupportedError`：Stata 在此形态下没有固定效应或总体平均的 `xtprobit`，因为 probit 没有可供条件的充分统计量。",
@@ -160,7 +160,7 @@
     "notes_en": "`method='fe'` and `method='pa'` are refused by name with `method='fe' is not available; supported: 're'` (and the same for `'pa'`), not silently mapped to `re`. On a binary outcome with little within-group correlation the estimate of `/lnsig2u` can be driven far negative, so `sigma_u` is effectively zero -- that is the model hitting the boundary, not a failure to converge.",
     "notes_zh": "`method='fe'` 与 `method='pa'` 会按名称被拒绝，报错为 `method='fe' is not available; supported: 're'`（`'pa'` 同），而不是静默映射为 `re`。在组内相关很弱的二值结果上，`/lnsig2u` 的估计可能被推得很负，于是 `sigma_u` 实际为零——这是模型撞到边界，而非未收敛。"
   },
-  "XtPoisson": {
+  "PanelPoisson": {
     "stata": "xtpoisson ycnt x1, fe",
     "en": "Panel Poisson -- Stata's `xtpoisson`, with `method='fe'` or `'re'`. `fe` conditions on the group total `S_i = sum_t y_it`, which removes the group effect exactly (the multinomial reduction), so it is a genuine likelihood and groups with `S_i = 0` are dropped. `re` uses a gamma random effect, which is conjugate to the Poisson, so the group likelihood is closed form and no quadrature is involved; the dispersion is reported as `/lnalpha` and `e(alpha)` as its exponential.",
     "zh": "面板 Poisson，即 Stata 的 `xtpoisson`，`method` 可为 `'fe'` 或 `'re'`。`fe` 以组总量 `S_i = sum_t y_it` 为条件，精确消去组效应（即多项分布归约），因此是真正的似然，`S_i = 0` 的组被剔除。`re` 使用与 Poisson 共轭的 gamma 随机效应，组似然有闭式，不涉及求积；离散参数报告为 `/lnalpha`，`e(alpha)` 为其指数。",
@@ -168,7 +168,7 @@
     "notes_en": "`method='pa'` is refused (`supported: 'fe', 're'`). The `fe` likelihood has no intercept -- the group effect absorbs it, and the likelihood is exactly flat in a constant -- so the patsy intercept is removed rather than estimated. `e(ivar)` and `e(tvar)` are not populated for this class, so the printed `Group variable:` line shows `.` even though `e(N_g)` does count the groups. `predict` registers no types.",
     "notes_zh": "`method='pa'` 会被拒绝（`supported: 'fe', 're'`）。`fe` 似然没有截距——组效应吸收了它，似然在常数方向上完全平坦——因此 patsy 的截距被移除而不是估计。本类不填 `e(ivar)` 与 `e(tvar)`，因此打印的 `Group variable:` 行显示为 `.`，尽管 `e(N_g)` 确实统计了组数。`predict` 未注册任何类型。"
   },
-  "XtNbreg": {
+  "PanelNbRegress": {
     "stata": "xtnbreg ycnt x1, fe",
     "en": "Conditional fixed-effects negative binomial -- Stata's `xtnbreg, fe`, and only `fe` is available. Stata maximises the Hausman-Hall-Griliches (1984) conditional kernel, which is not the conditional Poisson kernel: the dispersion enters through the `ln Gamma(lam + y) - ln Gamma(lam)` terms, which is why `xtnbreg, fe` and `xtpoisson, fe` report different standard errors on the same data. `e(estimator)='hhg_conditional_ml'` and `e(quasi_likelihood)=1` mark it, and `e(ll)` is the maximised conditional log-kernel -- the value Stata prints under `Log likelihood`.",
     "zh": "条件固定效应负二项，即 Stata 的 `xtnbreg, fe`，且只有 `fe` 可用。Stata 最大化的是 Hausman-Hall-Griliches（1984）条件核，而非条件 Poisson 核：离散参数通过 `ln Gamma(lam + y) - ln Gamma(lam)` 项进入，这正是同一数据上 `xtnbreg, fe` 与 `xtpoisson, fe` 报告不同标准误的原因。`e(estimator)='hhg_conditional_ml'` 与 `e(quasi_likelihood)=1` 标记这一点，`e(ll)` 是最大化的条件对数核——也就是 Stata 在 `Log likelihood` 下打印的值。",
@@ -176,7 +176,7 @@
     "notes_en": "The objective is a quasi-likelihood, so `e(ll)` is not a likelihood of the data and no AIC/BIC is stored. `_cons` is part of the parameter vector as in Stata, but the objective is nearly flat in it -- adding a constant to every `lam_it` barely moves the kernel -- so its estimate (and its enormous standard error) is optimiser-dependent while the slopes are not; dropping the constant would move the slopes, so it is kept.",
     "notes_zh": "目标函数是准似然，因此 `e(ll)` 并非数据的似然，也不存 AIC/BIC。与 Stata 一样，`_cons` 属于参数向量，但目标函数在该方向上近乎平坦——给每个 `lam_it` 加常数几乎不改变核——所以它的估计值（及其巨大的标准误）依赖优化器，而斜率不然；去掉常数项会改变斜率，因此予以保留。"
   },
-  "XtTobit": {
+  "PanelTobit": {
     "stata": "xttobit ycensp x1, re",
     "en": "Random-effects Tobit -- Stata's `xttobit`, random effects only. The latent outcome is `y*_it = x_it'b + u_i + e_it` with `u_i ~ N(0, sigma_u^2)` and `e_it ~ N(0, sigma_e^2)`, censored at `lower` and/or `upper`. Both variance components are reported as `sigma_u` and `sigma_e`, and `e(rho) = sigma_u^2/(sigma_u^2 + sigma_e^2)`; the integration is Stata's adaptive Gauss-Hermite (`e(intmethod)='mvaghermite'`) with `e(intpoints)` defaulting to 12.",
     "zh": "随机效应 Tobit，即 Stata 的 `xttobit`，仅有随机效应。潜在结果为 `y*_it = x_it'b + u_i + e_it`，其中 `u_i ~ N(0, sigma_u^2)`、`e_it ~ N(0, sigma_e^2)`，并在 `lower` 和/或 `upper` 处删失。两个方差成分分别报告为 `sigma_u` 与 `sigma_e`，`e(rho) = sigma_u^2/(sigma_u^2 + sigma_e^2)`；积分使用 Stata 的自适应 Gauss-Hermite（`e(intmethod)='mvaghermite'`），`e(intpoints)` 默认为 12。",

@@ -46,7 +46,7 @@ def _panel(*, balanced: bool, seed: int, entities: int = 40):
 @pytest.fixture(scope="module")
 def balanced_fit():
     frame = _panel(balanced=True, seed=970)
-    return frame, ws.RandomEffects.from_formula(
+    return frame, ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 
@@ -54,7 +54,7 @@ def balanced_fit():
 @pytest.fixture(scope="module")
 def unbalanced_fit():
     frame = _panel(balanced=False, seed=972)
-    return frame, ws.RandomEffects.from_formula(
+    return frame, ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
 

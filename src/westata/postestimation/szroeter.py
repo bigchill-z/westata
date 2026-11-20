@@ -38,7 +38,7 @@ from scipy import stats as scipy_stats
 
 
 @dataclass
-class SzroeterResult:
+class SzroeterResults:
     """One row of ``estat szroeter``.
 
     Attributes
@@ -99,7 +99,7 @@ class SzroeterResult:
 class SzroeterTable:
     """The multi-variable form: one row per variable plus the adjustment method."""
 
-    rows: list[SzroeterResult]
+    rows: list[SzroeterResults]
     method: str = "noadjust"
 
     def __iter__(self):
@@ -229,7 +229,7 @@ def estat_szroeter(
     *,
     rhs: bool = False,
     mtest: str | None = None,
-) -> SzroeterResult | SzroeterTable:
+) -> SzroeterResults | SzroeterTable:
     """Stata's ``estat szroeter``.
 
     Parameters
@@ -304,7 +304,7 @@ def estat_szroeter(
             f"{residuals.size} entries for {len(frame)} rows"
         )
 
-    rows: list[SzroeterResult] = []
+    rows: list[SzroeterResults] = []
     for variable in requested:
         if variable not in frame.columns:
             raise ValueError(
@@ -313,7 +313,7 @@ def estat_szroeter(
             )
         values = np.asarray(frame[variable], dtype=float)
         statistic, pvalue = _szroeter_statistic(values, residuals)
-        rows.append(SzroeterResult(variable=variable, statistic=statistic, pvalue=pvalue))
+        rows.append(SzroeterResults(variable=variable, statistic=statistic, pvalue=pvalue))
 
     method = (mtest or "noadjust").lower()
     adjusted = _apply_adjustment([row.pvalue for row in rows], method)
@@ -324,7 +324,7 @@ def estat_szroeter(
         # ``szroeter.ado:65-68``: a single variable drops the adjustment and reports the
         # scalars, so the adjusted value is not carried.
         single = rows[0]
-        return SzroeterResult(
+        return SzroeterResults(
             variable=single.variable,
             statistic=single.statistic,
             pvalue=single.pvalue,

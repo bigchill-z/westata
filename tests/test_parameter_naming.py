@@ -93,7 +93,7 @@ def interaction_result():
             "x2": x2,
         }
     )
-    return ws.OLS.from_formula("y ~ x1*x2", frame).fit()
+    return ws.Regress.from_formula("y ~ x1*x2", frame).fit()
 
 
 def test_no_table_prints_patsy_separators(interaction_result) -> None:

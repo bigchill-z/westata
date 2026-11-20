@@ -77,7 +77,7 @@ def hac():
 def test_the_unadjusted_branch_reports_durbin_and_wu(plain) -> None:
     reported = plain[1].estat_endogenous()
 
-    assert type(reported).__name__ == "EndogenousResult"
+    assert type(reported).__name__ == "EndogenousResults"
     assert np.isfinite(float(reported.durbin))
     assert np.isfinite(float(reported.wu))
 
@@ -94,7 +94,7 @@ def test_the_clustered_branch_reports_a_robust_f(clustered) -> None:
 
     reported = clustered[1].estat_endogenous()
 
-    assert type(reported).__name__ == "RegFResult"
+    assert type(reported).__name__ == "RegFResults"
     assert np.isfinite(float(reported.statistic))
 
 
@@ -110,7 +110,7 @@ def test_the_robust_branch_reports_a_score(robust) -> None:
 
     reported = robust[1].estat_endogenous()
 
-    assert type(reported).__name__ == "EndogScoreResult"
+    assert type(reported).__name__ == "EndogScoreResults"
     assert np.isfinite(float(reported.statistic))
 
 
@@ -124,7 +124,7 @@ def test_the_robust_score_keys(robust) -> None:
 def test_the_hac_branch_adds_lags(hac) -> None:
     reported = hac[1].estat_endogenous()
 
-    assert type(reported).__name__ == "EndogScoreResult"
+    assert type(reported).__name__ == "EndogScoreResults"
     assert "lags" in reported.to_dict()
 
 

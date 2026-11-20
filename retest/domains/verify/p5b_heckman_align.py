@@ -139,7 +139,7 @@ with S() as s:
     print(f"  -e(lambda)/e(sigma)= {-e_lam/e_sig:.12f}")
     print(f"  correlation sign check: corr(y - fitted_main, idx) sign = ?")
 
-et = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d2).fit()
+et = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", d2).fit()
 pn = list(et.param_names)
 print(f"\n  westata params {pn}")
 print(f"  westata e(sigma)={et.e.get('sigma')} e(rho)={et.e.get('rho')}"

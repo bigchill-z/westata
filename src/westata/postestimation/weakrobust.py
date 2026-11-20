@@ -33,7 +33,7 @@ from westata.postestimation.names import require_iv_structure
 
 
 @dataclass
-class WeakRobustResult:
+class WeakRobustResults:
     """One weak-instrument-robust test.
 
     Attributes
@@ -145,7 +145,7 @@ def _resolve_null_hypothesis(
 
 def _anderson_rubin(
     structure: dict[str, Any], null_values: np.ndarray
-) -> WeakRobustResult:
+) -> WeakRobustResults:
     """The Anderson-Rubin test of ``H0: beta_endog = null_values``.
 
     The recipe is the one in Anderson and Rubin (1949): subtract the hypothesised
@@ -214,7 +214,7 @@ def _anderson_rubin(
     # The chi-square form is ``q`` times the F, which is how Stata reports both.
     chi2 = q * f_statistic
     pvalue = float(scipy_stats.f.sf(f_statistic, q, df_denom))
-    return WeakRobustResult(
+    return WeakRobustResults(
         test="Anderson-Rubin",
         statistic=float(chi2),
         f_statistic=float(f_statistic),
@@ -224,13 +224,13 @@ def _anderson_rubin(
     )
 
 
-def estat_weakrobust(
+def estat_weak_instrument_robust(
     result: Any,
     *,
     ar: bool | None = None,
     clr: bool | None = None,
     betanull: Any = None,
-) -> WeakRobustResult:
+) -> WeakRobustResults:
     """Stata's ``estat weakrobust``.
 
     Parameters

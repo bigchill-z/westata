@@ -51,7 +51,7 @@ def _frame(n: int = 400, seed: int = 5800):
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.Etregress.from_formula("y ~ x + treat(t ~ z)", _frame()).fit()
+    return ws.EndogenousTreatmentRegress.from_formula("y ~ x + treat(t ~ z)", _frame()).fit()
 
 
 # ------------------------------------------------------------- the registration

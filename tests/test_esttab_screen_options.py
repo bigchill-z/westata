@@ -39,8 +39,8 @@ pytestmark = pytest.mark.skipif(
 def pair():
     frame = pd.read_stata(DATA)
     return [
-        ws.OLS.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1"),
-        ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit(cov_type="HC1"),
+        ws.Regress.from_formula("lnw ~ s + expr", frame).fit(cov_type="HC1"),
+        ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit(cov_type="HC1"),
     ]
 
 

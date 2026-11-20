@@ -50,7 +50,7 @@ def frame():
 def test_fe_sigma_values_are_exact(frame) -> None:
     """The shared-path change must leave the within estimator untouched."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(entity_effects=True)
     for key, value in STATA_FE.items():
@@ -60,10 +60,10 @@ def test_fe_sigma_values_are_exact(frame) -> None:
 def test_fe_and_re_report_their_own_sigma_e(frame) -> None:
     """Neither should inherit the other's divisor."""
 
-    fixed = ws.PanelOLS.from_formula(
+    fixed = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(entity_effects=True)
-    random_effects = ws.RandomEffects.from_formula(
+    random_effects = ws.PanelRegressRE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit()
     # The two agree here because both recover the same idiosyncratic variance on this data,
@@ -75,10 +75,10 @@ def test_fe_and_re_report_their_own_sigma_e(frame) -> None:
 def test_fe_sigma_u_differs_from_re_sigma_u(frame) -> None:
     """A strong check that the Swamy-Arora correction did not leak into fe."""
 
-    fixed = ws.PanelOLS.from_formula(
+    fixed = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(entity_effects=True)
-    random_effects = ws.RandomEffects.from_formula(
+    random_effects = ws.PanelRegressRE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit()
     assert float(fixed.e["sigma_u"]) != pytest.approx(float(random_effects.e["sigma_u"]), rel=1e-3)

@@ -48,7 +48,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def linear(frame):
-    return ws.OLS.from_formula("y ~ x1 + x2 + x3", frame).fit()
+    return ws.Regress.from_formula("y ~ x1 + x2 + x3", frame).fit()
 
 
 @pytest.fixture(scope="module")
@@ -59,7 +59,7 @@ def logit(frame):
 # ------------------------------------------------------------------- they run
 @pytest.mark.parametrize("method", ["normal", "iid", "fstat"])
 def test_hettest_methods_run(linear, method) -> None:
-    assert linear.estat_hettest(method=method) is not None
+    assert linear.estat_heteroskedasticity_test(method=method) is not None
 
 
 @pytest.mark.parametrize("mtest", ["bonferroni", "holm", "sidak", "noadjust"])
@@ -71,16 +71,16 @@ def test_hettest_mtest_methods_run(linear, mtest) -> None:
     drops it for a single regressor, silently).
     """
 
-    assert linear.estat_hettest(mtest=mtest, rhs=True) is not None
+    assert linear.estat_heteroskedasticity_test(mtest=mtest, rhs=True) is not None
 
 
 @pytest.mark.parametrize("mtest", ["bonferroni", "holm", "sidak"])
 def test_hettest_mtest_single_regressor_drops_the_family(linear, mtest) -> None:
     """Stata does not error here: it reports only the simultaneous test."""
 
-    rendered = linear.estat_hettest(mtest=mtest)
+    rendered = linear.estat_heteroskedasticity_test(mtest=mtest)
 
-    assert type(rendered).__name__ == "HetTestResult", mtest
+    assert type(rendered).__name__ == "HetTestResults", mtest
 
 
 @pytest.mark.parametrize(
@@ -98,12 +98,12 @@ def test_vif_option_combinations_run(linear, kwargs, label) -> None:
 
 @pytest.mark.parametrize("kwargs", [{}, {"white": True}])
 def test_imtest_options_run(linear, kwargs) -> None:
-    assert linear.estat_imtest(**kwargs) is not None
+    assert linear.estat_information_matrix_test(**kwargs) is not None
 
 
 @pytest.mark.parametrize("kwargs", [{}, {"rhs": True}])
 def test_ovtest_options_run(linear, kwargs) -> None:
-    assert linear.estat_ovtest(**kwargs) is not None
+    assert linear.estat_omitted_variables_test(**kwargs) is not None
 
 
 @pytest.mark.parametrize("df", [None, 1, 2])
@@ -127,9 +127,9 @@ def test_hettest_methods_differ(linear) -> None:
     Three different formulas, so the three statistics must not coincide.
     """
 
-    normal = float(linear.estat_hettest(method="normal").statistic)
-    iid = float(linear.estat_hettest(method="iid").statistic)
-    fstat = float(linear.estat_hettest(method="fstat").statistic)
+    normal = float(linear.estat_heteroskedasticity_test(method="normal").statistic)
+    iid = float(linear.estat_heteroskedasticity_test(method="iid").statistic)
+    fstat = float(linear.estat_heteroskedasticity_test(method="fstat").statistic)
 
     assert not np.isclose(normal, iid, rtol=1e-6)
     assert not np.isclose(normal, fstat, rtol=1e-6)
@@ -144,8 +144,8 @@ def test_mtest_adjusts_the_p_values(linear) -> None:
     default call cannot demonstrate the adjustment; a multi-regressor family can.
     """
 
-    unadjusted = linear.estat_hettest(mtest="noadjust", rhs=True)
-    adjusted = linear.estat_hettest(mtest="holm", rhs=True)
+    unadjusted = linear.estat_heteroskedasticity_test(mtest="noadjust", rhs=True)
+    adjusted = linear.estat_heteroskedasticity_test(mtest="holm", rhs=True)
 
     assert str(unadjusted) != str(adjusted)
     assert not np.allclose(
@@ -198,8 +198,8 @@ def test_vif_uncentered_changes_the_values(linear) -> None:
 def test_imtest_white_adds_the_white_component(linear) -> None:
     """``white`` adds a heteroskedasticity term to the Cameron-Trivedi split."""
 
-    plain = linear.estat_imtest()
-    with_white = linear.estat_imtest(white=True)
+    plain = linear.estat_information_matrix_test()
+    with_white = linear.estat_information_matrix_test(white=True)
 
     assert str(plain) != str(with_white)
 
@@ -233,16 +233,16 @@ def test_unknown_mtest_is_refused(linear, mtest) -> None:
     """``_mtest.ado:84`` accepts four methods; anything else must be rejected."""
 
     with pytest.raises(ValueError, match="mtest"):
-        linear.estat_hettest(mtest=mtest)
+        linear.estat_heteroskedasticity_test(mtest=mtest)
 
 
 def test_mtest_with_iid_is_refused(linear) -> None:
     """``hettest.ado:49-61``: ``mtest()`` may not be combined with ``iid``."""
 
     with pytest.raises(ValueError, match="iid"):
-        linear.estat_hettest(method="iid", mtest="holm")
+        linear.estat_heteroskedasticity_test(method="iid", mtest="holm")
 
 
 def test_unknown_hettest_method_is_refused(linear) -> None:
     with pytest.raises(ValueError, match="method"):
-        linear.estat_hettest(method="notamethod")
+        linear.estat_heteroskedasticity_test(method="notamethod")

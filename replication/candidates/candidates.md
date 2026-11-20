@@ -70,7 +70,7 @@ reg d_rpc l_sh_routine33a _Istatefip* [aw=timepwt48] if t2==1, cluster(statefip)
 reg d_rpc l_sh_routine33a t2 _Istatefip* [aw=timepwt48] if t1==1 | t2==1, cluster(statefip)
 ```
 
-- Estimator: OLS (`regress`)
+- Estimator: Regress (`regress`)
 - Dependent variable: `d_rpc` (change in routine-task intensity / "routine share")
 - Key regressor: `l_sh_routine33a` (start-of-period routine occupation share)
 - Fixed effects: **state fixed effects** (`i.statefip`, 48 clusters)
@@ -98,7 +98,7 @@ westata col2: 0.489933 (0.076050)   Stata: 0.489933 (0.076050)
 westata col3: 0.618514 (0.044148)   Stata: 0.618514 (0.044148)
 ```
 
-Run with `westata.OLS.from_formula('d_rpc ~ l_sh_routine33a [+ t2] + C(statefip)',
+Run with `westata.Regress.from_formula('d_rpc ~ l_sh_routine33a [+ t2] + C(statefip)',
 weights=..., weight_type='aweight').fit(cov_type='cluster', cov_kwds={'groups':...})`.
 All three columns reproduce to **6 decimal places**, i.e. exactly at the precision
 the paper prints.
@@ -227,7 +227,7 @@ reg d_emppriv_1990_2008 expof_euro5_qo93_07 $region_effects ///
     [w=ipums_pop_1990], r cluster(state)
 ```
 
-- Estimator: OLS (`regress`), weight `pweight`-style `[w=…]`
+- Estimator: Regress (`regress`), weight `pweight`-style `[w=…]`
 - Dependent variable: `d_emppriv_1990_2008` (change in private-employment/population ratio)
 - Key regressor: `expof_euro5_qo93_07` (foreign robot exposure)
 - Fixed effects: census **division** dummies (`i.division`)
@@ -377,7 +377,7 @@ Why it beats the alternatives for a *one-day, honest, exact* job:
 
 1. **No data engineering.** The archive ships the finished analysis file. No Census/IPUMS re-extraction, no crosswalk merging, no fixed-width parsing (contrast Card–Krueger), no private microdata (contrast Superstar Firms), no purchased IFR licences (contrast Demographics & Automation).
 2. **No out-of-scope commands.** `regress` + `i.statefip` + `[aw=timepwt48]` + `cluster(statefip)`. That is it. No `ivreg2`, no `reghdfe`, no `ssaggregate`, no two-way clustering (contrast China Syndrome and Political Polarization).
-3. **It already works in this repo.** The China Syndrome route is blocked today by `westata.IV2SLS` refusing weights; the Autor–Dorn route has no such gap — `westata.OLS` with `weight_type='aweight'` and `cov_type='cluster'` returned the published numbers exactly.
+3. **It already works in this repo.** The China Syndrome route is blocked today by `westata.IV2SLS` refusing weights; the Autor–Dorn route has no such gap — `westata.Regress` with `weight_type='aweight'` and `cov_type='cluster'` returned the published numbers exactly.
 4. **The paper ships ground truth.** `log/czone_analysis.log` contains the full Stata output for every table, so the replication can be checked against the authors' own run, not just against a printed table.
 5. **Influential and on-venue.** 3,823 citations, AER, and the measurement infrastructure (`occ1990dd`, commuting-zone task shares) that a large literature still uses.
 
@@ -423,7 +423,7 @@ Replication check for the top pick (produces the table in §1):
 import pandas as pd, westata
 df = pd.read_stata(r'replication/candidates/raw/ad2013/archive/dta/workfile2012.dta')
 d = df[df['t1'] == 1].dropna(subset=['d_rpc','l_sh_routine33a','timepwt48','statefip'])
-r = westata.OLS.from_formula('d_rpc ~ l_sh_routine33a + C(statefip)', data=d,
+r = westata.Regress.from_formula('d_rpc ~ l_sh_routine33a + C(statefip)', data=d,
         weights=d['timepwt48'].values, weight_type='aweight').fit(
         cov_type='cluster', cov_kwds={'groups': d['statefip'].values})
 print(r.params['l_sh_routine33a'], r.bse['l_sh_routine33a'], r.nobs)

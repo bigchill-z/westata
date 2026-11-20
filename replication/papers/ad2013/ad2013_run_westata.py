@@ -121,7 +121,7 @@ def main() -> int:
 
     for spec in SPECS:
         frame, dummy_names = _prepare(spec, raw)
-        result = ws.OLS.from_formula(
+        result = ws.Regress.from_formula(
             _formula(spec, dummy_names),
             frame,
             weights=frame["timepwt48"],

@@ -155,7 +155,7 @@ Margins: asbalanced
 --------------------------------------------------------------
 
 
-=== pwcompare :: all_pairs ===
+=== pairwise_compare :: all_pairs ===
 
 Pairwise comparisons of marginal linear predictions
 

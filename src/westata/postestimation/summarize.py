@@ -36,7 +36,7 @@ from westata.postestimation.names import is_constant_name
 #: The constant-name test lives in `names.py` (R6.1).
 _is_constant = is_constant_name
 
-__all__ = ["SummarizeResult", "estat_summarize"]
+__all__ = ["SummarizeResults", "estat_summarize"]
 
 
 
@@ -271,7 +271,7 @@ def _two_place_exponent(text: str) -> str:
     return f"{sign}{whole}.{fraction}e{exponent}"
 
 
-class SummarizeResult:
+class SummarizeResults:
     """The ``estat summarize`` table.
 
     Attributes
@@ -326,7 +326,7 @@ class SummarizeResult:
 
     def __repr__(self) -> str:
         return (
-            f"<SummarizeResult {len(self.table)} variables, N={self.n_obs:g}>"
+            f"<SummarizeResults {len(self.table)} variables, N={self.n_obs:g}>"
         )
 
     def __str__(self) -> str:
@@ -549,7 +549,7 @@ def estat_summarize(
     noweights: bool = False,
     noheader: bool = False,
     labels: Mapping[str, str] | None = None,
-) -> SummarizeResult:
+) -> SummarizeResults:
     """Stata's ``estat summarize``.
 
     Parameters
@@ -704,7 +704,7 @@ def estat_summarize(
         }
 
     n_obs = float(result.nobs) if hasattr(result, "nobs") else float(len(frame))
-    built = SummarizeResult(
+    built = SummarizeResults(
         table, n_obs, clusters, noheader=noheader, labels=labels
     )
     # Stata heads the table with "Estimation sample <command>"; the name comes from the fit

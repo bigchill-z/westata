@@ -67,7 +67,7 @@ def test_the_table_header_follows_the_blank(frame) -> None:
 def test_the_line_match_rate_against_stata_is_three_of_four(frame) -> None:
     """The ratio the report scores. It was 2 of 4 before the blank line was added."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
     mine = str(ws.summarize(pd.DataFrame({"e1": fitted.predict(kind="resid")}))).splitlines()
 
     def normalise(rows):

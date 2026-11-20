@@ -68,8 +68,8 @@ STATA_TWOSTEP = {
 def test_etregress_twostep_matches_stata():
     """Two-step against two-step, which is the only like-for-like comparison."""
 
-    Etregress = _require("Etregress")
-    result = Etregress.from_formula(
+    EndogenousTreatmentRegress = _require("EndogenousTreatmentRegress")
+    result = EndogenousTreatmentRegress.from_formula(
         "y ~ x1 + treat(treated ~ z)", treatreg_frame()
     ).fit(method="control")
 
@@ -105,7 +105,7 @@ def test_etregress_ml_matches_stata():
         {"y": 1.0 + 0.9 * x1 + v, "x1": x1, "z1": z1, "z2": z2, "t": treated}
     )
 
-    result = ws.Etregress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit(method="ml")
+    result = ws.EndogenousTreatmentRegress.from_formula("y ~ x1 + treat(t ~ z1 + z2)", frame).fit(method="ml")
 
     assert float(result.e["ll"]) == pytest.approx(-1124.693682764672, rel=1e-12)
     assert float(result.e["rho"]) == pytest.approx(0.4240986539296641, rel=1e-6)
@@ -124,8 +124,8 @@ def test_etregress_ml_matches_stata():
 def test_etregress_reports_the_inverse_mills_coefficient():
     """``lambda`` is the coefficient on the generated regressor, and Stata prints it."""
 
-    Etregress = _require("Etregress")
-    result = Etregress.from_formula(
+    EndogenousTreatmentRegress = _require("EndogenousTreatmentRegress")
+    result = EndogenousTreatmentRegress.from_formula(
         "y ~ x1 + treat(treated ~ z)", treatreg_frame()
     ).fit(method="control")
     assert "lambda" in result.param_names

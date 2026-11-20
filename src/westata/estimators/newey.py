@@ -49,10 +49,10 @@ import numpy as np
 import pandas as pd
 
 from westata.data.weights import normalize_weights
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 from westata.results.base import EReturn
 
-__all__ = ["newey", "NeweyWestResult", "check_time_spacing"]
+__all__ = ["newey_west", "NeweyWestResults", "check_time_spacing"]
 
 #: ``newey.sthlp:174``: the title printed above the table (note the en dash).
 NEWEY_TITLE = "Regression with Newey–West standard errors"
@@ -104,7 +104,7 @@ def check_time_spacing(time_values: Any) -> tuple[int, float | None]:
     return 0, minimum
 
 
-class NeweyWestResult:
+class NeweyWestResults:
     """``newey``'s result: ``regress``'s numbers behind ``newey``'s narrower surface.
 
     Two things differ from a plain ``StataResults`` and both are visible to
@@ -238,10 +238,10 @@ class NeweyWestResult:
         return render_summary(self._results, style="stata")
 
     def __repr__(self) -> str:
-        return f"<NeweyWestResult lag={self.lag} nobs={self._results.nobs}>"
+        return f"<NeweyWestResults lag={self.lag} nobs={self._results.nobs}>"
 
 
-def newey(
+def newey_west(
     formula: str,
     data: pd.DataFrame,
     *,
@@ -251,7 +251,7 @@ def newey(
     noconstant: bool = False,
     weights: Any = None,
     weight_type: str | None = None,
-) -> NeweyWestResult:
+) -> NeweyWestResults:
     """Fit ``newey depvar indepvars, lag(#)``.
 
     Thin wrapper over :class:`westata.Newey` -- the class is the implementation, this
@@ -280,7 +280,7 @@ def _newey_impl(
     noconstant: bool = False,
     weights: Any = None,
     weight_type: str | None = None,
-) -> NeweyWestResult:
+) -> NeweyWestResults:
     """Fit ``newey depvar indepvars, lag(#)``.
 
     Parameters
@@ -373,7 +373,7 @@ def _newey_impl(
         formula_kwargs["weights"] = weights
         formula_kwargs["weight_type"] = "aweight"
 
-    results = OLS.from_formula(fit_formula, data, **formula_kwargs).fit(**kwargs)
+    results = Regress.from_formula(fit_formula, data, **formula_kwargs).fit(**kwargs)
 
     # --- rewrite e() to newey's own collection ------------------------------
     #
@@ -412,7 +412,7 @@ def _newey_impl(
     results.predict_cmd = "newey_p"
     if weight_type is not None:
         results.e_wtype = "aweight"
-    return NeweyWestResult(results, lag=lag)
+    return NeweyWestResults(results, lag=lag)
 
 
 class Newey:
@@ -493,7 +493,7 @@ class Newey:
             weight_type=weight_type,
         )
 
-    def fit(self, *, lag: int | None = None) -> NeweyWestResult:
+    def fit(self, *, lag: int | None = None) -> NeweyWestResults:
         """Estimate.  ``lag`` may be overridden here for a single fit.
 
         There is no ``cov_type`` parameter: see the class docstring.

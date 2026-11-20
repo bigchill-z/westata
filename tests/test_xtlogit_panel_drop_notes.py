@@ -41,7 +41,7 @@ def _panel(seed: int = 11, groups: int = 60, periods: int = 8) -> pd.DataFrame:
 
 
 def _lines(**kwargs) -> list[str]:
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "ybin ~ x + z", _panel(), entity="pid", time="year", method="fe"
     ).fit(**kwargs)
     return str(fitted.summary()).splitlines()
@@ -64,7 +64,7 @@ def test_a_blank_line_follows_the_notes() -> None:
 
 
 def test_the_drop_counts_are_still_reported_in_e() -> None:
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "ybin ~ x + z", _panel(), entity="pid", time="year", method="fe"
     ).fit()
     assert int(fitted.e["N_group_drop"]) == 1
@@ -88,7 +88,7 @@ def test_a_fit_without_drops_has_no_notes() -> None:
     )
     frame["x"] = rng.normal(size=len(frame))
     frame["ybin"] = np.tile([0, 1, 0, 1, 0, 1], 40)
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "ybin ~ x", frame, entity="pid", time="year", method="fe"
     ).fit()
     rendered = str(fitted.summary())
@@ -99,7 +99,7 @@ def test_a_fit_without_drops_has_no_notes() -> None:
 def test_the_random_effects_form_is_unaffected() -> None:
     """These notes are a conditional-likelihood artefact; `re` must not carry them."""
 
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "ybin ~ x + z", _panel(), entity="pid", time="year", method="re"
     ).fit()
     rendered = str(fitted.summary())

@@ -28,7 +28,7 @@ def fitted():
         frame = pd.read_stata(NERLOVE)
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("nerlove.dta is not available")
-    return ws.OLS.from_formula("lntc ~ lnq + lnpl + lnpk + lnpf", frame).fit()
+    return ws.Regress.from_formula("lntc ~ lnq + lnpl + lnpk + lnpf", frame).fit()
 
 
 def test_the_margin_matches_stata(fitted) -> None:

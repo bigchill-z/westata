@@ -290,8 +290,15 @@ def collect() -> dict[str, object]:
     collector = _Collector()
     exports: list[dict[str, object]] = []
 
+    # Deprecated old names are importable but not primary API (R-N5/R-N6).
+    # The compat module is their record; the manual documents one name per concept.
+    import sys
+    sys.path.insert(0, str(ROOT / 'src'))
+    from westata._compat import RENAMED as _RENAMED, RESULT_RENAMED as _RESULT_RENAMED
+    _deprecated = {old for old, _new in _RENAMED + _RESULT_RENAMED}
+
     for name in sorted(dir(ws)):
-        if name.startswith("_") or name in NOT_API:
+        if name.startswith("_") or name in NOT_API or name in _deprecated:
             continue
         target = getattr(ws, name)
         kind = (

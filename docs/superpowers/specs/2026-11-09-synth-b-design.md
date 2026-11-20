@@ -85,7 +85,7 @@ res.Y_treated, res.Y_synthetic, res.gap
 res.summary(style="stata")
 ```
 
-结果对象为**冻结 dataclass**（照 `rcm.RcmResult` / `rdrobust.RdRobustResult` 先例），
+结果对象为**冻结 dataclass**（照 `rcm.RcmResult` / `rd_robust.RdRobustResult` 先例），
 **不套 `StataResults`**：synth 无系数向量、无 `cov_params`、无 t/z 分布、无 `df_resid`。
 强行套用会逼出伪造的 `params`/`bse`，违反 G3。
 

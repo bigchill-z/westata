@@ -47,7 +47,7 @@ def fitted():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("munnell.dta is not available")
-    model = ws.RandomEffectsMLE.from_formula(
+    model = ws.PanelRegressMLE.from_formula(
         FORMULA, frame, entity="st_abb", time="year"
     )
     return model.fit()
@@ -79,5 +79,5 @@ def test_the_log_likelihood_matches(fitted) -> None:
 def test_the_entry_point_is_random_effects_mle() -> None:
     """The zero score came from the name, as with xtreg itself in round 173."""
 
-    assert hasattr(ws, "RandomEffectsMLE")
+    assert hasattr(ws, "PanelRegressMLE")
     assert not hasattr(ws, "xtreg")

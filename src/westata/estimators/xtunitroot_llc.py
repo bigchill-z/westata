@@ -50,7 +50,7 @@ from scipy import stats
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["LlcResult", "levin_lin_chu"]
+__all__ = ["LlcResults", "levin_lin_chu"]
 
 #: ``_get_adj`` tables: model 1 = no constant, 2 = constant, 3 = constant + trend.
 #: Each row is (T, mu adjustment, sigma adjustment); the last row is the limit.
@@ -104,7 +104,7 @@ _ADJUSTMENT: dict[int, tuple[tuple[float, float, float], ...]] = {
 
 
 @dataclass(frozen=True)
-class LlcResult(ResultSerialisation):
+class LlcResults(ResultSerialisation):
     """Result of the Levin-Lin-Chu test (Stata ``xtunitroot llc``)."""
 
     tds: float
@@ -188,7 +188,7 @@ def levin_lin_chu(
     demean: bool = False,
     lags: int | None = None,
     hac_lags: int | None = None,
-) -> LlcResult:
+) -> LlcResults:
     """Levin-Lin-Chu panel unit-root test.
 
     ``constant`` and ``trend`` choose the deterministic specification, matching Stata's
@@ -388,7 +388,7 @@ def levin_lin_chu(
     pvalue_tds = float(stats.norm.cdf(tds))
     pvalue_td = float(stats.norm.cdf(td)) if model == 1 else None
 
-    return LlcResult(
+    return LlcResults(
         tds=float(tds),
         td=float(td),
         ttilde=ttilde,

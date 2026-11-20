@@ -56,10 +56,10 @@ def panel():
 
 @pytest.fixture(scope="module")
 def pair(panel):
-    fe = ws.PanelOLS.from_formula(
+    fe = ws.PanelRegressFE.from_formula(
         FORMULA, panel, entity="province", time="t"
     ).fit()
-    re_fit = ws.RandomEffects.from_formula(
+    re_fit = ws.PanelRegressRE.from_formula(
         FORMULA, panel, entity="province", time="t"
     ).fit()
     return fe, re_fit

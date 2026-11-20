@@ -34,7 +34,7 @@ def paired():
     n = 100
     frame = pd.DataFrame({"x1": rng.normal(size=n), "x2": rng.normal(size=n)})
     frame["y"] = 1.0 + 0.8 * frame["x1"] - 0.5 * frame["x2"] + rng.normal(size=n)
-    ours = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    ours = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     design = sm.add_constant(frame[["x1", "x2"]].to_numpy())
     theirs = sm.OLS(frame["y"].to_numpy(), design).fit()
     return ours, theirs
@@ -117,5 +117,5 @@ def test_cov_params_is_unchanged_by_design() -> None:
     """The user ruled this out of scope; this test records the decision, not a defect."""
 
     frame = pd.DataFrame({"y": np.arange(1, 21.0), "x": np.arange(1, 21.0) ** 1.5})
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     assert isinstance(fitted.cov_params(), np.ndarray)

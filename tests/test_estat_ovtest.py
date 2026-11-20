@@ -18,14 +18,14 @@ import pytest
 from scipy import stats
 
 import westata as ws
-from westata.postestimation.ovtest import estat_ovtest
+from westata.postestimation.ovtest import estat_omitted_variables_test
 
 
 @pytest.fixture()
 def fit():
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length", "displacement"]].dropna()
-    return frame, ws.OLS.from_formula("mpg ~ weight + length", frame).fit()
+    return frame, ws.Regress.from_formula("mpg ~ weight + length", frame).fit()
 
 
 def _joint_f(y, design, tested):
@@ -55,7 +55,7 @@ def test_default_uses_powers_of_the_rescaled_fitted_values(fit) -> None:
     design = np.column_stack([matrix, extra])
     expected, df1, df2, _ = _joint_f(y, design, range(matrix.shape[1], design.shape[1]))
 
-    rendered = result.estat_ovtest()
+    rendered = result.estat_omitted_variables_test()
 
     assert rendered.statistic == pytest.approx(expected, rel=1e-10)
     assert rendered.df == df1
@@ -76,7 +76,7 @@ def test_rescaling_changes_the_statistic(fit) -> None:
     design_raw = np.column_stack([matrix, extra_raw])
     raw_f, *_ = _joint_f(y, design_raw, range(matrix.shape[1], design_raw.shape[1]))
 
-    assert not np.isclose(result.estat_ovtest().statistic, raw_f, rtol=1e-8), (
+    assert not np.isclose(result.estat_omitted_variables_test().statistic, raw_f, rtol=1e-8), (
         "the fitted values must be rescaled to [0,1] before taking powers"
     )
 
@@ -103,7 +103,7 @@ def test_rhs_option_uses_powers_of_the_regressors(fit) -> None:
     design = np.column_stack([extra, matrix])
     expected, df1, _, _ = _joint_f(y, design, range(extra.shape[1]))
 
-    rendered = result.estat_ovtest(rhs=True)
+    rendered = result.estat_omitted_variables_test(rhs=True)
 
     # lstsq here and pinv inside the implementation invert the same design by different
     # factorisations, so agreement is to ~1e-9 rather than machine epsilon. The ORDER is
@@ -128,7 +128,7 @@ def test_default_omitted_label_names_the_dependent_variable(fit) -> None:
     """
 
     _, result = fit
-    label = result.estat_ovtest().omitted
+    label = result.estat_omitted_variables_test().omitted
 
     assert label.startswith("fitted values")
     assert " of " in label, label
@@ -136,7 +136,7 @@ def test_default_omitted_label_names_the_dependent_variable(fit) -> None:
 
 def test_pvalue_is_upper_tail_f(fit) -> None:
     _, result = fit
-    rendered = result.estat_ovtest()
+    rendered = result.estat_omitted_variables_test()
 
     assert rendered.pvalue == pytest.approx(
         float(stats.f.sf(rendered.statistic, rendered.df, rendered.df_denom)),
@@ -154,7 +154,7 @@ def test_a_misspecified_model_is_rejected() -> None:
     y = 1.0 + 2.0 * x + 3.0 * x**2 + rng.normal(scale=0.3, size=n)
     frame = pd.DataFrame({"y": y, "x": x})
 
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().estat_ovtest()
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().estat_omitted_variables_test()
 
     assert rendered.pvalue < 0.01
     assert rendered.statistic > 100.0
@@ -167,7 +167,7 @@ def test_a_well_specified_model_is_not_rejected() -> None:
     y = 1.0 + 2.0 * x + rng.normal(scale=0.3, size=n)
     frame = pd.DataFrame({"y": y, "x": x})
 
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().estat_ovtest()
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().estat_omitted_variables_test()
 
     assert rendered.pvalue > 0.01
 
@@ -184,28 +184,28 @@ def test_all_indicator_regressors_are_rejected() -> None:
             "g2": rng.integers(0, 2, size=n).astype(float),
         }
     )
-    fit = ws.OLS.from_formula("y ~ g1 + g2", frame).fit()
+    fit = ws.Regress.from_formula("y ~ g1 + g2", frame).fit()
 
     # The default (fitted values) still works, because the fitted values are
     # continuous even when every regressor is an indicator.
-    assert np.isfinite(fit.estat_ovtest().statistic)
+    assert np.isfinite(fit.estat_omitted_variables_test().statistic)
 
     # The rhs variant has no continuous regressor to take powers of.
     with pytest.raises(ValueError, match="collinear"):
-        fit.estat_ovtest(rhs=True)
+        fit.estat_omitted_variables_test(rhs=True)
 
 
 def test_to_dict_uses_stata_r_names(fit) -> None:
     _, result = fit
-    payload = result.estat_ovtest().to_dict()
+    payload = result.estat_omitted_variables_test().to_dict()
 
     assert set(payload) == {"F", "df", "df_r", "p"}
-    assert payload["F"] == result.estat_ovtest().statistic
+    assert payload["F"] == result.estat_omitted_variables_test().statistic
 
 
 def test_output_has_the_stata_header(fit) -> None:
     _, result = fit
-    text = str(result.estat_ovtest())
+    text = str(result.estat_omitted_variables_test())
 
     assert "Ramsey RESET test for omitted variables" in text
     assert "H0: Model has no omitted variables" in text
@@ -215,4 +215,4 @@ def test_output_has_the_stata_header(fit) -> None:
 def test_module_function_matches_the_method(fit) -> None:
     _, result = fit
 
-    assert estat_ovtest(result).to_dict() == result.estat_ovtest().to_dict()
+    assert estat_omitted_variables_test(result).to_dict() == result.estat_omitted_variables_test().to_dict()

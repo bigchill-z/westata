@@ -51,18 +51,18 @@ def ols_fit():
         frame = pd.read_stata(DATA).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_the_overid_heading_is_indented_by_two_spaces(iv_fit) -> None:
     """The only line that was out of step; the statistics already matched."""
 
-    rendered = [line for line in str(ws.estat_overid(iv_fit)).splitlines() if line.strip()]
+    rendered = [line for line in str(ws.estat_overidentification(iv_fit)).splitlines() if line.strip()]
     assert rendered == STATA_OVERID
 
 
 def test_the_overid_statistics_match_stata(iv_fit) -> None:
-    rendered = str(ws.estat_overid(iv_fit))
+    rendered = str(ws.estat_overidentification(iv_fit))
     assert "Sargan (score) chi2(2) =  91.2187" in rendered
     assert "Basmann chi2(2)        =  103.151" in rendered
 

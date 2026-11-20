@@ -260,7 +260,7 @@ def _wald_f(params: np.ndarray, cov: np.ndarray, tested: Sequence[int]) -> float
         return float("nan")
 
 
-class OLS:
+class Regress:
     """Ordinary least squares (Stata ``regress``).
 
     Parameters

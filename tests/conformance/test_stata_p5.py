@@ -36,7 +36,7 @@ def _factor_frame(n: int = 300, seed: int = 7) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "y ~ x + C(g, base=0)", _factor_frame()
     ).fit()
 
@@ -83,7 +83,7 @@ def test_contrast_grand_matches_stata(fitted):
 
 
 def test_pwcompare_matches_stata(fitted):
-    rows = fitted.pwcompare("C(g)")
+    rows = fitted.pairwise_compare("C(g)")
     assert len(rows) == 3
 
     estimates = [float(row.estimate) for row in rows]
@@ -99,4 +99,4 @@ def test_contrast_rejects_unimplemented_methods(fitted):
 
 def test_pwcompare_rejects_adjustment(fitted):
     with pytest.raises(UnsupportedError, match="adjust"):
-        fitted.pwcompare("C(g)", adjust="bonferroni")
+        fitted.pairwise_compare("C(g)", adjust="bonferroni")

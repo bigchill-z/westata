@@ -143,7 +143,7 @@ def test_tobit_estimate_differs_from_naive_ols():
     import westata as ws
 
     df = _left_censored()
-    ols = ws.OLS.from_formula("y ~ x1 + x2", df).fit()
+    ols = ws.Regress.from_formula("y ~ x1 + x2", df).fit()
     tobit = Tobit.from_formula("y ~ x1 + x2", df, lower=2.0).fit()
     assert tobit.params["x1"] > ols.params["x1"]
 

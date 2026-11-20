@@ -62,10 +62,10 @@ def frames():
     m1 = auto[["mpg", "weight", "foreign"]].dropna()
     m2 = auto[["mpg", "weight", "length", "displacement"]].dropna()
     return {
-        "M1": (m1, ws.OLS.from_formula("mpg ~ weight + foreign", m1).fit()),
+        "M1": (m1, ws.Regress.from_formula("mpg ~ weight + foreign", m1).fit()),
         "M2": (
             m2,
-            ws.OLS.from_formula(
+            ws.Regress.from_formula(
                 "mpg ~ weight + length + displacement", m2
             ).fit(),
         ),
@@ -135,7 +135,7 @@ def test_the_family_matches_stata(frames, reference) -> None:
 
     for model, entry in reference["mtest"].items():
         _, result = frames[model]
-        table = result.estat_hettest(mtest="noadjust", rhs=True).table
+        table = result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
         assert len(table) == entry["rows"], model
         for variable in entry["variables"]:
             row = table.loc[variable["name"]]
@@ -153,17 +153,17 @@ def test_the_family_has_one_row_per_regressor(frames, reference) -> None:
     """
 
     for model, entry in reference["mtest"].items():
-        table = frames[model][1].estat_hettest(mtest="noadjust", rhs=True).table
+        table = frames[model][1].estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
         assert sorted(table.index) == sorted(v["name"] for v in entry["variables"]), model
         assert len(table) == entry["rows"], model
 
 
 def test_per_variable_statistics_do_not_depend_on_the_method(frames) -> None:
     result = frames["M2"][1]
-    raw = result.estat_hettest(mtest="noadjust", rhs=True)
+    raw = result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True)
 
     for method in ("bonferroni", "holm", "sidak"):
-        adjusted = result.estat_hettest(mtest=method, rhs=True)
+        adjusted = result.estat_heteroskedasticity_test(mtest=method, rhs=True)
         assert np.allclose(
             adjusted.table["chi2"].to_numpy(), raw.table["chi2"].to_numpy()
         )
@@ -172,10 +172,10 @@ def test_per_variable_statistics_do_not_depend_on_the_method(frames) -> None:
 
 def test_adjusted_values_match_the_standalone_function(frames) -> None:
     result = frames["M2"][1]
-    raw_p = result.estat_hettest(mtest="noadjust", rhs=True).table["p"].to_numpy()
+    raw_p = result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table["p"].to_numpy()
 
     for method in ("bonferroni", "holm", "sidak"):
-        got = result.estat_hettest(mtest=method, rhs=True).table["adjustp"].to_numpy()
+        got = result.estat_heteroskedasticity_test(mtest=method, rhs=True).table["adjustp"].to_numpy()
         assert np.allclose(got, adjust_pvalues(raw_p, method)), method
 
 
@@ -188,7 +188,7 @@ def test_each_variable_gets_its_own_auxiliary_regression(frames) -> None:
     """
 
     frame, result = frames["M2"]
-    table = result.estat_hettest(mtest="noadjust", rhs=True).table
+    table = result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
 
     residuals = np.asarray(result.resid, dtype=float)
     scale = float(residuals @ residuals) / residuals.size
@@ -206,13 +206,13 @@ def test_each_variable_gets_its_own_auxiliary_regression(frames) -> None:
 
 
 def test_degrees_of_freedom_are_one_per_single_regressor(frames) -> None:
-    table = frames["M2"][1].estat_hettest(mtest="noadjust", rhs=True).table
+    table = frames["M2"][1].estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
 
     assert np.all(table["df"].to_numpy() == 1.0)
 
 
 def test_pvalue_is_the_chi2_upper_tail(frames) -> None:
-    table = frames["M2"][1].estat_hettest(mtest="noadjust", rhs=True).table
+    table = frames["M2"][1].estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
 
     for name, row in table.iterrows():
         assert row["p"] == pytest.approx(
@@ -225,8 +225,8 @@ def test_r_matrix_shape(frames) -> None:
 
     result = frames["M1"][1]
 
-    assert result.estat_hettest(mtest="noadjust", rhs=True).to_matrix().shape == (2, 3)
-    assert result.estat_hettest(mtest="holm", rhs=True).to_matrix().shape == (2, 4)
+    assert result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).to_matrix().shape == (2, 3)
+    assert result.estat_heteroskedasticity_test(mtest="holm", rhs=True).to_matrix().shape == (2, 4)
 
 
 def test_the_simultaneous_statistic_matches_the_rhs_test(frames, reference) -> None:
@@ -234,11 +234,11 @@ def test_the_simultaneous_statistic_matches_the_rhs_test(frames, reference) -> N
 
     for model, entry in reference["mtest"].items():
         result = frames[model][1]
-        simultaneous = result.estat_hettest(rhs=True).statistic
+        simultaneous = result.estat_heteroskedasticity_test(rhs=True).statistic
         assert simultaneous == pytest.approx(
             entry["simultaneous"]["chi2"], rel=1e-9
         ), model
-        assert result.estat_hettest(rhs=True).df == entry["simultaneous"]["df"]
+        assert result.estat_heteroskedasticity_test(rhs=True).df == entry["simultaneous"]["df"]
 
 
 # ---------------------------------------------- mtest() is silently dropped
@@ -251,10 +251,10 @@ def test_mtest_is_dropped_when_only_one_regressor(frames, reference) -> None:
     """
 
     result = frames["M1"][1]
-    rendered = result.estat_hettest(mtest="holm")
+    rendered = result.estat_heteroskedasticity_test(mtest="holm")
 
     expected = reference["mtest_single_regressor"]
-    assert type(rendered).__name__ == "HetTestResult"
+    assert type(rendered).__name__ == "HetTestResults"
     assert expected["r_mtest_missing"] is True
     assert rendered.statistic == pytest.approx(expected["chi2"], rel=1e-9)
     assert rendered.df == expected["df"]
@@ -262,38 +262,38 @@ def test_mtest_is_dropped_when_only_one_regressor(frames, reference) -> None:
 
 def test_explicit_single_variable_also_drops_mtest(frames) -> None:
     result = frames["M1"][1]
-    rendered = result.estat_hettest(variables=["weight"], mtest="holm")
+    rendered = result.estat_heteroskedasticity_test(variables=["weight"], mtest="holm")
 
-    assert type(rendered).__name__ == "HetTestResult"
+    assert type(rendered).__name__ == "HetTestResults"
     assert rendered.df == 1
 
 
 # --------------------------------------------------------------- refusals
 def test_iid_with_mtest_is_refused(frames) -> None:
     with pytest.raises(ValueError, match="iid may not be specified"):
-        frames["M1"][1].estat_hettest(method="iid", mtest="holm", rhs=True)
+        frames["M1"][1].estat_heteroskedasticity_test(method="iid", mtest="holm", rhs=True)
 
 
 def test_fstat_with_mtest_is_refused(frames) -> None:
     with pytest.raises(ValueError, match="fstat may not be specified"):
-        frames["M1"][1].estat_hettest(method="fstat", mtest="holm", rhs=True)
+        frames["M1"][1].estat_heteroskedasticity_test(method="fstat", mtest="holm", rhs=True)
 
 
 def test_unknown_mtest_method_is_refused(frames) -> None:
     with pytest.raises(ValueError, match="not supported"):
-        frames["M1"][1].estat_hettest(mtest="fdr", rhs=True)
+        frames["M1"][1].estat_heteroskedasticity_test(mtest="fdr", rhs=True)
 
 
 def test_robust_vce_is_still_refused_with_mtest(frames) -> None:
     frame, _ = frames["M1"]
-    robust = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit(cov_type="HC1")
+    robust = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit(cov_type="HC1")
 
     with pytest.raises(ValueError, match="robust"):
-        robust.estat_hettest(mtest="holm", rhs=True)
+        robust.estat_heteroskedasticity_test(mtest="holm", rhs=True)
 
 
 def test_output_lists_every_variable_and_the_adjustment(frames) -> None:
-    text = str(frames["M2"][1].estat_hettest(mtest="holm", rhs=True))
+    text = str(frames["M2"][1].estat_heteroskedasticity_test(mtest="holm", rhs=True))
 
     assert "holm" in text
     for name in ("weight", "length", "displacement"):

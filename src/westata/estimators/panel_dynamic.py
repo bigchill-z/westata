@@ -99,7 +99,7 @@ from westata.errors import ConsistencyError, UnsupportedError
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
-__all__ = ["DynamicPanelInstruments", "XtAbond", "build_instruments"]
+__all__ = ["DynamicPanelInstruments", "PanelAbond", "build_instruments"]
 
 
 def _abond_cov_label(cov_type: str | None) -> str:
@@ -197,7 +197,7 @@ def build_instruments(levels: np.ndarray, lags: int) -> np.ndarray:
     return matrix
 
 
-class XtAbond:
+class PanelAbond:
     """Arellano-Bond / Blundell-Bond dynamic panel GMM (Stata ``xtabond`` family)."""
 
     _stata_command = "xtabond"
@@ -516,13 +516,13 @@ class XtAbond:
         return ["Intercept"] + self._exog_names
 
 
-class XtDpd(XtAbond):
+class PanelDpd(PanelAbond):
     """``xtdpd``: same one-step estimator, exposed under Stata's other spelling."""
 
     _stata_command = "xtdpd"
 
 
-class XtDpdSys(XtAbond):
+class PanelDpdSys(PanelAbond):
     """``xtdpdsys``: Blundell-Bond system GMM.
 
     The level equation adds instruments that the difference estimator does not

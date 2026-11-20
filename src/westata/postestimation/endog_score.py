@@ -60,7 +60,7 @@ from westata.postestimation.names import is_constant_name
 #: The constant-name test lives in `names.py` (R6.1).
 _is_constant = is_constant_name
 
-__all__ = ["EndogScoreResult", "endog_score_test"]
+__all__ = ["EndogScoreResults", "endog_score_test"]
 
 
 
@@ -112,7 +112,7 @@ def _score_from_rhat(rhat: np.ndarray) -> float:
     return float(rhat.shape[0] - residual @ residual)
 
 
-class EndogScoreResult:
+class EndogScoreResults:
     """An endogeneity score test.
 
     Attributes
@@ -144,7 +144,7 @@ class EndogScoreResult:
 
     def __repr__(self) -> str:
         return (
-            f"<EndogScoreResult {self.test} chi2({self.df:g})="
+            f"<EndogScoreResults {self.test} chi2({self.df:g})="
             f"{self.statistic:.4f} p={self.pvalue:.4f}>"
         )
 
@@ -181,7 +181,7 @@ def endog_score_test(
     hac: bool = False,
     lags: int = 0,
     tested: Sequence[str] | None = None,
-) -> EndogScoreResult:
+) -> EndogScoreResults:
     """Run ``robwool`` (robust) or ``acwool`` (HAC).
 
     Parameters
@@ -277,7 +277,7 @@ def endog_score_test(
         rhat = _prewhiten(rhat, int(lags))
 
     statistic = _score_from_rhat(rhat)
-    return EndogScoreResult(
+    return EndogScoreResults(
         statistic=statistic,
         df=float(n_endog),
         test="acwool" if hac else "robwool",

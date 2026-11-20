@@ -10,7 +10,7 @@ import pytest
 import statsmodels.api as sm
 
 from westata.errors import ConsistencyError, WeightError
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 
 def _data(n: int = 60, seed: int = 0) -> pd.DataFrame:
@@ -30,14 +30,14 @@ def _statsmodels_fit(df: pd.DataFrame, cov_type: str = "nonrobust", **kw):
 
 def test_point_estimates_match_statsmodels():
     df = _data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit()
+    res = Regress.from_formula("y ~ x1 + x2", df).fit()
     ref = _statsmodels_fit(df)
     np.testing.assert_allclose(res.params.to_numpy(), ref.params.to_numpy(), rtol=1e-12)
 
 
 def test_hc1_matches_statsmodels():
     df = _data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(cov_type="HC1")
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(cov_type="HC1")
     ref = _statsmodels_fit(df, cov_type="HC1")
     np.testing.assert_allclose(res.bse.to_numpy(), ref.bse.to_numpy(), rtol=1e-12)
 
@@ -45,7 +45,7 @@ def test_hc1_matches_statsmodels():
 def test_cluster_matches_statsmodels_cr1():
     df = _data()
     groups = df["g"]
-    res = OLS.from_formula("y ~ x1 + x2", df).fit(
+    res = Regress.from_formula("y ~ x1 + x2", df).fit(
         cov_type="cluster", cov_kwds={"groups": groups}
     )
     ref = _statsmodels_fit(
@@ -57,7 +57,7 @@ def test_cluster_matches_statsmodels_cr1():
 
 def test_e_scalars_are_populated():
     df = _data()
-    res = OLS.from_formula("y ~ x1 + x2", df).fit()
+    res = Regress.from_formula("y ~ x1 + x2", df).fit()
     assert res.e["N"] == len(df)
     assert res.e["rank"] == 3
     assert res.e["df_m"] == 2
@@ -67,7 +67,7 @@ def test_e_scalars_are_populated():
 
 def test_stata_summary_labels():
     df = _data()
-    text = OLS.from_formula("y ~ x1 + x2", df).fit().summary(style="stata")
+    text = Regress.from_formula("y ~ x1 + x2", df).fit().summary(style="stata")
     # Spelled as the captured Stata output does (p8_outputs.txt:25):
     #   y | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
     for token in ["Number of obs", "Coefficient", "Std. err.", "P>|t|", "conf. interval"]:
@@ -91,7 +91,7 @@ def test_rank_deficient_drops_a_column_instead_of_refusing():
 
     df = _data()
     df["x1_copy"] = df["x1"]
-    result = OLS.from_formula("y ~ x1 + x1_copy", df).fit()
+    result = Regress.from_formula("y ~ x1 + x1_copy", df).fit()
 
     # The RIGHTMOST of the identical pair is the one omitted (positional sweep).
     assert float(result.params["x1_copy"]) == 0.0
@@ -113,7 +113,7 @@ def test_weights_require_weight_type():
     # Stata never guesses a weight type; P1 implements the four types and
     # rejects a bare weight vector so a silent default cannot change the VCE.
     with pytest.raises(WeightError):
-        OLS.from_formula("y ~ x1", df, weights=df["x1"])
+        Regress.from_formula("y ~ x1", df, weights=df["x1"])
 
 
 # ==========================================================================
@@ -162,7 +162,7 @@ STATA_E_F = {
 
 
 def test_e_f_nonrobust_matches_stata(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     assert res.e["F"] == pytest.approx(STATA_E_F["nonrobust"], rel=1e-9)
 
 
@@ -173,13 +173,13 @@ def test_e_f_robust_is_the_robust_wald_not_the_r2_form(auto):
     away; under clustering the same mistake was 37.5% off.
     """
 
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit(cov_type="HC1")
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit(cov_type="HC1")
     assert res.e["F"] == pytest.approx(STATA_E_F["robust"], rel=1e-9)
     assert res.e["F"] != pytest.approx(STATA_E_F["nonrobust"], rel=1e-6)
 
 
 def test_e_f_cluster_is_the_cr1_wald(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit(
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit(
         cov_type="cluster", cov_kwds={"groups": auto["gid"]}
     )
     assert res.e["F"] == pytest.approx(STATA_E_F["cluster"], rel=1e-9)
@@ -187,7 +187,7 @@ def test_e_f_cluster_is_the_cr1_wald(auto):
 
 @pytest.mark.parametrize("weight_type", ["pweight", "aweight", "fweight"])
 def test_e_f_under_weights(auto, weight_type):
-    res = OLS.from_formula(
+    res = Regress.from_formula(
         _AUTO_FORMULA, auto, weights=auto["w"], weight_type=weight_type
     ).fit()
     assert res.e["F"] == pytest.approx(STATA_E_F[weight_type], rel=1e-9)
@@ -201,7 +201,7 @@ def test_e_f_is_always_the_wald_of_the_reported_matrix(auto):
         {"cov_type": "HC1"},
         {"cov_type": "cluster", "cov_kwds": {"groups": auto["gid"]}},
     ):
-        res = OLS.from_formula(_AUTO_FORMULA, auto).fit(**fit_kw)
+        res = Regress.from_formula(_AUTO_FORMULA, auto).fit(**fit_kw)
         names = list(res.param_names)
         slopes = [i for i, nm in enumerate(names) if nm != "Intercept"]
         b = np.asarray(res.params, dtype=float)[slopes]
@@ -213,14 +213,14 @@ def test_e_f_is_always_the_wald_of_the_reported_matrix(auto):
 def test_e_f_is_zero_for_the_intercept_only_model(auto):
     """Stata: ``regress mpg`` reports e(F) = 0, not missing."""
 
-    res = OLS.from_formula("mpg ~ 1", auto).fit()
+    res = Regress.from_formula("mpg ~ 1", auto).fit()
     assert res.e["F"] == 0.0
 
 
 def test_e_df_r_is_g_minus_1_under_clustering(auto):
     """Stata: ``e(df_r) = 11`` (= G-1) where ``N-K = 71``; ``e(N_clust) = 12``."""
 
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit(
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit(
         cov_type="cluster", cov_kwds={"groups": auto["gid"]}
     )
     assert res.e["df_r"] == 11
@@ -234,7 +234,7 @@ def test_e_df_r_is_g_minus_1_under_clustering(auto):
 
 
 def test_e_df_r_stays_n_minus_k_without_clustering(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     assert res.e["df_r"] == len(auto) - 3
     assert "N_clust" not in res.e
 
@@ -250,7 +250,7 @@ STATA_SUMS = {
 
 
 def test_e_rss_and_e_mss_match_stata(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     rss, mss, sum_w = STATA_SUMS["nonrobust"]
     assert res.e["rss"] == pytest.approx(rss, rel=1e-12)
     assert res.e["mss"] == pytest.approx(mss, rel=1e-12)
@@ -269,7 +269,7 @@ def test_e_sum_w_is_the_raw_weight_sum(auto, weight_type):
     normalized one would report 74 and quietly disagree with Stata.
     """
 
-    res = OLS.from_formula(
+    res = Regress.from_formula(
         _AUTO_FORMULA, auto, weights=auto["w"], weight_type=weight_type
     ).fit()
     rss, mss, sum_w = STATA_SUMS[weight_type]
@@ -282,7 +282,7 @@ def test_e_sum_w_is_the_raw_weight_sum(auto, weight_type):
 def test_e_rss_and_mss_with_noconstant(auto):
     """Without a constant Stata does not centre TSS, so mss is not the demeaned SS."""
 
-    res = OLS.from_formula("mpg ~ 0 + weight + foreign", auto).fit()
+    res = Regress.from_formula("mpg ~ 0 + weight + foreign", auto).fit()
     rss, mss, _ = STATA_SUMS["noconstant"]
     assert res.e["rss"] == pytest.approx(rss, rel=1e-12)
     assert res.e["mss"] == pytest.approx(mss, rel=1e-12)
@@ -293,12 +293,12 @@ def test_e_rss_and_mss_with_noconstant(auto):
 
 
 def test_e_sum_w_equals_n_for_unweighted_fits(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     assert res.e["sum_w"] == float(len(auto))
 
 
 def test_e_rss_matches_the_residual_sum_of_squares(auto):
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     assert res.e["rss"] == pytest.approx(
         float(np.sum(np.asarray(res.resid) ** 2)), rel=1e-12
     )
@@ -313,23 +313,23 @@ def test_e_ll_0_is_the_intercept_only_likelihood(auto):
     stores no ``e(ll_0)`` at all.
     """
 
-    res = OLS.from_formula(_AUTO_FORMULA, auto).fit()
+    res = Regress.from_formula(_AUTO_FORMULA, auto).fit()
     assert res.e["ll_0"] == pytest.approx(-234.39433764823468, rel=1e-12)
     # It does not move with the VCE.
     for fit_kw in (
         {"cov_type": "HC1"},
         {"cov_type": "cluster", "cov_kwds": {"groups": auto["gid"]}},
     ):
-        assert OLS.from_formula(_AUTO_FORMULA, auto).fit(**fit_kw).e[
+        assert Regress.from_formula(_AUTO_FORMULA, auto).fit(**fit_kw).e[
             "ll_0"
         ] == pytest.approx(-234.39433764823468, rel=1e-12)
-    weighted = OLS.from_formula(
+    weighted = Regress.from_formula(
         _AUTO_FORMULA, auto, weights=auto["w"], weight_type="pweight"
     ).fit()
     assert weighted.e["ll_0"] == pytest.approx(-238.86834919298698, rel=1e-12)
-    fweighted = OLS.from_formula(
+    fweighted = Regress.from_formula(
         _AUTO_FORMULA, auto, weights=auto["w"], weight_type="fweight"
     ).fit()
     assert fweighted.e["ll_0"] == pytest.approx(-597.1708729824675, rel=1e-12)
     # No constant -> Stata reports no ll_0, and neither do we.
-    assert "ll_0" not in OLS.from_formula("mpg ~ 0 + weight + foreign", auto).fit().e
+    assert "ll_0" not in Regress.from_formula("mpg ~ 0 + weight + foreign", auto).fit().e

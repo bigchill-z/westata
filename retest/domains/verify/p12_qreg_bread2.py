@@ -35,7 +35,7 @@ yhom = 1.0 + 0.75 * b1 - 0.45 * b2 + rng.normal(size=n)
 for tag, (px, py, pz) in (("heteroskedastic", (x1, x2, yh)), ("homoskedastic", (b1, b2, yhom))):
     df = pd.DataFrame(dict(x1=px, x2=py, y=pz))
     X = np.column_stack([px, py, np.ones(n)])
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=0.5)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=0.5)
     ri = q.fit(cov_type="iid"); rr = q.fit(cov_type="robust")
     pn = list(rr.param_names); order = [pn.index(k) for k in ("x1", "x2", "Intercept")]
     sp = q._sparsity

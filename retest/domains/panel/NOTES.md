@@ -21,53 +21,53 @@
 | 单位根面板 | 4242 | 25 × 12 = 300 | `y_t = y_{t−1} + e_t`，`y_0=0`，`e~N(0,1)` |
 | 平稳面板 | 4242 | 25 × 12 = 300 | `y_t = 0.4 y_{t−1} + e_t`（与上一行同 seed，只差 AR 系数） |
 
-Stata 侧一律 `st.send(df)` 后 `xtset id t`；每条的样本量都核对过：`e(N)` 与 westata `nobs`
+Stata 侧一律 `st.send(df)` 后 `panel_set id t`；每条的样本量都核对过：`e(N)` 与 westata `nobs`
 逐条相等（唯一例外是 `xtreg, be`，见下文，那是 e(N) 语义不同而非样本不同）。
 
 ## 覆盖矩阵
 
 | # | Stata 命令 | westata 调用 | 数据 | 判定 | 系数相对差 | 标准误相对差 |
 |---|---|---|---|---|---|---|
-| 1 | `xtset id t` | —（无对应步骤） | 平衡 | pass | 0 | — |
-| 2 | `xtreg y x1 x2, fe` | `PanelOLS.from_formula(...).fit()` | 平衡 | **A** | 1.27e-16 | 1.85e-16 |
+| 1 | `panel_set id t` | —（无对应步骤） | 平衡 | pass | 0 | — |
+| 2 | `xtreg y x1 x2, fe` | `PanelRegressFE.from_formula(...).fit()` | 平衡 | **A** | 1.27e-16 | 1.85e-16 |
 | 3 | `xtreg, fe` 的 `e(r2_w)` / `e(rmse)`↔`e(sigma_e)` | 同上（读 `res.e`） | 平衡 | **A** | 0 | 0 |
 | 4 | `xtreg, fe` 的 `e()` 覆盖缺口 | 同上 | 平衡 | **fail（Stata 有、westata 无）** | — | — |
 | 5 | `xtreg y x1 x2, fe` | 同上 | 非平衡 | **A** | 5.26e-16 | 0 |
 | 6 | `xtreg y x1 x2, fd` | — | 平衡 | **skip** | — | — |
-| 7 | `regress D.y D.x1 D.x2, noconstant`（fd 的等价口径） | `FirstDifferenceOLS` | 平衡 | **A** | 4.18e-16 | 1.71e-16 |
-| 8 | `xtreg y x1 x2, be` | `BetweenOLS` | 平衡 | **A** | 4.01e-15 | 4.07e-16 |
-| 9 | `xtreg y x1 x2, re`（默认 GLS） | `RandomEffects` | 平衡 | **A** | 6.00e-16 | 3.15e-16（e(V) 全矩阵 2.36e-15） |
+| 7 | `regress D.y D.x1 D.x2, noconstant`（fd 的等价口径） | `PanelRegressFD` | 平衡 | **A** | 4.18e-16 | 1.71e-16 |
+| 8 | `xtreg y x1 x2, be` | `PanelRegressBE` | 平衡 | **A** | 4.01e-15 | 4.07e-16 |
+| 9 | `xtreg y x1 x2, re`（默认 GLS） | `PanelRegressRE` | 平衡 | **A** | 6.00e-16 | 3.15e-16（e(V) 全矩阵 2.36e-15） |
 | 10 | `xtreg, re` | 同上 | 非平衡 | **A** | 2.61e-16 | 2.90e-16 |
 | 11 | `xtreg, re` 的 theta→0 边界 | 同上 | theta=0 面板 | **A** | 2.64e-16 | 0 |
-| 12 | `xtreg y x1 x2, fe vce(robust)` | `PanelOLS.fit(cov_type="HC1")` | 平衡 | **E** | 1.27e-16 | 17.36 |
-| 13 | `xtreg y x1 x2, fe vce(cluster id)` | `PanelOLS.fit(cov_type="cluster")` | 平衡 | **E** | 1.27e-16 | 9.36e-2 |
+| 12 | `xtreg y x1 x2, fe vce(robust)` | `PanelRegressFE.fit(cov_type="HC1")` | 平衡 | **E** | 1.27e-16 | 17.36 |
+| 13 | `xtreg y x1 x2, fe vce(cluster id)` | `PanelRegressFE.fit(cov_type="cluster")` | 平衡 | **E** | 1.27e-16 | 9.36e-2 |
 | 14 | 归因 A：Stata `vce(cluster id) dfadj` | westata `cluster` | 平衡 | **A** | 2.54e-16 | 2.15e-15 |
 | 15 | 归因 B：手工 CR1 `G/(G-1)·(N-1)/(N-K)`, K=3 | — | 平衡 | **A** | 1.27e-16 | 8.76e-15 |
 | 16 | 归因 C：linearmodels `auto_df=True` | — | 平衡 | **A** | 1.27e-16 | 9.40e-15 |
 | 17 | 归因 D：`areg …, absorb(id) vce(robust)` | westata `HC1` | 平衡 | **A** | 0 | 0 |
-| 18 | `xtgls y x1 x2, panels(heteroskedastic)` | `XtGls(panels="heteroskedastic")` | 平衡 | **A** | 1.53e-15 | 5.68e-16 |
-| 19 | `xtgls y x1 x2, panels(correlated)` | `XtGls(panels="correlated")` | 6×8 | **A** | 2.81e-15 | 6.70e-15 |
+| 18 | `xtgls y x1 x2, panels(heteroskedastic)` | `PanelGls(panels="heteroskedastic")` | 平衡 | **A** | 1.53e-15 | 5.68e-16 |
+| 19 | `xtgls y x1 x2, panels(correlated)` | `PanelGls(panels="correlated")` | 6×8 | **A** | 2.81e-15 | 6.70e-15 |
 | 20 | `xtgls, panels(correlated)` | 同上 | 30×6（Σ 秩亏） | **E** | 2.12e-1 | 3.39 |
-| 21 | `xtgls …, panels(heteroskedastic) corr(ar1)` | `XtGls(corr="ar1")` | 平衡 | **error**（westata 拒绝） | — | — |
-| 22 | `xtpcse y x1 x2` | `XtPcse` | 平衡 | **A** | 1.10e-15 | 2.98e-15 |
-| 23 | `xtpcse y x1 x2`（casewise） | `XtPcse(selection="casewise")` | 非平衡 | **E** | 6.16e-16 | 2.81e-1 |
-| 24 | `xtpcse y x1 x2, pairwise` | `XtPcse(selection="pairwise")` | 非平衡 | **E** | 6.16e-16 | 4.19e-1 |
-| 25 | `xtivreg y x2 (x1 = z), fe` | `XtIvreg(method="fe")` | 平衡 | **A** | 8.23e-15 | 2.04e-15 |
-| 26 | `xtivreg y x2 (x1 = z), re` | `XtIvreg(method="re")` | 平衡 | **A** | 4.74e-15 | 1.23e-15 |
-| 27 | `xtlogit yb x1 x2, fe` | `XtLogit(method="fe")` | 平衡 | **B/C** | 3.70e-8 | 3.40e-6 |
-| 28 | `xtlogit yb x1 x2, pa` | `XtLogit(method="pa")` | 平衡 | **C/D** | 3.19e-4 | 1.06e-3 |
-| 29 | `xtlogit yb x1 x2, re` | `XtLogit(method="re")` | 平衡 | **B/C** | 1.77e-7 | 1.91e-4 |
-| 30 | `xtprobit yb x1 x2, re` | `XtProbit(method="re")` | 平衡 | **B/C** | 6.05e-7 | 1.16e-4 |
-| 31 | `xttobit ytob x1 x2, ll(0)` | `XtTobit(lower=0)` | 平衡 | **C/C** | 2.52e-6 | 7.49e-6 |
-| 32 | `xtpoisson yc x1 x2, fe` | `XtPoisson(method="fe")` | 平衡 | **B/C** | 4.42e-8 | 1.36e-5 |
-| 33 | `xtpoisson yc x1 x2, re` | `XtPoisson(method="re")` | 平衡 | **B/C** | 5.29e-8 | 1.78e-4 |
-| 34 | `xtnbreg yc x1 x2, fe` | `XtNbreg(method="fe")` | 平衡 | **D/E** | 1.36e-3 | 6.79e-2 |
-| 35 | `xtabond y x1 x2, lags(1)` | `XtAbond(lags=1)` | 动态面板 | **D/E** | 2.03e-3 | 9.08e-1 |
-| 36 | `xtabond y x1 x2, lags(2)` | `XtAbond(lags=2)` | 动态面板 | **E/E** | 3.49e-2 | 9.40e-1 |
+| 21 | `xtgls …, panels(heteroskedastic) corr(ar1)` | `PanelGls(corr="ar1")` | 平衡 | **error**（westata 拒绝） | — | — |
+| 22 | `xtpcse y x1 x2` | `PanelPcse` | 平衡 | **A** | 1.10e-15 | 2.98e-15 |
+| 23 | `xtpcse y x1 x2`（casewise） | `PanelPcse(selection="casewise")` | 非平衡 | **E** | 6.16e-16 | 2.81e-1 |
+| 24 | `xtpcse y x1 x2, pairwise` | `PanelPcse(selection="pairwise")` | 非平衡 | **E** | 6.16e-16 | 4.19e-1 |
+| 25 | `xtivreg y x2 (x1 = z), fe` | `PanelIVRegress(method="fe")` | 平衡 | **A** | 8.23e-15 | 2.04e-15 |
+| 26 | `xtivreg y x2 (x1 = z), re` | `PanelIVRegress(method="re")` | 平衡 | **A** | 4.74e-15 | 1.23e-15 |
+| 27 | `xtlogit yb x1 x2, fe` | `PanelLogit(method="fe")` | 平衡 | **B/C** | 3.70e-8 | 3.40e-6 |
+| 28 | `xtlogit yb x1 x2, pa` | `PanelLogit(method="pa")` | 平衡 | **C/D** | 3.19e-4 | 1.06e-3 |
+| 29 | `xtlogit yb x1 x2, re` | `PanelLogit(method="re")` | 平衡 | **B/C** | 1.77e-7 | 1.91e-4 |
+| 30 | `xtprobit yb x1 x2, re` | `PanelProbit(method="re")` | 平衡 | **B/C** | 6.05e-7 | 1.16e-4 |
+| 31 | `xttobit ytob x1 x2, ll(0)` | `PanelTobit(lower=0)` | 平衡 | **C/C** | 2.52e-6 | 7.49e-6 |
+| 32 | `xtpoisson yc x1 x2, fe` | `PanelPoisson(method="fe")` | 平衡 | **B/C** | 4.42e-8 | 1.36e-5 |
+| 33 | `xtpoisson yc x1 x2, re` | `PanelPoisson(method="re")` | 平衡 | **B/C** | 5.29e-8 | 1.78e-4 |
+| 34 | `xtnbreg yc x1 x2, fe` | `PanelNbRegress(method="fe")` | 平衡 | **D/E** | 1.36e-3 | 6.79e-2 |
+| 35 | `xtabond y x1 x2, lags(1)` | `PanelAbond(lags=1)` | 动态面板 | **D/E** | 2.03e-3 | 9.08e-1 |
+| 36 | `xtabond y x1 x2, lags(2)` | `PanelAbond(lags=2)` | 动态面板 | **E/E** | 3.49e-2 | 9.40e-1 |
 | 37 | `xtabond …, lags(2)` 的参数命名 | 同上（读 `param_names`） | 动态面板 | **fail（命名错位）** | — | — |
-| 38 | `xtabond y x1 x2, lags(1)` | `XtAbond(lags=1)` | 静态面板（弱识别） | **D/E** | 5.06e-3 | 1.99e-1 |
-| 39 | `xtunitroot ips y` | `XtUnitroot(test="ips")` | 单位根面板 | **A** | 6.29e-15 | — |
-| 40 | `xtunitroot llc y` | `XtUnitroot(test="llc")` | 单位根面板 | **A** | 2.72e-15 | — |
+| 38 | `xtabond y x1 x2, lags(1)` | `PanelAbond(lags=1)` | 静态面板（弱识别） | **D/E** | 5.06e-3 | 1.99e-1 |
+| 39 | `xtunitroot ips y` | `PanelUnitroot(test="ips")` | 单位根面板 | **A** | 6.29e-15 | — |
+| 40 | `xtunitroot llc y` | `PanelUnitroot(test="llc")` | 单位根面板 | **A** | 2.72e-15 | — |
 | 41 | `xtunitroot ips y` | 同上 | 平稳面板 | **A** | 1.45e-14 | — |
 | 42 | `xtunitroot llc y` | 同上 | 平稳面板 | **A** | 4.83e-16 | — |
 
@@ -135,7 +135,7 @@ linearmodels 的 `cov_type="robust"` = **HC1**（观测级三明治，不聚类�
    → 与 Stata 逐位相同（9.4e-15）。
 4. `sqrt(((N-1)/(N-3)) / ((N-1)/(N-32))) = sqrt(177/148) = 1.09359`，正是实测放大因子。
 
-**根因在 `src/westata/estimators/panel.py::PanelOLS._extra_fit_kwargs`**：
+**根因在 `src/westata/estimators/panel.py::PanelRegressFE._extra_fit_kwargs`**：
 它强制 `auto_df=False` 并注释说"`auto_df=True`（后端默认）在效应嵌套于聚类变量时会漏掉效应"。
 实测相反：`auto_df=True` 时 linearmodels 的 K 只数报告的系数，正是 Stata 的口径；
 `auto_df=False` 才把吸收的效应算进 K。**注释与事实相反，代码跟着注释错了。**
@@ -167,7 +167,7 @@ pairwise 下更低（0.68 / 0.72 / 0.58，相对差 0.320 / 0.281 / 0.419，最�
 **归因（读 `xtpcse.ado::getSigma` 并用 Python 独立复算验证）**：
 Stata 的 `casewise` 只用"**所有面板共同期**"的残差估 Σ（本数据共同期为 `t=0,1,2`，
 Stata 打印 `e(n_sigma)=3`，并警告它小于 `e(n_avg)=6.4`、建议改 `pairwise`），
-但 `X'ΩX` 用**全部**观测累加。westata 的 `XtPcse._aligned_slices()` 用
+但 `X'ΩX` 用**全部**观测累加。westata 的 `PanelPcse._aligned_slices()` 用
 
 ```python
 common = min(index.size for index in slices)
@@ -330,14 +330,14 @@ westata : r2=.7469091329（就是 Stata 的 r2_w）
 （"report theta"），不接受数值。因此"测 theta(0)"只能用数据构造：σ_u=0 的面板。
 
 实测在该面板上 Stata `e(theta)=0`、`e(rho)=0`、`e(sigma_u)=0`，
-RE 与 pooled OLS 的系数、SE **逐位相同**（2.2e-16）；westata 同样逐位相同（2.64e-16）。
+RE 与 pooled Regress 的系数、SE **逐位相同**（2.2e-16）；westata 同样逐位相同（2.64e-16）。
 westata 没有暴露 `theta`，所以从结果里看不出"现在处在 theta=0 的边界"。
 
 ### 12. `xtreg, fd` 与 `xtgls, corr(ar1)`
 
 - `xtreg, fd`：StataNow 19.5 的 `xtreg` 只有 re/cre/be/fe/mle/pa，**没有 fd**
   （实测 `r(198): option fd not allowed`）。改用它真正的等价命令 `regress D. noconstant`
-  核对：系数 4.2e-16、SE 1.7e-16、N=150、df_r=148 全对。westata 的 `FirstDifferenceOLS`
+  核对：系数 4.2e-16、SE 1.7e-16、N=150、df_r=148 全对。westata 的 `PanelRegressFD`
   在平衡面板上是正确的。
   （注：`xtivreg, fd` 存在，但要求有内生变量，实测 `xtivreg y x2 (x1 = z), fd`
   给出 `D.x1=.5034789`，与 `xtreg, fd` 不是同一个量，故不用它代替。）
@@ -385,7 +385,7 @@ westata 两者都不报。前者正确，后者也正确（平坦方向不是估
 
 | 项目 | 原因 |
 |---|---|
-| `xtreg, cre`（相关随机效应） | StataNow 19.5 新增模型，westata 无对应类（`RandomEffects` 只做 re）。任务清单未列。 |
+| `xtreg, cre`（相关随机效应） | StataNow 19.5 新增模型，westata 无对应类（`PanelRegressRE` 只做 re）。任务清单未列。 |
 | `xtreg, mle`、`xtreg, pa`（xtreg 内的 PA） | westata 的 xtreg 族只有 fe/re/be/fd 四个适配器；`xtlogit, pa` 已单独测过。 |
 | `xtregar`（带 AR(1) 扰动的面板） | 两边都没有对应实现。 |
 | `xtgls` 的 `igls` | westata 明确不支持（`igls` 会改变估计量而非显示选项）；Stata 的 igls 在 30×6 上不收敛（实测迭代 34 次未收敛），没有稳定参照值。 |
@@ -395,7 +395,7 @@ westata 两者都不报。前者正确，后者也正确（平坦方向不是估
 | `xtabond` 的 `vce(robust)`、Sargan/Hansen/AR(1)/AR(2) | westata 只有一种 VCE，且明确不报过度识别检验。 |
 | `xtunitroot` 的 `trend`、`noconstant`、`demean`、`lags()` 指定、`breitung`/`hadri`/`fisher` | westata 只实现 ips/llc 且拒绝 trend/noconstant/demean；其余检验 Stata 有、westata 无。 |
 | `xtivreg` 的 `be`/`fd`/`ec2sls` 与 `vce(robust)` | westata 明确只做 fe/re，且只支持 `nonrobust`。 |
-| `xtnbreg, re` | westata 的 `XtNbreg` 只有 `fe`。 |
+| `xtnbreg, re` | westata 的 `PanelNbRegress` 只有 `fe`。 |
 | 权重（`aweight`/`fweight`）与 `if`/`in` 子样本 | 面板族本轮未测；留待 linear 领域的权重覆盖。 |
 | 时间序列不连续（有洞）的 `xtreg, fd` | 只用强平衡面板测过 fd；westata 的 `_period_grid` 处理有洞的 pair 的逻辑未验证。 |
 

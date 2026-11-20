@@ -39,7 +39,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def fitted(frame):
-    return ws.QuantileRegression.from_formula("y ~ x1 + x2", frame).fit()
+    return ws.QuantileRegress.from_formula("y ~ x1 + x2", frame).fit()
 
 
 def test_the_scalar_keys_are_present(fitted) -> None:
@@ -169,7 +169,7 @@ def test_rreg_does_not_carry_the_qreg_keys(frame) -> None:
     regression would invent results for a command that reports different ones.
     """
 
-    result = ws.RobustRegression.from_formula("y ~ x1", frame).fit()
+    result = ws.RobustRegress.from_formula("y ~ x1", frame).fit()
 
     assert "sum_w" not in result.e
     assert "q" not in result.e

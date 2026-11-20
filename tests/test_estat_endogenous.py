@@ -164,7 +164,7 @@ def test_robust_vce_switches_to_the_score_test(iv_fit) -> None:
 
 def test_non_iv_results_are_refused(iv_fit) -> None:
     frame, _ = iv_fit
-    ols_fit = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    ols_fit = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     with pytest.raises(NotImplementedError, match="instrumental-variables"):
         ols_fit.estat_endogenous()

@@ -39,7 +39,7 @@ import pytest
 import statsmodels.api as sm
 
 from westata.errors import ConsistencyError
-from westata.estimators.did import Didregress, Xtdidregress
+from westata.estimators.did import DIDRegress, PanelDIDRegress
 
 # --------------------------------------------------------------------- references
 STATA_ATET = 1.18613
@@ -140,14 +140,14 @@ def panel() -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def pooled(panel: pd.DataFrame):
-    return Didregress.from_formula(
+    return DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     ).fit()
 
 
 @pytest.fixture(scope="module")
 def longitudinal(panel: pd.DataFrame):
-    return Xtdidregress.from_formula(
+    return PanelDIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     ).fit()
 
@@ -271,7 +271,7 @@ def test_xtdidregress_rejects_repeated_group_time_cells(panel):
 
     duplicated = pd.concat([panel, panel.iloc[:8]], ignore_index=True)
     with pytest.raises(ConsistencyError, match="repeat"):
-        Xtdidregress.from_formula(
+        PanelDIDRegress.from_formula(
             "y x1", "treated", duplicated, group="unit", time="period"
         ).fit()
 
@@ -283,7 +283,7 @@ def test_xtdidregress_accepts_an_unbalanced_panel():
     frame = frame[~((frame["unit"] == 3) & (frame["period"] == 2))].reset_index(
         drop=True
     )
-    result = Xtdidregress.from_formula(
+    result = PanelDIDRegress.from_formula(
         "y x1", "treated", frame, group="unit", time="period"
     ).fit()
     assert np.isfinite(float(result.params["treated"]))
@@ -301,7 +301,7 @@ def test_time_invariant_treatment_raises_a_collinearity_error(panel):
     frame = panel.assign(treated=panel["group"])
 
     with pytest.raises(ConsistencyError) as excinfo:
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -322,7 +322,7 @@ def test_a_treatment_collinear_with_the_period_effects_is_also_rejected(panel):
 
     frame = panel.assign(treated=(panel["period"] >= 4).astype(float))
     with pytest.raises(ConsistencyError, match="collinearity"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -330,7 +330,7 @@ def test_a_treatment_collinear_with_the_period_effects_is_also_rejected(panel):
 def test_xtdidregress_raises_the_same_collinearity_error(panel):
     frame = panel.assign(treated=panel["group"])
     with pytest.raises(ConsistencyError, match="collinearity"):
-        Xtdidregress.from_formula(
+        PanelDIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -371,10 +371,10 @@ def test_absorbed_effects_do_not_change_the_atet_when_covariates_differ(panel):
     """
 
     frame = did_frame(x2=True)
-    with_x1 = Didregress.from_formula(
+    with_x1 = DIDRegress.from_formula(
         "y x1", "treated", frame, group="unit", time="period"
     ).fit()
-    with_x1x2 = Didregress.from_formula(
+    with_x1x2 = DIDRegress.from_formula(
         "y x1 x2", "treated", frame, group="unit", time="period"
     ).fit()
 
@@ -399,7 +399,7 @@ def test_a_time_invariant_covariate_is_not_silently_estimated(panel):
     frame = panel.assign(z=panel["group"] + 1.0)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        result = Didregress.from_formula(
+        result = DIDRegress.from_formula(
             "y x1 z", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -407,7 +407,7 @@ def test_a_time_invariant_covariate_is_not_silently_estimated(panel):
     assert result.absorbed == ["z"]
     assert any("z" in str(record.message) for record in caught)
     # The ATET is unaffected by the presence of the collinear column.
-    reference = Didregress.from_formula(
+    reference = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     ).fit()
     assert float(result.params["treated"]) == pytest.approx(
@@ -470,7 +470,7 @@ def test_stata_block_syntax_parses_covariates():
     """``(y x1 x2) (treated)`` -> dependent variable plus two covariates."""
 
     frame = did_frame(n_units=20, n_periods=4, x2=True)
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1 x2", "treated", frame, group="unit", time="period"
     )
     assert model.depvar == "y"
@@ -496,7 +496,7 @@ def test_bare_outcome_adds_no_covariate(panel):
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        model = Didregress.from_formula(
+        model = DIDRegress.from_formula(
             "y", "treated", panel, group="unit", time="period"
         )
 
@@ -513,7 +513,7 @@ def test_covariates_all_opts_into_the_old_inference_with_a_warning(panel):
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        model = Didregress.from_formula(
+        model = DIDRegress.from_formula(
             "y", "treated", panel, group="unit", time="period", covariates="all"
         )
 
@@ -529,7 +529,7 @@ def test_covariates_all_opts_into_the_old_inference_with_a_warning(panel):
 
 def test_no_covariates_at_all_is_allowed():
     frame = did_frame(n_units=20, n_periods=4).drop(columns=["x1"])
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y", "treated", frame, group="unit", time="period"
     ).fit()
     assert result.param_names == ["treated"]
@@ -539,7 +539,7 @@ def test_no_covariates_at_all_is_allowed():
 def test_the_treatment_must_be_binary(panel):
     frame = panel.assign(treated=panel["treated"] * 2.0)
     with pytest.raises(ConsistencyError, match="0/1"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -547,7 +547,7 @@ def test_the_treatment_must_be_binary(panel):
 def test_a_single_arm_is_rejected(panel):
     frame = panel.assign(treated=0.0)
     with pytest.raises(ConsistencyError, match="control"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         ).fit()
 
@@ -555,7 +555,7 @@ def test_a_single_arm_is_rejected(panel):
 def test_missing_values_are_dropped_listwise(panel):
     frame = panel.copy()
     frame.loc[frame.index[:5], "x1"] = np.nan
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1", "treated", frame, group="unit", time="period"
     )
     result = model.fit()
@@ -566,20 +566,20 @@ def test_missing_values_are_dropped_listwise(panel):
 
 def test_unknown_column_is_reported(panel):
     with pytest.raises(ValueError, match="x9"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x9", "treated", panel, group="unit", time="period"
         )
 
 
 def test_group_and_time_must_differ(panel):
     with pytest.raises(ValueError, match="different columns"):
-        Didregress.from_formula("y x1", "treated", panel, group="unit", time="unit")
+        DIDRegress.from_formula("y x1", "treated", panel, group="unit", time="unit")
 
 
 def test_a_string_outcome_is_rejected(panel):
     frame = panel.assign(y=panel["y"].astype(str))
     with pytest.raises(TypeError, match="numeric"):
-        Didregress.from_formula(
+        DIDRegress.from_formula(
             "y x1", "treated", frame, group="unit", time="period"
         )
 
@@ -587,7 +587,7 @@ def test_a_string_outcome_is_rejected(panel):
 # --------------------------------------------------------------------- cov_type
 @pytest.mark.parametrize("cov_type", ["nonrobust", "HC1"])
 def test_alternative_covariances_keep_the_same_point_estimate(panel, pooled, cov_type):
-    result = Didregress.from_formula(
+    result = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     ).fit(cov_type=cov_type)
 
@@ -601,14 +601,14 @@ def test_alternative_covariances_keep_the_same_point_estimate(panel, pooled, cov
 
 def test_cov_type_aliases(panel):
     for alias in ("CLUSTER", "clustered", "CR1"):
-        result = Didregress.from_formula(
+        result = DIDRegress.from_formula(
             "y x1", "treated", panel, group="unit", time="period"
         ).fit(cov_type=alias)
         assert result.cov_type == "cluster"
 
 
 def test_an_unknown_cov_type_is_rejected(panel):
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     )
     with pytest.raises(ValueError, match="Unknown cov_type"):
@@ -616,7 +616,7 @@ def test_an_unknown_cov_type_is_rejected(panel):
 
 
 def test_hc0_is_rejected_rather_than_silently_approximated(panel):
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     )
     with pytest.raises(ValueError, match="HC0"):
@@ -625,7 +625,7 @@ def test_hc0_is_rejected_rather_than_silently_approximated(panel):
 
 # --------------------------------------------------------------------- plumbing
 def test_construction_does_not_estimate(panel):
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     )
     # THE SAMPLE SIZE IS KNOWABLE WITHOUT FITTING. Listwise deletion depends only on which
@@ -634,14 +634,14 @@ def test_construction_does_not_estimate(panel):
     # is ESTIMATE, and the absence of a coef table is what proves that.
     assert model.n_used == panel.shape[0]
     assert not hasattr(model, "params")
-    assert "Didregress" in repr(model)
+    assert "DIDRegress" in repr(model)
     assert "group(unit)" in repr(model)
 
 
 def test_the_construction_counts_match_the_fitted_ones(panel):
     """Construction and fit must agree: both read the same `_columns`."""
 
-    model = Didregress.from_formula(
+    model = DIDRegress.from_formula(
         "y x1", "treated", panel, group="unit", time="period"
     )
     before = (model.n_used, model.n_dropped_missing)

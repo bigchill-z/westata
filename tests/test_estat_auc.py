@@ -212,7 +212,7 @@ def test_an_ols_fit_refuses(separable_frame) -> None:
     """``estat auc`` is dispatched by ``logit_estat``, so an OLS fit has no such command."""
 
     ols_frame = separable_frame.assign(y=separable_frame["x1"])
-    result = ws.OLS.from_formula("y ~ x1", ols_frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", ols_frame).fit()
 
     with pytest.raises((AttributeError, NotImplementedError)):
         result.estat_auc()

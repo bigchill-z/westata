@@ -67,7 +67,7 @@ def m5():
         chi2, df, p, rc = got["chi2"], got["df"], got["p"], got["rc"]
         # westata side
         def est(f):
-            return ws.OLS.from_formula(f, ds).fit()
+            return ws.Regress.from_formula(f, ds).fit()
         L1 = est("mpg ~ weight")
         B1 = est("mpg ~ weight + foreign")
         E2 = est("mpg ~ weight")
@@ -123,8 +123,8 @@ def m6():
         chi2 = s.sc("r(chi2)")
         dof = s.sc("r(df)")
         p = s.sc("r(p)")
-        fe = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
-        re_ = ws.RandomEffects.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+        fe = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
+        re_ = ws.PanelRegressRE.from_formula("y ~ x1 + x2", df, entity="id", time="t").fit()
         kw = {"constant": True} if tag == "constant" else {}
         h = ws.hausman(fe, re_, **kw)
         r = abs(h.statistic - chi2) / max(abs(chi2), 1e-12)

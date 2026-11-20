@@ -32,11 +32,11 @@ from scipy import stats
 
 from westata.errors import ConsistencyError
 from westata.random.stata_rng import Mt19937_64
-from westata.estimators.quantile import QuantileRegression, solve_lad
+from westata.estimators.quantile import QuantileRegress, solve_lad
 from westata.formula.factor import build_design
 from westata.results.base import StataResults
 
-__all__ = ["Bsqreg", "Sqreg"]
+__all__ = ["BootstrappedQuantileRegress", "SimultaneousQuantileRegress"]
 
 
 def _check_sum(residuals: np.ndarray, quantile: float) -> float:
@@ -50,7 +50,7 @@ def _check_sum(residuals: np.ndarray, quantile: float) -> float:
     return float(np.sum(arr * (quantile - (arr < 0))))
 
 
-class Sqreg:
+class SimultaneousQuantileRegress:
     """Simultaneous-quantile regression (Stata ``sqreg``)."""
 
     _stata_command = "sqreg"
@@ -327,7 +327,7 @@ class Sqreg:
         return replicates
 
 
-class Bsqreg(Sqreg):
+class BootstrappedQuantileRegress(SimultaneousQuantileRegress):
     """Bootstrapped quantile regression (Stata ``bsqreg``).
 
     ``[R] qreg``: "bsqreg is equivalent to sqreg with one quantile."  Subclassing

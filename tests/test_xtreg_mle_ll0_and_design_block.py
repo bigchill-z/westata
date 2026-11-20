@@ -65,7 +65,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def fitted(panel):
-    return ws.RandomEffectsMLE.from_formula(
+    return ws.PanelRegressMLE.from_formula(
         "y ~ x1", panel, entity="sid", time="t"
     ).fit()
 
@@ -112,7 +112,7 @@ def test_the_gate_still_accepts_a_plain_xt_model_name(panel) -> None:
     """The e(cmd) fallback must not disturb the estimator that already carried an xt model_name."""
 
     rendered = str(
-        ws.RandomEffects.from_formula("y ~ x1", panel, entity="sid", time="t")
+        ws.PanelRegressRE.from_formula("y ~ x1", panel, entity="sid", time="t")
         .fit()
         .summary(style="stata")
     )

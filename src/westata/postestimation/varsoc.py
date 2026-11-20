@@ -38,7 +38,7 @@ from scipy import stats
 
 from westata.errors import ConsistencyError
 
-__all__ = ["VarSocResult", "varsoc"]
+__all__ = ["VarSocResults", "var_select_order"]
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class VarSocRow:
 
 
 @dataclass(frozen=True)
-class VarSocResult:
+class VarSocResults:
     """``varsoc``: lag-order selection criteria for a VAR."""
 
     rows: tuple[VarSocRow, ...]
@@ -326,7 +326,7 @@ class VarSocResult:
         return chr(10).join(lines)
 
 
-def varsoc(
+def var_select_order(
     data: np.ndarray | pd.DataFrame,
     *,
     maxlag: int = 4,
@@ -334,7 +334,7 @@ def varsoc(
     names: list[str] | None = None,
     exog: Any = None,
     constant: bool = True,
-) -> VarSocResult:
+) -> VarSocResults:
     """Lag-order selection, as Stata's ``varsoc``.
 
     ``data`` holds the endogenous series in time order (rows) by equation (columns). Missing
@@ -517,7 +517,7 @@ def varsoc(
         previous_ll = loglikelihood
         previous_k = k
 
-    return VarSocResult(
+    return VarSocResults(
         rows=tuple(rows),
         nobs=int(sample_size),
         equations=int(equations),

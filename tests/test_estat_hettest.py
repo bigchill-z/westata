@@ -28,7 +28,7 @@ import pytest
 from scipy import stats
 
 import westata as ws
-from westata.postestimation.hettest import estat_hettest
+from westata.postestimation.hettest import estat_heteroskedasticity_test
 
 FIXTURE = (
     Path(__file__).resolve().parent
@@ -73,18 +73,18 @@ def _fit(auto: pd.DataFrame, model: str, weight: dict | None):
     kwargs = {}
     if weight:
         kwargs = {"weights": weight["var"], "weight_type": weight["type"]}
-    return ws.OLS.from_formula(formula, frame, **kwargs).fit()
+    return ws.Regress.from_formula(formula, frame, **kwargs).fit()
 
 
 def _case(result, kind: str, method: str):
     """Run westata the way the fixture's ``kind`` says Stata was invoked."""
 
     if kind == "fitted":
-        return result.estat_hettest(method=method, variables=[])
+        return result.estat_heteroskedasticity_test(method=method, variables=[])
     if kind == "rhs":
-        return result.estat_hettest(method=method, rhs=True)
+        return result.estat_heteroskedasticity_test(method=method, rhs=True)
     named = kind.split(":", 1)[1].split(",")
-    return result.estat_hettest(method=method, variables=named)
+    return result.estat_heteroskedasticity_test(method=method, variables=named)
 
 
 def _cases(reference: dict):
@@ -157,8 +157,8 @@ def test_default_regresses_on_fitted_values_not_on_every_regressor(auto, referen
     """
 
     result = _fit(auto, "M1", None)
-    fitted = result.estat_hettest()
-    every = result.estat_hettest(rhs=True)
+    fitted = result.estat_heteroskedasticity_test()
+    every = result.estat_heteroskedasticity_test(rhs=True)
 
     assert fitted.df == 1
     assert every.df == 2
@@ -175,9 +175,9 @@ def test_the_default_is_not_the_iid_statistic(auto) -> None:
     """Different formulas on one fit, so they must not agree."""
 
     result = _fit(auto, "M2", None)
-    normal = result.estat_hettest(method="normal").statistic
-    iid = result.estat_hettest(method="iid").statistic
-    fstat = result.estat_hettest(method="fstat").statistic
+    normal = result.estat_heteroskedasticity_test(method="normal").statistic
+    iid = result.estat_heteroskedasticity_test(method="iid").statistic
+    fstat = result.estat_heteroskedasticity_test(method="fstat").statistic
 
     assert not np.isclose(normal, iid, rtol=1e-6)
     assert not np.isclose(normal, fstat, rtol=1e-6)
@@ -192,8 +192,8 @@ def test_varlist_names_use_source_variables_not_design_columns(auto, reference) 
     """
 
     result = _fit(auto, "F1", None)
-    raw = result.estat_hettest(variables=["rep78"], method="iid")
-    every = result.estat_hettest(rhs=True, method="iid")
+    raw = result.estat_heteroskedasticity_test(variables=["rep78"], method="iid")
+    every = result.estat_heteroskedasticity_test(rhs=True, method="iid")
 
     assert raw.df == 1
     assert every.df == 5
@@ -209,7 +209,7 @@ def test_a_value_labelled_variable_uses_its_raw_codes(auto, reference) -> None:
     """A labelled 0/1 variable is numeric in Stata, so it is one column."""
 
     result = _fit(auto, "F2", None)
-    raw = result.estat_hettest(variables=["foreign"], method="iid")
+    raw = result.estat_heteroskedasticity_test(variables=["foreign"], method="iid")
 
     assert raw.df == 1
     assert raw.statistic == pytest.approx(
@@ -228,13 +228,13 @@ def test_weights_are_used_by_the_auxiliary_regression(auto, reference) -> None:
     weighted = _fit(auto, "M1", {"type": "aweight", "var": "rep78"})
     unweighted = _fit(auto, "M1", None)
 
-    got = weighted.estat_hettest(method="iid")
+    got = weighted.estat_heteroskedasticity_test(method="iid")
     assert got.statistic == pytest.approx(
         reference["cases"]["M1|aweight:rep78|fitted|iid"][0], rel=1e-9
     )
-    assert got.statistic != pytest.approx(unweighted.estat_hettest(method="iid").statistic)
+    assert got.statistic != pytest.approx(unweighted.estat_heteroskedasticity_test(method="iid").statistic)
 
-    fstat = weighted.estat_hettest(method="fstat")
+    fstat = weighted.estat_heteroskedasticity_test(method="fstat")
     assert fstat.df_denom == 67
 
 
@@ -243,12 +243,12 @@ def test_fweight_and_iweight_use_sum_of_weights_as_e_N(auto, reference) -> None:
 
     for weight_type in ("fweight", "iweight"):
         result = _fit(auto, "M1", {"type": weight_type, "var": "rep78"})
-        fstat = result.estat_hettest(method="fstat")
+        fstat = result.estat_heteroskedasticity_test(method="fstat")
         expected = reference["cases"][f"M1|{weight_type}:rep78|fitted|fstat"]
         assert fstat.statistic == pytest.approx(expected[0], rel=1e-9), weight_type
         assert fstat.df_denom == 233, weight_type
 
-        iid = result.estat_hettest(method="iid")
+        iid = result.estat_heteroskedasticity_test(method="iid")
         assert iid.statistic == pytest.approx(
             reference["cases"][f"M1|{weight_type}:rep78|fitted|iid"][0], rel=1e-9
         ), weight_type
@@ -257,7 +257,7 @@ def test_fweight_and_iweight_use_sum_of_weights_as_e_N(auto, reference) -> None:
 # ------------------------------------------------------------------- mtest
 def test_mtest_per_variable_statistics_match_stata(auto, reference) -> None:
     for model, entry in reference["mtest"].items():
-        table = _fit(auto, model, None).estat_hettest(mtest="noadjust", rhs=True).table
+        table = _fit(auto, model, None).estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table
         for variable in entry["variables"]:
             row = table.loc[variable["name"]]
             assert row["chi2"] == pytest.approx(variable["chi2"], rel=1e-9), variable["name"]
@@ -269,7 +269,7 @@ def test_mtest_reports_the_simultaneous_statistic(auto, reference) -> None:
     """``r(chi2)`` sits alongside the family; it is the SAME test as ``rhs``."""
 
     result = _fit(auto, "M1", None)
-    simultaneous = result.estat_hettest(rhs=True).statistic
+    simultaneous = result.estat_heteroskedasticity_test(rhs=True).statistic
     expected = reference["mtest"]["M1"]["simultaneous"]["chi2"]
 
     assert simultaneous == pytest.approx(expected, rel=1e-9)
@@ -284,10 +284,10 @@ def test_mtest_is_dropped_for_a_single_regressor(auto, reference) -> None:
     """
 
     result = _fit(auto, "M1", None)
-    rendered = result.estat_hettest(mtest="holm")
+    rendered = result.estat_heteroskedasticity_test(mtest="holm")
 
     expected = reference["mtest_single_regressor"]
-    assert type(rendered).__name__ == "HetTestResult"
+    assert type(rendered).__name__ == "HetTestResults"
     assert rendered.statistic == pytest.approx(expected["chi2"], rel=1e-9)
     assert rendered.df == expected["df"]
     assert expected["r_mtest_missing"] is True
@@ -297,21 +297,21 @@ def test_mtest_adjusted_values_follow_the_raw_family(auto) -> None:
     from westata.postestimation.mtest import adjust_pvalues
 
     result = _fit(auto, "M1", None)
-    raw_p = result.estat_hettest(mtest="noadjust", rhs=True).table["p"].to_numpy()
+    raw_p = result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).table["p"].to_numpy()
     for method in ("bonferroni", "holm", "sidak"):
-        table = result.estat_hettest(mtest=method, rhs=True).table
+        table = result.estat_heteroskedasticity_test(mtest=method, rhs=True).table
         assert np.allclose(table["adjustp"].to_numpy(), adjust_pvalues(raw_p, method))
 
 
 def test_mtest_r_matrix_gains_the_adjusted_column(auto) -> None:
     result = _fit(auto, "M1", None)
 
-    assert result.estat_hettest(mtest="noadjust", rhs=True).to_matrix().shape == (2, 3)
-    assert result.estat_hettest(mtest="holm", rhs=True).to_matrix().shape == (2, 4)
+    assert result.estat_heteroskedasticity_test(mtest="noadjust", rhs=True).to_matrix().shape == (2, 3)
+    assert result.estat_heteroskedasticity_test(mtest="holm", rhs=True).to_matrix().shape == (2, 4)
 
 
 def test_mtest_display_lists_every_variable_and_the_adjustment(auto) -> None:
-    text = str(_fit(auto, "M2", None).estat_hettest(mtest="holm", rhs=True))
+    text = str(_fit(auto, "M2", None).estat_heteroskedasticity_test(mtest="holm", rhs=True))
 
     assert "holm" in text
     for name in ("weight", "length", "displacement"):
@@ -322,71 +322,71 @@ def test_mtest_display_lists_every_variable_and_the_adjustment(auto) -> None:
 # --------------------------------------------------------------------- refusals
 def test_robust_vce_is_refused(auto) -> None:
     frame = auto[["mpg", "weight", "foreign"]].dropna()
-    robust = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit(cov_type="HC1")
+    robust = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit(cov_type="HC1")
 
     with pytest.raises(ValueError, match="robust"):
-        robust.estat_hettest()
+        robust.estat_heteroskedasticity_test()
 
 
 def test_clustered_vce_is_refused(auto) -> None:
     frame = auto[["mpg", "weight", "foreign"]].dropna()
     groups = (np.arange(len(frame)) % 7).astype(int)
-    clustered = ws.OLS.from_formula("mpg ~ weight + foreign", frame).fit(
+    clustered = ws.Regress.from_formula("mpg ~ weight + foreign", frame).fit(
         cov_type="cluster", cov_kwds={"groups": groups}
     )
 
     with pytest.raises(ValueError, match="robust or clustered"):
-        clustered.estat_hettest()
+        clustered.estat_heteroskedasticity_test()
 
 
 def test_noconstant_is_refused(auto, reference) -> None:
     """``estat hettest`` after ``regress, noconstant`` is Stata r(301)."""
 
     frame = auto[["mpg", "weight", "foreign"]].dropna()
-    noconstant = ws.OLS.from_formula("mpg ~ 0 + weight + foreign", frame).fit()
+    noconstant = ws.Regress.from_formula("mpg ~ 0 + weight + foreign", frame).fit()
 
     assert reference["refusals"]["noconstant"] == 301
     with pytest.raises(ValueError, match="noconstant"):
-        noconstant.estat_hettest()
+        noconstant.estat_heteroskedasticity_test()
 
 
 def test_iid_with_mtest_is_refused(auto) -> None:
     with pytest.raises(ValueError, match="iid may not be specified"):
-        _fit(auto, "M1", None).estat_hettest(method="iid", mtest="holm", rhs=True)
+        _fit(auto, "M1", None).estat_heteroskedasticity_test(method="iid", mtest="holm", rhs=True)
 
 
 def test_fstat_with_mtest_is_refused(auto) -> None:
     with pytest.raises(ValueError, match="fstat may not be specified"):
-        _fit(auto, "M1", None).estat_hettest(method="fstat", mtest="holm", rhs=True)
+        _fit(auto, "M1", None).estat_heteroskedasticity_test(method="fstat", mtest="holm", rhs=True)
 
 
 def test_unknown_method_is_rejected(auto) -> None:
     with pytest.raises(ValueError, match="method must be one of"):
-        _fit(auto, "M1", None).estat_hettest(method="bogus")
+        _fit(auto, "M1", None).estat_heteroskedasticity_test(method="bogus")
 
 
 def test_unknown_mtest_method_is_rejected(auto) -> None:
     with pytest.raises(ValueError, match="not supported"):
-        _fit(auto, "M1", None).estat_hettest(mtest="fdr", rhs=True)
+        _fit(auto, "M1", None).estat_heteroskedasticity_test(mtest="fdr", rhs=True)
 
 
 def test_unknown_regressor_is_rejected(auto) -> None:
     with pytest.raises(ValueError, match="unknown regressor"):
-        _fit(auto, "M1", None).estat_hettest(variables=["nope"])
+        _fit(auto, "M1", None).estat_heteroskedasticity_test(variables=["nope"])
 
 
 def test_nonrobust_vce_is_accepted(auto) -> None:
     result = _fit(auto, "M1", None)
     assert result.cov_type == "nonrobust"
-    assert np.isfinite(result.estat_hettest().statistic)
+    assert np.isfinite(result.estat_heteroskedasticity_test().statistic)
 
 
 # ---------------------------------------------------------------- presentation
 def test_to_dict_matches_the_variant(auto) -> None:
     result = _fit(auto, "M1", None)
 
-    assert set(result.estat_hettest().to_dict()) == {"chi2", "df", "p"}
-    assert set(result.estat_hettest(method="fstat").to_dict()) == {
+    assert set(result.estat_heteroskedasticity_test().to_dict()) == {"chi2", "df", "p"}
+    assert set(result.estat_heteroskedasticity_test(method="fstat").to_dict()) == {
         "F",
         "df_m",
         "df_r",
@@ -407,18 +407,18 @@ def test_output_names_the_auxiliary_regressors(auto) -> None:
     """
 
     result = _fit(auto, "M1", None)
-    single = _fit(auto, "M1", None).estat_hettest(variables=["weight"])
+    single = _fit(auto, "M1", None).estat_heteroskedasticity_test(variables=["weight"])
 
-    assert "Variable: Fitted values of mpg" in str(result.estat_hettest())
-    assert "Variables: All independent variables" in str(result.estat_hettest(rhs=True))
+    assert "Variable: Fitted values of mpg" in str(result.estat_heteroskedasticity_test())
+    assert "Variables: All independent variables" in str(result.estat_heteroskedasticity_test(rhs=True))
     assert "Variable: weight" in str(single)
-    assert "Normal error terms" in str(result.estat_hettest())
-    assert "i.i.d. error terms" in str(result.estat_hettest(method="iid"))
-    assert "Constant variance" in str(result.estat_hettest())
+    assert "Normal error terms" in str(result.estat_heteroskedasticity_test())
+    assert "i.i.d. error terms" in str(result.estat_heteroskedasticity_test(method="iid"))
+    assert "Constant variance" in str(result.estat_heteroskedasticity_test())
 
 
 def test_pvalue_is_the_upper_tail(auto) -> None:
-    rendered = _fit(auto, "M1", None).estat_hettest()
+    rendered = _fit(auto, "M1", None).estat_heteroskedasticity_test()
 
     assert rendered.pvalue == pytest.approx(
         float(stats.chi2.sf(rendered.statistic, rendered.df)), rel=1e-12
@@ -428,4 +428,4 @@ def test_pvalue_is_the_upper_tail(auto) -> None:
 def test_module_function_matches_the_method(auto) -> None:
     result = _fit(auto, "M1", None)
 
-    assert estat_hettest(result).to_dict() == result.estat_hettest().to_dict()
+    assert estat_heteroskedasticity_test(result).to_dict() == result.estat_heteroskedasticity_test().to_dict()

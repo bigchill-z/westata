@@ -106,19 +106,19 @@ with Stata() as stata:
     attempt("regress", "auto", lambda: record(
         "regress", "auto", "regress price weight mpg foreign",
         stata.estimate("regress price weight mpg foreign"),
-        ws.OLS.from_formula("price ~ weight + mpg + foreign", auto).fit(),
+        ws.Regress.from_formula("price ~ weight + mpg + foreign", auto).fit(),
         [("weight", "weight"), ("mpg", "mpg"), ("foreign", "foreign"), ("_cons", "Intercept")]))
 
     attempt("regress vce(robust)", "auto", lambda: record(
         "regress vce(robust)", "auto", "regress price weight mpg, vce(robust)",
         stata.estimate("regress price weight mpg, vce(robust)"),
-        ws.OLS.from_formula("price ~ weight + mpg", auto).fit(cov_type="HC1"),
+        ws.Regress.from_formula("price ~ weight + mpg", auto).fit(cov_type="HC1"),
         [("weight", "weight"), ("mpg", "mpg"), ("_cons", "Intercept")]))
 
     attempt("regress i.foreign", "auto", lambda: record(
         "regress i.foreign", "auto", "regress price weight i.foreign",
         stata.estimate("regress price weight i.foreign"),
-        ws.OLS.from_formula("price ~ weight + C(foreign)", auto).fit(),
+        ws.Regress.from_formula("price ~ weight + C(foreign)", auto).fit(),
         [("weight", "weight"), ("1.foreign", "C(foreign)[T.1]"), ("_cons", "Intercept")],
         extra={"note": "Stata labels the level `1.foreign`; the CSV stores 0/1 so our label is "
                        "`C(foreign)[T.1]`. The estimates agree."}))
@@ -126,19 +126,19 @@ with Stata() as stata:
     attempt("qreg", "auto", lambda: record(
         "qreg median", "auto", "qreg price weight length, q(.5)",
         stata.estimate("qreg price weight length, q(.5)"),
-        ws.QuantileRegression.from_formula("price ~ weight + length", auto).fit(),
+        ws.QuantileRegress.from_formula("price ~ weight + length", auto).fit(),
         [("weight", "weight"), ("length", "length"), ("_cons", "Intercept")]))
 
     attempt("rreg", "auto", lambda: record(
         "rreg", "auto", "rreg price weight length, nolog",
         stata.estimate("rreg price weight length, nolog"),
-        ws.RobustRegression.from_formula("price ~ weight + length", auto).fit(),
+        ws.RobustRegress.from_formula("price ~ weight + length", auto).fit(),
         [("weight", "weight"), ("length", "length"), ("_cons", "Intercept")]))
 
     attempt("sureg", "auto", lambda: record(
         "sureg", "auto", "sureg (price weight mpg) (mpg weight foreign)",
         stata.estimate("sureg (price weight mpg) (mpg weight foreign)"),
-        ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], auto).fit(),
+        ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], auto).fit(),
         [("#0", "price:weight"), ("#1", "price:mpg"), ("#2", "price:_cons"),
          ("#3", "mpg:weight"), ("#4", "mpg:foreign"), ("#5", "mpg:_cons")],
         extra={"note": "Stata repeats each name once per equation, so positions are used."}))
@@ -146,7 +146,7 @@ with Stata() as stata:
     attempt("sureg vce(robust)", "auto", lambda: record(
         "sureg vce(robust)", "auto", "sureg (price weight mpg) (mpg weight foreign), vce(robust)",
         stata.estimate("sureg (price weight mpg) (mpg weight foreign), vce(robust)"),
-        ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
+        ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"],
                              auto).fit(cov_type="robust"),
         [("#0", "price:weight"), ("#1", "price:mpg"), ("#2", "price:_cons"),
          ("#3", "mpg:weight"), ("#4", "mpg:foreign"), ("#5", "mpg:_cons")]))
@@ -231,7 +231,7 @@ with Stata() as stata:
     attempt("etregress twostep", "sim", lambda: record(
         "etregress twostep", "sim", "etregress y_treat w, treat(treated = z1 z2) twostep",
         stata.estimate("etregress y_treat w, treat(treated = z1 z2) twostep"),
-        ws.Etregress.from_formula("y_treat ~ w + treat(treated ~ z1 + z2)", sim).fit(),
+        ws.EndogenousTreatmentRegress.from_formula("y_treat ~ w + treat(treated ~ z1 + z2)", sim).fit(),
         [("#0", "y:w"), ("#1", "y:treated"), ("#2", "y:Intercept"),
          ("#3", "treat:z1"), ("#4", "treat:z2"), ("#5", "treat:Intercept")]))
 
@@ -256,11 +256,11 @@ with Stata() as stata:
 
     for label, command, factory in (
         ("xtreg, fe", "xtreg y x1 x2, fe",
-         lambda: ws.PanelOLS.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
+         lambda: ws.PanelRegressFE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
         ("xtreg, re", "xtreg y x1 x2, re",
-         lambda: ws.RandomEffects.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
+         lambda: ws.PanelRegressRE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
         ("xtreg, be", "xtreg y x1 x2, be",
-         lambda: ws.BetweenOLS.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
+         lambda: ws.PanelRegressBE.from_formula("y ~ x1 + x2", panel, entity="firm", time="year").fit()),
     ):
         attempt(label, "panel", lambda label=label, command=command, factory=factory: record(
             label, "panel", command, stata.estimate(command), factory(),
@@ -269,7 +269,7 @@ with Stata() as stata:
     attempt("xtlogit, fe", "panel", lambda: record(
         "xtlogit, fe", "panel", "xtlogit binary x1 x2, fe",
         stata.estimate("xtlogit binary x1 x2, fe"),
-        ws.XtLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
+        ws.PanelLogit.from_formula("binary ~ x1 + x2", panel, entity="firm", time="year",
                                 method="fe").fit(),
         [("x1", "x1"), ("x2", "x2")],
         extra={"note": "Conditional logit: the intercept is conditioned out, so only slopes compare."}))
@@ -277,7 +277,7 @@ with Stata() as stata:
     attempt("xtpoisson, fe", "panel", lambda: record(
         "xtpoisson, fe", "panel", "xtpoisson count x1 x2, fe",
         stata.estimate("xtpoisson count x1 x2, fe"),
-        ws.XtPoisson.from_formula("count ~ x1 + x2", panel, entity="firm", time="year",
+        ws.PanelPoisson.from_formula("count ~ x1 + x2", panel, entity="firm", time="year",
                                   method="fe").fit(),
         [("x1", "x1"), ("x2", "x2")],
         extra={"note": "Conditional Poisson: only slopes compare."}))

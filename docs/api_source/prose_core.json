@@ -312,7 +312,7 @@
   "zh": "解析后的 Stata `exp_list`，可直接对单次重复的已存结果求值。它持有 `groups`（统计量组的元组，带标签的组保留其标签），并提供 `names`（展平后的统计量名，有标签的组加 `label:` 前缀）与 `evaluate(results)`——后者通过解析 `StoredResults` 中的 `r()`、`e()`、`_b[]`、`_se[]` 查表，把每个名字映射为浮点数。它是冻结 dataclass：解析产生一个值，而非可变构建器。",
   "example": "ws.parse_exp_list('(mean=r(mean)) (sd=r(sd))').names"
  },
- "SummarizeResult": {
+ "SummarizeResults": {
   "stata": "estat summarize -- summarize of the estimation sample",
   "en": "The `estat summarize` table: a per-variable summary of the ESTIMATION sample, not of the whole frame. Fields: `table` (a DataFrame indexed by variable with `Obs`, `Mean`, `Std. Dev.`, `Min`, `Max`), `n_obs` (the estimation sample size), `labels`, `clusters` and `noheader`. Because it summarises the rows the fit actually used, its `Obs` column can be smaller than `len(base)` after listwise deletion.",
   "zh": "`estat summarize` 表格：对估计样本（而非整个数据框）的逐变量摘要。字段：`table`（以变量为索引、含 `Obs`、`Mean`、`Std. Dev.`、`Min`、`Max` 的 DataFrame）、`n_obs`（估计样本量）、`labels`、`clusters` 与 `noheader`。由于它摘要的是拟合实际使用的行，列出删除后其 `Obs` 列可能小于 `len(base)`。",
@@ -326,7 +326,7 @@
   "notes_en": "`to_dict()` gives Stata's `r()` names: the statistic travels under the name of its OWN distribution (`F` or `chi2`), so reading `r(F)` after a chi-square test finds nothing -- which is correct, because Stata stores `r(chi2)` there.",
   "notes_zh": "`to_dict()` 给出 Stata 的 `r()` 名称：统计量以其自身分布的名字出现（`F` 或 `chi2`），因此在卡方检验之后读 `r(F)` 会找不到——这是对的，因为 Stata 在那里存的是 `r(chi2)`。"
  },
- "LincomResult": {
+ "LincomResults": {
   "stata": "lincom x1 - x2",
   "en": "One linear combination of parameters, shaped like Stata's `lincom` output. Fields: `estimate`, `std_err`, `statistic`, `pvalue`, `ci_lower`, `ci_upper`, `distribution` (`\"t\"` or `\"z\"`), `df` (`None` for a z-based fit, which genuinely has no degrees of freedom), `expression` (the hypothesis as written), plus `eform` and `label`. The standard error comes from the delta method on `weights @ b`, using the same covariance the coefficient table used.",
   "zh": "参数的一个线性组合，形态与 Stata 的 `lincom` 输出一致。字段：`estimate`、`std_err`、`statistic`、`pvalue`、`ci_lower`、`ci_upper`、`distribution`（`\"t\"` 或 `\"z\"`）、`df`（基于 z 的拟合为 `None`，它确实没有自由度）、`expression`（所写假设），以及 `eform` 与 `label`。标准误由 `weights @ b` 上的 delta 方法给出，使用与系数表相同的协方差。",
@@ -334,19 +334,19 @@
   "notes_en": "`to_dict()` omits `df` for a z-based fit rather than reporting 0 or None, because Stata does not store `r(df)` in that case; the statistic appears as `t` or `z` accordingly.",
   "notes_zh": "对基于 z 的拟合，`to_dict()` 省略 `df`，而不是报 0 或 None，因为 Stata 在这种情况下不存 `r(df)`；统计量相应地以 `t` 或 `z` 出现。"
  },
- "IcResult": {
+ "IcResults": {
   "stata": "estat ic",
   "en": "The `estat ic` table for one fitted model. Fields: `n`, `ll_null`, `ll_model`, `df` (the first four columns, matching Stata's `r(S)` layout), the four criteria `aic`, `bic`, `aicc`, `caic`, and `model` (the command name in the `Model` column). A missing statistic prints as `.` rather than `nan`, following Stata's rendering. This is the right surface for `regress`, which stores no information criteria of its own.",
   "zh": "单个已拟合模型的 `estat ic` 表。字段：`n`、`ll_null`、`ll_model`、`df`（前四列，对应 Stata 的 `r(S)` 布局）、四个准则 `aic`、`bic`、`aicc`、`caic`，以及 `model`（`Model` 列中的命令名）。缺失的统计量按 Stata 的方式打印为 `.` 而非 `nan`。对自身不存信息准则的 `regress` 来说，这才是正确的入口。",
   "example": "ws.estat_ic(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
- "VifResult": {
+ "VifResults": {
   "stata": "estat vif",
   "en": "The variance inflation factor table for a linear fit. Fields: `names` (regressors in the reported order, sorted by descending VIF unless `nosort=True`), `vif` and `tolerance` (its reciprocal) as arrays, and `mean_vif`. `to_frame()` returns the table as a DataFrame and `to_dict()` gives Stata's `r(vif_#)` scalars keyed by variable name. Only defined for the linear family: the auxiliary regressions are ordinary least squares by construction.",
   "zh": "线性拟合的方差膨胀因子表。字段：`names`（按报告顺序排列的回归元，除非 `nosort=True`，否则按 VIF 降序排序）、数组形式的 `vif` 与其倒数 `tolerance`，以及 `mean_vif`。`to_frame()` 返回 DataFrame 形式的表，`to_dict()` 给出以变量名为键的 Stata `r(vif_#)` 标量。仅对线性族有定义：辅助回归按构造就是普通最小二乘。",
   "example": "ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
- "MarginsResult": {
+ "MarginsResults": {
   "stata": "margins, dydx(x1)",
   "en": "One row of a `margins` table plus its covariance. Fields: `label` (the row label), `estimate`, `std_err`, `statistic`, `pvalue`, `ci_lower`, `ci_upper` and `prediction` (the prediction type used). The standard error is a delta-method one, with an analytic gradient where the response family has a closed form and an adaptive numeric one otherwise. `to_dict()` flattens to the row labels of Stata's `r(table)`.",
   "zh": "`margins` 表的一行及其协方差。字段：`label`（行标签）、`estimate`、`std_err`、`statistic`、`pvalue`、`ci_lower`、`ci_upper` 与 `prediction`（所用的预测类型）。标准误是 delta 方法值：响应族有闭式解处用解析梯度，其余用自适应数值梯度。`to_dict()` 展平为 Stata `r(table)` 的行标签。",
@@ -354,61 +354,61 @@
   "notes_en": "`to_dict()` labels the statistic row `t` unconditionally, because this object does not carry the distribution flag; Stata would label it `z` after a logit. Use `str(...)` when the label itself matters.",
   "notes_zh": "`to_dict()` 一律把统计量行标为 `t`，因为该对象不携带分布标志；logit 之后 Stata 会标为 `z`。当标签本身重要时请用 `str(...)`。"
  },
- "GofResult": {
+ "GofResults": {
   "stata": "estat gof (after poisson)",
   "en": "The Poisson goodness-of-fit table: a deviance (likelihood-ratio) test and a Pearson test, each with its upper-tail chi-square p-value. Fields: `deviance`, `deviance_pvalue`, `pearson`, `pearson_pvalue`, `df` (`e(N) - e(df_m) - 1`, shared by both). Stata defines `estat gof` ONLY for `poisson`; `nbreg` sets no `e(estat_cmd)`, so requesting it there raises `NotImplementedError` rather than returning an invented statistic.",
   "zh": "Poisson 拟合优度表：一个偏差（似然比）检验与一个 Pearson 检验，各带上尾卡方 p 值。字段：`deviance`、`deviance_pvalue`、`pearson`、`pearson_pvalue`、`df`（`e(N) - e(df_m) - 1`，两者共用）。Stata 仅对 `poisson` 定义 `estat gof`；`nbreg` 不设 `e(estat_cmd)`，因此在那里请求会抛 `NotImplementedError`，而不会返回编造的统计量。",
   "example": "ws.estat_gof(ws.Poisson.from_formula('ycnt ~ x1', base).fit())"
  },
- "ClassificationResult": {
+ "ClassificationResults": {
   "stata": "estat classification",
   "en": "The `estat classification` 2x2 table and its nine percentages. Fields: `table` (3x3 DataFrame with rows `+`/`-`/`Total` and columns `D`/`~D`/`Total`), `cutoff` (the probability threshold), and the rates Stata returns as `r(P_*)`: `percent_correct`, `sensitivity`, `specificity`, `false_positive_rate`, `false_negative_rate`, `positive_predictive_value`, `negative_predictive_value`, `false_positive_classified`, `false_negative_classified`. Note that the two \"false\" families are conditioned differently -- on the true class versus on the classified class.",
   "zh": "`estat classification` 的 2x2 表及其九个百分比。字段：`table`（3x3 DataFrame，行为 `+`/`-`/`Total`，列为 `D`/`~D`/`Total`）、`cutoff`（概率阈值），以及 Stata 以 `r(P_*)` 返回的各项比率：`percent_correct`、`sensitivity`、`specificity`、`false_positive_rate`、`false_negative_rate`、`positive_predictive_value`、`negative_predictive_value`、`false_positive_classified`、`false_negative_classified`。注意两类“错误率”的条件不同——一类以真实类别为条件，另一类以判定的类别为条件。",
   "example": "r = ws.estat_classification(ws.Logit.from_formula('yb ~ x1 + x2', base).fit())\n(r.cutoff, r.percent_correct)"
  },
- "HetTestResult": {
+ "HetTestResults": {
   "stata": "estat hettest",
   "en": "The Breusch-Pagan / Cook-Weisberg test for heteroskedasticity. Fields: `method` (`\"normal\"`, `\"iid\"` or `\"fstat\"`), `statistic`, `df`, `pvalue`, `df_denom` (only for `method=\"fstat\"`), and `variables` (the regressors the auxiliary regression used -- empty means the fitted values were used, which is Stata's default when no varlist is given). Like Stata, it refuses after a robust or clustered VCE and on pweighted data.",
   "zh": "Breusch-Pagan / Cook-Weisberg 异方差检验。字段：`method`（`\"normal\"`、`\"iid\"` 或 `\"fstat\"`）、`statistic`、`df`、`pvalue`、`df_denom`（仅 `method=\"fstat\"` 时）与 `variables`（辅助回归所用的回归元——为空表示使用了拟合值，这是未给变量列表时 Stata 的默认）。与 Stata 一致，在稳健或聚类 VCE 之后以及 pweight 数据上它会拒绝。",
   "example": "ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
- "ImTestResult": {
+ "ImTestResults": {
   "stata": "estat imtest",
   "en": "Cameron & Trivedi's information-matrix test decomposition, optionally with White's original test. Fields: `heteroskedasticity`, `skewness`, `kurtosis` and their degrees of freedom `df_heteroskedasticity`, `df_skewness`, `df_kurtosis`; `total` and `df_total` (the sum of the three); and `white`, `white_df`, `white_pvalue`, which are `None` unless `white=True` was requested.",
   "zh": "Cameron & Trivedi 的信息矩阵检验分解，可选附带 White 原始检验。字段：`heteroskedasticity`、`skewness`、`kurtosis` 及其自由度 `df_heteroskedasticity`、`df_skewness`、`df_kurtosis`；`total` 与 `df_total`（三者之和）；以及 `white`、`white_df`、`white_pvalue`——除非请求了 `white=True`，否则为 `None`。",
   "example": "ws.estat_imtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
- "OvTestResult": {
+ "OvTestResults": {
   "stata": "estat ovtest",
   "en": "Ramsey's RESET test for omitted variables. Fields: `statistic` (the F statistic), `df` and `df_denom` (numerator and denominator degrees of freedom), `pvalue`, and `omitted` (a human-readable description of what the powers were taken of, matching Stata's `Omitted:` line). The default path is Stata's `freset`, which it takes whenever `rhs` is not given. Also `dropped`: the auxiliary-regression columns the fit could not identify, in Stata's own order (the user's regressor BEFORE the generated power), one per `note: <name> omitted because of collinearity.` line printed above the table. It is empty on the default path, which cannot duplicate a regressor.",
   "zh": "Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`df` 与 `df_denom`（分子与分母自由度）、`pvalue`，以及 `omitted`（对被取幂对象的可读描述，与 Stata 的 `Omitted:` 行一致）。默认路径是 Stata 的 `freset`，未给 `rhs` 时它就走这条路径。 另有 `dropped`：辅助回归无法识别的列，按 Stata 自己的顺序排列（用户变量在生成的幂次之前），每项对应表格上方一行 `note: <name> omitted because of collinearity.`；默认路径不会产生它，因为单个拟合值向量不可能与某个回归元重复。",
   "example": "ws.estat_ovtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())"
  },
- "EndogenousResult": {
+ "EndogenousResults": {
   "stata": "estat endogenous",
   "en": "Durbin and Wu endogeneity tests for an IV fit. Fields: `durbin`, `durbin_pvalue` (Durbin's chi-square, with `df` equal to the number of tested endogenous regressors), `wu`, `wu_pvalue`, `wu_df`, `wu_df_denom` (Wu's F and its two degrees of freedom), and `tested` (the names of the endogenous regressors covered). A rejection means the regressor is endogenous, so OLS on the same equation would be inconsistent.",
   "zh": "IV 拟合的 Durbin 与 Wu 内生性检验。字段：`durbin`、`durbin_pvalue`（Durbin 卡方，`df` 等于被检验的内生回归元个数）、`wu`、`wu_pvalue`、`wu_df`、`wu_df_denom`（Wu 的 F 及其两个自由度），以及 `tested`（所覆盖的内生回归元名称）。拒绝意味着该回归元内生，因此同方程上的 OLS 会不一致。",
   "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit()\nws.estat_endogenous(iv)"
  },
- "FirstStageResult": {
+ "FirstStageResults": {
   "stata": "estat firststage",
   "en": "First-stage diagnostics for an IV fit: one row per endogenous regressor plus the headline F. Fields: `endog` (names in reported order), `r2` and `adj_r2` (the endogenous regressor on ALL exogenous variables), `partial_r2` (the residualised endogenous regressor on the residualised excluded instruments), `f`, `df_num`, `df_denom`, `pvalue` (the joint test of the excluded instruments), and `shea`, `shea_adj` (only computed with more than one endogenous regressor, because with one they coincide with `partial_r2`).",
   "zh": "IV 拟合的第一阶段诊断：每个内生回归元一行，外加一个总体 F。字段：`endog`（按报告顺序的名称）、`r2` 与 `adj_r2`（内生回归元对全部外生变量回归）、`partial_r2`（残差化后的内生回归元对残差化后的排除工具变量回归）、`f`、`df_num`、`df_denom`、`pvalue`（排除工具变量的联合检验），以及 `shea`、`shea_adj`（仅在内生回归元多于一个时计算，因为只有一个时它们与 `partial_r2` 相同）。",
   "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit()\nws.estat_firststage(iv)"
  },
- "OverIdResult": {
+ "OverIdResults": {
   "stata": "estat overid",
   "en": "The overidentification restrictions test for an IV fit. Fields: `statistic`, `df` (the number of overidentifying restrictions) and `pvalue`; `basmann` and `basmann_pvalue`, the finite-sample variant `Sargan*(N-k)/(N-Sargan)`, which is `None` for GMM; and `test`, either `\"Sargan\"` (2SLS and LIML) or `\"Hansen J\"` (GMM). An exactly identified model has no restriction to test and is refused rather than reported as a statistic of zero.",
   "zh": "IV 拟合的过度识别约束检验。字段：`statistic`、`df`（过度识别约束个数）与 `pvalue`；`basmann` 与 `basmann_pvalue`，即有限样本变体 `Sargan*(N-k)/(N-Sargan)`，对 GMM 为 `None`；以及 `test`，为 `\"Sargan\"`（2SLS 与 LIML）或 `\"Hansen J\"`（GMM）。恰好识别的模型没有可检验的约束，会被拒绝，而不是报成统计量为零。",
   "example": "iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + y1]', base).fit()\nws.estat_overid(iv)"
  },
- "LRTestResult": {
+ "LRTestResults": {
   "stata": "lrtest unrestricted restricted",
   "en": "A likelihood-ratio test between a restricted and an unrestricted model. Fields: `statistic` (`2 (lnL_unrestricted - lnL_restricted)`), `df` (the difference in parameter counts, always positive because two models with equal counts are refused as Stata's `r(498)`), `pvalue` (`P > chi2(df)`, exactly 1.0 for a negative statistic as Stata prints), and `ll_unrestricted`, `ll_restricted`, kept so the number can be audited without re-fitting.",
   "zh": "受限模型与非受限模型之间的似然比检验。字段：`statistic`（`2 (lnL_unrestricted - lnL_restricted)`）、`df`（参数个数之差，始终为正，因为参数个数相同的两个模型会按 Stata 的 `r(498)` 被拒绝）、`pvalue`（`P > chi2(df)`，统计量为负时按 Stata 的打印恰为 1.0），以及 `ll_unrestricted`、`ll_restricted`——保留它们以便无需重新拟合即可审计该数值。",
   "example": "u = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()\nr = ws.Logit.from_formula('yb ~ x1', base).fit()\nu.lrtest(r)"
  },
- "HausmanResult": {
+ "HausmanResults": {
   "stata": "hausman fe re",
   "en": "The Hausman specification test: `(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`. Fields: `statistic`, `df` (the number of coefficients actually compared, constants excluded), `pvalue` (`P > chi2(df)`), and `excluded` (parameters not present in both models, so not comparable -- a diagnostic this package adds, not an `r()` scalar). A rejection means the efficient estimator is inconsistent, so the consistent one is preferred.",
   "zh": "Hausman 设定检验：`(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`。字段：`statistic`、`df`（实际参与比较的系数个数，不含常数项）、`pvalue`（`P > chi2(df)`），以及 `excluded`（两个模型中不同时存在、因而不可比较的参数——这是本包增加的诊断，不是 `r()` 标量）。拒绝意味着有效估计量不一致，应改用一致估计量。",

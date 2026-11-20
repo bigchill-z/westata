@@ -29,8 +29,8 @@ L1 用旧文档规定的映射、L3/L4 用修复前的估计量/公式——所�
 | L1 | IV `vce(robust)` 标签：文档说 HC1，实为 HC0 | 1.09e-02（HC1 vs `vce(robust)`） | 5.4e-15（HC0 vs `vce(robust)`）；5.4e-15（HC1 vs `vce(robust) small`） | `ivregress 2sls y x1 (e1 = z1 z2), vce(robust)` / `… small` | 已修复 A |
 | L2 | `IVLIML` 的 `vce(cluster)` 恒加 CR1（Stata 默认 CR0） | 4.53e-02（140×14）；2.58e-02（240×24） | 1.15e-14 / 1.27e-14 / 2.68e-15（三组数据） | `ivregress liml y x1 (e1 = z1 z2), vce(cluster gid)` | 已修复 A |
 | L3 | `IVGMM` + `vce(cluster)`：Stata 连 `W` 一起聚类 | 点估计 **3.583e-02**（在 retest 的 12d 原始数据上复现，与报告 3.58e-2 逐位吻合）；SE 1.736e-01 | 系数 4.575e-16；SE 6.362e-16（同一数据）；另三组数据系数 6.7e-16 / 8.2e-16 / 1.4e-15，`e(V)` 全矩阵 1.3e-14 | `ivregress gmm yiv x1 (e1 = z1 z2), vce(cluster gid)` | 已修复 A（不是回退成 `UnsupportedError`） |
-| L4 | `OLS.e['F']` 不随 `cov_type` 变 | nonrobust 0（本来对）；robust 5.497e-02；cluster 1.489e-01；pweight 1.279e-01；`noconstant` 与截距-only 改前是 **NaN**（Stata 分别 216.97 与 0） | 1.2e-15 / 4.6e-15 / 4.0e-15 / 1.4e-14（另 aweight/fweight/noconstant/noconstant-robust 也 ≤2.3e-15） | `regress mpg weight foreign[, vce(robust) / vce(cluster gid)]`、`[pweight=w]` | 已修复 A |
-| L5 | `OLS.e['df_r']` 在 cluster 下存 `N-K` | 9.54（存 71，Stata 存 11） | 0（存 11 = G-1；`e(N_clust)=12`） | `regress mpg weight foreign, vce(cluster gid)` | 已修复 A |
+| L4 | `Regress.e['F']` 不随 `cov_type` 变 | nonrobust 0（本来对）；robust 5.497e-02；cluster 1.489e-01；pweight 1.279e-01；`noconstant` 与截距-only 改前是 **NaN**（Stata 分别 216.97 与 0） | 1.2e-15 / 4.6e-15 / 4.0e-15 / 1.4e-14（另 aweight/fweight/noconstant/noconstant-robust 也 ≤2.3e-15） | `regress mpg weight foreign[, vce(robust) / vce(cluster gid)]`、`[pweight=w]` | 已修复 A |
+| L5 | `Regress.e['df_r']` 在 cluster 下存 `N-K` | 9.54（存 71，Stata 存 11） | 0（存 11 = G-1；`e(N_clust)=12`） | `regress mpg weight foreign, vce(cluster gid)` | 已修复 A |
 | L6 | `e()` 覆盖缺口 `rss`/`mss`/`sum_w`/`N_clust`（+ `ll_0`） | 缺失（`get_scalar` 返回 None） | 0 / ≤6.1e-16（八种权重与 VCE 组合）；`e(ll_0)` 六种情形 rel = 0.0（`aweight` 1.81e-02，见"未修"） | `regress …`、`… [fweight=w]`、`… vce(cluster gid)` | 已修复 A |
 
 **L1–L6 全部修到 A 档（≤1e-9），无一项降级到 B/C。**
@@ -53,7 +53,7 @@ L3 按 BRIEF 的"优先实现"路线完成，没有使用 `UnsupportedError` 回
 - **改法**：
   - `iv.py` 模块 docstring 的映射表重写为
     `HC0 ↔ vce(robust)`、`HC1 ↔ vce(robust) small`，并明确写出
-    "这与 OLS/`regress` 相反"；
+    "这与 Regress/`regress` 相反"；
   - `-- cov_type` 参数文档、`_canonical_cov_type` docstring 同步；
   - `_backend_fit` 的注释从"robust variants keep their own convention"
     改成三条明确分支（nonrobust/HC0/HC1/cluster）。
@@ -103,7 +103,7 @@ L3 按 BRIEF 的"优先实现"路线完成，没有使用 `UnsupportedError` 回
     `W` 换成了聚类版本，不是别的原因；
   - 非聚类 GMM 未被改坏：系数 1.04e-15 / 6.0e-16 / 4.4e-16。
 
-### L4（P1-15）`OLS.e['F']` 不随 `cov_type` 变
+### L4（P1-15）`Regress.e['F']` 不随 `cov_type` 变
 
 - **根因**：`linear.py` 里 `fvalue = (r2/df_m)/((1-r2)/df_resid)` 是经典 R² 型 F，
   只在 nonrobust 下等于 Stata 的 `e(F)`。Stata 的 `e(F)` 是
@@ -118,7 +118,7 @@ L3 按 BRIEF 的"优先实现"路线完成，没有使用 `UnsupportedError` 回
   并打印"用 westata 自己的 V 复算的 Wald/k"以把"V 错"与"F 定义错"分开
   ——两者相对差完全相同，说明 V 一直是 A 档、错的只是定义。
 
-### L5（P1-16）`OLS.e['df_r']` 在 cluster 下应为 `G-1`
+### L5（P1-16）`Regress.e['df_r']` 在 cluster 下应为 `G-1`
 
 - **根因**：`linear.py` 的 `e` 字典写入 `"df_r": df_resid`（`N-K`），而
   `StataResults(df_resid=df_t)` 已经在用 `G-1`。两个"自由度"概念静默分叉。
@@ -135,10 +135,10 @@ L3 按 BRIEF 的"优先实现"路线完成，没有使用 `UnsupportedError` 回
 - **根因**：`linear.py` / `iv.py` 的 `e` 字典没有 `rss`/`mss`/`sum_w`/`N_clust`；
   IV 侧还缺 `kappa`/`k_endog`/`iterations`/`J`/`tss`/`rank_mb`。
 - **改法**：
-  - **OLS**：补 `rss`（`Σ w e²`）、`mss = tss − rss`（有常数时 tss 为去均值平方和，
+  - **Regress**：补 `rss`（`Σ w e²`）、`mss = tss − rss`（有常数时 tss 为去均值平方和，
     `noconstant` 时为 `Σ w y²`，与 Stata 一致）、`sum_w`（**原始**权重和：
     `aweight`/`pweight` 的估计权重被归一化到和为 N，必须用归一化前的向量才
-    得到 185 而不是 74）、`N_clust`（cluster 时）。为此在 `OLS.__init__` 里
+    得到 185 而不是 74）、`N_clust`（cluster 时）。为此在 `Regress.__init__` 里
     新增 `_raw_weight_sum`。
   - **IV**：补 `rss`/`mss`/`tss`/`k_endog`/`iterations`；
     `_extra_estimator_scalars(ref, canonical)` 钩子：k-class 给 `kappa`，
@@ -155,7 +155,7 @@ L3 按 BRIEF 的"优先实现"路线完成，没有使用 `UnsupportedError` 回
     权重约定偏移（westata 的 `e(ll)` 差 2.160e-02、`e(ll_0)` 差 1.810e-02，
     绝对差都是 4.4044），这**不是本轮引入的**（`e(ll)` 一直如此），
     且 `e(ll) − e(ll_0)`（LR 统计量）仍然精确。已在代码注释与本文件标注。
-- **验证**：`repro_l5_l6_ols_e.py`（OLS 八种情形）与 `repro_l6_iv_e.py`
+- **验证**：`repro_l5_l6_ols_e.py`（Regress 八种情形）与 `repro_l6_iv_e.py`
   （`ivregress 2sls/liml/gmm` × `default/vce(cluster)/vce(robust)`）：
   Stata 存过的标量 westata 一个不缺，数值全部 ≤ 6.1e-16（fweight 的 rss 6.0e-16、
   LIML `kappa` 5.7e-15、GMM `J` 1.1e-15）。
@@ -240,7 +240,7 @@ aweight 下一直是这个值。
 似然归一化（`[R] regress` 未给出，只能用上面第 1 条那样黑箱反解）。
 
 `retest/domains/linear_iv/run.py` 里 L6 的覆盖项中还列了几个
-westata **故意多存**的量（`aic`/`bic`/`sigma` for OLS；`F`/`F_first`/`ll`/`tss`
+westata **故意多存**的量（`aic`/`bic`/`sigma` for Regress；`F`/`F_first`/`ll`/`tss`
 for IV）。这些是便利字段，Stata 不存，属"多"而不是"少"；`repro_l6_iv_e.py`
 会把它们作为 `westata extra (documented conveniences)` 打印出来。
 
@@ -252,7 +252,7 @@ for IV）。这些是便利字段，Stata 不存，属"多"而不是"少"；`rep
 |---|---|
 | `10d / 11d / 12c …vs westata HC1（文档映射）` | 这三条正是把"HC1 当成 `vce(robust)`"的错误映射固定成 fail 的证据。修复后 HC1 对的是 `vce(robust) small`（`10e` 就是这条，pass）。要它们转 pass 只能把比较对象改掉 → 需 Lead 改 `run.py`。 |
 | `11f Stata liml cluster **small** vs westata cluster` | westata 的 `cluster` 默认现在是 CR0（= Stata 无 `small`），与 Stata 的 `small` 当然不同。改成 `ssc=SSC(adj=True)` 即 pass。 |
-| `7c areg absorb(gid) vce(cluster gid) vs FEOLS` | **与本组无关，且是防误判项**：`retest/REPORT.md` §2.1 的"防误判提示"已说明 areg 把 13 个虚拟变量计入 K（K=16）而 reghdfe 记 K=3，闭式复算三方都对得上 1e-15。这条 fail 是**预期**的。 |
+| `7c areg absorb(gid) vce(cluster gid) vs RegressHighDimFixedEffects` | **与本组无关，且是防误判项**：`retest/REPORT.md` §2.1 的"防误判提示"已说明 areg 把 13 个虚拟变量计入 K（K=16）而 reghdfe 记 K=3，闭式复算三方都对得上 1e-15。这条 fail 是**预期**的。 |
 
 ## 需要 Lead 裁决的
 

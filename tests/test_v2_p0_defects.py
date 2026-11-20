@@ -70,7 +70,7 @@ def test_panel_clustered_se_matches_stata(lin, as_frame: bool) -> None:
     """The (n,1) form is what linearmodels accepts; it used to be refused outright."""
 
     clusters = lin[["province"]].values if as_frame else lin["province"].values
-    model = ws.PanelOLS.from_formula(PANEL_FORMULA, lin, entity="province", time="year")
+    model = ws.PanelRegressFE.from_formula(PANEL_FORMULA, lin, entity="province", time="year")
     fitted = model.fit(
         entity_effects=True, cov_type="cluster", cov_kwds={"clusters": clusters}
     )
@@ -85,7 +85,7 @@ def test_panel_clustered_se_matches_stata(lin, as_frame: bool) -> None:
 def test_panel_robust_se_also_matches_stata(lin) -> None:
     """``cov_type="robust"`` was reported as broken too; it was not, and still works."""
 
-    model = ws.PanelOLS.from_formula(PANEL_FORMULA, lin, entity="province", time="year")
+    model = ws.PanelRegressFE.from_formula(PANEL_FORMULA, lin, entity="province", time="year")
     fitted = model.fit(entity_effects=True, cov_type="robust")
     names = [str(name) for name in fitted.params.index]
     got = float(fitted.bse.iloc[names.index("ltlan")])
@@ -96,18 +96,18 @@ def test_panel_robust_se_also_matches_stata(lin) -> None:
 def test_ovtest_skips_indicators(grilic) -> None:
     """Each dummy used to count as two test columns; Stata leaves indicators out entirely."""
 
-    with_dummies = ws.OLS.from_formula(
+    with_dummies = ws.Regress.from_formula(
         "lnw ~ s + expr + tenure + rns + smsa", grilic
     ).fit()
-    rendered = str(with_dummies.estat_ovtest(rhs=True))
+    rendered = str(with_dummies.estat_omitted_variables_test(rhs=True))
     assert "F(9, 743) =   2.03" in rendered, rendered
 
 
 def test_ovtest_all_continuous_is_unchanged(grilic) -> None:
     """The guard for the fix not over-reaching: continuous-only models must not move."""
 
-    continuous = ws.OLS.from_formula("lnw ~ s + expr + tenure", grilic).fit()
-    rendered = str(continuous.estat_ovtest(rhs=True))
+    continuous = ws.Regress.from_formula("lnw ~ s + expr + tenure", grilic).fit()
+    rendered = str(continuous.estat_omitted_variables_test(rhs=True))
     assert "F(9, 745) =   1.70" in rendered, rendered
 
 

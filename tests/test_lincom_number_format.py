@@ -55,7 +55,7 @@ def grilic():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return str(ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit().lincom("s"))
+    return str(ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit().lincom("s"))
 
 
 @pytest.fixture(scope="module")
@@ -66,7 +66,7 @@ def cobb():
         )
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("cobb_douglas.dta is not available")
-    return str(ws.OLS.from_formula("y ~ k + l", frame).fit().lincom("k + l"))
+    return str(ws.Regress.from_formula("y ~ k + l", frame).fit().lincom("k + l"))
 
 
 def test_the_grilic_block_matches(grilic) -> None:

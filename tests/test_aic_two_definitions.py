@@ -82,7 +82,7 @@ def test_the_ml_family_uses_the_textbook_formula(frame, name: str) -> None:
 def test_regress_does_not_agree_with_estat_ic(frame) -> None:
     """Deliberate: its ``e(aic)`` is on the Gaussian-deviance scale."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     table = fitted.estat_ic()
     e = fitted.e
 
@@ -96,7 +96,7 @@ def test_the_regress_gap_is_the_omitted_constant(frame) -> None:
     likelihood constant rather than from an arithmetic mistake on one side.
     """
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     e = fitted.e
     n = float(e["N"])
 
@@ -108,7 +108,7 @@ def test_the_regress_gap_is_the_omitted_constant(frame) -> None:
 def test_regress_estat_ic_follows_the_documented_formula(frame) -> None:
     """``estimates.ado:985-1002``: ``AIC = -2 e(ll) + 2 e(df)``."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     e = fitted.e
     table = fitted.estat_ic()
 
@@ -125,7 +125,7 @@ def test_the_families_disagree(frame) -> None:
         float(ML_BUILDERS["logit"](frame).e["aic"])
         - float(ML_BUILDERS["logit"](frame).estat_ic().aic)
     ) < 1e-6
-    ols_fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    ols_fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     ols_agrees = abs(float(ols_fitted.e["aic"]) - float(ols_fitted.estat_ic().aic)) < 1e-6
 
     assert ml_agrees is True
@@ -135,7 +135,7 @@ def test_the_families_disagree(frame) -> None:
 # ------------------------------------------------------------ nothing regressed
 def test_every_estimator_still_stores_both_criteria(frame) -> None:
     estimators = dict(ML_BUILDERS)
-    estimators["regress"] = lambda frame: ws.OLS.from_formula("y ~ x", frame).fit()
+    estimators["regress"] = lambda frame: ws.Regress.from_formula("y ~ x", frame).fit()
 
     for name, builder in estimators.items():
         e = builder(frame).e

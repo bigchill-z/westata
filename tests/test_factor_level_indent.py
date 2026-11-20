@@ -36,7 +36,7 @@ def factor_fit():
         frame = pd.read_stata(DATA).dropna(subset=["mpg", "weight", "foreign", "rep78"])
     except FileNotFoundError:  # pragma: no cover - the file ships with the repo
         pytest.skip("auto.dta is missing")
-    return ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame.reset_index(drop=True)).fit()
+    return ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame.reset_index(drop=True)).fit()
 
 
 def test_the_level_label_is_indented_not_right_aligned(factor_fit) -> None:

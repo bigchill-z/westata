@@ -44,9 +44,9 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import UnsupportedError
-from westata.postestimation.lincom import LincomResult, run_lincom
+from westata.postestimation.lincom import LincomResults, run_lincom
 
-__all__ = ["contrast", "pwcompare"]
+__all__ = ["contrast", "pairwise_compare"]
 
 #: ``C(g, Treatment(reference='a'))[T.b]`` / ``g[T.b]`` -> base + level.  The
 #: greedy ``.+?`` plus the anchored ``]`` rejects interaction columns such as
@@ -511,7 +511,7 @@ def _run(
     comparisons: list[tuple[str, str, np.ndarray]],
     *,
     level: float,
-) -> list[LincomResult]:
+) -> list[LincomResults]:
     params = np.asarray(result.params, dtype=float).reshape(-1)
     cov = np.asarray(result.cov_params(), dtype=float)
     dist = "z" if str(getattr(result, "dist", "t")) == "z" else "t"
@@ -540,7 +540,7 @@ def contrast(
     *,
     level: float = 0.95,
     nowald: bool = False,
-) -> list[LincomResult]:
+) -> list[LincomResults]:
     """ANOVA-style contrasts of a factor variable's estimated means.
 
     Parameters
@@ -704,7 +704,7 @@ class PwCompareTable(list):
 
     def __init__(
         self,
-        rows: Sequence[LincomResult],
+        rows: Sequence[LincomResults],
         *,
         term: str = "",
         margin_label: str = "asbalanced",
@@ -765,7 +765,7 @@ class PwCompareTable(list):
         return "\n".join(lines)
 
 
-def pwcompare(
+def pairwise_compare(
     result: Any,
     term: str,
     *,

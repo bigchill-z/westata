@@ -54,7 +54,7 @@ def frame():
 
 # ------------------------------------------------------------------ the values
 def test_regress_calls_itself_linear_regression(frame) -> None:
-    assert ws.OLS.from_formula("y ~ x", frame).fit().e["title"] == "Linear regression"
+    assert ws.Regress.from_formula("y ~ x", frame).fit().e["title"] == "Linear regression"
 
 
 def test_tobit_calls_itself_tobit_regression(frame) -> None:
@@ -86,7 +86,7 @@ def test_qreg_publishes_NO_title(frame) -> None:
     distinction the qreg surface file documents for ``mss``/``rss``/``ll``.
     """
 
-    fitted = ws.QuantileRegression.from_formula("y ~ x", frame).fit()
+    fitted = ws.QuantileRegress.from_formula("y ~ x", frame).fit()
 
     assert "title" not in fitted.e
 
@@ -145,7 +145,7 @@ def test_the_titles_are_distinct(frame) -> None:
     """Guard: a shared constant would satisfy every per-command test above."""
 
     titles = {
-        ws.OLS.from_formula("y ~ x", frame).fit().e["title"],
+        ws.Regress.from_formula("y ~ x", frame).fit().e["title"],
         ws.Tobit.from_formula("yc ~ x", frame, lower=0).fit().e["title"],
         ws.Logit.from_formula("yb ~ x", frame).fit().e["title"],
         ws.Probit.from_formula("yb ~ x", frame).fit().e["title"],

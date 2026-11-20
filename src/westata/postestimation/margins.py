@@ -50,7 +50,7 @@ from westata.results.summary import _stata_number
 
 __all__ = [
     "DEFAULT_PREDICT",
-    "MarginsResult",
+    "MarginsResults",
     "MarginsTable",
     "default_predict_kind",
     "margins",
@@ -120,7 +120,7 @@ def _margin_rate(value: float, decimals: int, end_column: int, used: int) -> str
 
 
 @dataclass
-class MarginsResult:
+class MarginsResults:
     """One row of a ``margins`` table plus its covariance."""
 
     label: str
@@ -306,7 +306,7 @@ class MarginsTable(list):
         return "\n".join(lines)
 
     @staticmethod
-    def _header(first: MarginsResult) -> str:
+    def _header(first: MarginsResults) -> str:
         """The two-line header, whose only variable parts are the column and stat labels."""
 
         column = first.column_label or "dy/dx"
@@ -317,7 +317,7 @@ class MarginsTable(list):
         )
 
     @staticmethod
-    def _row(row: MarginsResult) -> str:
+    def _row(row: MarginsResults) -> str:
         """One data line, every value ending at its measured column."""
 
         # Stata labels a single predictive margin "_cons"; the upstream row calls it
@@ -336,7 +336,7 @@ class MarginsTable(list):
 
 
 def _finish_margins(
-    rows: list[MarginsResult],
+    rows: list[MarginsResults],
     result: Any,
     *,
     variables: Sequence[str] = (),
@@ -751,7 +751,7 @@ def _row_from_statistic(
     df_resid: float,
     level: float,
     prediction: str,
-) -> MarginsResult:
+) -> MarginsResults:
     from scipy import stats
 
     variance = float(gradient @ cov @ gradient)
@@ -767,7 +767,7 @@ def _row_from_statistic(
         statistic = estimate / std_err if std_err > 0 else float("nan")
         pvalue = float(2.0 * stats.t.sf(abs(statistic), df_resid))
 
-    return MarginsResult(
+    return MarginsResults(
         label=label,
         estimate=estimate,
         std_err=std_err,
@@ -823,7 +823,7 @@ def margins(
     predict_kind: str | None = None,
     factor_vars: Sequence[str] | None = None,
     outcome: int | None = None,
-) -> list[MarginsResult] | MarginsResult:
+) -> list[MarginsResults] | MarginsResults:
     """Compute marginal effects or predictive margins.
 
     Parameters
@@ -947,7 +947,7 @@ def margins(
     # they cannot be reused across scenarios.
     scenarios = _at_scenarios(at) if at else [{}]
     if len(scenarios) > 1:
-        collected: list[MarginsResult] = []
+        collected: list[MarginsResults] = []
         for scenario in scenarios:
             produced = margins(
                 result,
@@ -1261,13 +1261,13 @@ def _marginal_effects(
     predict_kind: str,
     outcome: int | None = None,
     elasticity_form: str | None = None,
-) -> list[MarginsResult]:
+) -> list[MarginsResults]:
     dist = "z" if getattr(result, "dist", "t") == "z" else "t"
     df_resid = float(result.df_resid)
     cov = result.cov_params()
 
     groups = _groups(over, exog.shape[0], getattr(result, "model_data", None))
-    rows: list[MarginsResult] = []
+    rows: list[MarginsResults] = []
 
     def _scale(
         name: str,
@@ -1531,13 +1531,13 @@ def _predictive_margins(
     level: float,
     predict_kind: str,
     outcome: int | None = None,
-) -> list[MarginsResult]:
+) -> list[MarginsResults]:
     dist = "z" if getattr(result, "dist", "t") == "z" else "t"
     df_resid = float(result.df_resid)
     cov = result.cov_params()
 
     groups = _groups(over, exog.shape[0], getattr(result, "model_data", None))
-    rows: list[MarginsResult] = []
+    rows: list[MarginsResults] = []
 
     if groups is None:
         estimate, gradient = _statistic_and_gradient(

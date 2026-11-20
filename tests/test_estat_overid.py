@@ -52,7 +52,7 @@ def test_sargan_matches_the_all_instruments_auxiliary(overidentified) -> None:
     frame, result = overidentified
     expected, _, _ = _sargan_by_hand(frame, result)
 
-    assert result.estat_overid().statistic == pytest.approx(expected, rel=1e-10)
+    assert result.estat_overidentification().statistic == pytest.approx(expected, rel=1e-10)
 
 
 def test_sargan_is_not_the_excluded_instruments_only_version(overidentified) -> None:
@@ -70,7 +70,7 @@ def test_sargan_is_not_the_excluded_instruments_only_version(overidentified) -> 
     aux = resid - excluded @ beta
     wrong = n * (1.0 - float(aux @ aux) / rss_main)
 
-    assert not np.isclose(result.estat_overid().statistic, wrong, rtol=1e-6)
+    assert not np.isclose(result.estat_overidentification().statistic, wrong, rtol=1e-6)
 
 
 def test_sargan_equals_n_times_r2_of_the_auxiliary(overidentified) -> None:
@@ -92,7 +92,7 @@ def test_sargan_equals_n_times_r2_of_the_auxiliary(overidentified) -> None:
     tss = float((resid - resid.mean()) @ (resid - resid.mean()))
     r2 = 1.0 - float(aux @ aux) / tss
 
-    assert result.estat_overid().statistic == pytest.approx(n * r2, rel=1e-10)
+    assert result.estat_overidentification().statistic == pytest.approx(n * r2, rel=1e-10)
 
 
 def test_basmann_matches_stata(overidentified) -> None:
@@ -117,7 +117,7 @@ def test_basmann_matches_stata(overidentified) -> None:
     """
 
     frame, result = overidentified
-    rendered = result.estat_overid()
+    rendered = result.estat_overidentification()
     _, _, n = _sargan_by_hand(frame, result)
 
     # Recover k from the reported numbers: basmann = sargan*(N-k)/(N-sargan).
@@ -133,11 +133,11 @@ def test_basmann_matches_stata(overidentified) -> None:
 def test_degrees_of_freedom_are_the_overidentifying_restrictions(overidentified) -> None:
     """2 excluded instruments for 1 endogenous regressor -> 1 restriction."""
 
-    assert overidentified[1].estat_overid().df == 1.0
+    assert overidentified[1].estat_overidentification().df == 1.0
 
 
 def test_pvalue_is_upper_tail_chi_square(overidentified) -> None:
-    rendered = overidentified[1].estat_overid()
+    rendered = overidentified[1].estat_overidentification()
 
     assert rendered.pvalue == pytest.approx(
         float(stats.chi2.sf(rendered.statistic, rendered.df)), rel=1e-12
@@ -150,7 +150,7 @@ def test_gmm_reports_hansens_j_not_sargan(overidentified) -> None:
         "mpg ~ weight + [length ~ displacement + price]", frame
     ).fit()
 
-    rendered = gmm.estat_overid()
+    rendered = gmm.estat_overidentification()
 
     assert rendered.test == "Hansen J"
     assert rendered.statistic == pytest.approx(float(gmm.e["J"]), rel=1e-14)
@@ -164,7 +164,7 @@ def test_exactly_identified_model_is_refused(overidentified) -> None:
     ).fit()
 
     with pytest.raises(ValueError, match="exactly identified"):
-        just.estat_overid()
+        just.estat_overidentification()
 
 
 def test_robust_vce_switches_to_the_score_test(overidentified) -> None:
@@ -180,7 +180,7 @@ def test_robust_vce_switches_to_the_score_test(overidentified) -> None:
         "mpg ~ weight + [length ~ displacement + price]", frame
     ).fit(cov_type="HC0")
 
-    rendered = robust.estat_overid()
+    rendered = robust.estat_overidentification()
 
     assert rendered.test == "Wooldridge score"
     assert rendered.basmann is None
@@ -188,10 +188,10 @@ def test_robust_vce_switches_to_the_score_test(overidentified) -> None:
 
 def test_non_iv_results_are_refused(overidentified) -> None:
     frame, _ = overidentified
-    ols = ws.OLS.from_formula("mpg ~ weight", frame).fit()
+    ols = ws.Regress.from_formula("mpg ~ weight", frame).fit()
 
     with pytest.raises(NotImplementedError, match="instrumental-variables"):
-        ols.estat_overid()
+        ols.estat_overidentification()
 
 
 def test_df_counts_excluded_instruments_minus_endogenous(overidentified) -> None:
@@ -208,13 +208,13 @@ def test_df_counts_excluded_instruments_minus_endogenous(overidentified) -> None
         frame,
     ).fit()
 
-    rendered = fit.estat_overid()
+    rendered = fit.estat_overidentification()
 
     assert rendered.df == 2.0
 
 
 def test_to_dict_uses_stata_r_names(overidentified) -> None:
-    payload = overidentified[1].estat_overid().to_dict()
+    payload = overidentified[1].estat_overidentification().to_dict()
 
     assert set(payload) == {"sargan", "p_sargan", "basmann", "p_basmann"}
 
@@ -225,13 +225,13 @@ def test_gmm_to_dict_uses_hansen_names(overidentified) -> None:
         "mpg ~ weight + [length ~ displacement + price]", frame
     ).fit()
 
-    payload = gmm.estat_overid().to_dict()
+    payload = gmm.estat_overidentification().to_dict()
 
     assert set(payload) == {"HansenJ", "p_HansenJ"}
 
 
 def test_output_names_the_test(overidentified) -> None:
-    text = str(overidentified[1].estat_overid())
+    text = str(overidentified[1].estat_overidentification())
 
     assert "overidentifying restrictions" in text
     assert "Sargan" in text

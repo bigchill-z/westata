@@ -30,7 +30,7 @@ from westata.postestimation.ic import estat_ic
 @pytest.fixture()
 def linear_fit():
     df = pd.read_stata("tests/data/auto.dta")
-    return ws.OLS.from_formula("mpg ~ weight + length", df).fit()
+    return ws.Regress.from_formula("mpg ~ weight + length", df).fit()
 
 
 @pytest.fixture()
@@ -137,7 +137,7 @@ def test_aicc_is_nan_when_df_too_large() -> None:
     """``N - df - 1 <= 0`` leaves AICc undefined rather than inventing a value."""
 
     df = pd.read_stata("tests/data/auto.dta")
-    fit = ws.OLS.from_formula("mpg ~ weight", df).fit()
+    fit = ws.Regress.from_formula("mpg ~ weight", df).fit()
     ic = fit.estat_ic(n=3, df=3)  # N - df - 1 == -1
 
     assert np.isnan(ic.aicc)

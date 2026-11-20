@@ -47,10 +47,10 @@ def panel_fits():
             "year": np.tile(np.arange(periods), entities),
         }
     )
-    random_effects = ws.RandomEffects.from_formula(
+    random_effects = ws.PanelRegressRE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
-    fixed_effects = ws.PanelOLS.from_formula(
+    fixed_effects = ws.PanelRegressFE.from_formula(
         "y ~ x1", frame, entity="firm", time="year"
     ).fit()
     return frame, random_effects, fixed_effects
@@ -101,7 +101,7 @@ def test_mundlak_works(panel_fits) -> None:
 # ------------------------------------------------------------------- the refusals
 @pytest.mark.parametrize(
     "method",
-    ["estat_hettest", "estat_ovtest", "estat_imtest", "estat_vif", "estat_gof"],
+    ["estat_heteroskedasticity_test", "estat_omitted_variables_test", "estat_information_matrix_test", "estat_vif", "estat_gof"],
 )
 def test_commands_outside_the_list_are_refused(panel_fits, method) -> None:
     """``xtreg_estat.ado:22-25`` rejects anything not in the five.
@@ -118,7 +118,7 @@ def test_the_refusal_is_explained_not_bare(panel_fits) -> None:
     """``estat_hettest`` names the estimator it is unavailable for."""
 
     with pytest.raises(ValueError) as caught:
-        panel_fits[1].estat_hettest()
+        panel_fits[1].estat_heteroskedasticity_test()
 
     message = str(caught.value).lower()
     assert "xtreg" in message or "panel" in message or "not available" in message
@@ -144,7 +144,7 @@ def test_mundlak_is_not_offered_for_a_plain_ols_fit() -> None:
 
     rng = np.random.default_rng(962)
     frame = pd.DataFrame({"y": rng.normal(size=100), "x": rng.normal(size=100)})
-    plain = ws.OLS.from_formula("y ~ x", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x", frame).fit()
 
     with pytest.raises(NotImplementedError):
         plain.estat_mundlak(entity="x")

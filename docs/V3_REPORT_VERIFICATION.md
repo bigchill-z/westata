@@ -14,13 +14,13 @@
 | 条目 | 报告内容 | 核实 | 处理 |
 |---|---|---|---|
 | **N14** | `prais, corc` 标准误 4.7% 偏差 | ✅ 成立：系数与 rho 精确，`se(price)` `.8491466` vs `.8108501` | **已修复**：最终方差用了错误的变换（PW 而非 corc），且 corc 的残差自由度应少 1 |
-| **P0-2** | `rdrobust` 缺自动带宽 | ✅ 成立：`bandwidth=None` 抛 `UnsupportedError` | **部分**：三种组合规则（mserd/msesum/msetwo）已从 `rdbwselect.ado` 精确转写；`C[1..3]` 在 `lrdrobust.mlib` 字节码中，不可得 |
+| **P0-2** | `rd_robust` 缺自动带宽 | ✅ 成立：`bandwidth=None` 抛 `UnsupportedError` | **部分**：三种组合规则（mserd/msesum/msetwo）已从 `rdbwselect.ado` 精确转写；`C[1..3]` 在 `lrdrobust.mlib` 字节码中，不可得 |
 
 ## 二、报告不成立（当前代码已正确）
 
 | 条目 | 报告内容 | 实测结果 |
 |---|---|---|
-| **P0-1** | `PanelOLS.fit(cov_type=)` 在 linearmodels 7.x 下全部 `ValueError` | ❌ **不成立**。linearmodels **7.1** 下 `robust` / `HC1` / `cluster` 三种写法**全部成功**，且数值不同（`0.065784` vs `0.116169`），证明确实在计算 |
+| **P0-1** | `PanelRegressFE.fit(cov_type=)` 在 linearmodels 7.x 下全部 `ValueError` | ❌ **不成立**。linearmodels **7.1** 下 `robust` / `HC1` / `cluster` 三种写法**全部成功**，且数值不同（`0.065784` vs `0.116169`），证明确实在计算 |
 | **C13-08** | `reg airpassengers i.m` 整型因子未展开，`F(0,143)=0.00`，只有常数项 | ❌ **不成立**。`C(m)` 正常展开为 12 个参数，`F=1.4245`（Stata 1.42）、`R²=0.1061`（Stata 0.1061），全部精确 |
 
 ## 三、已记录但仍未完成
@@ -28,7 +28,7 @@
 | 条目 | 状态 | 原因 |
 |---|---|---|
 | `teffects psmatch` 推断量 | ATET 精确（`2639.8646` vs `2639.865`），`se`/`z`/`p`/CI 为 NaN | 需要完整的 Abadie-Imbens 影响函数。模块 docstring 已排除两种简化路线：直接对处理效应取样本方差会小 1.2948 倍；该比值既非 `n/n_t` 也非 `(n-1)/(n_t-1)`，说明携带一阶推断函数修正 |
-| `rdrobust` 自动带宽 | 组合规则已完成 | `C[1..3]` 在 Mata 字节码中 |
+| `rd_robust` 自动带宽 | 组合规则已完成 | `C[1..3]` 在 Mata 字节码中 |
 | `synth` / `synth2` | 未实现 | 核心在 Mata 字节码（A 类：信息不可得）|
 
 ## 四、`nnmatch` 标准误的诚实标注
@@ -141,11 +141,11 @@ olog 后，两边都是 **19 行且逐行相同（1.0000）**。
 
 ### 核实后不成立
 
-**§4 (2)「7 个 `from_formula` 首参不是公式字符串」—— 对 `Sureg` 是合理设计。**
+**§4 (2)「7 个 `from_formula` 首参不是公式字符串」—— 对 `SeeminglyUnrelatedRegress` 是合理设计。**
 
-`Sureg.from_formula(['lnw ~ s + expr', 'iq ~ s + expr'], d)` 接受**公式列表**，
+`SeeminglyUnrelatedRegress.from_formula(['lnw ~ s + expr', 'iq ~ s + expr'], d)` 接受**公式列表**，
 因为多方程系统本来就需要多个公式，单个 `formula` 无法表达。其余 6 个（`IPW`/`AIPW`/
-`RegressionAdjustment`/`NearestNeighbourMatching`/`Didregress`/`Xtdidregress`）是
+`RegressionAdjustment`/`NearestNeighbourMatching`/`DIDRegress`/`PanelDIDRegress`）是
 `(outcome, treatment, data, ...)` 形态，对应 Stata 的 `teffects (y) (t) (x)` 双公式语法——
 单公式同样无法表达。
 
@@ -210,7 +210,7 @@ westata: _cons |   1.107758   .0782241     1.45   0.147     .96457
 但审计顺带发现一个真实的易用性缺陷（第 30 轮已修）：
 
 ```python
-Didregress.from_formula(...).n_used     # 返回 0，即使数据有 2000 个完整行
+DIDRegress.from_formula(...).n_used     # 返回 0，即使数据有 2000 个完整行
 ```
 
 样本计数在 `__init__` 里置 0、只在 `fit()` 时填充。现在构造时即计算，且与 `fit` 后一致
@@ -218,7 +218,7 @@ Didregress.from_formula(...).n_used     # 返回 0，即使数据有 2000 个完
 
 ### 一条通用教训（已完成第 8 条的第 4 次验证）
 
-写测试参考值时**必须实时捕获**。我的第一版 OLS 全精度 fixture 是编造的，
+写测试参考值时**必须实时捕获**。我的第一版 Regress 全精度 fixture 是编造的，
 测试立即失败。`error.md` 第 8 条至此已命中四次。
 
 ## 六、最终验证

@@ -66,7 +66,7 @@ def stable():
     model = ws.VAR(
         frame[["dinf", "unem"]].to_numpy(float), lags=2, names=["dinf", "unem"]
     )
-    return ws.varstable(model.fit())
+    return ws.var_stable(model.fit())
 
 
 def test_the_stability_block_matches_stata(stable) -> None:

@@ -55,7 +55,7 @@ def _present(macros: dict, key: str) -> bool:
 
 
 # ------------------------------------------------------------ the sigma family
-@pytest.mark.parametrize("name", ["RandomEffects", "PanelOLS"])
+@pytest.mark.parametrize("name", ["PanelRegressRE", "PanelRegressFE"])
 def test_fe_and_re_store_the_sigma_family(frame, name) -> None:
     macros = _e(frame, name)
 
@@ -63,7 +63,7 @@ def test_fe_and_re_store_the_sigma_family(frame, name) -> None:
         assert _present(macros, key), (name, key)
 
 
-@pytest.mark.parametrize("name", ["BetweenOLS", "FirstDifferenceOLS"])
+@pytest.mark.parametrize("name", ["PanelRegressBE", "PanelRegressFD"])
 def test_be_and_fd_store_no_sigma_family(frame, name) -> None:
     """``be`` runs OLS on entity means and ``fd`` differences the effect away.
 
@@ -80,8 +80,8 @@ def test_be_and_fd_store_no_sigma_family(frame, name) -> None:
 def test_only_re_stores_theta(frame) -> None:
     """``xtreg_re.ado:265-266``: theta is the quasi-demeaning factor, RE only."""
 
-    assert _present(_e(frame, "RandomEffects"), "theta")
-    for name in ("PanelOLS", "BetweenOLS", "FirstDifferenceOLS"):
+    assert _present(_e(frame, "PanelRegressRE"), "theta")
+    for name in ("PanelRegressFE", "PanelRegressBE", "PanelRegressFD"):
         assert not _present(_e(frame, name), "theta"), name
 
 
@@ -89,7 +89,7 @@ def test_only_re_stores_theta(frame) -> None:
 def test_fe_stores_mss_rss_and_tss(frame) -> None:
     """``xtreg.sthlp:1068-1144`` lists all three."""
 
-    macros = _e(frame, "PanelOLS")
+    macros = _e(frame, "PanelRegressFE")
 
     for key in ("mss", "rss", "tss"):
         assert _present(macros, key), key
@@ -98,7 +98,7 @@ def test_fe_stores_mss_rss_and_tss(frame) -> None:
 def test_be_stores_mss_and_rss_but_not_tss(frame) -> None:
     """``xtreg.sthlp:1014-1067`` has ``mss``/``rss`` and no ``tss``."""
 
-    macros = _e(frame, "BetweenOLS")
+    macros = _e(frame, "PanelRegressBE")
 
     assert _present(macros, "mss")
     assert _present(macros, "rss")
@@ -114,7 +114,7 @@ def test_re_stores_no_sums_of_squares_at_all(frame) -> None:
     to e(ll): `estat ic` after `xtreg, re` raises r(321) because there is no likelihood stored.
     """
 
-    macros = _e(frame, "RandomEffects")
+    macros = _e(frame, "PanelRegressRE")
 
     for key in ("rss", "mss", "tss", "ll"):
         assert not _present(macros, key), key
@@ -132,17 +132,17 @@ def test_stores_mss_means_mss_WITHOUT_tss(frame) -> None:
     ``fe`` look wrong when it is right.
     """
 
-    assert ws.BetweenOLS._stores_mss is True
-    assert ws.BetweenOLS._stores_totals is False
-    assert ws.PanelOLS._stores_mss is False
-    assert ws.PanelOLS._stores_totals is True
+    assert ws.PanelRegressBE._stores_mss is True
+    assert ws.PanelRegressBE._stores_totals is False
+    assert ws.PanelRegressFE._stores_mss is False
+    assert ws.PanelRegressFE._stores_totals is True
 
 
 def test_both_routes_produce_mss(frame) -> None:
     """Whatever the flag means, both estimators DO store ``mss``."""
 
-    assert _present(_e(frame, "BetweenOLS"), "mss")
-    assert _present(_e(frame, "PanelOLS"), "mss")
+    assert _present(_e(frame, "PanelRegressBE"), "mss")
+    assert _present(_e(frame, "PanelRegressFE"), "mss")
 
 
 def test_the_flag_matrix_is_pinned() -> None:
@@ -153,7 +153,7 @@ def test_the_flag_matrix_is_pinned() -> None:
     """
 
     expected = {
-        "PanelOLS": {
+        "PanelRegressFE": {
             "_stores_totals": True,
             "_stores_absorbed": True,
             "_estimates_on_entity_means": False,
@@ -162,7 +162,7 @@ def test_the_flag_matrix_is_pinned() -> None:
             "_stores_sigma": True,
             "_stores_wald_chi2": False,
         },
-        "RandomEffects": {
+        "PanelRegressRE": {
             "_stores_totals": False,
             "_stores_absorbed": False,
             "_estimates_on_entity_means": False,
@@ -171,7 +171,7 @@ def test_the_flag_matrix_is_pinned() -> None:
             "_stores_sigma": True,
             "_stores_wald_chi2": True,
         },
-        "BetweenOLS": {
+        "PanelRegressBE": {
             "_stores_totals": False,
             "_stores_absorbed": False,
             "_estimates_on_entity_means": True,
@@ -180,7 +180,7 @@ def test_the_flag_matrix_is_pinned() -> None:
             "_stores_sigma": False,
             "_stores_wald_chi2": False,
         },
-        "FirstDifferenceOLS": {
+        "PanelRegressFD": {
             "_stores_totals": False,
             "_stores_absorbed": False,
             "_estimates_on_entity_means": False,

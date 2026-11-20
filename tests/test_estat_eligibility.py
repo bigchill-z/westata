@@ -59,7 +59,7 @@ def panel_frame():
 
 # --------------------------------------------------------------- xtreg surface
 XTREG_ALLOWED = ("estat_summarize", "estat_ic", "estat_vce")
-XTREG_REFUSED = ("estat_hettest", "estat_ovtest")
+XTREG_REFUSED = ("estat_heteroskedasticity_test", "estat_omitted_variables_test")
 
 
 @pytest.mark.parametrize("estimator", ["fe", "re"])
@@ -70,11 +70,11 @@ def test_xtreg_allows_exactly_what_the_dispatch_table_allows(
     rest are "estat <sub> not valid"."""
 
     if estimator == "fe":
-        result = ws.PanelOLS.from_formula(
+        result = ws.PanelRegressFE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
     else:
-        result = ws.RandomEffects.from_formula(
+        result = ws.PanelRegressRE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
 
@@ -109,7 +109,7 @@ def test_logit_allows_its_documented_subcommands(frame) -> None:
         assert getattr(result, method)() is not None, method
 
 
-@pytest.mark.parametrize("method", ["estat_hettest", "estat_ovtest", "estat_vif"])
+@pytest.mark.parametrize("method", ["estat_heteroskedasticity_test", "estat_omitted_variables_test", "estat_vif"])
 def test_logit_refuses_the_tests_it_does_not_dispatch(frame, method) -> None:
     """Only classification/gof/auc are logit-specific; hettest/ovtest/vif are not
     among them and are not estat_default subcommands either."""
@@ -145,15 +145,15 @@ def test_logit_gof_is_now_implemented(frame) -> None:
 def test_rreg_allows_no_estat_subcommands(frame) -> None:
     """``rreg.ado:214`` clears ``e(estat_cmd)`` outright."""
 
-    result = ws.RobustRegression.from_formula("y ~ x1", frame).fit()
+    result = ws.RobustRegress.from_formula("y ~ x1", frame).fit()
 
-    for method in ("estat_hettest", "estat_ovtest"):
+    for method in ("estat_heteroskedasticity_test", "estat_omitted_variables_test"):
         with pytest.raises(ValueError, match="rreg"):
             getattr(result, method)()
 
 
 # ----------------------------------------------------------------- IV surface
-IV_ALLOWED = ("estat_firststage", "estat_endogenous")
+IV_ALLOWED = ("estat_first_stage", "estat_endogenous")
 IV_REFUSED = ("estat_vif",)
 
 

@@ -44,10 +44,10 @@ def _frame() -> pd.DataFrame:
 
 
 def _lines(formula: str, **kwargs) -> list[str]:
-    fitted = ws.OLS.from_formula(formula, _frame()).fit()
+    fitted = ws.Regress.from_formula(formula, _frame()).fit()
     return [
         line
-        for line in str(ws.estat_ovtest(fitted, **kwargs)).splitlines()
+        for line in str(ws.estat_omitted_variables_test(fitted, **kwargs)).splitlines()
     ]
 
 
@@ -63,7 +63,7 @@ def test_the_notes_name_both_dropped_columns() -> None:
 def test_the_regressor_precedes_the_power() -> None:
     """`ovtest.ado:310` builds the list from e(b) order, so the user column comes first."""
 
-    result = ws.estat_ovtest(ws.OLS.from_formula(DUPLICATE, _frame()).fit(), rhs=True)
+    result = ws.estat_omitted_variables_test(ws.Regress.from_formula(DUPLICATE, _frame()).fit(), rhs=True)
     assert result.dropped == ("expr2", "expr2^2"), result.dropped
 
 
@@ -104,5 +104,5 @@ def test_the_default_path_never_notes_anything() -> None:
 
 
 def test_the_dropped_attribute_is_empty_on_the_default_path() -> None:
-    result = ws.estat_ovtest(ws.OLS.from_formula(DUPLICATE, _frame()).fit())
+    result = ws.estat_omitted_variables_test(ws.Regress.from_formula(DUPLICATE, _frame()).fit())
     assert result.dropped == ()

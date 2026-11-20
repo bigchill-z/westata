@@ -89,5 +89,5 @@ def test_using_cov_params_would_be_wrong(fitted) -> None:
 
 
 def test_vargranger_prints_the_same_number(fitted) -> None:
-    rendered = str(ws.vargranger(fitted))
+    rendered = str(ws.var_granger(fitted))
     assert "24.124" in rendered or "24.12" in rendered

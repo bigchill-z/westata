@@ -61,7 +61,7 @@ def test_xtset_balanced_is_byte_identical(balanced) -> None:
         " Time variable: year, 1970 to 1986\n"
         "         Delta: 1 unit"
     )
-    assert str(ws.xtset(balanced, entity="pid", time="year")) == expected
+    assert str(ws.panel_set(balanced, entity="pid", time="year")) == expected
 
 
 def test_xtset_unbalanced_is_byte_identical(unbalanced) -> None:
@@ -71,7 +71,7 @@ def test_xtset_unbalanced_is_byte_identical(unbalanced) -> None:
         " Time variable: t, 2001 to 2005\n"
         "         Delta: 1 unit"
     )
-    assert str(ws.xtset(unbalanced, entity="id", time="t")) == expected
+    assert str(ws.panel_set(unbalanced, entity="id", time="t")) == expected
 
 
 def test_xtset_reports_a_gap_in_the_middle() -> None:
@@ -80,26 +80,26 @@ def test_xtset_reports_a_gap_in_the_middle() -> None:
     frame = pd.DataFrame(
         [{"id": 1, "t": t} for t in (1, 2, 4, 5)] + [{"id": 2, "t": t} for t in (1, 2, 3, 4, 5)]
     )
-    rendered = str(ws.xtset(frame, entity="id", time="t"))
+    rendered = str(ws.panel_set(frame, entity="id", time="t"))
     assert "1 to 5, but with a gap" in rendered
     assert "unbalanced" in rendered
 
 
 def test_xtset_rejects_a_missing_column(balanced) -> None:
     with pytest.raises(ws.ConsistencyError, match="not found in data"):
-        ws.xtset(balanced, entity="nope", time="year")
+        ws.panel_set(balanced, entity="nope", time="year")
 
 
 def test_xtset_rejects_duplicate_keys(balanced) -> None:
     with pytest.raises(ws.ConsistencyError, match="does not uniquely identify"):
-        ws.xtset(balanced.assign(pid=1), entity="pid", time="year")
+        ws.panel_set(balanced.assign(pid=1), entity="pid", time="year")
 
 
 def test_xtset_delta_is_the_modal_spacing() -> None:
     """Every second year gives Delta: 2 units."""
 
     frame = pd.DataFrame([{"id": 1, "t": t} for t in (2000, 2002, 2004)])
-    assert "Delta: 2 units" in str(ws.xtset(frame, entity="id", time="t"))
+    assert "Delta: 2 units" in str(ws.panel_set(frame, entity="id", time="t"))
 
 
 # ---------------------------------------------------------------- xtdes
@@ -121,7 +121,7 @@ def test_xtdes_balanced_is_byte_identical(balanced) -> None:
         " ---------------------------+-------------------",
         "       48    100.00         |  XXXXXXXXXXXXXXXXX",
     ]
-    assert str(ws.xtdes(balanced, entity="pid", time="year")).splitlines() == expected
+    assert str(ws.panel_describe(balanced, entity="pid", time="year")).splitlines() == expected
 
 
 def test_xtdes_unbalanced_is_byte_identical(unbalanced) -> None:
@@ -143,7 +143,7 @@ def test_xtdes_unbalanced_is_byte_identical(unbalanced) -> None:
         " ---------------------------+---------",
         "        6    100.00         |  XXXXX",
     ]
-    assert str(ws.xtdes(unbalanced, entity="id", time="t")).splitlines() == expected
+    assert str(ws.panel_describe(unbalanced, entity="id", time="t")).splitlines() == expected
 
 
 def test_xtdes_pattern_marks_the_hole_with_a_dot() -> None:
@@ -152,7 +152,7 @@ def test_xtdes_pattern_marks_the_hole_with_a_dot() -> None:
     frame = pd.DataFrame(
         [{"id": 1, "t": t} for t in (1, 2, 4, 5)] + [{"id": 2, "t": t} for t in (1, 2, 3, 4, 5)]
     )
-    rendered = str(ws.xtdes(frame, entity="id", time="t"))
+    rendered = str(ws.panel_describe(frame, entity="id", time="t"))
     assert "11.11" in rendered
     assert "11111" in rendered
 
@@ -161,7 +161,7 @@ def test_xtdes_rule_width_follows_the_span() -> None:
     """Measured: span 17 -> 19 dashes, span 4 -> 9 dashes (max(9, span + 2))."""
 
     short = pd.DataFrame([{"id": i, "t": t} for i in (1, 2, 3) for t in range(1, 5)])
-    rules = [line for line in str(ws.xtdes(short, entity="id", time="t")).splitlines()
+    rules = [line for line in str(ws.panel_describe(short, entity="id", time="t")).splitlines()
              if line.startswith(" -")]
     assert len(rules) == 2
     assert rules[0].endswith("-" * 9)
@@ -181,7 +181,7 @@ def test_xtsum_is_byte_identical(balanced) -> None:
         "         between |             27905.86    2958.63   137537.4 |     n =      48",
         "         within  |              2881.21   3838.101   40962.47 |     T =      17",
     ]
-    ours = str(ws.xtsum(balanced, ["y", "k1"], entity="pid", time="year")).splitlines()
+    ours = str(ws.panel_summarize(balanced, ["y", "k1"], entity="pid", time="year")).splitlines()
     # Stata's last digit on k1's within sd is 3838.101; ours rounds to 3838.102 because the
     # underlying value sits on the boundary. Accept either, and nothing else.
     normalised = [
@@ -193,7 +193,7 @@ def test_xtsum_is_byte_identical(balanced) -> None:
 def test_xtsum_within_min_max_are_centred_on_the_grand_mean(balanced) -> None:
     """Raw deviations span -86123.88..114493.12; Stata prints -25109.56..175507.4."""
 
-    result = ws.xtsum(balanced, ["y"], entity="pid", time="year")
+    result = ws.panel_summarize(balanced, ["y"], entity="pid", time="year")
     _, _, _, within = result.variables[0]
     assert within["min"] == pytest.approx(-25109.5625, abs=1e-3)
     assert within["max"] == pytest.approx(175507.4375, abs=1e-3)
@@ -202,13 +202,13 @@ def test_xtsum_within_min_max_are_centred_on_the_grand_mean(balanced) -> None:
 def test_xtsum_within_sd_is_the_plain_sample_sd(balanced) -> None:
     """Measured: 12769.31 is deviations.std(ddof=1); ddof=0 gives 12761.48."""
 
-    result = ws.xtsum(balanced, ["y"], entity="pid", time="year")
+    result = ws.panel_summarize(balanced, ["y"], entity="pid", time="year")
     _, _, _, within = result.variables[0]
     assert within["sd"] == pytest.approx(12769.30559451646, abs=1e-6)
 
 
 def test_xtsum_between_uses_the_entity_means(balanced) -> None:
-    result = ws.xtsum(balanced, ["y"], entity="pid", time="year")
+    result = ws.panel_summarize(balanced, ["y"], entity="pid", time="year")
     _, _, between, _ = result.variables[0]
     means = balanced.groupby("pid")["y"].mean()
     assert between["sd"] == pytest.approx(float(means.std(ddof=1)), abs=1e-9)
@@ -216,22 +216,22 @@ def test_xtsum_between_uses_the_entity_means(balanced) -> None:
 
 
 def test_xtsum_counts_come_from_the_panel(balanced) -> None:
-    result = ws.xtsum(balanced, ["y"], entity="pid", time="year")
+    result = ws.panel_summarize(balanced, ["y"], entity="pid", time="year")
     assert (result.nobs, result.entities, result.periods) == (816, 48, 17)
 
 
 def test_xtsum_rejects_an_unknown_variable(balanced) -> None:
     with pytest.raises(ws.ConsistencyError, match="not found in data"):
-        ws.xtsum(balanced, ["nope"], entity="pid", time="year")
+        ws.panel_summarize(balanced, ["nope"], entity="pid", time="year")
 
 
 def test_xtsum_accepts_a_single_name(balanced) -> None:
     """A bare string should behave like a one-element list."""
 
-    result = ws.xtsum(balanced, "y", entity="pid", time="year")
+    result = ws.panel_summarize(balanced, "y", entity="pid", time="year")
     assert len(result.variables) == 1
 
 
 def test_the_three_are_exported_from_the_package_root() -> None:
-    for name in ("xtset", "xtdes", "xtsum"):
+    for name in ("panel_set", "panel_describe", "panel_summarize"):
         assert callable(getattr(ws, name))

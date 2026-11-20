@@ -189,7 +189,7 @@ Stata 的 `e(p) = chi2.sf(e(chi2), e(rank)-1)`，**不是** `chi2.sf(e(chi2), e(
    `_MLLimitedBase` 继承 `_DiscreteBase`，而基类 `_stata_scalars` 的签名变了
    （多了 `cov/names/canonical/groups`）。**已核实不是阻塞项**：`limited` 组已经把它
    覆写为同样的新签名（`limited.py:495-505`，`canonical`/`groups` 带默认值），
-   实测 `Truncreg.from_formula(...).fit()` 正常返回 SE。**无需裁决，仅告知**。
+   实测 `TruncatedRegress.from_formula(...).fit()` 正常返回 SE。**无需裁决，仅告知**。
    我最初按旧代码判断会 TypeError，实测后已更正。
 3. **`summary.py` 我没有改**。它本来就按 `e['chi2type']` 渲染，实测
    nonrobust→`LR chi2(2)`、robust→`Wald chi2(2)`。你的授权不需要动用。

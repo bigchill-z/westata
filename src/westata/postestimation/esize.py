@@ -36,7 +36,7 @@ from scipy.optimize import brentq
 
 
 @dataclass
-class EffectSizeResult:
+class EffectSizeResults:
     """One effect-size estimate and its confidence interval.
 
     Attributes
@@ -145,13 +145,13 @@ def _noncentral_f_bounds(
     return to_eta(lower_noncentrality), to_eta(upper_noncentrality)
 
 
-def estat_esize(
+def estat_effect_size(
     result: Any,
     *,
     epsilon: bool = False,
     omega: bool = False,
     level: float = 0.95,
-) -> EffectSizeResult:
+) -> EffectSizeResults:
     """Stata's ``estat esize``.
 
     Parameters
@@ -227,16 +227,16 @@ def estat_esize(
         estimate = (mss - df_effect * mean_square_error) / (
             total + mean_square_error
         )
-        return EffectSizeResult(kind="omega2", estimate=float(estimate), level=level)
+        return EffectSizeResults(kind="omega2", estimate=float(estimate), level=level)
     if epsilon:
         estimate = (mss - df_effect * mean_square_error) / total
-        return EffectSizeResult(kind="epsilon2", estimate=float(estimate), level=level)
+        return EffectSizeResults(kind="epsilon2", estimate=float(estimate), level=level)
 
     statistic = (mss / df_effect) / mean_square_error if mean_square_error > 0 else 0.0
     lower, upper = _noncentral_f_bounds(
         float(statistic), df_effect, df_residual, level
     )
-    return EffectSizeResult(
+    return EffectSizeResults(
         kind="eta2",
         estimate=float(eta_squared),
         ci_lower=lower,

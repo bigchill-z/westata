@@ -63,10 +63,10 @@ def main() -> int:
             if "cov_kwds" in fit_kw and fit_kw["cov_kwds"]["groups"] == "gid":
                 fit_kw["cov_kwds"] = {"groups": df["gid"]}
             if weight_type is None:
-                res = ws.OLS.from_formula("mpg ~ weight + foreign" if "noconstant" not in cmd
+                res = ws.Regress.from_formula("mpg ~ weight + foreign" if "noconstant" not in cmd
                                           else "mpg ~ 0 + weight + foreign", df).fit(**fit_kw)
             else:
-                res = ws.OLS.from_formula(
+                res = ws.Regress.from_formula(
                     "mpg ~ weight + foreign", df,
                     weights=df["w"], weight_type=weight_type,
                 ).fit(**fit_kw)
@@ -98,7 +98,7 @@ def main() -> int:
 
         # The intercept-only model: Stata reports e(F) = 0.
         cap = st.estimate("regress mpg")
-        res = ws.OLS.from_formula("mpg ~ 1", df).fit()
+        res = ws.Regress.from_formula("mpg ~ 1", df).fit()
         print(f"\n-- intercept only: Stata e(F) = {cap.scalars['F']!r}, "
               f"westata e(F) = {res.e['F']!r}")
         if not (cap.scalars["F"] == 0.0 and res.e["F"] == 0.0):

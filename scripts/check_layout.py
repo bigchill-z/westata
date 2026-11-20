@@ -111,7 +111,7 @@ def main() -> int:
         (
             "truncreg",
             capture_block("truncreg", "truncreg", "intreg"),
-            ws.Truncreg.from_formula("y ~ x1 + x2", truncated, lower=0.0).fit(),
+            ws.TruncatedRegress.from_formula("y ~ x1 + x2", truncated, lower=0.0).fit(),
         )
     )
 
@@ -125,7 +125,7 @@ def main() -> int:
             capture_block(
                 "qreg_0.5", "qreg_0.5", "qreg_0.75", fixture="p8_outputs.txt"
             ),
-            ws.QuantileRegression.from_formula(
+            ws.QuantileRegress.from_formula(
                 "y ~ x1 + x2", qframe, quantile=0.5
             ).fit(),
         )

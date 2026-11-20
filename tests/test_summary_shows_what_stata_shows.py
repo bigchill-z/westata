@@ -45,7 +45,7 @@ def _frame(n: int = 250, seed: int = 6300):
 
 @pytest.fixture(scope="module")
 def ols_fit():
-    return ws.OLS.from_formula("y ~ x", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x", _frame()).fit()
 
 
 @pytest.fixture(scope="module")

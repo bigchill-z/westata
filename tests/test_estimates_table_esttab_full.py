@@ -35,8 +35,8 @@ pytestmark = pytest.mark.skipif(
 def models():
     frame = pd.read_stata(DATA)
     return [
-        ws.OLS.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
-        ws.OLS.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
+        ws.Regress.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit(cov_type="HC1"),
+        ws.Regress.from_formula("lnw ~ iq + s + expr + tenure + rns + smsa", frame).fit(
             cov_type="HC1"
         ),
         ws.IV2SLS.from_formula(
@@ -126,7 +126,7 @@ def test_se_false_switches_the_second_row_to_t_statistics(models) -> None:
     """
 
     frame = pd.read_stata(DATA)
-    single = [ws.OLS.from_formula("lnw ~ s", frame).fit()]
+    single = [ws.Regress.from_formula("lnw ~ s", frame).fit()]
     with_se = ws.render_estimates_table(single, model_names=["one"], se=True, mtitle=True)
     without_se = ws.render_estimates_table(single, model_names=["one"], se=False, mtitle=True)
     assert "Standard errors in parentheses" in with_se

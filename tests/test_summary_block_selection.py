@@ -80,7 +80,7 @@ def frame():
 
 # ------------------------------------------------------------- the OLS block
 def test_regress_uses_the_ols_block(frame) -> None:
-    rendered = str(ws.OLS.from_formula("y ~ x", frame).fit().summary(style="statsmodels"))
+    rendered = str(ws.Regress.from_formula("y ~ x", frame).fit().summary(style="statsmodels"))
 
     for label in OLS_LABELS:
         assert _has_standalone_label(rendered, label), label
@@ -141,7 +141,7 @@ def test_no_dots_are_printed_for_statistics_the_command_does_not_have(frame) -> 
 @pytest.mark.parametrize(
     "builder",
     [
-        lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(),
+        lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(),
         lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(),
         lambda frame: ws.Poisson.from_formula("ycnt ~ x", frame).fit(),
     ],
@@ -159,7 +159,7 @@ def test_every_table_keeps_the_essentials(frame, builder) -> None:
 @pytest.mark.parametrize(
     "builder,stat_column",
     [
-        (lambda frame: ws.OLS.from_formula("y ~ x", frame).fit(), "P>|t|"),
+        (lambda frame: ws.Regress.from_formula("y ~ x", frame).fit(), "P>|t|"),
         (lambda frame: ws.Logit.from_formula("yb ~ x", frame).fit(), "P>|z|"),
         (lambda frame: ws.Poisson.from_formula("ycnt ~ x", frame).fit(), "P>|z|"),
     ],

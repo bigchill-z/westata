@@ -53,7 +53,7 @@ def fitted():
 def test_the_verified_sample_still_matches(fitted) -> None:
     """This is the sample the eleven-line capture was taken on; it must keep matching."""
 
-    rendered = [line for line in str(ws.varstable(fitted)).splitlines() if line.strip()]
+    rendered = [line for line in str(ws.var_stable(fitted)).splitlines() if line.strip()]
     assert len(rendered) == 11
     assert rendered[0] == "   Eigenvalue stability condition"
 
@@ -61,7 +61,7 @@ def test_the_verified_sample_still_matches(fitted) -> None:
 def test_every_row_is_the_same_width(fitted) -> None:
     """The box is 44 characters whether a row holds a real or a complex eigenvalue."""
 
-    rendered = [line for line in str(ws.varstable(fitted)).splitlines() if line.strip()]
+    rendered = [line for line in str(ws.var_stable(fitted)).splitlines() if line.strip()]
     for line in rendered:
         if line.startswith("  |"):
             assert len(line) == 44, line
@@ -70,7 +70,7 @@ def test_every_row_is_the_same_width(fitted) -> None:
 def test_a_complex_pair_reports_one_modulus(fitted) -> None:
     """A conjugate pair shares its magnitude, so the two rows must show the same number."""
 
-    result = ws.varstable(fitted)
+    result = ws.var_stable(fitted)
     rendered = [line for line in str(result).splitlines() if "i  |" in line or "i |" in line]
     assert len(rendered) == 2
     left, right = (line.split("|")[2].strip() for line in rendered)
@@ -80,7 +80,7 @@ def test_a_complex_pair_reports_one_modulus(fitted) -> None:
 def test_real_eigenvalues_have_no_imaginary_part(fitted) -> None:
     """Mixing the two shapes in one row is what the n=120 and n=300 differences looked like."""
 
-    rendered = [line for line in str(ws.varstable(fitted)).splitlines() if line.strip()]
+    rendered = [line for line in str(ws.var_stable(fitted)).splitlines() if line.strip()]
     for line in rendered[3:]:
         if not line.startswith("  |"):
             continue

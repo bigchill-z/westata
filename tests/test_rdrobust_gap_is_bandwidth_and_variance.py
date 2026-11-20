@@ -40,7 +40,7 @@ def sample():
 
 def test_the_point_estimate_matches_stata_once_the_bandwidth_is_given(sample) -> None:
     response, running = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
     assert float(fitted.tau) == pytest.approx(STATA_TAU, abs=1e-9)
@@ -61,7 +61,7 @@ def test_the_standard_error_is_now_hc0(sample) -> None:
     """
 
     response, running = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
     assert float(fitted.se) == pytest.approx(0.1075019935, abs=1e-9)
@@ -77,7 +77,7 @@ def test_automatic_bandwidth_selection_still_refuses(sample) -> None:
 
     response, running = sample
     with pytest.raises(Exception, match="bandwidth"):
-        ws.rdrobust(response, running, cutoff=0.0)
+        ws.rd_robust(response, running, cutoff=0.0)
 
 
 def test_the_pieces_that_do_exist_are_usable(sample) -> None:
@@ -259,7 +259,7 @@ def test_the_package_reports_hc0_while_stata_defaults_to_nn(sample) -> None:
     """
 
     response, running = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
     assert float(fitted.se) == pytest.approx(0.1075019935, abs=1e-9)
@@ -286,7 +286,7 @@ def test_any_nearest_neighbour_implementation_must_exceed_hc0(sample) -> None:
     """
 
     response, running = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
     hc0 = float(fitted.se)

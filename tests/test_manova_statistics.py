@@ -279,7 +279,7 @@ def test_per_equation_r2_matches_a_plain_ols_fit(fitted) -> None:
     result, frame = fitted
 
     for position, response in enumerate(("y1", "y2")):
-        univariate = ws.OLS.from_formula(f"{response} ~ C(g)", frame).fit()
+        univariate = ws.Regress.from_formula(f"{response} ~ C(g)", frame).fit()
         assert result.r2_by_equation[position] == pytest.approx(
             float(univariate.rsquared), rel=1e-10
         )
@@ -293,7 +293,7 @@ def test_per_equation_f_matches_a_plain_ols_fit(fitted) -> None:
     result, frame = fitted
 
     for position, response in enumerate(("y1", "y2")):
-        univariate = ws.OLS.from_formula(f"{response} ~ C(g)", frame).fit()
+        univariate = ws.Regress.from_formula(f"{response} ~ C(g)", frame).fit()
         assert result.f_by_equation[position] == pytest.approx(
             float(univariate.e["F"]), rel=1e-10
         )
@@ -437,7 +437,7 @@ def test_predict_stdp_is_the_sandwich_standard_error(fitted) -> None:
     stdp = np.asarray(result.predict("stdp"), dtype=float)
 
     # Independent build: OLS covariance of the same equation.
-    univariate = ws.OLS.from_formula("y1 ~ C(g)", frame).fit()
+    univariate = ws.Regress.from_formula("y1 ~ C(g)", frame).fit()
     covariance = np.asarray(univariate.cov_params(), dtype=float)
     design = np.asarray(result.design_matrix, dtype=float)
     expected = np.sqrt(np.einsum("ij,jk,ik->i", design, covariance, design))
@@ -462,8 +462,8 @@ def test_predict_stddp_includes_the_cross_equation_covariance(fitted) -> None:
         result.predict("stddp", equation=1, equation2=2), dtype=float
     )
 
-    univariate1 = ws.OLS.from_formula("y1 ~ C(g)", frame).fit()
-    univariate2 = ws.OLS.from_formula("y2 ~ C(g)", frame).fit()
+    univariate1 = ws.Regress.from_formula("y1 ~ C(g)", frame).fit()
+    univariate2 = ws.Regress.from_formula("y2 ~ C(g)", frame).fit()
     v_first = np.asarray(univariate1.cov_params(), dtype=float)
     v_second = np.asarray(univariate2.cov_params(), dtype=float)
 

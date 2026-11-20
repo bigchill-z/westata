@@ -42,7 +42,7 @@ def fitted():
         frame = pd.read_stata(DATA)
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("nsw_dw.dta is not available")
-    return ws.OLS.from_formula("re78 ~ age + education + black", frame).fit()
+    return ws.Regress.from_formula("re78 ~ age + education + black", frame).fit()
 
 
 def test_a_joint_test_of_two_restrictions_matches_stata(fitted) -> None:

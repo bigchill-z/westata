@@ -81,7 +81,7 @@ def test_re_still_raises_unsupported() -> None:
     """The gap is open. When this flips to passing, the estimator was implemented."""
 
     with pytest.raises(ws.errors.UnsupportedError):
-        ws.XtNbreg.from_formula(
+        ws.PanelNbRegress.from_formula(
             "n ~ x1", _counts(), entity="sid", time="t", method="re"
         )
 
@@ -89,14 +89,14 @@ def test_re_still_raises_unsupported() -> None:
 def test_only_fe_is_advertised() -> None:
     """`_methods` must not list re while there is nothing behind it."""
 
-    assert ws.XtNbreg._methods == ("fe",)
+    assert ws.PanelNbRegress._methods == ("fe",)
 
 
 def test_the_beta_label_is_not_applied_to_the_fe_variant() -> None:
     """The renderer maps xtnbreg to Gamma today. That is CORRECT until the RE path exists,
     because a conditional fit never prints a distribution line at all."""
 
-    fitted = ws.XtNbreg.from_formula(
+    fitted = ws.PanelNbRegress.from_formula(
         "n ~ x1", _counts(), entity="sid", time="t", method="fe"
     ).fit()
     rendered = str(fitted.summary(style="stata"))

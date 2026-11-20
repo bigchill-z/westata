@@ -40,8 +40,8 @@ westata 新增了 `Areg`（提交 `56304d4`），本文件随之更新。
 |---|---|---|
 | Stata `areg`（作者当年跑的） | 0.1213388 | **0.0171579** |
 | Stata `xtreg, fe` | 0.1213388 | **0.0164182** |
-| westata `FEOLS` | 0.1213388 | **0.0164182** |
-| westata `PanelOLS` | 0.1213388 | **0.0164182** |
+| westata `RegressHighDimFixedEffects` | 0.1213388 | **0.0164182** |
+| westata `PanelRegressFE` | 0.1213388 | **0.0164182** |
 | **westata `Areg`（修复后）** | 0.1213388 | **0.0171579** ← 与 `areg` 一致 |
 
 > 修复前 `Areg` 报的是 0.0164182——即 `xtreg`/`reghdfe` 的值。见 §1.5。
@@ -61,7 +61,7 @@ westata vs areg       →  se 相对差 4.3e-02    （4.5%）
 
 这就把问题从"westata 是否算错"变成"westata 实现的是哪一种约定"。
 
-`FEOLS`/`PanelOLS` 的答案是 **`xtreg`/`reghdfe`**，这是它们的正确目标。
+`RegressHighDimFixedEffects`/`PanelRegressFE` 的答案是 **`xtreg`/`reghdfe`**，这是它们的正确目标。
 `Areg` 的答案必须是 **`areg`**——它修好之后报 0.0171579，与 Stata `areg` 逐位相同（§1.5）。
 
 ### 1.3 差异的机制（实测定位，纠正了初版说法）
@@ -121,7 +121,7 @@ $$\sqrt{rac{1529}{1400}} = 1.0450563895$$
 
 ### 1.5 聚类标准误的修复：`Areg` 现在与 `areg` 一致
 
-**修复前**：`Areg` 继承 `FEOLS` 的 `reghdfe` 方差路径，报 0.0164182。
+**修复前**：`Areg` 继承 `RegressHighDimFixedEffects` 的 `reghdfe` 方差路径，报 0.0164182。
 
 **根因**：两个命令用同一个 CR1 公式 `G/(G-1) · (N-1)/(N-K)`，**只有 K 不同**：
 
@@ -178,10 +178,10 @@ K = 152 → 0.0171579390   （= Stata areg，逐位相同）
 
 ### 3.1 现象：确实存在两个不同的分母
 
-同一次 `FEOLS` 拟合（cluster 于 `isocode`），三个量的分母不一致：
+同一次 `RegressHighDimFixedEffects` 拟合（cluster 于 `isocode`），三个量的分母不一致：
 
 ```
-westata FEOLS (cluster):
+westata RegressHighDimFixedEffects (cluster):
     e(rmse) = 0.2608791     ← 隐含分母 rss/rmse² = 1400
     e(df_r) = 129           ← G−1 = 130−1
     bse     = 0.0164182     ← 与 xtreg, fe 相同
@@ -199,7 +199,7 @@ westata FEOLS (cluster):
 . reghdfe ln_wpot … , absorb(isocode) vce(cluster isocode)
 ```
 
-| 量 | 真实 `reghdfe` | westata `FEOLS` |
+| 量 | 真实 `reghdfe` | westata `RegressHighDimFixedEffects` |
 |---|---|---|
 | `e(rmse)` | 0.2608790670546 | 0.2608790559441 |
 | 隐含 `rmse` 分母 | **1400** | **1400** |
@@ -313,7 +313,7 @@ consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍�
 - `e(cmd) = "areg"`
 - `e(title) = "Linear regression, absorbing indicators"`
 - `e(predict) = "areg_p"`
-- 报告 `_cons`（`FEOLS` 不报告）
+- 报告 `_cons`（`RegressHighDimFixedEffects` 不报告）
 
 但**报告一个与 Stata 数值不符的 `_cons`，比不报告更糟**——使用者会以为它可信。
 标准误相差 125% 尤其严重：这会让常数项的置信区间宽约 2.2 倍。
@@ -343,7 +343,7 @@ consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍�
 |---|---|
 | 是否静默出错 | **是**——输出看起来正常，`_cons` 有值、有标准误，不报错 |
 | 影响面 | 中：常数项通常不是研究关注点，但它是 `predict` 与 `margins` 的输入 |
-| 是否有替代 | 有（`FEOLS` 不报常数项，反而不会误导） |
+| 是否有替代 | 有（`RegressHighDimFixedEffects` 不报常数项，反而不会误导） |
 
 主结果（斜率）不受影响，但会误导需要常数项的使用者。**P1。**
 （**已修复**，见 §4.1/§4.4。）
@@ -351,14 +351,14 @@ consistency between vce(robust) and vce(cluster _n)"。**它是清醒的取舍�
 ### 4.6 顺带修复：`vce(hc2)` / `vce(hc3)`
 
 `areg.sthlp:47-49` 把 `vce(hc2 [clustvar])` 列为它的 SE/Robust 选项之一。
-`Areg` 原先继承 `FEOLS` 的限制而**拒绝** HC2/HC3：
+`Areg` 原先继承 `RegressHighDimFixedEffects` 的限制而**拒绝** HC2/HC3：
 
 ```
-ValueError: cov_type 'HC2' is not supported by FEOLS: HC2 needs the leverage of
+ValueError: cov_type 'HC2' is not supported by RegressHighDimFixedEffects: HC2 needs the leverage of
 the full dummy design, which PyFixest does not expose for fixed-effect models
 ```
 
-**这个理由对 `FEOLS` 成立，对 `Areg` 不成立**——`Areg` 为算 `_cons` 本来就构造了完整
+**这个理由对 `RegressHighDimFixedEffects` 成立，对 `Areg` 不成立**——`Areg` 为算 `_cons` 本来就构造了完整
 设计矩阵，杠杆值 `h_jj` 就在手里。`areg.sthlp:202` 写得很清楚：
 
 > `vce(hc2)` instead uses `u_j^2/(1-h_jj)` as the observation's variance estimate
@@ -366,7 +366,7 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 现在按此实现：HC2 用 `u²/(1−h)`，HC3 用 `u²/(1−h)²`，两者都在完整设计上重算协方差
 （含 `_cons` 那一行/列）。实测四者严格递增（HC0 < HC1 < HC2 < HC3），符合文档预期。
 
-`FEOLS` 仍然拒绝 HC2/HC3——它的理由没有被削弱，测试里也锁住了这一点。
+`RegressHighDimFixedEffects` 仍然拒绝 HC2/HC3——它的理由没有被削弱，测试里也锁住了这一点。
 
 ### 4.7 顺带补齐：`noabsorb`（Stata 写作 `noabsorbtest`）
 
@@ -389,7 +389,7 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 | `e(r2_c)` | 有 | 无（它只用于算这个 F） |
 | `e(r2)` / `e(rmse)` / `e(df_a)` / 系数 | — | **完全相同** |
 
-`FEOLS` 不获得该参数——`reghdfe` 没有这个选项，测试锁住了这一点。
+`RegressHighDimFixedEffects` 不获得该参数——`reghdfe` 没有这个选项，测试锁住了这一点。
 
 ### 4.8 补齐：`vce(bootstrap)` 与 `vce(jackknife)`
 
@@ -404,7 +404,7 @@ the full dummy design, which PyFixest does not expose for fixed-effect models
 | **`vce(jackknife)`** | 0.08945882 | **0.08945882** | 确定性，逐位相同 |
 | **`vce(bootstrap)`** | 0.08104865 | 0.08104864 | 随机性内（1e-8） |
 
-**实现要点**：`areg` 的估计就是组内去均值后的 OLS，而 `vce(bootstrap)` 用的是
+**实现要点**：`areg` 的估计就是组内去均值后的 Regress，而 `vce(bootstrap)` 用的是
 Stata 的 `wvar()` 频数权重形式，所以去均值必须用**加权组均值**，否则与 Stata 差一截。
 
 **踩到一个会静默出错的坑**：设计矩阵里若保留 `Intercept` 列，它与吸收组的哑变量完全
@@ -436,8 +436,8 @@ westata 的协方差**本来就是对的**。
 `斜率数 + 吸收水平数 − 1`」——达到就说明哑变量已计入，不需要再修正。
 
 **多路还有一个独立的坑**：即使修正了 K，`a b` 仍差 0.45%。查证发现这不是 K 的问题——
-Stata 的 `reghdfe` 在同一次拟合上给 **0.1023861**，而 westata 的 `FEOLS` 给的正是
-0.1023861（逐位相同）。也就是说 `FEOLS` 完全正确，它忠实实现了 `reghdfe` 的口径；
+Stata 的 `reghdfe` 在同一次拟合上给 **0.1023861**，而 westata 的 `RegressHighDimFixedEffects` 给的正是
+0.1023861（逐位相同）。也就是说 `RegressHighDimFixedEffects` 完全正确，它忠实实现了 `reghdfe` 的口径；
 但 `areg` 给的是 0.11086346，两者**因子结构不同**，不是某个 K 参数之差（反解隐含 K
 得 0.13，不是整数）。
 
@@ -449,7 +449,7 @@ Stata 的 `reghdfe` 在同一次拟合上给 **0.1023861**，而 westata 的 `FE
 > 错的只是它属于 `reghdfe` 而不是 `areg`。测试因此同时断言 Areg 得 0.11086346 **且**
 > 不等于 0.1023861。
 
-`FEOLS` 未受影响——它仍然报 0.1023861（= Stata `reghdfe`），有测试锁定。
+`RegressHighDimFixedEffects` 未受影响——它仍然报 0.1023861（= Stata `reghdfe`），有测试锁定。
 
 ### 4.9 记录：`dfadjust` 尚未实现（附实测对照数据）
 
@@ -512,8 +512,8 @@ areg y x1, absorb(firm) vce(hc2, dfadjust)
 （还有 `collin_tol`）。所以前两条**不是做不到，是做得到但不值得**——两者的理由强度不同，
 不该混为一谈。
 
-**注意区分**：不做 ≠ 无影响。真要改变收敛行为，正确的位置是 `FEOLS`/`pyfixest` 那一层，
-而不是在 `Areg` 上开三个转手就丢的空参数。若将来确实需要，应作为 **FEOLS 的能力**统一实现，
+**注意区分**：不做 ≠ 无影响。真要改变收敛行为，正确的位置是 `RegressHighDimFixedEffects`/`pyfixest` 那一层，
+而不是在 `Areg` 上开三个转手就丢的空参数。若将来确实需要，应作为 **RegressHighDimFixedEffects 的能力**统一实现，
 `Areg` 再继承。
 
 #### 两项报告选项：`clustertable` 与 `level(` —— 均已实现
@@ -524,7 +524,7 @@ areg y x1, absorb(firm) vce(hc2, dfadjust)
 | 选项 | 出处 | 作用 | 状态 |
 |---|---|---|---|
 | `clustertable` | `areg.sthlp:225-228` | 多路聚类下打印「聚类组合 × 组数」表 | **已实现** |
-| `level(#)` | `areg.sthlp:53` | 置信水平，默认 95 | **已实现**（`OLS`/`IV2SLS`/`Areg` 等） |
+| `level(#)` | `areg.sthlp:53` | 置信水平，默认 95 | **已实现**（`Regress`/`IV2SLS`/`Areg` 等） |
 
 **`level(#)` 的实测对照**（StataNow 19.5，210 行面板）：
 

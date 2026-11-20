@@ -174,7 +174,7 @@ def main():
         E = s.est(f"didregress {spec} (tp), group(unit) time(period)")
         k = E.idx("r1vs0.tp")
         sb, ss = float(E.b[k]), float(np.sqrt(E.V[k, k]))
-        r = ws.Didregress.from_formula("y" if cov is None else "y x1", "tp",
+        r = ws.DIDRegress.from_formula("y" if cov is None else "y x1", "tp",
                                        dd, group="unit", time="period",
                                        covariates=cov).fit()
         wb_ = float(r.params[r.param_names[0]])

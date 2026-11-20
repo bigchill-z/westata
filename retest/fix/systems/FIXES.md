@@ -277,7 +277,7 @@ SE 相对差 **4.027e-03 → 1.722e-07**。
 
 1. **`tests/conformance/test_stata_p11.py` 里两条 DID 测试现在会失败**，
    而 `tests/conformance/` 不在我的写作用域内。两条都是
-   `Didregress.from_formula("y", "treated", did_frame(), ...)`（**裸 `"y"`**），
+   `DIDRegress.from_formula("y", "treated", did_frame(), ...)`（**裸 `"y"`**），
    却断言 `(y x1)` 的 `1.18613 / .0590465`。它们以前能过，**正是因为 S5 这个缺陷**：
    裸 `"y"` 会静默把 `x1` 当协变量。S5 修好后裸 `"y"` 是对的（1.1543177866493608），
    该断言必然失败。

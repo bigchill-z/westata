@@ -39,7 +39,7 @@ def sample():
 
 def test_the_covariate_adjusted_estimate_matches_stata(sample) -> None:
     response, running, covariate = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response,
         running,
         cutoff=0.0,
@@ -52,7 +52,7 @@ def test_the_covariate_adjusted_estimate_matches_stata(sample) -> None:
 
 def test_the_covariate_coefficient_matches_stata(sample) -> None:
     response, running, covariate = sample
-    fitted = ws.rdrobust(
+    fitted = ws.rd_robust(
         response,
         running,
         cutoff=0.0,
@@ -69,10 +69,10 @@ def test_adding_a_covariate_moves_the_estimate(sample) -> None:
     """If it did not, the covariate would be entering nothing."""
 
     response, running, covariate = sample
-    plain = ws.rdrobust(
+    plain = ws.rd_robust(
         response, running, cutoff=0.0, bandwidth=STATA_H, bias_bandwidth=STATA_B
     )
-    adjusted = ws.rdrobust(
+    adjusted = ws.rd_robust(
         response,
         running,
         cutoff=0.0,
@@ -88,4 +88,4 @@ def test_the_automatic_bandwidth_still_refuses(sample) -> None:
 
     response, running, covariate = sample
     with pytest.raises(Exception):
-        ws.rdrobust(response, running, cutoff=0.0)
+        ws.rd_robust(response, running, cutoff=0.0)

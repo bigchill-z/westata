@@ -70,7 +70,7 @@ def test_the_package_exports_synth() -> None:
 
     assert hasattr(ws, "synth")
     assert callable(ws.synth)
-    assert hasattr(ws, "SynthResult")
+    assert hasattr(ws, "SynthResults")
 
 
 @pytest.fixture(scope="module")

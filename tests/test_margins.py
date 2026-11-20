@@ -50,7 +50,7 @@ def _linear(n: int = 400, seed: int = 7) -> pd.DataFrame:
 
 
 def test_ols_predict_xb_equals_fittedvalues():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     np.testing.assert_allclose(res.predict(kind="xb"), res.fittedvalues, rtol=1e-12)
 
 
@@ -75,7 +75,7 @@ def test_poisson_predict_n_is_positive_mean():
 
 
 def test_unsupported_predict_kind_raises():
-    res = ws.OLS.from_formula("y ~ x1", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1", _linear()).fit()
     with pytest.raises(UnsupportedError, match="predict"):
         res.predict(kind="pr")
 
@@ -131,7 +131,7 @@ def test_poisson_average_marginal_effect_matches_analytic_formula():
 
 
 def test_ols_marginal_effect_is_the_coefficient_with_its_own_se():
-    res = ws.OLS.from_formula("y ~ x1 + x2", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1 + x2", _linear()).fit()
     for name in ("x1", "x2"):
         outcome = res.margins(dydx=name)
         assert outcome.estimate == pytest.approx(res.params[name], rel=1e-8)
@@ -172,13 +172,13 @@ def test_predictive_margin_matches_mean_prediction():
 
 
 def test_margins_unknown_variable_raises():
-    res = ws.OLS.from_formula("y ~ x1", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1", _linear()).fit()
     with pytest.raises(KeyError, match="not in"):
         res.margins(dydx="not_a_variable")
 
 
 def test_margins_without_design_matrix_raises():
-    res = ws.OLS.from_formula("y ~ x1", _linear()).fit()
+    res = ws.Regress.from_formula("y ~ x1", _linear()).fit()
     res.design_matrix = None
     with pytest.raises(UnsupportedError, match="design matrix"):
         res.margins(dydx="x1")
@@ -187,8 +187,8 @@ def test_margins_without_design_matrix_raises():
 def test_margins_requires_standard_errors_from_model_vce():
     # A robust VCE must propagate into the marginal-effect standard error.
     df = _linear()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", df).fit()
-    robust = ws.OLS.from_formula("y ~ x1 + x2", df).fit(cov_type="HC1")
+    plain = ws.Regress.from_formula("y ~ x1 + x2", df).fit()
+    robust = ws.Regress.from_formula("y ~ x1 + x2", df).fit(cov_type="HC1")
     assert plain.margins(dydx="x1").std_err != pytest.approx(
         robust.margins(dydx="x1").std_err, rel=1e-3
     )
@@ -290,7 +290,7 @@ def test_regress_predictive_margins_over_groups_match_stata():
     """``margins, over(foreign)``: an exact linear combination of ``e(V)``."""
 
     frame = _auto()
-    rows = ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame).fit().margins(
+    rows = ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame).fit().margins(
         over="foreign"
     )
 
@@ -310,7 +310,7 @@ def test_regress_factor_discrete_change_matches_stata():
     """
 
     frame = _auto()
-    result = ws.OLS.from_formula("mpg ~ weight + C(foreign)", frame).fit()
+    result = ws.Regress.from_formula("mpg ~ weight + C(foreign)", frame).fit()
     row = result.margins(dydx="C(foreign)[T.1]", factor_vars=["C(foreign)[T.1]"])
     row = row[0] if isinstance(row, list) else row
 

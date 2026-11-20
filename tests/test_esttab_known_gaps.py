@@ -43,8 +43,8 @@ def models():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
     return [
-        ws.OLS.from_formula("lnw ~ s", frame).fit(),
-        ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit(),
+        ws.Regress.from_formula("lnw ~ s", frame).fit(),
+        ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit(),
     ]
 
 

@@ -81,7 +81,7 @@ def _frame() -> pd.DataFrame:
 # --------------------------------------------------------------- estimator surface
 def _ols_works() -> str:
     frame = _frame()
-    result = ws.OLS.from_formula("d_fte ~ nj", frame).fit()
+    result = ws.Regress.from_formula("d_fte ~ nj", frame).fit()
     index = list(result.param_names).index("nj")
     coef = float(np.asarray(result.params, dtype=float)[index])
     if abs(coef - 2.3258) > 1e-3:
@@ -100,7 +100,7 @@ def _stata_labels_available() -> str:
     """
 
     frame = _frame()
-    result = ws.OLS.from_formula("d_fte ~ nj", frame).fit()
+    result = ws.Regress.from_formula("d_fte ~ nj", frame).fit()
     stata_names = [str(n) for n in result.stata_param_names]
     if "_cons" not in stata_names:
         raise _Gap(f"stata_param_names has no _cons: {stata_names}")
@@ -114,7 +114,7 @@ def _weights_accepted() -> str:
     """CK does not need weights, but ADH did; this confirms that capability survived."""
 
     frame = _frame()
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         "d_fte ~ nj", frame, weights=frame["fte"], weight_type="aweight"
     ).fit()
     if not result.nobs:

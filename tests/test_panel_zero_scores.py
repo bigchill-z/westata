@@ -55,7 +55,7 @@ STATA_TWOWAY = {"ltlan": 0.39300903, "ltwlab": 0.27005734, "ltpow": 0.19720692}
 
 
 def test_fe_robust_coefficients_match(frame) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["prov"]})
     for name, value in STATA_FE.items():
@@ -66,7 +66,7 @@ def test_fe_robust_coefficients_match(frame) -> None:
 def test_fe_robust_standard_errors_match(frame) -> None:
     """The part a 0.00 score would lead you to believe is wrong."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["prov"]})
     for name, value in STATA_FE_SE.items():
@@ -75,7 +75,7 @@ def test_fe_robust_standard_errors_match(frame) -> None:
 
 
 def test_two_way_slopes_match(frame) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit(entity_effects=True, time_effects=True)
     for name, value in STATA_TWOWAY.items():

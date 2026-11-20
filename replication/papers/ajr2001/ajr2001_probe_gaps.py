@@ -93,7 +93,7 @@ def _panelols_weights() -> str:
 
     import numpy as np
 
-    signature = inspect.signature(ws.PanelOLS.from_formula)
+    signature = inspect.signature(ws.PanelRegressFE.from_formula)
     if "weights" not in signature.parameters:
         raise _Gap(
             "PanelOLS.from_formula stopped accepting weights; the paper's xtreg ... "
@@ -101,7 +101,7 @@ def _panelols_weights() -> str:
         )
 
     frame = _sample()
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "urbrate ~ " + " + ".join(_spec().regressors),
         frame, entity="id", time="year",
         weights=frame["totalpop1750"], weight_type="aweight",

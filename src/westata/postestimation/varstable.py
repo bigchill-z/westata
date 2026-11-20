@@ -29,11 +29,11 @@ import numpy as np
 
 from westata.errors import ConsistencyError
 
-__all__ = ["VarStableResult", "varstable"]
+__all__ = ["VarStableResults", "var_stable"]
 
 
 @dataclass(frozen=True)
-class VarStableResult:
+class VarStableResults:
     """``varstable``: eigenvalues of the companion matrix."""
 
     eigenvalues: tuple[complex, ...]
@@ -329,7 +329,7 @@ def _format_complex(value: complex) -> str:
     return f"{_bare(real)} {sign}  {_bare(abs(imaginary))}i"
 
 
-def varstable(result: Any) -> VarStableResult:
+def var_stable(result: Any) -> VarStableResults:
     """Eigenvalues of the VAR's companion matrix, as ``varstable``.
 
     ``result`` must be a fitted VAR exposing ``coefs`` with shape ``(lags, K, K)``.
@@ -375,6 +375,6 @@ def varstable(result: Any) -> VarStableResult:
     ordered_values = tuple(complex(values[i]) for i in order)
     ordered_modulus = tuple(float(magnitudes[i]) for i in order)
 
-    return VarStableResult(
+    return VarStableResults(
         eigenvalues=ordered_values, modulus=ordered_modulus
     )

@@ -81,7 +81,7 @@ def main():
     s.send(fr)
     for spec, tol in (("rreg y x1 x2", 0.01), ("rreg y x1 x2, tolerance(1e-9)", 1e-9)):
         E = s.est(spec)
-        r = ws.RobustRegression.from_formula("y ~ x1 + x2", fr).fit(tolerance=tol)
+        r = ws.RobustRegress.from_formula("y ~ x1 + x2", fr).fit(tolerance=tol)
         pairs = [("x1", "x1"), ("x2", "x2"), ("_cons", "Intercept")]
         b, _ = cmp_b(E, r, pairs)
         se, _ = cmp_se(E, r, pairs)
@@ -146,13 +146,13 @@ def main():
         for k in range(5):
             rows.append((i + 1, k + 1, rng.normal(), rng.normal(), rng.normal()))
     bal = pd.DataFrame(rows, columns=["id", "t", "x1", "x2", "y"])
-    res = ws.XtPcse.from_formula("y ~ x1 + x2", bal, entity="id").fit()
+    res = ws.PanelPcse.from_formula("y ~ x1 + x2", bal, entity="id").fit()
     s.send(bal)
     s.q("xtset id t")
     E = s.est("xtpcse y x1")
     pairs = [("x1", "x1"), ("_cons", "Intercept")]
-    b, _ = cmp_b(E, ws.XtPcse.from_formula("y ~ x1", bal, entity="id").fit(), pairs)
-    se, _ = cmp_se(E, ws.XtPcse.from_formula("y ~ x1", bal, entity="id").fit(), pairs)
+    b, _ = cmp_b(E, ws.PanelPcse.from_formula("y ~ x1", bal, entity="id").fit(), pairs)
+    se, _ = cmp_se(E, ws.PanelPcse.from_formula("y ~ x1", bal, entity="id").fit(), pairs)
     report("xtpcse 12x5 balanced, one regressor", b, se, tier(b), tier(se))
     out["G6 xtpcse small balanced"] = max(b, se)
 

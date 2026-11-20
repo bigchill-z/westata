@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from westata.errors import ConsistencyError, UnsupportedError
-from westata.estimators.panel_dynamic import XtAbond, build_instruments
+from westata.estimators.panel_dynamic import PanelAbond, build_instruments
 
 
 def _dynamic_panel(n_firms: int = 90, n_years: int = 9, seed: int = 79) -> pd.DataFrame:
@@ -90,7 +90,7 @@ def test_xtabond_recovers_a_persistent_series():
     """The DGP has an AR coefficient of 0.5; one-step GMM should land near it."""
 
     frame = _dynamic_panel()
-    result = XtAbond.from_formula(
+    result = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=1
     ).fit()
 
@@ -129,7 +129,7 @@ def test_xtabond_reports_the_instrument_count():
     """
 
     frame = _dynamic_panel()
-    result = XtAbond.from_formula(
+    result = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=1
     ).fit()
 
@@ -155,7 +155,7 @@ def test_xtabond_lag2_parameter_names_line_up_with_the_design():
     """
 
     frame = _dynamic_panel()
-    result = XtAbond.from_formula(
+    result = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=2
     ).fit()
 
@@ -167,10 +167,10 @@ def test_xtabond_lag2_parameter_names_line_up_with_the_design():
 
 def test_xtabond_lag_two_reduces_the_instrument_count():
     frame = _dynamic_panel()
-    one = XtAbond.from_formula(
+    one = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=1
     ).fit()
-    two = XtAbond.from_formula(
+    two = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=2
     ).fit()
     assert int(two.e["instruments"]) < int(one.e["instruments"])
@@ -184,7 +184,7 @@ def test_xtabond_does_not_report_sargan_or_hansen():
     """
 
     frame = _dynamic_panel()
-    result = XtAbond.from_formula(
+    result = PanelAbond.from_formula(
         "y ~ x1", frame, entity="firm", time="year", lags=1
     ).fit()
     for key in ("sargan", "hansen", "ar1", "ar2"):
@@ -195,12 +195,12 @@ def test_xtabond_rejects_an_unbalanced_panel():
     frame = _dynamic_panel(n_firms=20, n_years=6)
     frame = frame.drop(index=frame.index[3]).reset_index(drop=True)
     with pytest.raises(UnsupportedError, match="balanced"):
-        XtAbond.from_formula("y ~ x1", frame, entity="firm", time="year")
+        PanelAbond.from_formula("y ~ x1", frame, entity="firm", time="year")
 
 
 def test_xtabond_rejects_too_short_a_panel():
     frame = _dynamic_panel(n_firms=20, n_years=3)
     with pytest.raises(ConsistencyError):
-        XtAbond.from_formula(
+        PanelAbond.from_formula(
             "y ~ x1", frame, entity="firm", time="year", lags=2
         ).fit()

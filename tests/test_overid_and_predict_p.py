@@ -56,7 +56,7 @@ def test_overid_matches_stata(frame) -> None:
     """Report scores this 0.00 while its own numeric-coverage column says 1.00."""
 
     fit = ws.IV2SLS.from_formula("lnw ~ [expr ~ s + tenure + age]", frame).fit()
-    rendered = str(fit.estat_overid())
+    rendered = str(fit.estat_overidentification())
     assert f"{STATA_SARGAN:.3f}" in rendered
     assert f"{STATA_BASMANN:.3f}" in rendered
 

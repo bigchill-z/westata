@@ -68,17 +68,17 @@ def auto():
 def test_ols_coefficients_are_machine_precision(grilic) -> None:
     """The report's 1e-8 threshold, with the observed gap about six orders tighter."""
 
-    fitted = ws.OLS.from_formula("lnw ~ s + expr + tenure", grilic).fit()
+    fitted = ws.Regress.from_formula("lnw ~ s + expr + tenure", grilic).fit()
     coefficients, errors = REFERENCES["ols"]
     assert np.allclose(fitted.params.to_numpy(), coefficients, atol=1e-8)
     assert np.allclose(fitted.bse.to_numpy(), errors, atol=1e-6)
 
 
 def test_ols_robust_matches(grilic) -> None:
-    fitted = ws.OLS.from_formula("lnw ~ s + expr", grilic).fit(cov_type="HC1")
+    fitted = ws.Regress.from_formula("lnw ~ s + expr", grilic).fit(cov_type="HC1")
     assert np.isfinite(fitted.bse.to_numpy()).all()
     # A robust fit differs from the classical one; if these collapsed, the VCE was ignored.
-    classical = ws.OLS.from_formula("lnw ~ s + expr", grilic).fit()
+    classical = ws.Regress.from_formula("lnw ~ s + expr", grilic).fit()
     assert not np.allclose(fitted.bse.to_numpy(), classical.bse.to_numpy(), rtol=1e-6)
 
 
@@ -116,5 +116,5 @@ def test_iv_coefficients_are_machine_precision(grilic) -> None:
     assert len(fitted.params) == 4
     assert "s" in list(fitted.param_names)
     # IV standard errors are larger than OLS's on the same regressor and must not be dropped.
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure", grilic).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure", grilic).fit()
     assert float(fitted.bse["s"]) > float(ols.bse["s"])

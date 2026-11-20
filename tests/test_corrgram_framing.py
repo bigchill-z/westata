@@ -48,7 +48,7 @@ def _ar_frame(n: int = 60, seed: int = 11) -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def plain():
     frame = _ar_frame()
-    return ws.OLS.from_formula("y ~ 1", frame).fit()
+    return ws.Regress.from_formula("y ~ 1", frame).fit()
 
 
 def _stata_lines(frame: pd.DataFrame, command: str) -> list[str]:
@@ -74,13 +74,13 @@ def _stata_lines(frame: pd.DataFrame, command: str) -> list[str]:
 
 # ---------------------------------------------------------------- framing
 def test_block_opens_with_a_blank_line(plain) -> None:
-    lines = str(ws.estat_corrgram(plain, lags=8, time="t")).split("\n")
+    lines = str(ws.estat_correlogram(plain, lags=8, time="t")).split("\n")
     assert lines[0] == ""
     assert "-1       0       1" in lines[1]
 
 
 def test_block_closes_with_a_blank_line(plain) -> None:
-    lines = str(ws.estat_corrgram(plain, lags=8, time="t")).split("\n")
+    lines = str(ws.estat_correlogram(plain, lags=8, time="t")).split("\n")
     assert lines[-1] == ""
     assert lines[-2].lstrip().startswith(("7", "8"))
 
@@ -101,8 +101,8 @@ def test_a_gapped_series_puts_the_note_above_the_blank_line() -> None:
     """Measured: the note is the FIRST line, then the blank, then the scale row."""
 
     frame = _gapped_frame()
-    fit = ws.OLS.from_formula("y ~ 1", frame).fit()
-    lines = str(ws.estat_corrgram(fit, lags=2, time="t")).split("\n")
+    fit = ws.Regress.from_formula("y ~ 1", frame).fit()
+    lines = str(ws.estat_correlogram(fit, lags=2, time="t")).split("\n")
     assert lines[0] == "(note: time series has 1 gap)"
     assert lines[1] == ""
     assert "-1       0       1" in lines[2]
@@ -112,15 +112,15 @@ def test_a_gapped_series_puts_the_note_above_the_blank_line() -> None:
 # ---------------------------------------------------------------- byte equality
 def test_whole_block_matches_stata_without_a_gap(plain) -> None:
     lines = _stata_lines(_ar_frame(), "corrgram y, lags(8)")
-    ours = str(ws.estat_corrgram(plain, lags=8, time="t")).split("\n")
+    ours = str(ws.estat_correlogram(plain, lags=8, time="t")).split("\n")
     assert ours == lines
 
 
 def test_whole_block_matches_stata_with_a_gap() -> None:
     frame = _gapped_frame()
-    fit = ws.OLS.from_formula("y ~ 1", frame).fit()
+    fit = ws.Regress.from_formula("y ~ 1", frame).fit()
     lines = _stata_lines(frame, "corrgram y, lags(2)")
-    ours = str(ws.estat_corrgram(fit, lags=2, time="t")).split("\n")
+    ours = str(ws.estat_correlogram(fit, lags=2, time="t")).split("\n")
     assert ours == lines
 
 
@@ -130,7 +130,7 @@ def test_numbers_match_stata_at_every_lag(plain) -> None:
 
     lines = _stata_lines(_ar_frame(), "corrgram y, lags(8)")
     stata_rows = [line for line in lines if line[:1].isdigit()]
-    ours = [line for line in str(ws.estat_corrgram(plain, lags=8, time="t")).split("\n")
+    ours = [line for line in str(ws.estat_correlogram(plain, lags=8, time="t")).split("\n")
             if line[:1].isdigit()]
     assert len(stata_rows) == len(ours) == 8
     for stata_row, our_row in zip(stata_rows, ours):
@@ -138,7 +138,7 @@ def test_numbers_match_stata_at_every_lag(plain) -> None:
 
 
 def test_every_body_line_is_79_characters(plain) -> None:
-    lines = str(ws.estat_corrgram(plain, lags=8, time="t")).split("\n")
+    lines = str(ws.estat_correlogram(plain, lags=8, time="t")).split("\n")
     body = [line for line in lines if line and line[:1].isdigit() or line.startswith(" LAG")]
     assert body
     for line in body:
@@ -147,6 +147,6 @@ def test_every_body_line_is_79_characters(plain) -> None:
 
 def test_lags_option_is_honoured(plain) -> None:
     for order in (3, 5, 12):
-        rows = str(ws.estat_corrgram(plain, lags=order, time="t")).split("\n")
+        rows = str(ws.estat_correlogram(plain, lags=order, time="t")).split("\n")
         body = [line for line in rows if line[:1].isdigit()]
         assert len(body) == order

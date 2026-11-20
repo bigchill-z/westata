@@ -24,7 +24,7 @@
 ## 2026-11-14 「父类做了、子类忘了」是清单式属性最常见的失效方式
 
 `StataResults._stata_order` 靠 `_formula_rhs_order` 恢复 Stata 的 `e(b)` 行序。
-`OLS` 在建模型时就设了这个属性，而 `PanelOLS` / 其他面板估计器**从来没设**——
+`Regress` 在建模型时就设了这个属性，而 `PanelRegressFE` / 其他面板估计器**从来没设**——
 于是只有它们退回 patsy 的字母序，`y ~ ltlan + ... + t` 里的 `t` 排到了最前面，
 而 Stata 把它排在最后。
 
@@ -158,22 +158,22 @@ cov_type in robust_names or ("robust" in cov_type ...)  # ts_lags
 
 | 族 | `cov_type="robust"` 实际是 | 结果回显 |
 |---|---|---|
-| `OLS` | `HC1`（`n/(n-k)`） | `'HC1'` ✅ |
+| `Regress` | `HC1`（`n/(n-k)`） | `'HC1'` ✅ |
 | `IV2SLS` | `HC0`（无 `n/(n-k)`） | `'HC0'` ✅ |
 | `Logit`/`Poisson` | **第三种**：`n/(n-1)` 的 ML 三明治 | `'robust'` ❌ |
-| `PanelOLS` | **`vce(cluster panelvar)`**（与 HC 无关） | `'robust'` ❌ |
-| `QuantileRegression` | `qreg` 专属 `tau(1-tau) J⁻¹(X'X)J⁻¹` | `'robust'` ❌ |
-| `RobustRegression` | **静默降级为默认值**，`bse` 逐位不变 | `'nonrobust'` ❌ |
+| `PanelRegressFE` | **`vce(cluster panelvar)`**（与 HC 无关） | `'robust'` ❌ |
+| `QuantileRegress` | `qreg` 专属 `tau(1-tau) J⁻¹(X'X)J⁻¹` | `'robust'` ❌ |
+| `RobustRegress` | **静默降级为默认值**，`bse` 逐位不变 | `'nonrobust'` ❌ |
 
 ```python
 # 最坏的一种：不报错、不回显、数值也不变
-a = ws.RobustRegression.from_formula("y~x", df).fit()
-b = ws.RobustRegression.from_formula("y~x", df).fit(cov_type="robust")
+a = ws.RobustRegress.from_formula("y~x", df).fit()
+b = ws.RobustRegress.from_formula("y~x", df).fit(cov_type="robust")
 np.allclose(a.bse, b.bse)     # True —— cov_type 被整个吞掉
 ```
 
 **为什么会漏掉**：`vce/dispatch.py:48` 有一条全局别名 `"ROBUST": "HC1"`，
-它对 7 个族中的 6 个都不成立，只有 `OLS` 成立。各估计族于是各自打补丁：
+它对 7 个族中的 6 个都不成立，只有 `Regress` 成立。各估计族于是各自打补丁：
 `iv.py:266` 覆写成 HC0，`panel.py:220` 覆写成 cluster，`discrete.py:154`
 自己实现第三种，`hdfe.py:114` 直接拒绝。**没有一个地方能回答「robust 是什么」**。
 
@@ -187,7 +187,7 @@ np.allclose(a.bse, b.bse)     # True —— cov_type 被整个吞掉
    `test_cov_type_family_table_covers_every_estimator` 强制**每个可估类都要有决定**
    ——新增估计器若不定这一行，测试直接失败。
 3. **默认别名要按「最少假设」选，不能按「最常见」选**。取 `HC1` 作全局默认，
-   等于把 OLS 的语义强加给 IV 与 ML；正确做法是不设全局默认，
+   等于把 Regress 的语义强加给 IV 与 ML；正确做法是不设全局默认，
    让每个族自己声明。
 4. **在单参数模型上对拍会掩盖公式差异**：`n/(n-1)` 与 `n/(n-k)` 在 k=1 时相等。
    验证 `robust` 语义必须用 **k≥2** 的模型，否则二者「一致」。
@@ -199,18 +199,18 @@ np.allclose(a.bse, b.bse)     # True —— cov_type 被整个吞掉
 
 ```python
 # 1. fit() 第一个位置参数不是 cov_type
-m = ws.PanelOLS.from_formula("y ~ x", panel, entity="firm", time="year")
+m = ws.PanelRegressFE.from_formula("y ~ x", panel, entity="firm", time="year")
 m.fit("HC1").cov_type      # -> 'nonrobust'，bse 与 m.fit() 完全一致
 # "HC1" 被当成真值赋给 entity_effects，cov_type 收到 None。调用成功，数字错误。
 
 # 2. **kwargs 收下即丢
-ws.XtUnitroot.from_formula(...).fit(zzz=[1,2,3])   # 正常返回 PanelUnitRootResult
+ws.PanelUnitroot.from_formula(...).fit(zzz=[1,2,3])   # 正常返回 PanelUnitRootResult
 ws.VECM(...).fit(bogus=1)                          # 正常返回 VECMResults
 
 # 3. level 有两套单位
 ws.margins(res, level=0.95)          # 分数
-estat_esize(res, level=95.0)         # 百分数，内部算 (100-level)/2
-estat_esize(res, level=0.95)         # -> 49.5% 区间，静默错
+estat_effect_size(res, level=95.0)         # 百分数，内部算 (100-level)/2
+estat_effect_size(res, level=0.95)         # -> 49.5% 区间，静默错
 
 # 4. 死参数
 ws.im_pesaran_shin(panel, ..., level=0.5)   # level 从未被引用，输出与默认完全相同
@@ -484,7 +484,7 @@ PyPI 上传缺 API token（`Credential not found for API token`，keyring 亦无
 ② 黑箱的**输入/输出**能从活体 oracle 采集吗？③ 只有**公式/源码**拿不到吗？」
 只有第 ③ 层是真边界。把三层混成一句「信息不可得」会误杀可交付的工作。
 本项目 `GAP_REGISTER.md §8.4` 早已把这类错误定性为最坏失败模式，本次是第三例
-（前两例：`bgodfrey` 实为未查用户 ado 路径、`dfgls` 实为默认选项写反）。
+（前两例：`bgodfrey` 实为未查用户 ado 路径、`df_gls` 实为默认选项写反）。
 
 ### 0.1 断言「某 `e()` 不存在」前，用 `ereturn list` 实测，别靠记忆/拼写
 
@@ -623,7 +623,7 @@ ACL 故障 —— `diagnose-windows-sandbox-acl` 技能明确说此类无需 ACL
 - `rddensity_senate.dta` 的变量是 `margin`，不是 `votesfor`（那是别的数据集）。
   写错变量名得到 `variable votesfor not found` → r(111)，与安装无关。
 - 冒烟测试前先 `ds` 看变量名；`webuse` 联网取数失败会 r(603) 并连累后续命令
-  （如 `xtoverid`），改用本地 `.dta` 即可。
+  （如 `panel_overid`），改用本地 `.dta` 即可。
 
 ### 5. Stata 安装写的是工作区外的 PLUS 目录，沙箱下会 r(603)
 - `ssc install` / `net install` 默认写 `sysdir` 的 `PLUS`
@@ -676,7 +676,7 @@ Get-ChildItem -Recurse -Directory -Filter __pycache__ src\westata | Remove-Item 
 ### 11. 测量脚本自身的 bug 会伪装成被测代码的缺陷
 
 `nbreg` / `logit` / `probit` / `poisson` 一度测出 0.11–0.31 的行匹配率，**真实值是 1.0000**。
-原因：评分脚本里写死了 `ws.OLS.from_formula`，拿 Stata 的 logit 去比本包的 OLS。
+原因：评分脚本里写死了 `ws.Regress.from_formula`，拿 Stata 的 logit 去比本包的 Regress。
 
 - **教训**：行匹配率异常低（< 0.35）时，先怀疑测量脚本。验证：直接 print 被测对象的
   `model_name` 与输出首行。
@@ -790,7 +790,7 @@ C13-06 被判为「`irf table oirf` 只给 1 列」。实际 `irf_table()` **存
 | 接口 | 状态 |
 |---|---|
 | `RegressionAdjustment` 类 | **精确**（ATE 与 SE 都对到打印位）|
-| `teffects_ra()` 便捷函数 | 打印 `(variance not reproduced)` |
+| `treatment_effects_ra()` 便捷函数 | 打印 `(variance not reproduced)` |
 | `teffects aipw` | 点估计低 2.53，未解决 |
 
 模块 docstring 用一句话概括了「robust 标准误未复现」，掩盖了**类版本已经精确**这个事实。
@@ -817,7 +817,7 @@ capture noisily display e(key)
   「是否恰为 `.`」，不在「是否以 `.` 开头」。
 ### 24. 「换个后端」不是局部改动：先数清消费方再动手
 
-第 61–62 轮尝试给 `FirstDifferenceOLS` 补上 Stata 会保留的截距。算术早已验证逐位一致
+第 61–62 轮尝试给 `PanelRegressFD` 补上 Stata 会保留的截距。算术早已验证逐位一致
 （4 个系数 + 4 个标准误，`n=768`、`df=764`），但**两次实现都在测试里翻车**：
 
 - 第 61 轮：事后补截距 → 斜率不变，得到不属于任何模型的参数向量；
@@ -827,7 +827,7 @@ capture noisily display e(key)
 
 ```
 test_panel_e_identities.py::test_fd_r2_within_and_overall_are_a_recorded_gap
-test_panel_e_surface.py::test_be_and_fd_store_no_sigma_family[FirstDifferenceOLS]
+test_panel_e_surface.py::test_be_and_fd_store_no_sigma_family[PanelRegressFD]
 test_predict_registry.py::test_every_registered_type_runs[xtreg, fd]
 test_predict_registry.py::test_xtreg_fd_design_matches_its_coefficient_count
 ```
@@ -841,7 +841,7 @@ test_predict_registry.py::test_xtreg_fd_design_matches_its_coefficient_count
 - 结论已写入 `options.md` T10：这不是一轮能完成的改动。
 ### 25. 缺公式时，数值试错会收敛到「某个能对上几个数」的错误实现
 
-第 64–65 轮实现 `rdrobust` 的 NN 方差。目标是 `se = 0.1099186153`，我试了五种公式：
+第 64–65 轮实现 `rd_robust` 的 NN 方差。目标是 `se = 0.1099186153`，我试了五种公式：
 
 | 尝试 | 结果 | 偏差 |
 |---|---|---|
@@ -1123,7 +1123,7 @@ Stata 用户写 `test i.rep78` 或 `test 2.rep78 3.rep78` 是日常，而这里�
 
 `e(theta)` / `e(thta_*)` 在**加不加 `theta` 选项时都已存进 e()**。所以 westata 的实现是：
 
-* **估计层**：`ws.RandomEffects.from_formula(...).fit(cov_type="robust")` —— 一一对应；
+* **估计层**：`ws.PanelRegressRE.from_formula(...).fit(cov_type="robust")` —— 一一对应；
 * **展示层**：`e(theta)` / `e(thta_*)` 直接可读，无需「开选项」；
 * **缺失的那一层**：`StataResults.summary()` 没有 `theta=` 开关，`summary()` 里不打印那行，
   但 `ereturn_list()` 和 `e["theta"]` 都有。
@@ -1400,7 +1400,7 @@ scalar，再在 Stata 里**逐步重放数据变换**并逐个比对 `e(rmse)`/`
 
 ## 35. 版式对齐必须先用程序打印逐字符列位置，不能目调试空格
 
-**场景**：实现 `xtsum` 的渲染器时，要把 79 字符宽的三行数字对齐到 Stata 的位置。
+**场景**：实现 `panel_summarize` 的渲染器时，要把 79 字符宽的三行数字对齐到 Stata 的位置。
 这一段我改了约 **10 次**，每次都是「看着像差一格」就加/减一个空格再跑一遍。
 
 **错在哪**：肉眼比较 `repr()` 只能看出「不一致」，看不出**差在第几列**。
@@ -1430,9 +1430,9 @@ print([(m.group(), m.start(), m.end()) for m in re.finditer(r"\S+", line)])
 有了这张表，规则一目了然：`overall` 在第 9..16 列（所以是左对齐 8 宽）、
 管道符在 17、数值右端在 28/39/50/61、`N` 在 68、数值右端在 79。
 
-**同一轮里奏效的对比**：`xtdes` 我也是靠这种表一次定位的
+**同一轮里奏效的对比**：`panel_describe` 我也是靠这种表一次定位的
 （`colon at 8`、`n at 61`、`= at 63`、数值右端 75），那次只改了两轮。
-而 `xtsum` 我一开始就上手调空格，改了十轮。
+而 `panel_summarize` 我一开始就上手调空格，改了十轮。
 
 **教训**：
 
@@ -1440,10 +1440,10 @@ print([(m.group(), m.start(), m.end()) for m in re.finditer(r"\S+", line)])
    不要先写代码再靠 repr 比较来修。`repr` 只告诉你「不等」，不告诉你「差几列」。
 2. 若一个对齐问题改了 **3 次还没对**，停下来：说明你在猜规则，而不是在读规则。
    立刻换成「打印列位置」或「从源码找格式串」。
-3. 同一类问题在同一轮里往往出现多次（`xtsum` 的表头、行标签、数值列、观测块四处），
+3. 同一类问题在同一轮里往往出现多次（`panel_summarize` 的表头、行标签、数值列、观测块四处），
    一次建好列位表可以同时解决全部四处。
 
-**相关的另一面**：数值公式也踩了同类坑——`xtsum` 的 within sd 我按「别处用过」的
+**相关的另一面**：数值公式也踩了同类坑——`panel_summarize` 的 within sd 我按「别处用过」的
 `sqrt(T/(T-1))` 修正，得 `13162.30`，而 Stata 就是原始的 `ddof=1`（`12769.31`）；
 within 的 min/max 也以为是原始离差，实际要**加回总均值**。
 **「别处这么做过」不能替代实测**，尤其在同一命令的相邻字段上。

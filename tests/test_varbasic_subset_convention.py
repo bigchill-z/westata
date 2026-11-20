@@ -106,7 +106,7 @@ def test_the_parameter_is_called_subset() -> None:
     parameters = inspect.signature(ws.varbasic).parameters
     assert "subset" in parameters
     assert "keep" not in parameters
-    assert "subset" in inspect.signature(ws.Varbasic.__init__).parameters
+    assert "subset" in inspect.signature(ws.VarBasic.__init__).parameters
 
 
 def test_the_frame_is_named_data() -> None:
@@ -118,12 +118,12 @@ def test_the_frame_is_named_data() -> None:
 
 
 def test_subset_matches_the_other_estimators(panel) -> None:
-    assert "subset" in inspect.signature(ws.OLS.from_formula).parameters
+    assert "subset" in inspect.signature(ws.Regress.from_formula).parameters
 
 
 def test_the_class_form_takes_the_same_mask(panel) -> None:
     by_function = ws.varbasic(panel, "dlny", lags=1, time="year", subset=panel["year"] < 2013)
-    by_class = ws.Varbasic(
+    by_class = ws.VarBasic(
         panel, "dlny", lags=1, time="year", subset=panel["year"] < 2013
     ).fit()
     assert by_function.ll == by_class.ll

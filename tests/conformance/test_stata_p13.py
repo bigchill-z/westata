@@ -129,7 +129,7 @@ def test_bootstrap_point_estimate_equals_the_original_fit():
     Bootstrap = _require("Bootstrap")
     frame = resample_frame()
     result = Bootstrap.from_formula("y ~ x1 + x2", frame, reps=60, seed=11).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.sort(np.asarray(result.params, dtype=float)),
@@ -154,7 +154,7 @@ def test_bootstrap_standard_error_is_the_right_order():
     Bootstrap = _require("Bootstrap")
     frame = resample_frame()
     result = Bootstrap.from_formula("y ~ x1 + x2", frame, reps=400, seed=20261023).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     ratio = float(result.bse["x1"]) / float(plain.bse["x1"])
     assert 0.5 < ratio < 2.0

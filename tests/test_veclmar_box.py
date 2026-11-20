@@ -38,7 +38,7 @@ def rank_two_lm():
         }
     )
     fitted = ws.VECM(frame.to_numpy(float), coint_rank=2, lags=2, names=["a", "b", "c"]).fit()
-    return ws.veclmar(fitted)
+    return ws.vec_lmar(fitted)
 
 
 STATA_LINES = [

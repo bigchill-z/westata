@@ -51,11 +51,11 @@ Stata 打印的空行或分隔线。**全部已修复并逐字节验证。**
 | 条目 | 状态 | 原因 |
 |---|---|---|
 | `synth` / `synth2` | 未实现 | 核心在 Mata 字节码，无源码可读 |
-| `xtserial` | 未实现 | 无 ado 文件，Stata 报 r(111) |
+| `panel_serial` | 未实现 | 无 ado 文件，Stata 报 r(111) |
 | `xtnbreg, re` | 未实现 | 需 Beta-负二项混合估计器（规格与似然原型已完成，见 tests/test_xtnbreg_*）|
 | `arima` 两处 | 估计量差异 | 优化路径不同，已定性 |
 | `arimasoc` | 未实现 | — |
-| `rdrobust` 自动带宽 | 未实现 | 需复现 rdrobust 的带宽选择算法 |
+| `rd_robust` 自动带宽 | 未实现 | 需复现 rd_robust 的带宽选择算法 |
 | `teffects` AI-robust 方差 | 未实现 | 同上 |
 
 ## 四、已定性但不再追查的数值差异

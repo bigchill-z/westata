@@ -66,11 +66,11 @@ probe("Heckman.fit(method='ml')", lambda: ws.Heckman.from_formula("y ~ x1 + sele
 probe("Frontier(distribution='exponential')",
       lambda: ws.Frontier.from_formula("mpg ~ weight + length", A, distribution="exponential").fit())
 probe("Sureg.fit(cov_type='robust')",
-      lambda: ws.Sureg.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], A.dropna()).fit(cov_type="robust"))
+      lambda: ws.SeeminglyUnrelatedRegress.from_formula(["price ~ weight + mpg", "mpg ~ weight + foreign"], A.dropna()).fit(cov_type="robust"))
 probe("XtGls(corr='ar1')",
-      lambda: ws.XtGls.from_formula("mpg ~ weight", A.assign(id=np.arange(len(A)) // 6 % 10,
+      lambda: ws.PanelGls.from_formula("mpg ~ weight", A.assign(id=np.arange(len(A)) // 6 % 10,
                                                             t=np.arange(len(A)) % 6),
                                     panels="heteroskedastic", corr="ar1").fit())
 probe("XtAbond lags=2 param_names",
-      lambda: ws.XtAbond(D.assign(id=np.arange(len(D)) // 6, t=np.arange(len(D)) % 6),
+      lambda: ws.PanelAbond(D.assign(id=np.arange(len(D)) // 6, t=np.arange(len(D)) % 6),
                          endog="yb", lags=2, regressors=["x1", "x2"], entity="id", time="t").fit().param_names)

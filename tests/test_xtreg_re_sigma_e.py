@@ -50,7 +50,7 @@ def fitted():
     frame = frame.copy()
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         "y ~ k1 + C(year)", frame, entity="sid", time="year"
     ).fit()
 

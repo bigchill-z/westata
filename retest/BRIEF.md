@@ -32,7 +32,7 @@ with Stata() as st:                       # 启动内嵌 Stata（mp）
     cap = st.estimate("regress mpg weight i.foreign")   # 捕获 e(b)/e(V)/e() scalars
     cap.b, cap.V, cap.names, cap.scalars, cap.macros, cap.nobs
 
-res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", df).fit()
+res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", df).fit()
 comp = compare("regress i.foreign", cap, res, tolerance=1e-9,
                scalars=("N", "df_r", "r2", "rmse"))
 Record("linear").add(comp)                # 立刻落盘 + 打印一行

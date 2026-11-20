@@ -142,7 +142,7 @@ def block_linear() -> None:
             ("regress mpg weight foreign, vce(robust)", {"cov_type": "HC1"}),
         ]:
             cap = st.estimate(cmd)
-            res = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(**kw)
+            res = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(**kw)
             check(f"{cmd}: e(F)", scalar(res, "F"), cap.scalars["F"])
             check_scalar(f"{cmd}: e(df_r)", scalar(res, "df_r"), cap.scalars["df_r"])
             check_scalar(f"{cmd}: e(rss)", scalar(res, "rss"), cap.scalars["rss"])
@@ -150,7 +150,7 @@ def block_linear() -> None:
 
         st.send(df)
         cap = st.estimate("regress yiv x1 e1, vce(cluster gid)")
-        res = ws.OLS.from_formula("yiv ~ x1 + e1", df).fit(
+        res = ws.Regress.from_formula("yiv ~ x1 + e1", df).fit(
             cov_type="cluster", cov_kwds={"groups": df["gid"]}
         )
         check_scalar("cluster: e(df_r) = G-1", scalar(res, "df_r"), cap.scalars["df_r"])
@@ -196,7 +196,7 @@ def block_panel() -> None:
         cr = st.estimate("xtreg y x1 x2, fe vce(robust)")
         cc = st.estimate("xtreg y x1 x2, fe vce(cluster id)")
         check("Stata itself: V_robust == V_cluster", cr.V, cc.V, tol=1e-12)
-        p = ws.PanelOLS.from_formula("y ~ x1 + x2", df, entity="id", time="t")
+        p = ws.PanelRegressFE.from_formula("y ~ x1 + x2", df, entity="id", time="t")
         se_stata = np.sqrt(np.diag(cc.V))
         hr = p.fit(cov_type="HC1")
         cl = p.fit(cov_type="cluster", cov_kwds={"groups": df["id"]})
@@ -215,7 +215,7 @@ def block_panel() -> None:
                 y[i] = 0.5 * y[i - 1] + 0.8 * rng.normal() - 0.4 * rng.normal() + rng.normal(scale=0.7)
         dyn = pd.DataFrame({"id": ids, "t": T, "y": y,
                             "x1": rng.normal(size=480), "x2": rng.normal(size=480)})
-        ab = ws.XtAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=2).fit()
+        ab = ws.PanelAbond.from_formula("y ~ x1 + x2", dyn, entity="id", time="t", lags=2).fit()
         names = list(ab.param_names)
         print(f"  xtabond lags=2 names: {names}")
         want = [n for n in names if n.startswith("L")]
@@ -301,13 +301,13 @@ def block_limited() -> None:
         st.send(qd)
         for tau in (0.25, 0.5, 0.75):
             cap = st.estimate(f"qreg y x1, quantile({tau}) vce(robust)")
-            r = ws.QuantileRegression.from_formula("y ~ x1", qd, quantile=tau).fit(cov_type="robust")
+            r = ws.QuantileRegress.from_formula("y ~ x1", qd, quantile=tau).fit(cov_type="robust")
             check_named(f"qreg tau={tau} robust: SE (heteroskedastic DGP)", r, cap.names,
                         np.sqrt(np.diag(cap.V)), tol=1e-6, field="bse")
 
         st.run("sysuse auto, clear")
         cap = st.estimate("rreg mpg weight length")
-        rr = ws.RobustRegression.from_formula("mpg ~ weight + length", auto_ := pd.read_stata(
+        rr = ws.RobustRegress.from_formula("mpg ~ weight + length", auto_ := pd.read_stata(
             "tests/data/auto.dta", convert_categoricals=False)).fit()
         check_named("rreg: SE law rmse*sqrt(diag((X'X)^-1))", rr, cap.names,
                     np.sqrt(np.diag(cap.V)), tol=1e-6, field="bse")

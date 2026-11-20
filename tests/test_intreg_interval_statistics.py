@@ -43,7 +43,7 @@ def _frame(n: int = 400, seed: int = 5600):
 
 @pytest.fixture(scope="module")
 def intreg_fit():
-    return ws.Intreg.from_formula("lo hi ~ x", _frame()).fit()
+    return ws.IntervalRegress.from_formula("lo hi ~ x", _frame()).fit()
 
 
 # ------------------------------------------------------------- the registration

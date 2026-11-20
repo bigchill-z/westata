@@ -124,7 +124,7 @@ tests/test_zero_scored_but_present.py         # 守卫改写
 | 参数 | 类型 | 语义 / 校验 |
 |---|---|---|
 | `data` | `pd.DataFrame` | 长面板；`unit`/`time`/`depvar`/`predictors` 列必须存在 |
-| `unit` / `time` | `str` | 面板 / 时间变量（Stata 用 `xtset`，DataFrame 显式给列名） |
+| `unit` / `time` | `str` | 面板 / 时间变量（Stata 用 `panel_set`，DataFrame 显式给列名） |
 | `depvar` | `str` | 结果变量 |
 | `predictors` | `Sequence[str]` | 可含 `var(period)`（复用 `ws.synth` 的解析） |
 | `trunit` / `trperiod` | 编码 / 数值 | 必须能在相应列取到（`:61-66,85-90`），否则 `ValueError` |
@@ -292,7 +292,7 @@ pval[t] = [tr_eff[t], two, right, left]          # T1 x 4
    —— 对拍测试必须转红。
 5. 守卫改写：`test_the_two_missing_features.py:44-47`、
    `test_zero_scored_but_present.py:74` 由「断言缺席」改为「存在性检查」，
-   并保留 `xtserial` 仍缺席的部分。
+   并保留 `panel_serial` 仍缺席的部分。
 6. registry 追加 `command: synth2`，`level: E2`，notes 逐量写实测差；
    `scripts/audit_registry_coverage.py` 的 `NO_TABLE` 需加 `synth2`（无系数表）。
 7. 全量 `pytest -q` + registry schema 校验 + 每 20 轮修改一次全量测试。

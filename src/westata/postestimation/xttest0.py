@@ -41,11 +41,11 @@ from scipy import stats
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["XtTest0Result", "xttest0"]
+__all__ = ["PanelTest0Results", "panel_test0"]
 
 
 @dataclass(frozen=True)
-class XtTest0Result(ResultSerialisation):
+class PanelTest0Results(ResultSerialisation):
     """``xttest0``: the Breusch-Pagan LM test for random effects."""
 
     chibar2: float
@@ -198,11 +198,11 @@ def _panel_name(result: Any, kind: str) -> str:
     return str(stored.get(key) or "").strip()
 
 
-def xttest0(
+def panel_test0(
     result: Any,
     *,
     entity: Any = None,
-) -> XtTest0Result:
+) -> PanelTest0Results:
     """Breusch-Pagan LM test for a random effect, as ``xttest0`` after ``xtreg, re``.
 
     ``entity`` supplies the group labels when ``result`` does not carry them. The residuals
@@ -344,7 +344,7 @@ def xttest0(
     if var_y is None:
         var_y = float(np.var(values, ddof=1))
 
-    return XtTest0Result(
+    return PanelTest0Results(
         chibar2=float(statistic),
         pvalue=float(pvalue),
         var_u=float(var_u),

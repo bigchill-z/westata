@@ -74,13 +74,13 @@ def _panel(with_covariate: bool) -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def plain():
     frame = _panel(with_covariate=False)
-    return ws.Didregress.from_formula("y", "t", frame, group="unit", time="year").fit()
+    return ws.DIDRegress.from_formula("y", "t", frame, group="unit", time="year").fit()
 
 
 @pytest.fixture(scope="module")
 def with_covariate():
     frame = _panel(with_covariate=True)
-    return ws.Didregress.from_formula("y x1", "t", frame, group="unit", time="year").fit()
+    return ws.DIDRegress.from_formula("y x1", "t", frame, group="unit", time="year").fit()
 
 
 def test_the_atet_row_matches_stata(plain) -> None:

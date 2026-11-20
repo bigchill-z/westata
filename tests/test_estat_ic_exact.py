@@ -56,7 +56,7 @@ def ic():
         frame = pd.read_stata(DATA).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.estat_ic(ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit())
+    return ws.estat_ic(ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit())
 
 
 def test_the_block_matches_stata_byte_for_byte(ic) -> None:

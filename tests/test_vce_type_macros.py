@@ -56,8 +56,8 @@ def frame():
 
 def _fit(frame, cov_type=None, cov_kwds=None):
     if cov_type is None:
-        return ws.OLS.from_formula("y ~ x", frame).fit()
-    return ws.OLS.from_formula("y ~ x", frame).fit(
+        return ws.Regress.from_formula("y ~ x", frame).fit()
+    return ws.Regress.from_formula("y ~ x", frame).fit(
         cov_type=cov_type, cov_kwds=cov_kwds or {}
     )
 

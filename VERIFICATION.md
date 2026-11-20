@@ -30,22 +30,22 @@
 | `xtreg, fe` | 25 | 同上 |
 | `xtreg, be` | 20 | 同上 |
 | `VAR` 完整报告 | 39 | `test_var_full_report_exact.py` |
-| `varsoc` | 14 | `test_varsoc_table_exact.py` |
+| `var_select_order` | 14 | `test_varsoc_table_exact.py` |
 | `dfuller` | 13 | `test_dfuller_table_exact.py` |
-| `vecstable` | 11 | `test_vecstable_table_exact.py` |
-| `varstable` | 11 | `test_varstable_exact.py` |
+| `vec_stable` | 11 | `test_vecstable_table_exact.py` |
+| `var_stable` | 11 | `test_varstable_exact.py` |
 | `irf_table`（宽表） | 14 | `test_irf_table_all_columns.py` |
 | `irf_table`（窄表） | 11 | `test_irf_table_narrow_form.py` |
 | `fevd_table_as_stata` | 14 | `test_fevd_table_as_stata.py` |
 | **`esttab`** | **18** | `test_esttab_c10_07.py` |
 | **`summarize, detail`** | **15** | `test_summarize_detail_exact.py` |
 | `summarize`（多变量） | 7 | `test_summarize_multivariable_exact.py` |
-| `varlmar` | 8 | `test_varlmar_varwle_exact.py` |
-| `varwle` | 21 | 同上 |
+| `var_lmar` | 8 | `test_varlmar_varwle_exact.py` |
+| `var_wle` | 21 | 同上 |
 | `estat firststage` | 7 | `test_firststage_exact.py` |
 | `estat classification` | 23 | `test_classification_and_white_exact.py` |
 | `estat imtest, white` | 15 | 同上 |
-| `estat ic`（OLS/VAR） | 1 | `test_estat_ic_vif_values.py` |
+| `estat ic`（Regress/VAR） | 1 | `test_estat_ic_vif_values.py` |
 | `lincom` | 6 | `test_test_and_lincom_exact.py` |
 
 **合计 21 张表、约 360 行逐字符一致。**
@@ -75,17 +75,17 @@
 | C11-05 `margins eyex` | 0.5714 | 8 位精确 |
 | C11-06 `margins at()` | 0.8182 | 8 位精确 |
 | C11-07 分类正确率 | 0.4783 | **23 行一致** |
-| C12-01/02/03/04/05/07/08/09 | 0.0–1.0 | 全部精确（含 MLE、xttest0、LSDV）|
-| C13-02 `varwle` | 0.9524 | **21 行一致** |
-| C13-03 `varlmar` | 0.875 | 8 行一致 |
-| C13-05 `vargranger` | 1.0 | chi2 改 5 位有效数字后一致 |
+| C12-01/02/03/04/05/07/08/09 | 0.0–1.0 | 全部精确（含 MLE、panel_test0、LSDV）|
+| C13-02 `var_wle` | 0.9524 | **21 行一致** |
+| C13-03 `var_lmar` | 0.875 | 8 行一致 |
+| C13-05 `var_granger` | 1.0 | chi2 改 5 位有效数字后一致 |
 | C13-06 `irf_table` | 0.0 | **14 行 + 11 行一致** |
 | C13-07 `estat ic` after arima | 0.8571 | 差异来自 **trend 默认值**，对齐后一致 |
 | C13-08 整型因子 | 0.125 | 12 参数、R²/F 精确 |
 | C14-02 ADF lags(9) | 0.0 | Z(t) 7 位精确、N=156 正确 |
 | C15-01 `psmatch` ATET | 0.8333 | 点估计 8 位精确（方差如实用 NaN）|
 | C15-06 IPW | 0.0556 | ATE 精确，se 高 0.24%（联合估计差异）|
-| C16-01/03 `rdrobust` | 0.0 | hc0 方差与 covs 均精确 |
+| C16-01/03 `rd_robust` | 0.0 | hc0 方差与 covs 均精确 |
 | C09-04 杠杆值 | 0.0 | 4 位统计精确 |
 
 ---
@@ -113,7 +113,7 @@
 |---|---|---|
 | `bwselect` / `msetwo` | C16-02 | T1、T3（ADB 字节码）|
 | `synth` / `synth2` | C18-02 | ~~T3、T6（6 个内核不可读）~~ → 2026-11-09 证伪并落地 `synth` E2 |
-| `xtserial` | C12-11 | T3（本机 Stata 未安装）|
+| `panel_serial` | C12-11 | T3（本机 Stata 未安装）|
 | `summarize, detail` 百分位 | — | ~~T24~~ **已实现** |
 | `teffects psmatch` 方差 | C15-01 | T3、T23 |
 | `L()` 滞后算子 | C08-06 | ~~已实现~~ **第 115 轮完成** |
@@ -135,7 +135,7 @@
 | 159 | `summarize, detail` 未实现 | **整功能缺失** |
 | 160 | `detail` 空缺槽位未打印 `.` | 布局 |
 | 162 | **`VAR()` 丢弃 DataFrame 列名** | 影响所有 VAR 派生表 |
-| 162 | `varlmar` 缺顶部边框、`varwle` chi2 位数 | 布局 |
+| 162 | `var_lmar` 缺顶部边框、`var_wle` chi2 位数 | 布局 |
 | 164 | **`VECM` 同一列名缺陷** | 同上 |
 | 165 | ARIMA/GARCH 缺 `response_name` | 后估计读到 None |
 

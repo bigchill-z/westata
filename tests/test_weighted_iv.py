@@ -326,7 +326,7 @@ def test_the_rss_scale_matches_ols_for_the_same_weights() -> None:
     iv_fit = ws.IV2SLS.from_formula(
         "y ~ 1 + [x ~ z1 + z2]", frame, weights=weight, weight_type="aweight"
     ).fit()
-    ols_fit = ws.OLS.from_formula("y ~ x", frame, weights=weight, weight_type="aweight").fit()
+    ols_fit = ws.Regress.from_formula("y ~ x", frame, weights=weight, weight_type="aweight").fit()
 
     # Compare the SCALE both use: rss / sum of normalised weights is the weighted MSE,
     # which is scale-free and therefore comparable across the two estimators.

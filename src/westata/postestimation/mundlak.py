@@ -28,7 +28,7 @@ from scipy import stats as scipy_stats
 
 
 @dataclass
-class MundlakResult:
+class MundlakResults:
     """The Mundlak specification test.
 
     Attributes
@@ -139,7 +139,7 @@ def estat_mundlak(
     storer: Any = None,
     entity: str | None = None,
     time: str | None = None,
-) -> MundlakResult:
+) -> MundlakResults:
     """Stata's ``estat mundlak``.
 
     Parameters
@@ -192,7 +192,7 @@ def estat_mundlak(
         terms.append(mean_name)
 
     if storer is None:
-        from westata.estimators.panel import RandomEffects
+        from westata.estimators.panel import PanelRegressRE
 
         if entity is None:
             raise ValueError(
@@ -206,13 +206,13 @@ def estat_mundlak(
                 "estat mundlak: the result records no response name; pass storer="
             )
         formula = f"{response} ~ " + " + ".join(list(slopes) + terms)
-        refit = RandomEffects.from_formula(
+        refit = PanelRegressRE.from_formula(
             formula, augmented, entity=entity, time=time
         ).fit()
     else:
         refit = storer(augmented)
 
     statistic, df, pvalue = _joint_wald(refit, terms)
-    return MundlakResult(
+    return MundlakResults(
         statistic=statistic, df=df, pvalue=pvalue, tested=list(slopes)
     )

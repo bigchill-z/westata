@@ -46,7 +46,7 @@ def rendered():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("cobb_douglas.dta is not available")
-    return str(ws.OLS.from_formula("y ~ k + l", frame).fit().lincom("k + l"))
+    return str(ws.Regress.from_formula("y ~ k + l", frame).fit().lincom("k + l"))
 
 
 def test_every_line_matches_stata(rendered) -> None:
@@ -76,6 +76,6 @@ def test_the_value_and_interval_agree_with_the_fit() -> None:
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("cobb_douglas.dta is not available")
-    outcome = ws.OLS.from_formula("y ~ k + l", frame).fit().lincom("k + l")
+    outcome = ws.Regress.from_formula("y ~ k + l", frame).fit().lincom("k + l")
     assert float(outcome.estimate) == pytest.approx(1.075205, abs=5e-7)
     assert float(outcome.std_err) == pytest.approx(0.1159063, abs=5e-7)

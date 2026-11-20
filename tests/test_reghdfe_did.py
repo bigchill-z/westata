@@ -63,7 +63,7 @@ def _did_panel() -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def fitted():
     frame = _did_panel()
-    return ws.FEOLS("y ~ did_x | unit + year", frame).fit(
+    return ws.RegressHighDimFixedEffects("y ~ did_x | unit + year", frame).fit(
         cov_type="cluster", cov_kwds={"groups": frame["grp"]}
     )
 
@@ -96,5 +96,5 @@ def test_the_degrees_of_freedom_match_stata(fitted) -> None:
 def test_the_entry_point_is_feols_not_reghdfe() -> None:
     """Recorded because C17-01's score came from the missing NAME, not a wrong number."""
 
-    assert hasattr(ws, "FEOLS")
+    assert hasattr(ws, "RegressHighDimFixedEffects")
     assert not hasattr(ws, "reghdfe")

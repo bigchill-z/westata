@@ -43,7 +43,7 @@ import pandas as pd
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["ImpulseResponse", "IrFTable", "IrfResult", "Varbasic", "varbasic", "irf_table"]
+__all__ = ["ImpulseResponse", "IrfTable", "IrfResults", "VarBasic", "varbasic", "irf_table"]
 
 
 # ---------------------------------------------------------------- helpers
@@ -150,7 +150,7 @@ class ImpulseResponse(ResultSerialisation):
 
 
 @dataclass(frozen=True)
-class IrfResult(ResultSerialisation):
+class IrfResults(ResultSerialisation):
     """The fitted VAR plus everything ``irf table`` needs."""
 
     names: list[str]
@@ -334,7 +334,7 @@ class IrfResult(ResultSerialisation):
         return "\n".join(lines)
 
 
-class Varbasic:
+class VarBasic:
     """Class form of :func:`varbasic`, following the package's estimator convention.
 
     ``VarBasic(frame, "dlny", lags=1, time="year").fit()`` is the same computation as
@@ -360,7 +360,7 @@ class Varbasic:
         self._time = time
         self._subset = subset
 
-    def fit(self) -> IrfResult:
+    def fit(self) -> IrfResults:
         """Estimate the VAR and register the IRF (the responses need :func:`irf_table`)."""
 
         return varbasic(
@@ -481,7 +481,7 @@ def varbasic(
     trend: str = "c",
     time: str | None = None,
     subset: "Any | None" = None,
-) -> IrfResult:
+) -> IrfResults:
     """Stata's ``varbasic``: fit a VAR(p) and register an IRF.
 
     ``time`` names the time variable. It is OPTIONAL -- omitting it changes no number, only the
@@ -720,7 +720,7 @@ def varbasic(
     if trend == "c":
         regressor_names.append("_cons")
 
-    return IrfResult(
+    return IrfResults(
         names=names,
         regressor_names=tuple(regressor_names),
         lags=len(order),
@@ -748,7 +748,7 @@ def varbasic(
 
 # ---------------------------------------------------------------- IRF
 @dataclass(frozen=True)
-class IrFTable(ResultSerialisation):
+class IrfTable(ResultSerialisation):
     """Stata's ``irf table irf`` block."""
 
     responses: "tuple[ImpulseResponse, ...]"
@@ -943,13 +943,13 @@ def _cell_irf(text: str, end: int, used: int) -> str:
 
 
 def irf_table(
-    fitted: IrfResult,
+    fitted: IrfResults,
     *,
     impulse: str | None = None,
     response: str | None = None,
     steps: int = 8,
     all: bool = False,
-) -> IrFTable:
+) -> IrfTable:
     """Stata's ``irf table irf``: impulse responses with delta-method bands.
 
     ``varbasic`` registers the IRF but prints no table; this is the second command that shows it.
@@ -982,11 +982,11 @@ def irf_table(
                 fitted, impulse or names[0], response or names[0], steps
             )
         ]
-    return IrFTable(responses=tuple(pairs))
+    return IrfTable(responses=tuple(pairs))
 
 
 def _response_pair(
-    fitted: IrfResult, impulse: str, response: str, steps: int
+    fitted: IrfResults, impulse: str, response: str, steps: int
 ) -> ImpulseResponse:
     """One impulse-response path with its band."""
 
@@ -1040,7 +1040,7 @@ def _response_pair(
 
 
 def _coefficient_covariance(
-    fitted: IrfResult,
+    fitted: IrfResults,
     coefficients: np.ndarray,
     design: np.ndarray,
     equation: int,
@@ -1058,7 +1058,7 @@ def _coefficient_covariance(
     return sigma_jj * xtx_inv[np.ix_(lag_rows, lag_rows)]
 
 
-def _lag_count(fitted: IrfResult) -> int:
+def _lag_count(fitted: IrfResults) -> int:
     """How many lag blocks the fit retained, read from its coefficient matrix."""
 
     coefficients = np.asarray(fitted.coefficients, dtype=float)

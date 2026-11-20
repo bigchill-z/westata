@@ -71,7 +71,7 @@ with Stata() as st:
         cap = st.estimate(command)
         names = list(cap.names)
         pos = {name: i for i, name in enumerate(names)}
-        res = ws.RobustRegression.from_formula(formula, frame).fit()
+        res = ws.RobustRegress.from_formula(formula, frame).fit()
 
         stata_order = [pos["_cons"] if nm == "Intercept" else pos[nm]
                        for nm in res.param_names]

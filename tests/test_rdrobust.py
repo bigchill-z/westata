@@ -53,7 +53,7 @@ def _sample():
 @pytest.fixture(scope="module")
 def fitted():
     vote, margin = _sample()
-    return ws.rdrobust(vote, margin, bandwidth=STATA_H)
+    return ws.rd_robust(vote, margin, bandwidth=STATA_H)
 
 
 def test_point_estimate_matches_stata(fitted) -> None:
@@ -97,15 +97,15 @@ def test_the_standard_error_now_reproduces_stata(fitted) -> None:
 def test_bandwidth_selection_refuses_rather_than_guessing() -> None:
     vote, margin = _sample()
     with pytest.raises(Exception):
-        ws.rdrobust(vote, margin)
+        ws.rd_robust(vote, margin)
 
 
 def test_a_custom_cutoff_is_honoured() -> None:
     """A cutoff away from zero must actually move the estimate."""
 
     vote, margin = _sample()
-    at_zero = ws.rdrobust(vote, margin, bandwidth=0.5, cutoff=0.0).tau
-    shifted = ws.rdrobust(vote, margin, bandwidth=0.5, cutoff=0.3).tau
+    at_zero = ws.rd_robust(vote, margin, bandwidth=0.5, cutoff=0.0).tau
+    shifted = ws.rd_robust(vote, margin, bandwidth=0.5, cutoff=0.3).tau
     assert abs(at_zero - shifted) > 1e-3
 
 
@@ -130,7 +130,7 @@ def test_the_point_estimate_matches_stata_on_real_data() -> None:
         _pytest.skip("border.dta is not available")
 
     sample = frame[["diff", "border"]].dropna()
-    result = ws.rdrobust(
+    result = ws.rd_robust(
         sample["diff"], sample["border"], cutoff=30.0, bandwidth=5.0, bias_bandwidth=8.0
     )
     import pytest as _pytest
@@ -166,7 +166,7 @@ def test_the_variance_is_computed_on_a_second_dataset() -> None:
         _pytest.skip("border.dta is not available")
 
     sample = frame[["diff", "border"]].dropna()
-    result = ws.rdrobust(
+    result = ws.rd_robust(
         sample["diff"], sample["border"], cutoff=30.0, bandwidth=5.0, bias_bandwidth=8.0
     )
     assert _np.isfinite(result.se) and result.se > 0

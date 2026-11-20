@@ -41,7 +41,7 @@ def pair():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
     iv = ws.IV2SLS.from_formula("lnw ~ [s ~ expr + tenure + age]", frame).fit()
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
     return hausman(iv, ols)
 
 

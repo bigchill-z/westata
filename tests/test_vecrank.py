@@ -39,7 +39,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.vecrank import vecrank
+from westata.postestimation.vecrank import vec_rank
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -61,7 +61,7 @@ def data():
 
 @pytest.fixture(scope="module")
 def table(data):
-    return vecrank(data, lags=2)
+    return vec_rank(data, lags=2)
 
 
 def test_sample_and_lag_count_match_stata(table) -> None:
@@ -118,7 +118,7 @@ def test_lags_one_matches_stata(data) -> None:
     Computing the reduced-rank regression directly reproduces all four numbers.
     """
 
-    result = vecrank(data, lags=1)
+    result = vec_rank(data, lags=1)
     table = str(result)
 
     assert "172.5034" in table

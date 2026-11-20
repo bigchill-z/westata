@@ -34,7 +34,7 @@ def _lines(n: int) -> list[str]:
     return [
         line
         for line in str(
-            ws.estat_ovtest(ws.OLS.from_formula("y ~ x1 + x2", frame).fit())
+            ws.estat_omitted_variables_test(ws.Regress.from_formula("y ~ x1 + x2", frame).fit())
         ).splitlines()
         if line.strip()
     ]

@@ -48,7 +48,7 @@ def panel():
 
 @pytest.fixture(scope="module")
 def fitted(panel):
-    return ws.FEOLS.from_formula("y ~ x | firm", panel).fit()
+    return ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm", panel).fit()
 
 
 # --------------------------------------------------------------- registration
@@ -178,7 +178,7 @@ def test_the_coefficient_equals_the_within_regression(panel) -> None:
     were built from a different coefficient, this would disagree.
     """
 
-    fitted = ws.FEOLS.from_formula("y ~ x | firm", panel).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm", panel).fit()
     coefficient = float(np.asarray(fitted.params, dtype=float)[0])
 
     groups = panel["firm"].to_numpy()
@@ -202,7 +202,7 @@ def test_multi_way_absorption_is_refused_with_a_reason(panel) -> None:
     misleading, since single-way absorption works.
     """
 
-    fitted = ws.FEOLS.from_formula("y ~ x | firm + year", panel).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm + year", panel).fit()
 
     with pytest.raises(ws.UnsupportedError, match="MORE THAN ONE absorbed dimension"):
         fitted.predict(kind="xb")
@@ -211,13 +211,13 @@ def test_multi_way_absorption_is_refused_with_a_reason(panel) -> None:
 def test_a_model_without_absorption_registers_nothing(panel) -> None:
     """No absorbed effect means no ``d``; the generic ``xb`` path already applies."""
 
-    fitted = ws.FEOLS.from_formula("y ~ x", panel).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x", panel).fit()
 
     assert getattr(fitted, "_predict_types", None) is None
 
 
 def test_an_unknown_kind_is_refused(panel) -> None:
-    fitted = ws.FEOLS.from_formula("y ~ x | firm", panel).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | firm", panel).fit()
 
     with pytest.raises((ws.UnsupportedError, ValueError)):
         fitted.predict(kind="stdf")

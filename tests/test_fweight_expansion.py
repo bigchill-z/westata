@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
 
 def _data(n: int = 30, seed: int = 5) -> tuple[pd.DataFrame, np.ndarray]:
@@ -37,11 +37,11 @@ def _expanded(df: pd.DataFrame, counts: np.ndarray) -> pd.DataFrame:
 @pytest.mark.parametrize("cov_type", ["nonrobust", "HC0", "HC1", "HC2", "HC3"])
 def test_fweight_matches_expanded_for_all_hc_variants(cov_type):
     df, counts = _data()
-    weighted = OLS.from_formula(
+    weighted = Regress.from_formula(
         "y ~ x1 + x2", df, weights=counts, weight_type="fweight"
     ).fit(cov_type=cov_type)
 
-    expanded = OLS.from_formula("y ~ x1 + x2", _expanded(df, counts)).fit(
+    expanded = Regress.from_formula("y ~ x1 + x2", _expanded(df, counts)).fit(
         cov_type=cov_type
     )
 
@@ -58,13 +58,13 @@ def test_fweight_matches_expanded_for_cluster():
     rng = np.random.default_rng(21)
     clusters = rng.integers(0, 4, size=len(df))
 
-    weighted = OLS.from_formula(
+    weighted = Regress.from_formula(
         "y ~ x1 + x2", df, weights=counts, weight_type="fweight"
     ).fit(cov_type="cluster", cov_kwds={"groups": clusters})
 
     expanded_df = _expanded(df, counts)
     expanded_clusters = np.repeat(clusters, counts.astype(int))
-    expanded = OLS.from_formula("y ~ x1 + x2", expanded_df).fit(
+    expanded = Regress.from_formula("y ~ x1 + x2", expanded_df).fit(
         cov_type="cluster", cov_kwds={"groups": expanded_clusters}
     )
 
@@ -77,7 +77,7 @@ def test_fweight_matches_expanded_for_cluster():
 
 def test_fweight_e_df_r_uses_expanded_sample_size():
     df, counts = _data()
-    res = OLS.from_formula(
+    res = Regress.from_formula(
         "y ~ x1 + x2", df, weights=counts, weight_type="fweight"
     ).fit()
     expanded_n = counts.sum()

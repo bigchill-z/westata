@@ -49,7 +49,7 @@ def _panel_frame(n: int = 600) -> pd.DataFrame:
 
 
 def test_a_random_effects_logit_names_only_the_command() -> None:
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "hi ~ x", _panel_frame(), entity="id", time="t", method="re"
     ).fit()
     heading = _heading(fitted)
@@ -60,14 +60,14 @@ def test_a_random_effects_logit_names_only_the_command() -> None:
 def test_no_heading_carries_a_comma() -> None:
     """A trailing ", re" would be an option, not part of the command."""
 
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "hi ~ x", _panel_frame(), entity="id", time="t", method="re"
     ).fit()
     assert not _heading(fitted).rstrip().endswith("re")
 
 
 def test_the_absorbed_fit_still_says_areg() -> None:
-    fitted = ws.FEOLS.from_formula("y ~ x | id", _panel_frame()).fit()
+    fitted = ws.RegressHighDimFixedEffects.from_formula("y ~ x | id", _panel_frame()).fit()
     heading = _heading(fitted)
     assert "areg" in heading
     assert "reghdfe" not in heading
@@ -75,7 +75,7 @@ def test_the_absorbed_fit_still_says_areg() -> None:
 
 @pytest.mark.parametrize(
     "estimator,formula,expected",
-    [("OLS", "y ~ x", "regress"), ("Logit", "hi ~ x", "logit")],
+    [("Regress", "y ~ x", "regress"), ("Logit", "hi ~ x", "logit")],
 )
 def test_the_plain_commands_are_unaffected(estimator, formula, expected) -> None:
     frame = _panel_frame(500)

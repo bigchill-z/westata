@@ -76,8 +76,8 @@ def test_the_kernel_constants_are_the_documented_ones() -> None:
 def test_rdrobust_still_refuses_to_guess_a_bandwidth(senate) -> None:
     """Guard the honest failure: a 50x-wrong selector must not be silently used."""
 
-    from westata.estimators.rdrobust import rdrobust
+    from westata.estimators.rdrobust import rd_robust
     from westata.errors import UnsupportedError
 
     with pytest.raises(UnsupportedError, match="bandwidth"):
-        rdrobust(senate["vote"].to_numpy(), senate["margin"].to_numpy())
+        rd_robust(senate["vote"].to_numpy(), senate["margin"].to_numpy())

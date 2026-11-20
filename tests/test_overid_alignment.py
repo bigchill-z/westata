@@ -43,7 +43,7 @@ def _rows(n: int) -> list[str]:
     )
     fitted = ws.IV2SLS.from_formula("y ~ w + [x ~ z1 + z2]", frame).fit()
     return [
-        line for line in str(ws.estat_overid(fitted)).splitlines() if line.strip()
+        line for line in str(ws.estat_overidentification(fitted)).splitlines() if line.strip()
     ]
 
 

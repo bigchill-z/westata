@@ -30,7 +30,7 @@ def granger():
         }
     )
     fitted = ws.VAR(frame[["y1", "y2"]], lags=2).fit()
-    return str(ws.vargranger(fitted))
+    return str(ws.var_granger(fitted))
 
 
 def test_the_chi2_uses_five_significant_figures(granger) -> None:

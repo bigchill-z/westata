@@ -105,7 +105,7 @@ def test_endogenous_matches_stata(grilic) -> None:
 def test_hausman_statistic_matches_stata(grilic) -> None:
     """C10-06: chi2(1) = 24.92 reproduces exactly."""
 
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure", grilic).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure", grilic).fit()
     iv = ws.IV2SLS.from_formula("lnw ~ [s ~ expr + tenure]", grilic).fit()
     rendered = str(ws.hausman(iv, ols))
     assert f"{STATA_HAUSMAN_CHI2:.2f}" in rendered
@@ -115,12 +115,12 @@ def test_hausman_statistic_matches_stata(grilic) -> None:
 def test_fe_robust_se_matches_stata(panel) -> None:
     """C12-02, which the report scores 0.00 / 0.00."""
 
-    fit = ws.PanelOLS(PANEL_FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
+    fit = ws.PanelRegressFE(PANEL_FORMULA, panel, entity="pid", time="tid").fit(cov_type="robust")
     assert float(fit.bse["ltlan"]) == pytest.approx(STATA_FE_ROBUST_SE, abs=5e-7)
 
 
 def test_mle_variance_component_matches_stata(panel) -> None:
     """C12-05, also scored 0.00 / 0.00."""
 
-    fit = ws.RandomEffectsMLE(PANEL_FORMULA, panel, entity="pid", time="tid").fit()
+    fit = ws.PanelRegressMLE(PANEL_FORMULA, panel, entity="pid", time="tid").fit()
     assert float(fit.e["sigma_u"]) == pytest.approx(STATA_MLE_SIGMA_U, abs=5e-6)

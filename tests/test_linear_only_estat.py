@@ -53,7 +53,7 @@ def models(frame):
     """One linear fit and several non-linear ones sharing the same design."""
 
     return {
-        "OLS": ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
+        "Regress": ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
         "Logit": ws.Logit.from_formula("yb ~ x1 + x2", frame).fit(),
         "Poisson": ws.Poisson.from_formula("yc ~ x1", frame).fit(),
         "NBreg": ws.NegativeBinomial.from_formula("yc ~ x1", frame).fit(),
@@ -65,10 +65,10 @@ def models(frame):
 def test_hettest_works_on_a_linear_model(models) -> None:
     """The guard must not over-reach: OLS still reports the test."""
 
-    result = models["OLS"].estat_hettest()
+    result = models["Regress"].estat_heteroskedasticity_test()
 
     assert np.isfinite(float(result.statistic))
-    assert "rss" in models["OLS"].e and "mss" in models["OLS"].e
+    assert "rss" in models["Regress"].e and "mss" in models["Regress"].e
 
 
 @pytest.mark.parametrize("label", ["Logit", "Poisson", "NBreg", "OrderedLogit"])
@@ -79,7 +79,7 @@ def test_hettest_refuses_on_non_linear_models(models, label) -> None:
 
     assert "rss" not in result.e
     with pytest.raises(ValueError, match="linear"):
-        result.estat_hettest()
+        result.estat_heteroskedasticity_test()
 
 
 def test_hettest_refusal_is_typed_not_an_indexerror(models) -> None:
@@ -90,12 +90,12 @@ def test_hettest_refusal_is_typed_not_an_indexerror(models) -> None:
     """
 
     with pytest.raises(ValueError):
-        models["NBreg"].estat_hettest()
+        models["NBreg"].estat_heteroskedasticity_test()
 
 
 # -------------------------------------------------------------------- ovtest
 def test_ovtest_works_on_a_linear_model(models) -> None:
-    result = models["OLS"].estat_ovtest()
+    result = models["Regress"].estat_omitted_variables_test()
 
     assert np.isfinite(float(result.statistic))
 
@@ -105,7 +105,7 @@ def test_ovtest_refuses_on_non_linear_models(models, label) -> None:
     result = models[label]
 
     with pytest.raises(ValueError, match="linear|sums of squares"):
-        result.estat_ovtest()
+        result.estat_omitted_variables_test()
 
 
 def test_the_former_silent_answers_would_have_looked_plausible(frame, models) -> None:
@@ -117,14 +117,14 @@ def test_the_former_silent_answers_would_have_looked_plausible(frame, models) ->
 
     # The comparison is only meaningful if a linear fit is available for the same
     # response; use a binary response with both OLS and logit.
-    ols = ws.OLS.from_formula("yb ~ x1", frame).fit()
+    ols = ws.Regress.from_formula("yb ~ x1", frame).fit()
     logit = ws.Logit.from_formula("yb ~ x1", frame).fit()
 
-    linear_ovtest = float(ols.estat_ovtest().statistic)
+    linear_ovtest = float(ols.estat_omitted_variables_test().statistic)
 
     # Both must now refuse rather than mimic it.
     with pytest.raises(ValueError):
-        logit.estat_ovtest()
+        logit.estat_omitted_variables_test()
     # The linear number itself remains available and finite.
     assert np.isfinite(linear_ovtest)
 
@@ -162,12 +162,12 @@ def test_rreg_offers_no_estat_subcommands(frame) -> None:
     assume OLS residuals; ``rreg``'s come from an iteratively reweighted fit.
     """
 
-    result = ws.RobustRegression.from_formula("y ~ x1", frame).fit()
+    result = ws.RobustRegress.from_formula("y ~ x1", frame).fit()
 
     # The estimate itself is fine and still usable.
     assert np.all(np.isfinite(np.asarray(result.params, dtype=float)))
 
-    for method in ("estat_hettest", "estat_ovtest"):
+    for method in ("estat_heteroskedasticity_test", "estat_omitted_variables_test"):
         with pytest.raises(ValueError, match="rreg"):
             getattr(result, method)()
 
@@ -175,10 +175,10 @@ def test_rreg_offers_no_estat_subcommands(frame) -> None:
 def test_ols_still_offers_hettest_and_ovtest(frame) -> None:
     """Regression guard: the rreg exclusion must not touch plain OLS."""
 
-    result = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
-    assert np.isfinite(float(result.estat_hettest().statistic))
-    assert np.isfinite(float(result.estat_ovtest().statistic))
+    assert np.isfinite(float(result.estat_heteroskedasticity_test().statistic))
+    assert np.isfinite(float(result.estat_omitted_variables_test().statistic))
 
 
 # ------------------------------- estat vif is not an ivregress subcommand
@@ -208,7 +208,7 @@ def test_iv_estimators_still_offer_the_subcommands_stata_does(frame) -> None:
 
     result = ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z1]", frame).fit()
 
-    assert result.estat_firststage() is not None
+    assert result.estat_first_stage() is not None
     assert result.estat_endogenous() is not None
 
 
@@ -236,11 +236,11 @@ def test_xtreg_offers_estat_summarize(panel_frame, estimator) -> None:
     """
 
     if estimator == "fe":
-        result = ws.PanelOLS.from_formula(
+        result = ws.PanelRegressFE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
     else:
-        result = ws.RandomEffects.from_formula(
+        result = ws.PanelRegressRE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
 
@@ -251,7 +251,7 @@ def test_xtreg_offers_estat_summarize(panel_frame, estimator) -> None:
 
 
 @pytest.mark.parametrize("estimator", ["fe", "re"])
-@pytest.mark.parametrize("method", ["estat_hettest", "estat_ovtest"])
+@pytest.mark.parametrize("method", ["estat_heteroskedasticity_test", "estat_omitted_variables_test"])
 def test_xtreg_refuses_the_tests_it_does_not_allow(
     panel_frame, estimator, method
 ) -> None:
@@ -263,11 +263,11 @@ def test_xtreg_refuses_the_tests_it_does_not_allow(
     """
 
     if estimator == "fe":
-        result = ws.PanelOLS.from_formula(
+        result = ws.PanelRegressFE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
     else:
-        result = ws.RandomEffects.from_formula(
+        result = ws.PanelRegressRE.from_formula(
             "y ~ x1", panel_frame, entity="firm", time="year"
         ).fit()
 
@@ -278,7 +278,7 @@ def test_xtreg_refuses_the_tests_it_does_not_allow(
 def test_xtreg_still_offers_ic_and_vce(panel_frame) -> None:
     """The two subcommands it does allow must keep working."""
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1", panel_frame, entity="firm", time="year"
     ).fit()
 

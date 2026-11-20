@@ -60,7 +60,7 @@ def fit():
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("lin_1992.dta is not available")
     frame = frame.dropna(subset=["ltvfo", *XS]).reset_index(drop=True)
-    return ws.RandomEffectsMLE.from_formula(
+    return ws.PanelRegressMLE.from_formula(
         FORMULA, frame, entity="province", time="t"
     ).fit()
 
@@ -144,7 +144,7 @@ def test_unbalanced_panels_report_their_own_min_and_max() -> None:
                 {"id": unit, "t": period, "y": rng.normal(), "x": rng.normal()}
             )
     frame = pd.DataFrame(rows)
-    result = ws.RandomEffectsMLE.from_formula(
+    result = ws.PanelRegressMLE.from_formula(
         "y ~ x", frame, entity="id", time="t"
     ).fit()
     assert result.e["g_min"] == 4.0

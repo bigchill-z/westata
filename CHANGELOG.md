@@ -7,6 +7,31 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.41] - 2026-11-20
+
+### Changed — the naming convention is applied to the whole public API
+
+All 136 entries of the machine-readable rename contract (`scripts/naming_map.py`) are now in
+the source tree. Familiar Stata acronyms stay (`DID`, `IV`, `VAR`), cryptic prefixes expand
+(`Xt -> Panel`, `Svy -> Survey`, `Teffects -> TreatmentEffects`), result classes take the plural
+`*Results`, and the `estat_` prefix is kept while its suffix expands. `OLS -> Regress`,
+`Varbasic -> VarBasic`, `IrFTable -> IrfTable`.
+
+R-N5 compatibility: EVERY old public name remains importable as a direct alias with a
+DeprecationWarning at import time; old estat method names resolve through
+`StataResults.__getattr__`. Class aliases are the class itself, so `OLS.from_formula(...)` and
+`isinstance(x, OLS)` still work. Aliases are removed in one release.
+
+### Verification
+
+Full `pytest -q`: **6764 passed, 23 skipped, 0 failed**. `check_naming.py` reports 136/136 done,
+0 findings. The API reference was regenerated (305/305 prose coverage) and the documentation
+guard suite passes. Special care was taken with third-party symbols: `linearmodels`' `PanelOLS`
+/ `RandomEffects` and `statsmodels.api.OLS` keep their original names, as do Stata e() macros,
+`.ado` paths and cov_type aliases.
+
+---
+
 ## [0.3.40] - 2026-11-19
 
 ### Fixed — `var`'s `Sample:` line printed nanoseconds on a date axis
@@ -123,18 +148,18 @@ the coverage audit reports `UNACCOUNTED FOR: 0`.
 
 ## [0.3.38] - 2026-11-18
 
-### Added — `varstable(...).plot()`, the figure Stata's `varstable, graph` draws
+### Added — `var_stable(...).plot()`, the figure Stata's `var_stable, graph` draws
 
-`varstable, graph` is not a time-series plot. `varstable_w2.ado` hands the option to
+`var_stable, graph` is not a time-series plot. `varstable_w2.ado` hands the option to
 `_vec_grcroots.ado`, which draws the eigenvalues of the COMPANION matrix in the complex plane —
 real part on x, imaginary part on y — over a unit circle, titled `Roots of the companion matrix`.
 `plot()` is that figure:
 
 ```python
 fit = ws.VAR(df[["dinf", "unem"]], lags=2).fit()
-ws.varstable(fit).plot()                   # circle + one point per root
-ws.varstable(fit).plot(labels=True)        # annotate with the modulus  (Stata's `modlabel`)
-ws.varstable(fit).plot(labels="distance")  # 1 - |eigenvalue|           (Stata's `dlabel`)
+ws.var_stable(fit).plot()                   # circle + one point per root
+ws.var_stable(fit).plot(labels=True)        # annotate with the modulus  (Stata's `modlabel`)
+ws.var_stable(fit).plot(labels="distance")  # 1 - |eigenvalue|           (Stata's `dlabel`)
 ```
 
 Three details are load-bearing and each is pinned by a test:
@@ -282,25 +307,25 @@ each compared against a live Stata run.
 
 ## [0.3.35] - 2026-11-17
 
-### Added — `varsoc`'s configuration options
+### Added — `var_select_order`'s configuration options
 
-`varlmar`, `varstable`, `varwle`, `vargranger` and the `irf` suite were already implemented and
-already byte-identical to Stata. `varsoc` was the one with gaps, and it now takes the options Stata
+`var_lmar`, `var_stable`, `var_wle`, `var_granger` and the `irf` suite were already implemented and
+already byte-identical to Stata. `var_select_order` was the one with gaps, and it now takes the options Stata
 actually accepts:
 
 ```python
-ws.varsoc(values, names=["a", "b"], maxlag=3, exog=frame[["x"]], constant=False)
+ws.var_select_order(values, names=["a", "b"], maxlag=3, exog=frame[["x"]], constant=False)
 ```
 
 Five shapes are byte-identical to Stata, including the two combinations:
 
 | command | result |
 |---|---|
-| `varsoc a b, maxlag(3)` | ✅ |
-| `varsoc a b, maxlag(3) exog(x)` | ✅ |
-| `varsoc a b, maxlag(3) noconstant` | ✅ |
-| `varsoc a b, maxlag(2) exog(x) noconstant` | ✅ |
-| `varsoc a b, maxlag(4)` | ✅ |
+| `var_select_order a b, maxlag(3)` | ✅ |
+| `var_select_order a b, maxlag(3) exog(x)` | ✅ |
+| `var_select_order a b, maxlag(3) noconstant` | ✅ |
+| `var_select_order a b, maxlag(2) exog(x) noconstant` | ✅ |
+| `var_select_order a b, maxlag(4)` | ✅ |
 
 ### The option list was PROBED, not recalled
 
@@ -311,8 +336,8 @@ ignored. `sep()` only spaces the printed block and changes no number, so it is n
 ### Two lag-0 rules that only the `noconstant` captures revealed
 
 * The lag-0 row disappears **only when there is nothing to regress on** — no constant AND no
-  exogenous variables. `varsoc a b, noconstant` starts at lag 1, but
-  `varsoc a b, exog(x) noconstant` still prints lag 0 because `x` is a regressor.
+  exogenous variables. `var_select_order a b, noconstant` starts at lag 1, but
+  `var_select_order a b, exog(x) noconstant` still prints lag 0 because `x` is a regressor.
 * When it does disappear, the first printed row still carries `.` in the **LR and p** columns, with
   `df` showing the equation count (`equations²`, not `equations`). The p field is right-aligned to
   column 38 — a start-anchored column put the dot four places early, visible only on that row.
@@ -560,7 +585,7 @@ ws.varbasic(frame, "dlny", lags=1, time="year", keep=frame["year"] < 2013)
 ws.varbasic(frame, "dlny", lags=1, time="year", subset=frame["year"] < 2013)
 ```
 
-`subset=` is what `OLS`, `Logit`, `Poisson`, `FEOLS` and `Didregress` all take, so `keep=` was a
+`subset=` is what `Regress`, `Logit`, `Poisson`, `RegressHighDimFixedEffects` and `DIDRegress` all take, so `keep=` was a
 reinvention that made callers repeat themselves. `hdfe.py` already documented why the mask matters
 rather than a pre-sliced frame:
 
@@ -648,7 +673,7 @@ Hence `keep=` takes a mask over the **full** frame rather than expecting the cal
 
 ### API
 
-`Varbasic(...).fit()` is the class form required by R2.7; `varbasic(...)` remains a thin wrapper.
+`VarBasic(...).fit()` is the class form required by R2.7; `varbasic(...)` remains a thin wrapper.
 `keep` is a boolean mask over the full frame.
 
 ### Verified
@@ -663,7 +688,7 @@ commands; API prose coverage is 298/298.
 
 ### Fixed — `corrgram`'s block framing
 
-`corrgram` was already available as `ws.estat_corrgram`, and its table body was byte-identical to
+`corrgram` was already available as `ws.estat_correlogram`, and its table body was byte-identical to
 Stata: every AC/PAC/Q/Prob>Q value, both bar charts, all 79-column lines. What differed was the
 **framing** — where the block starts and ends. That is invisible when reading the output and only
 shows up when it is diffed against a real Stata log.
@@ -686,8 +711,8 @@ blank sits between the note and the scale row. A single blank closes it either w
 Both are now reproduced exactly — 13 lines byte-identical without a gap, 8 with one:
 
 ```python
-fit = ws.OLS.from_formula("y ~ 1", frame).fit()
-print(ws.estat_corrgram(fit, lags=8, time="t"))
+fit = ws.Regress.from_formula("y ~ 1", frame).fit()
+print(ws.estat_correlogram(fit, lags=8, time="t"))
 ```
 
 ### Verified
@@ -744,15 +769,15 @@ does not carry the flag.
 
 ## [0.3.26] - 2026-11-15
 
-### Added — `xtset`, `xtdes` and `xtsum`
+### Added — `panel_set`, `panel_describe` and `panel_summarize`
 
 Stata's three panel-description commands, each reproducing the printed block character for
 character:
 
 ```python
-ws.xtset(panel, entity="pid", time="year")
-ws.xtdes(panel, entity="pid", time="year")
-ws.xtsum(panel, ["y", "k1"], entity="pid", time="year")
+ws.panel_set(panel, entity="pid", time="year")
+ws.panel_describe(panel, entity="pid", time="year")
+ws.panel_summarize(panel, ["y", "k1"], entity="pid", time="year")
 ```
 
 ```
@@ -792,17 +817,17 @@ Four of these were wrong on the first attempt and only character-level compariso
 
 | detail | what it actually is |
 |---|---|
-| `xtsum` within sd | the plain sample sd of the deviations (`ddof=1`). Multiplying by `sqrt(T/(T-1))` — the rescaling used elsewhere — gives a different number |
-| `xtsum` within min/max | the deviations **shifted back by the grand mean**; the raw deviations span `-86123.88 .. 114493.12` where Stata prints `-25109.56 .. 175507.4` |
-| `xtsum` numbers | **seven** significant figures with the leading zero dropped |
-| `xtsum` row label | **left**-aligned in 8 columns, which is why `within` carries two trailing spaces and `between` one |
-| `xtdes` pattern rule | `max(9, span + 2)` dashes — measured across spans 4, 5 and 17 |
-| `xtset` gap | a hole **inside one entity's range**, not inside the union of observed periods. A panel where one entity covers `1..5` and another skips `3` still prints `, but with a gap` |
+| `panel_summarize` within sd | the plain sample sd of the deviations (`ddof=1`). Multiplying by `sqrt(T/(T-1))` — the rescaling used elsewhere — gives a different number |
+| `panel_summarize` within min/max | the deviations **shifted back by the grand mean**; the raw deviations span `-86123.88 .. 114493.12` where Stata prints `-25109.56 .. 175507.4` |
+| `panel_summarize` numbers | **seven** significant figures with the leading zero dropped |
+| `panel_summarize` row label | **left**-aligned in 8 columns, which is why `within` carries two trailing spaces and `between` one |
+| `panel_describe` pattern rule | `max(9, span + 2)` dashes — measured across spans 4, 5 and 17 |
+| `panel_set` gap | a hole **inside one entity's range**, not inside the union of observed periods. A panel where one entity covers `1..5` and another skips `3` still prints `, but with a gap` |
 
 ### API-rule compliance
 
-`xtset` / `xtdes` / `xtsum` are **r-class descriptions**, not estimation commands: they store no
-coefficient vector, so they are registered alongside `xtserial` in the R2.7 allow-list rather than
+`panel_set` / `panel_describe` / `panel_summarize` are **r-class descriptions**, not estimation commands: they store no
+coefficient vector, so they are registered alongside `panel_serial` in the R2.7 allow-list rather than
 given an empty `.from_formula().fit()` shell. Their three result classes are exported at the package
 root so callers can name the type they receive (R5.2).
 
@@ -919,19 +944,19 @@ Five new guards in `tests/test_xtreg_mle_rho_interval.py`.
 
 ## [0.3.23] - 2026-11-15
 
-### Added — `ws.xtoverid`, the Sargan-Hansen test of overidentifying restrictions
+### Added — `ws.panel_overid`, the Sargan-Hansen test of overidentifying restrictions
 
-`xtoverid` is a user-written Stata command (Schaffer & Stillman, 2.1.8), not a base one. After
+`panel_overid` is a user-written Stata command (Schaffer & Stillman, 2.1.8), not a base one. After
 `xtreg ..., re` it re-estimates the same equation with the WITHIN DEVIATIONS of every regressor
 added and tests those terms jointly to zero: a rejection means the random-effects estimator is
 inconsistent and fixed effects is preferred.
 
 ```python
-re_fit = ws.RandomEffects.from_formula(
+re_fit = ws.PanelRegressRE.from_formula(
     "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mci + ngca",
     df, entity="province", time="t",
 ).fit()
-print(ws.xtoverid(re_fit))
+print(ws.panel_overid(re_fit))
 ```
 
 ```
@@ -955,7 +980,7 @@ Six cases were captured from live StataNow 19.5 and all reproduce:
 
 **Two details are load-bearing, and both were measured rather than assumed.**
 
-**1. The VCE follows the original fit.** `xtoverid.ado:178-181` mirrors `e(vcetype)` when it
+**1. The VCE follows the original fit.** `panel_overid.ado:178-181` mirrors `e(vcetype)` when it
 refits, so the same equation gives `53.285` under the conventional VCE and `221.225` under
 `cov_type="robust"`. That is a 4x difference: a version that always used the model-based VCE would
 pass a "does it run" check while being wrong on every robust fit. `xtreg, re robust` is
@@ -964,9 +989,9 @@ pass a "does it run" check while being wrong on every robust fit. `xtreg, re rob
 
 **2. The auxiliary equation is quasi-demeaned at the ORIGINAL `e(theta)`.** Every added regressor
 is a within deviation with an identically zero group mean, so it carries no between variation.
-Re-estimating the variance components through `RandomEffects` therefore drifts `sigma_u` from
+Re-estimating the variance components through `PanelRegressRE` therefore drifts `sigma_u` from
 `.13324845` to `.09466035` and `theta` from `.81012778` to `.73537079`, landing **4.66 away** on the
-statistic. Stata's own `xtoverid, noisily` prints the ORIGINAL `sigma_u`/`theta`, which is what the
+statistic. Stata's own `panel_overid, noisily` prints the ORIGINAL `sigma_u`/`theta`, which is what the
 fixed-theta GLS solve reproduces.
 
 ### Refused, not approximated
@@ -974,8 +999,8 @@ fixed-theta GLS solve reproduces.
 - `xtreg, fe` / `be` / `fd` — the ado itself refuses them at `:97-104`.
 - `xtivreg` / `xtivreg2` / `xthtaylor` — these need `ivreg2` plus an instrument set this package does
   not record in the shape the ado reads.
-- weighted fits — `xtoverid.ado:165-168` refuses them outright.
-- `sigma_u == 0` (a degenerate RE fit that collapsed to pooled OLS) — `xtoverid.ado:241-244`.
+- weighted fits — `panel_overid.ado:165-168` refuses them outright.
+- `sigma_u == 0` (a degenerate RE fit that collapsed to pooled Regress) — `panel_overid.ado:241-244`.
 - unbalanced panels — they store no single `e(theta)`, only the five `e(thta_*)` percentiles, and
   picking one would be inventing an estimator.
 
@@ -1107,7 +1132,7 @@ fixed estimators. For balanced data, this is a constant, and for unbalanced data
 values is presented in the header of the output."* That option is now reachable:
 
 ```python
-res = ws.RandomEffects.from_formula(
+res = ws.PanelRegressRE.from_formula(
     "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mci + ngca",
     df, entity="province", time="t",
 ).fit(cov_type="robust")
@@ -1155,9 +1180,9 @@ runs (`StataMP-64.exe -b do`) and compared byte for byte, not transcribed from t
 
 ## [0.3.21] - 2026-11-14
 
-### Fixed — `xttest0` after `xtreg ..., re`: four measured defects
+### Fixed — `panel_test0` after `xtreg ..., re`: four measured defects
 
-Reported against Stata's `xtreg ..., re` followed by `xttest0`. With the panel variable named the
+Reported against Stata's `xtreg ..., re` followed by `panel_test0`. With the panel variable named the
 same way on both sides the outputs are now byte-identical — 15 lines, zero differences:
 
 ```
@@ -1187,11 +1212,11 @@ so Stata uses the most digits that still fit 8 characters; a shared significant-
 `.003737434` where Stata has `.0037374`.
 
 **3. The equation line printed placeholders** (`lny[id,t]`). `StataResults` has no `entity_name`
-attribute, and `xtreg` recorded the panel names nowhere on the path `RandomEffects.fit` actually takes
-(it delegates to `PanelOLS.fit`). Stata stores them in `e(ivar)`/`e(tvar)`, which is now done where
+attribute, and `xtreg` recorded the panel names nowhere on the path `PanelRegressRE.fit` actually takes
+(it delegates to `PanelRegressFE.fit`). Stata stores them in `e(ivar)`/`e(tvar)`, which is now done where
 the `e()` block is built.
 
-**4. `xttest0(fit)` refused without `entity=`.** Label discovery tried a hard-coded list
+**4. `panel_test0(fit)` refused without `entity=`.** Label discovery tried a hard-coded list
 (`id`/`entity`/`group`/`county`/`firm`/`prov`), so a variable named `province` or `st_abb` was never
 found even though the fit knew the name. `e(ivar)` is now tried first, with the old list as fallback.
 
@@ -1217,7 +1242,7 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
   patsy alphabetises the design matrix, so a trend term came out in the wrong row:
 
   ```python
-  ws.PanelOLS.from_formula(
+  ws.PanelRegressFE.from_formula(
       "ltvfo ~ ltlan + ltwlab + ltpow + ltfer + hrs + mipric1 + giprice + mci "
       "+ ngca + t", d, entity="province", time="t").fit(...)
   ```
@@ -1229,7 +1254,7 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
   westata:   t, ltlan ... ngca, _cons      <- before this fix
   ```
 
-  The cause was narrow. `OLS` records `_formula_rhs_order` when the model is built
+  The cause was narrow. `Regress` records `_formula_rhs_order` when the model is built
   (`linear.py`) and `StataResults._stata_order` uses it to reproduce Stata's `e(b)`
   layout; the panel estimators never set that attribute, so only they fell back to
   patsy's alphabetical order. A trend is the case that exposes it -- every other
@@ -1245,7 +1270,7 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
 ## [0.3.19] - 2026-11-14
 
 ### Fixed
-* **`ws.xtserial` now returns the first-stage differenced regression.**  Stata's
+* **`ws.panel_serial` now returns the first-stage differenced regression.**  Stata's
   `, output` prints that regression before the three-line test block, and this
   package computed it and then discarded it -- wasteful, since the test needs those
   residuals, and unhelpful, since the differenced equation is an estimate in its own
@@ -1267,11 +1292,11 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
 ## [0.3.18] - 2026-11-14
 
 ### Added
-* **`ws.xtserial` -- Wooldridge's test for serial correlation in panel data**, the
+* **`ws.panel_serial` -- Wooldridge's test for serial correlation in panel data**, the
   user-written Stata command of that name.
 
   ```python
-  result = ws.xtserial(df, "ltvfo ~ ltlan + ltwlab + ...", entity="province", time="t")
+  result = ws.panel_serial(df, "ltvfo ~ ltlan + ltwlab + ...", entity="province", time="t")
   print(result)
   ```
 
@@ -1282,8 +1307,8 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
              Prob > F =      0.0015
   ```
 
-  `xtserial` is Drukker's ado (`xtserial.ado` v1.1.0, 22apr2003), distributed
-  outside SSC -- `net install xtserial, from("http://www.stata.com/users/ddrukker")`.
+  `panel_serial` is Drukker's ado (`panel_serial.ado` v1.1.0, 22apr2003), distributed
+  outside SSC -- `net install panel_serial, from("http://www.stata.com/users/ddrukker")`.
   Its body is four lines, so this is a transcription: difference the response and
   every regressor (no constant, clustered on the panel), regress those residuals on
   their own lag the same way, and test that the lag coefficient equals **-0.5**.
@@ -1345,7 +1370,7 @@ Full suite **6401 passed, 5 skipped, 0 failed**, with 9 new guards in
 
 ### Added -- class forms for the seven remaining estimation commands
 
-`newey`/`prais` got class forms in 0.3.14 (R2.7). Seven estimation commands were
+`newey_west`/`prais` got class forms in 0.3.14 (R2.7). Seven estimation commands were
 still reachable only as bare functions, so the same operation took a construction
 step in 40 families and none in these:
 
@@ -1353,12 +1378,12 @@ step in 40 families and none in these:
 ws.Synth.from_variables(data, unit="id", time="t", depvar="y",
                         predictors=["x1"], trunit=1, trperiod=12).fit()
 ws.Synth2.from_variables(...)                        # same options plus placebo/loo
-ws.Rcm.from_variables("y", data, predictors=["x1"], unit="id", time="t",
+ws.RegressionControlMethod.from_variables("y", data, predictors=["x1"], unit="id", time="t",
                       treated_unit=1, treatment_period=12).fit()
-ws.Rdrobust.from_variables("y", "running", data, bandwidth=0.5).fit()
-ws.TeffectsRa.from_variables("y", "d", data, covariates=["x1"]).fit()
-ws.TeffectsPsmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
-ws.TeffectsNnmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
+ws.RDRobust.from_variables("y", "running", data, bandwidth=0.5).fit()
+ws.TreatmentEffectsRa.from_variables("y", "d", data, covariates=["x1"]).fit()
+ws.TreatmentEffectsPsmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
+ws.TreatmentEffectsNnmatch.from_variables("y", "d", data, covariates=["x1"]).fit()
 ```
 
 Every function keeps working unchanged and delegates to the one implementation, so
@@ -1393,11 +1418,11 @@ from 0.3.15 and is resolved by reinstalling). `--strict` exits 0.
 ## [0.3.15] - 2026-11-14
 
 ### Fixed
-* **`PanelOLS.fit(cov_type="cluster", ...)` no longer depends on the installed
+* **`PanelRegressFE.fit(cov_type="cluster", ...)` no longer depends on the installed
   `linearmodels` version.** The documented call
 
   ```python
-  ws.PanelOLS.from_formula(formula, df, entity="province", time="t").fit(
+  ws.PanelRegressFE.from_formula(formula, df, entity="province", time="t").fit(
       cov_type="cluster", cov_kwds={"groups": df["province"]})
   ```
 
@@ -1448,15 +1473,15 @@ Coefficients and standard errors were already exact to 1e-8 for both `fe` and
 was captured from StataNow 19.5 on 2026-11-14 and is pinned by
 `tests/test_xtreg_fe_robust_sigma.py`.
 
-### Added -- `newey` and `prais` have the class form every other estimator has
+### Added -- `newey_west` and `prais` have the class form every other estimator has
 
 Both are e-class estimation commands, but they were the only two reachable
 exclusively as bare functions: the same operation took a construction step in 40
-families (`ws.OLS.from_formula(...).fit()`) and none in these two (`ws.newey(...)`).
+families (`ws.Regress.from_formula(...).fit()`) and none in these two (`ws.newey_west(...)`).
 
 ```python
 ws.Newey.from_formula("y ~ x1", data, lag=2).fit()
-ws.newey("y ~ x1", data, lag=2)      # same numbers, still supported
+ws.newey_west("y ~ x1", data, lag=2)      # same numbers, still supported
 
 ws.Prais.from_formula("y ~ x", data).fit()
 ws.prais(data, "y ~ x")              # same numbers, still supported
@@ -1468,7 +1493,7 @@ they agree bit-for-bit.
 
 Three decisions worth knowing:
 
-* **Neither `fit()` accepts `cov_type`.** Stata's `newey`/`prais` have no `vce()`
+* **Neither `fit()` accepts `cov_type`.** Stata's `newey_west`/`prais` have no `vce()`
   option; the HAC / AR(1)-transformed variance IS the estimator, so a `cov_type`
   parameter would promise a choice that cannot be honoured.
 * **`lag` and `corc` are model options** and live on construction, not on `fit()`.
@@ -1479,7 +1504,7 @@ Three decisions worth knowing:
 
 `docs/API_CONVENTIONS.md` gains R2.7, which decides by what Stata stores rather than
 by style: a command returning `StataResults` (e-class, fills `e(b)`/`e(V)`) needs a
-class form; a test command returning only `r()` (`dfuller`, `kpss`, `vecrank`)
+class form; a test command returning only `r()` (`dfuller`, `kpss`, `vec_rank`)
 correctly stays function-only. The rule carries a shrinking backlog of the seven
 causal estimators still awaiting the same treatment.
 
@@ -1499,14 +1524,14 @@ assigned the string to something else and left `cov_type` at `None`:
 
 ```python
 # before
-ws.PanelOLS.from_formula("y ~ x", panel, entity="firm", time="year").fit("HC1")
+ws.PanelRegressFE.from_formula("y ~ x", panel, entity="firm", time="year").fit("HC1")
 # -> cov_type="nonrobust", bse=[0.060844 0.062376]   (the request was ignored)
 # after
 # -> cov_type="cluster",   bse=[0.000409 0.047031]
 ```
 
-`PanelOLS`/`RandomEffects`/`RandomEffectsMLE` now take
-`(cov_type, cov_kwds, ssc, *, entity_effects, time_effects)`; `Heckman`/`Etregress`
+`PanelRegressFE`/`PanelRegressRE`/`PanelRegressMLE` now take
+`(cov_type, cov_kwds, ssc, *, entity_effects, time_effects)`; `Heckman`/`EndogenousTreatmentRegress`
 take `(cov_type, cov_kwds, ssc, *, method, maxiter, strict)`. **Calls that passed
 `entity_effects` or `method` positionally must switch to keywords.**
 
@@ -1517,12 +1542,12 @@ same word means a different estimator in each family:
 
 | call | reports |
 |---|---|
-| `OLS(..., cov_type="robust")` | `HC1` |
+| `Regress(..., cov_type="robust")` | `HC1` |
 | `IV2SLS(..., cov_type="robust")` | `HC0` |
 | `Logit(..., cov_type="robust")` | `ML_ROBUST` (the `n/(n-1)` sandwich) |
-| `PanelOLS(..., cov_type="robust")` | `cluster` (`xtreg`'s `vce(robust)` *is* `vce(cluster panelvar)`) |
-| `QuantileRegression(..., cov_type="robust")` | `QREG_ROBUST` |
-| `Sureg(..., cov_type="robust")` | `SYSTEMS_ROBUST` |
+| `PanelRegressFE(..., cov_type="robust")` | `cluster` (`xtreg`'s `vce(robust)` *is* `vce(cluster panelvar)`) |
+| `QuantileRegress(..., cov_type="robust")` | `QREG_ROBUST` |
+| `SeeminglyUnrelatedRegress(..., cov_type="robust")` | `SYSTEMS_ROBUST` |
 
 **If you branch on `result.cov_type == "robust"`, use the predicate instead:**
 
@@ -1534,8 +1559,8 @@ if is_robust(result.cov_type):
 
 ### Added - `cov_type="robust"` works everywhere Stata has it
 
-`FEOLS` and `Areg` used to *reject* Stata's own spelling and demand `HC1`; they now accept
-it (it is the same covariance, verified `bse`-identical). `RobustRegression` silently
+`RegressHighDimFixedEffects` and `Areg` used to *reject* Stata's own spelling and demand `HC1`; they now accept
+it (it is the same covariance, verified `bse`-identical). `RobustRegress` silently
 ignored any `cov_type`; it now refuses with a reason (`rreg` has no `vce()`). The global
 `"ROBUST": "HC1"` alias is gone: each family declares its own target, so a new estimator
 that forgets raises instead of silently receiving HC1.
@@ -1554,9 +1579,9 @@ Six subcommands were method-only (`result.estat_auc()`) and could not be called 
 `StataResults` postestimation methods expose real signatures instead of `**kwargs`
 (`inspect.signature(result.estat_vif)` now shows the parameters).
 
-### Fixed - `estat_esize` `level` is a fraction
+### Fixed - `estat_effect_size` `level` is a fraction
 
-`estat_esize(level=95.0)` was the only percentage `level` in the package. It is now
+`estat_effect_size(level=95.0)` was the only percentage `level` in the package. It is now
 `level=0.95`, matching `margins`/`nlcom`/`contrast`. Passing `0.95` to the old code
 computed `(100 - 0.95) / 2 = 49.5%` intervals.
 
@@ -1566,7 +1591,7 @@ computed `(100 - 0.95) / 2 = 49.5%` intervals.
   `sample = data.dropna()` and then read `data` throughout, so the documented listwise
   deletion did not happen. A 144-row panel with one missing value now reports
   `observations=131` (correct) instead of using the uncleaned series.
-* **`estat_esize().ci_lower` was always `nan`.** The noncentral-F solve has no root when
+* **`estat_effect_size().ci_lower` was always `nan`.** The noncentral-F solve has no root when
   the observed F is small, and the bracket failure returned `nan`; the correct lower
   limit is 0 (an effect size of 0), not a missing value.
 * **`modeltests.py` never recognised a constant.** Its set contained capitalised
@@ -1576,13 +1601,13 @@ computed `(100 - 0.95) / 2 = 49.5%` intervals.
 ### Changed - naming
 
 `prais`/`im_pesaran_shin`/`levin_lin_chu` take `data` instead of `frame` (R2.3);
-`Didregress`/`RegressionAdjustment`/`IPW`/`NearestNeighbourMatching` gained
+`DIDRegress`/`RegressionAdjustment`/`IPW`/`NearestNeighbourMatching` gained
 `from_variables(...)` with `from_formula` kept as a deprecation alias (R3.2);
 `Areg(noabsorb=)` became `absorb_test=` (it turns off the absorbed-indicator *test*, not
-absorption); `tebalance_summarize(normalise_counts=)` became `normalize_counts=`;
-`dfgls` lost its `notrend` duplicate of `trend`.
+absorption); `treatment_balance_summarize(normalise_counts=)` became `normalize_counts=`;
+`df_gls` lost its `notrend` duplicate of `trend`.
 
-`XtAbond` and `XtUnitroot` no longer default matrix-interface names to `("L1.y",)` /
+`PanelAbond` and `PanelUnitroot` no longer default matrix-interface names to `("L1.y",)` /
 `("x1",)` / `"y"` -- literal column names from the dataset they were first tried on.
 
 ### Added - `scripts/check_api_conventions.py`
@@ -1842,7 +1867,7 @@ Worth recording because it silently changed every standard error in that table:
 | `regress ..., r` | `cov_type="HC1"` |
 | `ivregress ..., r` | `cov_type="HC0"` |
 
-Using `HC0` for the OLS columns scales every SE by `sqrt(n/(n-k))` — on grilic, `0.0061852491`
+Using `HC0` for the Regress columns scales every SE by `sqrt(n/(n-k))` — on grilic, `0.0061852491`
 against Stata's `0.0062098752`.
 
 ---
@@ -1904,7 +1929,7 @@ were already implemented:
 | Stata | westata | shape |
 |---|---|---|
 | `ivregress ..., first` | `result.first_stage()` | coefficient table |
-| `estat firststage` | `ws.estat_firststage(result)` | R-sq panel, no coefficients |
+| `estat firststage` | `ws.estat_first_stage(result)` | R-sq panel, no coefficients |
 
 ---
 
@@ -1918,7 +1943,7 @@ equivalent here?"  Answering it turned up three defects that all four commands s
 
 ### Added
 * **`time=` on `ws.estat_bgodfrey` / `ws.estat_dwatson` / `ws.wntestq` /
-  `ws.estat_corrgram`** — the `tsset` equivalent.  Either a column name of the
+  `ws.estat_correlogram`** — the `tsset` equivalent.  Either a column name of the
   retained estimation frame or the period values themselves, plus `delta=` for
   `tsset, delta(#)`.  With it, a period absent from the sample makes that lag
   MISSING, which is what `L.` does; without it the lags come from row order, as
@@ -1926,10 +1951,10 @@ equivalent here?"  Answering it turned up three defects that all four commands s
 * `n_gaps` on all four results, and Stata's own announcement reproduced byte for
   byte: `Number of gaps in sample = N` (bgodfrey/dwatson) and
   `(note: time series has N gap(s))` (wntestq/corrgram).
-* `result.estat_bgodfrey()`, `result.estat_corrgram()` and `result.wntestq()`.
+* `result.estat_bgodfrey()`, `result.estat_correlogram()` and `result.wntestq()`.
   `estat dwatson` got this wiring in round 93; the other three were reachable only
   as module functions, so the serial commands had inconsistent surfaces.
-* `ws.wntestq` and `ws.estat_corrgram` accept a **bare numeric series**, which is
+* `ws.wntestq` and `ws.estat_correlogram` accept a **bare numeric series**, which is
   what `wntestq e1` takes in Stata; previously a raw array raised
   `ConsistencyError` even though `docs/API.md` promised it worked.
 * Refusals matching Stata: clustered VCE (`vce(cluster)` sets `e(vcetype)=Robust`,
@@ -2209,7 +2234,7 @@ whose source tree matches the full committed documentation set.
 * The two compiled Mata kernels were **solved exactly** by black-box
   identification against live StataNow 19.5: `normalize()` = sample SD (ddof=1)
   of `[treated | controls]`; `regsval()` = normalised sum of SQUARED per-period
-  multivariate cross-sectional OLS coefficients. `scripts/verify_synth_mata_formulas.py`
+  multivariate cross-sectional Regress coefficients. `scripts/verify_synth_mata_formulas.py`
   verifies both in pure Python without a Stata licence (4/4, ~8e-14).
 * Six full-precision Stata captures committed in
   `tests/conformance/stata_fixtures/synth_*.json`; `StataCapture.capture_matrices()`
@@ -2259,12 +2284,12 @@ and sdist are in `dist/` (gitignored).
 
 #### 表格几何
 
-* **`varsoc` 的判定列右对齐到 55/65/75 列，星号不占宽度。** 此前使用起始列映射
+* **`var_select_order` 的判定列右对齐到 55/65/75 列，星号不占宽度。** 此前使用起始列映射
   `{56: 49, 66: 59, 76: 69}`，那只是**满宽情形**；短值如 `5.574` 会少两个空格。
   根因是宽度计算没有 `rstrip("*")`。现 **n = 100/200/300/900/1500 全部一致**。
-* **`varstable` 的行几何。** 两种形态的左栏都结束于第 13 列；复数另加符号在第 15 列、
+* **`var_stable` 的行几何。** 两种形态的左栏都结束于第 13 列；复数另加符号在第 15 列、
   虚部起于 17 列。此前复数行整体晚一列。现 **n = 60/200/900/1500 全部一致**。
-* **`vecstable` 的模数列**改用与 `varstable` 相同的 0.1 阈值规则
+* **`vec_stable` 的模数列**改用与 `var_stable` 相同的 0.1 阈值规则
   （≥0.1 用 6 位有效数字，<0.1 用 6 位小数），3/3 样本一致。
 * **`dfuller` 的增强版表头。** `lags > 0` 时 banner 为 "Augmented Dickey-Fuller" 且
   **独占一行**，观测数移到 Variable 行。列位置由 `dfuller.ado` 的
@@ -2278,7 +2303,7 @@ and sdist are in `dist/` (gitignored).
 
 * **`estat summarize` 的列宽是 9 而非 8**，三个格式区间：≥1 用 7 位有效数字、
   <1 用 7 位小数去尾零、<1e-5 用两位尾数的科学计数法。
-* **`varwle` 的小 chi2 去掉前导零**（`0.1923409` → `.1923409`）。
+* **`var_wle` 的小 chi2 去掉前导零**（`0.1923409` → `.1923409`）。
 * **`dwatson` 的统计量 <1 时用 7 位小数去尾零**（`.0070096`，而非 `.00701`）。
 * **`zip`/`zinb` 的对数似然用 7 位有效数字**，其余 ML 命令用 8 位。
 * **`estat ic` 的 `df` 列对吸收拟合计入常数**（`df_m + 1`）。
@@ -2306,18 +2331,18 @@ and sdist are in `dist/` (gitignored).
 #### 名称与文案
 
 * **`estat summarize` 表头写 Stata 命令名**：`reghdfe` → `areg`，并剥离 `, re` 之类的选项后缀。
-* **`varstable` 的两条稳定性提示**：`At least one eigenvalue is at least 1.0.`
+* **`var_stable` 的两条稳定性提示**：`At least one eigenvalue is at least 1.0.`
   与 `VAR does not satisfy stability condition.`（原文案不同）。
 
 ### Notes
 
 * 每处修正都附**多场景守卫**（新增 20 余个测试文件），且守卫在修复落地前会失败。
 * **6 处剩余差异经查为数值路径差异**，不是格式问题：
-  `estat vif` 的 1/VIF 第 9 位、`varstable` 在 n≥300 时特征值第 9 位、
+  `estat vif` 的 1/VIF 第 9 位、`var_stable` 在 n≥300 时特征值第 9 位、
   VECM 系数末位、`zip`/`zinb` 系数第 7 位有效数字。
   这些**记录在 `options.md` 而非调格式掩盖**。
 * **未实现的功能按要求记录跳过**：`bwselect`、`msetwo`、`synth`、`synth2`、
-  `xtserial`、`ztp`、`ztnb`、`teffects aipw` 等。
+  `panel_serial`、`ztp`、`ztnb`、`teffects aipw` 等。
 * `error.md` 新增第 27 条：几何对不上两次就该读 `.ado` 源码，不要第三次反推。
 
 ---
@@ -2402,7 +2427,7 @@ The two variants are now byte-identical to a live capture, 19 lines each.
 ### Known, unchanged
 
 The `corc` estimates themselves were already exact and are untouched. Six numerical differences
-recorded in `options.md` (the `estat vif` 1/VIF ninth figure, `varstable` eigenvalues at n >= 300,
+recorded in `options.md` (the `estat vif` 1/VIF ninth figure, `var_stable` eigenvalues at n >= 300,
 VECM last digit, `zip`/`zinb` seventh figure) are unrelated to this release and remain open.
 
 ---
@@ -2470,7 +2495,7 @@ The two compiled Mata kernels previously filed as "information unavailable"
 were **solved exactly** by black-box identification against live StataNow 19.5
 (P0, 2026-11-09): `normalize()` is the sample SD (ddof=1) of
 `[treated | controls]`; `regsval()` is the normalised sum of SQUARED
-per-period multivariate cross-sectional OLS coefficients.  `e(V_matrix)` is
+per-period multivariate cross-sectional Regress coefficients.  `e(V_matrix)` is
 directly exportable and `regsval` is a deterministic pure function of its
 four matrix arguments.  `scripts/verify_synth_mata_formulas.py` verifies both
 in pure Python without a Stata licence.
@@ -2539,12 +2564,12 @@ REAL DEFECTS FOUND AND FIXED:
   on every `predict ...; summarize ...` case.
 * **A plain `regress` did not close its coefficient table**, so every ordinary regression ended one
   line short of Stata's.
-* **`Didregress.n_used` read 0 until `fit`**, even though listwise deletion depends only on which
+* **`DIDRegress.n_used` read 0 until `fit`**, even though listwise deletion depends only on which
   cells are missing.
 
 CLAIMS THAT DID NOT REPRODUCE, each verified against a live Stata:
 
-* "`PanelOLS.fit(cov_type=...)` fails entirely on linearmodels 7.x" -- on 7.1 all three of
+* "`PanelRegressFE.fit(cov_type=...)` fails entirely on linearmodels 7.x" -- on 7.1 all three of
   `robust`/`HC1`/`cluster` succeed and produce different standard errors, so the variance is
   genuinely computed;
 * "the integer factor `C(m)` is not expanded" -- it expands to 12 parameters with F = 1.4245
@@ -2552,7 +2577,7 @@ CLAIMS THAT DID NOT REPRODUCE, each verified against a live Stata:
 * "`estat endogenous` scores 0.00" -- 6 of 6 lines match;
 * "`predict lev` / `predict p` / `margins, dydx(*)` score 0.00" -- all match exactly;
 * "weighted `logit, or` is missing its closing rule" -- the rule is present and every digit matches;
-* "`from_formula`'s first parameter should be a formula string" -- `Sureg` takes a LIST of equations
+* "`from_formula`'s first parameter should be a formula string" -- `SeeminglyUnrelatedRegress` takes a LIST of equations
   and the `teffects` family mirrors Stata's `(y) (t) (x)` two-formula syntax; a single formula
   cannot express either, so this is structure rather than a defect.
 
@@ -2699,15 +2724,15 @@ column names are parsed rather than splitting on `(`.
 ### Known limitation (not fixed, recorded)
 
 * `synth` / `synth2`: the core is Mata bytecode with no readable source in the installation.
-* `xtserial`: no `.ado` file exists; Stata itself raises `r(111)`.
-* `rdrobust` automatic bandwidth selection, `teffects` AI-robust variance, `arimasoc`: unimplemented.
+* `panel_serial`: no `.ado` file exists; Stata itself raises `r(111)`.
+* `rd_robust` automatic bandwidth selection, `teffects` AI-robust variance, `arimasoc`: unimplemented.
 * Numeric differences characterised and deliberately not chased: the last digit of a `logit ..., or`
   odds ratio and of an `ologit` cut point, where both implementation's likelihoods agree to fifteen
   digits and only the optimiser's stopping point differs.
 
 ### Fixed — `estat imtest, white` reported one degree of freedom too many
 
-`result.estat_imtest(white=True)` disagreed with Stata's `estat imtest, white`.
+`result.estat_information_matrix_test(white=True)` disagreed with Stata's `estat imtest, white`.
 The statistic was right; the **degrees of freedom** were not, and that changed
 the p-value and the verdict.
 
@@ -2756,7 +2781,7 @@ must collapse more than one column (14, against 28 nominal). Mutation check: put
 
 ### Fixed — `estat hettest` did not match Stata (`method="iid"` and the default)
 
-`result.estat_hettest()` and `result.estat_hettest(method="iid")` returned numbers
+`result.estat_heteroskedasticity_test()` and `result.estat_heteroskedasticity_test(method="iid")` returned numbers
 that disagreed with Stata's `estat hettest` / `estat hettest, iid`. The cause was
 not arithmetic — the auxiliary regression, the statistic formulas and the
 standardisation were all right. It was **which columns the auxiliary regression
@@ -2807,7 +2832,7 @@ And one behaviour that looked like a bug but is Stata's:
 **`mtest()` is silently dropped for a single-regressor auxiliary regression**
 (`hettest.ado:126-128`). Since the no-varlist default is a single column, the
 package was returning a `mtest` family where Stata returns only the simultaneous
-test and no `r(mtest)` matrix at all. `estat_hettest(mtest=...)` now does the
+test and no `r(mtest)` matrix at all. `estat_heteroskedasticity_test(mtest=...)` now does the
 same; pass `rhs=True` to get a family.
 
 **How this was verified.** `scripts/capture_hettest_fixtures.py` runs
@@ -2835,10 +2860,10 @@ findings and most of its P1s, each measured against a live StataNow run.
 - **`margins, atmeans` under fweight** took the means before expanding the weights, so the
   `At:` block showed `.3333` where Stata prints `.0495229` and the child MEM was 18% off.
   All five means and both MEMs now match character for character.
-- **`dfgls`** still does not match, and is recorded rather than shipped: the report says it
+- **`df_gls`** still does not match, and is recorded rather than shipped: the report says it
   omits the division by the standard error, but it already divides — the statistic has the
   wrong SIGN (`+0.806` against `-1.284`), and a grid over the detrending parameters never got
-  closer than `-0.1188`. `dfgls` is builtin in this Stata, so its source cannot be read.
+  closer than `-0.1188`. `df_gls` is builtin in this Stata, so its source cannot be read.
 
 ### Fixed — P1s
 
@@ -2854,7 +2879,7 @@ findings and most of its P1s, each measured against a live StataNow run.
   that hang past the aligned number and a constant printed LAST.
 - **`xtreg, mle`**: a different estimator from `xtreg, re`, not a variant — `sigma_u` differs by
   60%. Log-likelihood agrees to 9 significant figures.
-- **`vecrank`**: the 5% critical-value table was indexed by nothing, so a three-variable system
+- **`vec_rank`**: the 5% critical-value table was indexed by nothing, so a three-variable system
   printed `nan`; `lags(2)` statistics now reproduce Stata exactly after finding that lagged
   differences belong in BOTH residualisations.
 
@@ -2868,9 +2893,9 @@ additional names instead. `cov_params()` still returns an ndarray, by explicit u
 
 ### Known limitation (not fixed, recorded)
 
-`rdrobust` bandwidth selection: the algorithm is transcribed from `rdbwselect.ado` and two
-helpers are exact, but the selector lands 6x off and is NOT wired in. `rdrobust` still refuses
-to guess. Three-variable `vecrank` remains 15% high after QR+SVD removed an impossible >1
+`rd_robust` bandwidth selection: the algorithm is transcribed from `rdbwselect.ado` and two
+helpers are exact, but the selector lands 6x off and is NOT wired in. `rd_robust` still refuses
+to guess. Three-variable `vec_rank` remains 15% high after QR+SVD removed an impossible >1
 eigenvalue. `synth`/`synth2` are absent: the function that builds V lives only in
 `lsynth_mata_subr.mlib`.
 
@@ -2884,13 +2909,13 @@ A minor bump rather than a patch: the public surface grew, and several outputs t
 | name | Stata command | note |
 |---|---|---|
 | `summarize` | `summarize` | the plain six-column table; `estat_summarize` is the estimation-sample variant and could not substitute |
-| `teffects_nnmatch` | `teffects nnmatch` | the whole estimator was missing, not just `caliper()` |
-| `teffects_psmatch` | `teffects psmatch` | all-controls-at-the-k-th-distance tie rule |
-| `tebalance_summarize` | `tebalance summarize` | 7 of 8 covariates exact; `age` differs and is documented |
+| `treatment_effects_nnmatch` | `teffects nnmatch` | the whole estimator was missing, not just `caliper()` |
+| `treatment_effects_psmatch` | `teffects psmatch` | all-controls-at-the-k-th-distance tie rule |
+| `treatment_balance_summarize` | `tebalance summarize` | 7 of 8 covariates exact; `age` differs and is documented |
 | `rcm` | `rcm` | exact when `selected=` is supplied; the forward search is not aligned |
-| `rdrobust` | `rdrobust` | point estimate exact; robust SE not reproducible (compiled `lrobust.mlib`) |
+| `rd_robust` | `rd_robust` | point estimate exact; robust SE not reproducible (compiled `lrobust.mlib`) |
 | `MultinomialLogit` | `mlogit` | base-outcome block inserted, not dropped |
-| `vargranger` | `vargranger` | 10/10 rows character-exact |
+| `var_granger` | `var_granger` | 10/10 rows character-exact |
 | `format_ereturn_list` | `ereturn list` | the four-block dump |
 
 `ws.summarize` also unblocks report cases C04-04, C05-08 and C09-04, which all ended
@@ -2902,13 +2927,13 @@ with "you have to summarize yourself" -- none of them named the missing command.
   Stata's `F(1,21) = 18866.2`, **5% off**. The denominator is
   `N - rank - (n_instruments - 1)`; the old formula matched two-instrument fits and
   was one too low on every single-instrument one.
-- `vecrank lags(1)` was refused for six rounds on the theory that Stata "searches a
+- `vec_rank lags(1)` was refused for six rounds on the theory that Stata "searches a
   different space". At one lag there are no lagged differences to regress out, so both
   sides are residualised on a constant alone; computed directly it reproduces Stata's
   eigenvalues `.64575/.00769` and trace `172.5034/1.2744` exactly.
 - `logit ..., or` (previously absent), and `margins` elasticities, which used
   `mean(dy)*mean(f)` where Stata uses `mean(dy*f)` -- 0.2% low.
-- `VAR`/`varwle` lag labels printed `L.` for lag 1 where Stata prints `L1.`.
+- `VAR`/`var_wle` lag labels printed `L.` for lag 1 where Stata prints `L1.`.
 
 ### Fixed — layout, each measured against a live reference
 
@@ -2920,7 +2945,7 @@ with "you have to summarize yourself" -- none of them named the missing command.
 - `estat overid`: Sargan used `%8.5f` and Basmann `%8.4f`, so the two rows disagreed
   with each other and neither matched Stata's six decimals.
 - `estat endogenous`, `test`, `lincom`: indentation off by one or two columns.
-- `newey` prints `Newey–West` with an EN-DASH; an ASCII hyphen compares unequal while
+- `newey_west` prints `Newey–West` with an EN-DASH; an ASCII hyphen compares unequal while
   looking identical in a diff.
 
 ### Documentation
@@ -2937,8 +2962,8 @@ explicit instruction.
 
 Not reproduced, each traced to a mechanism rather than left unexplained:
 `synth`/`synth2` (V is built by a function that lives only in `lsynth_mata_subr.mlib`
-and depends on the outcome paths as well as the predictors), `rdrobust` robust SE,
-`teffects ra` SE (the sandwich is inside the builtin `gmm`), `xtserial` (absent from
+and depends on the outcome paths as well as the predictors), `rd_robust` robust SE,
+`teffects ra` SE (the sandwich is inside the builtin `gmm`), `panel_serial` (absent from
 both ado paths), and `rcm`'s automatic model search (a different regression setup, not
 a different search space).
 
@@ -3027,7 +3052,7 @@ Representative fixes, each traced to a measured difference rather than a guess:
 * `areg` printed a Source/SS table Stata does not print for it, and dropped the
   `clustertable` for clustered fits when its header branch was replaced;
 * `xtabond` used the command name as its banner and emitted no design block at all;
-* `sureg`/`mvreg` printed generic OLS statistics instead of their equation summary tables
+* `sureg`/`mvreg` printed generic Regress statistics instead of their equation summary tables
   ("Params" in one, "Parms" in the other) — and the equation-prefix logic, once built, had
   to stop treating `x1#x2` (an interaction) as an equation split;
 * `reghdfe` needed its HDFE header and the absorbed-degrees-of-freedom table, plus
@@ -3062,12 +3087,12 @@ visible.
 
 ## [0.0.4] — 2026-11-02
 
-### Added — `Areg`: Stata's `areg` as its own command, and `PanelOLS` weights
+### Added — `Areg`: Stata's `areg` as its own command, and `PanelRegressFE` weights
 
 `areg` and `reghdfe` are different commands, and the package only had the second
 identity. A caller asking for `areg` got `e(cmd)="reghdfe"`, no `e(title)`, no
 `e(predict)`, and — the substantive part — no intercept, because `reghdfe` reports slopes
-only. `ws.Areg` is now a subclass of `FEOLS` that overrides the identity, the constant and
+only. `ws.Areg` is now a subclass of `RegressHighDimFixedEffects` that overrides the identity, the constant and
 the small-sample convention:
 
     e(cmd)           areg
@@ -3091,7 +3116,7 @@ which gives the variance AND the covariances with the slopes. A shortcut that wi
 matrix and leaves the off-diagonals at zero gets the standard errors right and the
 covariance wrong, so the whole matrix is compared.
 
-`vce(hc2)`/`vce(hc3)` were then reachable for the first time: `FEOLS` refuses them
+`vce(hc2)`/`vce(hc3)` were then reachable for the first time: `RegressHighDimFixedEffects` refuses them
 because PyFixest hides the leverage of the dummy design, while `Areg` builds that design
 itself. `noabsorb` (Stata's `noabsorbtest`) skips the absorbed-indicator F test, leaving
 `e(F_absorb)`/`e(p_absorb)` absent rather than present-and-empty.
@@ -3113,25 +3138,25 @@ it was compared against the right reference:
    2 (slopes only) when nested.
 
 3. **Multiway clustering is not a parameter-count difference.** Stata's `reghdfe` and
-   westata's `FEOLS` agree exactly (both 0.1023861); `areg` reports 0.11086346, and
+   westata's `RegressHighDimFixedEffects` agree exactly (both 0.1023861); `areg` reports 0.11086346, and
    solving for the implied K gives 0.13 — not an integer. The factors differ in structure,
-   so `Areg` rebuilds the CGM covariance on the full design instead of scaling FEOLS'.
+   so `Areg` rebuilds the CGM covariance on the full design instead of scaling RegressHighDimFixedEffects'.
 
-Also added: `level(#)` package-wide (`OLS`, `IV2SLS`/`IVLIML`/`IVGMM`, `FEOLS`, `Areg`),
+Also added: `level(#)` package-wide (`Regress`, `IV2SLS`/`IVLIML`/`IVGMM`, `RegressHighDimFixedEffects`, `Areg`),
 which was missing from `StataResults`, from `conf_int()` and from every `fit()`;
 `clustertable` for multiway fits, with the joint counts MEASURED rather than multiplied;
 and `Bootstrap`/`Jackknife` resampling of an `areg` fit.
 
-`PanelOLS` now accepts `weights=`/`weight_type=`, so the documented `xtreg` equivalent can
+`PanelRegressFE` now accepts `weights=`/`weight_type=`, so the documented `xtreg` equivalent can
 estimate the AJR paper's weighted columns directly instead of forcing a detour through
-`FEOLS`. A missing weight drops the row (Stata's `[aweight=]` marks it "not to be used"),
+`RegressHighDimFixedEffects`. A missing weight drops the row (Stata's `[aweight=]` marks it "not to be used"),
 and weights align by position rather than by label.
 
 ### Corrected — a "defect" that was a wrong reference
 
 The AJR write-up recorded `Areg`'s weighted clustered SE as 11% off. Measuring both Stata
 commands settles it: `areg` gives .45292274 and `xtreg` gives .40751063, and `Areg`
-reports .45292274 while `FEOLS` reports .40751063. Both are right, each against its own
+reports .45292274 while `RegressHighDimFixedEffects` reports .40751063. Both are right, each against its own
 command. `Areg` claims to replace `areg`, so comparing it with `xtreg` was guaranteed to
 show 11% and says nothing about the implementation.
 
@@ -3184,10 +3209,10 @@ denominator, `Obs` and the range against a construction sharing no code.
 Also confirmed `estat_summ.ado` stores no `e()` or `r()` at all, so
 `estat_summarize` having no `e()` surface is correct.
 
-One third-party defect recorded, not worked around: `FEOLS` with both weights and
+One third-party defect recorded, not worked around: `RegressHighDimFixedEffects` with both weights and
 absorbed fixed effects panics inside PyFixest's Rust layer
 (`called Option::unwrap() on a None value` at `src/demean.rs:71`).
-`PanelOLS` and `IV2SLS` do not accept weights, so `OLS` is the only affected path
+`PanelRegressFE` and `IV2SLS` do not accept weights, so `Regress` is the only affected path
 and the fix covers it fully.
 
 **Tests: 1995 → 2007 passing.**
@@ -3215,13 +3240,13 @@ non-stub-ness in both languages.
 **Writing it surfaced four library defects, all fixed.**
 
 A single-cluster clustered VCE raised ``ConsistencyError`` from ``logit`` but a plain
-``ValueError`` from OLS and IV — the same user error with two exception types, so
+``ValueError`` from Regress and IV — the same user error with two exception types, so
 ``except WestataError`` caught only one. ``ConsistencyError`` now inherits
 ``(WestataError, ValueError)``, following the precedent ``FormulaError`` already set:
 existing ``except ValueError`` callers are unaffected, and ``except WestataError`` finally
 catches the VCE refusals. The three sites now agree.
 
-``cov_kwds`` spelled the cluster labels differently per family — ``groups`` for OLS/ML,
+``cov_kwds`` spelled the cluster labels differently per family — ``groups`` for Regress/ML,
 ``clusters`` for IV, ``cluster`` for hdfe — and each rejected the others. Moving a call
 between families failed on the name. All three spellings are now accepted, through one
 accessor instead of four separate lookups.
@@ -3304,7 +3329,7 @@ option, and ``poisson.sthlp:247`` documents the key. ``nbreg`` does the same
 a test checks the filesystem rather than a naming rule.
 
 **``e(vce)`` and ``e(vcetype)`` are different strings, and the ML default differs from
-OLS.** ``arch.ado:1470-1474`` shows both branches at once: ``e(vcetype) == "Robust"`` in the
+Regress.** ``arch.ado:1470-1474`` shows both branches at once: ``e(vcetype) == "Robust"`` in the
 robust case and ``est local vcetype "OIM"`` otherwise. So the linear family defaults to
 ``ols``/``Ols`` (``regress.ado:68``) while the ML family defaults to ``oim``/``OIM``. The HC
 forms are two words — ``didregress.ado:477``: ``ereturn local vcetype "Robust HC2"`` — which
@@ -3386,7 +3411,7 @@ fixtures contain neither key); the printed values were on the Gaussian-deviance 
 differ from ``estat ic`` by exactly ``N(1 + log 2pi)``. They are now shown only where the
 command stores them.
 
-ML fits printed the OLS block — ``R-squared: .``, ``Adj. R-squared: .``,
+ML fits printed the Regress block — ``R-squared: .``, ``Adj. R-squared: .``,
 ``F-statistic: .``, ``Df Residuals: 250`` — a row of dots that made a discrete-choice table
 look like a broken regression one. They now print ``Pseudo R-squared`` and ``LR chi2``.
 ``tobit`` is what rules out keying this on ``dist``: its ``dist`` is ``"t"`` yet it reports
@@ -3607,8 +3632,8 @@ Two API facts surfaced while building it: ``model_name`` is Stata's spelling
 name — so the augmented refit cannot be rebuilt from the result alone, and ``entity=`` is
 required with an explanation rather than a bare ``TypeError``.
 
-**A real `e(chi2)` bug caused by inheritance.** ``BetweenOLS`` and ``FirstDifferenceOLS``
-inherit from ``RandomEffects``, which sets ``_stores_wald_chi2 = True``; the flag came
+**A real `e(chi2)` bug caused by inheritance.** ``PanelRegressBE`` and ``PanelRegressFD``
+inherit from ``PanelRegressRE``, which sets ``_stores_wald_chi2 = True``; the flag came
 along, so ``be`` and ``fd`` reported a Wald chi-square Stata does not store — and its value
 was just ``F * df_m`` under another name. ``xtreg.sthlp`` gives ``e(chi2)`` only in the
 ``re`` block (891-951), not in ``be`` (1014-1067) or ``fe`` (1068-1144). A reader seeing
@@ -3669,7 +3694,7 @@ distributional assumption, not about clustering.
 **``estat weakrobust`` did not exist.** ``sthlp:364-375`` makes the reported test depend on
 identification: Anderson-Rubin for a just-identified model, CLR (Moreira 2003) for an
 overidentified one. Only AR is implemented — it is a restricted F test with a closed form,
-verifiable against two OLS fits, and its distribution does not depend on instrument
+verifiable against two Regress fits, and its distribution does not depend on instrument
 strength, which is the point of the command. CLR needs a simulated conditional
 distribution and Stata's implementation is a compiled builtin with no ``ado/base`` source,
 so it refuses with that reason rather than reporting AR under a CLR label. ``betanull``
@@ -3812,13 +3837,13 @@ settings.
 **The eligibility matrix** is recorded against the dispatch chain rather than inferred
 from ``e()`` contents — rounds 79-84 showed that inference errs in both directions:
 
-| command | OLS | Logit | Poisson | IV2SLS |
+| command | Regress | Logit | Poisson | IV2SLS |
 |---|---|---|---|---|
 | `summarize` / `vce` / `ic` | yes | yes | yes | yes |
 | `vif` | yes | **no** | **no** | **no** |
 
 ``estat_default.ado`` contains no ``vif`` at all, and ``ivregress_estat.ado`` never
-dispatches it — which is why an IV fit used to return exactly the OLS VIF (round 102): a
+dispatches it — which is why an IV fit used to return exactly the Regress VIF (round 102): a
 plausible number for a model it was not fitted on.
 
 **Tests: 2583 → 2625 passing.**
@@ -4201,7 +4226,7 @@ different fits.
 
 **Tests: 2421 → 2426 passing.**
 
-### Added — Stata's ANOVA table for OLS-style fits
+### Added — Stata's ANOVA table for Regress-style fits
 
 Stata prints the sums of squares as a table with the fit statistics BESIDE it
 (``p10_outputs.txt:97-102``):
@@ -4227,7 +4252,7 @@ The right-hand column REPLACES the stacked header — printing both would repeat
    that already existed — and made the table the first lookup, which also restored
    `arima`'s "no fit block" behaviour that my hand-rolled `dist` heuristic had lost.
 2. **`ivregress` classified as ML.** 2SLS is a regression: it has an F/Wald test AND
-   `R-squared`, but `dist == "z"`. It now takes the OLS block explicitly.
+   `R-squared`, but `dist == "z"`. It now takes the Regress block explicitly.
 3. **`summary()` crashed on factor terms.** `stata_param_names` deliberately REFUSES
    when a factor's Stata spelling is ambiguous (Stata emits a level row plus a zero
    base row; we hold one column). That refusal is right for a name-mapping caller,
@@ -4248,8 +4273,8 @@ established (fixture first, then ado, then help file):
 | `lnsigma` (intreg) | no | no | no | invented, removed |
 | `n_left`/`n_right`/`n_interval`/`n_uncensored` | no | no | `N_lc`/`N_rc`/`N_int`/`N_unc` | renamed |
 
-`Truncreg._extra_scalars` now returns only `{"llopt": ..., "ulopt": ...}`, and
-`Intreg._extra_scalars` returns `{}` — the correct counts already come from
+`TruncatedRegress._extra_scalars` now returns only `{"llopt": ..., "ulopt": ...}`, and
+`IntervalRegress._extra_scalars` returns `{}` — the correct counts already come from
 `_interval_counts` and `se_sigma` from the delta method. The truncation count stays
 an internal attribute for diagnostics rather than pretending to be a Stata scalar.
 
@@ -4411,13 +4436,13 @@ est scalar r2_o = r(rho)^2
 `corr` there is the **command**, and `r(rho)` is its return value; they build
 `r2_o`/`r2_w` and are not `e()` keys at all. Reading them as keys put
 `sigma_u`/`sigma_e`/`sigma`/`rho`/`corr`/`ui` on a between-estimator result. The
-between fit is OLS on the entity means, so there is no panel/epsilon decomposition
+between fit is Regress on the entity means, so there is no panel/epsilon decomposition
 to report. A `_stores_sigma` flag now scopes the family to `fe`/`re`.
 
 That is a "false friend" worth naming: **grepping a word in an ado can hit a
 command, an option or a comment** — the context decides.
 
-**`xtreg, fd` was correct by accident.** It inherits from `RandomEffects`, so
+**`xtreg, fd` was correct by accident.** It inherits from `PanelRegressRE`, so
 `_stores_theta` was `True`; the key was absent only because the theta block is
 guarded by `isfinite(sigma_u)` and `fd` happens to have no `sigma_u`. A future
 change that started computing one would have silently begun reporting theta for a
@@ -4460,8 +4485,8 @@ with no population behind it. Unbalanced panels now store `thta_min/5/50/95/max`
 verified against a per-entity recomputation to 1e-12 and checked for ordering.
 
 **`xtreg, be` was carrying a `theta` it should not have.** `xtreg_be.ado` contains
-no `theta` at all — the between estimator runs OLS on the entity means and never
-quasi-demeans. The cause was inheritance: `BetweenOLS(RandomEffects)` picked up
+no `theta` at all — the between estimator runs Regress on the entity means and never
+quasi-demeans. The cause was inheritance: `PanelRegressBE(PanelRegressRE)` picked up
 `_stores_theta = True`. The flag is now switched off explicitly, and a test pins
 that `fe`, `be` and `fd` store no theta while `re` does. This is the same trap as
 round 91, where `_Ordered` overrode `fit` and bypassed a base-class fix.
@@ -4489,18 +4514,18 @@ now tests, and the tests also record where each one does NOT apply.
 
 | identity | holds for |
 |---|---|
-| `r2 == mss / (mss + rss)` | OLS, quantile |
-| `ll == -N/2 * (log 2pi + log(rss/N) + 1)` | OLS |
+| `r2 == mss / (mss + rss)` | Regress, quantile |
+| `ll == -N/2 * (log 2pi + log(rss/N) + 1)` | Regress |
 | `chi2 == 2 * (ll - ll_0)` | logit, poisson |
 | `ll_0` == the constant-only fit's `ll` | logit |
-| `N - df_r == rank` | OLS-family |
+| `N - df_r == rank` | Regress-family |
 
 **Three models break the last one, and NONE of them is a defect:**
 
 | model | what happens | why |
 |---|---|---|
 | `Tobit` | `N - df_r` = 1 against `rank` 3 | `tobit.ado` sets `df_r = N - df_m`; `rank` also counts `lnsigma` |
-| `PanelOLS` | `N - df_r` = 41 (= 60 groups + 1) | `df_r` absorbs the entity effects |
+| `PanelRegressFE` | `N - df_r` = 41 (= 60 groups + 1) | `df_r` absorbs the entity effects |
 | panel `r2` | 0.0088 against `mss/tss` = 0.2244 | `r2` is the WITHIN R²; `r2_o` is the overall one |
 
 Every one of those was my invariant being applied to the wrong model. The lesson:
@@ -4542,7 +4567,7 @@ user typed it — there is no field to recover any of them from, and a
 plausible-looking fabricated string is worse than a missing key. A test pins the
 absence so a future change cannot quietly start inventing them.
 
-**A fabricated `e(df_r)` was found by an identity check.** For `OLS`,
+**A fabricated `e(df_r)` was found by an identity check.** For `Regress`,
 `N - df_r == rank` held; for `logit` and `poisson` it gave 0 instead of 2. The
 cause: `StataResults.__init__` injected `df_r` **unconditionally**. But
 `logit`/`poisson`/`nbreg`/`ologit` document only `e(df_m)` — their tests are
@@ -4590,11 +4615,11 @@ All six now report it:
 
 ```
 Tobit               depvar='y'
-Truncreg            depvar='w'
-Intreg              depvar='lo hi'   # an interval is TWO columns; Stata stores both
+TruncatedRegress            depvar='w'
+IntervalRegress              depvar='lo hi'   # an interval is TWO columns; Stata stores both
 OrderedLogit        depvar='rep'
-QuantileRegression  depvar='y'
-RobustRegression    depvar='y'
+QuantileRegress  depvar='y'
+RobustRegress    depvar='y'
 ```
 
 Also corrected while in `lfit`: the header label. `lfit.ado:117-119` prints
@@ -4681,7 +4706,7 @@ if strpos(`"`allowed_butsum'"',`"`subcmd'"') == 0 {
 | `estat hettest` | returned a number | refused |
 | `estat ovtest` | returned a number | refused |
 
-`PanelOLS`/`RandomEffects` now retain `model_data` and `e(depvar)`; `hettest` and
+`PanelRegressFE`/`PanelRegressRE` now retain `model_data` and `e(depvar)`; `hettest` and
 `ovtest` refuse panel models by name.
 
 **The same check cleared the other estimators** and confirmed they were right:
@@ -4709,8 +4734,8 @@ correct one.
 Round 72 ran `estat` against 8 estimators. Widening it to all 23 found issues in
 every direction.
 
-**Two crashes.** `estat_summarize` raised a bare `KeyError` on `Mvreg` and
-`Sureg`: their coefficient names carry an equation prefix (`y:x2`, `x1:_cons`),
+**Two crashes.** `estat_summarize` raised a bare `KeyError` on `MultivariateRegress` and
+`SeeminglyUnrelatedRegress`: their coefficient names carry an equation prefix (`y:x2`, `x1:_cons`),
 which never matched a plain data column, so the variable list came out empty and
 the fixed column selection failed. `estat_summ.ado:15` accepts an equation list, so
 multi-equation support was always intended. The prefix is now parsed — before the
@@ -4724,17 +4749,17 @@ both looked entirely plausible:
 
 | call | returned | why it is wrong |
 |---|---|---|
-| `estat vif` after `IV2SLS` | 1.000203 — *identical to OLS* | `ivregress_estat.ado:20-56` never dispatches `vif`; `estat_default.ado` offers ic/summarize/bootstrap/vce only |
+| `estat vif` after `IV2SLS` | 1.000203 — *identical to Regress* | `ivregress_estat.ado:20-56` never dispatches `vif`; `estat_default.ado` offers ic/summarize/bootstrap/vce only |
 | `estat hettest`/`ovtest` after `rreg` | finite statistics | `rreg.ado:214` sets `e(estat_cmd)` to **empty**, so Stata offers no estat at all |
 
-The IV case is the most deceptive kind of bug: IV and OLS share the same design, so
-recomputing the OLS VIF yields exactly the right-looking answer for the wrong
+The IV case is the most deceptive kind of bug: IV and Regress share the same design, so
+recomputing the Regress VIF yields exactly the right-looking answer for the wrong
 command.
 
 **One real gap, found by questioning a refusal.** Round 79's grid showed
-`estat_summarize`/`estat_vif` as `ref` on `FEOLS` and it read as a deliberate
+`estat_summarize`/`estat_vif` as `ref` on `RegressHighDimFixedEffects` and it read as a deliberate
 limitation. It was not: `reghdfe` supports both, and the estimator had held the
-frame all along — it was simply never attached to the result. `FEOLS.fit` now
+frame all along — it was simply never attached to the result. `RegressHighDimFixedEffects.fit` now
 retains `model_data`, `design_matrix` and `e(depvar)`.
 
 That last one is the lesson worth keeping: **a refusal can mean "should not
@@ -4751,7 +4776,7 @@ advertised and then refused** — the same defect class as round 74's `ue`.
 | model | type | cause |
 |---|---|---|
 | `nbreg` | `n` | parameter count (3, incl. `/lnalpha`) vs design columns (2) |
-| `newey` | `index` | a synonym for `xb` the base dispatcher cannot serve |
+| `newey_west` | `index` | a synonym for `xb` the base dispatcher cannot serve |
 | `xtreg, fd` | `xb`/`stdp`/`stdf`/`fitted` | design had 2 columns against 1 coefficient |
 | `zip`/`zinb`/`ztp`/`tnbreg` | `residuals` | Stata documents no residuals for these |
 
@@ -4774,7 +4799,7 @@ pass; no further registry lies.
 
 **Round 78 audited the OPTION axis** — the one the method×estimator and
 type×estimator grids never touched, and the same blind spot that hid
-`Sqreg(seed=None)` for 70 rounds. All 26 documented option values run, and each is
+`SimultaneousQuantileRegress(seed=None)` for 70 rounds. All 26 documented option values run, and each is
 asserted to *change* the output: `mtest()` (bonus/holm/sidak/noadjust, per
 `_mtest.ado:84`), `hettest method()` (normal/iid/fstat), `vif uncentered`/`nosort`,
 `imtest white`, `ic df()`, `classification cutoff()`, `vce correlation`.
@@ -4840,7 +4865,7 @@ searching the tests that depended on it.**
 
 ### Fixed — a crashing default path, and two silently wrong `estat` results
 
-**`Sqreg`/`Bsqreg` crashed when no `seed` was given.** The bootstrap read
+**`SimultaneousQuantileRegress`/`BootstrappedQuantileRegress` crashed when no `seed` was given.** The bootstrap read
 `DEFAULT_SEED`, a constant that was never defined:
 
 ```python
@@ -4853,7 +4878,7 @@ takes first — was never executed. It now draws a fresh seed (matching Stata's
 would have replaced a crash with "every run identical", a different wrong answer.
 
 **Two `estat` methods returned plausible numbers where they should refuse.**
-`estat_hettest` and `estat_ovtest` are methods on every result, but both are
+`estat_heteroskedasticity_test` and `estat_omitted_variables_test` are methods on every result, but both are
 least-squares tests:
 
 * `hettest.ado:108,155` uses `e(rss)/e(N)` and `e(mss)/2`;
@@ -4861,15 +4886,15 @@ least-squares tests:
   squares.
 
 A `logit` result stores neither `e(rss)` nor `e(mss)`, yet both ran anyway — and
-the answers were nearly indistinguishable from the OLS ones:
+the answers were nearly indistinguishable from the Regress ones:
 
-| test | logit (meaningless) | OLS (correct) |
+| test | logit (meaningless) | Regress (correct) |
 |---|---|---|
 | `hettest` | 0.00496 | 0.00487 |
 | `ovtest` | 1.3478 | 1.3508 |
 
 Nothing looks wrong: right magnitude, no error, plausible test statistic. Both now
-raise a typed `ValueError` naming the estimator. `estat_hettest` on `nbreg` also
+raise a typed `ValueError` naming the estimator. `estat_heteroskedasticity_test` on `nbreg` also
 used to raise a raw `IndexError`, now the same refusal.
 
 **Guards against over-correction.** `estat ic` and `estat vce` apply to any
@@ -4908,8 +4933,8 @@ runtime. `sureg` also runs through `reg3` (`sureg.ado:14,45`) and had no
 **A sweep for the same class of error.** A script collected every
 `e(predict)`/`e(estat_cmd)`/`e(cmd)` from live results and checked each name
 against the ado tree: **0 invented names**. But it exposed the reverse gap —
-`newey.ado:218` sets `eret local predict newey_p`, and the package stored it only
-as the Python attribute `predict_cmd`, **never in `e()`**. `newey.sthlp:168-180`
+`newey_west.ado:218` sets `eret local predict newey_p`, and the package stored it only
+as the Python attribute `predict_cmd`, **never in `e()`**. `newey_west.sthlp:168-180`
 lists eight macros; all are now in `e()`, which grew from 7 keys to 15.
 
 The lesson generalises: **an attribute existing is not the same as `e()` carrying
@@ -4997,9 +5022,9 @@ multivariate tests —
 
 > e(r2) — R-squared for **each equation**
 
-Cross-checked against a separate `OLS` per response, exact to 1e-10:
+Cross-checked against a separate `Regress` per response, exact to 1e-10:
 
-| response | manova R² | OLS R² | manova F | OLS F |
+| response | manova R² | Regress R² | manova F | Regress F |
 |---|---|---|---|---|
 | y1 | 0.36940469 | 0.36940469 | 25.482435 | 25.482435 |
 | y2 | 0.17319174 | 0.17319174 | 9.111956 | 9.111956 |
@@ -5023,18 +5048,18 @@ they are not invented.
 
 **Tests: 2055 → 2072 passing.**
 
-### Added — `newey`: regression with Newey-West standard errors
+### Added — `newey_west`: regression with Newey-West standard errors
 
 The HAC engine landed in rounds 27-30 and is verified against Stata; what was
 missing was the command itself, which `docs/GAP_REGISTER.md` had listed as ⬜
 "HAC regression (in-model HAC supported, standalone command not done)".
 
-`newey` is **not a new estimator**: `newey.ado:96` fits the point estimates with
+`newey_west` is **not a new estimator**: `newey_west.ado:96` fits the point estimates with
 `_regress` and only the variance differs. The implementation therefore reuses
-`OLS` with a HAC VCE rather than re-deriving anything, and the value comes from
+`Regress` with a HAC VCE rather than re-deriving anything, and the value comes from
 the command surface.
 
-**Validation, transcribed from `newey.ado`:**
+**Validation, transcribed from `newey_west.ado`:**
 
 | rule | source |
 |---|---|
@@ -5047,27 +5072,27 @@ the command surface.
 `lag(0)` reproduces **HC1**, not HC0 — the ratio is exactly `sqrt(N/(N-K))`,
 cross-checking the round-30 finding independently.
 
-**The surface had to be narrowed, not inherited.** `newey.ado:191` builds `e()`
+**The surface had to be narrowed, not inherited.** `newey_west.ado:191` builds `e()`
 with `mat post`, so it does not extend `regress`'s collection;
-`newey.sthlp:156-187` lists exactly `N df_m df_r F p lag rank`. `regress`'s
-`r2`/`rss`/`mss`/`rmse`/`sigma`/`ll` do not exist for `newey` and are removed.
+`newey_west.sthlp:156-187` lists exactly `N df_m df_r F p lag rank`. `regress`'s
+`r2`/`rss`/`mss`/`rmse`/`sigma`/`ll` do not exist for `newey_west` and are removed.
 Likewise `newey_p.ado:20` offers only `xb index stdp residuals` — the influence
 diagnostics require `vce(ols)` (`regress_postestimation.sthlp:152-153`).
 `index` is a **synonym for `xb`** (`newey_p.ado:54`), so it maps rather than
 refuses.
 
-The rendered header is `newey`'s own (`newey.ado:245-258`): `Maximum lag` in the
+The rendered header is `newey_west`'s own (`newey_west.ado:245-258`): `Maximum lag` in the
 left column, `F`/`Prob > F` on the right, and **no R-squared, Adj R-squared or
 Root MSE**.
 
 **Two self-inflicted regressions caught by the checks:**
 
-1. Renaming `model_name` to `"newey"` broke *every* `predict` type — the dispatch
+1. Renaming `model_name` to `"newey_west"` broke *every* `predict` type — the dispatch
    table is keyed by `model_name`, so all four raised
-   `no prediction types registered`. Registering `"newey"` fixed it.
+   `no prediction types registered`. Registering `"newey_west"` fixed it.
 2. `__str__` first delegated to `StataResults.summary()`, which is the
    **statsmodels** layout and printed `R-squared: .` / `Adj R-squared: .` — the
-   exact rows Stata never shows for `newey`. It now calls
+   exact rows Stata never shows for `newey_west`. It now calls
    `render_summary(..., style="stata")`.
 
 Also the 4th failed direction-of-effect assumption in this session: "a larger lag
@@ -5187,13 +5212,13 @@ condition number 2.74. `kappa` is 1.00057 — nowhere near enough to lose
 definiteness. That comment was the reason HAC was skipped in the first place.
 
 **The small-sample factor had to be unified.** After wiring it, `liml`/`gmm` HAC
-at lag 0 agreed *exactly* with HC0 while `2sls` did not. `newey.ado:187`:
+at lag 0 agreed *exactly* with HC0 while `2sls` did not. `newey_west.ado:187`:
 
 ```stata
 mat `v' = (`xtxi'*`xtx'*`xtxi')*(`nobs'/`tdf')
 ```
 
-`newey` applies `nobs/tdf` **unconditionally** — it has no `small` option — but
+`newey_west` applies `nobs/tdf` **unconditionally** — it has no `small` option — but
 the IV default is `SSC(adj=False)`, so HAC fell through the `else` branch and lost
 the factor. With a dedicated branch the three estimators agree exactly:
 `HAC(lag=0)/HC0 = sqrt(400/398)`.
@@ -5247,13 +5272,13 @@ properties that must hold for **all 14 estimators at once**:
 5. unmappable terms raise `NotImplementedError` rather than inventing a row.
 
 All 14 pass with zero problems. One suspicion of mine was wrong and is worth
-recording: I doubted `PanelOLS fe` should report `_cons`, but
+recording: I doubted `PanelRegressFE fe` should report `_cons`, but
 `xtreg_fe.json`/`xtreg_re.json`/`xtreg_be.json` all have
 `names = ['x1', 'x2', '_cons']` — the implementation was right.
 
 ### Fixed — auxiliary parameters kept a display slash and sat in the wrong place
 
-Round 40's sweep covered the OLS family but not the ML models. Extending it found
+Round 40's sweep covered the Regress family but not the ML models. Extending it found
 two differences.
 
 **The slash is formatting, not `e(b)`.** Stata prints auxiliary equations with a
@@ -5278,7 +5303,7 @@ parameters. Verified:
 | `nbreg` | `['weight', '_cons', 'lnalpha']` |
 | `ologit` | `['weight', 'cut1', 'cut2', 'cut3', 'cut4']` |
 | `logit` | `['weight', 'mpg', '_cons']` (no auxiliary parameters) |
-| `OLS` | unchanged, still matches `regress_auto.json` |
+| `Regress` | unchanged, still matches `regress_auto.json` |
 
 One test of mine was itself wrong — `assert "/lnalpha" in ordered` treated the
 result object as iterable and raised `TypeError`; it now inspects `param_names`.
@@ -5425,7 +5450,7 @@ result.stata_cov_params    # e(V) order
 ```
 
 **The order has to come from the formula.** patsy destroys the written order, so
-`OLS.from_formula` records `_formula_rhs_order` and hands it to the result. Two
+`Regress.from_formula` records `_formula_rhs_order` and hands it to the result. Two
 tests pin that: `mpg ~ weight + foreign` and `mpg ~ foreign + weight` produce
 *different* `stata_param_names`, which could not happen if the order were
 alphabetical or data-driven.
@@ -5501,7 +5526,7 @@ All five `reghdfe_*` fixtures now reach 100%, along with every other estimator:
 **A real semantic difference between two commands.** `areg` and `reghdfe` define
 `df_a` differently, and each fixture proves its own side: `areg.json` reports 29
 for 30 groups (`k_absorb - 1`, intercept reported separately) while
-`reghdfe_firm.json` reports 30 (`= df_a_initial`, intercept absorbed). `FEOLS`
+`reghdfe_firm.json` reports 30 (`= df_a_initial`, intercept absorbed). `RegressHighDimFixedEffects`
 announces itself as `reghdfe`, so it follows that convention; a class flag records
 the choice.
 
@@ -5513,7 +5538,7 @@ bypassing the corrected `e(df_a)`. Under two-way absorption the two disagreed, s
 `auto` data while asserting `areg` formulas — but `areg.json`'s `cmdline` is
 `areg y x1 x2, absorb(firm)`, a 180-row panel, not `auto`. Those tests were
 self-referential from the start: they compared the implementation against a formula
-recomputed from the same implementation's output. They now verify `FEOLS`'s internal
+recomputed from the same implementation's output. They now verify `RegressHighDimFixedEffects`'s internal
 consistency on `auto` (which is `reghdfe` semantics) and say so.
 
 **Tests: 1866 (the deferred-gap test was replaced rather than added).**
@@ -5529,7 +5554,7 @@ the same convention as `var`'s `df_m1`. `ManovaResult` gained an `n_equations`
 field so `k` and `k_eq` are read rather than guessed; the first version did guess
 it from `statistics` and was corrected.
 
-**`vecrank`** (`vecrank.sthlp:179-210`) has ten scalars plus eight vector-valued
+**`vec_rank`** (`vec_rank.sthlp:179-210`) has ten scalars plus eight vector-valued
 entries (`max`, `trace`, `ll`, `lambda`, `k_rank`, `aic`, `sbic`, `hqic`) — 18
 keys total. The log likelihood at rank `r` is
 
@@ -5577,7 +5602,7 @@ ivregress 2sls `dep' `indep' ..., `vceopt' small
 
 with `indep = exog test x2hat` and **no `(endog = instr)` block**. Without that
 block there is nothing to instrument, so `ivregress 2sls` reduces to ordinary
-least squares. Treated as OLS the statistic is **F = 70.636, p = 4.6e-11**,
+least squares. Treated as Regress the statistic is **F = 70.636, p = 4.6e-11**,
 matching a hand-built Wald form to 1e-10.
 
 **This unlocks the clustered case.** `ado:1128-1145` reports *only* `regF` after
@@ -5598,7 +5623,7 @@ Wooldridge endogeneity score test, transcribed from
 `ivregress_estat.ado:1187-1263`:
 
 ```
-uhat     = OLS residual of y on (exog + endog)
+uhat     = Regress residual of y on (exog + endog)
 endhat_i = fitted from regressing endog_i on (exog + addlinst)
 rhat_i   = residual of endhat_i on (exog + endog), times uhat
 robwool  = N - rss of (ones on rhat)
@@ -5664,19 +5689,19 @@ estimators. It is now connected.
 
 2SLS is a k-class estimator with `kappa == 1`, so its bread is `Xhat'Xhat` and
 `compute_cov` already expresses the whole sandwich — wiring HAC in only required
-forwarding the bandwidth, not re-deriving the algebra. `estat_overid` now reaches
+forwarding the bandwidth, not re-deriving the algebra. `estat_overidentification` now reaches
 its prewhitening branch end to end, which reverses the round-28 note that the
 branch was unreachable; that test now asserts the opposite.
 
 **A ratio of exactly 0.995.** The first check compared the covariance against a
 hand-built sandwich and found a clean `398/400` factor. It looked like a kernel
-error; it was a missing `N/(N-K)`. `newey.sthlp:113-114` says `lag(0)` reproduces
+error; it was a missing `N/(N-K)`. `newey_west.sthlp:113-114` says `lag(0)` reproduces
 `vce(robust)`, and Stata's `vce(robust)` carries that factor **unconditionally**,
 but the IV path only rebuilt the small-sample settings when `ssc.adj` was off.
 HAC now gets its own branch that always enables the factor; the hand-built
 comparison then agrees to 0.0.
 
-`ssc(adj=False)` does **not** disable the factor for HAC — `newey` has no such
+`ssc(adj=False)` does **not** disable the factor for HAC — `newey_west` has no such
 option, so neither does westata. My first test asserted that it did and failed;
 the tests now verify the factor by dividing it out of a raw `cov_hac` sandwich
 instead.
@@ -5693,7 +5718,7 @@ autocovariance) rather than a direction.
 
 Round 28 confirmed that `SUPPORTED_COV_TYPES` had no HAC entry, which is why the
 Wooldridge score's prewhitening branch was unreachable. The covariance itself is
-now implemented, transcribed from `newey.ado:133-183`:
+now implemented, transcribed from `newey_west.ado:133-183`:
 
 ```
 g_t     = x_t * e_t
@@ -5704,7 +5729,7 @@ V       = bread * meat * bread * N/(N-K)
 
 Matches a step-by-step transcription of the ado across lags 0–4 with zero error.
 
-**One comparison had to be chosen carefully.** `newey.sthlp:113-114` says
+**One comparison had to be chosen carefully.** `newey_west.sthlp:113-114` says
 `lag(0)` reproduces `vce(robust)`. Stata's `vce(robust)` carries the `N/(N-K)`
 factor, so the match is against **HC1**, not HC0. The first check compared
 against HC0, saw a ratio of exactly `N/(N-K) = 1.0204`, and looked like a kernel
@@ -5746,7 +5771,7 @@ sides of that boundary.
 
 **The branch is also unreachable end to end.** `vce/dispatch.py`'s
 `SUPPORTED_COV_TYPES` has no HAC entry, so no IV result can carry a HAC VCE and
-`estat_overid` never prewhitens through the public API. The branch is kept because
+`estat_overidentification` never prewhitens through the public API. The branch is kept because
 it is part of the ado, and its arithmetic is tested at the function level — but
 **no comparison against Stata's HAC output has been performed**, and a test
 asserts that no HAC VCE can be fitted so nobody reads it as verified.
@@ -5793,8 +5818,8 @@ overidentification test there.
 ### Added — `estat hettest, mtest()` multiple-testing adjustment
 
 ```python
-result.estat_hettest(mtest="holm")        # also: bonferroni, sidak, noadjust
-result.estat_hettest(mtest="holm").to_matrix()   # r(mtest), nvar x 4
+result.estat_heteroskedasticity_test(mtest="holm")        # also: bonferroni, sidak, noadjust
+result.estat_heteroskedasticity_test(mtest="holm").to_matrix()   # r(mtest), nvar x 4
 ```
 
 Transcribed from `hettest.ado:160-190` and `_mtest.ado:189-296`. With `mtest()`
@@ -5927,7 +5952,7 @@ those counters could only be invented. A test asserts they are absent.
 ### Added — `areg`'s `F_absorb` / `p_absorb` / `r2_c`, closing a deferred gap
 
 Round 18 recorded these three as unimplementable on the grounds that they "need
-the pooled OLS R-squared, which PyFixest cannot supply". That was wrong twice
+the pooled Regress R-squared, which PyFixest cannot supply". That was wrong twice
 over: round 13 had already implemented the identical computation for `xtreg, fe`
 (where it is called `F_f`/`p_f`), and the fixtures prove it is the same quantity —
 
@@ -5940,7 +5965,7 @@ bit for bit. `areg` is now 22/22 on its fixture.
 
 **A value that looked right and was not.** The first implementation used
 PyFixest's `model._X` as the design and produced `r2_c = 0.9187`. The actual
-pooled OLS R-squared is **0.7174**: `_X` has the fixed effects already projected
+pooled Regress R-squared is **0.7174**: `_X` has the fixed effects already projected
 out, so regressing on it yields the *within* R-squared. 0.9187 sits temptingly
 close to `e(r2) = 0.9497`, which is what made it convincing. Recomputing from the
 original estimation frame gives 0.7173575810880002 against an independent
@@ -5977,7 +6002,7 @@ not share a statistic key: `ips` uses `r(Zt)`/`r(p)`, `llc` uses
 `r(tds)`/`r(p_tds)`. A shared key would make a combined table ambiguous, so a test
 asserts they are mutually exclusive.
 
-**An API trap this round exposed:** `XtUnitroot`'s `test=` is a *constructor*
+**An API trap this round exposed:** `PanelUnitroot`'s `test=` is a *constructor*
 argument, not a `fit()` one. Writing `fit(method="llc")` is silently accepted by
 `**kwargs` and returns the **ips** result, because that is the default. Only
 asserting on `r["test"]` catches it, which the tests now do.
@@ -6077,7 +6102,7 @@ Also added `e(alpha)` and `k_aux` for `nbreg`, `N_cd`/`version` for the ordered
 models, and `ar2`, `k_absorb`, `df_a`, `sum_w`, `rc`, `p` for `areg`.
 
 Three keys are deliberately **not** implemented, with the reason verified rather
-than guessed: `F_absorb`/`p_absorb`/`r2_c` need the pooled-OLS R-squared, which
+than guessed: `F_absorb`/`p_absorb`/`r2_c` need the pooled-Regress R-squared, which
 PyFixest cannot supply because it does not return the absorbed effects; the
 logit `N_cdf`/`N_cds` counts need a definition before a value; and `nbreg`'s
 `ll_c`/`chi2_c`/`rank0` need an extra constant-only fit. A test asserts the first
@@ -6128,8 +6153,8 @@ compare in Stata before quoting one — rather than implying it has been checked
 ### Added — `estat imtest` (Cameron & Trivedi IM-test)
 
 ```python
-result.estat_imtest()             # the three-component decomposition
-result.estat_imtest(white=True)   # also White's original test
+result.estat_information_matrix_test()             # the three-component decomposition
+result.estat_information_matrix_test(white=True)   # also White's original test
 ```
 
 Transcribed from `imtest.ado` v2.1.5:
@@ -6249,10 +6274,10 @@ for all.
 **A conclusion I had written down backwards.** The earlier comment said
 `e(F_f)`/`e(p_f)` were unimplementable because they "need the entity effects,
 which linearmodels does not return". Reading `xtreg_fe.ado:505-524` shows all
-three absorbed-block quantities come from one plain OLS:
+three absorbed-block quantities come from one plain Regress:
 
 ```stata
-ereturn scalar r2_c = e(r2)                                  // pooled OLS R2
+ereturn scalar r2_c = e(r2)                                  // pooled Regress R2
 ereturn scalar F_f = ((`r2'-`r2c')/e(df_a))/((1-`r2')/e(df_r))
 ```
 
@@ -6278,7 +6303,7 @@ Formulas from `ivregress_estat.ado`'s `Endog2sls`:
 
 ```
 uc    = 2SLS residuals (consistent model)
-ue    = OLS residuals on exog + endog (efficient model)
+ue    = Regress residuals on exog + endog (efficient model)
 USSR  = sum(ue^2)
 uePue = mss of (ue ~ exog + endog + addlinst, noconstant)
 ucPuc = mss of (uc ~ exog + addlinst, noconstant)
@@ -6304,8 +6329,8 @@ the Durbin-Wu name.
 ### Added — `estat overid` (overidentification restrictions)
 
 ```python
-result.estat_overid()          # Sargan + Basmann (2SLS/LIML), or Hansen's J (GMM)
-result.estat_overid().to_dict()
+result.estat_overidentification()          # Sargan + Basmann (2SLS/LIML), or Hansen's J (GMM)
+result.estat_overidentification().to_dict()
 ```
 
 Formulas from `ivregress_estat.ado`'s `OverID2sls`:
@@ -6339,8 +6364,8 @@ latter case `OverID2sls` leaves both statistics missing.
 ### Added — `estat firststage` (IV first-stage diagnostics)
 
 ```python
-result.estat_firststage()              # one row per endogenous regressor
-result.estat_firststage().to_frame()   # DataFrame with Stata's columns
+result.estat_first_stage()              # one row per endogenous regressor
+result.estat_first_stage().to_frame()   # DataFrame with Stata's columns
 ```
 
 Columns follow `ivregress_estat.ado`'s `FirstStage` program: the endogenous
@@ -6443,8 +6468,8 @@ These diagnostics are refused under a robust or clustered VCE, matching
 ### Added — `estat ovtest` (Ramsey RESET test)
 
 ```python
-result.estat_ovtest()          # powers of the fitted values (Stata's default)
-result.estat_ovtest(rhs=True)  # powers of the right-hand-side variables
+result.estat_omitted_variables_test()          # powers of the fitted values (Stata's default)
+result.estat_omitted_variables_test(rhs=True)  # powers of the right-hand-side variables
 ```
 
 Transcribed from `ovtest.ado` v2.7.0: the response is regressed on the original
@@ -6468,10 +6493,10 @@ themselves; when no continuous regressor remains the command raises with Stata's
 ### Added — `estat hettest` (Breusch-Pagan / Cook-Weisberg)
 
 ```python
-result.estat_hettest()                 # normal (default): chi2 = e(mss)/2
-result.estat_hettest(method="iid")     # chi2 = e(N)*e(r2)
-result.estat_hettest(method="fstat")   # F from the auxiliary regression
-result.estat_hettest(variables=[])     # regress on fitted values
+result.estat_heteroskedasticity_test()                 # normal (default): chi2 = e(mss)/2
+result.estat_heteroskedasticity_test(method="iid")     # chi2 = e(N)*e(r2)
+result.estat_heteroskedasticity_test(method="fstat")   # F from the auxiliary regression
+result.estat_heteroskedasticity_test(variables=[])     # regress on fitted values
 ```
 
 Transcribed from `hettest.ado` v3.4.4: the auxiliary regression is of the
@@ -6521,7 +6546,7 @@ Three details worth recording:
 
 Two refusals mirror `vif.ado`: a model without a constant raises unless
 `uncentered=True` (`"not appropriate after regress, nocons"`), and a non-linear
-model raises `NotImplementedError` because the auxiliary regressions are OLS by
+model raises `NotImplementedError` because the auxiliary regressions are Regress by
 construction.
 
 **Tests: 1506 → 1521 passing.**

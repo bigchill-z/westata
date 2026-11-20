@@ -10,8 +10,8 @@
 判定口径沿用 BRIEF §2.3：A ≤1e-9、B ≤1e-6、C ≤1e-3、D ≤1e-2、E >1e-2，
 相对差 = `max(|westata - stata| / max(|stata|, 1e-12))`。
 
-> **重要口径说明（本领域特有）**：`test` / `margins` / `contrast` / `pwcompare` / `lincom` / `nlcom`
-> 的 Stata 结果都存在 `r()` 里，**没有 `e(b)/e(V)`**，而 `r(b)/r(V)` 在 `pwcompare` 里存的是
+> **重要口径说明（本领域特有）**：`test` / `margins` / `contrast` / `pairwise_compare` / `lincom` / `nlcom`
+> 的 Stata 结果都存在 `r()` 里，**没有 `e(b)/e(V)`**，而 `r(b)/r(V)` 在 `pairwise_compare` 里存的是
 > *单元格均值*、对比量在 `r(b_vs)`。所以本领域的"统计量"必须从 `r(F)/r(chi2)/r(df)/r(p)`
 > 或 `r(table)`（9×k：b、se、stat、p、ll、ul、df、crit、eform）取全精度，不能解析打印表。
 > 每条 `test`/`margins` 记录都同时比了**统计量、df、p 值**三项（见 `extra.part_rel`）。
@@ -22,7 +22,7 @@
 
 | # | Stata 命令 | westata 调用 | 数据 | 判定 | 系数相对差 | 标准误相对差 |
 |---|---|---|---|---|---|---|
-| 1 | `regress mpg weight foreign` | `ws.OLS.from_formula` | auto(N=74) | **pass A** | 0 | — (样本核对) |
+| 1 | `regress mpg weight foreign` | `ws.Regress.from_formula` | auto(N=74) | **pass A** | 0 | — (样本核对) |
 | 2 | `logit foreign weight mpg` | `ws.Logit.from_formula` | auto | **pass A** | 0 | — (样本核对) |
 | 3 | `poisson rep78 mpg weight` | `ws.Poisson.from_formula` | auto dropna(N=69) | **pass A** | 0 | — (样本核对) |
 | 4 | `tobit mpg weight foreign, ll(17)` | `ws.Tobit.from_formula(lower=17)` | auto | **pass A** | 0 | — (样本核对) |
@@ -61,7 +61,7 @@
 | 37 | `contrast r.r3`（3 水平） | `contrast("C(r3)","r")` | 自造 r3(N=69) | **pass A** | 5.35e-14 | — |
 | 38 | `contrast g.r3` | `contrast(..., "g")` | 同上 | **pass A** | 3.81e-15 | — |
 | 39 | `contrast a.r3` | `contrast(..., "a")` | 同上 | **pass A** | 5.35e-14 | — |
-| 40 | `pwcompare r3` | `m.pwcompare("C(r3)")` | 同上 | **pass A** | 5.35e-14 | — |
+| 40 | `pairwise_compare r3` | `m.pairwise_compare("C(r3)")` | 同上 | **pass A** | 5.35e-14 | — |
 | 41 | `margins, dydx(weight)`（logit） | `lg.margins(dydx="weight")` | auto | **fail D** | 7.15e-03（SE 分量 7.10e-03） | 同左 |
 | 42 | 上条 #41 的解析仲裁 | 解析 delta method | auto | **fail D** | 7.10e-03 | — |
 | 43 | `margins, dydx(weight) at(mpg=20)` | `margins(dydx=..., at=...)` | auto | **fail E** | 5.38e-02（SE 分量） | 同左 |
@@ -97,7 +97,7 @@
 | 73 | 上条 #72 的归因（rss/N vs sigma²） | — | auto | **fail E** | 1.52e-01 | — |
 | 74 | `predict double, pr(17,.)`（tobit） | `tb.predict(kind="pr")` | auto | **fail** | — (westata 拒绝) | — |
 | 75 | `esttab m1 m2, b(%12.6f) se(%12.6f) nostar …` | `ws.etable(...)` + `to_markdown` | auto | **pass A** | 0 | 0 |
-| 76 | `pwcompare foreign, mcompare(bonferroni)` | `pwcompare(adjust="bonferroni")` | auto | **fail** | — (westata 拒绝) | — |
+| 76 | `pairwise_compare foreign, mcompare(bonferroni)` | `pairwise_compare(adjust="bonferroni")` | auto | **fail** | — (westata 拒绝) | — |
 | 77 | `contrast h.foreign` | `contrast(..., "h")` | auto | **fail** | — (westata 拒绝) | — |
 
 ---
@@ -270,9 +270,9 @@ z 从 -197.7 变成 -187.6（差 5%）。p 值仍远小于 0.001，但区间宽�
 - 这是**能力缺口**：`margins, predict(pr(0,.))` 这类 Stata 工作流无法复现。
   记 fail，但注意它是"明确拒绝"而非"给错数"。
 
-### 11. `pwcompare` 的多重比较校正与 `contrast h.`（#76、#77）
+### 11. `pairwise_compare` 的多重比较校正与 `contrast h.`（#76、#77）
 
-- Stata：`pwcompare foreign, mcompare(bonferroni)` 正常返回校正后 p 值；
+- Stata：`pairwise_compare foreign, mcompare(bonferroni)` 正常返回校正后 p 值；
   `contrast h.foreign`（Helmert）也可用。
 - westata：两者都抛 `UnsupportedError`（`contrast.py::_check_adjust` / `_KNOWN_UNSUPPORTED_METHODS`）。
 - 属**已文档化的能力缺口**，且拒绝而非静默给出未校正 p 值，方向是对的；记 fail 以计入覆盖。
@@ -302,7 +302,7 @@ z 从 -197.7 变成 -187.6（差 5%）。p 值仍远小于 0.001，但区间宽�
 | `lrtest` | E3，1e-3，"df == 0 返回 p = 1.0" | 嵌套场景 A 档；**Stata 对 df=0 直接 r(498) 报错**；**非嵌套（k 不同）Stata 接受并返回负 LR，westata 拒绝** | **冲突**：df=0 分支在 Stata 侧不存在 |
 | `hausman` | E3，容差 5e-2 | 正定场景 2.60e-13；**非正定场景 Stata 报负 chi2、westata 夹到 0**；**`constant` 选项无对应** | 数值一致；**新增两条行为差异**，旧条目未记 |
 | `contrast` | E3，2e-6 | r./g./a. 各两档全 A（3.8e-15～5.35e-14）；**已知 a. 是 low-vs-high，本次独立复核确认** | **一致** |
-| `pwcompare` | E3，2e-6 | A 档 5.35e-14；**注意 Stata 把对比量放在 `r(b_vs)`，`r(b)` 是单元格均值** | 一致，补了取数口径 |
+| `pairwise_compare` | E3，2e-6 | A 档 5.35e-14；**注意 Stata 把对比量放在 `r(b_vs)`，`r(b)` 是单元格均值** | 一致，补了取数口径 |
 | `margins` | E3，1e-6，"Marginal effects 1.6e-7，standard errors 5.2e-6" | **未复现该等级**：regress 预测边际 A 档；但 logit AME 的 SE 偏 7.1e-3、`at()` 偏 5.4e-2，`over()`/`dydx()` 偏 1.9e-9 | **冲突**：旧结论的 5.2e-6 本次未重现，实测最差 5.4e-2 |
 | `predict` | E3，1e-9，"e(a,b) and ystar(a,b) both 5.8e-10" | regress/logit 各类型 A 档；tobit `e()`/`ystar()` 5.78e-09（**差一个数量级**）；**tobit stdf 偏 7.7e-2**（旧条目未提） | **部分冲突**：数量级不同 + stdf 缺陷未被记录 |
 | `predict, stdp/stdf` | E3，1e-10，"stdf is offered only for the linear families … so westata refuses it too" | 复核**成立**（logit/poisson 双方都拒绝）；但 **tobit 的 stdf 有量纲错误** | 部分一致；**tobit stdf 是旧条目遗漏** |
@@ -322,7 +322,7 @@ z 从 -197.7 变成 -187.6（差 5%）。p 值仍远小于 0.001，但区间宽�
 | `margins, dydx()` 的 `vce(unconditional)` | westata 明确列为未实现；本次未构造可比的 Stata 命令 |
 | `margins` 的 `expression()` / `atmeans` 与因子组合 | 同上，westata 抛 `UnsupportedError`；未做系统覆盖 |
 | `margins, at()` 对因子变量的组合（`at(foreign=(0 1))`） | 需要 `margins` 的因子展开层，westata 无对应；只测了连续变量 `at()` |
-| `pwcompare` 的 Holm/Šidák/Tukey 等 | 只测了 bonferroni 一种（验证拒绝行为），未逐一测全 |
+| `pairwise_compare` 的 Holm/Šidák/Tukey 等 | 只测了 bonferroni 一种（验证拒绝行为），未逐一测全 |
 | `contrast m.`（multiple-comparison） | 同上 |
 | `esttab` 的 `star()` / `mtitles` / 多模型 4 列以上 | 只测了 `nostar` + `stats()` 的两列场景（打印层足够） |
 | `predict` 的 `xb`/`stdp` 在 `xtreg`/`reghdfe` 后 | 属 panel/linear 领域，本领域只测了 regress/logit/poisson/tobit |

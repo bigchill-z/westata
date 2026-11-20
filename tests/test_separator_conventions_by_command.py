@@ -43,8 +43,8 @@ def models():
         }
     )
     return [
-        ws.OLS.from_formula("y ~ x1", frame).fit(),
-        ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
+        ws.Regress.from_formula("y ~ x1", frame).fit(),
+        ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
     ]
 
 
@@ -66,7 +66,7 @@ def test_summarize_does_separate_the_count() -> None:
 def test_the_regression_block_separates_its_count() -> None:
     rng = np.random.default_rng(1500)
     frame = pd.DataFrame({"y": rng.normal(size=1500), "x": rng.normal(size=1500)})
-    rendered = str(ws.OLS.from_formula("y ~ x", frame).fit().summary(style="stata"))
+    rendered = str(ws.Regress.from_formula("y ~ x", frame).fit().summary(style="stata"))
     assert "1,500" in rendered
 
 

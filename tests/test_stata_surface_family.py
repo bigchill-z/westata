@@ -67,12 +67,12 @@ def frame():
 
 def _estimators(frame):
     return {
-        "OLS": lambda: ws.OLS.from_formula("y ~ x1 + x2", frame).fit(),
-        "OLS interaction": lambda: ws.OLS.from_formula("y ~ x1 * x2", frame).fit(),
-        "FEOLS one-way": lambda: ws.FEOLS.from_formula(
+        "Regress": lambda: ws.Regress.from_formula("y ~ x1 + x2", frame).fit(),
+        "OLS interaction": lambda: ws.Regress.from_formula("y ~ x1 * x2", frame).fit(),
+        "FEOLS one-way": lambda: ws.RegressHighDimFixedEffects.from_formula(
             "y ~ x1 + x2 | firm", frame
         ).fit(),
-        "FEOLS two-way": lambda: ws.FEOLS.from_formula(
+        "FEOLS two-way": lambda: ws.RegressHighDimFixedEffects.from_formula(
             "y ~ x1 + x2 | firm + year", frame
         ).fit(),
         "IV2SLS": lambda: ws.IV2SLS.from_formula(
@@ -88,20 +88,20 @@ def _estimators(frame):
         "OrderedProbit": lambda: ws.OrderedProbit.from_formula(
             "rep ~ x1", frame
         ).fit(),
-        "PanelOLS fe": lambda: ws.PanelOLS.from_formula(
+        "PanelOLS fe": lambda: ws.PanelRegressFE.from_formula(
             "y ~ x1 + x2", frame, entity="firm", time="year"
         ).fit(),
-        "RandomEffects": lambda: ws.RandomEffects.from_formula(
+        "PanelRegressRE": lambda: ws.PanelRegressRE.from_formula(
             "y ~ x1 + x2", frame, entity="firm", time="year"
         ).fit(),
-        "BetweenOLS": lambda: ws.BetweenOLS.from_formula(
+        "PanelRegressBE": lambda: ws.PanelRegressBE.from_formula(
             "y ~ x1 + x2", frame, entity="firm", time="year"
         ).fit(),
     }
 
 
 _LABELS = [
-    "OLS",
+    "Regress",
     "OLS interaction",
     "FEOLS one-way",
     "FEOLS two-way",
@@ -113,8 +113,8 @@ _LABELS = [
     "OrderedLogit",
     "OrderedProbit",
     "PanelOLS fe",
-    "RandomEffects",
-    "BetweenOLS",
+    "PanelRegressRE",
+    "PanelRegressBE",
 ]
 
 
@@ -142,7 +142,7 @@ def test_stata_params_is_a_permutation_of_params(frame, label) -> None:
 
 
 @pytest.mark.parametrize("label", [
-    "OLS",
+    "Regress",
     "FEOLS one-way",
     "IV2SLS",
     "PanelOLS fe",
@@ -187,7 +187,7 @@ def test_xtreg_fixtures_do_report_a_constant(frame) -> None:
     names are all ``['x1', 'x2', '_cons']``.
     """
 
-    for estimator in (ws.PanelOLS, ws.RandomEffects, ws.BetweenOLS):
+    for estimator in (ws.PanelRegressFE, ws.PanelRegressRE, ws.PanelRegressBE):
         result = estimator.from_formula(
             "y ~ x1 + x2", frame, entity="firm", time="year"
         ).fit()
@@ -197,7 +197,7 @@ def test_xtreg_fixtures_do_report_a_constant(frame) -> None:
 def test_unmappable_terms_raise_rather_than_invent(frame) -> None:
     """The round-38/39 rule still holds inside the family."""
 
-    explicit = ws.OLS.from_formula("y ~ x1 + C(firm)", frame).fit()
+    explicit = ws.Regress.from_formula("y ~ x1 + C(firm)", frame).fit()
 
     with pytest.raises(NotImplementedError):
         _ = explicit.stata_param_names

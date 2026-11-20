@@ -54,7 +54,7 @@ def fitted():
         pytest.skip("grilic.dta is not available")
     frame = frame.copy()
     frame["iqgrp"] = pd.qcut(frame["iq"], 4, labels=False).astype(int) + 1
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure + C(iqgrp)", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure + C(iqgrp)", frame).fit()
 
 
 def test_the_joint_wald_block_matches_stata(fitted) -> None:
@@ -72,7 +72,7 @@ def test_nowald_returns_the_per_comparison_rows(fitted) -> None:
 def test_pwcompare_rows_match_stata(fitted) -> None:
     """The pairwise table's numbers were already exact; this pins them."""
 
-    rows = ws.pwcompare(fitted, "C(iqgrp)")
+    rows = ws.pairwise_compare(fitted, "C(iqgrp)")
     observed = {row.label: (row.estimate, row.std_err) for row in rows}
     assert set(observed) == set(STATA_ROWS)
     for label, (estimate, std_err) in STATA_ROWS.items():

@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from westata.postestimation.lincom import LincomResult, run_lincom
+from westata.postestimation.lincom import LincomResults, run_lincom
 from westata.postestimation.tests import (
     WaldTest,
     build_contrast,
@@ -491,7 +491,7 @@ def lincom_as_stata(
     constraint = (
         expression if constant == 0.0 else _constraint_with_constant(expression, constant)
     )
-    return LincomResult(
+    return LincomResults(
         estimate=estimate,
         std_err=std_err,
         statistic=statistic,

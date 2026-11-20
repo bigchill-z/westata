@@ -14,7 +14,7 @@
 ### 1.1 现象（修复前）
 
 ```python
-ws.OLS.from_formula(
+ws.Regress.from_formula(
     "d_rpc ~ l_sh_routine33a + <48 个州虚拟变量>",
     frame,                      # 722 行，其中 d_rpc 有 47 个缺失
     weights=frame["timepwt48"], # 也是 722 个元素，与 frame 对齐
@@ -30,7 +30,7 @@ WeightError: weights have 722 entries but the data have 675 rows
 
 ### 1.2 原因
 
-`OLS.from_formula` 内部：
+`Regress.from_formula` 内部：
 
 ```python
 X, names, kept_index = build_design(formula, data)   # patsy 丢掉 47 个含缺失的行
@@ -83,7 +83,7 @@ which is why the estimation sample can be shorter than the frame.
 ### 2.1 权重不接受列名 —— 已修复
 
 ```python
-ws.OLS.from_formula(formula, frame, weights="timepwt48", weight_type="aweight")
+ws.Regress.from_formula(formula, frame, weights="timepwt48", weight_type="aweight")
 # 修复前 → ValueError；修复后可用
 ```
 
@@ -93,7 +93,7 @@ statsmodels 的 `from_formula` 接受列名，这正是它能把 `dropna` 处理
 
 ### 2.2 文档没提"会丢行" —— 已修复
 
-`OLS.from_formula` 的 docstring 现在写明：
+`Regress.from_formula` 的 docstring 现在写明：
 
 - 公式涉及的任何变量有缺失值的行**会被丢弃**（与 Stata 估计命令、`statsmodels.formula.api` 一致）；
 - `weights` 跟着那个样本走，两种形式（列名 / 对齐向量）都正确。

@@ -35,7 +35,7 @@ import pandas as pd
 
 
 @dataclass
-class SucestResult:
+class SuestResults:
     """The stacked parameter vector and its simultaneous covariance matrix.
 
     Attributes
@@ -195,7 +195,7 @@ def suest(
     *,
     names: Sequence[str] | None = None,
     cluster: Any = None,
-) -> SucestResult:
+) -> SuestResults:
     """Stata's ``suest`` -- stack several fits into one simultaneous covariance.
 
     Parameters
@@ -303,7 +303,7 @@ def suest(
     residual_df = min(
         float(getattr(model, "df_resid", count - 1)) for model in models
     )
-    return SucestResult(
+    return SuestResults(
         params=np.concatenate(params),
         covariance=covariance,
         param_names=param_names,

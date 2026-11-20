@@ -26,7 +26,7 @@ def run_case(tag, x1, x2, y, taus):
     print("#" * 76)
     print(f"## {tag}  n={n}")
     for tau in taus:
-        q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+        q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
         ri = q.fit(cov_type="iid"); rr = q.fit(cov_type="robust")
         pn = list(rr.param_names)
         order = [pn.index(k) for k in ("x1", "x2", "Intercept")]

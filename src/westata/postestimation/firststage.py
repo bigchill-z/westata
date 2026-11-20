@@ -55,7 +55,7 @@ from westata.postestimation.names import is_constant_name, require_iv_structure
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["FirstStageResult", "estat_firststage"]
+__all__ = ["FirstStageResults", "estat_first_stage"]
 
 
 def _as_reported(values: Any) -> Any:
@@ -120,7 +120,7 @@ def _residualise(y: np.ndarray, design: np.ndarray) -> np.ndarray:
     return y - fitted
 
 
-class FirstStageResult:
+class FirstStageResults:
     """One row per endogenous regressor, plus the headline F.
 
     Attributes
@@ -208,7 +208,7 @@ class FirstStageResult:
 
     def __repr__(self) -> str:
         return (
-            f"<FirstStageResult {len(self.endog)} endogenous, "
+            f"<FirstStageResults {len(self.endog)} endogenous, "
             f"min partial R2 {np.nanmin(self.partial_r2):.4f}>"
         )
 
@@ -595,9 +595,9 @@ def _require_iv(result: Any) -> dict[str, Any]:
     return require_iv_structure(result, 'estat firststage')
 
 
-def estat_firststage(
+def estat_first_stage(
     result: Any, *, all: bool = False, forcenonrobust: bool = False
-) -> FirstStageResult:
+) -> FirstStageResults:
     """Stata's ``estat firststage`` for an IV fit.
 
     Parameters
@@ -836,7 +836,7 @@ def estat_firststage(
         except np.linalg.LinAlgError:  # pragma: no cover - singular blocks
             mineig = None
 
-    return FirstStageResult(
+    return FirstStageResults(
         endog=endog_names,
         r2=[row["r2"] for row in rows],
         adj_r2=[row["adj_r2"] for row in rows],

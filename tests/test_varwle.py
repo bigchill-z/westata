@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 import westata as ws
-from westata.postestimation.varwle import varwle
+from westata.postestimation.varwle import var_wle
 
 DATA = r"D:\myCodeProject\test_westata\data\macro_swatson.dta"
 
@@ -43,7 +43,7 @@ def fitted_var():
 
 
 def test_every_cell_matches_stata(fitted_var) -> None:
-    table = varwle(fitted_var)
+    table = var_wle(fitted_var)
     seen = {(row.equation, row.lag): row for row in table.rows}
     assert set(seen) == set(STATA), sorted(seen)
     for key, expected in STATA.items():
@@ -52,7 +52,7 @@ def test_every_cell_matches_stata(fitted_var) -> None:
 
 
 def test_degrees_of_freedom_match_stata(fitted_var) -> None:
-    table = varwle(fitted_var)
+    table = var_wle(fitted_var)
     for row in table.rows:
         expected_df = 4 if row.equation == "All" else 2
         assert row.df == expected_df, (row.equation, row.lag)
@@ -61,7 +61,7 @@ def test_degrees_of_freedom_match_stata(fitted_var) -> None:
 def test_the_table_is_grouped_per_equation(fitted_var) -> None:
     """``varwle`` prints one block per equation plus an ``All`` block."""
 
-    grouped = varwle(fitted_var).by_equation()
+    grouped = var_wle(fitted_var).by_equation()
     assert list(grouped) == ["dinf", "unem", "All"]
     for rows in grouped.values():
         assert [row.lag for row in rows] == [1, 2]
@@ -70,7 +70,7 @@ def test_the_table_is_grouped_per_equation(fitted_var) -> None:
 def test_all_row_pools_every_equation(fitted_var) -> None:
     """The All statistic must exceed either equation's on its own."""
 
-    table = varwle(fitted_var)
+    table = var_wle(fitted_var)
     seen = {(row.equation, row.lag): row.chi2 for row in table.rows}
     for lag in (1, 2):
         assert seen[("All", lag)] > seen[("dinf", lag)]

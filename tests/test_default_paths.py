@@ -50,37 +50,37 @@ def frame():
 #: estimator cannot infer (the entity/time columns for a panel, the lag for
 #: newey -- both REQUIRED by Stata too), and nothing else.
 CASES = {
-    "OLS": lambda f: ws.OLS.from_formula("y ~ x1", f).fit(),
+    "Regress": lambda f: ws.Regress.from_formula("y ~ x1", f).fit(),
     "IV2SLS": lambda f: ws.IV2SLS.from_formula("y ~ x1 + [x2 ~ z1]", f).fit(),
     "IVLIML": lambda f: ws.IVLIML.from_formula("y ~ x1 + [x2 ~ z1]", f).fit(),
     "IVGMM": lambda f: ws.IVGMM.from_formula("y ~ x1 + [x2 ~ z1]", f).fit(),
-    "FEOLS": lambda f: ws.FEOLS.from_formula("y ~ x1 | firm", f).fit(),
+    "RegressHighDimFixedEffects": lambda f: ws.RegressHighDimFixedEffects.from_formula("y ~ x1 | firm", f).fit(),
     "Logit": lambda f: ws.Logit.from_formula("yb ~ x1", f).fit(),
     "Probit": lambda f: ws.Probit.from_formula("yb ~ x1", f).fit(),
     "Poisson": lambda f: ws.Poisson.from_formula("yc ~ x1", f).fit(),
     "NBreg": lambda f: ws.NegativeBinomial.from_formula("yc ~ x1", f).fit(),
     "OrderedLogit": lambda f: ws.OrderedLogit.from_formula("rep ~ x1", f).fit(),
     "OrderedProbit": lambda f: ws.OrderedProbit.from_formula("rep ~ x1", f).fit(),
-    "PanelOLS": lambda f: ws.PanelOLS.from_formula(
+    "PanelRegressFE": lambda f: ws.PanelRegressFE.from_formula(
         "y ~ x1", f, entity="firm", time="year"
     ).fit(),
-    "RandomEffects": lambda f: ws.RandomEffects.from_formula(
+    "PanelRegressRE": lambda f: ws.PanelRegressRE.from_formula(
         "y ~ x1", f, entity="firm", time="year"
     ).fit(),
-    "BetweenOLS": lambda f: ws.BetweenOLS.from_formula(
+    "PanelRegressBE": lambda f: ws.PanelRegressBE.from_formula(
         "y ~ x1", f, entity="firm", time="year"
     ).fit(),
-    "FirstDifferenceOLS": lambda f: ws.FirstDifferenceOLS.from_formula(
+    "PanelRegressFD": lambda f: ws.PanelRegressFD.from_formula(
         "y ~ x1", f, entity="firm", time="year"
     ).fit(),
-    "QuantileRegression": lambda f: ws.QuantileRegression.from_formula(
+    "QuantileRegress": lambda f: ws.QuantileRegress.from_formula(
         "y ~ x1", f
     ).fit(),
-    "RobustRegression": lambda f: ws.RobustRegression.from_formula("y ~ x1", f).fit(),
-    "Mvreg": lambda f: ws.Mvreg.from_formula("y x1 = x2", f).fit(),
+    "RobustRegress": lambda f: ws.RobustRegress.from_formula("y ~ x1", f).fit(),
+    "MultivariateRegress": lambda f: ws.MultivariateRegress.from_formula("y x1 = x2", f).fit(),
     "Manova": lambda f: ws.Manova.from_formula("y x1 = firm", f).fit(),
-    "Sureg": lambda f: ws.Sureg.from_formula(["y ~ x1", "x1 ~ x2"], f).fit(),
-    "newey": lambda f: ws.newey("y ~ x1", f, lag=1, time=f["t"])._results,
+    "SeeminglyUnrelatedRegress": lambda f: ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x1", "x1 ~ x2"], f).fit(),
+    "newey_west": lambda f: ws.newey_west("y ~ x1", f, lag=1, time=f["t"])._results,
 }
 
 
@@ -93,7 +93,7 @@ def test_the_smallest_legal_call_runs(frame, label) -> None:
     assert result is not None
 
 
-@pytest.mark.parametrize("label", ["Sqreg", "Bsqreg"])
+@pytest.mark.parametrize("label", ["SimultaneousQuantileRegress", "BootstrappedQuantileRegress"])
 def test_bootstrap_estimators_run_without_a_seed(frame, label) -> None:
     """The round-70 failure mode, pinned per estimator.
 
@@ -102,12 +102,12 @@ def test_bootstrap_estimators_run_without_a_seed(frame, label) -> None:
     test.
     """
 
-    if label == "Sqreg":
-        result = ws.Sqreg.from_formula(
+    if label == "SimultaneousQuantileRegress":
+        result = ws.SimultaneousQuantileRegress.from_formula(
             "y ~ x1", frame, quantiles=(0.25, 0.75)
         ).fit()
     else:
-        result = ws.Bsqreg.from_formula("y ~ x1", frame).fit()
+        result = ws.BootstrappedQuantileRegress.from_formula("y ~ x1", frame).fit()
 
     assert np.all(np.isfinite(np.asarray(result.cov_params())))
 
@@ -119,8 +119,8 @@ def test_an_unseeded_bootstrap_is_not_silently_deterministic(frame) -> None:
     every run identical, which is a different wrong answer.
     """
 
-    first = ws.Bsqreg.from_formula("y ~ x1", frame).fit()
-    second = ws.Bsqreg.from_formula("y ~ x1", frame).fit()
+    first = ws.BootstrappedQuantileRegress.from_formula("y ~ x1", frame).fit()
+    second = ws.BootstrappedQuantileRegress.from_formula("y ~ x1", frame).fit()
 
     assert not np.allclose(
         np.asarray(first.cov_params()), np.asarray(second.cov_params())
@@ -137,4 +137,4 @@ def test_eivreg_refuses_without_reliability_ratios(frame) -> None:
     """
 
     with pytest.raises(ws.ConsistencyError, match="reliab"):
-        ws.Eivreg.from_formula("y ~ x1", frame).fit()
+        ws.ErrorsInVariablesRegress.from_formula("y ~ x1", frame).fit()

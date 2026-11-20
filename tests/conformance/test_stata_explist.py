@@ -75,7 +75,7 @@ def test_expressions_over_regression_results():
     assert float(result.params["nobs"]) == 400.0
     assert float(result.bse["nobs"]) == pytest.approx(0.0, abs=1e-12)
     # The observed t statistic matches the plain fit.
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
     expected = float(plain.params["x1"]) / float(plain.bse["x1"])
     assert float(result.params["tstat"]) == pytest.approx(expected, rel=1e-10)
 

@@ -145,7 +145,7 @@ _LINALG_WARNING: type[Warning] = getattr(
     type("_NoLinAlgWarning", (Warning,), {}),
 )
 
-__all__ = ["Etregress", "Heckman", "Intreg", "Truncreg"]
+__all__ = ["EndogenousTreatmentRegress", "Heckman", "IntervalRegress", "TruncatedRegress"]
 
 
 # --------------------------------------------------------------- arithmetic
@@ -669,7 +669,7 @@ def _restate(result: StataResults, df_model: float) -> StataResults:
 # ------------------------------------------------------------------ truncreg
 
 
-class Truncreg(_MLLimitedBase):
+class TruncatedRegress(_MLLimitedBase):
     """Truncated regression (Stata ``truncreg``).
 
     Observations outside ``(lower, upper)`` are absent from the sample, so each
@@ -891,7 +891,7 @@ def _truncation_mask(
 # ------------------------------------------------------------------- intreg
 
 
-class Intreg(_MLLimitedBase):
+class IntervalRegress(_MLLimitedBase):
     """Interval regression (Stata ``intreg``).
 
     Only the interval ``[lower, upper]`` is known for each observation:
@@ -2062,7 +2062,7 @@ class Heckman:
         )
 
 
-class Etregress:
+class EndogenousTreatmentRegress:
     """Endogenous treatment regression (Stata ``etregress``), control function.
 
     Treatment equation (probit, full sample)::

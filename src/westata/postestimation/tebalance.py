@@ -50,7 +50,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["BalanceRow", "BalanceSummary", "tebalance_summarize"]
+__all__ = ["BalanceRow", "BalanceSummary", "treatment_balance_summarize"]
 
 
 def _no_leading_zero(value: float, *args: Any, **kwargs: Any) -> str:
@@ -204,7 +204,7 @@ def _weighted_mean_variance(
     return mean, variance
 
 
-def tebalance_summarize(
+def treatment_balance_summarize(
     treatment: Any,
     covariates: Any,
     *,

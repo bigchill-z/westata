@@ -116,7 +116,7 @@ def main() -> int:
     for label, term in (("gap (as in the paper)", "gap"),
                         ("NJ dummy instead of GAP", "gap_as_dummy"),
                         ("GAP randomly permuted", "gap_shuffled")):
-        fit = ws.OLS.from_formula(f"d_fte ~ {term}", frame).fit()
+        fit = ws.Regress.from_formula(f"d_fte ~ {term}", frame).fit()
         i = [str(n) for n in fit.param_names].index(term)
         control[label] = {
             "b": float(np.asarray(fit.params, dtype=float)[i]),

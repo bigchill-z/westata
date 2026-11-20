@@ -48,19 +48,19 @@ def sample():
 
 def test_nneighbor_1_matches_stata(sample) -> None:
     y, d, x = sample
-    assert ws.teffects_nnmatch(y, d, x, nneighbor=1).ate == pytest.approx(2453.0763, abs=5e-4)
+    assert ws.treatment_effects_nnmatch(y, d, x, nneighbor=1).ate == pytest.approx(2453.0763, abs=5e-4)
 
 
 def test_nneighbor_4_matches_stata(sample) -> None:
     y, d, x = sample
-    assert ws.teffects_nnmatch(y, d, x, nneighbor=4).ate == pytest.approx(2060.4859, abs=5e-4)
+    assert ws.treatment_effects_nnmatch(y, d, x, nneighbor=4).ate == pytest.approx(2060.4859, abs=5e-4)
 
 
 def test_the_tie_rule_is_all_tied_controls(sample) -> None:
     """The first-tie-only value must NOT be what we return."""
 
     y, d, x = sample
-    result = ws.teffects_nnmatch(y, d, x, nneighbor=1)
+    result = ws.treatment_effects_nnmatch(y, d, x, nneighbor=1)
     assert abs(result.ate - 2277.0212) > 100
     assert result.matches_max > 1
 
@@ -69,15 +69,15 @@ def test_the_match_counts_match_psmatchs(sample) -> None:
     """Both estimators use all tied neighbours, so the counts agree."""
 
     y, d, x = sample
-    one = ws.teffects_nnmatch(y, d, x, nneighbor=1)
-    four = ws.teffects_nnmatch(y, d, x, nneighbor=4)
+    one = ws.treatment_effects_nnmatch(y, d, x, nneighbor=1)
+    four = ws.treatment_effects_nnmatch(y, d, x, nneighbor=4)
     assert (one.matches_min, one.matches_max) == (1, 8)
     assert (four.matches_min, four.matches_max) == (4, 11)
 
 
 def test_the_metric_is_mahalanobis(sample) -> None:
     y, d, x = sample
-    assert ws.teffects_nnmatch(y, d, x).metric == "mahalanobis"
+    assert ws.treatment_effects_nnmatch(y, d, x).metric == "mahalanobis"
 
 
 def test_a_caliper_that_excludes_everything_raises(sample) -> None:
@@ -85,11 +85,11 @@ def test_a_caliper_that_excludes_everything_raises(sample) -> None:
 
     y, d, x = sample
     with pytest.raises(Exception, match="caliper|no matches"):
-        ws.teffects_nnmatch(y, d, x, nneighbor=1, caliper=1e-9)
+        ws.treatment_effects_nnmatch(y, d, x, nneighbor=1, caliper=1e-9)
 
 
 def test_a_generous_caliper_leaves_the_estimate_alone(sample) -> None:
     y, d, x = sample
-    wide = ws.teffects_nnmatch(y, d, x, nneighbor=1, caliper=1e6)
+    wide = ws.treatment_effects_nnmatch(y, d, x, nneighbor=1, caliper=1e6)
     assert wide.ate == pytest.approx(2453.0763, abs=5e-4)
     assert wide.caliper == pytest.approx(1e6)

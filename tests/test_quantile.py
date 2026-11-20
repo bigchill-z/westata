@@ -13,8 +13,8 @@ import pytest
 import westata as ws
 from westata.errors import ConsistencyError
 from westata.estimators.quantile import (
-    QuantileRegression,
-    RobustRegression,
+    QuantileRegress,
+    RobustRegress,
     solve_lad,
 )
 
@@ -105,8 +105,8 @@ def test_qreg_median_is_close_to_ols_on_homoskedastic_data():
     y = 1.0 + 2.0 * x1 - 0.5 * x2 + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x1": x1, "x2": x2})
 
-    quantile = QuantileRegression.from_formula("y ~ x1 + x2", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    quantile = QuantileRegress.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         quantile.params[["Intercept", "x1", "x2"]].to_numpy(),
@@ -119,7 +119,7 @@ def test_qreg_heteroskedastic_slopes_increase_with_the_quantile():
     frame = _quantile_frame()
     coefficients = []
     for tau in (0.25, 0.5, 0.75, 0.9):
-        result = QuantileRegression.from_formula(
+        result = QuantileRegress.from_formula(
             "y ~ x1 + x2", frame, quantile=tau
         ).fit()
         coefficients.append(float(result.params["Intercept"]))
@@ -129,7 +129,7 @@ def test_qreg_heteroskedastic_slopes_increase_with_the_quantile():
 
 
 def test_qreg_pseudo_r2_is_between_zero_and_one():
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=0.5
     ).fit()
     assert 0.0 < float(result.e["r2_p"]) < 1.0
@@ -140,13 +140,13 @@ def test_qreg_pseudo_r2_is_between_zero_and_one():
 
 def test_qreg_rejects_a_bad_quantile():
     with pytest.raises(ValueError, match="quantile"):
-        QuantileRegression.from_formula("y ~ x1", _quantile_frame(), quantile=0.0)
+        QuantileRegress.from_formula("y ~ x1", _quantile_frame(), quantile=0.0)
     with pytest.raises(ValueError, match="quantile"):
-        QuantileRegression.from_formula("y ~ x1", _quantile_frame(), quantile=1.0)
+        QuantileRegress.from_formula("y ~ x1", _quantile_frame(), quantile=1.0)
 
 
 def test_qreg_rejects_an_unknown_cov_type():
-    model = QuantileRegression.from_formula("y ~ x1 + x2", _quantile_frame())
+    model = QuantileRegress.from_formula("y ~ x1 + x2", _quantile_frame())
     with pytest.raises(ValueError, match="cov_type"):
         model.fit(cov_type="hac")
 
@@ -158,8 +158,8 @@ def test_qreg_robust_and_iid_differ_but_are_close_on_iid_errors():
     y = 1.0 + 2.0 * x1 + rng.normal(size=n)
     frame = pd.DataFrame({"y": y, "x1": x1})
 
-    iid = QuantileRegression.from_formula("y ~ x1", frame).fit(cov_type="iid")
-    robust = QuantileRegression.from_formula("y ~ x1", frame).fit(cov_type="robust")
+    iid = QuantileRegress.from_formula("y ~ x1", frame).fit(cov_type="iid")
+    robust = QuantileRegress.from_formula("y ~ x1", frame).fit(cov_type="robust")
 
     np.testing.assert_allclose(iid.params.to_numpy(), robust.params.to_numpy())
     ratio = float(robust.bse["x1"]) / float(iid.bse["x1"])
@@ -171,7 +171,7 @@ def test_qreg_robust_and_iid_differ_but_are_close_on_iid_errors():
 
 
 def test_qreg_populates_e_and_renders():
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=0.5
     ).fit()
     for key in ["N", "df_m", "df_r", "q", "sum_adev", "sum_rdev", "r2_p", "rank"]:
@@ -184,8 +184,8 @@ def test_qreg_populates_e_and_renders():
 
 def test_rreg_beats_ols_on_contaminated_data():
     frame = _outlier_frame()
-    robust = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
-    plain = ws.OLS.from_formula("y ~ x1 + x2", frame).fit()
+    robust = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
+    plain = ws.Regress.from_formula("y ~ x1 + x2", frame).fit()
 
     true_slope = 2.0
     assert abs(float(robust.params["x1"]) - true_slope) < abs(
@@ -202,7 +202,7 @@ def test_rreg_reports_a_positive_scale():
     advertised a Stata macro that does not exist, so it moved to the attribute.
     """
 
-    result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
     assert np.isfinite(float(result.rreg_detail["scale"]))
     assert float(result.rreg_detail["scale"]) > 0
     assert "scale" not in result.e
@@ -219,7 +219,7 @@ def test_rreg_cooks_screen_is_reported_and_consistent():
     """
 
     frame = _outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
     # ``dropped`` is an implementation diagnostic, not a Stata e() macro.
     dropped = int(result.rreg_detail["dropped"])
     assert dropped >= 0
@@ -242,7 +242,7 @@ def test_rreg_cooks_screen_is_reported_and_consistent():
 
 
 def test_rreg_populates_e_and_renders():
-    result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
     # ``scale`` is deliberately NOT an e() key: ``rreg.ado`` has one ``ereturn``
     # statement in total and inherits the rest, so there is no ``e(scale)`` macro.
     for key in ["N", "df_m", "df_r", "rank", "r2", "rmse"]:
@@ -345,7 +345,7 @@ def test_qreg_coefficients_match_every_stata_quantile(quantile):
     """All four captured quantiles, coefficients to 1e-3 relative."""
 
     block = _stata_block(quantile)
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=quantile
     ).fit()
 
@@ -367,7 +367,7 @@ def test_qreg_standard_errors_match_stata(quantile):
     """
 
     block = _stata_block(quantile)
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=quantile
     ).fit()
 
@@ -388,7 +388,7 @@ def test_qreg_pseudo_r2_matches_stata(quantile):
 
     block = _stata_block(quantile)
     expected = _stata_scalar(block, r"Pseudo R2\s*=\s*(-?\d+\.\d+)")
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=quantile
     ).fit()
     assert float(result.e["r2_p"]) == pytest.approx(expected, abs=5e-4)
@@ -403,7 +403,7 @@ def test_qreg_sum_adev_is_the_check_function_not_the_absolute_sum():
     """
 
     expected = _stata_scalar("qreg_0.25", r"Min sum of deviations\s+(\d+\.\d+)")
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=0.25
     ).fit()
 
@@ -424,7 +424,7 @@ def test_qreg_robust_vce_matches_stata():
 
     for variable in ("x1", "x2", "_cons"):
         _, expected_se = _stata_coef("qreg_robust", variable)
-        ours = QuantileRegression.from_formula(
+        ours = QuantileRegress.from_formula(
             "y ~ x1 + x2", _quantile_frame(), quantile=0.5
         ).fit(cov_type="robust")
         key = "Intercept" if variable == "_cons" else variable
@@ -438,7 +438,7 @@ def test_rreg_coefficients_match_stata():
     Stata's; running the biweight stage from the Huber result lands within 2e-3.
     """
 
-    result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
     for variable in ("x1", "x2", "_cons"):
         expected, _ = _stata_coef("rreg", variable)
         key = "Intercept" if variable == "_cons" else variable
@@ -455,7 +455,7 @@ def test_rreg_standard_errors_are_close_to_stata():
     refit instead is 26-36% off, which this assertion still catches.
     """
 
-    result = RobustRegression.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", _outlier_frame()).fit()
     for variable in ("x1", "x2", "_cons"):
         _, expected_se = _stata_coef("rreg", variable)
         key = "Intercept" if variable == "_cons" else variable
@@ -465,7 +465,7 @@ def test_rreg_standard_errors_are_close_to_stata():
 def test_qreg_records_stata_e_scalars():
     """The documented ``e()`` scalars exist and are self-consistent."""
 
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", _quantile_frame(), quantile=0.25
     ).fit()
 
@@ -509,7 +509,7 @@ def test_qreg_rejects_kernel_and_residual_denmethods():
     failure mode this module exists to avoid.
     """
 
-    model = QuantileRegression.from_formula("y ~ x1 + x2", _quantile_frame())
+    model = QuantileRegress.from_formula("y ~ x1 + x2", _quantile_frame())
     for bad in ("kernel", "iid, kernel(epanechnikov)", "iid, residual", "residual"):
         with pytest.raises(ValueError, match="cov_type"):
             model.fit(cov_type=bad)
@@ -524,7 +524,7 @@ def test_rreg_documents_huber_only_vs_full_scheme():
     """
 
     frame = _outlier_frame()
-    model = RobustRegression.from_formula("y ~ x1 + x2", frame)
+    model = RobustRegress.from_formula("y ~ x1 + x2", frame)
     full = model.fit()
 
     X = np.column_stack(
@@ -636,7 +636,7 @@ def test_qreg_standard_errors_match_stata_at_every_quantile(dataset, tau, cov_ty
 
     frame = _qreg_hetero() if dataset == "hetero" else _qreg_homo()
     expected_b, expected_se = QREG_STATA[(dataset, tau, cov_type)]
-    result = QuantileRegression.from_formula(
+    result = QuantileRegress.from_formula(
         "y ~ x1 + x2", frame, quantile=tau
     ).fit(cov_type=cov_type)
 
@@ -654,7 +654,7 @@ def test_qreg_robust_meat_is_tau_one_minus_tau_xpx():
     """
 
     frame = _qreg_hetero()
-    model = QuantileRegression.from_formula("y ~ x1 + x2", frame, quantile=0.25)
+    model = QuantileRegress.from_formula("y ~ x1 + x2", frame, quantile=0.25)
     result = model.fit(cov_type="robust")
 
     X = np.column_stack([np.ones(len(frame)), frame["x1"], frame["x2"]])
@@ -721,7 +721,7 @@ def test_rreg_standard_errors_are_rmse_times_the_ols_law():
     """
 
     frame = _rreg_outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     np.testing.assert_allclose(
         np.asarray(result.params, dtype=float), RREG_OUTLIER_STATA_B, rtol=1e-9
@@ -743,7 +743,7 @@ def test_rreg_reported_sum_of_squares_match_stata():
     """
 
     frame = _rreg_outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     for key, expected in RREG_OUTLIER_STATA.items():
         assert float(result.e[key]) == pytest.approx(expected, rel=1e-9), key
@@ -768,7 +768,7 @@ def test_rreg_lambda_uses_the_nonzero_weight_count():
     """
 
     frame = _rreg_outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     assert int(result.e["N"]) == 400
     # ``N_weighted`` is a diagnostic on the attribute, not a Stata macro.
@@ -792,7 +792,7 @@ def test_rreg_default_tolerance_is_statas_not_machine_precision():
     """
 
     frame = _rreg_outlier_frame()
-    model = RobustRegression.from_formula("y ~ x1 + x2", frame)
+    model = RobustRegress.from_formula("y ~ x1 + x2", frame)
 
     default = model.fit()                 # Stata's tolerance(.01)
     tight = model.fit(tolerance=1e-9)     # fully converged
@@ -827,7 +827,7 @@ def test_rreg_sums_of_squares_describe_the_adjusted_regression():
     """
 
     frame = _rreg_outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     assert float(result.e["rss"]) == pytest.approx(471.32198880778736, rel=1e-9)
     assert float(result.e["rss"]) > 400.0          # not the weighted 330.3
@@ -849,7 +849,7 @@ def test_rreg_huber_threshold_is_two_mad_not_1345():
     """
 
     frame = _rreg_outlier_frame()
-    result = RobustRegression.from_formula("y ~ x1 + x2", frame).fit()
+    result = RobustRegress.from_formula("y ~ x1 + x2", frame).fit()
 
     # If someone reverts the threshold to 1.345 * (mad/0.6745), the coefficients
     # move to these values and this assertion fails.

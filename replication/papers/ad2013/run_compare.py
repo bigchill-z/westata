@@ -122,7 +122,7 @@ def main() -> int:
              c for c in frame.columns if c.startswith("st_"))),
         ("without state dummies", f"{target.depvar} ~ {target.term}"),
     ):
-        fit = ws.OLS.from_formula(formula, frame, weights=frame["timepwt48"],
+        fit = ws.Regress.from_formula(formula, frame, weights=frame["timepwt48"],
                                   weight_type="aweight").fit()
         i = [str(n) for n in fit.param_names].index(target.term)
         control[label] = {

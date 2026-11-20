@@ -104,6 +104,31 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("R3.2", "RegressionAdjustment.from_formula"): "deprecated alias -> from_variables (remove after migration)",
     ("R3.2", "IPW.from_formula"): "deprecated alias -> from_variables (remove after migration)",
     ("R3.2", "NearestNeighbourMatching.from_formula"): "deprecated alias -> from_variables (remove after migration)",
+    # ------------------------------------------------------------------ #
+    # 0.3.41 naming migration (one-release transition; remove after cleanup)
+    # ------------------------------------------------------------------ #
+    # R2.7: renamed e-class functions still have no class form, as before the rename.
+    ("R2.7", "df_gls"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "newey_west"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "panel_describe"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "panel_serial"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "panel_set"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "panel_summarize"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "rd_robust"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "var_select_order"): "renamed e-class function; class form unchanged by the migration",
+    ("R2.7", "vec_rank"): "renamed e-class function; class form unchanged by the migration",
+    ("R3.2", "DIDRegress.from_formula"): "deprecated alias -> from_variables (remove after migration)",
+    ("R3.2", "SeeminglyUnrelatedRegress.from_formula"): "multi-equation constructor; renamed from Sureg",
+    ("R4.2", "IrfResults"): "VAR container: its interval surface is the IRF table, not conf_int",
+    ("R5.7", "estat_corrgram"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_esize"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_firststage"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_hettest"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_imtest"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_overid"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_ovtest"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_ptrends"): "deprecated estat alias via StataResults.__getattr__ (one release)",
+    ("R5.7", "estat_weakrobust"): "deprecated estat alias via StataResults.__getattr__ (one release)",
 }
 
 
@@ -1032,7 +1057,7 @@ def check_r6(report: Report) -> None:
 #: ``REFUSAL_IS_MISSING_IMPLEMENTATION`` records which is which, because "not supported"
 #: and "not implemented yet" are different promises to the user.
 COV_TYPE_ROBUST_TARGETS: dict[str, str] = {
-    "OLS": "HC1",
+    "Regress": "HC1",
     "IV2SLS": "HC0",
     "IVLIML": "HC0",
     "IVGMM": "HC0",
@@ -1046,28 +1071,28 @@ COV_TYPE_ROBUST_TARGETS: dict[str, str] = {
     "ZeroInflatedNegativeBinomial": "ML_ROBUST",
     "TruncatedPoisson": "ML_ROBUST",
     "TruncatedNegativeBinomial": "ML_ROBUST",
-    "PanelOLS": "cluster",
-    "RandomEffects": "cluster",
-    "RandomEffectsMLE": "cluster",
-    "BetweenOLS": "cluster",
-    "FirstDifferenceOLS": "cluster",
-    "Sureg": "SYSTEMS_ROBUST",
-    "Mvreg": "SYSTEMS_ROBUST",
-    "QuantileRegression": "QREG_ROBUST",
+    "PanelRegressFE": "cluster",
+    "PanelRegressRE": "cluster",
+    "PanelRegressMLE": "cluster",
+    "PanelRegressBE": "cluster",
+    "PanelRegressFD": "cluster",
+    "SeeminglyUnrelatedRegress": "SYSTEMS_ROBUST",
+    "MultivariateRegress": "SYSTEMS_ROBUST",
+    "QuantileRegress": "QREG_ROBUST",
     # `Sqreg`/`Bsqreg` take their covariance FROM the bootstrap: `cov_type="bootstrap"`
     # is a real, distinct value here (not an HC alias), so `robust` has no separate
     # meaning and must be refused rather than silently mapped to one.
-    "Sqreg": "bootstrap",
-    "Bsqreg": "bootstrap",
+    "SimultaneousQuantileRegress": "bootstrap",
+    "BootstrappedQuantileRegress": "bootstrap",
     # `RobustRegression` is `rreg`: its covariance comes from the biweight iteration,
     # and Stata's `rreg` has no `vce()` at all.  It currently ACCEPTS any cov_type and
     # silently returns the default -- which is worse than refusing.
-    "RobustRegression": "REFUSED",
+    "RobustRegress": "REFUSED",
     # `FEOLS`/`Areg` currently REFUSE `robust` and demand `HC1`.  That is R3.7.0a's
     # canonical "fake refusal": `reghdfe, robust` IS HC1, the implementation already
     # exists, and only the alias table is missing a key.  Recorded as HC1, not REFUSED,
     # so the checker demands the fix rather than blessing the workaround.
-    "FEOLS": "HC1",
+    "RegressHighDimFixedEffects": "HC1",
     "Areg": "HC1",
 }
 
@@ -1075,7 +1100,7 @@ COV_TYPE_ROBUST_TARGETS: dict[str, str] = {
 #: is correct behaviour.  Everything else that refuses is a missing implementation,
 #: recorded in ``REFUSAL_IS_MISSING_IMPLEMENTATION`` so the error message can say
 #: "not implemented yet" instead of implying the user asked for something invalid.
-REFUSAL_IS_CORRECT = frozenset({"RobustRegression"})
+REFUSAL_IS_CORRECT = frozenset({"RobustRegress"})
 
 #: Families where Stata DOES have `vce(robust)` but westata has not implemented it.
 #: `robust` must still raise today, but the message must say "not implemented yet"
@@ -1083,13 +1108,13 @@ REFUSAL_IS_CORRECT = frozenset({"RobustRegression"})
 REFUSAL_IS_MISSING_IMPLEMENTATION = frozenset(
     {
         "Tobit",
-        "Truncreg",
-        "Intreg",
+        "TruncatedRegress",
+        "IntervalRegress",
         "Heckman",
-        "Etregress",
-        "XtIvreg",
-        "XtGls",
-        "XtPcse",
+        "EndogenousTreatmentRegress",
+        "PanelIVRegress",
+        "PanelGls",
+        "PanelPcse",
     }
 )
 
@@ -1098,21 +1123,21 @@ REFUSAL_IS_MISSING_IMPLEMENTATION = frozenset(
 COV_TYPE_ROBUST_REFUSED = frozenset(
     {
         "Tobit",
-        "Truncreg",
-        "Intreg",
+        "TruncatedRegress",
+        "IntervalRegress",
         "Heckman",
-        "Etregress",
-        "Eivreg",
-        "XtIvreg",
-        "XtGls",
-        "XtPcse",
-        "XtUnitroot",
-        "XtLogit",
-        "XtProbit",
-        "XtTobit",
-        "XtPoisson",
-        "XtNbreg",
-        "Didregress",
+        "EndogenousTreatmentRegress",
+        "ErrorsInVariablesRegress",
+        "PanelIVRegress",
+        "PanelGls",
+        "PanelPcse",
+        "PanelUnitroot",
+        "PanelLogit",
+        "PanelProbit",
+        "PanelTobit",
+        "PanelPoisson",
+        "PanelNbRegress",
+        "DIDRegress",
     }
 )
 
@@ -1146,7 +1171,7 @@ def check_r3_cov_type(report: Report) -> None:
     frame["z"] = frame["x"] * 0.6 + rng.normal(size=240)
 
     builders = {
-        "OLS": lambda: ws.OLS.from_formula("y ~ x", frame).fit(cov_type="robust"),
+        "OLS": lambda: ws.Regress.from_formula("y ~ x", frame).fit(cov_type="robust"),
         "IV2SLS": lambda: ws.IV2SLS.from_formula(
             "y ~ [x ~ z]", frame
         ).fit(cov_type="robust"),
@@ -1157,26 +1182,26 @@ def check_r3_cov_type(report: Report) -> None:
         "OrderedLogit": lambda: ws.OrderedLogit.from_formula("yb ~ x", frame).fit(
             cov_type="robust"
         ),
-        "PanelOLS": lambda: ws.PanelOLS.from_formula(
+        "PanelOLS": lambda: ws.PanelRegressFE.from_formula(
             "y ~ x", frame, entity="firm", time="year"
         ).fit(cov_type="robust"),
-        "RandomEffects": lambda: ws.RandomEffects.from_formula(
+        "RandomEffects": lambda: ws.PanelRegressRE.from_formula(
             "y ~ x", frame, entity="firm", time="year"
         ).fit(cov_type="robust"),
-        "QuantileRegression": lambda: ws.QuantileRegression.from_formula(
+        "QuantileRegression": lambda: ws.QuantileRegress.from_formula(
             "y ~ x", frame
         ).fit(cov_type="robust"),
-        "Sureg": lambda: ws.Sureg.from_formula(["y ~ x", "x ~ y"], frame).fit(
+        "Sureg": lambda: ws.SeeminglyUnrelatedRegress.from_formula(["y ~ x", "x ~ y"], frame).fit(
             cov_type="robust"
         ),
         # `y ~ x + z | firm` has k=2 (x, z) plus the absorbed firms: k>=2, so the
         # n/(n-1) vs n/(n-k) difference is visible (R3.7.5).
-        "FEOLS": lambda: ws.FEOLS.from_formula("y ~ x + z | firm", frame).fit(
+        "FEOLS": lambda: ws.RegressHighDimFixedEffects.from_formula("y ~ x + z | firm", frame).fit(
             cov_type="robust"
         ),
         # `rreg` has no `vce()` at all.  It currently ACCEPTS cov_type and returns the
         # default, which is a silent wrong-variance bug rather than a hard error.
-        "RobustRegression": lambda: ws.RobustRegression.from_formula("y ~ x", frame).fit(
+        "RobustRegression": lambda: ws.RobustRegress.from_formula("y ~ x", frame).fit(
             cov_type="robust"
         ),
     }
@@ -1319,11 +1344,11 @@ def check_r3_cov_echo_case(report: Report) -> None:
     frame["z"] = frame["x"] * 0.6 + rng.normal(size=240)
 
     builders = {
-        "OLS": lambda: ws.OLS.from_formula("y ~ x", frame).fit(cov_type="HC1"),
+        "OLS": lambda: ws.Regress.from_formula("y ~ x", frame).fit(cov_type="HC1"),
         "IV2SLS": lambda: ws.IV2SLS.from_formula("y ~ [x ~ z]", frame).fit(cov_type="HC1"),
         "Logit": lambda: ws.Logit.from_formula("yb ~ x + w", frame).fit(cov_type="HC1"),
         "Poisson": lambda: ws.Poisson.from_formula("yb ~ x + w", frame).fit(cov_type="HC1"),
-        "PanelOLS": lambda: ws.PanelOLS.from_formula(
+        "PanelOLS": lambda: ws.PanelRegressFE.from_formula(
             "y ~ x", frame, entity="firm", time="year"
         ).fit(cov_type="HC1"),
     }

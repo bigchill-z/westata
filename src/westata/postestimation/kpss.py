@@ -48,7 +48,7 @@ import numpy as np
 
 from westata.errors import ConsistencyError
 
-__all__ = ["KpssResult", "KpssRow", "kpss"]
+__all__ = ["KpssResults", "KpssRow", "kpss"]
 
 #: Critical values for the level-stationary (``notrend``) case, Stata's own table.
 _CRITICAL_LEVEL = {0.10: 0.347, 0.05: 0.463, 0.025: 0.574, 0.01: 0.739}
@@ -65,7 +65,7 @@ class KpssRow:
 
 
 @dataclass(frozen=True)
-class KpssResult:
+class KpssResults:
     """``kpss``: KPSS test for stationarity, one row per lag order."""
 
     rows: tuple[KpssRow, ...]
@@ -174,7 +174,7 @@ def kpss(
     trend: bool = True,
     maxlag: int | None = None,
     name: str = "",
-) -> KpssResult:
+) -> KpssResults:
     """KPSS test for stationarity, as ``kpss varname``.
 
     ``trend=True`` is Stata's DEFAULT (``trend stationary``); pass ``trend=False`` for its
@@ -215,7 +215,7 @@ def kpss(
         rows.append(KpssRow(lag=lags, statistic=numerator / variance))
 
     critical = dict(_CRITICAL_TREND if trend else _CRITICAL_LEVEL)
-    return KpssResult(
+    return KpssResults(
         rows=tuple(rows),
         trend=bool(trend),
         nobs=nobs,

@@ -69,7 +69,7 @@ from westata.results.base import StataResults
 from westata.results.serialisation import ResultSerialisation
 from westata.estimators.least_squares import slope_positions
 
-__all__ = ["Eivreg", "Manova", "ManovaResult", "Mvreg", "Sureg"]
+__all__ = ["ErrorsInVariablesRegress", "Manova", "ManovaResults", "MultivariateRegress", "SeeminglyUnrelatedRegress"]
 
 #: ``patsy`` spells the constant ``Intercept``; Stata prints ``_cons``.
 _CONSTANT_PATSY = "Intercept"
@@ -389,7 +389,7 @@ def _subset(data: Any, subset: Any) -> pd.DataFrame:
 
 
 # ----------------------------------------------------------------------- sureg
-class Sureg:
+class SeeminglyUnrelatedRegress:
     """Seemingly unrelated regression (Stata ``sureg``).
 
     Parameters
@@ -754,7 +754,7 @@ def _correlation(sigma: np.ndarray) -> np.ndarray:
 
 
 # ----------------------------------------------------------------------- mvreg
-class Mvreg:
+class MultivariateRegress:
     """Multivariate regression (Stata ``mvreg``).
 
     Every equation shares one design matrix, so the coefficients are exactly
@@ -975,7 +975,7 @@ class Mvreg:
 
 
 # ---------------------------------------------------------------------- eivreg
-class Eivreg:
+class ErrorsInVariablesRegress:
     """Errors-in-variables regression (Stata ``eivreg``).
 
     ``[R] eivreg`` Methods and formulas::
@@ -1178,7 +1178,7 @@ class Eivreg:
 
 # ---------------------------------------------------------------------- manova
 @dataclass(frozen=True)
-class ManovaResult(ResultSerialisation):
+class ManovaResults(ResultSerialisation):
     """MANOVA statistics for one factor (Stata ``manova``).
 
     ``df`` is Stata's hypothesis degrees of freedom for the factor (``g - 1``),
@@ -1662,7 +1662,7 @@ class Manova:
         model._response_names = list(outcomes)
         return model
 
-    def fit(self) -> ManovaResult:
+    def fit(self) -> ManovaResults:
         """Compute the between/within matrices and Rao's F for Wilks' lambda."""
 
         Y = self._Y
@@ -1837,7 +1837,7 @@ class Manova:
             f_by_equation.append(f_j)
             p_f_by_equation.append(p_j)
 
-        return ManovaResult(
+        return ManovaResults(
             wilks_lambda=wilks,
             df=q,
             df1=float(df1),

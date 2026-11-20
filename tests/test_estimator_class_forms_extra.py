@@ -67,10 +67,10 @@ def regression_discontinuity() -> pd.DataFrame:
 # --------------------------------------------------------------- teffects 三个
 def test_teffects_ra_class_matches_the_function(cross_section: pd.DataFrame) -> None:
     frame = cross_section
-    by_function = ws.teffects_ra(
+    by_function = ws.treatment_effects_ra(
         frame["y"].to_numpy(), frame["d"].to_numpy(), frame[["x1", "x2"]].to_numpy()
     )
-    by_class = ws.TeffectsRa.from_variables(
+    by_class = ws.TreatmentEffectsRa.from_variables(
         "y", "d", frame, covariates=["x1", "x2"]
     ).fit()
 
@@ -79,10 +79,10 @@ def test_teffects_ra_class_matches_the_function(cross_section: pd.DataFrame) -> 
 
 def test_teffects_psmatch_class_matches_the_function(cross_section: pd.DataFrame) -> None:
     frame = cross_section
-    by_function = ws.teffects_psmatch(
+    by_function = ws.treatment_effects_psmatch(
         frame["y"].to_numpy(), frame["d"].to_numpy(), frame[["x1", "x2"]].to_numpy()
     )
-    by_class = ws.TeffectsPsmatch.from_variables(
+    by_class = ws.TreatmentEffectsPsmatch.from_variables(
         "y", "d", frame, covariates=["x1", "x2"]
     ).fit()
 
@@ -91,10 +91,10 @@ def test_teffects_psmatch_class_matches_the_function(cross_section: pd.DataFrame
 
 def test_teffects_nnmatch_class_matches_the_function(cross_section: pd.DataFrame) -> None:
     frame = cross_section
-    by_function = ws.teffects_nnmatch(
+    by_function = ws.treatment_effects_nnmatch(
         frame["y"].to_numpy(), frame["d"].to_numpy(), frame[["x1", "x2"]].to_numpy()
     )
-    by_class = ws.TeffectsNnmatch.from_variables(
+    by_class = ws.TreatmentEffectsNnmatch.from_variables(
         "y", "d", frame, covariates=["x1", "x2"]
     ).fit()
 
@@ -104,8 +104,8 @@ def test_teffects_nnmatch_class_matches_the_function(cross_section: pd.DataFrame
 # ------------------------------------------------------------------ rdrobust
 def test_rdrobust_class_matches_the_function(regression_discontinuity: pd.DataFrame) -> None:
     frame = regression_discontinuity
-    by_function = ws.rdrobust(frame["y"].to_numpy(), frame["x"].to_numpy(), bandwidth=0.5)
-    by_class = ws.Rdrobust.from_variables("y", "x", frame, bandwidth=0.5).fit()
+    by_function = ws.rd_robust(frame["y"].to_numpy(), frame["x"].to_numpy(), bandwidth=0.5)
+    by_class = ws.RDRobust.from_variables("y", "x", frame, bandwidth=0.5).fit()
 
     assert np.isclose(float(by_function.tau), float(by_class.tau))
     assert np.isclose(float(by_function.se), float(by_class.se))
@@ -162,7 +162,7 @@ def test_rcm_class_matches_the_function() -> None:
         frame["unit"].to_numpy(), frame["year"].to_numpy(),
         **{k: v for k, v in args.items() if k not in ("predictors", "unit", "time")},
     )
-    by_class = ws.Rcm.from_variables("y", frame, **args).fit()
+    by_class = ws.RegressionControlMethod.from_variables("y", frame, **args).fit()
 
     assert np.isclose(float(by_function.att), float(by_class.att))
 
@@ -170,8 +170,8 @@ def test_rcm_class_matches_the_function() -> None:
 # --------------------------------------------- 构造入口必须是 from_variables
 @pytest.mark.parametrize(
     "cls",
-    [ws.TeffectsRa, ws.TeffectsPsmatch, ws.TeffectsNnmatch, ws.Rdrobust,
-     ws.Synth, ws.Synth2, ws.Rcm],
+    [ws.TreatmentEffectsRa, ws.TreatmentEffectsPsmatch, ws.TreatmentEffectsNnmatch, ws.RDRobust,
+     ws.Synth, ws.Synth2, ws.RegressionControlMethod],
 )
 def test_non_formula_command_uses_from_variables(cls: type) -> None:
     """这些命令在 Stata 里用变量列表，因此入口是 `from_variables`（R3.2）。
@@ -189,8 +189,8 @@ def test_non_formula_command_uses_from_variables(cls: type) -> None:
 # ------------------------------------------------------ fit() 不接受 cov_type
 @pytest.mark.parametrize(
     "cls",
-    [ws.TeffectsRa, ws.TeffectsPsmatch, ws.TeffectsNnmatch, ws.Rdrobust,
-     ws.Synth, ws.Synth2, ws.Rcm],
+    [ws.TreatmentEffectsRa, ws.TreatmentEffectsPsmatch, ws.TreatmentEffectsNnmatch, ws.RDRobust,
+     ws.Synth, ws.Synth2, ws.RegressionControlMethod],
 )
 def test_fit_offers_no_cov_type(cls: type) -> None:
     """这些命令没有 `vce()` 选项，所以 `fit()` 不该承诺这个选择（R1.5）。"""

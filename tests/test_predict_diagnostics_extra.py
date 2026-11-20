@@ -28,7 +28,7 @@ import westata as ws
 def fit():
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length"]].dropna()
-    return frame, ws.OLS.from_formula("mpg ~ weight + length", frame).fit()
+    return frame, ws.Regress.from_formula("mpg ~ weight + length", frame).fit()
 
 
 def _pieces(result):
@@ -124,7 +124,7 @@ def test_covratio_floats_around_one(fit) -> None:
 
 def test_all_four_are_refused_under_a_robust_vce(fit) -> None:
     frame, _ = fit
-    robust = ws.OLS.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
+    robust = ws.Regress.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
 
     for kind in ("stdr", "dfits", "welsch", "covratio"):
         with pytest.raises(ws.UnsupportedError, match="vce\\(ols\\)"):

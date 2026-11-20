@@ -55,13 +55,13 @@ import pandas as pd
 from scipy import stats
 
 from westata.errors import ConsistencyError
-from westata.estimators.linear import OLS
+from westata.estimators.linear import Regress
 
-__all__ = ["XtSerialResult", "xtserial"]
+__all__ = ["PanelSerialResults", "panel_serial"]
 
 
 @dataclass(frozen=True)
-class XtSerialResult:
+class PanelSerialResults:
     """``xtserial``: Wooldridge's test for first-order panel autocorrelation."""
 
     #: ``r(corr)``: the lag coefficient of the differenced residual (about -0.5 under H0).
@@ -156,14 +156,14 @@ def _lag_on_axis(values: np.ndarray, panel: np.ndarray, time: np.ndarray) -> np.
     return out
 
 
-def xtserial(
+def panel_serial(
     data: pd.DataFrame,
     formula: str,
     *,
     entity: str,
     time: str,
     keep_first_stage: bool = True,
-) -> XtSerialResult:
+) -> PanelSerialResults:
     """Wooldridge's test for serial correlation in linear panel-data models.
 
     ``formula`` is a ``"y ~ x1 + x2"`` spec, ``entity`` the panel variable and ``time``
@@ -214,7 +214,7 @@ def xtserial(
     differenced["_t"] = periods
     differenced = differenced.dropna(subset=[f"d_{c}" for c in columns]).reset_index(drop=True)
 
-    first = OLS.from_formula(
+    first = Regress.from_formula(
         f"d_{response} ~ " + " + ".join(f"d_{c}" for c in regressors) + " - 1",
         differenced,
     ).fit(cov_type="cluster", cov_kwds={"groups": differenced[entity]})
@@ -239,7 +239,7 @@ def xtserial(
             entity: differenced[entity].to_numpy()[keep],
         }
     )
-    second = OLS.from_formula("_res ~ _lag - 1", second_data).fit(
+    second = Regress.from_formula("_res ~ _lag - 1", second_data).fit(
         cov_type="cluster", cov_kwds={"groups": second_data[entity]}
     )
 
@@ -254,7 +254,7 @@ def xtserial(
         raise ConsistencyError(
             f"xtserial: {n_panels} panel(s) is too few for a clustered Wald test"
         )
-    return XtSerialResult(
+    return PanelSerialResults(
         corr=corr,
         f=f_value,
         df=1,

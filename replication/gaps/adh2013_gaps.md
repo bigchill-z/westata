@@ -25,7 +25,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 
 ## 1. P0：能力缺失（判据 1）—— 目前没有
 
-本清单初版把「加权 IV 不支持」和「`FEOLS` 没有 `predict`」列为两条能力缺失。**两条都已由上游实现并提交**，见 §6。按当前 HEAD 实测，判据 1（某类模型根本跑不了）**已经没有剩余条目**。
+本清单初版把「加权 IV 不支持」和「`RegressHighDimFixedEffects` 没有 `predict`」列为两条能力缺失。**两条都已由上游实现并提交**，见 §6。按当前 HEAD 实测，判据 1（某类模型根本跑不了）**已经没有剩余条目**。
 
 这不是清单失去意义，而是它按预期走完了一轮：写清单 → 上游修复 → 探针把「缺口」改写成「回归测试」。
 
@@ -51,7 +51,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 | 原优先级 | 事项 | 状态 | 提交 |
 |---|---|---|---|
 | P0-1 | 加权 IV 不支持 | ✅ 已修复（§6.2）| `01c3ce5` |
-| P0-2 | `FEOLS` 无 `predict` | ✅ 已修复（§6.3）| `fa5787e` |
+| P0-2 | `RegressHighDimFixedEffects` 无 `predict` | ✅ 已修复（§6.3）| `fa5787e` |
 | P1-3 | `cov_kwds` 聚类键名三套 | ✅ 已修复（§6.1）| `72a2d12` |
 | P1-4 | `subset=` 部分估计器才有 | ✅ 已修复（§6.4）| `7d11f1e` |
 | P1-5 | `margins(at=)` 只接受标量 | ✅ 已修复（§6.5）| `f84a404` |
@@ -72,7 +72,7 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 | `FIXED` | westata 已实现，本文该条已过时 |
 | `ERROR` | 探针本身异常 |
 
-另有 **3 条对照探针**（两路聚类在 HDFE 上可用、bootstrap 认 `reps`/`seed`、`subset=` 在 OLS 上生效）。对照若失败，说明探针测错了东西，上面所有结论都不可信。
+另有 **3 条对照探针**（两路聚类在 HDFE 上可用、bootstrap 认 `reps`/`seed`、`subset=` 在 Regress 上生效）。对照若失败，说明探针测错了东西，上面所有结论都不可信。
 
 测试 `test_the_capability_gap_list_is_still_accurate` 会在任何一条变 `FIXED` 时失败，强制本文更新——**一条过时的"westata 做不到 X"与谎称"能做到"同样有害**。§6 记录的正是这条机制第一次触发的实例。
 
@@ -105,19 +105,19 @@ westata 的 API 是 **statsmodels 风格，这是刻意的设计选择**（READM
 |---|---|---|
 | 聚类键名三套 | **已修复且已提交**（`72a2d12`） | `tests/test_cluster_key_is_uniform.py` 21 项；探针对照项通过 |
 | 加权 IV 不支持 | **已修复且已提交**（`01c3ce5`） | `tests/test_weighted_iv.py` 25 项；探针对照项断言复现 Stata 的 b 与 se |
-| `FEOLS` 没有 `predict` | **已修复且已提交**（`fa5787e`） | `tests/test_feols_predict.py` 17 项；探针对照项断言 `xb + residuals == y` |
+| `RegressHighDimFixedEffects` 没有 `predict` | **已修复且已提交**（`fa5787e`） | `tests/test_feols_predict.py` 17 项；探针对照项断言 `xb + residuals == y` |
 
 三条修复的经过值得一提：本清单初版把它们列为 P0 能力缺失，上游随后逐一实现。**清单的作用不只是记录问题，它促成了修复**；而修复之后，同一套探针自动把「缺口」改写成「回归测试」，不需要有人记得回来删条目——`test_the_capability_gap_list_is_still_accurate` 会在任何一条重新变回 `FIXED` 时失败。
 
 ### 6.1 `cov_kwds` 聚类键名三套并存 —— 已修复并提交（`72a2d12`）
 
-**原状**（本清单初版 §2 第 3 条）：同样是 `fit(cov_type="cluster", cov_kwds=...)`，四个估计器接受的键名不同（`OLS` 只认 `groups`，`IV2SLS`/`PanelOLS` 认 `groups`+`clusters`，`FEOLS` 认 `groups`+`cluster`）。在 `OLS` 上传 `clusters` 得到的报错是 `cov_kwds['groups'] must be one-dimensional; got 0 dimensions`——读起来像数据有问题，实际是键名用错了。
+**原状**（本清单初版 §2 第 3 条）：同样是 `fit(cov_type="cluster", cov_kwds=...)`，四个估计器接受的键名不同（`Regress` 只认 `groups`，`IV2SLS`/`PanelRegressFE` 认 `groups`+`clusters`，`RegressHighDimFixedEffects` 认 `groups`+`cluster`）。在 `Regress` 上传 `clusters` 得到的报错是 `cov_kwds['groups'] must be one-dimensional; got 0 dimensions`——读起来像数据有问题，实际是键名用错了。
 
 **现状**：`groups` / `clusters` / `cluster` **三种键名在四个估计器上全部可用**。
 
 ```python
 for key in ("groups", "clusters", "cluster"):
-    for est in (OLS, IV2SLS, FEOLS, PanelOLS):
+    for est in (Regress, IV2SLS, RegressHighDimFixedEffects, PanelRegressFE):
         ...  # 全部通过
 ```
 
@@ -146,9 +146,9 @@ native aweighted IV2SLS:
 
 **保留的防线**：探针的 `weighted IV` 对照项不只断言"不报错"，而是断言**复现出 Stata 的 b 与 se**。加权实现出错时的典型症状是**系数对、标准误错**（掩盖在 `e(V)` 里），只断言"能跑"会放过这种缺陷。
 
-### 6.3 `FEOLS` 的 `predict` —— 已修复并提交（`fa5787e`）
+### 6.3 `RegressHighDimFixedEffects` 的 `predict` —— 已修复并提交（`fa5787e`）
 
-**原状**：`OLS`/`IV2SLS`/`PanelOLS`/`Logit`/`Poisson` 都能 predict，唯独 `reghdfe` 抛 `no prediction types registered`。
+**原状**：`Regress`/`IV2SLS`/`PanelRegressFE`/`Logit`/`Poisson` 都能 predict，唯独 `reghdfe` 抛 `no prediction types registered`。
 
 **现状**：`kind="xb"`（含吸收效应）、`d`、`residuals`、`dresiduals` 均可用，实现在 `fa5787e` 提交（`estimators/hdfe.py`）。多路吸收（如 `| firm + year`）明确拒绝并说明原因——多路效应只在相差一个归一化常数下可识别。
 
@@ -156,11 +156,11 @@ native aweighted IV2SLS:
 
 ### 6.4 `subset=` 覆盖不全 —— 已修复并提交（`7d11f1e`）
 
-**原状**：`OLS`/`Logit`/`Poisson` 接受 `subset=`，而 `IV2SLS`/`IVLIML`/`IVGMM`/`FEOLS`/`PanelOLS` 不接受。"限制估计样本"是跨模型通用操作，却要按估计器换写法。
+**原状**：`Regress`/`Logit`/`Poisson` 接受 `subset=`，而 `IV2SLS`/`IVLIML`/`IVGMM`/`RegressHighDimFixedEffects`/`PanelRegressFE` 不接受。"限制估计样本"是跨模型通用操作，却要按估计器换写法。
 
 **现状**：全部 `from_formula` 都接受 `subset=`，布尔掩码与索引标签两种形式均可。
 
-**改动范围**（比清单里写的更大）：除了清单点名的 5 个，实测发现另有 4 个面板估计器也缺 —— `XtGls`、`XtPcse`、`XtIvreg`、`XtUnitroot`，以及 `Didregress`/`Xtdidregress`。清单只列了当时复现用到的那些。
+**改动范围**（比清单里写的更大）：除了清单点名的 5 个，实测发现另有 4 个面板估计器也缺 —— `PanelGls`、`PanelPcse`、`PanelIVRegress`、`PanelUnitroot`，以及 `DIDRegress`/`PanelDIDRegress`。清单只列了当时复现用到的那些。
 
 **顺带修正了探针本身的一个缺陷**：它用 `inspect.signature` 判断 `subset=` 是否存在，而 `IV2SLS.from_formula` 走 `**kwargs` 再从里面 `pop("subset")`，签名里永远看不到该参数。于是探针把**已经可用**的 IV 族报成缺失——如果照它的报告去"修"，会去改一条本来正常的路径。
 

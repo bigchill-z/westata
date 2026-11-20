@@ -118,6 +118,6 @@ def test_first_on_a_non_iv_result_raises_with_a_clear_message(frame) -> None:
     what makes this safe to expose on every result class.
     """
 
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
     with pytest.raises(AttributeError, match="iv_structure"):
         ols.summary(style="stata", first=True)

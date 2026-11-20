@@ -43,7 +43,7 @@ def fitted():
 
 
 def test_the_sargan_and_basmann_statistics_match_stata(fitted) -> None:
-    rendered = str(ws.estat_overid(fitted))
+    rendered = str(ws.estat_overidentification(fitted))
     assert "1.66303" in rendered
     assert "1.65789" in rendered
     assert "chi2(1)" in rendered
@@ -59,7 +59,7 @@ def test_the_durbin_and_wu_hausman_statistics_match_stata(fitted) -> None:
 def test_the_two_tests_are_not_the_same_computation(fitted) -> None:
     """Their statistics differ by two orders of magnitude, so a swapped implementation is visible."""
 
-    overid = str(ws.estat_overid(fitted))
+    overid = str(ws.estat_overidentification(fitted))
     endogenous = str(ws.estat_endogenous(fitted))
     assert "1.66303" in overid and "46.3175" not in overid
     assert "46.3175" in endogenous and "1.66303" not in endogenous
@@ -78,4 +78,4 @@ def test_overid_needs_surplus_instruments() -> None:
     # One instrument for one endogenous regressor: exactly identified.
     exactly = ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns]", frame).fit()
     with pytest.raises(Exception):
-        ws.estat_overid(exactly)
+        ws.estat_overidentification(exactly)

@@ -46,7 +46,7 @@ from scipy.optimize import minimize
 from westata.errors import ConsistencyError, UnsupportedError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["SynthResult", "synth"]
+__all__ = ["SynthResults", "synth"]
 
 #: Stata stores a missing numeric value as this sentinel, not as NaN.
 _STATA_MISSING = 8.98846567431158e307
@@ -74,7 +74,7 @@ NUMERICALLY_INACTIVE_QP = frozenset({"sigf", "margin", "bound"})
 # Result object -- a frozen dataclass, NOT StataResults (there is no e(b)/e(V))
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
-class SynthResult(ResultSerialisation):
+class SynthResults(ResultSerialisation):
     """Outcome of :func:`synth`.
 
     Field names mirror Stata's ``e()`` matrices verbatim.  Note ``V_matrix``
@@ -881,7 +881,7 @@ class Synth:
             placebo=placebo,
         )
 
-    def fit(self) -> SynthResult:
+    def fit(self) -> SynthResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _synth_impl(
@@ -959,7 +959,7 @@ def synth(
     figure: bool = False,
     placebo: bool = False,
     **unsupported: Any,
-) -> SynthResult:
+) -> SynthResults:
     """Fit Stata's ``synth`` -- thin wrapper over :class:`westata.Synth`."""
 
     return _synth_impl(
@@ -1038,7 +1038,7 @@ def _synth_impl(
     figure: bool = False,
     placebo: bool = False,
     **unsupported: Any,
-) -> SynthResult:
+) -> SynthResults:
     """Fit a synthetic control (Stata ``synth``), extended feature set.
 
     Implements Stata's default path plus ``unitnames()``, per-predictor
@@ -1250,7 +1250,7 @@ def _synth_impl(
     else:
         keep_labels = tuple(str(u) for u in control_units)
 
-    result = SynthResult(
+    result = SynthResults(
         V_matrix=V,
         W_weights=W_weights,
         X_balance=X_balance,

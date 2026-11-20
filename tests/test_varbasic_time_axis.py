@@ -187,4 +187,4 @@ def test_the_class_form_forwards_the_same_validations(frame) -> None:
     """`Varbasic(...).fit()` must not be a second, laxer path."""
 
     with pytest.raises(ConsistencyError, match="not a column"):
-        ws.Varbasic(frame, "dlny", lags=1, time="nope").fit()
+        ws.VarBasic(frame, "dlny", lags=1, time="nope").fit()

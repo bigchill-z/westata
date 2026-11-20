@@ -65,7 +65,7 @@ def rendered():
 
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
-        print(str(ws.estat_firststage(fitted)))
+        print(str(ws.estat_first_stage(fitted)))
     return buffer.getvalue()
 
 

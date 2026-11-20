@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from westata.estimators.synth import SynthResult, synth
+from westata.estimators.synth import SynthResults, synth
 from tests.test_synth_extended import _panel
 
 
@@ -48,7 +48,7 @@ def test_ml_options_are_accepted_on_nested_path(opt) -> None:
     """Stata accepts these via `*`; westata must not raise UnsupportedError."""
 
     res = _base(nested=True, **opt)
-    assert isinstance(res, SynthResult)
+    assert isinstance(res, SynthResults)
     assert np.isfinite(res.RMSPE)
 
 

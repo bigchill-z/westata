@@ -39,7 +39,7 @@ def fitted():
             "z": rng.normal(size=n),
         }
     )
-    return ws.OLS.from_formula("y ~ x + z", frame).fit()
+    return ws.Regress.from_formula("y ~ x + z", frame).fit()
 
 
 def test_the_ic_row_matches_stata_character_for_character(fitted) -> None:

@@ -122,7 +122,7 @@ def test_a_panel_likelihood_fit_does_not_gain_the_rule(grilic) -> None:
             "t": np.tile(np.arange(n_t), n_g),
         }
     )
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "y ~ x1", frame, entity="sid", time="t", method="re"
     ).fit()
     lines = str(fitted.summary(style="stata")).splitlines()

@@ -47,7 +47,7 @@ def _frame() -> pd.DataFrame:
 
 
 def _result(formula: str):
-    return ws.estat_ovtest(ws.OLS.from_formula(formula, _frame()).fit(), rhs=True)
+    return ws.estat_omitted_variables_test(ws.Regress.from_formula(formula, _frame()).fit(), rhs=True)
 
 
 def test_a_duplicated_power_is_omitted_not_the_fitted_model() -> None:

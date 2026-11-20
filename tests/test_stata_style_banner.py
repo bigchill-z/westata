@@ -110,7 +110,7 @@ def test_plain_regress_prints_no_banner(frame) -> None:
     was the banner. That pinned the extra header line the gap report's C04-01 flagged.
     """
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit()
     rendered = render_summary(fitted, style="stata")
 
     assert fitted.e["title"] == "Linear regression"
@@ -123,7 +123,7 @@ def test_plain_regress_prints_no_banner(frame) -> None:
 def test_robust_regress_does_print_the_banner(frame) -> None:
     """The counterpart: with a robust VCE the title heads the two-column block."""
 
-    fitted = ws.OLS.from_formula("y ~ x", frame).fit(cov_type="HC1")
+    fitted = ws.Regress.from_formula("y ~ x", frame).fit(cov_type="HC1")
     rendered = render_summary(fitted, style="stata")
 
     assert "Linear regression" in rendered
@@ -157,7 +157,7 @@ def test_the_banners_are_not_all_the_same(frame) -> None:
     """Guard: a fixed banner would satisfy the fallback test and fail this one."""
 
     banners = {
-        _banner(render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")),
+        _banner(render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")),
         _banner(
             render_summary(ws.Logit.from_formula("yb ~ x", frame).fit(), style="stata")
         ),
@@ -181,7 +181,7 @@ def test_the_stata_style_table_still_has_its_parts(frame) -> None:
     """
 
     rendered = render_summary(
-        ws.OLS.from_formula("y ~ x", frame).fit(), style="stata"
+        ws.Regress.from_formula("y ~ x", frame).fit(), style="stata"
     )
 
     assert "Model:" not in rendered
@@ -205,7 +205,7 @@ def test_the_logit_stata_table_has_no_anova_block(frame) -> None:
 def test_the_regress_stata_table_KEEPS_its_anova_block(frame) -> None:
     """Guard on the other direction: ``regress`` must keep Source/SS/MS."""
 
-    rendered = render_summary(ws.OLS.from_formula("y ~ x", frame).fit(), style="stata")
+    rendered = render_summary(ws.Regress.from_formula("y ~ x", frame).fit(), style="stata")
 
     assert "Source |" in rendered
     assert "Number of obs" in rendered
@@ -214,7 +214,7 @@ def test_the_regress_stata_table_KEEPS_its_anova_block(frame) -> None:
 def test_the_statsmodels_style_is_unaffected(frame) -> None:
     """The default style never showed a Stata banner, and still does not."""
 
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().summary()
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().summary()
 
     assert GENERIC_BANNER not in rendered
     assert "Linear regression" not in rendered

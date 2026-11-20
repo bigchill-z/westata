@@ -153,7 +153,7 @@ def test_firststage_exposes_the_matrix(frame) -> None:
     first_stage = (
         ws.IV2SLS.from_formula("y ~ [x1 ~ z1 + z2]", frame)
         .fit()
-        .estat_firststage()
+        .estat_first_stage()
     )
 
     assert first_stage.mineigcv is not None
@@ -164,7 +164,7 @@ def test_the_matrix_matches_the_standalone_function(frame) -> None:
     first_stage = (
         ws.IV2SLS.from_formula("y ~ [x1 ~ z1 + z2]", frame)
         .fit()
-        .estat_firststage()
+        .estat_first_stage()
     )
 
     expected = mineig_critical_values(n_endog=1, n_instruments=2)
@@ -191,7 +191,7 @@ def test_mineig_is_comparable_against_the_tsls_size_row(frame) -> None:
     first_stage = (
         ws.IV2SLS.from_formula("y ~ [x1 ~ z1 + z2]", frame)
         .fit()
-        .estat_firststage()
+        .estat_first_stage()
     )
 
     mineig = first_stage.mineig
@@ -214,12 +214,12 @@ def test_the_matrix_is_unaffected_by_the_vce(frame) -> None:
     plain = (
         ws.IV2SLS.from_formula("y ~ [x1 ~ z1 + z2]", frame)
         .fit()
-        .estat_firststage()
+        .estat_first_stage()
     )
     robust = (
         ws.IV2SLS.from_formula("y ~ [x1 ~ z1 + z2]", frame)
         .fit(cov_type="HC1")
-        .estat_firststage()
+        .estat_first_stage()
     )
 
     np.testing.assert_allclose(plain.mineigcv, robust.mineigcv, equal_nan=True)

@@ -38,7 +38,7 @@ def collinear_result():
     x1 = rng.normal(size=n)
     x2 = x1 * 0.95 + rng.normal(size=n) * 0.05
     frame = pd.DataFrame({"y": rng.normal(size=n), "x3": x3, "x1": x1, "x2": x2})
-    return ws.OLS.from_formula("y ~ x3 + x1 + x2", frame).fit()
+    return ws.Regress.from_formula("y ~ x3 + x1 + x2", frame).fit()
 
 
 COMBINATIONS = list(itertools.product([False, True], [False, True]))

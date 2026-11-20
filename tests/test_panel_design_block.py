@@ -56,7 +56,7 @@ def _panel_frame(n_units: int = 100, n_periods: int = 14, seed: int = 7900):
 
 @pytest.fixture(scope="module")
 def pcse_fit():
-    return ws.XtPcse.from_formula(
+    return ws.PanelPcse.from_formula(
         "y ~ x1", _panel_frame(), entity="firm", time="year"
     ).fit()
 
@@ -115,7 +115,7 @@ def test_a_plain_regression_has_no_design_block() -> None:
 
     rng = np.random.default_rng(7902)
     frame = pd.DataFrame({"y": rng.normal(size=200), "x1": rng.normal(size=200)})
-    fitted = ws.OLS.from_formula("y ~ x1", frame).fit()
+    fitted = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     assert _panel_design_block(fitted) == []
     rendered = render_summary(fitted, style="stata")

@@ -40,7 +40,7 @@ def seasonal():
 def test_an_integer_factor_expands_to_eleven_dummies(seasonal) -> None:
     """Stata's `i.m` for 12 levels gives a constant plus eleven indicators."""
 
-    fitted = ws.OLS.from_formula("y ~ C(m)", seasonal).fit()
+    fitted = ws.Regress.from_formula("y ~ C(m)", seasonal).fit()
     assert len(fitted.params) == 12
     assert int(fitted.df_model) == 11
 
@@ -48,7 +48,7 @@ def test_an_integer_factor_expands_to_eleven_dummies(seasonal) -> None:
 def test_the_reference_level_is_dropped(seasonal) -> None:
     """The base level appears as the constant, not as its own column."""
 
-    fitted = ws.OLS.from_formula("y ~ C(m)", seasonal).fit()
+    fitted = ws.Regress.from_formula("y ~ C(m)", seasonal).fit()
     names = list(fitted.params.index)
     assert "Intercept" in names
     assert "C(m)[T.1]" not in names
@@ -59,7 +59,7 @@ def test_the_reference_level_is_dropped(seasonal) -> None:
 def test_the_model_is_not_degenerate(seasonal) -> None:
     """F(0, 143) = 0.00 was the recorded symptom; a real regression has a positive model df."""
 
-    fitted = ws.OLS.from_formula("y ~ C(m)", seasonal).fit()
+    fitted = ws.Regress.from_formula("y ~ C(m)", seasonal).fit()
     assert float(fitted.rsquared) > 0.0
     assert int(fitted.df_model) > 0
 
@@ -69,15 +69,15 @@ def test_a_string_factor_behaves_the_same_way(seasonal) -> None:
 
     frame = seasonal.copy()
     frame["s"] = frame["m"].astype(str)
-    from_int = ws.OLS.from_formula("y ~ C(m)", frame).fit()
-    from_str = ws.OLS.from_formula("y ~ C(s)", frame).fit()
+    from_int = ws.Regress.from_formula("y ~ C(m)", frame).fit()
+    from_str = ws.Regress.from_formula("y ~ C(s)", frame).fit()
     assert len(from_int.params) == len(from_str.params)
 
 
 def test_the_r_squared_and_f_match_stata(seasonal) -> None:
     """Stata: e(r2) = 0.055690, e(df_m) = 11, e(F) = 0.707687."""
 
-    fitted = ws.OLS.from_formula("y ~ C(m)", seasonal).fit()
+    fitted = ws.Regress.from_formula("y ~ C(m)", seasonal).fit()
     assert float(fitted.rsquared) == pytest.approx(0.055690, abs=1e-6)
     assert int(fitted.df_model) == 11
     assert float(fitted.fvalue) == pytest.approx(0.707687, abs=1e-6)

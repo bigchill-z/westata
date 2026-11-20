@@ -32,7 +32,7 @@ def signed_frame():
     frame = pd.DataFrame(
         {"y": 1.0 + 0.8 * covariate + rng.normal(size=n), "x1": covariate}
     )
-    return frame, ws.OLS.from_formula("y ~ x1", frame).fit()
+    return frame, ws.Regress.from_formula("y ~ x1", frame).fit()
 
 
 def test_the_fixture_really_has_negative_predictions(signed_frame) -> None:
@@ -111,7 +111,7 @@ def test_a_strictly_positive_response_is_unaffected() -> None:
             "x1": covariate,
         }
     )
-    result = ws.OLS.from_formula("y ~ x1", frame).fit()
+    result = ws.Regress.from_formula("y ~ x1", frame).fit()
 
     assert np.all(np.asarray(result.predict(), dtype=float) > 0.0)
     for form in ("dyex", "eyex", "eydx"):

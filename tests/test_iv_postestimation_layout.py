@@ -44,20 +44,20 @@ def fitted():
 
 
 def test_overid_opens_with_a_blank_line(fitted) -> None:
-    assert str(ws.estat_overid(fitted)).startswith("\n")
+    assert str(ws.estat_overidentification(fitted)).startswith("\n")
 
 
 def test_overid_has_a_blank_line_after_the_heading(fitted) -> None:
     """Stata: blank, heading, blank, then the Sargan row."""
 
-    lines = str(ws.estat_overid(fitted)).splitlines()
+    lines = str(ws.estat_overidentification(fitted)).splitlines()
     assert lines[1].strip() == "Tests of overidentifying restrictions:"
     assert lines[2] == ""
     assert "Sargan" in lines[3]
 
 
 def test_overid_reports_both_statistics(fitted) -> None:
-    rendered = str(ws.estat_overid(fitted))
+    rendered = str(ws.estat_overidentification(fitted))
     assert "Sargan" in rendered
     assert "Basmann" in rendered
 
@@ -73,7 +73,7 @@ def test_endogenous_matches_stata_exactly(fitted) -> None:
 def test_firststage_uses_variable_width_for_mineig(fitted) -> None:
     """20.0861, not "20.086" -- Stata prints r(mineig) with %g, not a fixed precision."""
 
-    result = ws.estat_firststage(fitted)
+    result = ws.estat_first_stage(fitted)
     rendered = str(result)
     assert f"{float(result.mineig):.6g}" in rendered
 
@@ -81,7 +81,7 @@ def test_firststage_uses_variable_width_for_mineig(fitted) -> None:
 def test_firststage_f_column_is_variable_width(fitted) -> None:
     """The F column obeys the same rule; it printed "20.086" before."""
 
-    result = ws.estat_firststage(fitted)
+    result = ws.estat_first_stage(fitted)
     expected = f"{float(result.f[0]):.6g}"
     assert expected in str(result)
     # The truncated form must be gone.
@@ -89,13 +89,13 @@ def test_firststage_f_column_is_variable_width(fitted) -> None:
 
 
 def test_firststage_has_blank_lines_around_the_stock_yogo_block(fitted) -> None:
-    lines = str(ws.estat_firststage(fitted)).splitlines()
+    lines = str(ws.estat_first_stage(fitted)).splitlines()
     index = next(i for i, line in enumerate(lines) if "Minimum eigenvalue" in line)
     assert lines[index - 1] == ""
     assert lines[index + 1] == ""
 
 
 def test_firststage_still_carries_the_critical_values(fitted) -> None:
-    rendered = str(ws.estat_firststage(fitted))
+    rendered = str(ws.estat_first_stage(fitted))
     assert "2SLS relative bias" in rendered
     assert "2SLS size of nominal 5% Wald test" in rendered

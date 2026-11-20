@@ -258,7 +258,7 @@ def main() -> int:
         # ================================================================
         st.run("sysuse auto, clear")
         cap = st.estimate("regress mpg weight foreign")
-        res = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+        res = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
         rec.add(
             compare(
                 "1 regress basic: mpg weight foreign",
@@ -274,7 +274,7 @@ def main() -> int:
         # 2. regress i. 因子
         # ================================================================
         cap = st.estimate("regress mpg weight i.foreign")
-        res = ws.OLS.from_formula("mpg ~ weight + C(foreign)", auto).fit()
+        res = ws.Regress.from_formula("mpg ~ weight + C(foreign)", auto).fit()
         rec.add(
             compare(
                 "2a regress i.foreign",
@@ -286,7 +286,7 @@ def main() -> int:
         )
 
         cap = st.estimate("regress mpg weight i.rep78")
-        res = ws.OLS.from_formula("mpg ~ weight + C(rep78)", auto).fit()
+        res = ws.Regress.from_formula("mpg ~ weight + C(rep78)", auto).fit()
         rec.add(
             compare(
                 "2b regress i.rep78（5 个缺失两侧都删）",
@@ -306,7 +306,7 @@ def main() -> int:
         # 3. regress vce(robust)
         # ================================================================
         cap = st.estimate("regress mpg weight foreign, vce(robust)")
-        res = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
+        res = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit(cov_type="HC1")
         rec.add(
             compare(
                 "3 regress vce(robust) [westata HC1]",
@@ -346,7 +346,7 @@ def main() -> int:
         st.send(panel)
         assert st.nobs() == n_panel, (st.nobs(), n_panel)
         cap = st.estimate("regress y x1 x2, vce(cluster gid)")
-        res = ws.OLS.from_formula("y ~ x1 + x2", panel).fit(
+        res = ws.Regress.from_formula("y ~ x1 + x2", panel).fit(
             cov_type="cluster", cov_kwds={"groups": panel["gid"]}
         )
         diag_rel, full_rel = v_matrix_rel(cap, res)
@@ -443,14 +443,14 @@ def main() -> int:
         # ================================================================
         # 5f 先做 API 契约检查：weight_type 必须显式给
         try:
-            ws.OLS.from_formula("y ~ x1 + x2", panel, weights=panel["w"]).fit()
+            ws.Regress.from_formula("y ~ x1 + x2", panel, weights=panel["w"]).fit()
             wt_guard = "NO ERROR（不符合预期）"
         except Exception as exc:  # noqa: BLE001
             wt_guard = f"{type(exc).__name__}: {exc}"
         for wt in ("fweight", "aweight", "pweight", "iweight"):
             t0 = time.perf_counter()
             cap = st.estimate(f"regress y x1 x2 [{wt}=w]")
-            res = ws.OLS.from_formula(
+            res = ws.Regress.from_formula(
                 "y ~ x1 + x2", panel, weights=panel["w"], weight_type=wt
             ).fit()
             rec.add(
@@ -474,7 +474,7 @@ def main() -> int:
             )
         # 5e：pweight 隐含 robust → Stata e(F) 换成稳健 Wald
         cap = st.estimate("regress y x1 x2 [pweight=w]")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "y ~ x1 + x2", panel, weights=panel["w"], weight_type="pweight"
         ).fit()
         wf = wald_f(res)
@@ -499,7 +499,7 @@ def main() -> int:
         )
         # 5g：fweight + vce(robust)（Stata eq.7 复制型 meat）
         cap = st.estimate("regress y x1 x2 [fweight=w], vce(robust)")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "y ~ x1 + x2", panel, weights=panel["w"], weight_type="fweight"
         ).fit(cov_type="HC1")
         rec.add(
@@ -513,7 +513,7 @@ def main() -> int:
         )
         # 5h：aweight + vce(robust)（精度型 meat）
         cap = st.estimate("regress y x1 x2 [aweight=w], vce(robust)")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "y ~ x1 + x2", panel, weights=panel["w"], weight_type="aweight"
         ).fit(cov_type="HC1")
         rec.add(
@@ -531,7 +531,7 @@ def main() -> int:
         # ================================================================
         st.run("sysuse auto, clear")
         cap = st.estimate("regress mpg weight foreign if mpg>20")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "mpg ~ weight + foreign", auto, subset=auto["mpg"] > 20
         ).fit()
         rec.add(
@@ -545,7 +545,7 @@ def main() -> int:
             )
         )
         cap = st.estimate("regress mpg weight foreign if weight<4000 & mpg>18")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "mpg ~ weight + foreign",
             auto,
             subset=(auto["weight"] < 4000) & (auto["mpg"] > 18),
@@ -566,7 +566,7 @@ def main() -> int:
         # ================================================================
         st.send(panel)
         cap = st.estimate("areg y x1 x2, absorb(gid)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit()
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit()
         rec.add(
             compare(
                 "7a areg absorb(gid) [分类 FE] vs FEOLS",
@@ -588,7 +588,7 @@ def main() -> int:
         )
 
         cap = st.estimate("areg y x1 x2, absorb(gid) vce(robust)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit(cov_type="HC1")
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit(cov_type="HC1")
         rec.add(
             compare(
                 "7b areg absorb(gid) vce(robust)",
@@ -600,7 +600,7 @@ def main() -> int:
         )
 
         cap = st.estimate("areg y x1 x2, absorb(gid) vce(cluster gid)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit(
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit(
             cov_type="cluster", cov_kwds={"cluster": "gid"}
         )
         # 7c：areg 的 (N-1)/(N-K) 里 K 把 13 个吸收虚拟变量算进去（K=16）；
@@ -644,7 +644,7 @@ def main() -> int:
             compare(
                 "7c-bis areg cluster(gid) vs reghdfe 同规格（归因用）",
                 keep_slopes(cap_r),
-                ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit(
+                ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit(
                     cov_type="cluster", cov_kwds={"cluster": "gid"}
                 ),
                 tolerance=1e-9,
@@ -692,7 +692,7 @@ def main() -> int:
 
         # 7d：非嵌套聚类 —— areg / reghdfe / FEOLS 三方应当一致
         cap = st.estimate("areg y x1 x2, absorb(gid) vce(cluster t)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit(
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit(
             cov_type="cluster", cov_kwds={"cluster": "t"}
         )
         rec.add(
@@ -717,7 +717,7 @@ def main() -> int:
 
         # 7e：absorb 数值存储变量（8 个取值）
         cap = st.estimate("areg y x1 x2, absorb(cont)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | cont", panel).fit()
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | cont", panel).fit()
         rec.add(
             compare(
                 "7e areg absorb(cont) [数值存储、8 个取值]",
@@ -742,7 +742,7 @@ def main() -> int:
         # 8. reghdfe（本机已装 6.14.1）
         # ================================================================
         cap = st.estimate("reghdfe y x1 x2, absorb(gid)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid", panel).fit()
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid", panel).fit()
         rec.add(
             compare(
                 "8a reghdfe absorb(gid) vs FEOLS",
@@ -760,7 +760,7 @@ def main() -> int:
         )
 
         cap = st.estimate("reghdfe y x1 x2, absorb(gid t)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid + t", panel).fit()
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid + t", panel).fit()
         rec.add(
             compare(
                 "8b reghdfe absorb(gid t) 双向 vs FEOLS 双向",
@@ -776,7 +776,7 @@ def main() -> int:
         )
 
         cap = st.estimate("reghdfe y x1 x2, absorb(gid t) vce(robust)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid + t", panel).fit(
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid + t", panel).fit(
             cov_type="HC1"
         )
         rec.add(
@@ -790,7 +790,7 @@ def main() -> int:
         )
 
         cap = st.estimate("reghdfe y x1 x2, absorb(gid t) vce(cluster gid)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid + t", panel).fit(
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid + t", panel).fit(
             cov_type="cluster", cov_kwds={"cluster": "gid"}
         )
         diag_rel, full_rel = v_matrix_rel(keep_slopes(cap), res)
@@ -820,7 +820,7 @@ def main() -> int:
         # 9. FEOLS 双向 FE vs areg 双向（i.t 显式期效应）
         # ================================================================
         cap = st.estimate("areg y x1 x2 i.t, absorb(gid) vce(robust)")
-        res = ws.FEOLS.from_formula("y ~ x1 + x2 | gid + t", panel).fit(cov_type="HC1")
+        res = ws.RegressHighDimFixedEffects.from_formula("y ~ x1 + x2 | gid + t", panel).fit(cov_type="HC1")
         rec.add(
             compare(
                 "9 FEOLS(gid+t, HC1) vs areg absorb(gid)+i.t",
@@ -1188,7 +1188,7 @@ def main() -> int:
         # ================================================================
         st.send(panel)
         cap = st.estimate("eivreg y x1 x2, reliab(x1 .9 x2 .95)")
-        res = ws.Eivreg.from_formula(
+        res = ws.ErrorsInVariablesRegress.from_formula(
             "y ~ x1 + x2", panel, reliab={"x1": 0.9, "x2": 0.95}
         ).fit()
         diag_rel, full_rel = v_matrix_rel(cap, res)
@@ -1218,7 +1218,7 @@ def main() -> int:
         # ================================================================
         st.run("sysuse auto, clear")
         cap = st.estimate("regress mpg weight foreign")
-        res = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+        res = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
         rec.add(
             compare(
                 "14a OLS e(): N/df_r/df_m/r2/r2_a/rmse/F/ll",
@@ -1256,7 +1256,7 @@ def main() -> int:
         # 14c：加权 OLS 的 e(N)/e(sum_w)
         st.send(panel)
         cap = st.estimate("regress y x1 x2 [fweight=w]")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "y ~ x1 + x2", panel, weights=panel["w"], weight_type="fweight"
         ).fit()
         rec.add(
@@ -1280,18 +1280,18 @@ def main() -> int:
         # ================================================================
         st.run("sysuse auto, clear")
         cap = st.estimate("regress mpg weight foreign")
-        res = ws.OLS.from_formula("mpg ~ weight + foreign", auto).fit()
+        res = ws.Regress.from_formula("mpg ~ weight + foreign", auto).fit()
         e_coverage_item("15a OLS e() 覆盖度（rss/mss/sum_w/rank/tss）", cap, res)
 
         st.send(panel)
         cap = st.estimate("regress y x1 x2 [fweight=w]")
-        res = ws.OLS.from_formula(
+        res = ws.Regress.from_formula(
             "y ~ x1 + x2", panel, weights=panel["w"], weight_type="fweight"
         ).fit()
         e_coverage_item("15b 加权 OLS e() 覆盖度（sum_w）", cap, res)
 
         cap = st.estimate("regress y x1 x2, vce(cluster gid)")
-        res = ws.OLS.from_formula("y ~ x1 + x2", panel).fit(
+        res = ws.Regress.from_formula("y ~ x1 + x2", panel).fit(
             cov_type="cluster", cov_kwds={"groups": panel["gid"]}
         )
         e_coverage_item(
@@ -1323,7 +1323,7 @@ def main() -> int:
         )
 
         cap = st.estimate("eivreg y x1 x2, reliab(x1 .9 x2 .95)")
-        res = ws.Eivreg.from_formula(
+        res = ws.ErrorsInVariablesRegress.from_formula(
             "y ~ x1 + x2", panel, reliab={"x1": 0.9, "x2": 0.95}
         ).fit()
         e_coverage_item("15f eivreg e() 覆盖度", cap, res)
@@ -1400,11 +1400,11 @@ def main() -> int:
         ):
             cap = st.estimate(cmd)
             if kw is None:
-                res = ws.OLS.from_formula(
+                res = ws.Regress.from_formula(
                     "y ~ x1 + x2", panel, weights=panel["w"], weight_type="pweight"
                 ).fit()
             else:
-                res = ws.OLS.from_formula("y ~ x1 + x2", panel).fit(**kw)
+                res = ws.Regress.from_formula("y ~ x1 + x2", panel).fit(**kw)
             wf = wald_f(res)  # 用 westata 自己的 V 算 Wald/k
             evidence_item(
                 f"17 {label}：Stata e(F) 与「westata V 的 Wald/k」",

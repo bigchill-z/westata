@@ -42,11 +42,11 @@ import pandas as pd
 from westata.errors import ConsistencyError
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["NnmatchResult", "teffects_nnmatch"]
+__all__ = ["NnmatchResults", "treatment_effects_nnmatch"]
 
 
 @dataclass(frozen=True)
-class NnmatchResult(ResultSerialisation):
+class NnmatchResults(ResultSerialisation):
     """``teffects nnmatch``: ATET from Mahalanobis nearest-neighbour matching."""
 
     ate: float
@@ -71,7 +71,7 @@ class NnmatchResult(ResultSerialisation):
         return self.ate
 
 
-class TeffectsNnmatch:
+class TreatmentEffectsNnmatch:
     """``teffects nnmatch (depvar) (treatment) (covariates)`` -- nearest neighbour.
 
     Class form of :func:`westata.teffects_nnmatch` (R2.7).  Construction takes column
@@ -131,7 +131,7 @@ class TeffectsNnmatch:
             tie_tolerance=tie_tolerance,
         )
 
-    def fit(self) -> NnmatchResult:
+    def fit(self) -> NnmatchResults:
         """Estimate.  No ``cov_type`` -- see the class docstring."""
 
         return _teffects_nnmatch_impl(
@@ -144,7 +144,7 @@ class TeffectsNnmatch:
         )
 
 
-def teffects_nnmatch(
+def treatment_effects_nnmatch(
     response: Any,
     treatment: Any,
     covariates: Any,
@@ -152,7 +152,7 @@ def teffects_nnmatch(
     nneighbor: int = 1,
     caliper: float | None = None,
     tie_tolerance: float = 1e-10,
-) -> NnmatchResult:
+) -> NnmatchResults:
     """Fit Stata's ``teffects nnmatch`` -- thin wrapper over :class:`TeffectsNnmatch`."""
 
     return _teffects_nnmatch_impl(
@@ -173,7 +173,7 @@ def _teffects_nnmatch_impl(
     nneighbor: int = 1,
     caliper: float | None = None,
     tie_tolerance: float = 1e-10,
-) -> NnmatchResult:
+) -> NnmatchResults:
     """ATET by Mahalanobis-distance nearest-neighbour matching.
 
     ``caliper`` caps the distance a match may have; ``None`` means no cap (Stata's default).
@@ -256,7 +256,7 @@ def _teffects_nnmatch_impl(
         differences.append(float(y[index] - np.mean(y[selected])))
         match_counts.append(int(selected.size))
 
-    return NnmatchResult(
+    return NnmatchResults(
         ate=float(np.mean(differences)),
         nobs=int(y.size),
         treated=int(treated.size),

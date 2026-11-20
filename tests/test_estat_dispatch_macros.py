@@ -46,7 +46,7 @@ def _frame(n: int = 300, seed: int = 6100):
 
 @pytest.fixture(scope="module")
 def regress_fit():
-    return ws.OLS.from_formula("y ~ x", _frame()).fit()
+    return ws.Regress.from_formula("y ~ x", _frame()).fit()
 
 
 @pytest.fixture(scope="module")
@@ -146,6 +146,6 @@ def test_a_missing_macro_means_no_estat(regress_fit) -> None:
     (``qreg.ado:192``) rather than naming a program.
     """
 
-    fitted = ws.QuantileRegression.from_formula("y ~ x", _frame()).fit()
+    fitted = ws.QuantileRegress.from_formula("y ~ x", _frame()).fit()
 
     assert "estat_cmd" not in fitted.e or not fitted.e["estat_cmd"]

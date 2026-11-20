@@ -46,7 +46,7 @@ def _critical_column(rendered: str) -> list[str]:
 
 def test_two_variables_get_the_last_two_entries(frame) -> None:
     values = frame[["dinf", "unem"]].dropna().to_numpy()
-    rows = _critical_column(str(ws.vecrank(values, lags=2)))
+    rows = _critical_column(str(ws.vec_rank(values, lags=2)))
     # Two testable ranks; the trailing untested row carries no critical value.
     assert rows[0].rstrip().endswith("15.41")
     assert rows[1].rstrip().endswith("3.76")
@@ -56,7 +56,7 @@ def test_three_variables_get_three_entries(frame) -> None:
     """This used to emit nan in the rank-0 row because the table ran out."""
 
     values = frame[["inf", "unem", "dinf"]].dropna().to_numpy()
-    rows = _critical_column(str(ws.vecrank(values, lags=2)))
+    rows = _critical_column(str(ws.vec_rank(values, lags=2)))
     assert rows[0].rstrip().endswith("29.68")
     assert rows[1].rstrip().endswith("15.41")
     assert rows[2].rstrip().endswith("3.76")
@@ -76,4 +76,4 @@ def test_more_variables_than_measured_is_refused() -> None:
 
     values = __import__("numpy").random.default_rng(0).normal(size=(120, 4))
     with pytest.raises(UnsupportedError, match="critical values"):
-        ws.vecrank(values, lags=2)
+        ws.vec_rank(values, lags=2)

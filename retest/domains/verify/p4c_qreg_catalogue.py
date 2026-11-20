@@ -28,7 +28,7 @@ y = 1.0 + 0.75 * x1 - 0.45 * x2 + sig * rng.normal(size=n)
 df = pd.DataFrame(dict(x1=x1, x2=x2, y=y))
 
 for tau in (0.25, 0.5, 0.75):
-    q = ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q = ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     ri = q.fit(cov_type="iid")
     rr = q.fit(cov_type="robust")
     pn = list(rr.param_names)

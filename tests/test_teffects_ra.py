@@ -49,7 +49,7 @@ def _sample():
 @pytest.fixture(scope="module")
 def fitted():
     y, d, x = _sample()
-    return ws.teffects_ra(y, d, x)
+    return ws.treatment_effects_ra(y, d, x)
 
 
 def test_ate_matches_stata(fitted) -> None:
@@ -63,7 +63,7 @@ def test_potential_outcome_means_match_stata(fitted) -> None:
 
 def test_atet_matches_stata() -> None:
     y, d, x = _sample()
-    result = ws.teffects_ra(y, d, x, estimand="atet")
+    result = ws.treatment_effects_ra(y, d, x, estimand="atet")
     assert result.atet == pytest.approx(STATA["atet"], abs=5e-7)
     assert result.estimand == "ATET"
 
@@ -87,10 +87,10 @@ def test_bad_treatment_coding_is_refused() -> None:
     y, _, x = _sample()
     bad = np.where(np.arange(y.size) % 2 == 0, 1, 2)
     with pytest.raises(Exception):
-        ws.teffects_ra(y, bad, x)
+        ws.treatment_effects_ra(y, bad, x)
 
 
 def test_unknown_estimands_are_refused() -> None:
     y, d, x = _sample()
     with pytest.raises(Exception):
-        ws.teffects_ra(y, d, x, estimand="atc")
+        ws.treatment_effects_ra(y, d, x, estimand="atc")

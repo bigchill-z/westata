@@ -37,10 +37,10 @@ def models():
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
 
-    fixed = ws.PanelOLS.from_formula(
+    fixed = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="sid", time="year"
     ).fit()
-    random = ws.RandomEffects.from_formula(
+    random = ws.PanelRegressRE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="sid", time="year"
     ).fit()
     return fixed, random
@@ -92,7 +92,7 @@ def test_the_iv_versus_ols_comparison_matches_stata() -> None:
         pytest.skip("grilic.dta is not available")
 
     iv = ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", frame).fit()
-    ols = ws.OLS.from_formula("lnw ~ s + expr", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr", frame).fit()
     result = ws.hausman(iv, ols)
 
     assert float(result.statistic) == pytest.approx(20.68960619, abs=1e-6)

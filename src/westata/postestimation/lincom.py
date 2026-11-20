@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import stats
 
-__all__ = ["LincomResult", "run_lincom"]
+__all__ = ["LincomResults", "run_lincom"]
 
 
 
@@ -55,7 +55,7 @@ def _lincom_g(value: float) -> str:
 
 
 @dataclass(frozen=True)
-class LincomResult:
+class LincomResults:
     """One linear combination, shaped like Stata's ``lincom`` output."""
 
     estimate: float
@@ -198,7 +198,7 @@ def run_lincom(
     eform: bool = False,
     label: str = "",
     response_name: str = "",
-) -> LincomResult:
+) -> LincomResults:
     """Evaluate ``weights @ b`` with its standard error and interval.
 
     Parameters
@@ -255,7 +255,7 @@ def run_lincom(
         lower = float(np.exp(lower))
         upper = float(np.exp(upper))
 
-    return LincomResult(
+    return LincomResults(
         estimate=estimate,
         std_err=std_err,
         statistic=statistic,

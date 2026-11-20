@@ -39,36 +39,36 @@
 
 | # | Stata 命令 | westata 调用 | 数据 | 判定 | 系数相对差 | 标准误相对差 |
 |---|---|---|---|---|---|---|
-| 1 | `regress mpg weight foreign` | ws.OLS.from_formula('mpg ~ weight + foreign').fit() | auto.dta | A | 5.1e-15 | 6.8e-16 |
-| 2 | `regress mpg weight i.foreign` | OLS 'mpg ~ weight + C(foreign)' | auto.dta | A | 3.7e-14 | 5.1e-16 |
-| 3 | `regress mpg weight i.rep78` | OLS 'mpg ~ weight + C(rep78)' | auto.dta | A | 1.2e-13 | 2.8e-15 |
-| 4 | `regress ..., vce(robust)` | OLS(...).fit(cov_type='HC1') | auto.dta | A | 5.1e-15 | 4.6e-15 |
+| 1 | `regress mpg weight foreign` | ws.Regress.from_formula('mpg ~ weight + foreign').fit() | auto.dta | A | 5.1e-15 | 6.8e-16 |
+| 2 | `regress mpg weight i.foreign` | Regress 'mpg ~ weight + C(foreign)' | auto.dta | A | 3.7e-14 | 5.1e-16 |
+| 3 | `regress mpg weight i.rep78` | Regress 'mpg ~ weight + C(rep78)' | auto.dta | A | 1.2e-13 | 2.8e-15 |
+| 4 | `regress ..., vce(robust)` | Regress(...).fit(cov_type='HC1') | auto.dta | A | 5.1e-15 | 4.6e-15 |
 | 5 | `同上` | 同上，仅比 e(F) | auto.dta | A* | 5.1e-15 | 4.6e-15 |
-| 6 | `regress y x1 x2, vce(cluster gid)` | OLS(...).fit(cov_type='cluster', cov_kwds={'groups': gid}) | 自造 140x14 组 | A | 3.5e-16 | 1.1e-15 |
+| 6 | `regress y x1 x2, vce(cluster gid)` | Regress(...).fit(cov_type='cluster', cov_kwds={'groups': gid}) | 自造 140x14 组 | A | 3.5e-16 | 1.1e-15 |
 | 7 | `同上` | 同上，仅比 e(df_r) | 自造 140x14 组 | A* | 3.5e-16 | 1.1e-15 |
 | 8 | `同上 + test x1` | 同上，比 t 检验 p | 自造 140x14 组 | A | 3.5e-16 | 1.1e-15 |
 | 9 | `同上` | 同上，仅比 e(F) | 自造 140x14 组 | A* | 3.5e-16 | 1.1e-15 |
-| 10 | `regress y x1 x2 [fweight=w]` | OLS(weights=w, weight_type='fweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
-| 11 | `regress y x1 x2 [aweight=w]` | OLS(weights=w, weight_type='aweight') | 自造 140x14 组 | A | 1.1e-15 | 5.6e-16 |
-| 12 | `regress y x1 x2 [pweight=w]` | OLS(weights=w, weight_type='pweight') | 自造 140x14 组 | A | 1.1e-15 | 8.9e-16 |
-| 13 | `regress y x1 x2 [iweight=w]` | OLS(weights=w, weight_type='iweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
+| 10 | `regress y x1 x2 [fweight=w]` | Regress(weights=w, weight_type='fweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
+| 11 | `regress y x1 x2 [aweight=w]` | Regress(weights=w, weight_type='aweight') | 自造 140x14 组 | A | 1.1e-15 | 5.6e-16 |
+| 12 | `regress y x1 x2 [pweight=w]` | Regress(weights=w, weight_type='pweight') | 自造 140x14 组 | A | 1.1e-15 | 8.9e-16 |
+| 13 | `regress y x1 x2 [iweight=w]` | Regress(weights=w, weight_type='iweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
 | 14 | `同上` | 同上，仅比 e(F) | 自造 140x14 组 | A* | 1.1e-15 | 8.9e-16 |
 | 15 | `regress ... [fweight=w], vce(robust)` | fweight + cov_type='HC1' | 自造 140x14 组 | A | 4.9e-16 | 1.6e-16 |
 | 16 | `regress ... [aweight=w], vce(robust)` | aweight + cov_type='HC1' | 自造 140x14 组 | A | 1.1e-15 | 8.9e-16 |
-| 17 | `regress mpg weight foreign if mpg>20` | OLS(..., subset=mpg>20) | auto.dta | A | 3.0e-14 | 4.2e-16 |
-| 18 | `regress ... if weight<4000 & mpg>18` | OLS(..., subset=两个条件) | auto.dta | A | 3.0e-15 | 6.2e-16 |
-| 19 | `areg y x1 x2, absorb(gid)` | ws.FEOLS('y ~ x1 + x2 \| gid') | 自造 140x14 组 | A | 1.1e-15 | 1.8e-16 |
-| 20 | `areg ..., absorb(gid) vce(robust)` | FEOLS(...).fit(cov_type='HC1') | 自造 140x14 组 | A | 1.1e-15 | 8.3e-16 |
-| 21 | `areg ..., absorb(gid) vce(cluster gid)` | FEOLS(...).fit(cov_type='cluster', {'cluster': 'gid'}) | 自造 140x14 组 | E | 1.1e-15 | 4.9e-02 |
+| 17 | `regress mpg weight foreign if mpg>20` | Regress(..., subset=mpg>20) | auto.dta | A | 3.0e-14 | 4.2e-16 |
+| 18 | `regress ... if weight<4000 & mpg>18` | Regress(..., subset=两个条件) | auto.dta | A | 3.0e-15 | 6.2e-16 |
+| 19 | `areg y x1 x2, absorb(gid)` | ws.RegressHighDimFixedEffects('y ~ x1 + x2 \| gid') | 自造 140x14 组 | A | 1.1e-15 | 1.8e-16 |
+| 20 | `areg ..., absorb(gid) vce(robust)` | RegressHighDimFixedEffects(...).fit(cov_type='HC1') | 自造 140x14 组 | A | 1.1e-15 | 8.3e-16 |
+| 21 | `areg ..., absorb(gid) vce(cluster gid)` | RegressHighDimFixedEffects(...).fit(cov_type='cluster', {'cluster': 'gid'}) | 自造 140x14 组 | E | 1.1e-15 | 4.9e-02 |
 | 22 | `reghdfe ..., absorb(gid) vce(cluster gid)` | 同 7c，但改比 reghdfe | 自造 140x14 组 | A | 9.4e-16 | 7.9e-16 |
 | 23 | `（手算，无 Stata 命令）` | 手算 within CR0 × 两个候选 CR1 因子 | 自造 140x14 组 | 证据 | n/a | n/a |
-| 24 | `areg ..., absorb(gid) vce(cluster t)` | FEOLS(...).fit(cov_type='cluster', {'cluster': 't'}) | 自造 140x14 组 | A | 7.8e-16 | 1.3e-15 |
-| 25 | `areg y x1 x2, absorb(cont)` | FEOLS('y ~ x1 + x2 \| cont') | 自造 140x14 组 | A | 5.9e-16 | 3.3e-16 |
-| 26 | `reghdfe y x1 x2, absorb(gid)` | FEOLS('y ~ x1 + x2 \| gid') | 自造 140x14 组 | A | 9.4e-16 | 1.9e-16 |
-| 27 | `reghdfe ..., absorb(gid t)` | FEOLS('y ~ x1 + x2 \| gid + t') | 自造 140x14 组 | A | 1.1e-15 | 2.1e-16 |
-| 28 | `reghdfe ..., absorb(gid t) vce(robust)` | FEOLS(gid+t).fit(cov_type='HC1') | 自造 140x14 组 | A | 1.1e-15 | 3.4e-16 |
-| 29 | `reghdfe ..., absorb(gid t) vce(cluster gid)` | FEOLS(gid+t).fit(cov_type='cluster', {'cluster': 'gid'}) | 自造 140x14 组 | A | 1.1e-15 | 2.1e-16 |
-| 30 | `areg y x1 x2 i.t, absorb(gid) vce(robust)` | FEOLS(gid+t).fit(cov_type='HC1') | 自造 140x14 组 | A | 9.4e-16 | 7.8e-16 |
+| 24 | `areg ..., absorb(gid) vce(cluster t)` | RegressHighDimFixedEffects(...).fit(cov_type='cluster', {'cluster': 't'}) | 自造 140x14 组 | A | 7.8e-16 | 1.3e-15 |
+| 25 | `areg y x1 x2, absorb(cont)` | RegressHighDimFixedEffects('y ~ x1 + x2 \| cont') | 自造 140x14 组 | A | 5.9e-16 | 3.3e-16 |
+| 26 | `reghdfe y x1 x2, absorb(gid)` | RegressHighDimFixedEffects('y ~ x1 + x2 \| gid') | 自造 140x14 组 | A | 9.4e-16 | 1.9e-16 |
+| 27 | `reghdfe ..., absorb(gid t)` | RegressHighDimFixedEffects('y ~ x1 + x2 \| gid + t') | 自造 140x14 组 | A | 1.1e-15 | 2.1e-16 |
+| 28 | `reghdfe ..., absorb(gid t) vce(robust)` | RegressHighDimFixedEffects(gid+t).fit(cov_type='HC1') | 自造 140x14 组 | A | 1.1e-15 | 3.4e-16 |
+| 29 | `reghdfe ..., absorb(gid t) vce(cluster gid)` | RegressHighDimFixedEffects(gid+t).fit(cov_type='cluster', {'cluster': 'gid'}) | 自造 140x14 组 | A | 1.1e-15 | 2.1e-16 |
+| 30 | `areg y x1 x2 i.t, absorb(gid) vce(robust)` | RegressHighDimFixedEffects(gid+t).fit(cov_type='HC1') | 自造 140x14 组 | A | 9.4e-16 | 7.8e-16 |
 | 31 | `ivregress 2sls yiv x1 (e1=z1)` | ws.IV2SLS.from_formula('yiv ~ x1 + [e1 ~ z1]') | 自造 140x14 组 | A | 2.6e-15 | 2.8e-15 |
 | 32 | `ivregress 2sls yiv x1 (e1=z1 z2)` | IV2SLS('yiv ~ x1 + [e1 ~ z1 + z2]') | 自造 140x14 组 | A | 2.6e-15 | 3.2e-15 |
 | 33 | `ivregress 2sls ..., vce(robust)` | IV2SLS(...).fit(cov_type='HC0') | 自造 140x14 组 | A | 2.6e-15 | 6.1e-15 |
@@ -86,10 +86,10 @@
 | 45 | `ivregress gmm ..., vce(robust)` | IVGMM(...).fit(cov_type='HC0') | 自造 140x14 组 | A | 2.2e-16 | 8.1e-16 |
 | 46 | `同上` | IVGMM(...).fit(cov_type='HC1') | 自造 140x14 组 | E | 2.2e-16 | 1.1e-02 |
 | 47 | `ivregress gmm ..., vce(cluster gid)` | IVGMM(...).fit(cov_type='cluster', {'clusters': gid}) | 自造 140x14 组 | E | 3.6e-02 | 1.2e-01 |
-| 48 | `eivreg y x1 x2, reliab(x1 .9 x2 .95)` | ws.Eivreg.from_formula(reliab={'x1': .9, 'x2': .95}) | 自造 140x14 组 | A | 4.5e-16 | 6.4e-16 |
-| 49 | `regress mpg weight foreign` | OLS(...).fit() | auto.dta | A | 5.1e-15 | 6.8e-16 |
+| 48 | `eivreg y x1 x2, reliab(x1 .9 x2 .95)` | ws.ErrorsInVariablesRegress.from_formula(reliab={'x1': .9, 'x2': .95}) | 自造 140x14 组 | A | 4.5e-16 | 6.4e-16 |
+| 49 | `regress mpg weight foreign` | Regress(...).fit() | auto.dta | A | 5.1e-15 | 6.8e-16 |
 | 50 | `同上` | resid / fitted 反算 | auto.dta | A | 5.1e-15 | 6.8e-16 |
-| 51 | `regress y x1 x2 [fweight=w]` | OLS(weights=w, weight_type='fweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
+| 51 | `regress y x1 x2 [fweight=w]` | Regress(weights=w, weight_type='fweight') | 自造 140x14 组 | A | 4.9e-16 | 3.0e-16 |
 | 52 | `regress mpg weight foreign` | 比较 e() 键集合 | auto.dta | 覆盖度 fail | n/a | n/a |
 | 53 | `regress y x1 x2 [fweight=w]` | 比较 e() 键集合 | 自造 140x14 组 | 覆盖度 fail | n/a | n/a |
 | 54 | `regress y x1 x2, vce(cluster gid)` | 比较 e() 键集合 | 自造 140x14 组 | 覆盖度 fail | n/a | n/a |
@@ -116,13 +116,13 @@
 下面只解释 A 档以外、以及需要额外说明的条目。所有归因都用可复算的方式验证：
 「把 westata 自己的 `e(V)` 代进同一个公式」或「手算同一估计量」，不靠推理。
 
-### 21 —— areg `vce(cluster gid)` 与 FEOLS 差 4.86e-2（E），但**不是 westata 的错**
+### 21 —— areg `vce(cluster gid)` 与 RegressHighDimFixedEffects 差 4.86e-2（E），但**不是 westata 的错**
 
 - 现象：系数一致到 1.1e-15；SE 系统性大 5.11%。
 - 原始数字：`areg y x1 x2, absorb(gid) vce(cluster gid)` →
   SE `[0.05512530662889631, 0.08085366893482775]`；
   `reghdfe` 同规格 → `[0.052444696588479306, 0.07692195099971824]`；
-  FEOLS 与 reghdfe 一致到 **7.94e-16**（22 号）。
+  RegressHighDimFixedEffects 与 reghdfe 一致到 **7.94e-16**（22 号）。
 - 归因（三个独立来源全部闭合）：
   - 聚类 CR1 因子是 `G/(G-1) * (N-1)/(N-K)`，两侧分歧只在 `K`。
   - `areg` 把吸收的 13 个 `gid` 虚拟变量 + 常数计入 `K` → **K=16**，因子 `1.2071960297766748`。
@@ -134,10 +134,10 @@
     乘 `K=16` 因子后与 areg 相对差 **1.13e-15**，乘 `K=3` 因子后与 reghdfe 相对差 **9.26e-16**。
     两个候选用同一个 CR0 基准，唯一差别是 `K`。
 - 反证（24 号）：把聚类变量换成**不嵌套**的 `t`（10 组），`areg` 与 `reghdfe` 的 SE 相同到
-  `[0.06534372453008551, 0.1119248857201664]`（FEOLS 相对差 1.27e-15）。
+  `[0.06534372453008551, 0.1119248857201664]`（RegressHighDimFixedEffects 相对差 1.27e-15）。
   → 5.11% 只出现在「聚类变量嵌套该 FE」时，是 Stata 两个命令对小样本因子的口径差。
-- **结论：这一条不构成 westata 的缺陷**，FEOLS 正确跟随了 reghdfe 口径。
-  专门记下来是因为：拿 `areg` 的 SE 当基准去校验 FEOLS，会误判成 5% 的 bug。
+- **结论：这一条不构成 westata 的缺陷**，RegressHighDimFixedEffects 正确跟随了 reghdfe 口径。
+  专门记下来是因为：拿 `areg` 的 SE 当基准去校验 RegressHighDimFixedEffects，会误判成 5% 的 bug。
 
 ### 34 / 40 / 46 —— IV 的 `vce(robust)`：westata 的 `HC1` 标签与 Stata 默认不一致（E，1.09e-2）
 
@@ -217,11 +217,11 @@
 | `regress ... [pweight=w]` | 311.9681833830176 | 311.96818338301676 | 2.7e-15 | 321.0520277297091 | **2.91e-2** |
 
 即：两侧 V 相同（把 westata 的 V 代进 Stata 的定义式，差 ≤1.9e-15），
-差别纯粹是 westata `OLS` 的 `e(F)` **恒为经典 R² 型** `(r2/df_m)/((1-r2)/df_r)`，不随 cov_type 变。
+差别纯粹是 westata `Regress` 的 `e(F)` **恒为经典 R² 型** `(r2/df_m)/((1-r2)/df_r)`，不随 cov_type 变。
 `auto.dta` 上同样：robust 下 westata 69.74846262 vs Stata 73.80592553（5.50e-2）。
 → 系数、SE、p 值都不受影响，但读 `e('F')` 做整体显著性判断的下游代码会拿到偏小的 F（cluster 下小 37%）。
 
-**e(df_r)**：Stata 在 `vce(cluster)` 下存 `e(df_r)=G-1=13`；westata `OLS` 存 `e(df_r)=N-K=137`。
+**e(df_r)**：Stata 在 `vce(cluster)` 下存 `e(df_r)=G-1=13`；westata `Regress` 存 `e(df_r)=N-K=137`。
 **推断用的 `results.df_resid` 两侧都是 13**：8 号用 Stata 的 `test x1` 验证
 （`r(F)=897.60686415`、`r(df_r)=13`、`p=2.209578718351644e-13`），
 westata 的 `p=2.2095787183516284e-13`，相对差 **7.1e-15**。
@@ -231,21 +231,21 @@ westata 的 `p=2.2095787183516284e-13`，相对差 **7.1e-15**。
 
 | 条目 | Stata 有而 westata `e` 没有 | 影响 |
 |---|---|---|
-| 52 OLS | `rss`, `mss`, `sum_w`, `ll_0` | `rss`/`mss` 可从 `resid`/`fitted` 反算（50 号，相对差 0，机器精度）；`ll_0` 无法从结果对象还原，要重跑空模型 |
-| 53 加权 OLS | 同上 | **`sum_w` 最要紧**：`fweight` 下 `e(N)=sum(w)=369` 而 `res.nobs=140`，下游若用 `nobs` 当 `N` 会算错自由度（westata 的 `e(N)`/`e(df_r)` 本身是对的：369/366，见 10 号） |
-| 54 cluster OLS | 上面 + `N_clust` | 聚类数只能从 `results.df_resid + 1` 反推（=G-1+1），没有显式 `e(N_clust)` |
+| 52 Regress | `rss`, `mss`, `sum_w`, `ll_0` | `rss`/`mss` 可从 `resid`/`fitted` 反算（50 号，相对差 0，机器精度）；`ll_0` 无法从结果对象还原，要重跑空模型 |
+| 53 加权 Regress | 同上 | **`sum_w` 最要紧**：`fweight` 下 `e(N)=sum(w)=369` 而 `res.nobs=140`，下游若用 `nobs` 当 `N` 会算错自由度（westata 的 `e(N)`/`e(df_r)` 本身是对的：369/366，见 10 号） |
+| 54 cluster Regress | 上面 + `N_clust` | 聚类数只能从 `results.df_resid + 1` 反推（=G-1+1），没有显式 `e(N_clust)` |
 | 55 2SLS | `rss`, `mss`, `kappa`, `k_endog`, `iterations`, `tss` | `kappa`（LIML 的 k-class 参数）是有信息量的诊断量（Stata 此处 `kappa=1.0013841716`） |
 | 56 GMM | 上面 + `J` | Stata 的 `e(J)` 是 Hansen J 过度识别检验统计量（此处 `0.1817596796`）；westata 不存，无法直接做 J 检验 |
 | 57 eivreg | （无缺失） | westata 反而多存 `reliab`/`vce`/`p` |
 
-westata 侧**多出**（不算缺陷，但与 Stata 不一致）：OLS 有 `aic`/`bic`/`sigma`；
+westata 侧**多出**（不算缺陷，但与 Stata 不一致）：Regress 有 `aic`/`bic`/`sigma`；
 IV 有 `F`/`F_first`/`ll`（Stata 的 `ivregress` 根本不存 `ll`/`F`，它存 `chi2`/`J`）。
 注意 IV 的 `e(df_r)`：Stata 存缺失（本机取到 `8.99e+307` 哨兵），westata 存 `N`——
 这正是 `iv.py` 文档声明的行为，本次实测一致（31/36 号 extra 里记录了哨兵判定为 true）。
 
 ### 48 —— eivreg（reliab）
 
-- `eivreg y x1 x2, reliab(x1 .9 x2 .95)` vs `ws.Eivreg(..., reliab={'x1': .9, 'x2': .95})`：
+- `eivreg y x1 x2, reliab(x1 .9 x2 .95)` vs `ws.ErrorsInVariablesRegress(..., reliab={'x1': .9, 'x2': .95})`：
   系数 4.50e-16、SE 6.39e-16；`e(N)=140`、`e(df_m)=2`、`e(df_r)=137`、`e(r2)=0.90051802`、
   `e(rmse)=0.66174985`、`e(F)=318.06823840` 全部 A 档。
 - **为什么不用 .8/.7**：Stata `eivreg` 在 reliab 过小、`A = X'X/n - S` 病态时报
@@ -255,15 +255,15 @@ IV 有 `F`/`F_first`/`ll`（Stata 的 `ivregress` 根本不存 `ll`/`F`，它存
 ### 25 —— areg `absorb(cont)`（数值存储的"连续"变量）
 
 `cont` 以 double 存储但只有 8 个不同取值：`areg y x1 x2, absorb(cont)` 按类别吸收，
-`FEOLS('y ~ x1 + x2 | cont')` 也当因子。系数 5.91e-16、SE 3.33e-16、`e(df_r)` 两侧都是 130、
+`RegressHighDimFixedEffects('y ~ x1 + x2 | cont')` 也当因子。系数 5.91e-16、SE 3.33e-16、`e(df_r)` 两侧都是 130、
 `e(df_a)=7`。**注意**：若 `absorb()` 的变量每个观测唯一取值，`areg` 会饱和
 （`e(df_r)=0`、系数全 0、`e(rank)=0`，见 58 号），那是模型不可识别而非数值差异；
-westata `FEOLS` 遇到这种情况抛 `ConsistencyError`（不给数字），行为更安全。
+westata `RegressHighDimFixedEffects` 遇到这种情况抛 `ConsistencyError`（不给数字），行为更安全。
 
-### 30 —— FEOLS 双向（`gid + t`）vs `areg absorb(gid) + i.t`
+### 30 —— RegressHighDimFixedEffects 双向（`gid + t`）vs `areg absorb(gid) + i.t`
 
 系数 9.43e-16、SE 4.48e-16；`e(N)/e(df_r)/e(r2)/e(rmse)` 全 A 档（`e(df_r)` 两侧都是 115）。
-`e(df_m)` 不比较：`areg` 把 9 个期虚拟变量计入（`df_m=11`），FEOLS 只报可报告斜率（`df_m=2`）——
+`e(df_m)` 不比较：`areg` 把 9 个期虚拟变量计入（`df_m=11`），RegressHighDimFixedEffects 只报可报告斜率（`df_m=2`）——
 参数化差异，不是错误。
 
 ### 10–16 —— 四种权重
@@ -302,7 +302,7 @@ westata `FEOLS` 遇到这种情况抛 `ConsistencyError`（不给数字），行
 | GAP_REGISTER §8：「`ivregress gmm` 稳健标准误 **2.9e-2**，GMM 权重矩阵构造与 Stata 不同」 | 按 `vce(robust)` ↔ `HC0`：SE 差 **8.15e-16**；按文档的 `HC1` 才 1.089e-2 | **旧结论不成立（推翻）**：2.9e-2 是把 HC1 当 Stata 默认 robust 的结果，与 GMM 权重矩阵无关 |
 | `eivreg` E3，`reliab(x1 .7)` 系数 4.2e-8 | 用 `.9/.95`（`.7/.8/.85` 在 Stata 侧报 `r(399)`）：系数 4.50e-16、SE 6.39e-16 | **等级一致**；旧数字（4.2e-8）不可直接比（不同 reliab、不同数据），本次改用可复现的 `.9/.95` |
 | GAP_REGISTER 未提及 | **GMM + `vce(cluster)` 点估计差 3.58e-2**：Stata 把 W 也聚类，westata 固定 heteroskedastic W | **新增发现（最严重的功能性缺口）** |
-| GAP_REGISTER 未提及 | **OLS 的 `e(F)` 在 robust/cluster/pweight 下语义不同**（westata 恒为经典 R² 型 F，cluster 下差 37%） | **新增发现** |
+| GAP_REGISTER 未提及 | **Regress 的 `e(F)` 在 robust/cluster/pweight 下语义不同**（westata 恒为经典 R² 型 F，cluster 下差 37%） | **新增发现** |
 | GAP_REGISTER 未提及 | **`e(df_r)` 在 cluster 下存 N-K 而非 G-1**；`e(rss)/e(mss)/e(sum_w)/e(N_clust)/e(kappa)/e(J)` 未实现 | **新增发现（e() 覆盖度缺口）** |
 | GAP_REGISTER 未提及 | **IV 的 `HC1` 标签与 Stata 默认 robust 不一致**（HC1 实际对应 `vce(robust) small`） | **新增发现（语义标签，非数值错误）** |
 | GAP_REGISTER 未提及 | **arEG 与 reghdfe 在嵌套聚类下差 5.11%**（Stata 内部口径差，westata 跟随 reghdfe） | **新增发现（用于防误判，不是缺陷）** |
@@ -313,7 +313,7 @@ westata `FEOLS` 遇到这种情况抛 `ConsistencyError`（不给数字），行
    本次不做数值对拍。Stata 侧可用，因此这是**已知能力缺口**而非未测项。
 2. **areg/reghdfe 的 `absorb()` 真连续变量**：会饱和（58 号记录 `e(df_r)=0`、`e(rank)=0`），
    两侧都不可估计，没有可比数字；改用「数值存储、8 个取值」的 `cont` 完成对比（25 号）。
-3. **多路聚类**（`vce(cluster gid t)` / `reghdfe` 的 multiway）：BRIEF 未要求。westata `FEOLS`
+3. **多路聚类**（`vce(cluster gid t)` / `reghdfe` 的 multiway）：BRIEF 未要求。westata `RegressHighDimFixedEffects`
    支持 `cov_kwds={'cluster': [a, b]}`，但本次未与 Stata 对拍（`reghdfe` 多路自由度按 `min(G)`
    取，值得单独一轮）。
 4. **`reghdfe` 的 HAC/Driscoll-Kraay**：westata 明确不支持（`hdfe.py` 抛错），未测。
@@ -328,7 +328,7 @@ westata `FEOLS` 遇到这种情况抛 `ConsistencyError`（不给数字），行
 9. **`reghdfe` 的 `dofadjustments()` 其他取值**（`pairwise`/`continuous`/`none`）：westata
    固定 `k_fixef="nonnested"`，与 reghdfe 默认对齐；非默认口径未测。
 10. **`eivreg` 的 `vce(robust)`**：Stata `eivreg` 本身没有 `vce()` 选项（只有 `reliab()`），
-    故未测；westata 的 `Eivreg.fit(cov_type=...)` 存在但无可比对象。
+    故未测；westata 的 `ErrorsInVariablesRegress.fit(cov_type=...)` 存在但无可比对象。
 
 ## 附：本次复测暴露的、建议上游修复的四点（按严重度）
 
@@ -336,8 +336,8 @@ westata `FEOLS` 遇到这种情况抛 `ConsistencyError`（不给数字），行
    要么补齐，要么在 `IVGMM` 文档与代码里显式拒绝 `cov_type='cluster'`。
 2. **IV 的 `HC1` 文档标签错**（`iv.py:586/624`）→ 按文档选 HC1 会偏大 `sqrt(N/(N-K))`（34/40/46 号）。
    建议：把 `vce(robust)` 的默认映射改成 `HC0`，并把 `HC1` 标注为 `vce(robust) small`。
-3. **`OLS.e['df_r']` 在 cluster 下与 Stata 不同义**（存 N-K，Stata 存 G-1），
-   而 `OLS.e['F']` 不随 cov_type 变（5/9/14 号）。`results.df_resid` 与 p 值是对的，
+3. **`Regress.e['df_r']` 在 cluster 下与 Stata 不同义**（存 N-K，Stata 存 G-1），
+   而 `Regress.e['F']` 不随 cov_type 变（5/9/14 号）。`results.df_resid` 与 p 值是对的，
    所以这是"存错的 e() 标量"，最容易误导下游。
 4. **e() 覆盖度缺口**：`rss`/`mss`/`sum_w`/`N_clust`/`kappa`/`J`（52–56 号）。
    其中 `sum_w` 与 `N_clust` 成本最低、收益最直接。

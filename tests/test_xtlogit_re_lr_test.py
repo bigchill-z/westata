@@ -41,7 +41,7 @@ def _panel():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return ws.XtLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t").fit()
+    return ws.PanelLogit.from_formula("y ~ x1", _panel(), entity="sid", time="t").fit()
 
 
 def test_the_block_closes_with_the_rho_test(fitted) -> None:
@@ -85,7 +85,7 @@ def test_xtpoisson_keeps_its_alpha_wording() -> None:
         {"n": counts, "x1": x1, "sid": sid, "t": np.tile(np.arange(n_obs), n_grp)}
     )
     rendered = str(
-        ws.XtPoisson.from_formula("n ~ x1", frame, entity="sid", time="t").fit().summary(
+        ws.PanelPoisson.from_formula("n ~ x1", frame, entity="sid", time="t").fit().summary(
             style="stata"
         )
     )

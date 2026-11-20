@@ -40,7 +40,7 @@ for tag,(px,py,pz) in (("hetero",(a1,a2,yh)),("homo",(b1,b2,yhom))):
     print(f"  c/(0.25*sparsity^2) = {R[0,0]/(0.25*sp**2):.10f}   sqrt={np.sqrt(R[0,0]/(0.25*sp**2)):.10f}")
     print(f"  iid se={np.round(np.sqrt(np.diag(Vi)),10)}  rob se={np.round(np.sqrt(np.diag(V)),10)}")
     print(f"  n/(n-3)={n/(n-3):.10f}  ((n-3)/n)={((n-3)/n):.10f}")
-    q = ws.QuantileRegression.from_formula("y ~ "+"x1 + x2", df, quantile=.5)
+    q = ws.QuantileRegress.from_formula("y ~ "+"x1 + x2", df, quantile=.5)
     ri=q.fit(cov_type="iid"); rr=q.fit(cov_type="robust")
     order=[list(rr.param_names).index(k) for k in ("x1","x2","Intercept")]
     print(f"  westata rob se={np.round(np.asarray(rr.bse)[order],10)}"

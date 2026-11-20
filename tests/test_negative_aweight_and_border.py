@@ -45,7 +45,7 @@ def frame():
 
 @pytest.fixture(scope="module")
 def weighted(frame):
-    return ws.OLS.from_formula(
+    return ws.Regress.from_formula(
         "lntc ~ lnq + lnpl + lnpk + lnpf",
         frame,
         weights=1.0 / frame["lntc"],
@@ -91,7 +91,7 @@ def test_the_weight_sum_line_is_printed(weighted) -> None:
 def test_the_weight_sum_line_is_absent_for_fweight(frame) -> None:
     """Only aweight and pweight prepend it."""
 
-    fitted = ws.OLS.from_formula(
+    fitted = ws.Regress.from_formula(
         "lntc ~ lnq + lnpl",
         frame,
         weights=np.ones(len(frame)),
@@ -103,7 +103,7 @@ def test_the_weight_sum_line_is_absent_for_fweight(frame) -> None:
 def test_a_plain_regress_closes_its_table(frame) -> None:
     """Stata prints a full border under the last coefficient row."""
 
-    fitted = ws.OLS.from_formula("lntc ~ lnq + lnpl", frame).fit()
+    fitted = ws.Regress.from_formula("lntc ~ lnq + lnpl", frame).fit()
     lines = str(fitted.summary(style="stata")).splitlines()
     assert set(lines[-1]) == {"-"}
 
@@ -113,7 +113,7 @@ def test_a_panel_fit_does_not_gain_that_border(frame) -> None:
 
     panel = pd.read_stata(r"D:\myCodeProject\test_westata\data\munnell.dta")
     panel["sid"] = pd.Categorical(panel["st_abb"]).codes
-    fitted = ws.PanelOLS.from_formula(
+    fitted = ws.PanelRegressFE.from_formula(
         "y ~ k1 + C(year)", panel, entity="sid", time="year"
     ).fit()
     lines = str(fitted.summary(style="stata")).splitlines()

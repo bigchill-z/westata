@@ -122,7 +122,7 @@ from westata.results.base import StataResults
 from westata.estimators.least_squares import ols_coefficients
 from westata.results.serialisation import ResultSerialisation
 
-__all__ = ["XtGls", "XtIvreg", "XtPcse", "XtUnitroot", "PanelUnitRootResult",
+__all__ = ["PanelGls", "PanelIVRegress", "PanelPcse", "PanelUnitroot", "PanelUnitRootResults",
            "SingularSigmaWarning"]
 
 
@@ -495,7 +495,7 @@ _XTIVREG_TITLES = {
 
 
 # ------------------------------------------------------------------- xtivreg
-class XtIvreg:
+class PanelIVRegress:
     """Panel instrumental variables (Stata ``xtivreg``), ``fe`` and ``re``.
 
     ``fe`` (within 2SLS)
@@ -1046,7 +1046,7 @@ class XtIvreg:
 
 
 # --------------------------------------------------------------------- xtgls
-class XtGls:
+class PanelGls:
     """Panel GLS (Stata ``xtgls``) with a Kronecker error structure.
 
     ``[XT] xtgls`` Methods and formulas defines ``Omega = Sigma_{m x m} kron
@@ -1497,7 +1497,7 @@ def _prais_winsten(
 
 
 # -------------------------------------------------------------------- xtpcse
-class XtPcse:
+class PanelPcse:
     """Panel-corrected standard errors (Stata ``xtpcse``), Beck-Katz (1995).
 
     OLS point estimates with the panel-corrected VCE.  ``[XT] xtpcse`` Methods and
@@ -2016,7 +2016,7 @@ def _interpolate(table: dict[int, tuple[float, float]], key: float) -> tuple[flo
 
 
 @dataclass(frozen=True)
-class PanelUnitRootResult(ResultSerialisation):
+class PanelUnitRootResults(ResultSerialisation):
     """A panel unit-root statistic together with its p-value.
 
     Stata's ``xtunitroot`` stores these in ``r()``, not ``e()``: the command is an
@@ -2081,7 +2081,7 @@ class PanelUnitRootResult(ResultSerialisation):
         return payload
 
 
-class XtUnitroot:
+class PanelUnitroot:
     """Panel unit-root tests (Stata ``xtunitroot ips`` / ``xtunitroot llc``).
 
     Both are panel-wide Dickey-Fuller procedures, and both match Stata on the
@@ -2248,7 +2248,7 @@ class XtUnitroot:
         )
 
     # ------------------------------------------------------------------- fit
-    def fit(self) -> PanelUnitRootResult:
+    def fit(self) -> PanelUnitRootResults:
         """Run the requested test and return its statistics.
 
         This used to be ``fit(self, **_ignored: Any)``, which accepted ANY keyword and
@@ -2308,7 +2308,7 @@ class XtUnitroot:
             )
         return float(beta[0] / standard_error), math.sqrt(sigma2)
 
-    def _ips(self) -> PanelUnitRootResult:
+    def _ips(self) -> PanelUnitRootResults:
         """Im-Pesaran-Shin test with Stata's default zero ADF lags."""
 
         lags = 0 if self._lags is None else int(self._lags)
@@ -2343,7 +2343,7 @@ class XtUnitroot:
         t_bar = float(t_array.mean())
         t_tilde_bar = float(tilde_array.mean())
         z_tilde = math.sqrt(n_panels) * (t_tilde_bar - mu_tilde) / math.sqrt(var_tilde)
-        return PanelUnitRootResult(
+        return PanelUnitRootResults(
             statistic=float(z_tilde),
             pvalue=float(stats.norm.cdf(z_tilde)),
             test="ips",
@@ -2359,7 +2359,7 @@ class XtUnitroot:
             },
         )
 
-    def _llc(self) -> PanelUnitRootResult:
+    def _llc(self) -> PanelUnitRootResults:
         """Levin-Lin-Chu test with Stata's default one ADF lag."""
 
         lags = 1 if self._lags is None else int(self._lags)
@@ -2450,7 +2450,7 @@ class XtUnitroot:
         mu, sigma_adj = _interpolate(_LLC_ADJUST, float(self._sizes[0]))
         t_star = (t_delta - n_t * s_bar / var_ep * standard_error * mu) / sigma_adj
 
-        return PanelUnitRootResult(
+        return PanelUnitRootResults(
             statistic=float(t_star),
             pvalue=float(stats.norm.cdf(t_star)),
             test="llc",

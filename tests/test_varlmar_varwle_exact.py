@@ -71,7 +71,7 @@ def test_explicit_names_still_win(panel) -> None:
 
 
 def test_the_lm_table_matches_stata(var_fit) -> None:
-    rendered = str(ws.varlmar(var_fit)).splitlines()
+    rendered = str(ws.var_lmar(var_fit)).splitlines()
     table = [line for line in rendered if line.strip()]
     expected = [line for line in STATA_VARLMAR if line.strip()]
     for got, want in zip(table, expected):
@@ -81,7 +81,7 @@ def test_the_lm_table_matches_stata(var_fit) -> None:
 def test_the_lm_box_is_closed_at_the_top(var_fit) -> None:
     """Without the top border the box looks unclosed and every row sits one line early."""
 
-    rendered = str(ws.varlmar(var_fit))
+    rendered = str(ws.var_lmar(var_fit))
     assert "  +" + "-" * 38 + "+" in rendered
     lines = [line for line in rendered.splitlines() if line.strip()]
     # '' / title / top border / header / separator / rows / closing border / H0
@@ -91,7 +91,7 @@ def test_the_lm_box_is_closed_at_the_top(var_fit) -> None:
 
 
 def test_the_wald_table_matches_stata(var_fit) -> None:
-    rendered = str(ws.varwle(var_fit))
+    rendered = str(ws.var_wle(var_fit))
     assert "Equation: dinf" in rendered
     assert "Equation: unem" in rendered
     assert "72.72164" in rendered
@@ -100,12 +100,12 @@ def test_the_wald_table_matches_stata(var_fit) -> None:
 def test_the_wald_chi2_uses_seven_significant_figures(var_fit) -> None:
     """A fixed decimal count cannot produce both 72.72164 and 741.8916."""
 
-    rendered = str(ws.varwle(var_fit))
+    rendered = str(ws.var_wle(var_fit))
     assert "72.72164" in rendered, "five decimals"
     assert "741.8916" in rendered, "four decimals, same column"
     assert "741.89158" not in rendered
 
 
 def test_the_wald_table_has_twenty_one_lines(var_fit) -> None:
-    lines = [line for line in str(ws.varwle(var_fit)).splitlines() if line.strip()]
+    lines = [line for line in str(ws.var_wle(var_fit)).splitlines() if line.strip()]
     assert len(lines) == 21

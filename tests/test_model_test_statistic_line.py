@@ -46,7 +46,7 @@ def _panel_frame(n_units: int = 100, n_periods: int = 14, seed: int = 8000):
 
 @pytest.fixture(scope="module")
 def pcse_fit():
-    return ws.XtPcse.from_formula(
+    return ws.PanelPcse.from_formula(
         "y ~ x1", _panel_frame(), entity="firm", time="year"
     ).fit()
 
@@ -55,7 +55,7 @@ def pcse_fit():
 def ols_fit():
     rng = np.random.default_rng(8002)
     frame = pd.DataFrame({"y": rng.normal(size=250), "x": rng.normal(size=250)})
-    return ws.OLS.from_formula("y ~ x", frame).fit()
+    return ws.Regress.from_formula("y ~ x", frame).fit()
 
 
 # ------------------------------------------------------------- xtpcse / xtgls

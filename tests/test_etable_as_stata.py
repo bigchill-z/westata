@@ -69,8 +69,8 @@ def rendered():
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("cobb_douglas.dta is not available")
-    first = ws.OLS.from_formula("y ~ k", frame).fit()
-    second = ws.OLS.from_formula("y ~ k + l", frame).fit()
+    first = ws.Regress.from_formula("y ~ k", frame).fit()
+    second = ws.Regress.from_formula("y ~ k + l", frame).fit()
     return ws.etable_as_stata(
         [first, second],
         model_names=["m1", "m2"],
@@ -118,7 +118,7 @@ def test_the_dataframe_form_still_exists() -> None:
         frame = pd.read_stata(DATA, convert_categoricals=False)
     except FileNotFoundError:  # pragma: no cover
         pytest.skip("cobb_douglas.dta is not available")
-    first = ws.OLS.from_formula("y ~ k", frame).fit()
-    second = ws.OLS.from_formula("y ~ k + l", frame).fit()
+    first = ws.Regress.from_formula("y ~ k", frame).fit()
+    second = ws.Regress.from_formula("y ~ k + l", frame).fit()
     as_frame = ws.etable([first, second], model_names=["m1", "m2"])
     assert isinstance(as_frame, pd.DataFrame)

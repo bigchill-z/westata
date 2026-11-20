@@ -75,7 +75,7 @@ def auto() -> pd.DataFrame:
 def _fit(auto: pd.DataFrame, model: str):
     formula, columns = MODELS[model]
     frame = auto[list(columns)].dropna()
-    return ws.OLS.from_formula(formula, frame).fit()
+    return ws.Regress.from_formula(formula, frame).fit()
 
 
 def _double_cases(reference: dict):
@@ -109,7 +109,7 @@ def test_matches_stata_in_double_precision(case_id: str, reference, auto) -> Non
 
     model, precision, kind = case_id.split("|")
     expected = reference["cases"][case_id]
-    rendered = _fit(auto, model).estat_imtest(white=(kind == "white"))
+    rendered = _fit(auto, model).estat_information_matrix_test(white=(kind == "white"))
 
     checks = [
         ("chi2_h", rendered.heteroskedasticity),
@@ -158,7 +158,7 @@ def test_dof_is_the_rank_not_the_column_count(reference, auto) -> None:
     while the df, the p-value and therefore the verdict were wrong.
     """
 
-    result = _fit(auto, "W1").estat_imtest(white=True)
+    result = _fit(auto, "W1").estat_information_matrix_test(white=True)
     expected_df = reference["cases"]["W1|double|white"]["df"]
 
     assert expected_df == 4.0
@@ -174,7 +174,7 @@ def test_dof_is_the_rank_not_the_column_count(reference, auto) -> None:
 def test_dof_total_uses_the_reduced_rank(reference, auto) -> None:
     """``df_t`` is ``df_h + df_s + df_k`` with every term rank-based."""
 
-    result = _fit(auto, "W1").estat_imtest()
+    result = _fit(auto, "W1").estat_information_matrix_test()
     expected = reference["cases"]["W1|double|decomposition"]
 
     assert result.df_heteroskedasticity == expected["df_h"]
@@ -190,7 +190,7 @@ def test_continuous_only_model_keeps_the_nominal_dof(reference, auto) -> None:
     indicator model.
     """
 
-    result = _fit(auto, "W2").estat_imtest(white=True)
+    result = _fit(auto, "W2").estat_information_matrix_test(white=True)
     expected = reference["cases"]["W2|double|white"]
 
     assert expected["df"] == 9.0
@@ -209,7 +209,7 @@ def test_two_indicators_collapse_two_columns(auto) -> None:
     Confirms the rule is genuinely rank-driven.
     """
 
-    result = _fit(auto, "W5").estat_imtest(white=True)
+    result = _fit(auto, "W5").estat_information_matrix_test(white=True)
 
     k = 6
     nominal = 1 + k + k * (k + 1) // 2
@@ -238,7 +238,7 @@ def test_default_float_and_double_captures_differ_as_documented(reference) -> No
 def test_we_match_double_not_float(auto, reference) -> None:
     """Our value equals ``, double`` and differs from the float default."""
 
-    result = _fit(auto, "W1").estat_imtest(white=True)
+    result = _fit(auto, "W1").estat_information_matrix_test(white=True)
     double_chi2 = reference["cases"]["W1|double|white"]["chi2"]
     float_chi2 = reference["cases"]["W1|float|white"]["chi2"]
 
@@ -259,7 +259,7 @@ def test_heteroskedasticity_equals_whites_statistic(auto, reference) -> None:
         assert entry["chi2"] == pytest.approx(entry["chi2_h"], rel=1e-12), model
 
     for model in MODELS:
-        rendered = _fit(auto, model).estat_imtest(white=True)
+        rendered = _fit(auto, model).estat_information_matrix_test(white=True)
         assert rendered.heteroskedasticity == pytest.approx(
             rendered.white, rel=1e-9
         ), model
@@ -267,7 +267,7 @@ def test_heteroskedasticity_equals_whites_statistic(auto, reference) -> None:
 
 def test_total_is_the_sum_of_the_components(auto) -> None:
     for model in MODELS:
-        rendered = _fit(auto, model).estat_imtest()
+        rendered = _fit(auto, model).estat_information_matrix_test()
 
         assert rendered.total == pytest.approx(
             rendered.heteroskedasticity + rendered.skewness + rendered.kurtosis
@@ -286,7 +286,7 @@ def test_heteroskedastic_data_is_detected() -> None:
     y = 1.0 + 2.0 * x + rng.normal(scale=x * 0.4, size=n)
     frame = pd.DataFrame({"y": y, "x": x})
 
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().estat_imtest()
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().estat_information_matrix_test()
 
     p = float(stats.chi2.sf(rendered.heteroskedasticity, rendered.df_heteroskedasticity))
     assert p < 0.01
@@ -299,7 +299,7 @@ def test_homoskedastic_data_is_not_flagged() -> None:
     y = 1.0 + 2.0 * x + rng.normal(scale=0.4, size=n)
     frame = pd.DataFrame({"y": y, "x": x})
 
-    rendered = ws.OLS.from_formula("y ~ x", frame).fit().estat_imtest()
+    rendered = ws.Regress.from_formula("y ~ x", frame).fit().estat_information_matrix_test()
 
     p = float(stats.chi2.sf(rendered.heteroskedasticity, rendered.df_heteroskedasticity))
     assert p > 0.05
@@ -313,20 +313,20 @@ def test_logit_is_refused(auto) -> None:
     logit = ws.Logit.from_formula("domestic ~ weight", frame).fit()
 
     with pytest.raises(NotImplementedError, match="after regress"):
-        logit.estat_imtest()
+        logit.estat_information_matrix_test()
 
 
 def test_robust_vce_is_refused(auto) -> None:
     frame = auto[["mpg", "weight", "length"]].dropna()
-    robust = ws.OLS.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
+    robust = ws.Regress.from_formula("mpg ~ weight + length", frame).fit(cov_type="HC1")
 
     with pytest.raises(ValueError, match="weighted or clustered"):
-        robust.estat_imtest()
+        robust.estat_information_matrix_test()
 
 
 # ------------------------------------------------------------- presentation
 def test_to_dict_uses_stata_r_names(auto) -> None:
-    payload = _fit(auto, "W1").estat_imtest().to_dict()
+    payload = _fit(auto, "W1").estat_information_matrix_test().to_dict()
 
     assert set(payload) == {
         "chi2_h",
@@ -338,12 +338,12 @@ def test_to_dict_uses_stata_r_names(auto) -> None:
         "chi2_t",
         "df_t",
     }
-    with_white = _fit(auto, "W1").estat_imtest(white=True).to_dict()
+    with_white = _fit(auto, "W1").estat_information_matrix_test(white=True).to_dict()
     assert "chi2" in with_white and "df" in with_white
 
 
 def test_output_names_the_three_components(auto) -> None:
-    text = str(_fit(auto, "W1").estat_imtest())
+    text = str(_fit(auto, "W1").estat_information_matrix_test())
 
     assert "Cameron & Trivedi" in text
     for label in ("Heteroskedasticity", "Skewness", "Kurtosis", "Total"):
@@ -385,6 +385,6 @@ def test_output_layout_matches_stata(auto) -> None:
         "               Total |      18.81      7    0.0088",
         "-" * 50,
     ]
-    rendered = [line.rstrip() for line in str(_fit(auto, "W1").estat_imtest(white=True)).splitlines()]
+    rendered = [line.rstrip() for line in str(_fit(auto, "W1").estat_information_matrix_test(white=True)).splitlines()]
 
     assert rendered == expected

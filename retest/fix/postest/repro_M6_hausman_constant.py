@@ -112,10 +112,10 @@ def main() -> int:
                 f" ({quadratic_form(difference, difference_cov)[1]})"
             )
 
-        fe = ws.PanelOLS.from_formula(
+        fe = ws.PanelRegressFE.from_formula(
             "y ~ 1 + x1 + x2", frame, entity="id", time="year"
         ).fit(entity_effects=True)
-        re = ws.RandomEffects.from_formula(
+        re = ws.PanelRegressRE.from_formula(
             "y ~ 1 + x1 + x2", frame, entity="id", time="year"
         ).fit()
 

@@ -10,7 +10,7 @@ x1=rng.normal(size=n); x2=rng.normal(size=n)
 y=1.0+0.8*x1-0.4*x2+rng.normal(size=n)*(1+0.4*np.abs(x1))
 df=pd.DataFrame(dict(x1=x1,x2=x2,y=y))
 for tau in (0.25,0.5):
-    q=ws.QuantileRegression.from_formula("y ~ x1 + x2", df, quantile=tau)
+    q=ws.QuantileRegress.from_formula("y ~ x1 + x2", df, quantile=tau)
     rr=q.fit(cov_type="robust")
     sp=q._sparsity
     print("names", list(rr.param_names), " sparsity keys", list(sp.keys()))

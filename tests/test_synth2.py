@@ -16,7 +16,7 @@ import pytest
 
 import westata as ws
 from westata.errors import UnsupportedError
-from westata.estimators.synth2 import Synth2Result, synth2
+from westata.estimators.synth2 import Synth2Results, synth2
 
 UNITS = [1, 2, 3, 4, 5, 6]
 YEARS = list(range(2000, 2010))
@@ -56,12 +56,12 @@ def _base(panel, **kw):
 def test_the_package_exports_synth2() -> None:
     assert hasattr(ws, "synth2")
     assert callable(ws.synth2)
-    assert hasattr(ws, "Synth2Result")
+    assert hasattr(ws, "Synth2Results")
 
 
 def test_result_is_a_frozen_dataclass(panel) -> None:
     res = _base(panel)
-    assert isinstance(res, Synth2Result)
+    assert isinstance(res, Synth2Results)
     with pytest.raises(Exception):
         res.rmse = 0.0  # type: ignore[misc]
 

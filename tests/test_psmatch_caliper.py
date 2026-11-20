@@ -49,7 +49,7 @@ def data():
 
 
 def test_the_uncapped_estimate_matches_stata(data) -> None:
-    result = ws.teffects_psmatch(
+    result = ws.treatment_effects_psmatch(
         data["re78"], data["treat"], data[COVARIATES].to_numpy(float)
     )
     assert float(result.ate) == pytest.approx(2639.8646, abs=5e-4)
@@ -58,7 +58,7 @@ def test_the_uncapped_estimate_matches_stata(data) -> None:
 def test_a_loose_caliper_changes_nothing(data) -> None:
     """0.1 excludes no control on this sample, so the answer must be identical."""
 
-    capped = ws.teffects_psmatch(
+    capped = ws.treatment_effects_psmatch(
         data["re78"], data["treat"], data[COVARIATES].to_numpy(float), caliper=0.1
     )
     assert float(capped.ate) == pytest.approx(2639.8646, abs=5e-4)
@@ -73,11 +73,11 @@ def test_matches_stay_inside_the_caliper(data) -> None:
     tighter caliper can never exceed the uncapped ones.
     """
 
-    uncapped = ws.teffects_psmatch(
+    uncapped = ws.treatment_effects_psmatch(
         data["re78"], data["treat"], data[COVARIATES].to_numpy(float)
     )
     for limit in (0.05, 0.01, 1e-3):
-        capped = ws.teffects_psmatch(
+        capped = ws.treatment_effects_psmatch(
             data["re78"], data["treat"], data[COVARIATES].to_numpy(float), caliper=limit
         )
         assert capped.matches_max <= uncapped.matches_max
@@ -85,7 +85,7 @@ def test_matches_stay_inside_the_caliper(data) -> None:
 
 
 def test_the_caliper_is_reported(data) -> None:
-    uncapped = ws.teffects_psmatch(
+    uncapped = ws.treatment_effects_psmatch(
         data["re78"], data["treat"], data[COVARIATES].to_numpy(float)
     )
     assert np.isnan(float(uncapped.caliper))
@@ -94,7 +94,7 @@ def test_the_caliper_is_reported(data) -> None:
 def test_a_tight_but_feasible_caliper_only_removes_matches(data) -> None:
     """A caliper between 0 and 0.1 may drop some treated units but cannot add any."""
 
-    tight = ws.teffects_psmatch(
+    tight = ws.treatment_effects_psmatch(
         data["re78"], data["treat"], data[COVARIATES].to_numpy(float), caliper=0.05
     )
     assert tight.matches_min >= 1
@@ -108,7 +108,7 @@ STATA_BY_NNEIGHBOR = {1: 2639.8646, 2: 2491.8602, 3: 2397.636, 4: 2330.1077, 5: 
 def test_every_nneighbor_count_matches_stata(data, nneighbor: int) -> None:
     """nn(1) through nn(5), live StataNow on nsw_dw."""
 
-    result = ws.teffects_psmatch(
+    result = ws.treatment_effects_psmatch(
         data["re78"],
         data["treat"],
         data[COVARIATES].to_numpy(float),
@@ -127,14 +127,14 @@ def test_the_tolerance_does_not_merge_distinct_distances(data) -> None:
     matches where Stata uses three, which moved nn(3) from 2397.636 to 2412.8207.
     """
 
-    loose = ws.teffects_psmatch(
+    loose = ws.treatment_effects_psmatch(
         data["re78"],
         data["treat"],
         data[COVARIATES].to_numpy(float),
         nneighbor=3,
         tie_tolerance=1e-6,
     )
-    tight = ws.teffects_psmatch(
+    tight = ws.treatment_effects_psmatch(
         data["re78"],
         data["treat"],
         data[COVARIATES].to_numpy(float),

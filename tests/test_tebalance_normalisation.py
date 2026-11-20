@@ -87,7 +87,7 @@ def test_without_weights_the_two_columns_are_identical(data) -> None:
     """The current behaviour, pinned so a fix shows up as a change rather than passing silently."""
 
     covariates, treated = data
-    summary = ws.tebalance_summarize(treated, covariates, names=COVARIATES)
+    summary = ws.treatment_balance_summarize(treated, covariates, names=COVARIATES)
 
     rendered = str(summary)
     treated_rows = [line for line in rendered.splitlines() if "Treated obs" in line]
@@ -117,7 +117,7 @@ def test_the_ipw_convention_reproduces_stata(data) -> None:
         np.zeros(treated.size), treated, covariates, estimand="atet"
     ).fit()
 
-    summary = ws.tebalance_summarize(
+    summary = ws.treatment_balance_summarize(
         treated,
         covariates,
         match_weights=result.weights,
@@ -144,7 +144,7 @@ def test_the_matching_convention_is_unchanged_by_the_new_flag(data) -> None:
     """
 
     covariates, treated = data
-    plain = ws.tebalance_summarize(treated, covariates, names=COVARIATES)
+    plain = ws.treatment_balance_summarize(treated, covariates, names=COVARIATES)
     # No weights at all: the two columns coincide and the counts are the raw group sizes.
     assert plain.treated_matched == plain.treated_raw
     assert plain.control_matched == plain.control_raw

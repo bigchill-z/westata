@@ -80,7 +80,7 @@ def test_varstable_is_internally_consistent(fitted) -> None:
     expected = sorted(np.abs(np.linalg.eigvals(companion)), reverse=True)
 
     # The table drops the leading zero, as Stata does, so compare against that spelling.
-    rendered = str(ws.varstable(fitted))
+    rendered = str(ws.var_stable(fitted))
     for value in expected:
         text_value = f"{value:.6g}"
         if text_value.startswith("0."):
@@ -91,5 +91,5 @@ def test_varstable_is_internally_consistent(fitted) -> None:
 def test_all_moduli_are_inside_the_unit_circle(fitted) -> None:
     """macro_swatson's VAR(2) is stable, and the verdict line says so."""
 
-    rendered = str(ws.varstable(fitted))
+    rendered = str(ws.var_stable(fitted))
     assert "inside the unit circle" in rendered

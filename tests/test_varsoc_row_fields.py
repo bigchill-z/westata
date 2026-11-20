@@ -41,7 +41,7 @@ def rows():
             }
         )
         out[n] = [
-            line for line in str(ws.varsoc(frame, maxlag=4)).splitlines() if line.startswith("  |")
+            line for line in str(ws.var_select_order(frame, maxlag=4)).splitlines() if line.startswith("  |")
         ]
     return out
 

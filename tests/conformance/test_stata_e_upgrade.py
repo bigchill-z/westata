@@ -103,8 +103,8 @@ STATA_XTLOGIT_PA = {
 
 
 def test_xtprobit_re_matches_stata():
-    XtProbit = _require("XtProbit")
-    result = XtProbit.from_formula(
+    PanelProbit = _require("PanelProbit")
+    result = PanelProbit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="re"
     ).fit()
 
@@ -113,8 +113,8 @@ def test_xtprobit_re_matches_stata():
 
 
 def test_xttobit_matches_stata():
-    XtTobit = _require("XtTobit")
-    result = XtTobit.from_formula(
+    PanelTobit = _require("PanelTobit")
+    result = PanelTobit.from_formula(
         "y ~ x1", censored_panel(), entity="firm", lower=0.5
     ).fit()
 
@@ -126,8 +126,8 @@ def test_xttobit_matches_stata():
 
 
 def test_xtpoisson_re_matches_stata():
-    XtPoisson = _require("XtPoisson")
-    result = XtPoisson.from_formula(
+    PanelPoisson = _require("PanelPoisson")
+    result = PanelPoisson.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="re"
     ).fit()
 
@@ -138,8 +138,8 @@ def test_xtpoisson_re_matches_stata():
 
 
 def test_xtnbreg_fe_matches_stata():
-    XtNbreg = _require("XtNbreg")
-    result = XtNbreg.from_formula(
+    PanelNbRegress = _require("PanelNbRegress")
+    result = PanelNbRegress.from_formula(
         "y ~ x1", count_panel(), entity="firm", method="fe"
     ).fit()
 
@@ -155,8 +155,8 @@ def test_xtlogit_pa_matches_stata():
     """GEE: a quasi-likelihood, so e(ll) is absent by design but the coefficients
     are estimable and now verified."""
 
-    XtLogit = _require("XtLogit")
-    result = XtLogit.from_formula(
+    PanelLogit = _require("PanelLogit")
+    result = PanelLogit.from_formula(
         "y ~ x1 + x2", binary_panel(), entity="firm", method="pa"
     ).fit()
 

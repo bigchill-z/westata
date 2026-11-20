@@ -66,7 +66,7 @@ def _slope_positions(result, capture):
 def _assert_matches(name: str, formula: str, cov_type: str, cov_kwds=None):
     capture = _load(name)
     frame = panel_frame()
-    result = ws.FEOLS.from_formula(formula, frame).fit(
+    result = ws.RegressHighDimFixedEffects.from_formula(formula, frame).fit(
         cov_type=cov_type, cov_kwds=cov_kwds
     )
     westata_positions, stata_positions = _slope_positions(result, capture)

@@ -60,7 +60,7 @@ def test_the_extension_recheck_records_the_honest_gaps() -> None:
     section = text.split("3.6.2 扩展项 X01 / X05 实测复核", 1)[1].split("### 3.7", 1)[0]
     assert "e(beta)" in section
     assert "e(sample)" in section
-    assert "varstable" in section
+    assert "var_stable" in section
     # Round 156 closed the two structural gaps; the entry must say so rather than still
     # describing them as missing.
     assert "第 156 轮补齐结构缺口" in section
@@ -75,7 +75,7 @@ def test_the_three_terminal_states_are_recorded() -> None:
     text = REGISTER.read_text(encoding="utf-8")
     assert "3.6.3 剩余缺口的三种终结状态" in text
     section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
-    for item in ("二进制 Mata", "本环境无参照", "rddensity", "xtserial", "dfgls", "rcm", "rdrobust"):
+    for item in ("二进制 Mata", "本环境无参照", "rddensity", "panel_serial", "df_gls", "rcm", "rd_robust"):
         assert item in section, item
     assert "反编译" in section
 
@@ -108,7 +108,7 @@ def test_dfgls_is_no_longer_filed_under_the_mata_core_class() -> None:
     section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
     class_a = [line for line in section.splitlines() if line.startswith("| **A.")]
     assert class_a, "class A row missing"
-    assert "dfgls" not in class_a[0], "dfgls must not be listed as a binary-Mata item"
+    assert "df_gls" not in class_a[0], "dfgls must not be listed as a binary-Mata item"
     assert "默认选项写反" in section
     assert "不要把" in section and "直接归入 A 类" in section
 
@@ -120,7 +120,7 @@ def test_dfgls_left_the_class_c_list_after_round_154() -> None:
     section = text.split("3.6.3 剩余缺口的三种终结状态", 1)[1].split("### 3.7", 1)[0]
     class_c = [line for line in section.splitlines() if line.startswith("| **C.")]
     assert class_c, "class C row missing"
-    assert "dfgls" not in class_c[0], "dfgls critical columns are implemented now"
+    assert "df_gls" not in class_c[0], "dfgls critical columns are implemented now"
     assert "已于第 154 轮完全移出本表" in section
     # And the register's own row must not still advertise the columns as missing.
     assert "1%/5%/10% 临界值列未实现" not in text

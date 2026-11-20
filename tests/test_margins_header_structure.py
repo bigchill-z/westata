@@ -65,7 +65,7 @@ def test_the_count_is_right_aligned() -> None:
     """Two data sizes put 'Number' at different columns while both lines end at 78."""
 
     frame = pd.read_stata(COBB)
-    fit = ws.OLS.from_formula("y ~ k + l", frame).fit()
+    fit = ws.Regress.from_formula("y ~ k + l", frame).fit()
     small_line = str(ws.margins(fit, dydx="*")).splitlines()[1]
     assert len(small_line) == 78
     assert "Number of obs = " in small_line
@@ -84,6 +84,6 @@ def test_a_large_estimate_keeps_six_decimals() -> None:
     """Stata prints 1.227637 for the cobb-douglas upper bound; the suite held 1.2276366."""
 
     frame = pd.read_stata(COBB)
-    rendered = str(ws.margins(ws.OLS.from_formula("y ~ k + l", frame).fit(), dydx="*"))
+    rendered = str(ws.margins(ws.Regress.from_formula("y ~ k + l", frame).fit(), dydx="*"))
     assert "1.227637" in rendered
     assert "1.2276366" not in rendered

@@ -52,7 +52,7 @@ def frame():
 
 @pytest.mark.parametrize(
     "klass, expected",
-    [(ws.PanelOLS, FE), (ws.RandomEffects, RE)],
+    [(ws.PanelRegressFE, FE), (ws.PanelRegressRE, RE)],
     ids=["fe", "re"],
 )
 def test_the_variance_components_are_exact(frame, klass, expected) -> None:
@@ -69,14 +69,14 @@ def test_fe_and_re_share_sigma_e(frame) -> None:
     A regression here would mean one of the two is being computed from the wrong residual.
     """
 
-    fe = ws.PanelOLS.from_formula(FORMULA, frame, entity="sid", time="year").fit()
-    re = ws.RandomEffects.from_formula(FORMULA, frame, entity="sid", time="year").fit()
+    fe = ws.PanelRegressFE.from_formula(FORMULA, frame, entity="sid", time="year").fit()
+    re = ws.PanelRegressRE.from_formula(FORMULA, frame, entity="sid", time="year").fit()
     assert float(fe.e["sigma_e"]) == pytest.approx(float(re.e["sigma_e"]), abs=1e-12)
 
 
 def test_the_between_estimator_stores_none_of_them(frame) -> None:
     """`xtreg, be` prints "." for all three; the package must not invent values."""
 
-    fitted = ws.BetweenOLS.from_formula(FORMULA, frame, entity="sid", time="year").fit()
+    fitted = ws.PanelRegressBE.from_formula(FORMULA, frame, entity="sid", time="year").fit()
     for name in ("sigma_u", "sigma_e", "rho"):
         assert name not in fitted.e or not np.isfinite(float(fitted.e[name]))

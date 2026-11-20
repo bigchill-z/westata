@@ -64,7 +64,7 @@ from westata.postestimation.names import is_constant_name, require_iv_structure
 #: eleven modules with four subtly different spellings, one of which could never match.
 _is_constant = is_constant_name
 
-__all__ = ["EndogenousResult", "estat_endogenous"]
+__all__ = ["EndogenousResults", "estat_endogenous"]
 
 
 
@@ -81,7 +81,7 @@ def _six_g(value: float) -> str:
     return text
 
 
-class EndogenousResult:
+class EndogenousResults:
     """Durbin and Wu endogeneity tests.
 
     Attributes
@@ -132,7 +132,7 @@ class EndogenousResult:
 
     def __repr__(self) -> str:
         return (
-            f"<EndogenousResult durbin chi2({self.wu_df:g})={self.durbin:.4f} "
+            f"<EndogenousResults durbin chi2({self.wu_df:g})={self.durbin:.4f} "
             f"p={self.durbin_pvalue:.4f}>"
         )
 
@@ -398,7 +398,7 @@ def estat_endogenous(
         wu = float("nan")
         wu_p = float("nan")
 
-    return EndogenousResult(
+    return EndogenousResults(
         durbin=durbin,
         durbin_pvalue=float(stats.chi2.sf(durbin, df)),
         wu=wu,

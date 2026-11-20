@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.38 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.40 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -11,15 +11,15 @@ _westata 版本: 0.3.38 · 生成脚本 `docs/render_api_reference.py`_
 ## 目录
 
 - **稳健标准误** — [Stata `robust` 与 `HC0`/`HC1` 的对应关系](#稳健标准误stata-的-robust-与-hc0hc1-的对应关系)
-- **线性模型与工具变量** — [`OLS`](#ols), [`FEOLS`](#feols), [`PanelOLS`](#panelols), [`RandomEffects`](#randomeffects), [`BetweenOLS`](#betweenols), [`FirstDifferenceOLS`](#firstdifferenceols), [`IV2SLS`](#iv2sls), [`IVLIML`](#ivliml), [`IVGMM`](#ivgmm), [`XtIvreg`](#xtivreg), [`XtGls`](#xtgls), [`XtPcse`](#xtpcse), [`XtAbond`](#xtabond), [`Eivreg`](#eivreg), [`Sureg`](#sureg), [`Mvreg`](#mvreg), [`RobustRegression`](#robustregression), [`QuantileRegression`](#quantileregression), [`Bsqreg`](#bsqreg), [`Sqreg`](#sqreg), [`NeweyWestResult`](#neweywestresult), [`Nl`](#nl)
-- **离散选择、计数与受限因变量** — [`Logit`](#logit), [`Probit`](#probit), [`OrderedLogit`](#orderedlogit), [`OrderedProbit`](#orderedprobit), [`Poisson`](#poisson), [`NegativeBinomial`](#negativebinomial), [`NegativeBinomialNB1`](#negativebinomialnb1), [`ZeroInflatedPoisson`](#zeroinflatedpoisson), [`ZeroInflatedNegativeBinomial`](#zeroinflatednegativebinomial), [`TruncatedPoisson`](#truncatedpoisson), [`TruncatedNegativeBinomial`](#truncatednegativebinomial), [`Tobit`](#tobit), [`Truncreg`](#truncreg), [`Intreg`](#intreg), [`Heckman`](#heckman), [`Etregress`](#etregress), [`Frontier`](#frontier), [`XtLogit`](#xtlogit), [`XtProbit`](#xtprobit), [`XtPoisson`](#xtpoisson), [`XtNbreg`](#xtnbreg), [`XtTobit`](#xttobit)
-- **时间序列、多元与面板单位根** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`XtUnitroot`](#xtunitroot), [`IpsResult`](#ipsresult), [`LlcResult`](#llcresult), [`UnitRootResult`](#unitrootresult), [`Manova`](#manova), [`ManovaResult`](#manovaresult)
-- **处理效应与调查数据** — [`Didregress`](#didregress), [`Xtdidregress`](#xtdidregress), [`TreatmentEffectResult`](#treatmenteffectresult), [`IPW`](#ipw), [`AIPW`](#aipw), [`NearestNeighbourMatching`](#nearestneighbourmatching), [`RegressionAdjustment`](#regressionadjustment), [`SurveyDesign`](#surveydesign), [`SvyMean`](#svymean), [`SvyTotal`](#svytotal), [`SvyProportion`](#svyproportion), [`SvyRegress`](#svyregress), [`SvyLogit`](#svylogit)
+- **线性模型与工具变量** — [`Regress`](#regress), [`RegressHighDimFixedEffects`](#regresshighdimfixedeffects), [`PanelRegressFE`](#panelregressfe), [`PanelRegressRE`](#panelregressre), [`PanelRegressBE`](#panelregressbe), [`PanelRegressFD`](#panelregressfd), [`IV2SLS`](#iv2sls), [`IVLIML`](#ivliml), [`IVGMM`](#ivgmm), [`PanelIVRegress`](#panelivregress), [`PanelGls`](#panelgls), [`PanelPcse`](#panelpcse), [`PanelAbond`](#panelabond), [`ErrorsInVariablesRegress`](#errorsinvariablesregress), [`SeeminglyUnrelatedRegress`](#seeminglyunrelatedregress), [`MultivariateRegress`](#multivariateregress), [`RobustRegress`](#robustregress), [`QuantileRegress`](#quantileregress), [`BootstrappedQuantileRegress`](#bootstrappedquantileregress), [`SimultaneousQuantileRegress`](#simultaneousquantileregress), [`NeweyWestResults`](#neweywestresults), [`Nl`](#nl)
+- **离散选择、计数与受限因变量** — [`Logit`](#logit), [`Probit`](#probit), [`OrderedLogit`](#orderedlogit), [`OrderedProbit`](#orderedprobit), [`Poisson`](#poisson), [`NegativeBinomial`](#negativebinomial), [`NegativeBinomialNB1`](#negativebinomialnb1), [`ZeroInflatedPoisson`](#zeroinflatedpoisson), [`ZeroInflatedNegativeBinomial`](#zeroinflatednegativebinomial), [`TruncatedPoisson`](#truncatedpoisson), [`TruncatedNegativeBinomial`](#truncatednegativebinomial), [`Tobit`](#tobit), [`TruncatedRegress`](#truncatedregress), [`IntervalRegress`](#intervalregress), [`Heckman`](#heckman), [`EndogenousTreatmentRegress`](#endogenoustreatmentregress), [`Frontier`](#frontier), [`PanelLogit`](#panellogit), [`PanelProbit`](#panelprobit), [`PanelPoisson`](#panelpoisson), [`PanelNbRegress`](#panelnbregress), [`PanelTobit`](#paneltobit)
+- **时间序列、多元与面板单位根** — [`ARIMA`](#arima), [`GARCH`](#garch), [`VAR`](#var), [`VECM`](#vecm), [`PanelUnitroot`](#panelunitroot), [`IpsResults`](#ipsresults), [`LlcResults`](#llcresults), [`UnitRootResults`](#unitrootresults), [`Manova`](#manova), [`ManovaResults`](#manovaresults)
+- **处理效应与调查数据** — [`DIDRegress`](#didregress), [`PanelDIDRegress`](#paneldidregress), [`TreatmentEffectResults`](#treatmenteffectresults), [`IPW`](#ipw), [`AIPW`](#aipw), [`NearestNeighbourMatching`](#nearestneighbourmatching), [`RegressionAdjustment`](#regressionadjustment), [`SurveyDesign`](#surveydesign), [`SurveyMean`](#surveymean), [`SurveyTotal`](#surveytotal), [`SurveyProportion`](#surveyproportion), [`SurveyRegress`](#surveyregress), [`SurveyLogit`](#surveylogit)
 - **重抽样** — [`Bootstrap`](#bootstrap), [`Jackknife`](#jackknife), [`Permute`](#permute)
-- **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pwcompare`](#pwcompare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_firststage`](#estat_firststage), [`estat_gof`](#estat_gof), [`estat_hettest`](#estat_hettest), [`estat_ic`](#estat_ic), [`estat_imtest`](#estat_imtest), [`estat_overid`](#estat_overid), [`estat_ovtest`](#estat_ovtest), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_esize`](#estat_esize), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weakrobust`](#estat_weakrobust), [`linktest`](#linktest), [`suest`](#suest), [`newey`](#newey), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_corrgram`](#estat_corrgram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
+- **后估计函数** — [`testnl`](#testnl), [`lrtest`](#lrtest), [`hausman`](#hausman), [`contrast`](#contrast), [`pairwise_compare`](#pairwise_compare), [`nlcom`](#nlcom), [`margins`](#margins), [`estat_classification`](#estat_classification), [`estat_endogenous`](#estat_endogenous), [`estat_first_stage`](#estat_first_stage), [`estat_gof`](#estat_gof), [`estat_heteroskedasticity_test`](#estat_heteroskedasticity_test), [`estat_ic`](#estat_ic), [`estat_information_matrix_test`](#estat_information_matrix_test), [`estat_overidentification`](#estat_overidentification), [`estat_omitted_variables_test`](#estat_omitted_variables_test), [`estat_summarize`](#estat_summarize), [`estat_vce`](#estat_vce), [`estat_vif`](#estat_vif), [`estat_auc`](#estat_auc), [`estat_effect_size`](#estat_effect_size), [`estat_moran`](#estat_moran), [`estat_mundlak`](#estat_mundlak), [`estat_szroeter`](#estat_szroeter), [`estat_weak_instrument_robust`](#estat_weak_instrument_robust), [`linktest`](#linktest), [`suest`](#suest), [`newey_west`](#newey_west), [`unitroot`](#unitroot), [`levin_lin_chu`](#levin_lin_chu), [`im_pesaran_shin`](#im_pesaran_shin), [`check_time_spacing`](#check_time_spacing), [`parse_exp_list`](#parse_exp_list), [`normalize_weights`](#normalize_weights), [`ereturn_list`](#ereturn_list), [`estat_bgodfrey`](#estat_bgodfrey), [`estat_correlogram`](#estat_correlogram), [`estat_dwatson`](#estat_dwatson), [`f_test`](#f_test), [`first_stage`](#first_stage), [`get_influence`](#get_influence), [`t_test`](#t_test), [`wntestq`](#wntestq)
 - **已拟合结果对象** — [`StataResults`](#stataresults), [`params`](#params), [`bse`](#bse), [`pvalues`](#pvalues), [`tvalues`](#tvalues), [`zvalues`](#zvalues), [`fvalue`](#fvalue), [`llf`](#llf), [`aic`](#aic), [`bic`](#bic), [`nobs`](#nobs), [`df_model`](#df_model), [`df_resid`](#df_resid), [`dist`](#dist), [`model_name`](#model_name), [`cov_type`](#cov_type), [`cov`](#cov), [`e`](#e), [`fittedvalues`](#fittedvalues), [`resid`](#resid), [`rsquared`](#rsquared), [`rsquared_adj`](#rsquared_adj), [`model_data`](#model_data), [`converged`](#converged), [`iterations`](#iterations), [`grad_norm`](#grad_norm), [`param_names`](#param_names), [`test`](#test), [`lincom`](#lincom), [`predict`](#predict), [`summary`](#summary), [`wald_test`](#wald_test), [`cov_params`](#cov_params), [`conf_int`](#conf_int), [`fitted_series`](#fitted_series), [`level`](#level), [`model`](#model), [`odds_ratios`](#odds_ratios), [`resid_series`](#resid_series), [`response_name`](#response_name), [`stata_cov_params`](#stata_cov_params), [`stata_factor_terms`](#stata_factor_terms), [`stata_param_names`](#stata_param_names), [`stata_params`](#stata_params)
-- **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResult`](#lincomresult), [`IcResult`](#icresult), [`VifResult`](#vifresult), [`MarginsResult`](#marginsresult), [`GofResult`](#gofresult), [`ClassificationResult`](#classificationresult), [`HetTestResult`](#hettestresult), [`ImTestResult`](#imtestresult), [`OvTestResult`](#ovtestresult), [`EndogenousResult`](#endogenousresult), [`FirstStageResult`](#firststageresult), [`OverIdResult`](#overidresult), [`LRTestResult`](#lrtestresult), [`HausmanResult`](#hausmanresult)
-- **其他名称** — [`Areg`](#areg), [`AucResult`](#aucresult), [`BgTestResult`](#bgtestresult), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResult`](#dfglsresult), [`DurbinWatsonResult`](#durbinwatsonresult), [`EReturn`](#ereturn), [`EffectSizeResult`](#effectsizeresult), [`EndogScoreResult`](#endogscoreresult), [`IRF_GRAPH_STATISTICS`](#irf_graph_statistics), [`IRF_STATISTICS`](#irf_statistics), [`ImpulseResponse`](#impulseresponse), [`IrFTable`](#irftable), [`IrfResult`](#irfresult), [`IrfSeries`](#irfseries), [`JohansenResult`](#johansenresult), [`KpssResult`](#kpssresult), [`LfitResult`](#lfitresult), [`LinkTestResult`](#linktestresult), [`LmarResult`](#lmarresult), [`MTEST_METHODS`](#mtest_methods), [`MTestResult`](#mtestresult), [`MarginsTable`](#marginstable), [`MoranResult`](#moranresult), [`MultinomialLogit`](#multinomiallogit), [`MundlakResult`](#mundlakresult), [`Newey`](#newey), [`NnmatchResult`](#nnmatchresult), [`PanelUnitRootResult`](#panelunitrootresult), [`PortmanteauResult`](#portmanteauresult), [`Prais`](#prais), [`PraisResult`](#praisresult), [`PsmatchResult`](#psmatchresult), [`PwCompareTable`](#pwcomparetable), [`RandomEffectsMLE`](#randomeffectsmle), [`Rcm`](#rcm), [`RcmResult`](#rcmresult), [`RdRobustResult`](#rdrobustresult), [`Rdrobust`](#rdrobust), [`RegFResult`](#regfresult), [`SUPPORTED_TYPES`](#supported_types), [`SucestResult`](#sucestresult), [`SummarizeResult`](#summarizeresult), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Result`](#synth2result), [`SynthResult`](#synthresult), [`SzroeterResult`](#szroeterresult), [`SzroeterTable`](#szroetertable), [`TefectsRaResult`](#tefectsraresult), [`TeffectsNnmatch`](#teffectsnnmatch), [`TeffectsPsmatch`](#teffectspsmatch), [`TeffectsRa`](#teffectsra), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarGrangerResult`](#vargrangerresult), [`VarSocResult`](#varsocresult), [`VarStableResult`](#varstableresult), [`VarWleResult`](#varwleresult), [`Varbasic`](#varbasic), [`VecRankResult`](#vecrankresult), [`VecStableResult`](#vecstableresult), [`WeakRobustResult`](#weakrobustresult), [`XtDesResult`](#xtdesresult), [`XtOveridResult`](#xtoveridresult), [`XtSerialResult`](#xtserialresult), [`XtSetResult`](#xtsetresult), [`XtSumResult`](#xtsumresult), [`XtTest0Result`](#xttest0result), [`adjust_pvalues`](#adjust_pvalues), [`dfgls`](#dfgls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_ptrends`](#estat_ptrends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`irf_cgraph`](#irf_cgraph), [`irf_graph`](#irf_graph), [`irf_ograph`](#irf_ograph), [`irf_series`](#irf_series), [`irf_table`](#irf_table), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`panel_description`](#panel_description), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rdrobust`](#rdrobust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`tebalance_summarize`](#tebalance_summarize), [`teffects_nnmatch`](#teffects_nnmatch), [`teffects_psmatch`](#teffects_psmatch), [`teffects_ra`](#teffects_ra), [`test_as_stata`](#test_as_stata), [`varbasic`](#varbasic), [`vargranger`](#vargranger), [`varlmar`](#varlmar), [`varsoc`](#varsoc), [`varstable`](#varstable), [`varwle`](#varwle), [`veclmar`](#veclmar), [`vecrank`](#vecrank), [`vecstable`](#vecstable), [`xtdes`](#xtdes), [`xtoverid`](#xtoverid), [`xtserial`](#xtserial), [`xtset`](#xtset), [`xtsum`](#xtsum), [`xttest0`](#xttest0)
+- **错误与支撑类型** — [`WestataError`](#westataerror), [`ConsistencyError`](#consistencyerror), [`ConvergenceError`](#convergenceerror), [`FormulaError`](#formulaerror), [`UnsupportedError`](#unsupportederror), [`WeightError`](#weighterror), [`ExpListError`](#explisterror), [`PackageNotFoundError`](#packagenotfounderror), [`StoredResults`](#storedresults), [`WeightSpec`](#weightspec), [`WEIGHT_TYPES`](#weight_types), [`SSC`](#ssc), [`VceMatrix`](#vcematrix), [`ParsedExpressionList`](#parsedexpressionlist), [`WaldTest`](#waldtest), [`LincomResults`](#lincomresults), [`IcResults`](#icresults), [`VifResults`](#vifresults), [`MarginsResults`](#marginsresults), [`GofResults`](#gofresults), [`ClassificationResults`](#classificationresults), [`HetTestResults`](#hettestresults), [`ImTestResults`](#imtestresults), [`OvTestResults`](#ovtestresults), [`EndogenousResults`](#endogenousresults), [`FirstStageResults`](#firststageresults), [`OverIdResults`](#overidresults), [`LRTestResults`](#lrtestresults), [`HausmanResults`](#hausmanresults)
+- **其他名称** — [`Areg`](#areg), [`AucResults`](#aucresults), [`BgTestResults`](#bgtestresults), [`ContrastResult`](#contrastresult), [`ContrastResults`](#contrastresults), [`Correlogram`](#correlogram), [`DFGLSResults`](#dfglsresults), [`DurbinWatsonResults`](#durbinwatsonresults), [`EReturn`](#ereturn), [`EffectSizeResults`](#effectsizeresults), [`EndogScoreResults`](#endogscoreresults), [`IRF_GRAPH_STATISTICS`](#irf_graph_statistics), [`IRF_STATISTICS`](#irf_statistics), [`ImpulseResponse`](#impulseresponse), [`IrfResults`](#irfresults), [`IrfSeries`](#irfseries), [`IrfTable`](#irftable), [`JohansenResults`](#johansenresults), [`KpssResults`](#kpssresults), [`LfitResults`](#lfitresults), [`LinkTestResults`](#linktestresults), [`LmarResults`](#lmarresults), [`MTEST_METHODS`](#mtest_methods), [`MTestResults`](#mtestresults), [`MarginsTable`](#marginstable), [`MoranResults`](#moranresults), [`MultinomialLogit`](#multinomiallogit), [`MundlakResults`](#mundlakresults), [`Newey`](#newey), [`NnmatchResults`](#nnmatchresults), [`PanelDesResults`](#paneldesresults), [`PanelOveridResults`](#paneloveridresults), [`PanelRegressMLE`](#panelregressmle), [`PanelSerialResults`](#panelserialresults), [`PanelSetResults`](#panelsetresults), [`PanelSumResults`](#panelsumresults), [`PanelTest0Results`](#paneltest0results), [`PanelUnitRootResults`](#panelunitrootresults), [`PortmanteauResults`](#portmanteauresults), [`Prais`](#prais), [`PraisResults`](#praisresults), [`PsmatchResults`](#psmatchresults), [`PwCompareTable`](#pwcomparetable), [`RDRobust`](#rdrobust), [`RcmResults`](#rcmresults), [`RdRobustResults`](#rdrobustresults), [`RegFResults`](#regfresults), [`RegressionControlMethod`](#regressioncontrolmethod), [`SUPPORTED_TYPES`](#supported_types), [`SuestResults`](#suestresults), [`SummarizeResults`](#summarizeresults), [`SummarizeTable`](#summarizetable), [`Synth`](#synth), [`Synth2`](#synth2), [`Synth2Results`](#synth2results), [`SynthResults`](#synthresults), [`SzroeterResults`](#szroeterresults), [`SzroeterTable`](#szroetertable), [`TreatmentEffectsNnmatch`](#treatmenteffectsnnmatch), [`TreatmentEffectsPsmatch`](#treatmenteffectspsmatch), [`TreatmentEffectsRa`](#treatmenteffectsra), [`TreatmentEffectsRaResults`](#treatmenteffectsraresults), [`VARResults`](#varresults), [`VECMResults`](#vecmresults), [`VarBasic`](#varbasic), [`VarGrangerResults`](#vargrangerresults), [`VarSocResults`](#varsocresults), [`VarStableResults`](#varstableresults), [`VarWleResults`](#varwleresults), [`VecRankResults`](#vecrankresults), [`VecStableResults`](#vecstableresults), [`WeakRobustResults`](#weakrobustresults), [`adjust_pvalues`](#adjust_pvalues), [`df_gls`](#df_gls), [`dfuller`](#dfuller), [`endog_regf_test`](#endog_regf_test), [`endog_score_test`](#endog_score_test), [`estat_parallel_trends`](#estat_parallel_trends), [`etable_as_stata`](#etable_as_stata), [`format_ereturn_list`](#format_ereturn_list), [`irf_cgraph`](#irf_cgraph), [`irf_graph`](#irf_graph), [`irf_ograph`](#irf_ograph), [`irf_series`](#irf_series), [`irf_table`](#irf_table), [`kpss`](#kpss), [`lincom_as_stata`](#lincom_as_stata), [`panel_describe`](#panel_describe), [`panel_description`](#panel_description), [`panel_overid`](#panel_overid), [`panel_serial`](#panel_serial), [`panel_set`](#panel_set), [`panel_summarize`](#panel_summarize), [`panel_test0`](#panel_test0), [`pperron`](#pperron), [`prais`](#prais), [`prais_winsten`](#prais_winsten), [`rcm`](#rcm), [`rd_robust`](#rd_robust), [`relabel_cov_type`](#relabel_cov_type), [`render_estimates_table`](#render_estimates_table), [`render_esttab`](#render_esttab), [`summarize`](#summarize), [`supported_types`](#supported_types), [`synth`](#synth), [`synth2`](#synth2), [`test_as_stata`](#test_as_stata), [`treatment_balance_summarize`](#treatment_balance_summarize), [`treatment_effects_nnmatch`](#treatment_effects_nnmatch), [`treatment_effects_psmatch`](#treatment_effects_psmatch), [`treatment_effects_ra`](#treatment_effects_ra), [`var_granger`](#var_granger), [`var_lmar`](#var_lmar), [`var_select_order`](#var_select_order), [`var_stable`](#var_stable), [`var_wle`](#var_wle), [`varbasic`](#varbasic), [`vec_lmar`](#vec_lmar), [`vec_rank`](#vec_rank), [`vec_stable`](#vec_stable)
 
 ## 稳健标准误：Stata 的 `robust` 与 `HC0`/`HC1` 的对应关系
 
@@ -95,7 +95,7 @@ ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", df).fit(
 
 ## 线性模型与工具变量
 
-### `OLS`
+### `Regress`
 
 **Stata 指令:** `regress y x1 x2`
 
@@ -104,19 +104,19 @@ ws.IV2SLS.from_formula("lnw ~ expr + [s ~ rns + mrt]", df).fit(
 **签名**
 
 ```python
-ws.OLS(endog: 'Any', exog: 'Any', *, weights: 'Any' = None, weight_type: 'str | None' = None, param_names: 'Sequence[str] | None' = None) -> 'None'
+ws.Regress(endog: 'Any', exog: 'Any', *, weights: 'Any' = None, weight_type: 'str | None' = None, param_names: 'Sequence[str] | None' = None) -> 'None'
 ```
 
-**`OLS.from_formula`**
+**`Regress.from_formula`**
 
 ```python
-OLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'OLS'"
+Regress.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'OLS'"
 ```
 
-**`OLS.fit`**
+**`Regress.fit`**
 
 ```python
-OLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
+Regress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **示例**
@@ -147,7 +147,7 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 
 **注意:** `regress` 不存总平方和，因此没有 `e(tss)`：`SS_total` 行由 `mss + rss` 重构。在含常数项的模型中该分解可加，所以这一步是精确的。
 
-### `FEOLS`
+### `RegressHighDimFixedEffects`
 
 **Stata 指令:** `reghdfe y x1 x2, absorb(firm year)`
 
@@ -156,19 +156,19 @@ ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 **签名**
 
 ```python
-ws.FEOLS(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.RegressHighDimFixedEffects(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`FEOLS.from_formula`**
+**`RegressHighDimFixedEffects.from_formula`**
 
 ```python
-FEOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'FEOLS'"
+RegressHighDimFixedEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'FEOLS'"
 ```
 
-**`FEOLS.fit`**
+**`RegressHighDimFixedEffects.fit`**
 
 ```python
-FEOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
+RegressHighDimFixedEffects.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, level: 'float | None' = None) -> 'StataResults'
 ```
 
 **示例**
@@ -207,7 +207,7 @@ Absorbed degrees of freedom:
 
 **注意:** `e(rank)` 计入每一个被吸收的固定效应参数，因此大于 `len(results.params)`；`e(df_m)` 只计报告的斜率。当给出 `weight_type='pweight'` 而未显式指定 `cov_type` 时，`fit` 选择 HC1——Stata 的 `pweight` 意味着 `vce(robust)`。`predict` 没有为 `reghdfe` 注册任何类型，因此无法经由它做预测。 吸收**多于一个维度**时预测会被拒绝：多路效应只在相差一个归一化常数的意义下可识别，因此拒绝信息会说明这一点，而不是让读者以为该估计器根本不能预测。
 
-### `PanelOLS`
+### `PanelRegressFE`
 
 **Stata 指令:** `xtreg ypanel x1 x2, fe`
 
@@ -216,19 +216,19 @@ Absorbed degrees of freedom:
 **签名**
 
 ```python
-ws.PanelOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.PanelRegressFE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`PanelOLS.from_formula`**
+**`PanelRegressFE.from_formula`**
 
 ```python
-PanelOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressFE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
-**`PanelOLS.fit`**
+**`PanelRegressFE.fit`**
 
 ```python
-PanelOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = True, time_effects: 'bool' = False) -> 'StataResults'
+PanelRegressFE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = True, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -268,7 +268,7 @@ F test that all u_i=0: F(39, 158) = 4.10                     Prob > F = 0.0000
 
 **注意:** 类文档中记录了一处刻意偏离：在 `cov_type='cluster'` 下，westata 把 `e(df_m)` 存为斜率个数、把 `e(rank)` 存为 `len(e(b))`，而聚类下的 Stata 两个值都小一（类文档字符串载有 StataNow 19.5 的实测数据）。`e(F)`、`e(df_b)` 与 `e(df_r)` 是一致的——只有这两个标签不同；若照抄 Stata，打印出的 F 标签会与其旁的 p 值自相矛盾。
 
-### `RandomEffects`
+### `PanelRegressRE`
 
 **Stata 指令:** `xtreg ypanel x1 x2, re`
 
@@ -277,19 +277,19 @@ F test that all u_i=0: F(39, 158) = 4.10                     Prob > F = 0.0000
 **签名**
 
 ```python
-ws.RandomEffects(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.PanelRegressRE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`RandomEffects.from_formula`**
+**`PanelRegressRE.from_formula`**
 
 ```python
-RandomEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressRE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
-**`RandomEffects.fit`**
+**`PanelRegressRE.fit`**
 
 ```python
-RandomEffects.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
+PanelRegressRE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -326,7 +326,7 @@ corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
 ------------------------------------------------------------------------------
 ```
 
-### `BetweenOLS`
+### `PanelRegressBE`
 
 **Stata 指令:** `xtreg ypanel x1 x2, be`
 
@@ -335,19 +335,19 @@ corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
 **签名**
 
 ```python
-ws.BetweenOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.PanelRegressBE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`BetweenOLS.from_formula`**
+**`PanelRegressBE.from_formula`**
 
 ```python
-BetweenOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressBE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
-**`BetweenOLS.fit`**
+**`PanelRegressBE.fit`**
 
 ```python
-BetweenOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
+PanelRegressBE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -380,7 +380,7 @@ sd(u_i + avg(e_i.)) = .9034525                  Prob > F          =     0.0066
 ------------------------------------------------------------------------------
 ```
 
-### `FirstDifferenceOLS`
+### `PanelRegressFD`
 
 **Stata 指令:** `xtreg ypanel x1 x2, fd`
 
@@ -389,19 +389,19 @@ sd(u_i + avg(e_i.)) = .9034525                  Prob > F          =     0.0066
 **签名**
 
 ```python
-ws.FirstDifferenceOLS(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.PanelRegressFD(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`FirstDifferenceOLS.from_formula`**
+**`PanelRegressFD.from_formula`**
 
 ```python
-FirstDifferenceOLS.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressFD.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
-**`FirstDifferenceOLS.fit`**
+**`PanelRegressFD.fit`**
 
 ```python
-FirstDifferenceOLS.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
+PanelRegressFD.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -597,7 +597,7 @@ Exogenous:  x1 x3
 
 **注意:** 协方差是后端的 GMM 权重矩阵三明治，无法经由面向 OLS 的 `vce.compute_cov` 路径表达，因此 `cov_kwds` 原样转发给后端，而不是在此处解释。
 
-### `XtIvreg`
+### `PanelIVRegress`
 
 **Stata 指令:** `xtivreg ypanel x1 (x2 = x3), fe`
 
@@ -606,19 +606,19 @@ Exogenous:  x1 x3
 **签名**
 
 ```python
-ws.XtIvreg(endog: 'Any', exog: 'Any', endog_regressors: 'Any', instruments: 'Any', *, exog_names: 'Sequence[str]', endog_names: 'Sequence[str]', instrument_names: 'Sequence[str]', codes: 'np.ndarray', sizes: 'np.ndarray', method: 'str' = 'fe', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelIVRegress(endog: 'Any', exog: 'Any', endog_regressors: 'Any', instruments: 'Any', *, exog_names: 'Sequence[str]', endog_names: 'Sequence[str]', instrument_names: 'Sequence[str]', codes: 'np.ndarray', sizes: 'np.ndarray', method: 'str' = 'fe', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtIvreg.from_formula`**
+**`PanelIVRegress.from_formula`**
 
 ```python
-XtIvreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtIvreg'"
+PanelIVRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtIvreg'"
 ```
 
-**`XtIvreg.fit`**
+**`PanelIVRegress.fit`**
 
 ```python
-XtIvreg.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
+PanelIVRegress.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -662,7 +662,7 @@ Exogenous:  x1 x3
 
 **注意:** 只实现了 `fe` 与 `re`。Stata 的 `be`、`fd` 以及 Baltagi 的 `ec2sls` 会抛 `UnsupportedError`，而不是退回到某个相近的估计量，因为差别在变换本身，不在显示。
 
-### `XtGls`
+### `PanelGls`
 
 **Stata 指令:** `xtgls y x1 x2, panels(heteroskedastic)`
 
@@ -671,19 +671,19 @@ Exogenous:  x1 x3
 **签名**
 
 ```python
-ws.XtGls(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, param_names: 'Sequence[str]', panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelGls(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, param_names: 'Sequence[str]', panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtGls.from_formula`**
+**`PanelGls.from_formula`**
 
 ```python
-XtGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, subset: 'Any' = None) -> "'XtGls'"
+PanelGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, subset: 'Any' = None) -> "'XtGls'"
 ```
 
-**`XtGls.fit`**
+**`PanelGls.fit`**
 
 ```python
-XtGls.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
+PanelGls.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -717,7 +717,7 @@ Estimated coefficients     =         3          Time periods      =          5
 
 **注意:** `panels(iid) corr(independent) nmk` 是能复现 `regress` 的组合，因为那里唯一缺少的就是 `nmk` 补上的 `N/(N-k)` 因子。`corr(psar1)`（每个面板单独一个系数）以及 robust/cluster 协方差会直接抛错，而不是把共用 rho 或常规数字挂在错误的标签下一并返回。模块文档字符串提到 `igls`，但 `fit` 并没有该参数，所以传入它会以 `TypeError` 失败，而不会抛 westata 的错误。
 
-### `XtPcse`
+### `PanelPcse`
 
 **Stata 指令:** `xtpcse y x1 x2, corr(independent)`
 
@@ -726,19 +726,19 @@ Estimated coefficients     =         3          Time periods      =          5
 **签名**
 
 ```python
-ws.XtPcse(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, param_names: 'Sequence[str]', correlation: 'str' = 'independent', selection: 'str' = 'casewise', periods: 'np.ndarray | None' = None, model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelPcse(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, param_names: 'Sequence[str]', correlation: 'str' = 'independent', selection: 'str' = 'casewise', periods: 'np.ndarray | None' = None, model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtPcse.from_formula`**
+**`PanelPcse.from_formula`**
 
 ```python
-XtPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise', subset: 'Any' = None) -> "'XtPcse'"
+PanelPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise', subset: 'Any' = None) -> "'XtPcse'"
 ```
 
-**`XtPcse.fit`**
+**`PanelPcse.fit`**
 
 ```python
-XtPcse.fit(self, cov_type: 'str' = 'pcse', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
+PanelPcse.fit(self, cov_type: 'str' = 'pcse', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -773,7 +773,7 @@ Estimated coefficients     =         3          Prob > chi2       =     0.0000
 
 **注意:** 在平衡面板上 `time=` 可以省略，此时期数按行序位置读取。在非平衡面板上则必须给出：否则抛 `ConsistencyError` 并点明该参数，因为按位置配对行所算出的量并不是协方差。`correlation='ar1'`/`'psar1'` 会用 Prais-Winsten 取代 OLS，一律抛 `UnsupportedError`。
 
-### `XtAbond`
+### `PanelAbond`
 
 **Stata 指令:** `xtabond ypanel x1, lags(1)`
 
@@ -782,19 +782,19 @@ Arellano-Bond / Blundell-Bond 动态面板 GMM，即 Stata 的 `xtabond` 家族�
 **签名**
 
 ```python
-ws.XtAbond(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str] | None' = None, exog_names: 'Sequence[str] | None' = None, system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelAbond(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags: 'int' = 1, param_names: 'Sequence[str] | None' = None, exog_names: 'Sequence[str] | None' = None, system: 'bool' = False, model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtAbond.from_formula`**
+**`PanelAbond.from_formula`**
 
 ```python
-XtAbond.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', lags: 'int' = 1, system: 'bool' = False, subset: 'Any' = None) -> "'XtAbond'"
+PanelAbond.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', lags: 'int' = 1, system: 'bool' = False, subset: 'Any' = None) -> "'XtAbond'"
 ```
 
-**`XtAbond.fit`**
+**`PanelAbond.fit`**
 
 ```python
-XtAbond.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
+PanelAbond.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 100, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -827,7 +827,7 @@ One-step results
 
 **注意:** Sargan、Hansen、AR(1) 与 AR(2) 干脆不报告，而不是近似报告：手册并未完整给出它们的精确构造，而一个错误的过度识别统计量比它的缺席更像权威结论。`system=True` 只是把结果标记为系统 GMM——水平方程的矩并未估计，系数仍是差分估计量的。
 
-### `Eivreg`
+### `ErrorsInVariablesRegress`
 
 **Stata 指令:** `eivreg y x1 x2, reliab(x1 .9)`
 
@@ -836,19 +836,19 @@ One-step results
 **签名**
 
 ```python
-ws.Eivreg(endog: 'Any', exog: 'Any', reliab: 'Mapping[str, float]', *, param_names: 'Sequence[str]', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.ErrorsInVariablesRegress(endog: 'Any', exog: 'Any', reliab: 'Mapping[str, float]', *, param_names: 'Sequence[str]', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`Eivreg.from_formula`**
+**`ErrorsInVariablesRegress.from_formula`**
 
 ```python
-Eivreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, reliab: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> "'Eivreg'"
+ErrorsInVariablesRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, reliab: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> "'Eivreg'"
 ```
 
-**`Eivreg.fit`**
+**`ErrorsInVariablesRegress.fit`**
 
 ```python
-Eivreg.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None) -> 'StataResults'
+ErrorsInVariablesRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None) -> 'StataResults'
 ```
 
 **示例**
@@ -878,7 +878,7 @@ Errors-in-variables regression
 
 **注意:** 只提供未调整的 VCE：`cov_type='robust'` 会抛 `UnsupportedError`。若 `reliab` 中给出的名字不是回归元，同样会报错，且消息会列出它实际找到的回归元。
 
-### `Sureg`
+### `SeeminglyUnrelatedRegress`
 
 **Stata 指令:** `sureg (y1 x1) (y2 x2)`
 
@@ -887,19 +887,19 @@ Errors-in-variables regression
 **签名**
 
 ```python
-ws.Sureg(designs: 'Sequence[np.ndarray]', responses: 'Sequence[np.ndarray]', *, equation_names: 'Sequence[str]', param_names: 'Sequence[Sequence[str]]', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.SeeminglyUnrelatedRegress(designs: 'Sequence[np.ndarray]', responses: 'Sequence[np.ndarray]', *, equation_names: 'Sequence[str]', param_names: 'Sequence[Sequence[str]]', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`Sureg.from_formula`**
+**`SeeminglyUnrelatedRegress.from_formula`**
 
 ```python
-Sureg.from_formula(equations: 'Sequence[str]', data: 'pd.DataFrame', *, names: 'Sequence[str] | None' = None, subset: 'Any' = None) -> "'Sureg'"
+SeeminglyUnrelatedRegress.from_formula(equations: 'Sequence[str]', data: 'pd.DataFrame', *, names: 'Sequence[str] | None' = None, subset: 'Any' = None) -> "'Sureg'"
 ```
 
-**`Sureg.fit`**
+**`SeeminglyUnrelatedRegress.fit`**
 
 ```python
-Sureg.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, iterate: 'bool' = False) -> 'StataResults'
+SeeminglyUnrelatedRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, iterate: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -933,7 +933,7 @@ y2           |
 
 **注意:** `iterate=True`（Stata 的 `isure`）被拒绝，因为其收敛规则未被精确文档化，而错误的规则会改变最后一次迭代后的每一个标准误。`cov_type='robust'` 走 `reg3` 的稳健三明治，确实会改变所报告的标准误，但 `e(vce)` 仍读作 `'unadjusted'`——若要知道拿到的是哪种 VCE，请读结果对象的 `cov_type` 属性。`cov_type='cluster'` 被拒绝；所有方程必须使用相同的观测，样本不一致会报错，而不是在各样本不等的条件下强行拟合。
 
-### `Mvreg`
+### `MultivariateRegress`
 
 **Stata 指令:** `mvreg y1 y2 = x1 x2`
 
@@ -942,19 +942,19 @@ y2           |
 **签名**
 
 ```python
-ws.Mvreg(designs: 'Sequence[np.ndarray]', responses: 'Sequence[np.ndarray]', *, outcome_names: 'Sequence[str]', param_names: 'Sequence[str]', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.MultivariateRegress(designs: 'Sequence[np.ndarray]', responses: 'Sequence[np.ndarray]', *, outcome_names: 'Sequence[str]', param_names: 'Sequence[str]', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`Mvreg.from_formula`**
+**`MultivariateRegress.from_formula`**
 
 ```python
-Mvreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Mvreg'"
+MultivariateRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Mvreg'"
 ```
 
-**`Mvreg.fit`**
+**`MultivariateRegress.fit`**
 
 ```python
-Mvreg.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None) -> 'StataResults'
+MultivariateRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None) -> 'StataResults'
 ```
 
 **示例**
@@ -988,7 +988,7 @@ y2           |
 
 **注意:** 只实现了未调整的 VCE；`cov_type='robust'` 会抛 `UnsupportedError`，因为该命令只有未调整 VCE 经过与 Stata 的验证。
 
-### `RobustRegression`
+### `RobustRegress`
 
 **Stata 指令:** `rreg y x1 x2`
 
@@ -997,19 +997,19 @@ y2           |
 **签名**
 
 ```python
-ws.RobustRegression(endog: 'Any', exog: 'Any', *, tune: 'float' = 7.0, param_names: 'list[str] | None' = None) -> 'None'
+ws.RobustRegress(endog: 'Any', exog: 'Any', *, tune: 'float' = 7.0, param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`RobustRegression.from_formula`**
+**`RobustRegress.from_formula`**
 
 ```python
-RobustRegression.from_formula(formula: 'str', data: 'pd.DataFrame', *, tune: 'float' = 7.0, subset: 'Any' = None) -> "'RobustRegression'"
+RobustRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, tune: 'float' = 7.0, subset: 'Any' = None) -> "'RobustRegression'"
 ```
 
-**`RobustRegression.fit`**
+**`RobustRegress.fit`**
 
 ```python
-RobustRegression.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 1000, tolerance: 'float' = 0.01, strict: 'bool' = False) -> 'StataResults'
+RobustRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 1000, tolerance: 'float' = 0.01, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -1037,7 +1037,7 @@ Robust regression                               Number of obs     =        200
 
 **注意:** 报告的 `mss`/`rss`/`mse`/`rmse`/`r2`/`F` 描述的是对调整后响应变量的无权回归——也就是 Stata 真正发布的那个回归——而不是由最终双权重构造的加权平方和，后者是另一个量。
 
-### `QuantileRegression`
+### `QuantileRegress`
 
 **Stata 指令:** `qreg y x1 x2, quantile(.5)`
 
@@ -1046,19 +1046,19 @@ Robust regression                               Number of obs     =        200
 **签名**
 
 ```python
-ws.QuantileRegression(endog: 'Any', exog: 'Any', *, quantile: 'float' = 0.5, param_names: 'list[str] | None' = None) -> 'None'
+ws.QuantileRegress(endog: 'Any', exog: 'Any', *, quantile: 'float' = 0.5, param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`QuantileRegression.from_formula`**
+**`QuantileRegress.from_formula`**
 
 ```python
-QuantileRegression.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'QuantileRegression'"
+QuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'QuantileRegression'"
 ```
 
-**`QuantileRegression.fit`**
+**`QuantileRegress.fit`**
 
 ```python
-QuantileRegression.fit(self, cov_type: 'str | None' = 'iid', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 0, maxiter: 'int' = 2000, strict: 'bool' = False) -> 'StataResults'
+QuantileRegress.fit(self, cov_type: 'str | None' = 'iid', cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 0, maxiter: 'int' = 2000, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -1085,7 +1085,7 @@ Median regression                                   Number of obs =        200
 
 **注意:** `e(marginsnotok)` 为 `"stdp stddp residuals"`，因此 `predict` 只提供 `xb`、`stdp` 与 `residuals`；`stddp` 是仅限 `sqreg` 的类型，在 `qreg` 之后调用会报错。
 
-### `Bsqreg`
+### `BootstrappedQuantileRegress`
 
 **Stata 指令:** `bsqreg y x1 x2, quantile(.5)`
 
@@ -1094,19 +1094,19 @@ Median regression                                   Number of obs =        200
 **签名**
 
 ```python
-ws.Bsqreg(endog: 'Any', exog: 'Any', *, quantile: 'float' = 0.5, param_names: 'list[str] | None' = None) -> 'None'
+ws.BootstrappedQuantileRegress(endog: 'Any', exog: 'Any', *, quantile: 'float' = 0.5, param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`Bsqreg.from_formula`**
+**`BootstrappedQuantileRegress.from_formula`**
 
 ```python
-Bsqreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'Bsqreg'"
+BootstrappedQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'Bsqreg'"
 ```
 
-**`Bsqreg.fit`**
+**`BootstrappedQuantileRegress.fit`**
 
 ```python
-Bsqreg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 200, seed: 'int | None' = None, strict: 'bool' = False) -> 'StataResults'
+BootstrappedQuantileRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 200, seed: 'int | None' = None, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -1133,7 +1133,7 @@ Median regression, bootstrap(50) SEs                Number of obs =         200
 
 **注意:** bootstrap 种子记录在 `e(seed)` 中，因此**即使未指定种子**也可复现：把 `seed=result.e['seed']` 传回 `fit()`，各次重抽样会完全重复。Stata 通过 `c(seed)` 与 `set seed` 提供同样的保证。另外，行序在重抽样之间会延续（与 Stata 的 `bsampl_w`/`qreg_c` 循环一致），因此每次重抽样并非从原始数据顺序开始。
 
-### `Sqreg`
+### `SimultaneousQuantileRegress`
 
 **Stata 指令:** `sqreg y x1 x2, quantiles(.25 .5 .75)`
 
@@ -1142,19 +1142,19 @@ Median regression, bootstrap(50) SEs                Number of obs =         200
 **签名**
 
 ```python
-ws.Sqreg(endog: 'Any', exog: 'Any', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), param_names: 'list[str] | None' = None) -> 'None'
+ws.SimultaneousQuantileRegress(endog: 'Any', exog: 'Any', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`Sqreg.from_formula`**
+**`SimultaneousQuantileRegress.from_formula`**
 
 ```python
-Sqreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), subset: 'Any' = None) -> "'Sqreg'"
+SimultaneousQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), subset: 'Any' = None) -> "'Sqreg'"
 ```
 
-**`Sqreg.fit`**
+**`SimultaneousQuantileRegress.fit`**
 
 ```python
-Sqreg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 200, seed: 'int | None' = None, strict: 'bool' = False) -> 'StataResults'
+SimultaneousQuantileRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, reps: 'int' = 200, seed: 'int | None' = None, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -1188,7 +1188,7 @@ q75             |
 
 **注意:** `stddp` 需要至少两个分位数、且两个方程使用相同回归元的 `sqreg` 结果，否则会报错。默认 `reps=200` 使三分位数的拟合在 200 行数据上耗时约二十秒，因此上例传入了更小的 `reps`，并只取两个分位数。 种子记录在 `e(seed)` 中，把该值传回 `fit(seed=...)` 即可复现未指定种子的拟合。
 
-### `NeweyWestResult`
+### `NeweyWestResults`
 
 **Stata 指令:** `newey y x1 x2, lag(2)`
 
@@ -1197,7 +1197,7 @@ q75             |
 **签名**
 
 ```python
-ws.NeweyWestResult(results: 'Any', *, lag: 'int') -> 'None'
+ws.NeweyWestResults(results: 'Any', *, lag: 'int') -> 'None'
 ```
 
 **示例**
@@ -1928,7 +1928,7 @@ Log likelihood = -252.67183                         Pseudo R2         = 0.1818
 
 **注意:** `tobit` 不存 `e(aic)`；`estat_ic` 会按需计算 AIC 与 BIC，因此准则仍然可用。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'e'`、`'ystar'`、`'pr'` 与 `'residuals'`；`'e'` 与 `'ystar'` 用 `lower=`/`upper=` 传入删失界限，而不传时 `'pr'` 对每个观测都返回 1，因为默认区间覆盖整条实轴。只实现了 `cov_type='nonrobust'`。
 
-### `Truncreg`
+### `TruncatedRegress`
 
 **Stata 指令:** `truncreg y x1 x2, ll(0)`
 
@@ -1937,19 +1937,19 @@ Log likelihood = -252.67183                         Pseudo R2         = 0.1818
 **签名**
 
 ```python
-ws.Truncreg(endog: 'Any', exog: 'Any', *, lower: 'float | None' = None, upper: 'float | None' = None, param_names: 'list[str] | None' = None) -> 'None'
+ws.TruncatedRegress(endog: 'Any', exog: 'Any', *, lower: 'float | None' = None, upper: 'float | None' = None, param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`Truncreg.from_formula`**
+**`TruncatedRegress.from_formula`**
 
 ```python
-Truncreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = None, upper: 'float | None' = None, subset: 'Any' = None) -> "'Truncreg'"
+TruncatedRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = None, upper: 'float | None' = None, subset: 'Any' = None) -> "'Truncreg'"
 ```
 
-**`Truncreg.fit`**
+**`TruncatedRegress.fit`**
 
 ```python
-Truncreg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'
+TruncatedRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -1980,7 +1980,7 @@ Log likelihood = -169.3211                      Pseudo R2         = 0.1635
 
 **注意:** 与 `TruncatedPoisson` 相反，本类会自行剔除越界的行并给出警告，而不是报错，因为 `truncreg` 的样本本就由限制定义。被剔除的个数是模型上的属性（`_n_truncated`），并**不**存入 `e()`：`e()` 遵循 `truncreg.sthlp`，其中没有这个标量——请用 `e(N_bf) - e(N)`。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'residuals'` 与 `'fitted'`。
 
-### `Intreg`
+### `IntervalRegress`
 
 **Stata 指令:** `intreg lo hi x1`
 
@@ -1989,19 +1989,19 @@ Log likelihood = -169.3211                      Pseudo R2         = 0.1635
 **签名**
 
 ```python
-ws.Intreg(lower: 'Any', upper: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None) -> 'None'
+ws.IntervalRegress(lower: 'Any', upper: 'Any', exog: 'Any', *, param_names: 'list[str] | None' = None) -> 'None'
 ```
 
-**`Intreg.from_formula`**
+**`IntervalRegress.from_formula`**
 
 ```python
-Intreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Intreg'"
+IntervalRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Intreg'"
 ```
 
-**`Intreg.fit`**
+**`IntervalRegress.fit`**
 
 ```python
-Intreg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'
+IntervalRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, maxiter: 'int' = 500, tol: 'float' = 1e-10, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2098,7 +2098,7 @@ select       |
 
 **注意:** 两步法结果不存 `e(aic)`（两步估计量不是联合模型的 ML 拟合），`e(N_selected)`/`e(N_nonselected)` 划分样本，而 `e(N)` 是全样本量，尽管打印的 `Number of obs` 是选中样本数。在 ML 路径上 `e(aic)` 会被存下，且等于 `-2*e(ll) + 2*k`，与 `estat_ic` 一致。标准误是两步 M 估计的夹心形式，而非朴素 OLS 标准误。`predict` 提供 `'xb'`、`'stdp'`、`'stdf'`、`'fitted'`、`'psel'`、`'ycond'`、`'yexpected'`、`'mills'` 与 `'nshazard'`。
 
-### `Etregress`
+### `EndogenousTreatmentRegress`
 
 **Stata 指令:** `etregress ytreat x1, treat(treat = x3)`
 
@@ -2107,19 +2107,19 @@ select       |
 **签名**
 
 ```python
-ws.Etregress(outcome: 'np.ndarray', outcome_exog: 'np.ndarray', treatment: 'np.ndarray', treatment_exog: 'np.ndarray', *, outcome_names: 'Sequence[str]', treatment_names: 'Sequence[str]', treated: 'np.ndarray', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.EndogenousTreatmentRegress(outcome: 'np.ndarray', outcome_exog: 'np.ndarray', treatment: 'np.ndarray', treatment_exog: 'np.ndarray', *, outcome_names: 'Sequence[str]', treatment_names: 'Sequence[str]', treated: 'np.ndarray', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`Etregress.from_formula`**
+**`EndogenousTreatmentRegress.from_formula`**
 
 ```python
-Etregress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Etregress'"
+EndogenousTreatmentRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Etregress'"
 ```
 
-**`Etregress.fit`**
+**`EndogenousTreatmentRegress.fit`**
 
 ```python
-Etregress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'control', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
+EndogenousTreatmentRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, method: 'str' = 'control', maxiter: 'int' = 200, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2212,7 +2212,7 @@ Log likelihood = -291.49689                             Prob > chi2   = 0.0000
 
 **注意:** 没有 `e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量（`e(chi2type)='Wald'`），对「无无效率项」模型的似然比统计量存于 `e(lr_chi2)`，其 p 值存于 `e(p_lr)`。`predict` 未为 `frontier` 注册任何类型，因此预测只能经由宏或手工完成。
 
-### `XtLogit`
+### `PanelLogit`
 
 **Stata 指令:** `xtlogit yb x1, fe`
 
@@ -2221,19 +2221,19 @@ Log likelihood = -291.49689                             Prob > chi2   = 0.0000
 **签名**
 
 ```python
-ws.XtLogit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelLogit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtLogit.from_formula`**
+**`PanelLogit.from_formula`**
 
 ```python
-XtLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtLogit'"
+PanelLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtLogit'"
 ```
 
-**`XtLogit.fit`**
+**`PanelLogit.fit`**
 
 ```python
-XtLogit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
+PanelLogit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2268,7 +2268,7 @@ Log likelihood = -71.492167                          Prob > chi2      = 0.0002
 
 **注意:** `method='pa'` 是带可交换工作相关的 GEE，**不是**似然：它不存 `e(ll)`、`e(ll_0)`、`e(r2_p)`、`e(aic)` 或 `e(bic)`，模型检验是 Wald 统计量，并以 `e(estimator)='gee'` 标记。`fe` 路径上的 `e(ll_0)` 是在保留样本上仅含常数项的 logit，这正是 LR 统计量可比的原因。三者都没有注册任何 `predict` 类型。
 
-### `XtProbit`
+### `PanelProbit`
 
 **Stata 指令:** `xtprobit ybp x1, re`
 
@@ -2277,19 +2277,19 @@ Log likelihood = -71.492167                          Prob > chi2      = 0.0002
 **签名**
 
 ```python
-ws.XtProbit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelProbit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtProbit.from_formula`**
+**`PanelProbit.from_formula`**
 
 ```python
-XtProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtProbit'"
+PanelProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtProbit'"
 ```
 
-**`XtProbit.fit`**
+**`PanelProbit.fit`**
 
 ```python
-XtProbit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
+PanelProbit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2332,7 +2332,7 @@ LR test of rho=0: chibar2(01) = 5.54                   Prob >= chibar2 = 0.009
 
 **注意:** `method='fe'` 与 `method='pa'` 会按名称被拒绝，报错为 `method='fe' is not available; supported: 're'`（`'pa'` 同），而不是静默映射为 `re`。在组内相关很弱的二值结果上，`/lnsig2u` 的估计可能被推得很负，于是 `sigma_u` 实际为零——这是模型撞到边界，而非未收敛。
 
-### `XtPoisson`
+### `PanelPoisson`
 
 **Stata 指令:** `xtpoisson ycnt x1, fe`
 
@@ -2341,19 +2341,19 @@ LR test of rho=0: chibar2(01) = 5.54                   Prob >= chibar2 = 0.009
 **签名**
 
 ```python
-ws.XtPoisson(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelPoisson(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtPoisson.from_formula`**
+**`PanelPoisson.from_formula`**
 
 ```python
-XtPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtPoisson'"
+PanelPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtPoisson'"
 ```
 
-**`XtPoisson.fit`**
+**`PanelPoisson.fit`**
 
 ```python
-XtPoisson.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
+PanelPoisson.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2385,7 +2385,7 @@ Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 
 **注意:** `method='pa'` 会被拒绝（`supported: 'fe', 're'`）。`fe` 似然没有截距——组效应吸收了它，似然在常数方向上完全平坦——因此 patsy 的截距被移除而不是估计。本类不填 `e(ivar)` 与 `e(tvar)`，因此打印的 `Group variable:` 行显示为 `.`，尽管 `e(N_g)` 确实统计了组数。`predict` 未注册任何类型。
 
-### `XtNbreg`
+### `PanelNbRegress`
 
 **Stata 指令:** `xtnbreg ycnt x1, fe`
 
@@ -2394,19 +2394,19 @@ Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 **签名**
 
 ```python
-ws.XtNbreg(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
+ws.PanelNbRegress(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequence[str]', method: 'str', model_data: 'pd.DataFrame | None' = None) -> 'None'
 ```
 
-**`XtNbreg.from_formula`**
+**`PanelNbRegress.from_formula`**
 
 ```python
-XtNbreg.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtNbreg'"
+PanelNbRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtNbreg'"
 ```
 
-**`XtNbreg.fit`**
+**`PanelNbRegress.fit`**
 
 ```python
-XtNbreg.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
+PanelNbRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2439,7 +2439,7 @@ Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 
 **注意:** 目标函数是准似然，因此 `e(ll)` 并非数据的似然，也不存 AIC/BIC。与 Stata 一样，`_cons` 属于参数向量，但目标函数在该方向上近乎平坦——给每个 `lam_it` 加常数几乎不改变核——所以它的估计值（及其巨大的标准误）依赖优化器，而斜率不然；去掉常数项会改变斜率，因此予以保留。
 
-### `XtTobit`
+### `PanelTobit`
 
 **Stata 指令:** `xttobit ycensp x1, re`
 
@@ -2448,19 +2448,19 @@ Log likelihood = -203.70227                          Prob > chi2      = 0.0000
 **签名**
 
 ```python
-ws.XtTobit(*args: 'Any', lower: 'float | None' = 0.0, upper: 'float | None' = None, **kwargs: 'Any') -> 'None'
+ws.PanelTobit(*args: 'Any', lower: 'float | None' = 0.0, upper: 'float | None' = None, **kwargs: 'Any') -> 'None'
 ```
 
-**`XtTobit.from_formula`**
+**`PanelTobit.from_formula`**
 
 ```python
-XtTobit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, lower: 'float | None' = 0.0, upper: 'float | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtTobit'"
+PanelTobit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, lower: 'float | None' = 0.0, upper: 'float | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtTobit'"
 ```
 
-**`XtTobit.fit`**
+**`PanelTobit.fit`**
 
 ```python
-XtTobit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
+PanelTobit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'Any' = None, *, intpoints: 'int' = 12, maxiter: 'int' = 500, strict: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -2685,7 +2685,7 @@ ws.VECM(d, coint_rank=1, lags=1, names=['a', 'b']).fit().beta
 
 **注意:** `johansen()` 中的临界值是 Stata 使用的 Johansen (1995) 表，而不是 statsmodels 的 Osterwald-Lenum 数值，这个差异会改变临界数据上选出的秩（5% 处 3.76 对 3.8415）。90% 那一列是 `nan`，因为 Stata 的 ado 只硬编码了 95% 与 99%。`VECMResults` 同样没有 `.summary()`——请直接读 `beta`/`alpha`/`gamma` 与 `e()`。
 
-### `XtUnitroot`
+### `PanelUnitroot`
 
 **Stata 指令:** `xtunitroot ips ypanel   /   xtunitroot llc ypanel`
 
@@ -2694,19 +2694,19 @@ ws.VECM(d, coint_rank=1, lags=1, names=['a', 'b']).fit().beta
 **签名**
 
 ```python
-ws.XtUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str | None' = None) -> 'None'
+ws.PanelUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, variable_name: 'str | None' = None) -> 'None'
 ```
 
-**`XtUnitroot.from_formula`**
+**`PanelUnitroot.from_formula`**
 
 ```python
-XtUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> "'XtUnitroot'"
+PanelUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> "'XtUnitroot'"
 ```
 
-**`XtUnitroot.fit`**
+**`PanelUnitroot.fit`**
 
 ```python
-XtUnitroot.fit(self) -> 'PanelUnitRootResult'
+PanelUnitroot.fit(self) -> 'PanelUnitRootResults'
 ```
 
 **示例**
@@ -2723,7 +2723,7 @@ ws.XtUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test=
 
 **注意:** `trend=True`、`noconstant=True` 与 `demean=True` 可以传入，但会抛 `UnsupportedError`，因为每一项都会改变查表值而这些表未被转录。短面板上 `lags=1` 还可能抛 `ConsistencyError`（“a panel has no residual degrees of freedom in its ADF regression”）——无滞后这一默认值才是复现 Stata 默认的取法。
 
-### `IpsResult`
+### `IpsResults`
 
 **Stata 指令:** `xtunitroot ips ypanel   (the r() results it returns)`
 
@@ -2732,7 +2732,7 @@ ws.XtUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test=
 **签名**
 
 ```python
-ws.IpsResult(tbar: 'float', ttildebar: 'float', zt: 'float', zttildebar: 'float', pvalue: 'float', critical: 'dict[str, float]', n_groups: 'int', n_periods: 'int', observations: 'int', mean_t: 'float', var_t: 'float', mean_ttilde: 'float', var_ttilde: 'float') -> None
+ws.IpsResults(tbar: 'float', ttildebar: 'float', zt: 'float', zttildebar: 'float', pvalue: 'float', critical: 'dict[str, float]', n_groups: 'int', n_periods: 'int', observations: 'int', mean_t: 'float', var_t: 'float', mean_ttilde: 'float', var_ttilde: 'float') -> None
 ```
 
 **示例**
@@ -2753,7 +2753,7 @@ Im-Pesaran-Shin unit-root test
 
 **注意:** `critical` 实际是空字典：固定 N 的精确临界值（IPS 表 2）尚未实现，代码宁可抛 `UnsupportedError` 也不从别的表里填一个数，因此 `r()` 里没有 `cv_1`/`cv_5`/`cv_10`。只有 t-bar 没有 p 值，这一点与 Stata 相同。
 
-### `LlcResult`
+### `LlcResults`
 
 **Stata 指令:** `xtunitroot llc ypanel   (the r() results it returns)`
 
@@ -2762,7 +2762,7 @@ Im-Pesaran-Shin unit-root test
 **签名**
 
 ```python
-ws.LlcResult(tds: 'float', td: 'float', ttilde: 'float', sbar: 'float', nu_hat: 'float', nu_se: 'float', var_ep: 'float', mu_adj: 'float', sig_adj: 'float', pvalue_tds: 'float', pvalue_td: 'float | None', n_groups: 'int', n_periods: 'int', observations: 'int', adf_lags: 'int', hac_lags: 'int') -> None
+ws.LlcResults(tds: 'float', td: 'float', ttilde: 'float', sbar: 'float', nu_hat: 'float', nu_se: 'float', var_ep: 'float', mu_adj: 'float', sig_adj: 'float', pvalue_tds: 'float', pvalue_td: 'float | None', n_groups: 'int', n_periods: 'int', observations: 'int', adf_lags: 'int', hac_lags: 'int') -> None
 ```
 
 **示例**
@@ -2782,7 +2782,7 @@ Levin-Lin-Chu unit-root test
 
 **注意:** 与 `IpsResult` 和 `UnitRootResult` 不同，`LlcResult` 没有 `r` 属性，因此 Stata 的 `r()` 名字需要由字段手工拼出。`pvalue_td` 在未选择无常数模型时为 `None`，因为 Stata 只为那种情形列出 p 值。
 
-### `UnitRootResult`
+### `UnitRootResults`
 
 **Stata 指令:** `dfuller y   /   pperron y   /   kpss y`
 
@@ -2791,7 +2791,7 @@ Levin-Lin-Chu unit-root test
 **签名**
 
 ```python
-ws.UnitRootResult(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '', regression: 'str' = 'c') -> None
+ws.UnitRootResults(test: 'str', statistic: 'float', pvalue: 'float', lags: 'int' = 0, observations: 'int' = 0, critical: 'Mapping[str, float]' = <factory>, null: 'str' = '', regression: 'str' = 'c') -> None
 ```
 
 **示例**
@@ -2841,7 +2841,7 @@ Manova.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = Non
 **`Manova.fit`**
 
 ```python
-Manova.fit(self) -> 'ManovaResult'
+Manova.fit(self) -> 'ManovaResults'
 ```
 
 **示例**
@@ -2860,7 +2860,7 @@ MANOVA treat
 
 **注意:** 只支持一个因子，不支持协变量：右端有多个项的公式会抛 `UnsupportedError`，而不是去拟合别的东西。非整数的数值型因子会被拒绝，诊断信息用的是 Stata 自己的说法，因为 Stata 的 `manova` 会把这种变量当作连续协变量，而本实现未实现协变量。
 
-### `ManovaResult`
+### `ManovaResults`
 
 **Stata 指令:** `manova y1 y2 = treat   (followed by manovatest)`
 
@@ -2869,7 +2869,7 @@ MANOVA treat
 **签名**
 
 ```python
-ws.ManovaResult(wilks_lambda: 'float', df: 'float', df1: 'float', df2: 'float', F: 'float', p: 'float', term: 'str' = 'group', nobs: 'int' = 0, groups: 'int' = 0, statistics: 'Mapping[str, float]' = <factory>, n_equations: 'int' = 0, r2_by_equation: "'Sequence[float]'" = <factory>, rmse_by_equation: "'Sequence[float]'" = <factory>, f_by_equation: "'Sequence[float]'" = <factory>, p_f_by_equation: "'Sequence[float]'" = <factory>, depvar_names: "'Sequence[str]'" = <factory>, design_matrix: 'Any' = None, coefficients: 'Any' = None, fitted_values: 'Any' = None, responses: 'Any' = None) -> None
+ws.ManovaResults(wilks_lambda: 'float', df: 'float', df1: 'float', df2: 'float', F: 'float', p: 'float', term: 'str' = 'group', nobs: 'int' = 0, groups: 'int' = 0, statistics: 'Mapping[str, float]' = <factory>, n_equations: 'int' = 0, r2_by_equation: "'Sequence[float]'" = <factory>, rmse_by_equation: "'Sequence[float]'" = <factory>, f_by_equation: "'Sequence[float]'" = <factory>, p_f_by_equation: "'Sequence[float]'" = <factory>, depvar_names: "'Sequence[str]'" = <factory>, design_matrix: 'Any' = None, coefficients: 'Any' = None, fitted_values: 'Any' = None, responses: 'Any' = None) -> None
 ```
 
 **示例**
@@ -2889,7 +2889,7 @@ ws.Manova.from_formula('y1 y2 = treat', base).fit().multivariate_tests()
 
 ## 处理效应与调查数据
 
-### `Didregress`
+### `DIDRegress`
 
 **Stata 指令:** `didregress (y x1) (treat), group(firm) time(year)`
 
@@ -2898,19 +2898,19 @@ ws.Manova.from_formula('y1 y2 = treat', base).fit().multivariate_tests()
 **签名**
 
 ```python
-ws.Didregress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'
+ws.DIDRegress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'
 ```
 
-**`Didregress.from_formula`**
+**`DIDRegress.from_formula`**
 
 ```python
-Didregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
+DIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
 ```
 
-**`Didregress.fit`**
+**`DIDRegress.fit`**
 
 ```python
-Didregress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
+DIDRegress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
 ```
 
 **示例**
@@ -2954,7 +2954,7 @@ Note: ATET estimate adjusted for group effects and time effects.
 
 **注意:** 单独的 `"y"` 表示**没有**协变量，与 Stata 的 `(y)` 块完全一致；要包含协变量请写 `"y x1"`，或用 `covariates="all"` 显式推断所有随时间变化的数值列。不随时间变化的处理指示变量就是单位固定效应本身，因此会被 `ConsistencyError` 拒绝（对应 Stata 的 r(198) 共线性诊断），而不是报告求解器剩下的值。`e(r2)`、`e(r2_a)`、`e(rmse)`、`e(F)`、`e(ll)` 是 westata 的增补，并非经 Stata 验证的输出。
 
-### `Xtdidregress`
+### `PanelDIDRegress`
 
 **Stata 指令:** `xtdidregress (y x1) (treat), group(firm) time(year)`
 
@@ -2963,19 +2963,19 @@ Note: ATET estimate adjusted for group effects and time effects.
 **签名**
 
 ```python
-ws.Xtdidregress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'
+ws.PanelDIDRegress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None) -> 'None'
 ```
 
-**`Xtdidregress.from_formula`**
+**`PanelDIDRegress.from_formula`**
 
 ```python
-Xtdidregress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
+PanelDIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
 ```
 
-**`Xtdidregress.fit`**
+**`PanelDIDRegress.fit`**
 
 ```python
-Xtdidregress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
+PanelDIDRegress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
 ```
 
 **示例**
@@ -3019,7 +3019,7 @@ Note: ATET estimate adjusted for panel effects and time effects.
 
 **注意:** 与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `xtset` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `Didregress` 完全一致这一点只在平衡面板上有保证并经过测试。
 
-### `TreatmentEffectResult`
+### `TreatmentEffectResults`
 
 **Stata 指令:** `teffects ipw / aipw / nnmatch / ra   (the table they print)`
 
@@ -3028,7 +3028,7 @@ Note: ATET estimate adjusted for panel effects and time effects.
 **签名**
 
 ```python
-ws.TreatmentEffectResult(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '', weights: 'Any' = None) -> None
+ws.TreatmentEffectResults(estimand: 'str', estimate: 'float', std_err: 'float', z: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', potential_outcomes: 'dict[str, tuple[float, float]]' = <factory>, se_method: 'str' = 'influence function', nobs: 'int' = 0, estimator: 'str' = '', outcome_model: 'str' = '', treatment_model: 'str' = '', weights: 'Any' = None) -> None
 ```
 
 **示例**
@@ -3067,7 +3067,7 @@ IPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwarg
 **`IPW.fit`**
 
 ```python
-IPW.fit(self) -> 'TreatmentEffectResult'
+IPW.fit(self) -> 'TreatmentEffectResults'
 ```
 
 **示例**
@@ -3112,7 +3112,7 @@ AIPW.from_formula(outcome: 'str', treatment: 'str', data: 'pd.DataFrame', **kwar
 **`AIPW.fit`**
 
 ```python
-AIPW.fit(self) -> 'TreatmentEffectResult'
+AIPW.fit(self) -> 'TreatmentEffectResults'
 ```
 
 **示例**
@@ -3157,7 +3157,7 @@ NearestNeighbourMatching.from_formula(outcome: 'str', treatment: 'str', data: 'p
 **`NearestNeighbourMatching.fit`**
 
 ```python
-NearestNeighbourMatching.fit(self) -> 'TreatmentEffectResult'
+NearestNeighbourMatching.fit(self) -> 'TreatmentEffectResults'
 ```
 
 **示例**
@@ -3203,7 +3203,7 @@ RegressionAdjustment.from_formula(outcome: 'str', treatment: 'str', data: 'pd.Da
 **`RegressionAdjustment.fit`**
 
 ```python
-RegressionAdjustment.fit(self) -> 'TreatmentEffectResult'
+RegressionAdjustment.fit(self) -> 'TreatmentEffectResults'
 ```
 
 **示例**
@@ -3253,7 +3253,7 @@ ws.SurveyDesign.from_frame(base, psu='firm').layout(base).df_r
 
 **注意:** `singleunit` 决定只含一个 PSU 的层如何处理：`"certainty"`（该 PSU 贡献为零，也是采集 fixture 时使用的设置）、`"missing"`、`"scaling"` 或 `"centered"`。只有 `certainty` 被采集到的 Stata 输出检验过，因此 `scaling` 与 `centered` 是有文档的近似，而非已验证的算术。未知取值在声明阶段就抛 `ValueError`，不会等到估计时才失败。
 
-### `SvyMean`
+### `SurveyMean`
 
 **Stata 指令:** `svy: mean y`
 
@@ -3262,13 +3262,13 @@ ws.SurveyDesign.from_frame(base, psu='firm').layout(base).df_r
 **签名**
 
 ```python
-ws.SvyMean(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame') -> 'None'
+ws.SurveyMean(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame') -> 'None'
 ```
 
-**`SvyMean.fit`**
+**`SurveyMean.fit`**
 
 ```python
-SvyMean.fit(self) -> 'StataResults'
+SurveyMean.fit(self) -> 'StataResults'
 ```
 
 **示例**
@@ -3297,7 +3297,7 @@ Number of PSUs   =  40            Population size = 252.433526
 
 **注意:** 影响函数里漏掉任何一块，点估计都不变而方差会严重失真：在 fixture 设计上，`y_i / sum(w)` 低 65%，`w_i y_i / sum(w)`（有权重但不中心化）低 30%，而 `w_i (y_i - ybar) / sum(w)` 才复现 Stata。设计自由度 `df_r` 没有被强行截断到至少 1，因为那样会悄悄高估精度。
 
-### `SvyTotal`
+### `SurveyTotal`
 
 **Stata 指令:** `svy: total y`
 
@@ -3306,13 +3306,13 @@ Number of PSUs   =  40            Population size = 252.433526
 **签名**
 
 ```python
-ws.SvyTotal(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame') -> 'None'
+ws.SurveyTotal(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame') -> 'None'
 ```
 
-**`SvyTotal.fit`**
+**`SurveyTotal.fit`**
 
 ```python
-SvyTotal.fit(self) -> 'StataResults'
+SurveyTotal.fit(self) -> 'StataResults'
 ```
 
 **示例**
@@ -3341,7 +3341,7 @@ Number of PSUs   =  40            Population size = 252.433526
 
 **注意:** 与 `SvyMean` 不同，这里的影响函数**不**围绕估计值中心化。把它中心化成 `w_i (y_i - T)` 看似无害，实则不然：在 fixture 设计上会把方差放大约 244,000 倍，因为 `T` 是全局常数，它与不等权重之间的交互项在层内并不抵消。
 
-### `SvyProportion`
+### `SurveyProportion`
 
 **Stata 指令:** `svy: proportion yb`
 
@@ -3350,13 +3350,13 @@ Number of PSUs   =  40            Population size = 252.433526
 **签名**
 
 ```python
-ws.SvyProportion(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', indicators: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', names: 'list[str]') -> 'None'
+ws.SurveyProportion(variables: 'Any', frame: 'pd.DataFrame', design: 'SurveyDesign', *, params: 'np.ndarray', indicators: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', names: 'list[str]') -> 'None'
 ```
 
-**`SvyProportion.fit`**
+**`SurveyProportion.fit`**
 
 ```python
-SvyProportion.fit(self) -> 'StataResults'
+SurveyProportion.fit(self) -> 'StataResults'
 ```
 
 **示例**
@@ -3387,7 +3387,7 @@ Number of PSUs   =  40            Population size = 252.433526
 
 **注意:** 系数名是形如 `yb=0`、`yb=1` 的字符串，因此按 `param_names` 定位是可靠的读取方式；这些水平是逐列删除缺失值后实际观测到的取值，而不是声明的值标签。
 
-### `SvyRegress`
+### `SurveyRegress`
 
 **Stata 指令:** `svy: regress y x1 x2`
 
@@ -3396,13 +3396,13 @@ Number of PSUs   =  40            Population size = 252.433526
 **签名**
 
 ```python
-ws.SvyRegress(frame: 'pd.DataFrame', formula: 'str', design: 'SurveyDesign', *, X: 'np.ndarray', y: 'np.ndarray', names: 'list[str]', has_constant: 'bool', weights: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', params: 'np.ndarray', resid: 'np.ndarray', xtwx_inv_xt: 'np.ndarray') -> 'None'
+ws.SurveyRegress(frame: 'pd.DataFrame', formula: 'str', design: 'SurveyDesign', *, X: 'np.ndarray', y: 'np.ndarray', names: 'list[str]', has_constant: 'bool', weights: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', params: 'np.ndarray', resid: 'np.ndarray', xtwx_inv_xt: 'np.ndarray') -> 'None'
 ```
 
-**`SvyRegress.fit`**
+**`SurveyRegress.fit`**
 
 ```python
-SvyRegress.fit(self) -> 'StataResults'
+SurveyRegress.fit(self) -> 'StataResults'
 ```
 
 **示例**
@@ -3435,7 +3435,7 @@ Number of PSUs   =  40                            Population size = 252.433526
 
 **注意:** 从影响函数里漏掉 `w_i` 或 `(X'WX)^-1`，系数仍然精确而方差会严重失准。基于设计的 `F` 是抽样调整形式 `(d - q + 1)/(d q) * W`，参考分布为 `F(q, d - q + 1)`，并非普通回归的 F；即使系数相同，它也不会等于未加权的 `regress` F。
 
-### `SvyLogit`
+### `SurveyLogit`
 
 **Stata 指令:** `svy: logit yb x1 x2`
 
@@ -3444,13 +3444,13 @@ Number of PSUs   =  40                            Population size = 252.433526
 **签名**
 
 ```python
-ws.SvyLogit(frame: 'pd.DataFrame', formula: 'str', design: 'SurveyDesign', *, X: 'np.ndarray', y: 'np.ndarray', names: 'list[str]', has_constant: 'bool', weights: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', params: 'np.ndarray', probabilities: 'np.ndarray', information_inverse_xt: 'np.ndarray', loglik: 'float', iterations: 'int') -> 'None'
+ws.SurveyLogit(frame: 'pd.DataFrame', formula: 'str', design: 'SurveyDesign', *, X: 'np.ndarray', y: 'np.ndarray', names: 'list[str]', has_constant: 'bool', weights: 'np.ndarray', layout: 'SurveyLayout', sample: 'pd.DataFrame', params: 'np.ndarray', probabilities: 'np.ndarray', information_inverse_xt: 'np.ndarray', loglik: 'float', iterations: 'int') -> 'None'
 ```
 
-**`SvyLogit.fit`**
+**`SurveyLogit.fit`**
 
 ```python
-SvyLogit.fit(self) -> 'StataResults'
+SurveyLogit.fit(self) -> 'StataResults'
 ```
 
 **示例**
@@ -3647,7 +3647,7 @@ ws.testnl(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), 'exp(_b[x1]) = 2')
 **签名**
 
 ```python
-ws.lrtest(unrestricted: 'Any', restricted: 'Any') -> 'LRTestResult'
+ws.lrtest(unrestricted: 'Any', restricted: 'Any') -> 'LRTestResults'
 ```
 
 **示例**
@@ -3677,7 +3677,7 @@ Prob > chi2 = 0.0095
 **签名**
 
 ```python
-ws.hausman(consistent: 'Any', efficient: 'Any', *, constant: 'bool' = False, sigmamore: 'bool' = False, sigmaless: 'bool' = False) -> 'HausmanResult'
+ws.hausman(consistent: 'Any', efficient: 'Any', *, constant: 'bool' = False, sigmamore: 'bool' = False, sigmaless: 'bool' = False) -> 'HausmanResults'
 ```
 
 **示例**
@@ -3720,7 +3720,7 @@ Prob > chi2 = 0.4501
 **签名**
 
 ```python
-ws.contrast(result: 'Any', term: 'str', method: 'str' = 'r', *, level: 'float' = 0.95, nowald: 'bool' = False) -> 'list[LincomResult]'
+ws.contrast(result: 'Any', term: 'str', method: 'str' = 'r', *, level: 'float' = 0.95, nowald: 'bool' = False) -> 'list[LincomResults]'
 ```
 
 **示例**
@@ -3742,7 +3742,7 @@ ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
 ------------------------------------------------------------------------------
 ```
 
-### `pwcompare`
+### `pairwise_compare`
 
 **Stata 指令:** `pwcompare g`
 
@@ -3751,7 +3751,7 @@ ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
 **签名**
 
 ```python
-ws.pwcompare(result: 'Any', term: 'str', *, level: 'float' = 0.95, adjust: 'str | None' = None) -> 'Any'
+ws.pairwise_compare(result: 'Any', term: 'str', *, level: 'float' = 0.95, adjust: 'str | None' = None) -> 'Any'
 ```
 
 **示例**
@@ -3783,7 +3783,7 @@ ws.pwcompare(ws.OLS.from_formula('y ~ x1 + C(g)', d).fit(), 'C(g)')[0]
 **签名**
 
 ```python
-ws.nlcom(result: 'Any', expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'LincomResult'
+ws.nlcom(result: 'Any', expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = False) -> 'LincomResults'
 ```
 
 **示例**
@@ -3816,7 +3816,7 @@ ws.nlcom(ws.Logit.from_formula('yb ~ x1 + x2', base).fit(), 'exp(_b[x1])')
 **签名**
 
 ```python
-ws.margins(result: 'Any', *, dydx: 'Sequence[str] | str | None' = None, eyex: 'Sequence[str] | str | None' = None, dyex: 'Sequence[str] | str | None' = None, eydx: 'Sequence[str] | str | None' = None, at: 'Mapping[str, Any] | None' = None, atmeans: 'bool' = False, over: 'str | None' = None, exog: 'np.ndarray | None' = None, param_names: 'Sequence[str] | None' = None, level: 'float' = 0.95, predict_kind: 'str | None' = None, factor_vars: 'Sequence[str] | None' = None, outcome: 'int | None' = None) -> 'list[MarginsResult] | MarginsResult'
+ws.margins(result: 'Any', *, dydx: 'Sequence[str] | str | None' = None, eyex: 'Sequence[str] | str | None' = None, dyex: 'Sequence[str] | str | None' = None, eydx: 'Sequence[str] | str | None' = None, at: 'Mapping[str, Any] | None' = None, atmeans: 'bool' = False, over: 'str | None' = None, exog: 'np.ndarray | None' = None, param_names: 'Sequence[str] | None' = None, level: 'float' = 0.95, predict_kind: 'str | None' = None, factor_vars: 'Sequence[str] | None' = None, outcome: 'int | None' = None) -> 'list[MarginsResults] | MarginsResults'
 ```
 
 **示例**
@@ -3854,7 +3854,7 @@ dy/dx wrt:  x1
 **签名**
 
 ```python
-ws.estat_classification(result: 'Any', *, cutoff: 'float' = 0.5, y: 'Any' = None, probabilities: 'Any' = None) -> 'ClassificationResult'
+ws.estat_classification(result: 'Any', *, cutoff: 'float' = 0.5, y: 'Any' = None, probabilities: 'Any' = None) -> 'ClassificationResults'
 ```
 
 **示例**
@@ -3927,7 +3927,7 @@ ws.estat_endogenous(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 
 **注意:** 非 IV 结果、GMM 拟合，以及理由不同的 LIML 拟合，都会抛出 `NotImplementedError`；在非 HAC VCE 上给 `lags` 则抛出 `ValueError`（`lags() only valid with models with HAC VCEs`）。
 
-### `estat_firststage`
+### `estat_first_stage`
 
 **Stata 指令:** `estat firststage`
 
@@ -3936,7 +3936,7 @@ ws.estat_endogenous(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 **签名**
 
 ```python
-ws.estat_firststage(result: 'Any', *, all: 'bool' = False, forcenonrobust: 'bool' = False) -> 'FirstStageResult'
+ws.estat_first_stage(result: 'Any', *, all: 'bool' = False, forcenonrobust: 'bool' = False) -> 'FirstStageResults'
 ```
 
 **示例**
@@ -4005,7 +4005,7 @@ Prob > chi2(197)                   =    0.6740
 
 **注意:** `y` 与 `mu` 默认取结果中保留的响应值与拟合均值；当结果未保留可用的残差时请显式传入。
 
-### `estat_hettest`
+### `estat_heteroskedasticity_test`
 
 **Stata 指令:** `estat hettest`
 
@@ -4014,7 +4014,7 @@ Breusch-Pagan / Cook-Weisberg 异方差检验（Stata `estat hettest`）。省�
 **签名**
 
 ```python
-ws.estat_hettest(result: 'Any', *, method: 'str' = 'normal', variables: 'Sequence[str] | None' = None, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'
+ws.estat_heteroskedasticity_test(result: 'Any', *, method: 'str' = 'normal', variables: 'Sequence[str] | None' = None, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'Any'
 ```
 
 **示例**
@@ -4048,7 +4048,7 @@ Prob > chi2 = 0.6006
 **签名**
 
 ```python
-ws.estat_ic(result: 'Any', *, n: 'float | None' = None, df: 'float | None' = None) -> 'IcResult'
+ws.estat_ic(result: 'Any', *, n: 'float | None' = None, df: 'float | None' = None) -> 'IcResults'
 ```
 
 **示例**
@@ -4073,7 +4073,7 @@ Note: BIC uses N = number of observations. See [R] IC note.
 
 **注意:** `regress` 不存 `e(aic)`；本函数按需计算，因此在那里同样可用。
 
-### `estat_imtest`
+### `estat_information_matrix_test`
 
 **Stata 指令:** `estat imtest, white`
 
@@ -4082,7 +4082,7 @@ Note: BIC uses N = number of observations. See [R] IC note.
 **签名**
 
 ```python
-ws.estat_imtest(result: 'Any', *, white: 'bool' = False, design: 'Any' = None) -> 'ImTestResult'
+ws.estat_information_matrix_test(result: 'Any', *, white: 'bool' = False, design: 'Any' = None) -> 'ImTestResults'
 ```
 
 **示例**
@@ -4115,7 +4115,7 @@ Cameron & Trivedi's decomposition of IM-test
 --------------------------------------------------
 ```
 
-### `estat_overid`
+### `estat_overidentification`
 
 **Stata 指令:** `estat overid`
 
@@ -4124,7 +4124,7 @@ Cameron & Trivedi's decomposition of IM-test
 **签名**
 
 ```python
-ws.estat_overid(result: 'Any', *, lags: 'int | None' = None, forcenonrobust: 'bool' = False) -> 'OverIdResult'
+ws.estat_overidentification(result: 'Any', *, lags: 'int | None' = None, forcenonrobust: 'bool' = False) -> 'OverIdResults'
 ```
 
 **示例**
@@ -4145,7 +4145,7 @@ ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 
 **注意:** `lags` 是 HAC 预白化截断阶数，HAC VCE 下默认为 1，否则为 0；Stata 拒绝负值，本实现同样拒绝。
 
-### `estat_ovtest`
+### `estat_omitted_variables_test`
 
 **Stata 指令:** `estat ovtest`
 
@@ -4154,7 +4154,7 @@ Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助�
 **签名**
 
 ```python
-ws.estat_ovtest(result: 'Any', *, rhs: 'bool' = False) -> 'OvTestResult'
+ws.estat_omitted_variables_test(result: 'Any', *, rhs: 'bool' = False) -> 'OvTestResults'
 ```
 
 **示例**
@@ -4185,7 +4185,7 @@ F(6, 191) =   1.28
 **签名**
 
 ```python
-ws.estat_summarize(result: 'Any', *, data: 'pd.DataFrame | None' = None, variables: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, cluster: 'Any' = None, cluster_name: 'str' = '', noweights: 'bool' = False, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'SummarizeResult'
+ws.estat_summarize(result: 'Any', *, data: 'pd.DataFrame | None' = None, variables: 'Sequence[str] | None' = None, weights: 'Any' = None, weight_type: 'str | None' = None, cluster: 'Any' = None, cluster_name: 'str' = '', noweights: 'bool' = False, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'SummarizeResults'
 ```
 
 **示例**
@@ -4248,7 +4248,7 @@ Correlation matrix of coefficients
 **签名**
 
 ```python
-ws.estat_vif(result: 'Any', *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'VifResult'
+ws.estat_vif(result: 'Any', *, uncentered: 'bool' = False, nosort: 'bool' = False) -> 'VifResults'
 ```
 
 **示例**
@@ -4278,7 +4278,7 @@ ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 **签名**
 
 ```python
-ws.estat_auc(result: 'Any') -> 'AucResult'
+ws.estat_auc(result: 'Any') -> 'AucResults'
 ```
 
 **示例**
@@ -4295,7 +4295,7 @@ Area under ROC curve = 0.6435
 
 **注意:** 只接受 `logit`/`probit` 结果：`ologit` 不设 `e(estat_cmd)`，没有该子命令。
 
-### `estat_esize`
+### `estat_effect_size`
 
 **Stata 指令:** `estat esize`
 
@@ -4304,7 +4304,7 @@ Area under ROC curve = 0.6435
 **签名**
 
 ```python
-ws.estat_esize(result: 'Any', *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'EffectSizeResult'
+ws.estat_effect_size(result: 'Any', *, epsilon: 'bool' = False, omega: 'bool' = False, level: 'float' = 0.95) -> 'EffectSizeResults'
 ```
 
 **示例**
@@ -4334,7 +4334,7 @@ Effect sizes for linear models
 **签名**
 
 ```python
-ws.estat_moran(result: 'Any', errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'MoranResult'
+ws.estat_moran(result: 'Any', errorlag: 'Any' = None, *, weights: 'Any' = None) -> 'MoranResults'
 ```
 
 **示例**
@@ -4372,7 +4372,7 @@ Ha: error terms are spatially correlated
 **签名**
 
 ```python
-ws.estat_mundlak(result: 'Any', *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'MundlakResult'
+ws.estat_mundlak(result: 'Any', *, storer: 'Any' = None, entity: 'str | None' = None, time: 'str | None' = None) -> 'MundlakResults'
 ```
 
 **示例**
@@ -4404,7 +4404,7 @@ Szroeter 的秩异方差检验（Stata `estat szroeter`），每个变量一个 
 **签名**
 
 ```python
-ws.estat_szroeter(result: 'Any', variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'SzroeterResult | SzroeterTable'
+ws.estat_szroeter(result: 'Any', variables: 'Sequence[str] | None' = None, *, rhs: 'bool' = False, mtest: 'str | None' = None) -> 'SzroeterResults | SzroeterTable'
 ```
 
 **示例**
@@ -4430,7 +4430,7 @@ Ha: Variance monotonic in variables
 
 **注意:** Stata 总是做多重检验但默认不做校正，因此单变量时丢弃校正后的 p 值并报告 `r(chi2)`/`r(df)`/`r(p)`，多变量时则把它放在 `r(mtest)` 矩阵里。此处单个变量返回单个结果，多个变量返回一张表；该表的 `to_dict()` 把 p 值列压平为 `{'p_<变量>': ...}`，`to_frame()` 则保留 chi2、df 与两个 p 值。
 
-### `estat_weakrobust`
+### `estat_weak_instrument_robust`
 
 **Stata 指令:** `estat weakrobust`
 
@@ -4439,7 +4439,7 @@ Ha: Variance monotonic in variables
 **签名**
 
 ```python
-ws.estat_weakrobust(result: 'Any', *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'WeakRobustResult'
+ws.estat_weak_instrument_robust(result: 'Any', *, ar: 'bool | None' = None, clr: 'bool | None' = None, betanull: 'Any' = None) -> 'WeakRobustResults'
 ```
 
 **示例**
@@ -4468,7 +4468,7 @@ Pregibon 的连接检验，用于发现设定错误（Stata `linktest`）。模�
 **签名**
 
 ```python
-ws.linktest(result: 'Any') -> 'LinkTestResult'
+ws.linktest(result: 'Any') -> 'LinkTestResults'
 ```
 
 **示例**
@@ -4501,7 +4501,7 @@ H0: the link is specified correctly
 **签名**
 
 ```python
-ws.suest(models: 'Sequence[Any]', *, names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'SucestResult'
+ws.suest(models: 'Sequence[Any]', *, names: 'Sequence[str] | None' = None, cluster: 'Any' = None) -> 'SuestResults'
 ```
 
 **示例**
@@ -4522,7 +4522,7 @@ Simultaneous covariance matrix
 
 **注意:** 按 `suest.sthlp` 的建议，各分量应在**不带** `vce(robust)`/`vce(cluster)` 的情况下估计：`suest` 自身就给出稳健协方差，带稳健分量的结果会被重复校正。
 
-### `newey`
+### `newey_west`
 
 **Stata 指令:** `newey y x1 x2, lag(2)`
 
@@ -4531,7 +4531,7 @@ Newey-West 回归，`newey 被解释变量 解释变量, lag(#)`（Stata `newey`
 **签名**
 
 ```python
-ws.newey(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' = None, force: 'bool' = False, noconstant: 'bool' = False, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'NeweyWestResult'
+ws.newey_west(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' = None, force: 'bool' = False, noconstant: 'bool' = False, weights: 'Any' = None, weight_type: 'str | None' = None) -> 'NeweyWestResults'
 ```
 
 **示例**
@@ -4568,7 +4568,7 @@ Maximum lag = 2                                 F(  2,       197) =     107.69
 **签名**
 
 ```python
-ws.unitroot(endog: 'Any', *, test: 'str' = 'adf', regression: 'str' = 'c', maxlag: 'int | None' = None, autolag: 'str | None' = None) -> 'UnitRootResult'
+ws.unitroot(endog: 'Any', *, test: 'str' = 'adf', regression: 'str' = 'c', maxlag: 'int | None' = None, autolag: 'str | None' = None) -> 'UnitRootResults'
 ```
 
 **示例**
@@ -4607,7 +4607,7 @@ Levin-Lin-Chu 面板单位根检验（Stata `xtunitroot llc`）。数据框必�
 **签名**
 
 ```python
-ws.levin_lin_chu(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResult'
+ws.levin_lin_chu(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, constant: 'bool' = True, demean: 'bool' = False, lags: 'int | None' = None, hac_lags: 'int | None' = None) -> 'LlcResults'
 ```
 
 **示例**
@@ -4636,7 +4636,7 @@ Im-Pesaran-Shin 面板单位根检验（Stata `xtunitroot ips`）。`trend=True`
 **签名**
 
 ```python
-ws.im_pesaran_shin(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResult'
+ws.im_pesaran_shin(data: 'pd.DataFrame', *, variable: 'str', entity: 'str', time: 'str', trend: 'bool' = False, demean: 'bool' = False, lags: 'int | None' = None, level: 'float' = 0.05) -> 'IpsResults'
 ```
 
 **示例**
@@ -4799,7 +4799,7 @@ Breusch-Godfrey 的 `lags` 阶序列相关 LM 检验。该检验把残差对**�
 **签名**
 
 ```python
-ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResult'
+ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'bool' = False, time: 'str | Sequence[Any] | None' = None, delta: 'float' = 1.0) -> 'BgTestResults'
 ```
 
 **示例**
@@ -4814,7 +4814,7 @@ print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
 None
 ```
 
-### `estat_corrgram`
+### `estat_correlogram`
 
 **Stata 指令:** `estat corrgram`
 
@@ -4823,7 +4823,7 @@ None
 **签名**
 
 ```python
-ws.estat_corrgram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
+ws.estat_correlogram(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'Correlogram'
 ```
 
 **示例**
@@ -4847,7 +4847,7 @@ None
 **签名**
 
 ```python
-ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResult'
+ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'DurbinWatsonResults'
 ```
 
 **示例**
@@ -4987,7 +4987,7 @@ r.t_test('x1 = 0')
 **签名**
 
 ```python
-ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResult'
+ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None' = None, delta: 'float' = 1.0) -> 'PortmanteauResults'
 ```
 
 **示例**
@@ -6339,7 +6339,7 @@ r.test('x1 = 0')
 
 **注意:** `to_dict()` 给出 Stata 的 `r()` 名称：统计量以其自身分布的名字出现（`F` 或 `chi2`），因此在卡方检验之后读 `r(F)` 会找不到——这是对的，因为 Stata 在那里存的是 `r(chi2)`。
 
-### `LincomResult`
+### `LincomResults`
 
 **Stata 指令:** `lincom x1 - x2`
 
@@ -6348,7 +6348,7 @@ r.test('x1 = 0')
 **签名**
 
 ```python
-ws.LincomResult(estimate: 'float', std_err: 'float', statistic: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', distribution: 'str', df: 'float | None', expression: 'str', eform: 'bool' = False, label: 'str' = '', response_name: 'str' = '') -> None
+ws.LincomResults(estimate: 'float', std_err: 'float', statistic: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', distribution: 'str', df: 'float | None', expression: 'str', eform: 'bool' = False, label: 'str' = '', response_name: 'str' = '') -> None
 ```
 
 **示例**
@@ -6373,7 +6373,7 @@ r.lincom('x1 - x2')
 
 **注意:** 对基于 z 的拟合，`to_dict()` 省略 `df`，而不是报 0 或 None，因为 Stata 在这种情况下不存 `r(df)`；统计量相应地以 `t` 或 `z` 出现。
 
-### `IcResult`
+### `IcResults`
 
 **Stata 指令:** `estat ic`
 
@@ -6382,7 +6382,7 @@ r.lincom('x1 - x2')
 **签名**
 
 ```python
-ws.IcResult(*, n: 'float', ll_null: 'float', ll_model: 'float', df: 'float', aic: 'float', bic: 'float', aicc: 'float', caic: 'float', model: 'str' = '') -> 'None'
+ws.IcResults(*, n: 'float', ll_null: 'float', ll_model: 'float', df: 'float', aic: 'float', bic: 'float', aicc: 'float', caic: 'float', model: 'str' = '') -> 'None'
 ```
 
 **示例**
@@ -6405,7 +6405,7 @@ Akaike's information criterion and Bayesian information criterion
 Note: BIC uses N = number of observations. See [R] IC note.
 ```
 
-### `VifResult`
+### `VifResults`
 
 **Stata 指令:** `estat vif`
 
@@ -6414,7 +6414,7 @@ Note: BIC uses N = number of observations. See [R] IC note.
 **签名**
 
 ```python
-ws.VifResult(names: 'Sequence[str]', vif: 'Sequence[float]', mean_vif: 'float') -> 'None'
+ws.VifResults(names: 'Sequence[str]', vif: 'Sequence[float]', mean_vif: 'float') -> 'None'
 ```
 
 **示例**
@@ -6435,7 +6435,7 @@ ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
     Mean VIF |      1.00
 ```
 
-### `MarginsResult`
+### `MarginsResults`
 
 **Stata 指令:** `margins, dydx(x1)`
 
@@ -6444,7 +6444,7 @@ ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
 **签名**
 
 ```python
-ws.MarginsResult(label: 'str', estimate: 'float', std_err: 'float', statistic: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', prediction: 'str' = '', title: 'str' = '', nobs: 'float' = nan, vce_label: 'str' = '', expression: 'str' = '', variables: 'tuple[str, ...]' = (), column_label: 'str' = '', stat_label: 'str' = 'z', at_means: 'tuple[tuple[str, float], ...]' = ()) -> None
+ws.MarginsResults(label: 'str', estimate: 'float', std_err: 'float', statistic: 'float', pvalue: 'float', ci_lower: 'float', ci_upper: 'float', prediction: 'str' = '', title: 'str' = '', nobs: 'float' = nan, vce_label: 'str' = '', expression: 'str' = '', variables: 'tuple[str, ...]' = (), column_label: 'str' = '', stat_label: 'str' = 'z', at_means: 'tuple[tuple[str, float], ...]' = ()) -> None
 ```
 
 **示例**
@@ -6473,7 +6473,7 @@ dy/dx wrt:  x1
 
 **注意:** `to_dict()` 一律把统计量行标为 `t`，因为该对象不携带分布标志；logit 之后 Stata 会标为 `z`。当标签本身重要时请用 `str(...)`。
 
-### `GofResult`
+### `GofResults`
 
 **Stata 指令:** `estat gof (after poisson)`
 
@@ -6482,7 +6482,7 @@ Poisson 拟合优度表：一个偏差（似然比）检验与一个 Pearson 检
 **签名**
 
 ```python
-ws.GofResult(*, deviance: 'float', deviance_pvalue: 'float', pearson: 'float', pearson_pvalue: 'float', df: 'float') -> 'None'
+ws.GofResults(*, deviance: 'float', deviance_pvalue: 'float', pearson: 'float', pearson_pvalue: 'float', df: 'float') -> 'None'
 ```
 
 **示例**
@@ -6502,7 +6502,7 @@ Pearson goodness-of-fit            =   187.551
 Prob > chi2(198)                   =    0.6918
 ```
 
-### `ClassificationResult`
+### `ClassificationResults`
 
 **Stata 指令:** `estat classification`
 
@@ -6511,7 +6511,7 @@ Prob > chi2(198)                   =    0.6918
 **签名**
 
 ```python
-ws.ClassificationResult(*, table: 'pd.DataFrame', cutoff: 'float', percent_correct: 'float', sensitivity: 'float', specificity: 'float', false_positive_rate: 'float', false_negative_rate: 'float', positive_predictive_value: 'float', negative_predictive_value: 'float', false_positive_classified: 'float', false_negative_classified: 'float', model_label: 'str' = '', depvar: 'str' = '') -> 'None'
+ws.ClassificationResults(*, table: 'pd.DataFrame', cutoff: 'float', percent_correct: 'float', sensitivity: 'float', specificity: 'float', false_positive_rate: 'float', false_negative_rate: 'float', positive_predictive_value: 'float', negative_predictive_value: 'float', false_positive_classified: 'float', false_negative_classified: 'float', model_label: 'str' = '', depvar: 'str' = '') -> 'None'
 ```
 
 **示例**
@@ -6527,7 +6527,7 @@ r = ws.estat_classification(ws.Logit.from_formula('yb ~ x1 + x2', base).fit())
 (0.5, 62.0)
 ```
 
-### `HetTestResult`
+### `HetTestResults`
 
 **Stata 指令:** `estat hettest`
 
@@ -6536,7 +6536,7 @@ Breusch-Pagan / Cook-Weisberg 异方差检验。字段：`method`（`"normal"`�
 **签名**
 
 ```python
-ws.HetTestResult(*, method: 'str', statistic: 'float', df: 'float', pvalue: 'float', df_denom: 'float | None' = None, variables: 'Sequence[str]' = (), label: 'str' = '', plural: 'bool' = False) -> 'None'
+ws.HetTestResults(*, method: 'str', statistic: 'float', df: 'float', pvalue: 'float', df_denom: 'float | None' = None, variables: 'Sequence[str]' = (), label: 'str' = '', plural: 'bool' = False) -> 'None'
 ```
 
 **示例**
@@ -6559,7 +6559,7 @@ H0: Constant variance
 Prob > chi2 = 0.6006
 ```
 
-### `ImTestResult`
+### `ImTestResults`
 
 **Stata 指令:** `estat imtest`
 
@@ -6568,7 +6568,7 @@ Cameron & Trivedi 的信息矩阵检验分解，可选附带 White 原始检验�
 **签名**
 
 ```python
-ws.ImTestResult(*, heteroskedasticity: 'float', skewness: 'float', kurtosis: 'float', df_heteroskedasticity: 'float', df_skewness: 'float', df_kurtosis: 'float', white: 'float | None' = None, white_df: 'float | None' = None) -> 'None'
+ws.ImTestResults(*, heteroskedasticity: 'float', skewness: 'float', kurtosis: 'float', df_heteroskedasticity: 'float', df_skewness: 'float', df_kurtosis: 'float', white: 'float | None' = None, white_df: 'float | None' = None) -> 'None'
 ```
 
 **示例**
@@ -6594,7 +6594,7 @@ Cameron & Trivedi's decomposition of IM-test
 --------------------------------------------------
 ```
 
-### `OvTestResult`
+### `OvTestResults`
 
 **Stata 指令:** `estat ovtest`
 
@@ -6603,7 +6603,7 @@ Ramsey 的 RESET 遗漏变量检验。字段：`statistic`（F 统计量）、`d
 **签名**
 
 ```python
-ws.OvTestResult(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str', dropped: 'Sequence[str]' = (), ambiguous: 'bool' = False) -> 'None'
+ws.OvTestResults(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float', omitted: 'str', dropped: 'Sequence[str]' = (), ambiguous: 'bool' = False) -> 'None'
 ```
 
 **示例**
@@ -6625,7 +6625,7 @@ F(3, 194) =   0.58
  Prob > F = 0.6277
 ```
 
-### `EndogenousResult`
+### `EndogenousResults`
 
 **Stata 指令:** `estat endogenous`
 
@@ -6634,7 +6634,7 @@ IV 拟合的 Durbin 与 Wu 内生性检验。字段：`durbin`、`durbin_pvalue`
 **签名**
 
 ```python
-ws.EndogenousResult(*, durbin: 'float', durbin_pvalue: 'float', wu: 'float', wu_pvalue: 'float', wu_df: 'float', wu_df_denom: 'float', tested) -> 'None'
+ws.EndogenousResults(*, durbin: 'float', durbin_pvalue: 'float', wu: 'float', wu_pvalue: 'float', wu_df: 'float', wu_df_denom: 'float', tested) -> 'None'
 ```
 
 **示例**
@@ -6655,7 +6655,7 @@ ws.estat_endogenous(iv)
   Wu-Hausman F(1,196)             =  1.62438  (p = 0.2040)
 ```
 
-### `FirstStageResult`
+### `FirstStageResults`
 
 **Stata 指令:** `estat firststage`
 
@@ -6664,7 +6664,7 @@ IV 拟合的第一阶段诊断：每个内生回归元一行，外加一个总�
 **签名**
 
 ```python
-ws.FirstStageResult(*, endog: 'Sequence[str]', r2: 'Sequence[float]', adj_r2: 'Sequence[float]', partial_r2: 'Sequence[float]', f: 'Sequence[float]', df_num: 'Sequence[float]', df_denom: 'Sequence[float]', pvalue: 'Sequence[float]', shea: 'Sequence[float] | None' = None, shea_adj: 'Sequence[float] | None' = None, mineig: 'float | None' = None, mineigcv: 'Any' = None, show_all: 'bool' = False, force_nonrobust: 'bool' = False, robust_vce: 'bool' = False) -> 'None'
+ws.FirstStageResults(*, endog: 'Sequence[str]', r2: 'Sequence[float]', adj_r2: 'Sequence[float]', partial_r2: 'Sequence[float]', f: 'Sequence[float]', df_num: 'Sequence[float]', df_denom: 'Sequence[float]', pvalue: 'Sequence[float]', shea: 'Sequence[float] | None' = None, shea_adj: 'Sequence[float] | None' = None, mineig: 'float | None' = None, mineigcv: 'Any' = None, show_all: 'bool' = False, force_nonrobust: 'bool' = False, robust_vce: 'bool' = False) -> 'None'
 ```
 
 **示例**
@@ -6701,7 +6701,7 @@ ws.estat_firststage(iv)
   ---------------------------------------------------------------------
 ```
 
-### `OverIdResult`
+### `OverIdResults`
 
 **Stata 指令:** `estat overid`
 
@@ -6710,7 +6710,7 @@ IV 拟合的过度识别约束检验。字段：`statistic`、`df`（过度识�
 **签名**
 
 ```python
-ws.OverIdResult(*, statistic: 'float', df: 'float', pvalue: 'float', test: 'str', basmann: 'float | None' = None, basmann_pvalue: 'float | None' = None) -> 'None'
+ws.OverIdResults(*, statistic: 'float', df: 'float', pvalue: 'float', test: 'str', basmann: 'float | None' = None, basmann_pvalue: 'float | None' = None) -> 'None'
 ```
 
 **示例**
@@ -6730,7 +6730,7 @@ ws.estat_overid(iv)
   Basmann chi2(1)        = .00291775  (p = 0.9569)
 ```
 
-### `LRTestResult`
+### `LRTestResults`
 
 **Stata 指令:** `lrtest unrestricted restricted`
 
@@ -6739,7 +6739,7 @@ ws.estat_overid(iv)
 **签名**
 
 ```python
-ws.LRTestResult(statistic: 'float', df: 'float', pvalue: 'float', ll_unrestricted: 'float', ll_restricted: 'float', restricted_name: 'str' = '', unrestricted_name: 'str' = '') -> None
+ws.LRTestResults(statistic: 'float', df: 'float', pvalue: 'float', ll_unrestricted: 'float', ll_restricted: 'float', restricted_name: 'str' = '', unrestricted_name: 'str' = '') -> None
 ```
 
 **示例**
@@ -6759,7 +6759,7 @@ LR chi2(1) = 0.79
 Prob > chi2 = 0.3731
 ```
 
-### `HausmanResult`
+### `HausmanResults`
 
 **Stata 指令:** `hausman fe re`
 
@@ -6768,7 +6768,7 @@ Hausman 设定检验：`(b_c - b_e)' [V_c - V_e]^-1 (b_c - b_e)`。字段：`sta
 **签名**
 
 ```python
-ws.HausmanResult(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '', tested_count: 'int | None' = None, not_positive_definite: 'bool' = False) -> None
+ws.HausmanResults(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'list[str]' = <factory>, names: 'list[str]' = <factory>, consistent: 'np.ndarray | None' = None, efficient: 'np.ndarray | None' = None, standard_errors: 'np.ndarray | None' = None, consistent_label: 'str' = '', efficient_label: 'str' = '', consistent_command: 'str' = '', efficient_command: 'str' = '', tested_count: 'int | None' = None, not_positive_definite: 'bool' = False) -> None
 ```
 
 **示例**
@@ -6855,7 +6855,7 @@ F test of absorbed indicators: F(39, 159) = 1.095       Prob > F = 0.340
 
 **注意:** `absorb=` 是必填项——不给它就等同于 `regress`。`_cons` 是被吸收组效应的**按组容量加权**均值；固定效应模型无法把常数与组效应分开识别，只有归一化能定住它，这里采用的是 areg 的归一化。聚类协方差的 CR1 因子用 `K = k_reported + (k_absorb - 1)`，而 `reghdfe` 用 `k_reported`：在 areg 的口径里被吸收的水平也消耗自由度。这个差别**在聚类维度与吸收维度的不同配对下并不一致**，所以只有 `e(rank)` 显示哑变量尚未计入时才施加修正。多路聚类时两个命令的因子是**结构不同**、不是差一个参数计数，因此在完整设计上重算，而不是缩放。`noabsorb=True` 跳过被吸收指示变量的 F 检验（Stata 的 `noabsorbtest`），此时 `e(F_absorb)`/`e(p_absorb)` 不存在。
 
-### `AucResult`
+### `AucResults`
 
 **Stata 指令:** `estat auc after logit/probit`
 
@@ -6864,7 +6864,7 @@ F test of absorbed indicators: F(39, 159) = 1.095       Prob > F = 0.340
 **签名**
 
 ```python
-ws.AucResult(*, area: 'float', n: 'int') -> 'None'
+ws.AucResults(*, area: 'float', n: 'int') -> 'None'
 ```
 
 **示例**
@@ -6880,7 +6880,7 @@ print(round(r.area, 6))
 None
 ```
 
-### `BgTestResult`
+### `BgTestResults`
 
 **Stata 指令:** `estat bgodfrey`
 
@@ -6889,7 +6889,7 @@ None
 **签名**
 
 ```python
-ws.BgTestResult(rows: 'tuple[BgTestRow, ...]', nobs: 'int', n_gaps: 'int' = 0) -> None
+ws.BgTestResults(rows: 'tuple[BgTestRow, ...]', nobs: 'int', n_gaps: 'int' = 0) -> None
 ```
 
 **示例**
@@ -6983,7 +6983,7 @@ print(r.to_frame())
 None
 ```
 
-### `DFGLSResult`
+### `DFGLSResults`
 
 **Stata 指令:** `dfgls`
 
@@ -6992,7 +6992,7 @@ None
 **签名**
 
 ```python
-ws.DFGLSResult(cells: 'tuple[DFGLSCell, ...]', trend: 'bool', variable: 'str' = '') -> None
+ws.DFGLSResults(cells: 'tuple[DFGLSCell, ...]', trend: 'bool', variable: 'str' = '') -> None
 ```
 
 **示例**
@@ -7008,7 +7008,7 @@ print(r.to_frame().head(3))
 None
 ```
 
-### `DurbinWatsonResult`
+### `DurbinWatsonResults`
 
 **Stata 指令:** `estat dwatson`
 
@@ -7017,7 +7017,7 @@ None
 **签名**
 
 ```python
-ws.DurbinWatsonResult(d: 'float', df: 'float', nobs: 'int', n_gaps: 'int' = 0) -> None
+ws.DurbinWatsonResults(d: 'float', df: 'float', nobs: 'int', n_gaps: 'int' = 0) -> None
 ```
 
 **示例**
@@ -7058,7 +7058,7 @@ print(fit.e['N'], round(fit.e['r2'], 6))
 None
 ```
 
-### `EffectSizeResult`
+### `EffectSizeResults`
 
 **Stata 指令:** `estat esize`
 
@@ -7067,7 +7067,7 @@ None
 **签名**
 
 ```python
-ws.EffectSizeResult(kind: 'str', estimate: 'float', ci_lower: 'float | None' = None, ci_upper: 'float | None' = None, level: 'float' = 0.95) -> None
+ws.EffectSizeResults(kind: 'str', estimate: 'float', ci_lower: 'float | None' = None, ci_upper: 'float | None' = None, level: 'float' = 0.95) -> None
 ```
 
 **示例**
@@ -7083,7 +7083,7 @@ print(round(r.estimate, 6))
 None
 ```
 
-### `EndogScoreResult`
+### `EndogScoreResults`
 
 **Stata 指令:** `estat endogenous (score form)`
 
@@ -7092,7 +7092,7 @@ None
 **签名**
 
 ```python
-ws.EndogScoreResult(*, statistic: 'float', df: 'float', test: 'str', lags: 'int | None' = None) -> 'None'
+ws.EndogScoreResults(*, statistic: 'float', df: 'float', test: 'str', lags: 'int | None' = None) -> 'None'
 ```
 
 **示例**
@@ -7176,39 +7176,7 @@ print(ws.irf_table(fit).responses[0].at(1))
 None
 ```
 
-### `IrFTable`
-
-**Stata 指令:** `irf table irf`
-
-渲染后的 `irf table` 区块。`responses` 中每个 (impulse, response) 组合对应一个 `ImpulseResponse`，含步数、点估计与上下界。
-
-**签名**
-
-```python
-ws.IrFTable(responses: "'tuple[ImpulseResponse, ...]'", ci_level: 'str' = '95') -> None
-```
-
-**示例**
-
-```python
-import numpy as np
-import pandas as pd
-rng = np.random.default_rng(11)
-y = np.zeros(60)
-for _t in range(1, 60):
-    y[_t] = 0.6 * y[_t - 1] + rng.normal()
-frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
-fit = ws.varbasic(frame, 'dlny', lags=1, time='t')
-print(ws.irf_table(fit).responses[0].steps)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `IrfResult`
+### `IrfResults`
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
@@ -7217,7 +7185,7 @@ None
 **签名**
 
 ```python
-ws.IrfResult(names: 'list[str]', lags: 'int', nobs: 'int', sample_first: 'Any' = None, sample_last: 'Any' = None, sample_has_gap: 'bool' = False, coefficients: 'np.ndarray' = None, sigma: 'np.ndarray' = None, sigma_se: 'np.ndarray' = None, ll: 'float' = nan, aic: 'float' = nan, hqic: 'float' = nan, sbic: 'float' = nan, fpe: 'float' = nan, det_sigma: 'float' = nan, rmse: 'tuple[float, ...]' = (), r2: 'tuple[float, ...]' = (), chi2: 'tuple[float, ...]' = (), chi2_p: 'tuple[float, ...]' = (), parms: 'tuple[int, ...]' = (), responses: 'tuple[ImpulseResponse, ...]' = (), design: 'np.ndarray' = None, regressor_names: 'tuple[str, ...]' = (), lag_orders: "'int | tuple[int, ...]'" = 1) -> None
+ws.IrfResults(names: 'list[str]', lags: 'int', nobs: 'int', sample_first: 'Any' = None, sample_last: 'Any' = None, sample_has_gap: 'bool' = False, coefficients: 'np.ndarray' = None, sigma: 'np.ndarray' = None, sigma_se: 'np.ndarray' = None, ll: 'float' = nan, aic: 'float' = nan, hqic: 'float' = nan, sbic: 'float' = nan, fpe: 'float' = nan, det_sigma: 'float' = nan, rmse: 'tuple[float, ...]' = (), r2: 'tuple[float, ...]' = (), chi2: 'tuple[float, ...]' = (), chi2_p: 'tuple[float, ...]' = (), parms: 'tuple[int, ...]' = (), responses: 'tuple[ImpulseResponse, ...]' = (), design: 'np.ndarray' = None, regressor_names: 'tuple[str, ...]' = (), lag_orders: "'int | tuple[int, ...]'" = 1) -> None
 ```
 
 **示例**
@@ -7267,7 +7235,39 @@ print(s.at('y', 'x1'))
 None
 ```
 
-### `JohansenResult`
+### `IrfTable`
+
+**Stata 指令:** `irf table irf`
+
+渲染后的 `irf table` 区块。`responses` 中每个 (impulse, response) 组合对应一个 `ImpulseResponse`，含步数、点估计与上下界。
+
+**签名**
+
+```python
+ws.IrfTable(responses: "'tuple[ImpulseResponse, ...]'", ci_level: 'str' = '95') -> None
+```
+
+**示例**
+
+```python
+import numpy as np
+import pandas as pd
+rng = np.random.default_rng(11)
+y = np.zeros(60)
+for _t in range(1, 60):
+    y[_t] = 0.6 * y[_t - 1] + rng.normal()
+frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
+fit = ws.varbasic(frame, 'dlny', lags=1, time='t')
+print(ws.irf_table(fit).responses[0].steps)
+```
+
+**输出**
+
+```text
+None
+```
+
+### `JohansenResults`
 
 **Stata 指令:** `vecrank / vec johansen`
 
@@ -7276,7 +7276,7 @@ Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 
 **签名**
 
 ```python
-ws.JohansenResult(trace: 'np.ndarray', trace_critical: 'np.ndarray', maxeig: 'np.ndarray', maxeig_critical: 'np.ndarray', eigenvectors: 'np.ndarray', diagnostics: 'Any' = None, context: 'Any' = None) -> None
+ws.JohansenResults(trace: 'np.ndarray', trace_critical: 'np.ndarray', maxeig: 'np.ndarray', maxeig_critical: 'np.ndarray', eigenvectors: 'np.ndarray', diagnostics: 'Any' = None, context: 'Any' = None) -> None
 ```
 
 **示例**
@@ -7292,7 +7292,7 @@ print(r.to_frame().head(3))
 None
 ```
 
-### `KpssResult`
+### `KpssResults`
 
 **Stata 指令:** `kpss`
 
@@ -7301,7 +7301,7 @@ None
 **签名**
 
 ```python
-ws.KpssResult(rows: 'tuple[KpssRow, ...]', trend: 'bool', nobs: 'int', critical: 'dict[float, float]', name: 'str' = '', maxlag_explicit: 'bool' = False) -> None
+ws.KpssResults(rows: 'tuple[KpssRow, ...]', trend: 'bool', nobs: 'int', critical: 'dict[float, float]', name: 'str' = '', maxlag_explicit: 'bool' = False) -> None
 ```
 
 **示例**
@@ -7317,7 +7317,7 @@ print(r.to_frame().head(3))
 None
 ```
 
-### `LfitResult`
+### `LfitResults`
 
 **Stata 指令:** `estat gof, lfit`
 
@@ -7326,7 +7326,7 @@ Hosmer-Lemeshow 式拟合优度结果：`to_dict()` 给出 Pearson 卡方、p �
 **签名**
 
 ```python
-ws.LfitResult(*, chi2: 'float', pvalue: 'float', df: 'float', patterns: 'int', depvar: 'str' = '', model_label: 'str' = 'logistic', n_obs: 'int' = 0) -> 'None'
+ws.LfitResults(*, chi2: 'float', pvalue: 'float', df: 'float', patterns: 'int', depvar: 'str' = '', model_label: 'str' = 'logistic', n_obs: 'int' = 0) -> 'None'
 ```
 
 **示例**
@@ -7342,7 +7342,7 @@ print(ws.estat_gof(fit, group=10).to_dict())
 None
 ```
 
-### `LinkTestResult`
+### `LinkTestResults`
 
 **Stata 指令:** `linktest`
 
@@ -7351,7 +7351,7 @@ None
 **签名**
 
 ```python
-ws.LinkTestResult(t_statistic: 'float', df: 'float', pvalue: 'float', hat_coefficient: 'float', hatsq_coefficient: 'float') -> None
+ws.LinkTestResults(t_statistic: 'float', df: 'float', pvalue: 'float', hat_coefficient: 'float', hatsq_coefficient: 'float') -> None
 ```
 
 **示例**
@@ -7367,7 +7367,7 @@ print(round(r.pvalue, 6))
 None
 ```
 
-### `LmarResult`
+### `LmarResults`
 
 **Stata 指令:** `varlmar / veclmar`
 
@@ -7376,7 +7376,7 @@ VAR/VECM 的拉格朗日乘子自相关结果：`to_frame()` 给出每个被检�
 **签名**
 
 ```python
-ws.LmarResult(rows: 'tuple[LmarRow, ...]') -> None
+ws.LmarResults(rows: 'tuple[LmarRow, ...]') -> None
 ```
 
 **示例**
@@ -7410,7 +7410,7 @@ print(ws.MTEST_METHODS)
 None
 ```
 
-### `MTestResult`
+### `MTestResults`
 
 **Stata 指令:** `estat hettest, mtest(...)`
 
@@ -7419,7 +7419,7 @@ None
 **签名**
 
 ```python
-ws.MTestResult(table: 'Any', method: 'str') -> 'None'
+ws.MTestResults(table: 'Any', method: 'str') -> 'None'
 ```
 
 **示例**
@@ -7460,7 +7460,7 @@ print(ws.margins(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), dydx=['x1','x2'
 None
 ```
 
-### `MoranResult`
+### `MoranResults`
 
 **Stata 指令:** `estat moran`
 
@@ -7469,7 +7469,7 @@ Moran 空间自相关检验结果：`to_dict()` 给出 Moran I 统计量、无�
 **签名**
 
 ```python
-ws.MoranResult(statistic: 'float', df: 'float', pvalue: 'float', moran_i: 'float', expected_i: 'float', z: 'float', errorlags: 'int' = 1) -> None
+ws.MoranResults(statistic: 'float', df: 'float', pvalue: 'float', moran_i: 'float', expected_i: 'float', z: 'float', errorlags: 'int' = 1) -> None
 ```
 
 **示例**
@@ -7522,7 +7522,7 @@ np.round(f.e['ll'], 4)
 -181.4397
 ```
 
-### `MundlakResult`
+### `MundlakResults`
 
 **Stata 指令:** `estat mundlak`
 
@@ -7531,7 +7531,7 @@ Mundlak 设定检验结果：被检验的项、`chibar2` 统计量、其自由�
 **签名**
 
 ```python
-ws.MundlakResult(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]') -> None
+ws.MundlakResults(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]') -> None
 ```
 
 **示例**
@@ -7567,7 +7567,7 @@ Newey.from_formula(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'A
 **`Newey.fit`**
 
 ```python
-Newey.fit(self, *, lag: 'int | None' = None) -> 'NeweyWestResult'
+Newey.fit(self, *, lag: 'int | None' = None) -> 'NeweyWestResults'
 ```
 
 **示例**
@@ -7583,7 +7583,7 @@ print(r.cov_type, round(float(r.params.iloc[0]), 6))
 None
 ```
 
-### `NnmatchResult`
+### `NnmatchResults`
 
 **Stata 指令:** `teffects nnmatch`
 
@@ -7592,7 +7592,7 @@ None
 **签名**
 
 ```python
-ws.NnmatchResult(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', metric: 'str' = 'mahalanobis', caliper: 'float' = nan, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan) -> None
+ws.NnmatchResults(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', metric: 'str' = 'mahalanobis', caliper: 'float' = nan, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan) -> None
 ```
 
 **示例**
@@ -7608,23 +7608,27 @@ print(round(r.ate, 6))
 None
 ```
 
-### `PanelUnitRootResult`
+### `PanelDesResults`
 
-**Stata 指令:** `xtunitroot ips/llc`
+**Stata 指令:** `xtdes`
 
-`XtUnitroot(...).fit()` 返回的对象：承载 p 值的统计量（`name` 说明是哪个，IPS 为 'Z-t-tilde-bar'）、p 值，以及 `details` 中的逐面板明细块。
+`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。
 
 **签名**
 
 ```python
-ws.PanelUnitRootResult(statistic: 'float', pvalue: 'float', test: 'str', name: 'str' = '', details: 'Mapping[str, float] | None' = None) -> None
+ws.PanelDesResults(entity: 'str', time: 'str', entities: 'int', periods: 'int', nobs: 'int', first_entity: 'Any' = None, second_entity: 'Any' = None, last_entity: 'Any' = None, first_time: 'Any' = None, second_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, span: 'int' = 0, size_quantiles: 'dict[str, float]' = <factory>, patterns: 'list[tuple[str, int]]' = <factory>) -> None
 ```
 
 **示例**
 
 ```python
-r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()
-print(r.name, round(r.pvalue, 6))
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtdes(panel, entity="pid", time="year")
+print(result.patterns)
 ```
 
 **输出**
@@ -7633,23 +7637,24 @@ print(r.name, round(r.pvalue, 6))
 None
 ```
 
-### `PortmanteauResult`
+### `PanelOveridResults`
 
-**Stata 指令:** `wntestq`
+**Stata 指令:** `r(j), r(jdf), r(jp) after xtoverid`
 
-混成（Ljung-Box / Box-Pierce）检验结果：所采用滞后阶下的 `q` 统计量、`df` 自由度与 `pvalue`。
+`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 "fixed vs random effects"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。
 
 **签名**
 
 ```python
-ws.PortmanteauResult(q: 'float', df: 'int', pvalue: 'float', lags: 'int', n_gaps: 'int' = 0) -> None
+ws.PanelOveridResults(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]', description: 'str' = 'fixed vs random effects', model: 'str' = 'xtreg re') -> None
 ```
 
 **示例**
 
 ```python
-r = ws.wntestq(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
-print(round(r.q, 6))
+fit = ws.RandomEffects.from_formula("y ~ x1", base, entity="firm", time="year").fit()
+r = ws.xtoverid(fit)
+print(r.statistic, r.df, r.pvalue)
 ```
 
 **输出**
@@ -7658,120 +7663,7 @@ print(round(r.q, 6))
 None
 ```
 
-### `Prais`
-
-**Stata 指令:** `prais depvar indepvars [, corc]`
-
-`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。
-
-**签名**
-
-```python
-ws.Prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'None'
-```
-
-**`Prais.from_formula`**
-
-```python
-Prais.from_formula(formula: 'str', data: 'pd.DataFrame', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> "'Prais'"
-```
-
-**`Prais.fit`**
-
-```python
-Prais.fit(self) -> 'PraisResult'
-```
-
-**示例**
-
-```python
-r = ws.Prais.from_formula('y ~ x1', base).fit()
-print(round(float(r.rho), 6), round(float(r.params.iloc[0]), 6))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `PraisResult`
-
-**Stata 指令:** `prais depvar indepvars`
-
-Prais-Winsten AR(1) 估计的结果。除常规接口外，它还记录估计出的自相关系数 `rho`、迭代次数以及是否收敛，因为该估计量是迭代的，由 `maxiter`/`tolerance` 控制。
-
-**签名**
-
-```python
-ws.PraisResult(**values: 'object') -> 'None'
-```
-
-**示例**
-
-```python
-r = ws.prais(base, 'y ~ x1')
-print(round(r.rho, 6))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `PsmatchResult`
-
-**Stata 指令:** `teffects psmatch`
-
-`teffects_psmatch` 返回的对象：由倾向得分匹配算出的 ATET 估计，含标准误、p 值与置信界。
-
-**签名**
-
-```python
-ws.PsmatchResult(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', outcome: 'str', caliper: 'float' = nan, treatment_model: 'str' = 'logit', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
-```
-
-**示例**
-
-```python
-r = ws.teffects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
-print(round(r.ate, 6))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `PwCompareTable`
-
-**Stata 指令:** `pwcompare`
-
-由 `LincomResult` 组成的列表，每个成对比较一行，并能渲染 Stata 的整张成对比较表。`to_frame()` 给出逐比较的行。
-
-**签名**
-
-```python
-ws.PwCompareTable(rows: 'Sequence[LincomResult]', *, term: 'str' = '', margin_label: 'str' = 'asbalanced', comparison: 'str' = 'Unadjusted') -> 'None'
-```
-
-**示例**
-
-```python
-fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
-r = ws.pwcompare(fit, 'firm')
-print(len(r))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `RandomEffectsMLE`
+### `PanelRegressMLE`
 
 **Stata 指令:** `xtreg ypanel x1 x2, mle`
 
@@ -7780,19 +7672,19 @@ None
 **签名**
 
 ```python
-ws.RandomEffectsMLE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
+ws.PanelRegressMLE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', weights: 'Any' = None, weight_type: 'str | None' = None) -> 'None'
 ```
 
-**`RandomEffectsMLE.from_formula`**
+**`PanelRegressMLE.from_formula`**
 
 ```python
-RandomEffectsMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
 ```
 
-**`RandomEffectsMLE.fit`**
+**`PanelRegressMLE.fit`**
 
 ```python
-RandomEffectsMLE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
+PanelRegressMLE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | None' = None, ssc: 'SSC | None' = None, *, entity_effects: 'bool' = False, time_effects: 'bool' = False) -> 'StataResults'
 ```
 
 **示例**
@@ -7831,28 +7723,24 @@ Log likelihood = -308.62872                          Prob > chi2      = 0.0000
 LR test of sigma_u=0: chibar2(01) = 39.08             Prob >= chibar2 = 0.0000
 ```
 
-### `Rcm`
+### `PanelSerialResults`
 
-**Stata 指令:** `rcm depvar predictors, unit() time() trunit() trperiod()`
+**Stata 指令:** `xtserial`
 
-回归控制法（HCW 风格）：对处理单位拟合处理前模型、外推反事实，给出 `att` 与入选预测变量。`method` 选择前向/后向搜索，`criterion` 选择信息准则。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+Wooldridge 面板序列相关检验的结果。五个 `r()` 标量为：`corr`（差分残差的滞后系数，原假设下约为 -0.5）、`f` 与 `df`/`df_r`（“该系数等于 -0.5”的 Wald 检验）以及 `p`。另有 `nobs`（Stata 打印的第一阶段样本量）、`n_panels`，以及 `first_stage`——差分回归本身，类型为 `StataResults`——和 `first_stage_table()`（其渲染后的表格）。`str()` 复现 Stata 的三行检验块。
 
 **签名**
 
 ```python
-ws.Rcm(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'None'
-```
-
-**`Rcm.fit`**
-
-```python
-Rcm.fit(self) -> 'RcmResult'
+ws.PanelSerialResults(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int', first_stage: 'Any' = None) -> None
 ```
 
 **示例**
 
 ```python
-print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUIDE')
+d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
+r = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')
+print(round(r.f, 6), r.df_r)
 ```
 
 **输出**
@@ -7861,22 +7749,27 @@ print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUID
 None
 ```
 
-### `RcmResult`
+### `PanelSetResults`
 
-**Stata 指令:** `rcm`
+**Stata 指令:** `xtset pid year`
 
-`ws.rcm` 返回的对象：`att`、入选的 `predictors`、拟合的 `coefficients`、前后年份、实际与 `predicted` 路径，以及逐期 `effects`。
+`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。
 
 **签名**
 
 ```python
-ws.RcmResult(att: 'float', unit: 'str', treatment_period: 'float', predictors: 'tuple[str, ...]', coefficients: 'np.ndarray', pre_years: 'np.ndarray', post_years: 'np.ndarray', actual: 'np.ndarray', predicted: 'np.ndarray', method: 'str' = 'forward', criterion: 'str' = 'aicc') -> None
+ws.PanelSetResults(entity: 'str', time: 'str', balance: 'str', first_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, gapped: 'bool' = False, entities: 'int' = 0, periods: 'int' = 0, nobs: 'int' = 0) -> None
 ```
 
 **示例**
 
 ```python
-print('RcmResult is returned by ws.rcm; it needs a unit/time panel')
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtset(panel, entity="pid", time="year")
+print(result.balance)
 ```
 
 **输出**
@@ -7885,23 +7778,27 @@ print('RcmResult is returned by ws.rcm; it needs a unit/time panel')
 None
 ```
 
-### `RdRobustResult`
+### `PanelSumResults`
 
-**Stata 指令:** `rdrobust`
+**Stata 指令:** `xtsum y k1`
 
-`rdrobust` 返回的对象：偏差校正后的点估计、标准误、z 统计量、p 值、置信界，以及产生它们的带宽。
+`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。
 
 **签名**
 
 ```python
-ws.RdRobustResult(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandwidth: 'float', nobs: 'int', nobs_left: 'int', nobs_right: 'int', nobs_effective_left: 'int', nobs_effective_right: 'int', order: 'int', bias_order: 'int', kernel: 'str', coef_covs: 'Any' = None, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+ws.PanelSumResults(entity: 'str', time: 'str', variables: 'list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]]' = <factory>, nobs: 'int' = 0, entities: 'int' = 0, periods: 'int' = 0) -> None
 ```
 
 **示例**
 
 ```python
-r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
-print(round(r.tau, 6))
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+result = ws.xtsum(panel, ["y"], entity="pid", time="year")
+print(result.variables[0][3]["sd"])
 ```
 
 **输出**
@@ -7910,7 +7807,196 @@ print(round(r.tau, 6))
 None
 ```
 
-### `Rdrobust`
+### `PanelTest0Results`
+
+**Stata 指令:** `xttest0`
+
+随机效应的 Breusch-Pagan LM 检验：`chibar2`、其 p 值，以及方差成分 `var_u`、`var_e`、`var_y`。
+
+**签名**
+
+```python
+ws.PanelTest0Results(chibar2: 'float', pvalue: 'float', var_u: 'float', var_e: 'float', var_y: 'float', nobs: 'int', entities: 'int', periods: 'int', depvar: 'str' = '', entity_name: 'str' = '', time_name: 'str' = '') -> None
+```
+
+**示例**
+
+```python
+fit = ws.RandomEffects.from_formula('y ~ x1', base, entity='firm', time='year').fit()
+r = ws.xttest0(fit)
+print(round(r.chibar2, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `PanelUnitRootResults`
+
+**Stata 指令:** `xtunitroot ips/llc`
+
+`XtUnitroot(...).fit()` 返回的对象：承载 p 值的统计量（`name` 说明是哪个，IPS 为 'Z-t-tilde-bar'）、p 值，以及 `details` 中的逐面板明细块。
+
+**签名**
+
+```python
+ws.PanelUnitRootResults(statistic: 'float', pvalue: 'float', test: 'str', name: 'str' = '', details: 'Mapping[str, float] | None' = None) -> None
+```
+
+**示例**
+
+```python
+r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()
+print(r.name, round(r.pvalue, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `PortmanteauResults`
+
+**Stata 指令:** `wntestq`
+
+混成（Ljung-Box / Box-Pierce）检验结果：所采用滞后阶下的 `q` 统计量、`df` 自由度与 `pvalue`。
+
+**签名**
+
+```python
+ws.PortmanteauResults(q: 'float', df: 'int', pvalue: 'float', lags: 'int', n_gaps: 'int' = 0) -> None
+```
+
+**示例**
+
+```python
+r = ws.wntestq(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
+print(round(r.q, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `Prais`
+
+**Stata 指令:** `prais depvar indepvars [, corc]`
+
+`ws.prais` 的类形式（R2.7）：Prais-Winsten / Cochrane-Orcutt AR(1) 估计量。`corc` 选择 Cochrane-Orcutt 变换（丢弃第一个观测而非按 sqrt(1-rho^2) 缩放），属**模型**选项，在构造阶段给出。`fit()` **不接受 `cov_type`**——Stata 的 `prais` 没有 `vce()` 选项。**注意顺序**：`Prais(data, formula)` 沿用函数的位置顺序，与本包其他 `from_formula` 相反；要标准顺序请用 `Prais.from_formula(formula, data)`。
+
+**签名**
+
+```python
+ws.Prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'None'
+```
+
+**`Prais.from_formula`**
+
+```python
+Prais.from_formula(formula: 'str', data: 'pd.DataFrame', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> "'Prais'"
+```
+
+**`Prais.fit`**
+
+```python
+Prais.fit(self) -> 'PraisResults'
+```
+
+**示例**
+
+```python
+r = ws.Prais.from_formula('y ~ x1', base).fit()
+print(round(float(r.rho), 6), round(float(r.params.iloc[0]), 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `PraisResults`
+
+**Stata 指令:** `prais depvar indepvars`
+
+Prais-Winsten AR(1) 估计的结果。除常规接口外，它还记录估计出的自相关系数 `rho`、迭代次数以及是否收敛，因为该估计量是迭代的，由 `maxiter`/`tolerance` 控制。
+
+**签名**
+
+```python
+ws.PraisResults(**values: 'object') -> 'None'
+```
+
+**示例**
+
+```python
+r = ws.prais(base, 'y ~ x1')
+print(round(r.rho, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `PsmatchResults`
+
+**Stata 指令:** `teffects psmatch`
+
+`teffects_psmatch` 返回的对象：由倾向得分匹配算出的 ATET 估计，含标准误、p 值与置信界。
+
+**签名**
+
+```python
+ws.PsmatchResults(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nneighbor: 'int', matches_min: 'int', matches_max: 'int', outcome: 'str', caliper: 'float' = nan, treatment_model: 'str' = 'logit', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**示例**
+
+```python
+r = ws.teffects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+print(round(r.ate, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `PwCompareTable`
+
+**Stata 指令:** `pwcompare`
+
+由 `LincomResult` 组成的列表，每个成对比较一行，并能渲染 Stata 的整张成对比较表。`to_frame()` 给出逐比较的行。
+
+**签名**
+
+```python
+ws.PwCompareTable(rows: 'Sequence[LincomResults]', *, term: 'str' = '', margin_label: 'str' = 'asbalanced', comparison: 'str' = 'Unadjusted') -> 'None'
+```
+
+**示例**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
+r = ws.pwcompare(fit, 'firm')
+print(len(r))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `RDRobust`
 
 **Stata 指令:** `rdrobust depvar running`
 
@@ -7919,13 +8005,13 @@ None
 **签名**
 
 ```python
-ws.Rdrobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'None'
+ws.RDRobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'None'
 ```
 
-**`Rdrobust.fit`**
+**`RDRobust.fit`**
 
 ```python
-Rdrobust.fit(self) -> 'RdRobustResult'
+RDRobust.fit(self) -> 'RdRobustResults'
 ```
 
 **示例**
@@ -7941,7 +8027,56 @@ print(round(float(r.tau), 6))
 None
 ```
 
-### `RegFResult`
+### `RcmResults`
+
+**Stata 指令:** `rcm`
+
+`ws.rcm` 返回的对象：`att`、入选的 `predictors`、拟合的 `coefficients`、前后年份、实际与 `predicted` 路径，以及逐期 `effects`。
+
+**签名**
+
+```python
+ws.RcmResults(att: 'float', unit: 'str', treatment_period: 'float', predictors: 'tuple[str, ...]', coefficients: 'np.ndarray', pre_years: 'np.ndarray', post_years: 'np.ndarray', actual: 'np.ndarray', predicted: 'np.ndarray', method: 'str' = 'forward', criterion: 'str' = 'aicc') -> None
+```
+
+**示例**
+
+```python
+print('RcmResult is returned by ws.rcm; it needs a unit/time panel')
+```
+
+**输出**
+
+```text
+None
+```
+
+### `RdRobustResults`
+
+**Stata 指令:** `rdrobust`
+
+`rdrobust` 返回的对象：偏差校正后的点估计、标准误、z 统计量、p 值、置信界，以及产生它们的带宽。
+
+**签名**
+
+```python
+ws.RdRobustResults(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandwidth: 'float', nobs: 'int', nobs_left: 'int', nobs_right: 'int', nobs_effective_left: 'int', nobs_effective_right: 'int', order: 'int', bias_order: 'int', kernel: 'str', coef_covs: 'Any' = None, se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**示例**
+
+```python
+r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
+print(round(r.tau, 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `RegFResults`
 
 **Stata 指令:** `estat endogenous (regression form)`
 
@@ -7950,13 +8085,43 @@ None
 **签名**
 
 ```python
-ws.RegFResult(*, statistic: 'float', df_num: 'float', df_denom: 'float') -> 'None'
+ws.RegFResults(*, statistic: 'float', df_num: 'float', df_denom: 'float') -> 'None'
 ```
 
 **示例**
 
 ```python
 print('RegFResult is returned by endog_regf_test; see estat_endogenous for the command')
+```
+
+**输出**
+
+```text
+None
+```
+
+### `RegressionControlMethod`
+
+**Stata 指令:** `rcm depvar predictors, unit() time() trunit() trperiod()`
+
+回归控制法（HCW 风格）：对处理单位拟合处理前模型、外推反事实，给出 `att` 与入选预测变量。`method` 选择前向/后向搜索，`criterion` 选择信息准则。`fit()` 不接受 `cov_type`：Stata 该命令没有 `vce()` 选项，方差是估计量的一部分；构造入口是 `from_variables(...)` 而非 `from_formula(...)`，因为 Stata 用变量列表（R2.7、R3.2）。
+
+**签名**
+
+```python
+ws.RegressionControlMethod(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'None'
+```
+
+**`RegressionControlMethod.fit`**
+
+```python
+RegressionControlMethod.fit(self) -> 'RcmResults'
+```
+
+**示例**
+
+```python
+print('Rcm 需要单位-时间面板与 treated_unit/treatment_period；见 GUIDE')
 ```
 
 **输出**
@@ -7983,7 +8148,7 @@ print(sorted(ws.SUPPORTED_TYPES)[:4])
 None
 ```
 
-### `SucestResult`
+### `SuestResults`
 
 **Stata 指令:** `suest`
 
@@ -7992,7 +8157,7 @@ None
 **签名**
 
 ```python
-ws.SucestResult(params: 'np.ndarray', covariance: 'np.ndarray', param_names: 'list[str]', models: 'int', n_observations: 'int', _df_resid: 'float' = 1.0) -> None
+ws.SuestResults(params: 'np.ndarray', covariance: 'np.ndarray', param_names: 'list[str]', models: 'int', n_observations: 'int', _df_resid: 'float' = 1.0) -> None
 ```
 
 **示例**
@@ -8009,7 +8174,7 @@ print(len(ws.suest([a, b]).params))
 None
 ```
 
-### `SummarizeResult`
+### `SummarizeResults`
 
 **Stata 指令:** `estat summarize -- summarize of the estimation sample`
 
@@ -8018,7 +8183,7 @@ None
 **签名**
 
 ```python
-ws.SummarizeResult(table: 'pd.DataFrame', n_obs: 'float', clusters: 'Mapping[str, Any] | None' = None, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'None'
+ws.SummarizeResults(table: 'pd.DataFrame', n_obs: 'float', clusters: 'Mapping[str, Any] | None' = None, noheader: 'bool' = False, labels: 'Mapping[str, str] | None' = None) -> 'None'
 ```
 
 **示例**
@@ -8077,7 +8242,7 @@ ws.Synth(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequ
 **`Synth.fit`**
 
 ```python
-Synth.fit(self) -> 'SynthResult'
+Synth.fit(self) -> 'SynthResults'
 ```
 
 **示例**
@@ -8108,7 +8273,7 @@ ws.Synth2(data: 'Any', unit: 'str', time: 'str', depvar: 'str', predictors: 'Seq
 **`Synth2.fit`**
 
 ```python
-Synth2.fit(self) -> 'Synth2Result'
+Synth2.fit(self) -> 'Synth2Results'
 ```
 
 **示例**
@@ -8123,7 +8288,7 @@ print('Synth2 需要平衡面板与 trunit/trperiod；见 GUIDE 的完整示例'
 None
 ```
 
-### `Synth2Result`
+### `Synth2Results`
 
 **Stata 指令:** `ereturn list -- the e() surface synth2 stores (synth's e() is wiped)`
 
@@ -8132,7 +8297,7 @@ None
 **签名**
 
 ```python
-ws.Synth2Result(N: 'int', T: 'int', T0: 'int', T1: 'int', K: 'int', J: 'int', rmse: 'float', r2: 'float', att: 'float', bal: 'np.ndarray', U_wt: 'np.ndarray', V_wt: 'np.ndarray', mspe: 'np.ndarray | None' = None, pval: 'np.ndarray | None' = None, Y_treated: 'np.ndarray | None' = None, Y_synthetic: 'np.ndarray | None' = None, time_index: 'np.ndarray | None' = None, placebo_probability: 'float | None' = None, placebo_removed: 'tuple[Any, ...]' = (), mspe_names: 'tuple[str, ...]' = (), time_placebo: 'dict[float, dict[str, np.ndarray]]' = <factory>, loo_min: 'np.ndarray | None' = None, loo_max: 'np.ndarray | None' = None, loo_effect_min: 'np.ndarray | None' = None, loo_effect_max: 'np.ndarray | None' = None, loo_n_runs: 'int' = 0, loo_units: 'tuple[Any, ...]' = (), synth_result: 'SynthResult | None' = None, method: 'str' = 'regression', numerically_inactive: 'tuple[str, ...]' = ()) -> None
+ws.Synth2Results(N: 'int', T: 'int', T0: 'int', T1: 'int', K: 'int', J: 'int', rmse: 'float', r2: 'float', att: 'float', bal: 'np.ndarray', U_wt: 'np.ndarray', V_wt: 'np.ndarray', mspe: 'np.ndarray | None' = None, pval: 'np.ndarray | None' = None, Y_treated: 'np.ndarray | None' = None, Y_synthetic: 'np.ndarray | None' = None, time_index: 'np.ndarray | None' = None, placebo_probability: 'float | None' = None, placebo_removed: 'tuple[Any, ...]' = (), mspe_names: 'tuple[str, ...]' = (), time_placebo: 'dict[float, dict[str, np.ndarray]]' = <factory>, loo_min: 'np.ndarray | None' = None, loo_max: 'np.ndarray | None' = None, loo_effect_min: 'np.ndarray | None' = None, loo_effect_max: 'np.ndarray | None' = None, loo_n_runs: 'int' = 0, loo_units: 'tuple[Any, ...]' = (), synth_result: 'SynthResults | None' = None, method: 'str' = 'regression', numerically_inactive: 'tuple[str, ...]' = ()) -> None
 ```
 
 **示例**
@@ -8158,7 +8323,7 @@ res.bal
  [  0.242489   0.870713   0.700712 -19.524351   0.678917 -22.02742 ]]
 ```
 
-### `SynthResult`
+### `SynthResults`
 
 **Stata 指令:** `ereturn list -- the e() matrices synth stores`
 
@@ -8167,7 +8332,7 @@ res.bal
 **签名**
 
 ```python
-ws.SynthResult(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, qp_solver: 'str' = 'SLSQP', unit_labels: 'tuple[str, ...]' = (), unit_codes: 'tuple[Any, ...]' = (), numerically_inactive: 'tuple[str, ...]' = (), stata_predictor_names: 'tuple[str, ...]' = ()) -> None
+ws.SynthResults(V_matrix: 'np.ndarray', W_weights: 'np.ndarray', X_balance: 'np.ndarray', RMSPE: 'float', Y_treated: 'np.ndarray', Y_synthetic: 'np.ndarray', unit_names: 'tuple[Any, ...]', predictor_names: 'tuple[str, ...]', time_index: 'np.ndarray', treated_unit: 'Any', treatment_period: 'float', T0: 'int', W_exact: 'np.ndarray', missing_warnings: 'tuple[str, ...]' = (), method: 'str' = 'regression', optimizer_settings: 'dict[str, float | int] | None' = None, qp_solver: 'str' = 'SLSQP', unit_labels: 'tuple[str, ...]' = (), unit_codes: 'tuple[Any, ...]' = (), numerically_inactive: 'tuple[str, ...]' = (), stata_predictor_names: 'tuple[str, ...]' = ()) -> None
 ```
 
 **示例**
@@ -8193,7 +8358,7 @@ res.V_matrix
  [0.       0.242489]]
 ```
 
-### `SzroeterResult`
+### `SzroeterResults`
 
 **Stata 指令:** `estat szroeter`
 
@@ -8202,7 +8367,7 @@ res.V_matrix
 **签名**
 
 ```python
-ws.SzroeterResult(variable: 'str', statistic: 'float', pvalue: 'float', adjusted_pvalue: 'float | None' = None) -> None
+ws.SzroeterResults(variable: 'str', statistic: 'float', pvalue: 'float', adjusted_pvalue: 'float | None' = None) -> None
 ```
 
 **示例**
@@ -8227,7 +8392,7 @@ None
 **签名**
 
 ```python
-ws.SzroeterTable(rows: 'list[SzroeterResult]', method: 'str' = 'noadjust') -> None
+ws.SzroeterTable(rows: 'list[SzroeterResults]', method: 'str' = 'noadjust') -> None
 ```
 
 **示例**
@@ -8244,32 +8409,7 @@ print(r.to_frame())
 None
 ```
 
-### `TefectsRaResult`
-
-**Stata 指令:** `teffects ra`
-
-`teffects_ra` 返回的对象：回归调整得到的 ATE/ATET 估计，含标准误、z 统计量、p 值与置信界。
-
-**签名**
-
-```python
-ws.TefectsRaResult(ate: 'float', po_0: 'float', po_1: 'float', atet: 'float', nobs: 'int', treated: 'int', estimate: 'float', estimand: 'str', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
-```
-
-**示例**
-
-```python
-r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
-print(round(r.estimate, 6))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `TeffectsNnmatch`
+### `TreatmentEffectsNnmatch`
 
 **Stata 指令:** `teffects nnmatch (depvar) (treatment) (covariates)`
 
@@ -8278,13 +8418,13 @@ None
 **签名**
 
 ```python
-ws.TeffectsNnmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'None'
+ws.TreatmentEffectsNnmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'None'
 ```
 
-**`TeffectsNnmatch.fit`**
+**`TreatmentEffectsNnmatch.fit`**
 
 ```python
-TeffectsNnmatch.fit(self) -> 'NnmatchResult'
+TreatmentEffectsNnmatch.fit(self) -> 'NnmatchResults'
 ```
 
 **示例**
@@ -8300,7 +8440,7 @@ print(round(float(r.ate), 6))
 None
 ```
 
-### `TeffectsPsmatch`
+### `TreatmentEffectsPsmatch`
 
 **Stata 指令:** `teffects psmatch (depvar) (treatment) (covariates)`
 
@@ -8309,13 +8449,13 @@ None
 **签名**
 
 ```python
-ws.TeffectsPsmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'None'
+ws.TreatmentEffectsPsmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'None'
 ```
 
-**`TeffectsPsmatch.fit`**
+**`TreatmentEffectsPsmatch.fit`**
 
 ```python
-TeffectsPsmatch.fit(self) -> 'PsmatchResult'
+TreatmentEffectsPsmatch.fit(self) -> 'PsmatchResults'
 ```
 
 **示例**
@@ -8331,7 +8471,7 @@ print(round(float(r.ate), 6))
 None
 ```
 
-### `TeffectsRa`
+### `TreatmentEffectsRa`
 
 **Stata 指令:** `teffects ra (depvar covariates) (treatment)`
 
@@ -8340,13 +8480,13 @@ None
 **签名**
 
 ```python
-ws.TeffectsRa(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'None'
+ws.TreatmentEffectsRa(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'None'
 ```
 
-**`TeffectsRa.fit`**
+**`TreatmentEffectsRa.fit`**
 
 ```python
-TeffectsRa.fit(self) -> 'TefectsRaResult'
+TreatmentEffectsRa.fit(self) -> 'TreatmentEffectsRaResults'
 ```
 
 **示例**
@@ -8354,6 +8494,31 @@ TeffectsRa.fit(self) -> 'TefectsRaResult'
 ```python
 r = ws.TeffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
 print(round(float(r.ate), 6))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `TreatmentEffectsRaResults`
+
+**Stata 指令:** `teffects ra`
+
+`teffects_ra` 返回的对象：回归调整得到的 ATE/ATET 估计，含标准误、z 统计量、p 值与置信界。
+
+**签名**
+
+```python
+ws.TreatmentEffectsRaResults(ate: 'float', po_0: 'float', po_1: 'float', atet: 'float', nobs: 'int', treated: 'int', estimate: 'float', estimand: 'str', se: 'float' = nan, z: 'float' = nan, pvalue: 'float' = nan, ci_lower: 'float' = nan, ci_upper: 'float' = nan, variance_matches_stata: 'bool' = False) -> None
+```
+
+**示例**
+
+```python
+r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+print(round(r.estimate, 6))
 ```
 
 **输出**
@@ -8412,107 +8577,7 @@ print(r.conf_int().shape)
 None
 ```
 
-### `VarGrangerResult`
-
-**Stata 指令:** `vargranger`
-
-Granger 因果检验表：每个（被引起、引起）对一行，含 Wald 卡方、自由度与 p 值。`str()` 打印 Stata 的框线表。
-
-**签名**
-
-```python
-ws.VarGrangerResult(rows: 'list[_Row]', equations: 'tuple[str, ...]') -> None
-```
-
-**示例**
-
-```python
-r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
-print(len(r.rows))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `VarSocResult`
-
-**Stata 指令:** `varsoc`
-
-滞后阶选择表：每个候选滞后一行，含 Stata 打印的 AIC、HQIC、SBIC、FPE。`to_frame()` 取数。
-
-**签名**
-
-```python
-ws.VarSocResult(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = (), exog_names: 'tuple[str, ...]' = (), constant: 'bool' = True) -> None
-```
-
-**示例**
-
-```python
-r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)
-print(r.to_frame())
-```
-
-**输出**
-
-```text
-None
-```
-
-### `VarStableResult`
-
-**Stata 指令:** `varstable`
-
-对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。`plot()` 画出 Stata `varstable, graph` 的那张图：每个特征值在复平面上的一个点（横轴实部、纵轴虚部），背后是单位圆——落在圆上或圆外正是稳定性被破坏的情形。因此二元 VAR(2) 显示**四个**点，伴随矩阵每个根一个，而不是每个方程一个。可选：`ax=` 画入已有坐标轴、`figsize=`、`labels=True`（模，即 Stata 的 `modlabel`）或 `labels="distance"`（Stata 的 `dlabel`）、`title=`、`grid=`、`unit_circle=False`。`matplotlib` 在方法内部才导入，因此仍是可选依赖（`pip install "westata[plot]"`）。
-
-**签名**
-
-```python
-ws.VarStableResult(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
-```
-
-**示例**
-
-```python
-r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
-print(r.to_frame())
-```
-
-**输出**
-
-```text
-None
-```
-
-### `VarWleResult`
-
-**Stata 指令:** `varwle`
-
-对拟合 VAR 的 Wald 滞后排除检验：`by_equation()` 返回逐方程统计量，每个滞后与方程一行。
-
-**签名**
-
-```python
-ws.VarWleResult(rows: 'tuple[VarWleRow, ...]', equations: 'tuple[str, ...]') -> None
-```
-
-**示例**
-
-```python
-r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())
-print(len(r.by_equation()))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `Varbasic`
+### `VarBasic`
 
 **Stata 指令:** `varbasic dlny, lags(1) irf`
 
@@ -8521,13 +8586,13 @@ None
 **签名**
 
 ```python
-ws.Varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
+ws.VarBasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'None'
 ```
 
-**`Varbasic.fit`**
+**`VarBasic.fit`**
 
 ```python
-Varbasic.fit(self) -> 'IrfResult'
+VarBasic.fit(self) -> 'IrfResults'
 ```
 
 **示例**
@@ -8549,7 +8614,107 @@ fit = ws.Varbasic(frame, 'dlny', lags=1, time='t').fit()
 None
 ```
 
-### `VecRankResult`
+### `VarGrangerResults`
+
+**Stata 指令:** `vargranger`
+
+Granger 因果检验表：每个（被引起、引起）对一行，含 Wald 卡方、自由度与 p 值。`str()` 打印 Stata 的框线表。
+
+**签名**
+
+```python
+ws.VarGrangerResults(rows: 'list[_Row]', equations: 'tuple[str, ...]') -> None
+```
+
+**示例**
+
+```python
+r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+print(len(r.rows))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `VarSocResults`
+
+**Stata 指令:** `varsoc`
+
+滞后阶选择表：每个候选滞后一行，含 Stata 打印的 AIC、HQIC、SBIC、FPE。`to_frame()` 取数。
+
+**签名**
+
+```python
+ws.VarSocResults(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', sample_start: 'int', sample_end: 'int', names: 'tuple[str, ...]' = (), exog_names: 'tuple[str, ...]' = (), constant: 'bool' = True) -> None
+```
+
+**示例**
+
+```python
+r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)
+print(r.to_frame())
+```
+
+**输出**
+
+```text
+None
+```
+
+### `VarStableResults`
+
+**Stata 指令:** `varstable`
+
+对拟合 VAR 的稳定性检验：伴随矩阵特征值以及过程是否稳定。`to_frame()` 给出特征值表。`plot()` 画出 Stata `varstable, graph` 的那张图：每个特征值在复平面上的一个点（横轴实部、纵轴虚部），背后是单位圆——落在圆上或圆外正是稳定性被破坏的情形。因此二元 VAR(2) 显示**四个**点，伴随矩阵每个根一个，而不是每个方程一个。可选：`ax=` 画入已有坐标轴、`figsize=`、`labels=True`（模，即 Stata 的 `modlabel`）或 `labels="distance"`（Stata 的 `dlabel`）、`title=`、`grid=`、`unit_circle=False`。`matplotlib` 在方法内部才导入，因此仍是可选依赖（`pip install "westata[plot]"`）。
+
+**签名**
+
+```python
+ws.VarStableResults(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
+```
+
+**示例**
+
+```python
+r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+print(r.to_frame())
+```
+
+**输出**
+
+```text
+None
+```
+
+### `VarWleResults`
+
+**Stata 指令:** `varwle`
+
+对拟合 VAR 的 Wald 滞后排除检验：`by_equation()` 返回逐方程统计量，每个滞后与方程一行。
+
+**签名**
+
+```python
+ws.VarWleResults(rows: 'tuple[VarWleRow, ...]', equations: 'tuple[str, ...]') -> None
+```
+
+**示例**
+
+```python
+r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())
+print(len(r.by_equation()))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `VecRankResults`
 
 **Stata 指令:** `vecrank`
 
@@ -8558,7 +8723,7 @@ None
 **签名**
 
 ```python
-ws.VecRankResult(rows: 'tuple[VecRankRow, ...]', nobs: 'int', lags: 'int', equations: 'int', deterministic: 'str' = 'constant', show_max: 'bool' = False) -> None
+ws.VecRankResults(rows: 'tuple[VecRankRow, ...]', nobs: 'int', lags: 'int', equations: 'int', deterministic: 'str' = 'constant', show_max: 'bool' = False) -> None
 ```
 
 **示例**
@@ -8574,7 +8739,7 @@ print(r.to_frame().head(2))
 None
 ```
 
-### `VecStableResult`
+### `VecStableResults`
 
 **Stata 指令:** `vecstable`
 
@@ -8583,7 +8748,7 @@ None
 **签名**
 
 ```python
-ws.VecStableResult(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
+ws.VecStableResults(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, ...]') -> None
 ```
 
 **示例**
@@ -8599,7 +8764,7 @@ print(r.to_frame())
 None
 ```
 
-### `WeakRobustResult`
+### `WeakRobustResults`
 
 **Stata 指令:** `estat weakrobust`
 
@@ -8608,178 +8773,13 @@ None
 **签名**
 
 ```python
-ws.WeakRobustResult(test: 'str', statistic: 'float', f_statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float') -> None
+ws.WeakRobustResults(test: 'str', statistic: 'float', f_statistic: 'float', df: 'float', df_denom: 'float', pvalue: 'float') -> None
 ```
 
 **示例**
 
 ```python
 print('WeakRobustResult is returned by estat_weakrobust; see its entry')
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtDesResult`
-
-**Stata 指令:** `xtdes`
-
-`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。
-
-**签名**
-
-```python
-ws.XtDesResult(entity: 'str', time: 'str', entities: 'int', periods: 'int', nobs: 'int', first_entity: 'Any' = None, second_entity: 'Any' = None, last_entity: 'Any' = None, first_time: 'Any' = None, second_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, span: 'int' = 0, size_quantiles: 'dict[str, float]' = <factory>, patterns: 'list[tuple[str, int]]' = <factory>) -> None
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-result = ws.xtdes(panel, entity="pid", time="year")
-print(result.patterns)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtOveridResult`
-
-**Stata 指令:** `r(j), r(jdf), r(jp) after xtoverid`
-
-`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 "fixed vs random effects"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。
-
-**签名**
-
-```python
-ws.XtOveridResult(statistic: 'float', df: 'float', pvalue: 'float', tested: 'list[str]', description: 'str' = 'fixed vs random effects', model: 'str' = 'xtreg re') -> None
-```
-
-**示例**
-
-```python
-fit = ws.RandomEffects.from_formula("y ~ x1", base, entity="firm", time="year").fit()
-r = ws.xtoverid(fit)
-print(r.statistic, r.df, r.pvalue)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtSerialResult`
-
-**Stata 指令:** `xtserial`
-
-Wooldridge 面板序列相关检验的结果。五个 `r()` 标量为：`corr`（差分残差的滞后系数，原假设下约为 -0.5）、`f` 与 `df`/`df_r`（“该系数等于 -0.5”的 Wald 检验）以及 `p`。另有 `nobs`（Stata 打印的第一阶段样本量）、`n_panels`，以及 `first_stage`——差分回归本身，类型为 `StataResults`——和 `first_stage_table()`（其渲染后的表格）。`str()` 复现 Stata 的三行检验块。
-
-**签名**
-
-```python
-ws.XtSerialResult(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'float', nobs: 'int', n_panels: 'int', first_stage: 'Any' = None) -> None
-```
-
-**示例**
-
-```python
-d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
-r = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')
-print(round(r.f, 6), r.df_r)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtSetResult`
-
-**Stata 指令:** `xtset pid year`
-
-`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。
-
-**签名**
-
-```python
-ws.XtSetResult(entity: 'str', time: 'str', balance: 'str', first_time: 'Any' = None, last_time: 'Any' = None, delta: 'float | None' = None, gapped: 'bool' = False, entities: 'int' = 0, periods: 'int' = 0, nobs: 'int' = 0) -> None
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-result = ws.xtset(panel, entity="pid", time="year")
-print(result.balance)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtSumResult`
-
-**Stata 指令:** `xtsum y k1`
-
-`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。
-
-**签名**
-
-```python
-ws.XtSumResult(entity: 'str', time: 'str', variables: 'list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]]' = <factory>, nobs: 'int' = 0, entities: 'int' = 0, periods: 'int' = 0) -> None
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-result = ws.xtsum(panel, ["y"], entity="pid", time="year")
-print(result.variables[0][3]["sd"])
-```
-
-**输出**
-
-```text
-None
-```
-
-### `XtTest0Result`
-
-**Stata 指令:** `xttest0`
-
-随机效应的 Breusch-Pagan LM 检验：`chibar2`、其 p 值，以及方差成分 `var_u`、`var_e`、`var_y`。
-
-**签名**
-
-```python
-ws.XtTest0Result(chibar2: 'float', pvalue: 'float', var_u: 'float', var_e: 'float', var_y: 'float', nobs: 'int', entities: 'int', periods: 'int', depvar: 'str' = '', entity_name: 'str' = '', time_name: 'str' = '') -> None
-```
-
-**示例**
-
-```python
-fit = ws.RandomEffects.from_formula('y ~ x1', base, entity='firm', time='year').fit()
-r = ws.xttest0(fit)
-print(round(r.chibar2, 6))
 ```
 
 **输出**
@@ -8812,7 +8812,7 @@ print(ws.adjust_pvalues([0.01, 0.04, 0.03], 'holm'))
 None
 ```
 
-### `dfgls`
+### `df_gls`
 
 **Stata 指令:** `dfgls varname`
 
@@ -8821,7 +8821,7 @@ None
 **签名**
 
 ```python
-ws.dfgls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, name: 'str' = '', **legacy: 'Any') -> 'DFGLSResult'
+ws.df_gls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, name: 'str' = '', **legacy: 'Any') -> 'DFGLSResults'
 ```
 
 **示例**
@@ -8845,7 +8845,7 @@ None
 **签名**
 
 ```python
-ws.dfuller(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'
+ws.dfuller(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResults'
 ```
 
 **示例**
@@ -8882,7 +8882,7 @@ MacKinnon approximate p-value for Z(t) = 0.0000.
 **签名**
 
 ```python
-ws.endog_regf_test(structure: 'dict[str, Any]', response: 'np.ndarray', *, cov_type: 'str' = 'nonrobust', cluster_labels: 'Sequence[Any] | None' = None, tested: 'Sequence[str] | None' = None) -> 'RegFResult'
+ws.endog_regf_test(structure: 'dict[str, Any]', response: 'np.ndarray', *, cov_type: 'str' = 'nonrobust', cluster_labels: 'Sequence[Any] | None' = None, tested: 'Sequence[str] | None' = None) -> 'RegFResults'
 ```
 
 **示例**
@@ -8906,7 +8906,7 @@ None
 **签名**
 
 ```python
-ws.endog_score_test(structure: 'dict[str, Any]', resid: 'np.ndarray', response: 'np.ndarray', *, hac: 'bool' = False, lags: 'int' = 0, tested: 'Sequence[str] | None' = None) -> 'EndogScoreResult'
+ws.endog_score_test(structure: 'dict[str, Any]', resid: 'np.ndarray', response: 'np.ndarray', *, hac: 'bool' = False, lags: 'int' = 0, tested: 'Sequence[str] | None' = None) -> 'EndogScoreResults'
 ```
 
 **示例**
@@ -8921,7 +8921,7 @@ print('endog_score_test takes an iv_structure dict; use estat_endogenous on a fi
 None
 ```
 
-### `estat_ptrends`
+### `estat_parallel_trends`
 
 **Stata 指令:** `estat ptrends`
 
@@ -8930,7 +8930,7 @@ None
 **签名**
 
 ```python
-ws.estat_ptrends(result: 'Any') -> 'dict[str, float]'
+ws.estat_parallel_trends(result: 'Any') -> 'dict[str, float]'
 ```
 
 **示例**
@@ -9157,7 +9157,7 @@ None
 **签名**
 
 ```python
-ws.irf_table(fitted: 'IrfResult', *, impulse: 'str | None' = None, response: 'str | None' = None, steps: 'int' = 8, all: 'bool' = False) -> 'IrFTable'
+ws.irf_table(fitted: 'IrfResults', *, impulse: 'str | None' = None, response: 'str | None' = None, steps: 'int' = 8, all: 'bool' = False) -> 'IrfTable'
 ```
 
 **示例**
@@ -9189,7 +9189,7 @@ KPSS 平稳性检验——其原假设与旁边的单位根检验**相反**：`H
 **签名**
 
 ```python
-ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, name: 'str' = '') -> 'KpssResult'
+ws.kpss(values: 'Any', *, trend: 'bool' = True, maxlag: 'int | None' = None, name: 'str' = '') -> 'KpssResults'
 ```
 
 **示例**
@@ -9230,6 +9230,48 @@ print(round(r.to_dict()['estimate'], 6))
 None
 ```
 
+### `panel_describe`
+
+**Stata 指令:** `xtdes`
+
+`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。
+
+**签名**
+
+```python
+ws.panel_describe(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'PanelDesResults'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtdes(panel, entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+     pid:  1, 2, ..., 2                                      n =          2
+    year:  1, 2, ..., 2                                      T =          2
+           Delta(year) = 1 unit
+           Span(year)  = 2 periods
+           (pid*year uniquely identifies each observation)
+
+Distribution of T_i:   min      5%     25%       50%       75%     95%     max
+                         2       2       2         2         2       2       2
+
+     Freq.  Percent    Cum. |  Pattern
+ ---------------------------+---------
+        2    100.00  100.00 |  11
+ ---------------------------+---------
+        2    100.00         |  XX
+```
+
 ### `panel_description`
 
 **Stata 指令:** `xtset panelvar timevar  /  xtdes  /  xtsum varlist`
@@ -9266,6 +9308,146 @@ Distribution of T_i:   min      5%     25%       50%       75%     95%     max
         2    100.00         |  XX
 ```
 
+### `panel_overid`
+
+**Stata 指令:** `xtoverid (user-written: Schaffer & Stillman)`
+
+过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type="robust"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。
+
+**签名**
+
+```python
+ws.panel_overid(result: 'Any') -> 'PanelOveridResults'
+```
+
+**示例**
+
+```python
+fit = ws.RandomEffects.from_formula("y ~ x1 + x2", base, entity="firm", time="year").fit()
+ws.xtoverid(fit).to_dict()
+```
+
+**输出**
+
+```text
+{'j': 1.184508111992374, 'jp': 0.5530792071413253, 'jdf': 2.0}
+```
+
+### `panel_serial`
+
+**Stata 指令:** `xtserial (user-written, Drukker)`
+
+Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。
+
+**签名**
+
+```python
+ws.panel_serial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str', keep_first_stage: 'bool' = True) -> 'PanelSerialResults'
+```
+
+**示例**
+
+```python
+d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
+print(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))
+```
+
+**输出**
+
+```text
+None
+```
+
+### `panel_set`
+
+**Stata 指令:** `xtset pid year`
+
+`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。
+
+**签名**
+
+```python
+ws.panel_set(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'PanelSetResults'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtset(panel, entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+Panel variable: pid (strongly balanced)
+ Time variable: year, 1 to 2
+         Delta: 1 unit
+```
+
+### `panel_summarize`
+
+**Stata 指令:** `xtsum y k1`
+
+`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。
+
+**签名**
+
+```python
+ws.panel_summarize(data: 'pd.DataFrame', variables: 'Sequence[str]', *, entity: 'str', time: 'str') -> 'PanelSumResults'
+```
+
+**示例**
+
+```python
+import pandas as pd
+panel = pd.DataFrame(
+    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
+)
+ws.xtsum(panel, ["y"], entity="pid", time="year")
+```
+
+**输出**
+
+```text
+
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+y        overall |       2.5   1.290994          1          4 |     N =       4
+         between |             1.414214        1.5        3.5 |     n =       2
+         within  |             .5773503          2          3 |     T =       2
+```
+
+### `panel_test0`
+
+**Stata 指令:** `xttest0 (after xtreg, re)`
+
+随机效应的 Breusch-Pagan 拉格朗日乘数检验：面板方差分量是否为零，即检验 `sigma_u = 0`。这是它必须跟在**随机效应**拟合之后的原因——固定效应已经吸收了 `u`，该检验不适用。
+
+**签名**
+
+```python
+ws.panel_test0(result: 'Any', *, entity: 'Any' = None) -> 'PanelTest0Results'
+```
+
+**示例**
+
+```python
+d = base.assign(firm=np.repeat(np.arange(20), 10), t=np.tile(np.arange(10), 20))
+f = ws.RandomEffects.from_formula('y ~ x1', d, entity='firm', time='t').fit()
+print(ws.xttest0(f, entity=d['firm']))
+```
+
+**输出**
+
+```text
+None
+```
+
 ### `pperron`
 
 **Stata 指令:** `pperron y, trend`
@@ -9275,7 +9457,7 @@ Phillips-Perron 单位根检验，采用 Stata 的拼写。`unitroot` 的薄封�
 **签名**
 
 ```python
-ws.pperron(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResult'
+ws.pperron(endog: 'Any', *, trend: 'bool' = False, lags: 'int | None' = None, autolag: 'str | None' = None, regression: 'str | None' = None) -> 'UnitRootResults'
 ```
 
 **示例**
@@ -9312,7 +9494,7 @@ Prais-Winsten AR(1) 回归：用估计出的自相关系数变换数据后做 GL
 **签名**
 
 ```python
-ws.prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResult'
+ws.prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, tolerance: 'float' = 1e-06, corc: 'bool' = False) -> 'PraisResults'
 ```
 
 **示例**
@@ -9361,7 +9543,7 @@ None
 **签名**
 
 ```python
-ws.rcm(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'RcmResult'
+ws.rcm(response: 'Any', predictors: 'Any', unit: 'Any', time: 'Any', *, treated_unit: 'Any', treatment_period: 'float', method: 'str' = 'forward', criterion: 'str' = 'aicc', selected: 'Sequence[Any] | None' = None, max_predictors: 'int | None' = None) -> 'RcmResults'
 ```
 
 **示例**
@@ -9380,7 +9562,7 @@ round(r.att, 6)
 
 **注意:** 自动模型搜索**未**与 Stata 对齐。Stata 自身的选择在前期拟合上远差于穷举最优，因为它的回归设定与这里任何重建都不同；有一条测试显式断言这一不匹配，避免两条路径被误认为等价。
 
-### `rdrobust`
+### `rd_robust`
 
 **Stata 指令:** `rdrobust depvar runvar, c(#)`
 
@@ -9389,7 +9571,7 @@ round(r.att, 6)
 **签名**
 
 ```python
-ws.rdrobust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResult'
+ws.rd_robust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidth: 'float | None' = None, bias_bandwidth: 'float | None' = None, order: 'int' = 1, bias_order: 'int' = 2, kernel: 'str' = 'triangular', covs: 'Any' = None) -> 'RdRobustResults'
 ```
 
 **示例**
@@ -9577,7 +9759,7 @@ None
 **签名**
 
 ```python
-ws.synth(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResult'
+ws.synth(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, resultsperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, unitnames: 'str | None' = None, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, nested: 'bool' = False, allopt: 'bool' = False, technique: 'str | None' = None, iterate: 'int | None' = None, nrtolerance: 'float | None' = None, nonrtolerance: 'bool' = False, difficult: 'bool' = False, search: 'str | None' = None, trace: 'bool' = False, keep: 'str | None' = None, replace: 'bool' = False, figure: 'bool' = False, placebo: 'bool' = False, **unsupported: 'Any') -> 'SynthResults'
 ```
 
 **示例**
@@ -9612,7 +9794,7 @@ Stata `synth2` 的非图形功能实现。`synth2` 是包装器：全部优化�
 **签名**
 
 ```python
-ws.synth2(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None, **unsupported: 'Any') -> 'Synth2Result'
+ws.synth2(data: 'Any', *, unit: 'str', time: 'str', depvar: 'str', predictors: 'Sequence[str]', trunit: 'Any', trperiod: 'float', counit: 'Sequence[Any] | None' = None, ctrlunit: 'Sequence[Any] | None' = None, preperiod: 'Sequence[float] | None' = None, postperiod: 'Sequence[float] | None' = None, xperiod: 'Sequence[float] | None' = None, mspeperiod: 'Sequence[float] | None' = None, customV: 'Sequence[float] | None' = None, nested: 'bool' = False, allopt: 'bool' = False, margin: 'float' = 0.005, maxiter: 'int' = 1000, sigf: 'int' = 12, bound: 'float' = 10, placebo: 'str | None' = None, loo: 'bool' = False, figure: 'bool' = False, nofigure: 'bool' = False, savegraph: 'str | None' = None, symbol: 'int' = 1, frame: 'str | None' = None, show: 'int | None' = None, **unsupported: 'Any') -> 'Synth2Results'
 ```
 
 **示例**
@@ -9638,7 +9820,33 @@ ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], 
 
 **注意:** `synth2.ado:330` 用 `ereturn clear` 清空 `synth` 的 e()，Python 结果面是 synth2 自己的，另附 `synth_result` 保留原始拟合。`R2` 分母是合成值的处理前离差（ado:647，非标准）。聚合概率与逐期 p 值把处理组自身计入分母且用 >= 比较（ado:441/940/947-949）。时间安慰剂不产生 mspe/pval。`frame()`/`symbol()` 是 Stata 特有的结果数据集机制，由 Synth2Result 属性替代。
 
-### `tebalance_summarize`
+### `test_as_stata`
+
+**Stata 指令:** `test`
+
+`result.test(...)` 背后的函数：跑一条或多条 Wald 约束，返回 Stata `test` 的输出。每个参数是一条约束规格；单个字符串里的逗号不是分隔符。
+
+**签名**
+
+```python
+ws.test_as_stata(result: 'Any', *specs: 'Any', coef: 'bool' = False) -> 'WaldTest | dict[str, Any]'
+```
+
+**示例**
+
+```python
+fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.test_as_stata(fit, 'x1', 'x2')
+print(r)
+```
+
+**输出**
+
+```text
+None
+```
+
+### `treatment_balance_summarize`
 
 **Stata 指令:** `tebalance summarize`
 
@@ -9647,7 +9855,7 @@ ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], 
 **签名**
 
 ```python
-ws.tebalance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalize_counts: 'bool' = False) -> 'BalanceSummary'
+ws.treatment_balance_summarize(treatment: 'Any', covariates: 'Any', *, match_weights: 'Any' = None, names: 'list[str] | None' = None, exact: 'tuple[str, ...]' = (), normalize_counts: 'bool' = False) -> 'BalanceSummary'
 ```
 
 **示例**
@@ -9683,7 +9891,7 @@ Control obs   =           72           51
 
 **注意:** 在参考的 nsw_dw 拟合上，八个协变量中有七个与 Stata 逐位一致；第八个（`age`）因并列权重的分配方式略有不同而有残差，该差异被记录而非隐藏。
 
-### `teffects_nnmatch`
+### `treatment_effects_nnmatch`
 
 **Stata 指令:** `teffects nnmatch ..., atet`
 
@@ -9692,7 +9900,7 @@ Control obs   =           72           51
 **签名**
 
 ```python
-ws.teffects_nnmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'NnmatchResult'
+ws.treatment_effects_nnmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, caliper: 'float | None' = None, tie_tolerance: 'float' = 1e-10) -> 'NnmatchResults'
 ```
 
 **示例**
@@ -9704,10 +9912,10 @@ ws.teffects_nnmatch(base['ytreat'], base['treat'], base[['x1','x2','x3']].to_num
 **输出**
 
 ```text
-NnmatchResult(ate=1.4150728330730742, nobs=200, treated=128, controls=72, nneighbor=4, matches_min=4, matches_max=4, metric='mahalanobis', caliper=nan, se=nan, z=nan, pvalue=nan, ci_lower=nan, ci_upper=nan)
+NnmatchResults(ate=1.4150728330730742, nobs=200, treated=128, controls=72, nneighbor=4, matches_min=4, matches_max=4, metric='mahalanobis', caliper=nan, se=nan, z=nan, pvalue=nan, ci_lower=nan, ci_upper=nan)
 ```
 
-### `teffects_psmatch`
+### `treatment_effects_psmatch`
 
 **Stata 指令:** `teffects psmatch ..., atet`
 
@@ -9716,7 +9924,7 @@ NnmatchResult(ate=1.4150728330730742, nobs=200, treated=128, controls=72, nneigh
 **签名**
 
 ```python
-ws.teffects_psmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'PsmatchResult'
+ws.treatment_effects_psmatch(response: 'Any', treatment: 'Any', covariates: 'Any', *, nneighbor: 'int' = 1, tie_tolerance: 'float' = 1e-09, outcome: 'str' = '', caliper: 'float | None' = None) -> 'PsmatchResults'
 ```
 
 **示例**
@@ -9745,7 +9953,7 @@ ATET         |
 
 **注意:** 未复现 Abadie-Imbens 的 AI 稳健标准误，因此 se/z/p/ci 为 NaN，而不是一个看似合理的猜测值。
 
-### `teffects_ra`
+### `treatment_effects_ra`
 
 **Stata 指令:** `teffects ra (depvar covars) (treat)`
 
@@ -9754,7 +9962,7 @@ ATET         |
 **签名**
 
 ```python
-ws.teffects_ra(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'TefectsRaResult'
+ws.treatment_effects_ra(response: 'Any', treatment: 'Any', covariates: 'Any', *, estimand: 'str' = 'ate', add_constant: 'bool' = True) -> 'TreatmentEffectsRaResults'
 ```
 
 **示例**
@@ -9769,64 +9977,7 @@ print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_nu
 None
 ```
 
-### `test_as_stata`
-
-**Stata 指令:** `test`
-
-`result.test(...)` 背后的函数：跑一条或多条 Wald 约束，返回 Stata `test` 的输出。每个参数是一条约束规格；单个字符串里的逗号不是分隔符。
-
-**签名**
-
-```python
-ws.test_as_stata(result: 'Any', *specs: 'Any', coef: 'bool' = False) -> 'WaldTest | dict[str, Any]'
-```
-
-**示例**
-
-```python
-fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r = ws.test_as_stata(fit, 'x1', 'x2')
-print(r)
-```
-
-**输出**
-
-```text
-None
-```
-
-### `varbasic`
-
-**Stata 指令:** `varbasic dlny, lags(1) irf`
-
-估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。
-
-**签名**
-
-```python
-ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResult'
-```
-
-**示例**
-
-```python
-import numpy as np
-import pandas as pd
-rng = np.random.default_rng(11)
-y = np.zeros(60)
-for _t in range(1, 60):
-    y[_t] = 0.6 * y[_t - 1] + rng.normal()
-frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
-fit = ws.varbasic(frame, 'dlny', lags=1, time='t')
-```
-
-**输出**
-
-```text
-None
-```
-
-### `vargranger`
+### `var_granger`
 
 **Stata 指令:** `vargranger`
 
@@ -9835,7 +9986,7 @@ None
 **签名**
 
 ```python
-ws.vargranger(fitted: 'Any') -> 'VarGrangerResult'
+ws.var_granger(fitted: 'Any') -> 'VarGrangerResults'
 ```
 
 **示例**
@@ -9861,7 +10012,7 @@ ws.vargranger(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fi
 
 **注意:** 即使只排除一个变量，每个方程块仍以 ALL 行结尾；Stata 就是这样打印的，该行与单行完全相同。
 
-### `varlmar`
+### `var_lmar`
 
 **Stata 指令:** `varlmar`
 
@@ -9870,7 +10021,7 @@ ws.vargranger(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fi
 **签名**
 
 ```python
-ws.varlmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResult'
+ws.var_lmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResults'
 ```
 
 **示例**
@@ -9885,7 +10036,7 @@ print(ws.varlmar(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2'])
 None
 ```
 
-### `varsoc`
+### `var_select_order`
 
 **Stata 指令:** `varsoc varlist, maxlag(#)`
 
@@ -9894,7 +10045,7 @@ None
 **签名**
 
 ```python
-ws.varsoc(data: 'np.ndarray | pd.DataFrame', *, maxlag: 'int' = 4, trend: 'str' = 'c', names: 'list[str] | None' = None, exog: 'Any' = None, constant: 'bool' = True) -> 'VarSocResult'
+ws.var_select_order(data: 'np.ndarray | pd.DataFrame', *, maxlag: 'int' = 4, trend: 'str' = 'c', names: 'list[str] | None' = None, exog: 'Any' = None, constant: 'bool' = True) -> 'VarSocResults'
 ```
 
 **示例**
@@ -9909,7 +10060,7 @@ print(ws.varsoc(base[['y1','y2']].to_numpy(), maxlag=2))
 None
 ```
 
-### `varstable`
+### `var_stable`
 
 **Stata 指令:** `varstable`
 
@@ -9918,7 +10069,7 @@ None
 **签名**
 
 ```python
-ws.varstable(result: 'Any') -> 'VarStableResult'
+ws.var_stable(result: 'Any') -> 'VarStableResults'
 ```
 
 **示例**
@@ -9933,7 +10084,7 @@ print(ws.varstable(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2'
 None
 ```
 
-### `varwle`
+### `var_wle`
 
 **Stata 指令:** `varwle`
 
@@ -9942,7 +10093,7 @@ None
 **签名**
 
 ```python
-ws.varwle(result: 'Any') -> 'VarWleResult'
+ws.var_wle(result: 'Any') -> 'VarWleResults'
 ```
 
 **示例**
@@ -9957,7 +10108,38 @@ print(ws.varwle(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).
 None
 ```
 
-### `veclmar`
+### `varbasic`
+
+**Stata 指令:** `varbasic dlny, lags(1) irf`
+
+估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。
+
+**签名**
+
+```python
+ws.varbasic(data: 'pd.DataFrame', variables: 'Sequence[str] | str', *, lags: "'int | Sequence[int]'" = (1, 2), trend: 'str' = 'c', time: 'str | None' = None, subset: "'Any | None'" = None) -> 'IrfResults'
+```
+
+**示例**
+
+```python
+import numpy as np
+import pandas as pd
+rng = np.random.default_rng(11)
+y = np.zeros(60)
+for _t in range(1, 60):
+    y[_t] = 0.6 * y[_t - 1] + rng.normal()
+frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
+fit = ws.varbasic(frame, 'dlny', lags=1, time='t')
+```
+
+**输出**
+
+```text
+None
+```
+
+### `vec_lmar`
 
 **Stata 指令:** `veclmar`
 
@@ -9966,7 +10148,7 @@ None
 **签名**
 
 ```python
-ws.veclmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResult'
+ws.vec_lmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResults'
 ```
 
 **示例**
@@ -9981,7 +10163,7 @@ print(ws.veclmar(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, nam
 None
 ```
 
-### `vecrank`
+### `vec_rank`
 
 **Stata 指令:** `vecrank varlist, lags(#)`
 
@@ -9990,7 +10172,7 @@ Johansen 协整秩检验，含 trace 与最大特征值两种形式及其 5% 临
 **签名**
 
 ```python
-ws.vecrank(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant', show_max: 'bool' = False) -> 'VecRankResult'
+ws.vec_rank(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant', show_max: 'bool' = False) -> 'VecRankResults'
 ```
 
 **示例**
@@ -10007,7 +10189,7 @@ None
 
 **注意:** `trend` 只接受 "constant"；Stata 的其他趋势设定会被拒绝，而不是近似处理。
 
-### `vecstable`
+### `vec_stable`
 
 **Stata 指令:** `vecstable`
 
@@ -10016,195 +10198,13 @@ None
 **签名**
 
 ```python
-ws.vecstable(result: 'Any') -> 'VecStableResult'
+ws.vec_stable(result: 'Any') -> 'VecStableResults'
 ```
 
 **示例**
 
 ```python
 print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `xtdes`
-
-**Stata 指令:** `xtdes`
-
-`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。
-
-**签名**
-
-```python
-ws.xtdes(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtDesResult'
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-ws.xtdes(panel, entity="pid", time="year")
-```
-
-**输出**
-
-```text
-
-     pid:  1, 2, ..., 2                                      n =          2
-    year:  1, 2, ..., 2                                      T =          2
-           Delta(year) = 1 unit
-           Span(year)  = 2 periods
-           (pid*year uniquely identifies each observation)
-
-Distribution of T_i:   min      5%     25%       50%       75%     95%     max
-                         2       2       2         2         2       2       2
-
-     Freq.  Percent    Cum. |  Pattern
- ---------------------------+---------
-        2    100.00  100.00 |  11
- ---------------------------+---------
-        2    100.00         |  XX
-```
-
-### `xtoverid`
-
-**Stata 指令:** `xtoverid (user-written: Schaffer & Stillman)`
-
-过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type="robust"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。
-
-**签名**
-
-```python
-ws.xtoverid(result: 'Any') -> 'XtOveridResult'
-```
-
-**示例**
-
-```python
-fit = ws.RandomEffects.from_formula("y ~ x1 + x2", base, entity="firm", time="year").fit()
-ws.xtoverid(fit).to_dict()
-```
-
-**输出**
-
-```text
-{'j': 1.184508111992374, 'jp': 0.5530792071413253, 'jdf': 2.0}
-```
-
-### `xtserial`
-
-**Stata 指令:** `xtserial (user-written, Drukker)`
-
-Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。
-
-**签名**
-
-```python
-ws.xtserial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 'str', keep_first_stage: 'bool' = True) -> 'XtSerialResult'
-```
-
-**示例**
-
-```python
-d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
-print(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))
-```
-
-**输出**
-
-```text
-None
-```
-
-### `xtset`
-
-**Stata 指令:** `xtset pid year`
-
-`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。
-
-**签名**
-
-```python
-ws.xtset(data: 'pd.DataFrame', entity: 'str', time: 'str') -> 'XtSetResult'
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-ws.xtset(panel, entity="pid", time="year")
-```
-
-**输出**
-
-```text
-
-Panel variable: pid (strongly balanced)
- Time variable: year, 1 to 2
-         Delta: 1 unit
-```
-
-### `xtsum`
-
-**Stata 指令:** `xtsum y k1`
-
-`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。
-
-**签名**
-
-```python
-ws.xtsum(data: 'pd.DataFrame', variables: 'Sequence[str]', *, entity: 'str', time: 'str') -> 'XtSumResult'
-```
-
-**示例**
-
-```python
-import pandas as pd
-panel = pd.DataFrame(
-    {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
-)
-ws.xtsum(panel, ["y"], entity="pid", time="year")
-```
-
-**输出**
-
-```text
-
-Variable         |      Mean   Std. dev.       Min        Max |    Observations
------------------+--------------------------------------------+----------------
-y        overall |       2.5   1.290994          1          4 |     N =       4
-         between |             1.414214        1.5        3.5 |     n =       2
-         within  |             .5773503          2          3 |     T =       2
-```
-
-### `xttest0`
-
-**Stata 指令:** `xttest0 (after xtreg, re)`
-
-随机效应的 Breusch-Pagan 拉格朗日乘数检验：面板方差分量是否为零，即检验 `sigma_u = 0`。这是它必须跟在**随机效应**拟合之后的原因——固定效应已经吸收了 `u`，该检验不适用。
-
-**签名**
-
-```python
-ws.xttest0(result: 'Any', *, entity: 'Any' = None) -> 'XtTest0Result'
-```
-
-**示例**
-
-```python
-d = base.assign(firm=np.repeat(np.arange(20), 10), t=np.tile(np.arange(10), 20))
-f = ws.RandomEffects.from_formula('y ~ x1', d, entity='firm', time='t').fit()
-print(ws.xttest0(f, entity=d['firm']))
 ```
 
 **输出**

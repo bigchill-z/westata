@@ -59,7 +59,7 @@ def test_the_result_presentation_names_that_do_exist() -> None:
 
     assert hasattr(ws, "etable")
     assert hasattr(ws, "etable_as_stata")
-    assert hasattr(ws, "tebalance_summarize")
+    assert hasattr(ws, "treatment_balance_summarize")
 
 
 def test_unit_root_names_are_the_ones_that_were_fixed() -> None:

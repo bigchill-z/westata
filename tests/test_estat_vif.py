@@ -26,7 +26,7 @@ _CONSTANT = {"intercept", "const", "_cons"}
 def linear_fit():
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length", "displacement"]].dropna()
-    return frame, ws.OLS.from_formula(
+    return frame, ws.Regress.from_formula(
         "mpg ~ weight + length + displacement", frame
     ).fit()
 
@@ -160,7 +160,7 @@ def test_a_collinear_regressor_gets_a_huge_vif() -> None:
     rng = np.random.default_rng(0)
     frame["weight_copy"] = frame["weight"] + rng.normal(scale=1e-6, size=len(frame))
 
-    rendered = ws.OLS.from_formula("mpg ~ weight + weight_copy", frame).fit().estat_vif()
+    rendered = ws.Regress.from_formula("mpg ~ weight + weight_copy", frame).fit().estat_vif()
 
     assert rendered.vif.max() > 1000.0
     # The mean must stay computable: an infinity would poison it.
@@ -172,7 +172,7 @@ def test_model_without_a_constant_refuses_centred_vif() -> None:
 
     df = pd.read_stata("tests/data/auto.dta")
     frame = df[["mpg", "weight", "length"]].dropna()
-    fit = ws.OLS.from_formula("mpg ~ weight + length - 1", frame).fit()
+    fit = ws.Regress.from_formula("mpg ~ weight + length - 1", frame).fit()
 
     with pytest.raises(ValueError, match="uncentered"):
         fit.estat_vif()

@@ -53,13 +53,13 @@ def fitted():
         frame = pd.read_stata(DATA).dropna(subset=["lnw", "s", "expr", "tenure"])
     except FileNotFoundError:  # pragma: no cover - data lives outside the repo
         pytest.skip("grilic.dta is not available")
-    return ws.OLS.from_formula("lnw ~ s + expr + tenure", frame).fit()
+    return ws.Regress.from_formula("lnw ~ s + expr + tenure", frame).fit()
 
 
 def test_the_hettest_title_keeps_its_trailing_space(fitted) -> None:
     """The round-166 fix: 54 characters, ending in a blank, exactly as Stata prints it."""
 
-    rendered = str(ws.estat_hettest(fitted, method="iid"))
+    rendered = str(ws.estat_heteroskedasticity_test(fitted, method="iid"))
     assert STATA_HETTEST_TITLE in rendered
     assert len(STATA_HETTEST_TITLE) == 56
 
@@ -77,7 +77,7 @@ def test_every_hettest_variant_reports_statas_statistics(
 ) -> None:
     """Each variant computes a DIFFERENT statistic: iid 0.59, normal 0.73 on the same fit."""
 
-    rendered = str(ws.estat_hettest(fitted, **kwargs))
+    rendered = str(ws.estat_heteroskedasticity_test(fitted, **kwargs))
     assert STATA_HETTEST_TITLE in rendered
     assert statistic in rendered
 
@@ -91,10 +91,10 @@ def test_the_iid_option_is_a_method_not_a_keyword(fitted) -> None:
 
     import inspect
 
-    signature = inspect.signature(ws.estat_hettest)
+    signature = inspect.signature(ws.estat_heteroskedasticity_test)
     assert "method" in signature.parameters
     assert "iid" not in signature.parameters
-    assert ws.estat_hettest(fitted, method="iid") is not None
+    assert ws.estat_heteroskedasticity_test(fitted, method="iid") is not None
 
 
 def test_ovtest_and_its_rhs_variant_are_two_different_tests(fitted) -> None:
@@ -104,8 +104,8 @@ def test_ovtest_and_its_rhs_variant_are_two_different_tests(fitted) -> None:
     rhs:   powers of the REGRESSORS,    F(9, 745)
     """
 
-    plain = [line for line in str(ws.estat_ovtest(fitted)).splitlines() if line.strip()]
-    with_rhs = [line for line in str(ws.estat_ovtest(fitted, rhs=True)).splitlines() if line.strip()]
+    plain = [line for line in str(ws.estat_omitted_variables_test(fitted)).splitlines() if line.strip()]
+    with_rhs = [line for line in str(ws.estat_omitted_variables_test(fitted, rhs=True)).splitlines() if line.strip()]
     for expected in STATA_OVTEST:
         assert expected in plain, repr(expected)
     for expected in STATA_OVTEST_RHS:

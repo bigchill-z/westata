@@ -46,7 +46,7 @@ def fitted():
         renamed.append(column if seen[column] == 1 else f"{column}_{seen[column]}")
     frame.columns = renamed
     frame["prov"] = frame["province"].astype("category").cat.codes + 1
-    return ws.RandomEffects.from_formula(
+    return ws.PanelRegressRE.from_formula(
         "ltvfo ~ ltlan + ltwlab + ltpow", frame, entity="prov", time="year"
     ).fit()
 
@@ -115,7 +115,7 @@ def test_a_small_panel_does_not_collapse_to_zero() -> None:
         ],
         ignore_index=True,
     )
-    result = ws.RandomEffects.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
+    result = ws.PanelRegressRE.from_formula("y ~ x1", frame, entity="firm", time="year").fit()
     assert float(result.e["sigma_u"]) > 0.0
     # An unbalanced panel has no single theta, only the distribution (Tcon == 0).
     assert float(result.e["thta_min"]) > 0.0

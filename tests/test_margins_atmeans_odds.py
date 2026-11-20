@@ -97,6 +97,6 @@ def test_odds_ratios_refuse_non_log_odds_models() -> None:
             "x": np.random.default_rng(4).normal(size=120),
         }
     )
-    ols = ws.OLS.from_formula("y ~ x", frame).fit()
+    ols = ws.Regress.from_formula("y ~ x", frame).fit()
     with pytest.raises(Exception):
         _ = ols.odds_ratios

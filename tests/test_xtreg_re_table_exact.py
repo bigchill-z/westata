@@ -60,7 +60,7 @@ def table():
     frame = frame.copy()
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
-    fitted = ws.RandomEffects.from_formula(
+    fitted = ws.PanelRegressRE.from_formula(
         FORMULA, frame, entity="sid", time="year"
     ).fit()
     return str(fitted.summary(style="stata")).splitlines()
@@ -135,7 +135,7 @@ def fe_table():
     frame = frame.copy()
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
-    fitted = ws.PanelOLS.from_formula(
+    fitted = ws.PanelRegressFE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="sid", time="year"
     ).fit()
     return str(fitted.summary(style="stata")).splitlines()
@@ -216,7 +216,7 @@ def be_table():
     frame = frame.copy()
     frame["sid"] = pd.Categorical(frame["st_abb"]).codes
     frame["year"] = frame["year"].astype(int)
-    fitted = ws.BetweenOLS.from_formula(
+    fitted = ws.PanelRegressBE.from_formula(
         "lny ~ lnk1 + lnk2 + lnlabor", frame, entity="sid", time="year"
     ).fit()
     return str(fitted.summary(style="stata")).splitlines()

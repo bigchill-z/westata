@@ -110,7 +110,7 @@ def _straight_call() -> str:
         )
 
     try:
-        result = ws.OLS.from_formula(
+        result = ws.Regress.from_formula(
             formula, frame, weights=frame["timepwt48"], weight_type="aweight"
         ).fit()
     except Exception as exc:
@@ -141,7 +141,7 @@ def _weight_by_name() -> str:
     frame = frame.query("t1==1").reset_index(drop=True)
     formula = "d_rpc ~ l_sh_routine33a + " + " + ".join(names)
     try:
-        ws.OLS.from_formula(formula, frame, weights="timepwt48", weight_type="aweight").fit()
+        ws.Regress.from_formula(formula, frame, weights="timepwt48", weight_type="aweight").fit()
     except Exception as exc:
         raise _Gap(
             f"weights as a column name is not supported ({type(exc).__name__}). "
@@ -155,7 +155,7 @@ def _weight_by_name() -> str:
 def _documented_behaviour() -> str:
     """The docstring should say what happens to weights when rows are dropped."""
 
-    doc = (ws.OLS.from_formula.__doc__ or "")
+    doc = (ws.Regress.from_formula.__doc__ or "")
     if "missing" not in doc.lower() and "kept_index" not in doc:
         raise _Gap(
             "OLS.from_formula's docstring does not mention that it drops rows with missing "
@@ -181,7 +181,7 @@ def _control_plain_ols() -> str:
     frame, names = _dummies(raw)
     frame = frame.dropna(subset=["d_rpc"]).query("t1==1").reset_index(drop=True)
     formula = "d_rpc ~ l_sh_routine33a + " + " + ".join(names)
-    result = ws.OLS.from_formula(
+    result = ws.Regress.from_formula(
         formula, frame, weights=frame["timepwt48"], weight_type="aweight"
     ).fit(cov_type="cluster", cov_kwds={"groups": frame["statefip"]})
     index = [str(n) for n in result.param_names].index("l_sh_routine33a")

@@ -50,7 +50,7 @@ def _random_effects_row(n: int = 600) -> str:
         }
     )
     frame["hi"] = (frame["y"] > 0).astype(float)
-    fitted = ws.XtLogit.from_formula(
+    fitted = ws.PanelLogit.from_formula(
         "hi ~ x", frame, entity="id", time="t", method="re"
     ).fit()
     rendered = str(fitted.summary(style="stata"))

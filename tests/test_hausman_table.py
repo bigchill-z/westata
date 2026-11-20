@@ -46,7 +46,7 @@ def outcome():
     iv = ws.IV2SLS.from_formula(
         "lnw ~ expr + tenure + rns + smsa + [s ~ mrt + iq]", frame
     ).fit()
-    ols = ws.OLS.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit()
+    ols = ws.Regress.from_formula("lnw ~ s + expr + tenure + rns + smsa", frame).fit()
     return iv.hausman(ols)
 
 
@@ -93,9 +93,9 @@ def test_the_coefficients_are_the_fitted_ones(outcome) -> None:
 def test_a_summary_only_result_still_renders() -> None:
     """Callers that construct the result without the estimates must not crash."""
 
-    from westata.postestimation.modeltests import HausmanResult
+    from westata.postestimation.modeltests import HausmanResults
 
-    simple = HausmanResult(statistic=3.5, df=2.0, pvalue=0.17)
+    simple = HausmanResults(statistic=3.5, df=2.0, pvalue=0.17)
     assert "chi2(2) = 3.50" in str(simple)
 
 STATA_ROWS = [

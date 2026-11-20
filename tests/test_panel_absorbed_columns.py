@@ -66,7 +66,7 @@ def test_prerebel_really_is_constant_within_county(panel_slice) -> None:
 
 
 def test_the_fit_succeeds_and_drops_only_the_absorbed_column(panel_slice) -> None:
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "rug_after ~ maize + prerebel", panel_slice, entity="county", time="year"
     ).fit()
     # The intercept stays (the backend needs it); only the absorbed slope is gone.
@@ -90,7 +90,7 @@ def test_the_surviving_coefficient_matches_its_within_regression(panel_slice) ->
     changed -- only which rows the fixture picks.
     """
 
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "rug_after ~ maize + prerebel", panel_slice, entity="county", time="year"
     ).fit()
 
@@ -130,10 +130,10 @@ def test_hausman_reports_a_usable_result_after_an_absorbed_column(panel_slice) -
     here as such rather than as a Stata constant.
     """
 
-    fe = ws.PanelOLS.from_formula(
+    fe = ws.PanelRegressFE.from_formula(
         "rug_after ~ maize + prerebel", panel_slice, entity="county", time="year"
     ).fit()
-    re = ws.RandomEffects.from_formula(
+    re = ws.PanelRegressRE.from_formula(
         "rug_after ~ maize + prerebel", panel_slice, entity="county", time="year"
     ).fit()
     result = ws.hausman(fe, re)
@@ -166,7 +166,7 @@ def test_ordinary_columns_are_never_dropped() -> None:
     effect = rng.normal(scale=1.0, size=entities)[entity]
     y = 2.0 + 1.5 * x1 - 0.7 * x2 + effect + rng.normal(scale=0.5, size=n)
     frame = pd.DataFrame({"y": y, "x1": x1, "x2": x2, "firm": entity, "year": time})
-    result = ws.PanelOLS.from_formula(
+    result = ws.PanelRegressFE.from_formula(
         "y ~ x1 + x2", frame, entity="firm", time="year"
     ).fit()
     assert set(result.params.index) == {"Intercept", "x1", "x2"}

@@ -766,7 +766,7 @@ class TruncatedRegress(_MLLimitedBase):
         lower: float | None = None,
         upper: float | None = None,
         subset: Any = None,
-    ) -> "Truncreg":
+    ) -> "TruncatedRegress":
         """Build the model from a formula (Stata ``truncreg y x, ll(#) ul(#)``)."""
 
         if not isinstance(data, pd.DataFrame):
@@ -963,7 +963,7 @@ class IntervalRegress(_MLLimitedBase):
     @classmethod
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
-    ) -> "Intreg":
+    ) -> "IntervalRegress":
         """Build from a formula whose left-hand side is ``"lower upper"``."""
 
         if not isinstance(data, pd.DataFrame):
@@ -2133,7 +2133,7 @@ class EndogenousTreatmentRegress:
     @classmethod
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
-    ) -> "Etregress":
+    ) -> "EndogenousTreatmentRegress":
         """Build the model from ``"y ~ x + treat(t ~ z)"``."""
 
         outcome_formula, treatment_formula, data = _parse_two_equation(

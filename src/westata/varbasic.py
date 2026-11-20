@@ -339,7 +339,7 @@ class VarBasic:
 
     ``VarBasic(frame, "dlny", lags=1, time="year").fit()`` is the same computation as
     ``varbasic(frame, "dlny", lags=1, time="year")``. The function stays as a thin wrapper because
-    Stata's ``varbasic`` is itself a one-line command, and callers coming from ``ws.xttest0(...)``
+    Stata's ``varbasic`` is itself a one-line command, and callers coming from ``ws.panel_test0(...)``
     style expect the bare call to work.
     """
 

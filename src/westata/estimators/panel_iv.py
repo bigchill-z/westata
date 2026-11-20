@@ -580,7 +580,7 @@ class PanelIVRegress:
         time: str | None = None,
         method: str = "fe",
         subset: Any = None,
-    ) -> "XtIvreg":
+    ) -> "PanelIVRegress":
         """Build the model from ``"y ~ w + (endog = z)"``.
 
         Rows with missing values are dropped listwise across the dependent
@@ -1109,7 +1109,7 @@ class PanelGls:
         corr: str = "independent",
         nmk: bool = False,
         subset: Any = None,
-    ) -> "XtGls":
+    ) -> "PanelGls":
         """Build the model from a formula and a panel frame."""
 
         if subset is not None:
@@ -1622,7 +1622,7 @@ class PanelPcse:
         correlation: str = "independent",
         selection: str = "casewise",
         subset: Any = None,
-    ) -> "XtPcse":
+    ) -> "PanelPcse":
         """Build the model from a formula and a panel frame."""
 
         if subset is not None:
@@ -2191,7 +2191,7 @@ class PanelUnitroot:
         noconstant: bool = False,
         demean: bool = False,
         subset: Any = None,
-    ) -> "XtUnitroot":
+    ) -> "PanelUnitroot":
         """Build the test from a formula and a panel frame.
 
         Only the left-hand side matters; ``"y ~ 1"`` and ``"y"`` both name ``y``.

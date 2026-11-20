@@ -177,7 +177,7 @@ class RegressionControlMethod:
         criterion: str = "aicc",
         selected: Sequence[Any] | None = None,
         max_predictors: int | None = None,
-    ) -> "Rcm":
+    ) -> "RegressionControlMethod":
         """Build from a frame and column names."""
 
         frame = data

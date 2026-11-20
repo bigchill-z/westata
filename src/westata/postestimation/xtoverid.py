@@ -187,7 +187,7 @@ def _require_re_fit(result: Any) -> tuple[pd.DataFrame, np.ndarray, list[str], s
             f"{model_name!r} re-estimates through ivreg2 with an instrument set this "
             "package does not record in the shape xtoverid.ado reads; the "
             "xtreg, re branch is the one implemented. Fit with "
-            "ws.RandomEffects.from_formula(...) to use ws.xtoverid."
+            "ws.PanelRegressRE.from_formula(...) to use ws.panel_overid."
         )
     if not lowered.startswith("xtreg"):
         raise NotImplementedError(

@@ -303,7 +303,7 @@ class RegressHighDimFixedEffects:
         weights: Any = None,
         weight_type: str | None = None,
         subset: Any = None,
-    ) -> "FEOLS":
+    ) -> "RegressHighDimFixedEffects":
         """Build a model from a PyFixest formula (see :class:`FEOLS`).
 
         ``subset=`` restricts the estimation sample, matching ``OLS``/``Logit``/

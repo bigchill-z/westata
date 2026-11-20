@@ -224,7 +224,7 @@ class TreatmentEffectsPsmatch:
         nneighbor: int = 1,
         tie_tolerance: float = 1e-09,
         caliper: float | None = None,
-    ) -> "TeffectsPsmatch":
+    ) -> "TreatmentEffectsPsmatch":
         """Build from a frame and column names."""
 
         frame = data

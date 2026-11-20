@@ -164,7 +164,7 @@ class TreatmentEffectsRa:
         covariates: Sequence[str] | None = None,
         estimand: str = "ate",
         add_constant: bool = True,
-    ) -> "TeffectsRa":
+    ) -> "TreatmentEffectsRa":
         """Build from a frame and column names -- ``teffects ra (y x) (t)``."""
 
         frame = data

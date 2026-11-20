@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.40 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.41 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -110,7 +110,7 @@ ws.Regress(endog: 'Any', exog: 'Any', *, weights: 'Any' = None, weight_type: 'st
 **`Regress.from_formula`**
 
 ```python
-Regress.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'OLS'"
+Regress.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'Regress'"
 ```
 
 **`Regress.fit`**
@@ -122,7 +122,7 @@ Regress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any] | 
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -162,7 +162,7 @@ ws.RegressHighDimFixedEffects(formula: 'str', data: 'pd.DataFrame', *, weights: 
 **`RegressHighDimFixedEffects.from_formula`**
 
 ```python
-RegressHighDimFixedEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'FEOLS'"
+RegressHighDimFixedEffects.from_formula(formula: 'str', data: 'pd.DataFrame', *, weights: 'Any' = None, weight_type: 'str | None' = None, subset: 'Any' = None) -> "'RegressHighDimFixedEffects'"
 ```
 
 **`RegressHighDimFixedEffects.fit`**
@@ -174,7 +174,7 @@ RegressHighDimFixedEffects.fit(self, cov_type: 'str | None' = None, cov_kwds: 'M
 **示例**
 
 ```python
-ws.FEOLS.from_formula('y ~ x1 + x2 | firm + year', base).fit().summary(style='stata')
+ws.RegressHighDimFixedEffects.from_formula('y ~ x1 + x2 | firm + year', base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -211,7 +211,7 @@ Absorbed degrees of freedom:
 
 **Stata 指令:** `xtreg ypanel x1 x2, fe`
 
-固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `OLS` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。 系数按**公式书写顺序**排列、常数项在最后，与 Stata 的 `e(b)` 一致；patsy 的设计矩阵是字母序，因此这个顺序是从公式还原出来的，而不是照列名读。
+固定效应面板回归，即 Stata 的 `xtreg, fe`。`fit(entity_effects=True)` 是默认值。公式与 `Regress` 完全一样地隐含常数项，因此尽管组内变换会吸收它，`e(b)` 仍含 `Intercept`；要对应 Stata 的 `noconstant`，请写 `'ypanel ~ x1 + x2 - 1'`。含缺失值的行在估计之前被整行剔除，所以 `e(N)` 可能小于 `len(data)`；汇总还会打印 `sigma_u`/`sigma_e`/`rho` 区块与「所有 `u_i` 为零」的 F 检验。 系数按**公式书写顺序**排列、常数项在最后，与 Stata 的 `e(b)` 一致；patsy 的设计矩阵是字母序，因此这个顺序是从公式还原出来的，而不是照列名读。
 
 **签名**
 
@@ -222,7 +222,7 @@ ws.PanelRegressFE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 
 **`PanelRegressFE.from_formula`**
 
 ```python
-PanelRegressFE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressFE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelRegressFE'"
 ```
 
 **`PanelRegressFE.fit`**
@@ -234,7 +234,7 @@ PanelRegressFE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.PanelOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelRegressFE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -283,7 +283,7 @@ ws.PanelRegressRE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 
 **`PanelRegressRE.from_formula`**
 
 ```python
-PanelRegressRE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressRE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelRegressFE'"
 ```
 
 **`PanelRegressRE.fit`**
@@ -295,7 +295,7 @@ PanelRegressRE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelRegressRE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -341,7 +341,7 @@ ws.PanelRegressBE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 
 **`PanelRegressBE.from_formula`**
 
 ```python
-PanelRegressBE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressBE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelRegressFE'"
 ```
 
 **`PanelRegressBE.fit`**
@@ -353,7 +353,7 @@ PanelRegressBE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.BetweenOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelRegressBE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -395,7 +395,7 @@ ws.PanelRegressFD(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 
 **`PanelRegressFD.from_formula`**
 
 ```python
-PanelRegressFD.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressFD.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelRegressFE'"
 ```
 
 **`PanelRegressFD.fit`**
@@ -407,7 +407,7 @@ PanelRegressFD.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.FirstDifferenceOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelRegressFD.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -612,7 +612,7 @@ ws.PanelIVRegress(endog: 'Any', exog: 'Any', endog_regressors: 'Any', instrument
 **`PanelIVRegress.from_formula`**
 
 ```python
-PanelIVRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtIvreg'"
+PanelIVRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'PanelIVRegress'"
 ```
 
 **`PanelIVRegress.fit`**
@@ -624,7 +624,7 @@ PanelIVRegress.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.XtIvreg.from_formula('ypanel ~ x1 + (x2 = x3)', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelIVRegress.from_formula('ypanel ~ x1 + (x2 = x3)', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -666,7 +666,7 @@ Exogenous:  x1 x3
 
 **Stata 指令:** `xtgls y x1 x2, panels(heteroskedastic)`
 
-面板 GLS，即 Stata 的 `xtgls`。`panels` 接受 `iid`、`heteroskedastic`（默认）与 `correlated`；`corr` 接受 `independent`（默认）与 `ar1`，后者以各面板共用的一个自相关系数做 Prais-Winsten 变换，再做同样的 GLS 步。这是两步可行 GLS，不是混合 OLS：各面板自身的方差为各自面板加权，因此当这些方差与回归元相关时系数会变动。在 fixture 数据上实测，`panels(heteroskedastic)` 给出 `x1 = .8398055`，而同一数据的 `OLS` 给出 `.8406445`。
+面板 GLS，即 Stata 的 `xtgls`。`panels` 接受 `iid`、`heteroskedastic`（默认）与 `correlated`；`corr` 接受 `independent`（默认）与 `ar1`，后者以各面板共用的一个自相关系数做 Prais-Winsten 变换，再做同样的 GLS 步。这是两步可行 GLS，不是混合 OLS：各面板自身的方差为各自面板加权，因此当这些方差与回归元相关时系数会变动。在 fixture 数据上实测，`panels(heteroskedastic)` 给出 `x1 = .8398055`，而同一数据的 `Regress` 给出 `.8406445`。
 
 **签名**
 
@@ -677,7 +677,7 @@ ws.PanelGls(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray',
 **`PanelGls.from_formula`**
 
 ```python
-PanelGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, subset: 'Any' = None) -> "'XtGls'"
+PanelGls.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, panels: 'str' = 'heteroskedastic', corr: 'str' = 'independent', nmk: 'bool' = False, subset: 'Any' = None) -> "'PanelGls'"
 ```
 
 **`PanelGls.fit`**
@@ -689,7 +689,7 @@ PanelGls.fit(self, cov_type: 'str' = 'nonrobust', cov_kwds: 'Mapping[str, Any] |
 **示例**
 
 ```python
-ws.XtGls.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelGls.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -732,7 +732,7 @@ ws.PanelPcse(endog: 'Any', exog: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray'
 **`PanelPcse.from_formula`**
 
 ```python
-PanelPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise', subset: 'Any' = None) -> "'XtPcse'"
+PanelPcse.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, correlation: 'str' = 'independent', selection: 'str' = 'casewise', subset: 'Any' = None) -> "'PanelPcse'"
 ```
 
 **`PanelPcse.fit`**
@@ -744,7 +744,7 @@ PanelPcse.fit(self, cov_type: 'str' = 'pcse', cov_kwds: 'Mapping[str, Any] | Non
 **示例**
 
 ```python
-ws.XtPcse.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelPcse.from_formula('y ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -788,7 +788,7 @@ ws.PanelAbond(endog: 'Any', exog: 'Any', groups: 'Any', periods: 'Any', *, lags:
 **`PanelAbond.from_formula`**
 
 ```python
-PanelAbond.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', lags: 'int' = 1, system: 'bool' = False, subset: 'Any' = None) -> "'XtAbond'"
+PanelAbond.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', lags: 'int' = 1, system: 'bool' = False, subset: 'Any' = None) -> "'PanelAbond'"
 ```
 
 **`PanelAbond.fit`**
@@ -800,7 +800,7 @@ PanelAbond.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any]
 **示例**
 
 ```python
-ws.XtAbond.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelAbond.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -842,7 +842,7 @@ ws.ErrorsInVariablesRegress(endog: 'Any', exog: 'Any', reliab: 'Mapping[str, flo
 **`ErrorsInVariablesRegress.from_formula`**
 
 ```python
-ErrorsInVariablesRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, reliab: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> "'Eivreg'"
+ErrorsInVariablesRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, reliab: 'Mapping[str, float] | None' = None, subset: 'Any' = None) -> "'ErrorsInVariablesRegress'"
 ```
 
 **`ErrorsInVariablesRegress.fit`**
@@ -854,7 +854,7 @@ ErrorsInVariablesRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwd
 **示例**
 
 ```python
-ws.Eivreg.from_formula('y ~ x1 + x2', base, reliab={'x1': 0.9}).fit().summary(style='stata')
+ws.ErrorsInVariablesRegress.from_formula('y ~ x1 + x2', base, reliab={'x1': 0.9}).fit().summary(style='stata')
 ```
 
 **输出**
@@ -893,7 +893,7 @@ ws.SeeminglyUnrelatedRegress(designs: 'Sequence[np.ndarray]', responses: 'Sequen
 **`SeeminglyUnrelatedRegress.from_formula`**
 
 ```python
-SeeminglyUnrelatedRegress.from_formula(equations: 'Sequence[str]', data: 'pd.DataFrame', *, names: 'Sequence[str] | None' = None, subset: 'Any' = None) -> "'Sureg'"
+SeeminglyUnrelatedRegress.from_formula(equations: 'Sequence[str]', data: 'pd.DataFrame', *, names: 'Sequence[str] | None' = None, subset: 'Any' = None) -> "'SeeminglyUnrelatedRegress'"
 ```
 
 **`SeeminglyUnrelatedRegress.fit`**
@@ -905,7 +905,7 @@ SeeminglyUnrelatedRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kw
 **示例**
 
 ```python
-ws.Sureg.from_formula(['y1 ~ x1', 'y2 ~ x2'], base).fit().summary(style='stata')
+ws.SeeminglyUnrelatedRegress.from_formula(['y1 ~ x1', 'y2 ~ x2'], base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -948,7 +948,7 @@ ws.MultivariateRegress(designs: 'Sequence[np.ndarray]', responses: 'Sequence[np.
 **`MultivariateRegress.from_formula`**
 
 ```python
-MultivariateRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Mvreg'"
+MultivariateRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'MultivariateRegress'"
 ```
 
 **`MultivariateRegress.fit`**
@@ -960,7 +960,7 @@ MultivariateRegress.fit(self, cov_type: 'str | None' = 'nonrobust', cov_kwds: 'M
 **示例**
 
 ```python
-ws.Mvreg.from_formula('y1 y2 = x1 x2', base).fit().summary(style='stata')
+ws.MultivariateRegress.from_formula('y1 y2 = x1 x2', base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -1003,7 +1003,7 @@ ws.RobustRegress(endog: 'Any', exog: 'Any', *, tune: 'float' = 7.0, param_names:
 **`RobustRegress.from_formula`**
 
 ```python
-RobustRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, tune: 'float' = 7.0, subset: 'Any' = None) -> "'RobustRegression'"
+RobustRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, tune: 'float' = 7.0, subset: 'Any' = None) -> "'RobustRegress'"
 ```
 
 **`RobustRegress.fit`**
@@ -1015,7 +1015,7 @@ RobustRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, A
 **示例**
 
 ```python
-ws.RobustRegression.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
+ws.RobustRegress.from_formula('y ~ x1 + x2', base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -1052,7 +1052,7 @@ ws.QuantileRegress(endog: 'Any', exog: 'Any', *, quantile: 'float' = 0.5, param_
 **`QuantileRegress.from_formula`**
 
 ```python
-QuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'QuantileRegression'"
+QuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'QuantileRegress'"
 ```
 
 **`QuantileRegress.fit`**
@@ -1064,7 +1064,7 @@ QuantileRegress.fit(self, cov_type: 'str | None' = 'iid', cov_kwds: 'Mapping[str
 **示例**
 
 ```python
-ws.QuantileRegression.from_formula('y ~ x1 + x2', base, quantile=0.5).fit().summary(style='stata')
+ws.QuantileRegress.from_formula('y ~ x1 + x2', base, quantile=0.5).fit().summary(style='stata')
 ```
 
 **输出**
@@ -1089,7 +1089,7 @@ Median regression                                   Number of obs =        200
 
 **Stata 指令:** `bsqreg y x1 x2, quantile(.5)`
 
-自助法分位数回归，即 Stata 的 `bsqreg`。点估计就是普通的 `qreg` 估计，只有标准误来自自助法（对行重抽样并重拟合）。`reps` 默认为 200，`seed` 使抽样可复现；不给 seed 时会从系统熵中新抽一个种子，对应 Stata 使用会话当前的 `c(seed)` 而非固定常数——但抽到的值不会存到结果里，因此未给种子的拟合事后无法复现。结构上它就是单分位数的 `Sqreg`，这正是 `[R] qreg` 所述的等价关系，因此两者在重抽样方案上不可能不一致。
+自助法分位数回归，即 Stata 的 `bsqreg`。点估计就是普通的 `qreg` 估计，只有标准误来自自助法（对行重抽样并重拟合）。`reps` 默认为 200，`seed` 使抽样可复现；不给 seed 时会从系统熵中新抽一个种子，对应 Stata 使用会话当前的 `c(seed)` 而非固定常数——但抽到的值不会存到结果里，因此未给种子的拟合事后无法复现。结构上它就是单分位数的 `SimultaneousQuantileRegress`，这正是 `[R] qreg` 所述的等价关系，因此两者在重抽样方案上不可能不一致。
 
 **签名**
 
@@ -1100,7 +1100,7 @@ ws.BootstrappedQuantileRegress(endog: 'Any', exog: 'Any', *, quantile: 'float' =
 **`BootstrappedQuantileRegress.from_formula`**
 
 ```python
-BootstrappedQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'Bsqreg'"
+BootstrappedQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantile: 'float' = 0.5, subset: 'Any' = None) -> "'BootstrappedQuantileRegress'"
 ```
 
 **`BootstrappedQuantileRegress.fit`**
@@ -1112,7 +1112,7 @@ BootstrappedQuantileRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: '
 **示例**
 
 ```python
-ws.Bsqreg.from_formula('y ~ x1 + x2', base, quantile=0.5).fit(reps=50, seed=20261031).summary(style='stata')
+ws.BootstrappedQuantileRegress.from_formula('y ~ x1 + x2', base, quantile=0.5).fit(reps=50, seed=20261031).summary(style='stata')
 ```
 
 **输出**
@@ -1148,7 +1148,7 @@ ws.SimultaneousQuantileRegress(endog: 'Any', exog: 'Any', *, quantiles: 'Sequenc
 **`SimultaneousQuantileRegress.from_formula`**
 
 ```python
-SimultaneousQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), subset: 'Any' = None) -> "'Sqreg'"
+SimultaneousQuantileRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, quantiles: 'Sequence[float]' = (0.25, 0.5, 0.75), subset: 'Any' = None) -> "'SimultaneousQuantileRegress'"
 ```
 
 **`SimultaneousQuantileRegress.fit`**
@@ -1160,7 +1160,7 @@ SimultaneousQuantileRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: '
 **示例**
 
 ```python
-ws.Sqreg.from_formula('y ~ x1 + x2', base, quantiles=(0.25, 0.75)).fit(reps=50, seed=20261031).summary(style='stata')
+ws.SimultaneousQuantileRegress.from_formula('y ~ x1 + x2', base, quantiles=(0.25, 0.75)).fit(reps=50, seed=20261031).summary(style='stata')
 ```
 
 **输出**
@@ -1192,7 +1192,7 @@ q75             |
 
 **Stata 指令:** `newey y x1 x2, lag(2)`
 
-`newey` 返回的对象：`regress` 的点估计套在 `newey` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey` 自身的标量与宏，因为 `newey` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.newey(formula, data, lag=...)` 返回。
+`newey_west` 返回的对象：`regress` 的点估计套在 `newey_west` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey_west` 自身的标量与宏，因为 `newey_west` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.newey_west(formula, data, lag=...)` 返回。
 
 **签名**
 
@@ -1203,7 +1203,7 @@ ws.NeweyWestResults(results: 'Any', *, lag: 'int') -> 'None'
 **示例**
 
 ```python
-ws.newey('y ~ x1 + x2', base, lag=2).summary(style='stata')
+ws.newey_west('y ~ x1 + x2', base, lag=2).summary(style='stata')
 ```
 
 **输出**
@@ -1815,7 +1815,7 @@ Log likelihood = -187.9949                              Pseudo R2     = 0.0873
 ------------------------------------------------------------------------------
 ```
 
-**注意:** 截断意味着越界的行本就不在样本中，因此调用方必须先取子集——本类不会替你取子集，这与 `Truncreg` 的行为相反。`predict` 只提供 `'xb'`、`'n'` 与 `'stdp'`，没有 `'pr'`。
+**注意:** 截断意味着越界的行本就不在样本中，因此调用方必须先取子集——本类不会替你取子集，这与 `TruncatedRegress` 的行为相反。`predict` 只提供 `'xb'`、`'n'` 与 `'stdp'`，没有 `'pr'`。
 
 ### `TruncatedNegativeBinomial`
 
@@ -1943,7 +1943,7 @@ ws.TruncatedRegress(endog: 'Any', exog: 'Any', *, lower: 'float | None' = None, 
 **`TruncatedRegress.from_formula`**
 
 ```python
-TruncatedRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = None, upper: 'float | None' = None, subset: 'Any' = None) -> "'Truncreg'"
+TruncatedRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, lower: 'float | None' = None, upper: 'float | None' = None, subset: 'Any' = None) -> "'TruncatedRegress'"
 ```
 
 **`TruncatedRegress.fit`**
@@ -1955,7 +1955,7 @@ TruncatedRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str
 **示例**
 
 ```python
-ws.Truncreg.from_formula('y ~ x1 + x2', base, lower=0.0).fit().summary(style='stata')
+ws.TruncatedRegress.from_formula('y ~ x1 + x2', base, lower=0.0).fit().summary(style='stata')
 ```
 
 **输出**
@@ -1995,7 +1995,7 @@ ws.IntervalRegress(lower: 'Any', upper: 'Any', exog: 'Any', *, param_names: 'lis
 **`IntervalRegress.from_formula`**
 
 ```python
-IntervalRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Intreg'"
+IntervalRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'IntervalRegress'"
 ```
 
 **`IntervalRegress.fit`**
@@ -2008,7 +2008,7 @@ IntervalRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str,
 
 ```python
 d = base.assign(lo=np.floor(base.y1), hi=np.floor(base.y1) + 1)
-ws.Intreg.from_formula('lo hi ~ x1', d).fit().summary(style='stata')
+ws.IntervalRegress.from_formula('lo hi ~ x1', d).fit().summary(style='stata')
 ```
 
 **输出**
@@ -2113,7 +2113,7 @@ ws.EndogenousTreatmentRegress(outcome: 'np.ndarray', outcome_exog: 'np.ndarray',
 **`EndogenousTreatmentRegress.from_formula`**
 
 ```python
-EndogenousTreatmentRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'Etregress'"
+EndogenousTreatmentRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, subset: 'Any' = None) -> "'EndogenousTreatmentRegress'"
 ```
 
 **`EndogenousTreatmentRegress.fit`**
@@ -2125,7 +2125,7 @@ EndogenousTreatmentRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'M
 **示例**
 
 ```python
-ws.Etregress.from_formula('ytreat ~ x1 + treat(treat ~ x3)', base).fit().summary(style='stata')
+ws.EndogenousTreatmentRegress.from_formula('ytreat ~ x1 + treat(treat ~ x3)', base).fit().summary(style='stata')
 ```
 
 **输出**
@@ -2227,7 +2227,7 @@ ws.PanelLogit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequenc
 **`PanelLogit.from_formula`**
 
 ```python
-PanelLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtLogit'"
+PanelLogit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'PanelLogit'"
 ```
 
 **`PanelLogit.fit`**
@@ -2239,7 +2239,7 @@ PanelLogit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any]
 **示例**
 
 ```python
-ws.XtLogit.from_formula('yb ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
+ws.PanelLogit.from_formula('yb ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2283,7 +2283,7 @@ ws.PanelProbit(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Sequen
 **`PanelProbit.from_formula`**
 
 ```python
-PanelProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtProbit'"
+PanelProbit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'PanelProbit'"
 ```
 
 **`PanelProbit.fit`**
@@ -2296,7 +2296,7 @@ PanelProbit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any
 
 ```python
 d = base.assign(ybp=(base.ypanel > 1).astype(int))
-ws.XtProbit.from_formula('ybp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')
+ws.PanelProbit.from_formula('ybp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2347,7 +2347,7 @@ ws.PanelPoisson(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Seque
 **`PanelPoisson.from_formula`**
 
 ```python
-PanelPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtPoisson'"
+PanelPoisson.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'PanelPoisson'"
 ```
 
 **`PanelPoisson.fit`**
@@ -2359,7 +2359,7 @@ PanelPoisson.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, An
 **示例**
 
 ```python
-ws.XtPoisson.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
+ws.PanelPoisson.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2400,7 +2400,7 @@ ws.PanelNbRegress(endog: 'Any', exog: 'Any', groups: 'Any', *, param_names: 'Seq
 **`PanelNbRegress.from_formula`**
 
 ```python
-PanelNbRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'XtNbreg'"
+PanelNbRegress.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, method: 'str' = 'fe', subset: 'Any' = None) -> "'PanelNbRegress'"
 ```
 
 **`PanelNbRegress.fit`**
@@ -2412,7 +2412,7 @@ PanelNbRegress.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, 
 **示例**
 
 ```python
-ws.XtNbreg.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
+ws.PanelNbRegress.from_formula('ycnt ~ x1', base, entity='firm', method='fe').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2454,7 +2454,7 @@ ws.PanelTobit(*args: 'Any', lower: 'float | None' = 0.0, upper: 'float | None' =
 **`PanelTobit.from_formula`**
 
 ```python
-PanelTobit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, lower: 'float | None' = 0.0, upper: 'float | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'XtTobit'"
+PanelTobit.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, lower: 'float | None' = 0.0, upper: 'float | None' = None, method: 'str' = 're', subset: 'Any' = None) -> "'PanelTobit'"
 ```
 
 **`PanelTobit.fit`**
@@ -2467,7 +2467,7 @@ PanelTobit.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str, Any]
 
 ```python
 d = base.assign(ycensp=np.clip(base.ypanel, 0.0, None))
-ws.XtTobit.from_formula('ycensp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')
+ws.PanelTobit.from_formula('ycensp ~ x1', d, entity='firm', method='re').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2608,7 +2608,7 @@ ARCH         |
 
 **Stata 指令:** `var a b, lags(1)`
 
-多序列向量自回归，对应 Stata 的 `var`。endog 参数是 `(n_obs, n_variables)` 数组，`names` 为方程命名。`fit()` 返回 `VARResults` 而非 `StataResults`：默认报告极大似然的残差协方差（每个方程的残差平方和除以 `T`，也就是 Stata 存入 `e(Sigma)` 与 `e(V)` 的量），`ml=False` 则复现 Stata 的 `var ..., dfk`。`select_order()` 返回 Stata `varsoc` 打印的 AIC/BIC/HQIC/FPE 表，而不是悄悄替你挑一个滞后阶。
+多序列向量自回归，对应 Stata 的 `var`。endog 参数是 `(n_obs, n_variables)` 数组，`names` 为方程命名。`fit()` 返回 `VARResults` 而非 `StataResults`：默认报告极大似然的残差协方差（每个方程的残差平方和除以 `T`，也就是 Stata 存入 `e(Sigma)` 与 `e(V)` 的量），`ml=False` 则复现 Stata 的 `var ..., dfk`。`select_order()` 返回 Stata `var_select_order` 打印的 AIC/BIC/HQIC/FPE 表，而不是悄悄替你挑一个滞后阶。
 
 **签名**
 
@@ -2655,7 +2655,7 @@ Note: BIC uses N = number of observations. See [R] IC note.
 
 **Stata 指令:** `vec a b, rank(1) lags(1)`
 
-向量误差修正模型，对应 Stata 的 `vec`。`coint_rank` 是协整秩，通常先由 `johansen()` 读出；该方法对应 `vecrank`，返回迹统计量与最大特征值统计量，并附上 Stata 打印的临界值。系数入口为 `beta`（协整向量）、`alpha`（调整速度）与 `gamma`（短期项），`e()` 载荷携带 Stata 的命名，如 `k_ce`、`k_ar_diff`、`r2_1`、`r2_2`。
+向量误差修正模型，对应 Stata 的 `vec`。`coint_rank` 是协整秩，通常先由 `johansen()` 读出；该方法对应 `vec_rank`，返回迹统计量与最大特征值统计量，并附上 Stata 打印的临界值。系数入口为 `beta`（协整向量）、`alpha`（调整速度）与 `gamma`（短期项），`e()` 载荷携带 Stata 的命名，如 `k_ce`、`k_ar_diff`、`r2_1`、`r2_2`。
 
 **签名**
 
@@ -2700,7 +2700,7 @@ ws.PanelUnitroot(values: 'Any', codes: 'np.ndarray', sizes: 'np.ndarray', *, tes
 **`PanelUnitroot.from_formula`**
 
 ```python
-PanelUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> "'XtUnitroot'"
+PanelUnitroot.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str | None' = None, test: 'str' = 'ips', lags: 'int | None' = None, trend: 'bool' = False, noconstant: 'bool' = False, demean: 'bool' = False, subset: 'Any' = None) -> "'PanelUnitroot'"
 ```
 
 **`PanelUnitroot.fit`**
@@ -2712,7 +2712,7 @@ PanelUnitroot.fit(self) -> 'PanelUnitRootResults'
 **示例**
 
 ```python
-ws.XtUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test='ips').fit().r
+ws.PanelUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test='ips').fit().r
 ```
 
 **输出**
@@ -2904,7 +2904,7 @@ ws.DIDRegress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 
 **`DIDRegress.from_formula`**
 
 ```python
-DIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
+DIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'DIDRegress'"
 ```
 
 **`DIDRegress.fit`**
@@ -2916,7 +2916,7 @@ DIDRegress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
 **示例**
 
 ```python
-ws.Didregress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')
+ws.DIDRegress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -2958,7 +2958,7 @@ Note: ATET estimate adjusted for group effects and time effects.
 
 **Stata 指令:** `xtdidregress (y x1) (treat), group(firm) time(year)`
 
-面板双重差分，对应 Stata 的 `xtdidregress`。估计量与 `Didregress` 是同一个双向固定效应回归，在平衡面板上 ATET 完全相同；差别只在自由度约定：面板单位效应嵌套在 `group()` 聚类变量之内，因此不计入 `(N-1)/(N-K)` 因子。于是聚类标准误是两者中较小的那个，这正是 Stata 自身输出里 `didregress` 与 `xtdidregress` 的差别。
+面板双重差分，对应 Stata 的 `xtdidregress`。估计量与 `DIDRegress` 是同一个双向固定效应回归，在平衡面板上 ATET 完全相同；差别只在自由度约定：面板单位效应嵌套在 `group()` 聚类变量之内，因此不计入 `(N-1)/(N-K)` 因子。于是聚类标准误是两者中较小的那个，这正是 Stata 自身输出里 `didregress` 与 `xtdidregress` 的差别。
 
 **签名**
 
@@ -2969,7 +2969,7 @@ ws.PanelDIDRegress(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, gr
 **`PanelDIDRegress.from_formula`**
 
 ```python
-PanelDIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'Didregress'"
+PanelDIDRegress.from_formula(outcome: 'Any', treatment: 'Any', data: 'pd.DataFrame', *, group: 'str', time: 'str', covariates: 'Any' = None, subset: 'Any' = None) -> "'DIDRegress'"
 ```
 
 **`PanelDIDRegress.fit`**
@@ -2981,7 +2981,7 @@ PanelDIDRegress.fit(self, cov_type: 'str' = 'cluster') -> 'StataResults'
 **示例**
 
 ```python
-ws.Xtdidregress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')
+ws.PanelDIDRegress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -3017,7 +3017,7 @@ ATET         |
 Note: ATET estimate adjusted for panel effects and time effects.
 ```
 
-**注意:** 与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `xtset` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `Didregress` 完全一致这一点只在平衡面板上有保证并经过测试。
+**注意:** 与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `panel_set` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `DIDRegress` 完全一致这一点只在平衡面板上有保证并经过测试。
 
 ### `TreatmentEffectResults`
 
@@ -3275,7 +3275,7 @@ SurveyMean.fit(self) -> 'StataResults'
 
 ```python
 b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))
-ws.SvyMean.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
+ws.SurveyMean.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
 ```
 
 **输出**
@@ -3301,7 +3301,7 @@ Number of PSUs   =  40            Population size = 252.433526
 
 **Stata 指令:** `svy: total y`
 
-抽样加权合计，对应 `svy: total`。估计为 `sum(w y)`，影响函数为 `psi_i = w_i y_i`；这里刻意**不**对权重归一化，因为合计估计的是一个总体量，它的量纲本身就是答案的一部分。其余部分——线性化、分层、`df_r = #PSU - #strata` 的参考分布与 fpc 因子——与 `SvyMean` 共用。
+抽样加权合计，对应 `svy: total`。估计为 `sum(w y)`，影响函数为 `psi_i = w_i y_i`；这里刻意**不**对权重归一化，因为合计估计的是一个总体量，它的量纲本身就是答案的一部分。其余部分——线性化、分层、`df_r = #PSU - #strata` 的参考分布与 fpc 因子——与 `SurveyMean` 共用。
 
 **签名**
 
@@ -3319,7 +3319,7 @@ SurveyTotal.fit(self) -> 'StataResults'
 
 ```python
 b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))
-ws.SvyTotal.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
+ws.SurveyTotal.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
 ```
 
 **输出**
@@ -3339,7 +3339,7 @@ Number of PSUs   =  40            Population size = 252.433526
 --------------------------------------------------------------
 ```
 
-**注意:** 与 `SvyMean` 不同，这里的影响函数**不**围绕估计值中心化。把它中心化成 `w_i (y_i - T)` 看似无害，实则不然：在 fixture 设计上会把方差放大约 244,000 倍，因为 `T` 是全局常数，它与不等权重之间的交互项在层内并不抵消。
+**注意:** 与 `SurveyMean` 不同，这里的影响函数**不**围绕估计值中心化。把它中心化成 `w_i (y_i - T)` 看似无害，实则不然：在 fixture 设计上会把方差放大约 244,000 倍，因为 `T` 是全局常数，它与不等权重之间的交互项在层内并不抵消。
 
 ### `SurveyProportion`
 
@@ -3363,7 +3363,7 @@ SurveyProportion.fit(self) -> 'StataResults'
 
 ```python
 b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))
-ws.SvyProportion.from_frame('yb', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
+ws.SurveyProportion.from_frame('yb', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
 ```
 
 **输出**
@@ -3391,7 +3391,7 @@ Number of PSUs   =  40            Population size = 252.433526
 
 **Stata 指令:** `svy: regress y x1 x2`
 
-抽样加权线性回归，对应 `svy: regress`。系数是加权最小二乘——与 `ws.OLS(..., weights=..., weight_type="pweight")` 得到的数值相同，差别只在顺序与命名（斜率在前，常数在最后记作 `_cons`）——因此抽样机制对点估计没有贡献，全部贡献都在方差上。影响函数为 `psi_i = (X'WX)^-1 w_i x_i e_i`，权重与逆交叉积都在线性化之内；模型的 F 统计量是按设计自由度报告的抽样调整 Wald 形式。
+抽样加权线性回归，对应 `svy: regress`。系数是加权最小二乘——与 `ws.Regress(..., weights=..., weight_type="pweight")` 得到的数值相同，差别只在顺序与命名（斜率在前，常数在最后记作 `_cons`）——因此抽样机制对点估计没有贡献，全部贡献都在方差上。影响函数为 `psi_i = (X'WX)^-1 w_i x_i e_i`，权重与逆交叉积都在线性化之内；模型的 F 统计量是按设计自由度报告的抽样调整 Wald 形式。
 
 **签名**
 
@@ -3409,7 +3409,7 @@ SurveyRegress.fit(self) -> 'StataResults'
 
 ```python
 b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))
-ws.SvyRegress.from_frame(b, 'y ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
+ws.SurveyRegress.from_frame(b, 'y ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
 ```
 
 **输出**
@@ -3457,7 +3457,7 @@ SurveyLogit.fit(self) -> 'StataResults'
 
 ```python
 b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))
-ws.SvyLogit.from_frame(b, 'yb ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
+ws.SurveyLogit.from_frame(b, 'yb ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')
 ```
 
 **输出**
@@ -3683,8 +3683,8 @@ ws.hausman(consistent: 'Any', efficient: 'Any', *, constant: 'bool' = False, sig
 **示例**
 
 ```python
-fe = ws.PanelOLS.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
-re = ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
+fe = ws.PanelRegressFE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
+re = ws.PanelRegressRE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
 ws.hausman(fe, re)
 ```
 
@@ -3726,7 +3726,7 @@ ws.contrast(result: 'Any', term: 'str', method: 'str' = 'r', *, level: 'float' =
 **示例**
 
 ```python
-ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
+ws.contrast(ws.Regress.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
 ```
 
 **输出**
@@ -3746,7 +3746,7 @@ ws.contrast(ws.OLS.from_formula('y ~ x1 + C(treat)', base).fit(), 'C(treat)')[0]
 
 **Stata 指令:** `pwcompare g`
 
-因子变量各水平之间的全部两两差异（Stata `pwcompare`）。当 j > i 时第 (i, j) 行报告 `水平_j - 水平_i`，因此 L 个水平按此顺序给出 L*(L-1)/2 行；由于返回值是列表，示例取其中第一个。`adjust` 只接受 `None`——即 Stata 的 `adjust(none)`——因为所有真正的多重比较校正都未实现，传入其他值会抛出 `UnsupportedError`，而不是把校正悄悄丢掉。可调用为 `ws.pwcompare(result, term)` 或 `result.pwcompare(term)`。
+因子变量各水平之间的全部两两差异（Stata `pairwise_compare`）。当 j > i 时第 (i, j) 行报告 `水平_j - 水平_i`，因此 L 个水平按此顺序给出 L*(L-1)/2 行；由于返回值是列表，示例取其中第一个。`adjust` 只接受 `None`——即 Stata 的 `adjust(none)`——因为所有真正的多重比较校正都未实现，传入其他值会抛出 `UnsupportedError`，而不是把校正悄悄丢掉。可调用为 `ws.pairwise_compare(result, term)` 或 `result.pairwise_compare(term)`。
 
 **签名**
 
@@ -3758,7 +3758,7 @@ ws.pairwise_compare(result: 'Any', term: 'str', *, level: 'float' = 0.95, adjust
 
 ```python
 d = base.assign(g=pd.cut(base['x3'], 3, labels=['lo', 'mid', 'hi']))
-ws.pwcompare(ws.OLS.from_formula('y ~ x1 + C(g)', d).fit(), 'C(g)')[0]
+ws.pairwise_compare(ws.Regress.from_formula('y ~ x1 + C(g)', d).fit(), 'C(g)')[0]
 ```
 
 **输出**
@@ -3931,7 +3931,7 @@ ws.estat_endogenous(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 
 **Stata 指令:** `estat firststage`
 
-工具变量的一阶段诊断（Stata `estat firststage`）。对每个内生回归元，报告其对外生变量回归的 R² 与调整 R²、被排除工具变量的偏 R²，以及这些工具变量的联合 F。内生回归元多于一个时，报告会切换为 Shea 偏 R²，除非给出 `all=True`；`forcenonrobust=True` 使得在稳健 VCE 下仍报告最小特征值统计量及其临界值。可调用为 `ws.estat_firststage(result)` 或 `result.estat_firststage()`。
+工具变量的一阶段诊断（Stata `estat firststage`）。对每个内生回归元，报告其对外生变量回归的 R² 与调整 R²、被排除工具变量的偏 R²，以及这些工具变量的联合 F。内生回归元多于一个时，报告会切换为 Shea 偏 R²，除非给出 `all=True`；`forcenonrobust=True` 使得在稳健 VCE 下仍报告最小特征值统计量及其临界值。可调用为 `ws.estat_first_stage(result)` 或 `result.estat_first_stage()`。
 
 **签名**
 
@@ -3942,7 +3942,7 @@ ws.estat_first_stage(result: 'Any', *, all: 'bool' = False, forcenonrobust: 'boo
 **示例**
 
 ```python
-ws.estat_firststage(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
+ws.estat_first_stage(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit())
 ```
 
 **输出**
@@ -4009,7 +4009,7 @@ Prob > chi2(197)                   =    0.6740
 
 **Stata 指令:** `estat hettest`
 
-Breusch-Pagan / Cook-Weisberg 异方差检验（Stata `estat hettest`）。省略 `variables` 时，辅助回归是标准化残差平方对**拟合值**的回归——这正是 `hettest.ado:110-115` 在没有变量列表时的行为，它与 `rhs=True`（对 `e(b)` 全部回归元回归）**不是**同一个检验（`regress mpg weight foreign` 上分别为 chi2(1)=7.89 与 chi2(2)=24.17）。`variables` 优先按原始数据变量名解析（`'rep78'` 就是原始 1-5 那一列，自由度 1），否则按设计矩阵列名解析（`'foreign[T.Foreign]'`）。**默认**统计量是该辅助回归的 `e(mss)/2`，而不是 `N*R2`；`method='iid'` 给出 `N*R2`，`method='fstat'` 给出辅助回归的 F。估计权重会被辅助回归复用，因此 `fweight`/`iweight` 的 `e(N)` 是 `sum(w)`。稳健或聚类 VCE、pweight 数据以及 `noconstant` 拟合都会被拒绝，与 `hettest.ado` 一致。全部统计量已对照 StataNow 19.5 的实际输出验证。可调用为 `ws.estat_hettest(result)` 或 `result.estat_hettest()`。
+Breusch-Pagan / Cook-Weisberg 异方差检验（Stata `estat hettest`）。省略 `variables` 时，辅助回归是标准化残差平方对**拟合值**的回归——这正是 `hettest.ado:110-115` 在没有变量列表时的行为，它与 `rhs=True`（对 `e(b)` 全部回归元回归）**不是**同一个检验（`regress mpg weight foreign` 上分别为 chi2(1)=7.89 与 chi2(2)=24.17）。`variables` 优先按原始数据变量名解析（`'rep78'` 就是原始 1-5 那一列，自由度 1），否则按设计矩阵列名解析（`'foreign[T.Foreign]'`）。**默认**统计量是该辅助回归的 `e(mss)/2`，而不是 `N*R2`；`method='iid'` 给出 `N*R2`，`method='fstat'` 给出辅助回归的 F。估计权重会被辅助回归复用，因此 `fweight`/`iweight` 的 `e(N)` 是 `sum(w)`。稳健或聚类 VCE、pweight 数据以及 `noconstant` 拟合都会被拒绝，与 `hettest.ado` 一致。全部统计量已对照 StataNow 19.5 的实际输出验证。可调用为 `ws.estat_heteroskedasticity_test(result)` 或 `result.estat_heteroskedasticity_test()`。
 
 **签名**
 
@@ -4020,7 +4020,7 @@ ws.estat_heteroskedasticity_test(result: 'Any', *, method: 'str' = 'normal', var
 **示例**
 
 ```python
-ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_heteroskedasticity_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -4054,7 +4054,7 @@ ws.estat_ic(result: 'Any', *, n: 'float | None' = None, df: 'float | None' = Non
 **示例**
 
 ```python
-ws.estat_ic(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_ic(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -4077,7 +4077,7 @@ Note: BIC uses N = number of observations. See [R] IC note.
 
 **Stata 指令:** `estat imtest, white`
 
-`regress` 之后 Cameron & Trivedi 的信息矩阵检验（Stata `estat imtest`）：把得分检验分解为异方差、偏度、峰度三个分量以及总和。`white=True` 另外计算 White 的原始检验，即单独报告的异方差分量。权重与 `cluster()` 会被拒绝，因为 `imtest.ado` 也拒绝它们——否则统计量会由未加权的残差几何算出，含义已经不同——非 `regress` 结果抛出 `NotImplementedError`。可调用为 `ws.estat_imtest(result)` 或 `result.estat_imtest()`。
+`regress` 之后 Cameron & Trivedi 的信息矩阵检验（Stata `estat imtest`）：把得分检验分解为异方差、偏度、峰度三个分量以及总和。`white=True` 另外计算 White 的原始检验，即单独报告的异方差分量。权重与 `cluster()` 会被拒绝，因为 `imtest.ado` 也拒绝它们——否则统计量会由未加权的残差几何算出，含义已经不同——非 `regress` 结果抛出 `NotImplementedError`。可调用为 `ws.estat_information_matrix_test(result)` 或 `result.estat_information_matrix_test()`。
 
 **签名**
 
@@ -4088,7 +4088,7 @@ ws.estat_information_matrix_test(result: 'Any', *, white: 'bool' = False, design
 **示例**
 
 ```python
-ws.estat_imtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), white=True)
+ws.estat_information_matrix_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), white=True)
 ```
 
 **输出**
@@ -4119,7 +4119,7 @@ Cameron & Trivedi's decomposition of IM-test
 
 **Stata 指令:** `estat overid`
 
-工具变量拟合之后的过度识别约束检验（Stata `estat overid`）。对 2SLS 与 LIML 报告 Sargan 及其有限样本 Basmann 变体，`N*(1 - rss_aux/rss_main)`，其中辅助回归是 IV 残差对**全部**工具变量回归——包含外生变量与被排除工具变量——若改用辅助回归的残差平方和作分母，得到的统计量没有分布。对 GMM 返回 `e(J)` 中的 Hansen J，因为 Sargan 假定同方差而 J 不假定。恰好识别模型、聚类 VCE，以及在非 HAC 拟合上给 `lags` 都会被拒绝。可调用为 `ws.estat_overid(result)` 或 `result.estat_overid()`。
+工具变量拟合之后的过度识别约束检验（Stata `estat overid`）。对 2SLS 与 LIML 报告 Sargan 及其有限样本 Basmann 变体，`N*(1 - rss_aux/rss_main)`，其中辅助回归是 IV 残差对**全部**工具变量回归——包含外生变量与被排除工具变量——若改用辅助回归的残差平方和作分母，得到的统计量没有分布。对 GMM 返回 `e(J)` 中的 Hansen J，因为 Sargan 假定同方差而 J 不假定。恰好识别模型、聚类 VCE，以及在非 HAC 拟合上给 `lags` 都会被拒绝。可调用为 `ws.estat_overidentification(result)` 或 `result.estat_overidentification()`。
 
 **签名**
 
@@ -4130,7 +4130,7 @@ ws.estat_overidentification(result: 'Any', *, lags: 'int | None' = None, forceno
 **示例**
 
 ```python
-ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
+ws.estat_overidentification(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 ```
 
 **输出**
@@ -4149,7 +4149,7 @@ ws.estat_overid(ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + lo]', base).fit())
 
 **Stata 指令:** `estat ovtest`
 
-Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助回归加入**重标度到 [0, 1]** 的拟合值的二、三、四次幂；重标度并非装饰——量级上百的拟合值的四次幂会让辅助设计矩阵病态，去掉它会改变统计量。检验是这三个新增项的联合 F。`rhs=True` 走 Stata 的另一条路径，改用右端变量的幂，其中示性变量只贡献自身水平。可调用为 `ws.estat_ovtest(result)` 或 `result.estat_ovtest()`。 **不带常数项**的拟合两条路径都会拒绝：`ovtest.ado:7` 第一行就是 `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答 `not appropriate after regress, nocons`（r(301)）。这是先决条件而非选项检查，漏掉它很危险：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回 `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而接受 `noconstant` 拟合，所以这条规则只属于以常数项为前提的那些检验。） 当辅助设计阵中存在两列方向完全相同时——即某个回归量恰是另一个的精确多项式，例如 `exper2 = exper^2` 与 `exper` 并列——`df` 取决于列的扫掠顺序。`OvTestResult.ambiguous` 会标出这一点，打印的块里也有一行 warning。Stata 在扫掠前会在内部决定这个顺序，而该选择既取决于数值，也取决于变量的**存储精度**：同一份数据上，六个幂次是 `float` 还是 `double` 取决于它们来自 `.dta` 文件还是在内存中生成，`recast double` 就让 Stata 的答案从 `df = 8` 变成 `df = 7`，F 从 3525.13 变成 1.06。给定一份固定数据，Stata 是确定性的——连续 6 次运行输出完全相同——但它丢哪一列无法仅从设计阵推断。把内部重排关掉（`set tol r 0`）后，Stata 的输出与本包完全一致。
+Ramsey 的 RESET 遗漏变量检验（Stata `estat ovtest`）。默认的辅助回归加入**重标度到 [0, 1]** 的拟合值的二、三、四次幂；重标度并非装饰——量级上百的拟合值的四次幂会让辅助设计矩阵病态，去掉它会改变统计量。检验是这三个新增项的联合 F。`rhs=True` 走 Stata 的另一条路径，改用右端变量的幂，其中示性变量只贡献自身水平。可调用为 `ws.estat_omitted_variables_test(result)` 或 `result.estat_omitted_variables_test()`。 **不带常数项**的拟合两条路径都会拒绝：`ovtest.ado:7` 第一行就是 `_isfit cons anovaok`，所以 `reg y x1 x2, noconstant` 后跑 `estat ovtest`，Stata 答 `not appropriate after regress, nocons`（r(301)）。这是先决条件而非选项检查，漏掉它很危险：未加守卫的默认路径曾对一个 Stata 根本不肯检验的拟合返回 `F(3, 195) = 64.86, p = 3.9e-29`。（`estat imtest` 反而接受 `noconstant` 拟合，所以这条规则只属于以常数项为前提的那些检验。） 当辅助设计阵中存在两列方向完全相同时——即某个回归量恰是另一个的精确多项式，例如 `exper2 = exper^2` 与 `exper` 并列——`df` 取决于列的扫掠顺序。`OvTestResult.ambiguous` 会标出这一点，打印的块里也有一行 warning。Stata 在扫掠前会在内部决定这个顺序，而该选择既取决于数值，也取决于变量的**存储精度**：同一份数据上，六个幂次是 `float` 还是 `double` 取决于它们来自 `.dta` 文件还是在内存中生成，`recast double` 就让 Stata 的答案从 `df = 8` 变成 `df = 7`，F 从 3525.13 变成 1.06。给定一份固定数据，Stata 是确定性的——连续 6 次运行输出完全相同——但它丢哪一列无法仅从设计阵推断。把内部重排关掉（`set tol r 0`）后，Stata 的输出与本包完全一致。
 
 **签名**
 
@@ -4160,7 +4160,7 @@ ws.estat_omitted_variables_test(result: 'Any', *, rhs: 'bool' = False) -> 'OvTes
 **示例**
 
 ```python
-ws.estat_ovtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), rhs=True)
+ws.estat_omitted_variables_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), rhs=True)
 ```
 
 **输出**
@@ -4191,7 +4191,7 @@ ws.estat_summarize(result: 'Any', *, data: 'pd.DataFrame | None' = None, variabl
 **示例**
 
 ```python
-ws.estat_summarize(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), variables=['y', 'x1'])
+ws.estat_summarize(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), variables=['y', 'x1'])
 ```
 
 **输出**
@@ -4223,7 +4223,7 @@ ws.estat_vce(result: 'Any', *, correlation: 'bool' = False) -> 'VceMatrix'
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().estat_vce(correlation=True)
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().estat_vce(correlation=True)
 ```
 
 **输出**
@@ -4254,7 +4254,7 @@ ws.estat_vif(result: 'Any', *, uncentered: 'bool' = False, nosort: 'bool' = Fals
 **示例**
 
 ```python
-ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_vif(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -4299,7 +4299,7 @@ Area under ROC curve = 0.6435
 
 **Stata 指令:** `estat esize`
 
-线性模型的效应量（Stata `estat esize`）：默认给出 eta 平方，也就是 R 平方；`epsilon=True` 给出 epsilon 平方，`omega=True` 给出 omega 平方，这两个调整 R 平方的类比只在分母上不同，omega 多加上一个 `MS_error`，因此更小、在零效应下也不那么负。两个选项互斥，由 `esize.ado` 的 `opts_exclusive` 强制；只有 eta 平方有区间定义，来自非中心 F 分布。只服务 `regress`/`areg`/`anova` 拟合。请用 `result.estat_esize()` 或 `westata.postestimation.esize.estat_esize(result)`；与 `estat auc` 一样，它没有被重新导出到顶层 `ws` 命名空间。
+线性模型的效应量（Stata `estat esize`）：默认给出 eta 平方，也就是 R 平方；`epsilon=True` 给出 epsilon 平方，`omega=True` 给出 omega 平方，这两个调整 R 平方的类比只在分母上不同，omega 多加上一个 `MS_error`，因此更小、在零效应下也不那么负。两个选项互斥，由 `esize.ado` 的 `opts_exclusive` 强制；只有 eta 平方有区间定义，来自非中心 F 分布。只服务 `regress`/`areg`/`anova` 拟合。请用 `result.estat_effect_size()` 或 `westata.postestimation.esize.estat_esize(result)`；与 `estat auc` 一样，它没有被重新导出到顶层 `ws` 命名空间。
 
 **签名**
 
@@ -4310,7 +4310,7 @@ ws.estat_effect_size(result: 'Any', *, epsilon: 'bool' = False, omega: 'bool' = 
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().estat_esize()
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().estat_esize()
 ```
 
 **输出**
@@ -4340,7 +4340,7 @@ ws.estat_moran(result: 'Any', errorlag: 'Any' = None, *, weights: 'Any' = None) 
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 W = (np.abs(np.subtract.outer(base['year'].to_numpy(), base['year'].to_numpy())) == 1).astype(float)
 r.estat_moran(weights=W)
 ```
@@ -4378,7 +4378,7 @@ ws.estat_mundlak(result: 'Any', *, storer: 'Any' = None, entity: 'str | None' = 
 **示例**
 
 ```python
-re = ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
+re = ws.PanelRegressRE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit()
 re.estat_mundlak(entity='firm', time='year')
 ```
 
@@ -4410,7 +4410,7 @@ ws.estat_szroeter(result: 'Any', variables: 'Sequence[str] | None' = None, *, rh
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().estat_szroeter(rhs=True)
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().estat_szroeter(rhs=True)
 ```
 
 **输出**
@@ -4434,7 +4434,7 @@ Ha: Variance monotonic in variables
 
 **Stata 指令:** `estat weakrobust`
 
-对弱工具变量稳健的推断（Stata `estat weakrobust`）：报告 Anderson-Rubin 检验，其分布不依赖工具变量的强度。这是 Stata 在恰好识别模型下的默认；对过度识别模型，Stata 的默认是 Moreira 的条件似然比检验，而 CLR 需要模拟条件分布、本包未实现，因此过度识别拟合必须传入 `ar=True`，否则以该理由抛出 `NotImplementedError`。`betanull` 设定内生系数上的原假设：可用映射、按位置对应的序列，或 `None` 表示全为零。请用 `result.estat_weakrobust()` 或 `westata.postestimation.weakrobust.estat_weakrobust(result, ar=True)`；它没有被重新导出到 `ws`。
+对弱工具变量稳健的推断（Stata `estat weakrobust`）：报告 Anderson-Rubin 检验，其分布不依赖工具变量的强度。这是 Stata 在恰好识别模型下的默认；对过度识别模型，Stata 的默认是 Moreira 的条件似然比检验，而 CLR 需要模拟条件分布、本包未实现，因此过度识别拟合必须传入 `ar=True`，否则以该理由抛出 `NotImplementedError`。`betanull` 设定内生系数上的原假设：可用映射、按位置对应的序列，或 `None` 表示全为零。请用 `result.estat_weak_instrument_robust()` 或 `westata.postestimation.weakrobust.estat_weakrobust(result, ar=True)`；它没有被重新导出到 `ws`。
 
 **签名**
 
@@ -4474,7 +4474,7 @@ ws.linktest(result: 'Any') -> 'LinkTestResults'
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().linktest()
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().linktest()
 ```
 
 **输出**
@@ -4507,8 +4507,8 @@ ws.suest(models: 'Sequence[Any]', *, names: 'Sequence[str] | None' = None, clust
 **示例**
 
 ```python
-a = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-a.suest(ws.OLS.from_formula('y1 ~ x1 + x2', base).fit())
+a = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
+a.suest(ws.Regress.from_formula('y1 ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -4526,7 +4526,7 @@ Simultaneous covariance matrix
 
 **Stata 指令:** `newey y x1 x2, lag(2)`
 
-Newey-West 回归，`newey 被解释变量 解释变量, lag(#)`（Stata `newey`）。它是一个**函数**而非类：传入公式与数据框，得到 NeweyWestResult。`lag` 必填且不得为负；`time=` 扮演 `tsset` 的角色并启用 `Checkt` 间隔校验，`force=True` 允许时间取值不等间隔；只接受 `aweight`。`e()` 集合被改写为 `newey` 自己的清单，因此 `regress` 会存而 `newey` 不存的键（`r2`、`rss`、`mss`、`rmse`、`sigma`、`ll` 等）会被**删除**，而不是留在里面。
+Newey-West 回归，`newey 被解释变量 解释变量, lag(#)`（Stata `newey_west`）。它是一个**函数**而非类：传入公式与数据框，得到 NeweyWestResult。`lag` 必填且不得为负；`time=` 扮演 `tsset` 的角色并启用 `Checkt` 间隔校验，`force=True` 允许时间取值不等间隔；只接受 `aweight`。`e()` 集合被改写为 `newey_west` 自己的清单，因此 `regress` 会存而 `newey_west` 不存的键（`r2`、`rss`、`mss`、`rmse`、`sigma`、`ll` 等）会被**删除**，而不是留在里面。
 
 **签名**
 
@@ -4537,7 +4537,7 @@ ws.newey_west(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' =
 **示例**
 
 ```python
-ws.newey('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).summary(style='stata')
+ws.newey_west('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).summary(style='stata')
 ```
 
 **输出**
@@ -4557,7 +4557,7 @@ Maximum lag = 2                                 F(  2,       197) =     107.69
        _cons |   1.005003   .0768392    13.08   0.000     .8534696    1.156535
 ```
 
-**注意:** 这里的 `time=` 数组扮演 `tsset` 的角色。`base` 自带的 `year` 列在各实体间重复 1..5，对整体样本并不等间隔，`newey` 会拒绝，除非给出 `force=True`；真正的时间序列两者都不需要。
+**注意:** 这里的 `time=` 数组扮演 `tsset` 的角色。`base` 自带的 `year` 列在各实体间重复 1..5，对整体样本并不等间隔，`newey_west` 会拒绝，除非给出 `force=True`；真正的时间序列两者都不需要。
 
 ### `unitroot`
 
@@ -4659,7 +4659,7 @@ Im-Pesaran-Shin unit-root test
 
 **Stata 指令:** `(no Stata equivalent -- this is the Checkt routine inside newey.ado)`
 
-判定时间变量的间隔：即 `newey.ado` 中的 `Checkt` 例程，之所以单独暴露，既因为 `newey` 需要它，也因为它是本包中唯一把 Stata 的 tsset 间隔规则写清楚的地方。返回 `(tflag, delta)`：`tflag` 为 0 表示间隔为 1 的等间隔，为 1 表示不等间隔，为 2 表示等间隔但间隔大于 1；等间隔时 `delta` 为公共间隔，否则为 `None`。差分按数组的**行顺序**计算，对应 Stata 的 `sort touse tvar`，所有比较都以浮点数进行。
+判定时间变量的间隔：即 `newey.ado` 中的 `Checkt` 例程，之所以单独暴露，既因为 `newey_west` 需要它，也因为它是本包中唯一把 Stata 的 tsset 间隔规则写清楚的地方。返回 `(tflag, delta)`：`tflag` 为 0 表示间隔为 1 的等间隔，为 1 表示不等间隔，为 2 表示等间隔但间隔大于 1；等间隔时 `delta` 为公共间隔，否则为 `None`。差分按数组的**行顺序**计算，对应 Stata 的 `sort touse tvar`，所有比较都以浮点数进行。
 
 **签名**
 
@@ -4747,7 +4747,7 @@ ws.ereturn_list(self) -> 'str'
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.ereturn_list()
 ```
 
@@ -4805,7 +4805,7 @@ ws.estat_bgodfrey(result: 'Any', *, lags: 'int | Sequence[int]' = 1, nomiss0: 'b
 **示例**
 
 ```python
-print(ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+print(ws.estat_bgodfrey(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), lags=2))
 ```
 
 **输出**
@@ -4829,7 +4829,7 @@ ws.estat_correlogram(result: 'Any', *, lags: 'int | None' = None, time: 'str | A
 **示例**
 
 ```python
-print(ws.estat_corrgram(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=4))
+print(ws.estat_correlogram(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), lags=4))
 ```
 
 **输出**
@@ -4853,7 +4853,7 @@ ws.estat_dwatson(result: 'Any', *, time: 'str | Any | None' = None, delta: 'floa
 **示例**
 
 ```python
-print(ws.estat_dwatson(ws.OLS.from_formula('y ~ x1 + x2', base).fit()))
+print(ws.estat_dwatson(ws.Regress.from_formula('y ~ x1 + x2', base).fit()))
 ```
 
 **输出**
@@ -4877,7 +4877,7 @@ ws.f_test(self, r_matrix: 'Any', cov_p: 'Any' = None, invcov: 'Any' = None) -> '
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.f_test('x1 = 0, x2 = 0')
 ```
 
@@ -4891,7 +4891,7 @@ r.f_test('x1 = 0, x2 = 0')
 
 **Stata 指令:** `ivregress 2sls ..., first`
 
-IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_firststage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。
+IV 拟合的第一阶段回归表（Stata `ivregress ..., first`）。每个内生回归元一段，以「First-stage regressions」开头，给出该方程的 F、R 方、调整 R 方与 Root MSE，随后是含外生变量与排除工具的系数表。这与 `estat_first_stage` 的输出不同——后者打印同一批方程的**诊断量**；Stata 两者都提供且互不替代，因此这里也都保留。
 
 **签名**
 
@@ -4943,7 +4943,7 @@ ws.get_influence(self) -> 'Any'
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.get_influence()['hat_matrix_diag'][:5]
 ```
 
@@ -4968,7 +4968,7 @@ ws.t_test(self, r_matrix: 'Any', cov_p: 'Any' = None, use_t: 'bool | None' = Non
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.t_test('x1 = 0')
 ```
 
@@ -4993,7 +4993,7 @@ ws.wntestq(result: 'Any', *, lags: 'int | None' = None, time: 'str | Any | None'
 **示例**
 
 ```python
-print(ws.wntestq(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), lags=2))
+print(ws.wntestq(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), lags=2))
 ```
 
 **输出**
@@ -5020,7 +5020,7 @@ ws.StataResults(*, params: 'np.ndarray', param_names: 'list[str]', cov: 'np.ndar
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.e['r2']
 ```
 
@@ -5041,7 +5041,7 @@ r.e['r2']
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.params
 ```
 
@@ -5063,7 +5063,7 @@ Name: params, dtype: float64
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.bse
 ```
 
@@ -5085,7 +5085,7 @@ Name: bse, dtype: float64
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.pvalues
 ```
 
@@ -5107,7 +5107,7 @@ Name: pvalues, dtype: float64
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.tvalues
 ```
 
@@ -5151,7 +5151,7 @@ Name: tvalues, dtype: float64
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.fvalue
 ```
 
@@ -5170,7 +5170,7 @@ r.fvalue
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.llf
 ```
 
@@ -5189,7 +5189,7 @@ r.llf
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 (r.aic, ws.estat_ic(r).aic)
 ```
 
@@ -5210,7 +5210,7 @@ r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 (r.bic, ws.estat_ic(r).bic)
 ```
 
@@ -5229,7 +5229,7 @@ r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 (r.nobs, r.e['N'])
 ```
 
@@ -5248,7 +5248,7 @@ r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.df_model
 ```
 
@@ -5267,7 +5267,7 @@ r.df_model
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': base['firm']})
+r = ws.Regress.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': base['firm']})
 (r.df_resid, r.cov_type)
 ```
 
@@ -5305,7 +5305,7 @@ z
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.model_name
 ```
 
@@ -5324,7 +5324,7 @@ regress
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit(cov_type='HC1')
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit(cov_type='HC1')
 r.cov_type
 ```
 
@@ -5343,7 +5343,7 @@ HC1
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 np.round(r.cov, 4)
 ```
 
@@ -5364,7 +5364,7 @@ np.round(r.cov, 4)
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 sorted(r.e)
 ```
 
@@ -5385,7 +5385,7 @@ sorted(r.e)
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.fittedvalues[:5]
 ```
 
@@ -5404,7 +5404,7 @@ r.fittedvalues[:5]
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.resid[:5]
 ```
 
@@ -5423,7 +5423,7 @@ r.resid[:5]
 **示例**
 
 ```python
-ols = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+ols = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 lg = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()
 ((ols.rsquared, lg.rsquared), lg.e['r2_p'])
 ```
@@ -5443,7 +5443,7 @@ lg = ws.Logit.from_formula('yb ~ x1 + x2', base).fit()
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.rsquared_adj
 ```
 
@@ -5462,7 +5462,7 @@ r.rsquared_adj
 **示例**
 
 ```python
-r = ws.OLS.from_formula("y ~ x1 + x2", base).fit()
+r = ws.Regress.from_formula("y ~ x1 + x2", base).fit()
 list(r.model_data.columns)
 ```
 
@@ -5540,7 +5540,7 @@ nan
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.param_names
 ```
 
@@ -5565,7 +5565,7 @@ ws.test(self, *specs: 'Any', coef: 'bool' = False) -> 'Any'
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.test('x1 = 0')
 ```
 
@@ -5596,7 +5596,7 @@ ws.lincom(self, expression: 'str', *, level: 'float' = 0.95, eform: 'bool' = Fal
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.lincom('x1 - x2')
 ```
 
@@ -5656,7 +5656,7 @@ ws.summary(self, style: 'str' = 'stata', *, odds_ratio: 'bool' = False, first: '
 **示例**
 
 ```python
-ws.RandomEffects.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(theta=True)
+ws.PanelRegressRE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(theta=True)
 ```
 
 **输出**
@@ -5703,7 +5703,7 @@ ws.wald_test(self, R: 'Any', q: 'Any' = None, scalar: 'bool' = True) -> 'Any'
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.wald_test(np.array([[0.0, 1.0, 0.0]]), scalar=False)
 ```
 
@@ -5732,7 +5732,7 @@ ws.cov_params(self) -> 'np.ndarray'
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().cov_params()
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().cov_params()
 ```
 
 **输出**
@@ -5758,7 +5758,7 @@ ws.conf_int(self, alpha: 'float | None' = None) -> 'pd.DataFrame'
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1 + x2', base).fit().conf_int(alpha=0.10)
+ws.Regress.from_formula('y ~ x1 + x2', base).fit().conf_int(alpha=0.10)
 ```
 
 **输出**
@@ -5779,7 +5779,7 @@ x2        -0.635740 -0.388434
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.fitted_series.head()
 ```
 
@@ -5803,7 +5803,7 @@ Name: fittedvalues, dtype: float64
 **示例**
 
 ```python
-ws.OLS.from_formula('y ~ x1', base).fit(level=90).conf_int()
+ws.Regress.from_formula('y ~ x1', base).fit(level=90).conf_int()
 ```
 
 **输出**
@@ -5825,7 +5825,7 @@ x1         0.709618  0.975431
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.model
 ```
 
@@ -5862,7 +5862,7 @@ None
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.resid_series.head()
 ```
 
@@ -5886,7 +5886,7 @@ Name: resid, dtype: float64
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.response_name
 ```
 
@@ -5905,7 +5905,7 @@ y
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 np.round(r.stata_cov_params, 4)
 ```
 
@@ -5926,7 +5926,7 @@ np.round(r.stata_cov_params, 4)
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + C(yb)', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + C(yb)', base).fit()
 r.stata_factor_terms
 ```
 
@@ -5947,7 +5947,7 @@ r.stata_factor_terms
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 (r.param_names, r.stata_param_names)
 ```
 
@@ -5966,7 +5966,7 @@ r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.stata_params
 ```
 
@@ -6011,7 +6011,7 @@ Name: params, dtype: float64
 ```python
 msg = None
 try:
-    r = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': np.zeros(len(base), dtype=int)})
+    r = ws.Regress.from_formula('y ~ x1', base).fit(cov_type='cluster', cov_kwds={'groups': np.zeros(len(base), dtype=int)})
 except ws.WestataError as exc:
     msg = (type(exc).__name__, isinstance(exc, ValueError))
 msg
@@ -6059,7 +6059,7 @@ logit: optimiser did not converge after 1 iterations; estimates may be unreliabl
 ```python
 msg = None
 try:
-    ws.OLS.from_formula('y ~ nosuchcolumn', base)
+    ws.Regress.from_formula('y ~ nosuchcolumn', base)
 except ws.FormulaError as exc:
     msg = str(exc).splitlines()[0]
 msg
@@ -6266,7 +6266,7 @@ ws.VceMatrix(names: 'Sequence[str]', values: 'np.ndarray', kind: 'str', model_la
 **示例**
 
 ```python
-ws.estat_vce(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_vce(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6323,7 +6323,7 @@ ws.WaldTest(statistic: 'float', df: 'float', df_denom: 'float | None', pvalue: '
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.test('x1 = 0')
 ```
 
@@ -6354,7 +6354,7 @@ ws.LincomResults(estimate: 'float', std_err: 'float', statistic: 'float', pvalue
 **示例**
 
 ```python
-r = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+r = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r.lincom('x1 - x2')
 ```
 
@@ -6388,7 +6388,7 @@ ws.IcResults(*, n: 'float', ll_null: 'float', ll_model: 'float', df: 'float', ai
 **示例**
 
 ```python
-ws.estat_ic(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_ic(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6420,7 +6420,7 @@ ws.VifResults(names: 'Sequence[str]', vif: 'Sequence[float]', mean_vif: 'float')
 **示例**
 
 ```python
-ws.estat_vif(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_vif(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6542,7 +6542,7 @@ ws.HetTestResults(*, method: 'str', statistic: 'float', df: 'float', pvalue: 'fl
 **示例**
 
 ```python
-ws.estat_hettest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_heteroskedasticity_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6574,7 +6574,7 @@ ws.ImTestResults(*, heteroskedasticity: 'float', skewness: 'float', kurtosis: 'f
 **示例**
 
 ```python
-ws.estat_imtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_information_matrix_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6609,7 +6609,7 @@ ws.OvTestResults(*, statistic: 'float', df: 'float', df_denom: 'float', pvalue: 
 **示例**
 
 ```python
-ws.estat_ovtest(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+ws.estat_omitted_variables_test(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 ```
 
 **输出**
@@ -6671,7 +6671,7 @@ ws.FirstStageResults(*, endog: 'Sequence[str]', r2: 'Sequence[float]', adj_r2: '
 
 ```python
 iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3]', base).fit()
-ws.estat_firststage(iv)
+ws.estat_first_stage(iv)
 ```
 
 **输出**
@@ -6717,7 +6717,7 @@ ws.OverIdResults(*, statistic: 'float', df: 'float', pvalue: 'float', test: 'str
 
 ```python
 iv = ws.IV2SLS.from_formula('y ~ x1 + [x2 ~ x3 + y1]', base).fit()
-ws.estat_overid(iv)
+ws.estat_overidentification(iv)
 ```
 
 **输出**
@@ -6774,8 +6774,8 @@ ws.HausmanResults(statistic: 'float', df: 'float', pvalue: 'float', excluded: 'l
 **示例**
 
 ```python
-fe = ws.PanelOLS.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()
-re = ws.RandomEffects.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()
+fe = ws.PanelRegressFE.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()
+re = ws.PanelRegressRE.from_formula('ypanel ~ x1', base, entity='firm', time='year').fit()
 fe.hausman(re)
 ```
 
@@ -6808,7 +6808,7 @@ Prob > chi2 = 0.2280
 
 **Stata 指令:** `areg y x1 x2, absorb(firm)`
 
-吸收类别指示变量的线性回归 —— Stata 的 `areg`。它与 `reghdfe` 是**两个不同的命令**，不是同义词：`absorb=` 是必填项，标题栏为「Linear regression, absorbing indicators」并在第二行注明被吸收的变量，`e(predict)` 是 `areg_p`，而且——实质差别在这里——**它报告截距**。`reghdfe` 只报斜率，所以 `Areg` 会追加 `_cons`，即被吸收组效应的**按组容量加权**均值（不是等权均值：两者只在平衡面板上巧合相等）。估计量本身是同一个组内变换，因此系数与 `FEOLS` 一致；不同的是命令身份、常数项和小样本口径。`fit` 接受 `level=` 控制打印的置信区间，并支持 `vce(hc2)`/`vce(hc3)`——因为它自己构造了完整哑变量设计，能算出 `FEOLS` 拿不到的杠杆值。
+吸收类别指示变量的线性回归 —— Stata 的 `areg`。它与 `reghdfe` 是**两个不同的命令**，不是同义词：`absorb=` 是必填项，标题栏为「Linear regression, absorbing indicators」并在第二行注明被吸收的变量，`e(predict)` 是 `areg_p`，而且——实质差别在这里——**它报告截距**。`reghdfe` 只报斜率，所以 `Areg` 会追加 `_cons`，即被吸收组效应的**按组容量加权**均值（不是等权均值：两者只在平衡面板上巧合相等）。估计量本身是同一个组内变换，因此系数与 `RegressHighDimFixedEffects` 一致；不同的是命令身份、常数项和小样本口径。`fit` 接受 `level=` 控制打印的置信区间，并支持 `vce(hc2)`/`vce(hc3)`——因为它自己构造了完整哑变量设计，能算出 `RegressHighDimFixedEffects` 拿不到的杠杆值。
 
 **签名**
 
@@ -6895,7 +6895,7 @@ ws.BgTestResults(rows: 'tuple[BgTestRow, ...]', nobs: 'int', n_gaps: 'int' = 0) 
 **示例**
 
 ```python
-r = ws.estat_bgodfrey(ws.OLS.from_formula('y ~ x1', base).fit(), lags=[1, 2])
+r = ws.estat_bgodfrey(ws.Regress.from_formula('y ~ x1', base).fit(), lags=[1, 2])
 print(r.to_frame())
 ```
 
@@ -6920,7 +6920,7 @@ ws.ContrastResult(rows, *, term, fvalue, df, pvalue, df_denom)
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
+fit = ws.Regress.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
 r = ws.contrast(fit, 'firm')
 print(len(r))
 ```
@@ -6947,7 +6947,7 @@ ws.ContrastResults(*, statistic: 'float', pvalue: 'float', df_num: 'float', df_r
 
 ```python
 from westata.results.ecosystem import build_contrast
-fit = ws.OLS.from_formula('y ~ x1', base).fit()
+fit = ws.Regress.from_formula('y ~ x1', base).fit()
 c = build_contrast(fit, 'x1 = 0')
 print(round(c.pvalue, 6))
 ```
@@ -6962,7 +6962,7 @@ None
 
 **Stata 指令:** `estat corrgram`
 
-`estat_corrgram` 返回的对象：每个滞后阶一行，含自相关、偏自相关及其 Q 统计量。`to_frame()` 给出表格，`to_dict()` 给出每行一个字典。
+`estat_correlogram` 返回的对象：每个滞后阶一行，含自相关、偏自相关及其 Q 统计量。`to_frame()` 给出表格，`to_dict()` 给出每行一个字典。
 
 **签名**
 
@@ -6973,7 +6973,7 @@ ws.Correlogram(rows: 'tuple[CorrelogramRow, ...]', n_gaps: 'int' = 0) -> None
 **示例**
 
 ```python
-r = ws.estat_corrgram(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
+r = ws.estat_correlogram(ws.Regress.from_formula('y ~ x1', base).fit(), lags=4)
 print(r.to_frame())
 ```
 
@@ -6987,7 +6987,7 @@ None
 
 **Stata 指令:** `dfgls`
 
-`dfgls` 返回的对象：每个候选滞后阶一格（`to_frame()` 即 Stata 打印的表格），另有 `trend`（所跑的确定性情形）与 `variable`。
+`df_gls` 返回的对象：每个候选滞后阶一格（`to_frame()` 即 Stata 打印的表格），另有 `trend`（所跑的确定性情形）与 `variable`。
 
 **签名**
 
@@ -6998,7 +6998,7 @@ ws.DFGLSResults(cells: 'tuple[DFGLSCell, ...]', trend: 'bool', variable: 'str' =
 **示例**
 
 ```python
-r = ws.dfgls(base.y.to_numpy())
+r = ws.df_gls(base.y.to_numpy())
 print(r.to_frame().head(3))
 ```
 
@@ -7023,7 +7023,7 @@ ws.DurbinWatsonResults(d: 'float', df: 'float', nobs: 'int', n_gaps: 'int' = 0) 
 **示例**
 
 ```python
-r = ws.estat_dwatson(ws.OLS.from_formula('y ~ x1', base).fit())
+r = ws.estat_dwatson(ws.Regress.from_formula('y ~ x1', base).fit())
 print(round(r.d, 6))
 ```
 
@@ -7048,7 +7048,7 @@ ws.EReturn(mapping: 'Mapping[str, Any] | None' = None, /, **kwargs: 'Any') -> 'N
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1', base).fit()
+fit = ws.Regress.from_formula('y ~ x1', base).fit()
 print(fit.e['N'], round(fit.e['r2'], 6))
 ```
 
@@ -7062,7 +7062,7 @@ None
 
 **Stata 指令:** `estat esize`
 
-`estat_esize` 返回的对象：`kind`（'eta2'/'epsilon2'/'omega2'）、`estimate`；对 eta-squared 还有按 `level`（分数，如 0.95）给出的置信界 `ci_lower`/`ci_upper`。
+`estat_effect_size` 返回的对象：`kind`（'eta2'/'epsilon2'/'omega2'）、`estimate`；对 eta-squared 还有按 `level`（分数，如 0.95）给出的置信界 `ci_lower`/`ci_upper`。
 
 **签名**
 
@@ -7073,7 +7073,7 @@ ws.EffectSizeResults(kind: 'str', estimate: 'float', ci_lower: 'float | None' = 
 **示例**
 
 ```python
-r = ws.estat_esize(ws.OLS.from_formula('y ~ x1 + x2', base).fit())
+r = ws.estat_effect_size(ws.Regress.from_formula('y ~ x1 + x2', base).fit())
 print(round(r.estimate, 6))
 ```
 
@@ -7271,7 +7271,7 @@ None
 
 **Stata 指令:** `vecrank / vec johansen`
 
-Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 给出迹统计量与最大特征值表，`to_stata_table()` 渲染 Stata `vecrank` 打印的块。
+Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 给出迹统计量与最大特征值表，`to_stata_table()` 渲染 Stata `vec_rank` 打印的块。
 
 **签名**
 
@@ -7357,7 +7357,7 @@ ws.LinkTestResults(t_statistic: 'float', df: 'float', pvalue: 'float', hat_coeff
 **示例**
 
 ```python
-r = ws.linktest(ws.OLS.from_formula('y ~ x1', base).fit())
+r = ws.linktest(ws.Regress.from_formula('y ~ x1', base).fit())
 print(round(r.pvalue, 6))
 ```
 
@@ -7382,7 +7382,7 @@ ws.LmarResults(rows: 'tuple[LmarRow, ...]') -> None
 **示例**
 
 ```python
-r = ws.varlmar(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit(), mlag=1)
+r = ws.var_lmar(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit(), mlag=1)
 print(r.to_frame())
 ```
 
@@ -7425,8 +7425,8 @@ ws.MTestResults(table: 'Any', method: 'str') -> 'None'
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
-r = ws.estat_hettest(fit, mtest='bonferroni')
+fit = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
+r = ws.estat_heteroskedasticity_test(fit, mtest='bonferroni')
 print(r.to_dict())
 ```
 
@@ -7451,7 +7451,7 @@ ws.MarginsTable(iterable=(), /)
 **示例**
 
 ```python
-print(ws.margins(ws.OLS.from_formula('y ~ x1 + x2', base).fit(), dydx=['x1','x2']))
+print(ws.margins(ws.Regress.from_formula('y ~ x1 + x2', base).fit(), dydx=['x1','x2']))
 ```
 
 **输出**
@@ -7550,7 +7550,7 @@ None
 
 **Stata 指令:** `newey depvar indepvars, lag(#) [noconstant] [aw=...]`
 
-`ws.newey` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey(...)` 保留为同一实现的薄包装。
+`ws.newey_west` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey_west` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey_west(...)` 保留为同一实现的薄包装。
 
 **签名**
 
@@ -7587,7 +7587,7 @@ None
 
 **Stata 指令:** `teffects nnmatch`
 
-`teffects_nnmatch` 返回的对象：ATE/ATET 的 `estimate`、标准误与 p 值、置信界，以及潜在结果均值。
+`treatment_effects_nnmatch` 返回的对象：ATE/ATET 的 `estimate`、标准误与 p 值、置信界，以及潜在结果均值。
 
 **签名**
 
@@ -7598,7 +7598,7 @@ ws.NnmatchResults(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nn
 **示例**
 
 ```python
-r = ws.teffects_nnmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1', 'x2']].to_numpy())
+r = ws.treatment_effects_nnmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1', 'x2']].to_numpy())
 print(round(r.ate, 6))
 ```
 
@@ -7612,7 +7612,7 @@ None
 
 **Stata 指令:** `xtdes`
 
-`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。
+`panel_describe` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。
 
 **签名**
 
@@ -7627,7 +7627,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-result = ws.xtdes(panel, entity="pid", time="year")
+result = ws.panel_describe(panel, entity="pid", time="year")
 print(result.patterns)
 ```
 
@@ -7641,7 +7641,7 @@ None
 
 **Stata 指令:** `r(j), r(jdf), r(jp) after xtoverid`
 
-`ws.xtoverid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 "fixed vs random effects"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。
+`ws.panel_overid` 返回的对象。字段：`statistic`（`r(j)`）、`df`（`r(jdf)`，过度识别约束个数）、`pvalue`（`r(jp)`）、`tested`（被约束为零的系数名）、`description`（所比较的假设——`xtreg, re` 情形下为 "fixed vs random effects"）以及 `model`（被重新估计的估计量）。`str()` 复现 Stata 打印的三行；`to_dict()` 给出三个 `r()` 名字，`to_frame()` 给出单行 DataFrame。
 
 **签名**
 
@@ -7652,8 +7652,8 @@ ws.PanelOveridResults(statistic: 'float', df: 'float', pvalue: 'float', tested: 
 **示例**
 
 ```python
-fit = ws.RandomEffects.from_formula("y ~ x1", base, entity="firm", time="year").fit()
-r = ws.xtoverid(fit)
+fit = ws.PanelRegressRE.from_formula("y ~ x1", base, entity="firm", time="year").fit()
+r = ws.panel_overid(fit)
 print(r.statistic, r.df, r.pvalue)
 ```
 
@@ -7667,7 +7667,7 @@ None
 
 **Stata 指令:** `xtreg ypanel x1 x2, mle`
 
-用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`RandomEffects` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。 三个方差成分行都带标准误，两个 sigma 还带置信区间，与 Stata 一致。这些标准误无法从 statsmodels 取得——它的协方差只覆盖固定效应加上随机效应方差的一个内部变换，而残差尺度 是被 profile 掉的——因此这里从模型自身的似然构造信息阵。该似然在求导之前已与 statsmodels 的 `llf` 校验到 2.8e-13；由于 Powell 在 `sigma_u` 上比 Stata 早停约 4e-06（而似然本身只差 5.7e-09），这里又本地重优化了一次。`e(sigma_u_se)`、`e(sigma_e_se)`、`e(rho_se)` 存标准误，`e(sigma_u_ci)`/`e(sigma_e_ci)` 存对数尺度的区间界限；对照 StataNow 19.5 在 lin_1992.dta 上实测，七位小数一致。`rho` 的区间**刻意不复现**：它打印的界限意味着上下两侧乘数不等，而 log、logit、atanh、Fieller 都无法复现，故省略而不猜测。 信息阵在**方差尺度**（sigma_u^2、sigma_e^2）上构造，这与 Baltagi 对随机效应模型的处理以及 Stata 的 `vce(oim)` 一致。若改成在对数尺度上对集中似然求导，var(sigma_e) 与 Stata 的 `e(V)` 会差 1.3e-05 且换任何步长都修不好；换回方差尺度后同样的导数落在 2e-06 以内，表中两行 `/sigma_` 与 Stata **逐字符相同**，含置信区间端点。 `rho` 的标准误是唯一在打印末位仍有差异的量（.0486811 对 .0486812，相差 8.8e-08，舍入边界在 .04868115）：在 4e-5 到 3e-6 之间扫描步长，没有任何取值能同时满足三项的打印结果，故如实记作数值微分残差而不去凑。 方差成分在构造信息阵之前，会在同一似然上用 Newton 步精修。这一点比听起来重要：置信区间是 `exp(log(s) -/+ z se/s)`，sigma 的第九位小数会带动区间端点的第七位。仅用 Nelder-Mead 会停在约 1e-09 之外，此时只有极窄的 Hessian 步长能打印一致；精修之后，1.32e-05 到 1.5e-05 的每个步长都能复现 Stata 的两行。
+用**极大似然**估计的随机效应回归（Stata `xtreg, mle`）。`PanelRegressRE` 是代入 Swamy-Arora 方差成分的 GLS `xtreg, re`，而本类在同一随机效应似然中对系数与两个方差成分**同时**求极大，因此 `sigma_u` 会明显不同。底层用 statsmodels 的 `MixedLM` 以 ML（非 REML）配合 Powell 优化器拟合；标准误来自观测信息阵之逆。返回 `StataResults`；稳健或聚类 VCE 会被拒绝，因为 Stata 的 `mle` 也不接受它们。 `e()` 里带 Stata 自己的似然标量：`e(ll)` 与 `e(ll_0)`（表头 LR chi2 用的常数项模型）、`e(ll_c)`（**混合** OLS 拟合）以及 `e(chi2_c) = 2*(e(ll) - e(ll_c))`，也就是方差成分下方那行 `LR test of sigma_u=0`；`e(g_min)`/`e(g_avg)`/`e(g_max)` 给出 `Obs per group`。`lin_1992.dta` 实测（对照 StataNow 19.5）：`ll_c = 100.785038`、`chi2_c = 464.224713`、`g_min = g_avg = g_max = 17`。 三个方差成分行都带标准误，两个 sigma 还带置信区间，与 Stata 一致。这些标准误无法从 statsmodels 取得——它的协方差只覆盖固定效应加上随机效应方差的一个内部变换，而残差尺度 是被 profile 掉的——因此这里从模型自身的似然构造信息阵。该似然在求导之前已与 statsmodels 的 `llf` 校验到 2.8e-13；由于 Powell 在 `sigma_u` 上比 Stata 早停约 4e-06（而似然本身只差 5.7e-09），这里又本地重优化了一次。`e(sigma_u_se)`、`e(sigma_e_se)`、`e(rho_se)` 存标准误，`e(sigma_u_ci)`/`e(sigma_e_ci)` 存对数尺度的区间界限；对照 StataNow 19.5 在 lin_1992.dta 上实测，七位小数一致。`rho` 的区间**刻意不复现**：它打印的界限意味着上下两侧乘数不等，而 log、logit、atanh、Fieller 都无法复现，故省略而不猜测。 信息阵在**方差尺度**（sigma_u^2、sigma_e^2）上构造，这与 Baltagi 对随机效应模型的处理以及 Stata 的 `vce(oim)` 一致。若改成在对数尺度上对集中似然求导，var(sigma_e) 与 Stata 的 `e(V)` 会差 1.3e-05 且换任何步长都修不好；换回方差尺度后同样的导数落在 2e-06 以内，表中两行 `/sigma_` 与 Stata **逐字符相同**，含置信区间端点。 `rho` 的标准误是唯一在打印末位仍有差异的量（.0486811 对 .0486812，相差 8.8e-08，舍入边界在 .04868115）：在 4e-5 到 3e-6 之间扫描步长，没有任何取值能同时满足三项的打印结果，故如实记作数值微分残差而不去凑。 方差成分在构造信息阵之前，会在同一似然上用 Newton 步精修。这一点比听起来重要：置信区间是 `exp(log(s) -/+ z se/s)`，sigma 的第九位小数会带动区间端点的第七位。仅用 Nelder-Mead 会停在约 1e-09 之外，此时只有极窄的 Hessian 步长能打印一致；精修之后，1.32e-05 到 1.5e-05 的每个步长都能复现 Stata 的两行。
 
 **签名**
 
@@ -7678,7 +7678,7 @@ ws.PanelRegressMLE(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time:
 **`PanelRegressMLE.from_formula`**
 
 ```python
-PanelRegressMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelOLS'"
+PanelRegressMLE.from_formula(formula: 'str', data: 'pd.DataFrame', *, entity: 'str', time: 'str', subset: 'Any' = None, weights: 'Any' = None, weight_type: 'str | None' = None) -> "'PanelRegressFE'"
 ```
 
 **`PanelRegressMLE.fit`**
@@ -7690,7 +7690,7 @@ PanelRegressMLE.fit(self, cov_type: 'str | None' = None, cov_kwds: 'Mapping[str,
 **示例**
 
 ```python
-ws.RandomEffectsMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
+ws.PanelRegressMLE.from_formula('ypanel ~ x1 + x2', base, entity='firm', time='year').fit().summary(style='stata')
 ```
 
 **输出**
@@ -7739,7 +7739,7 @@ ws.PanelSerialResults(corr: 'float', f: 'float', df: 'int', df_r: 'int', p: 'flo
 
 ```python
 d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
-r = ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period')
+r = ws.panel_serial(d, 'y ~ x1 + x2', entity='pid', time='period')
 print(round(r.f, 6), r.df_r)
 ```
 
@@ -7753,7 +7753,7 @@ None
 
 **Stata 指令:** `xtset pid year`
 
-`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。
+`panel_set` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。
 
 **签名**
 
@@ -7768,7 +7768,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-result = ws.xtset(panel, entity="pid", time="year")
+result = ws.panel_set(panel, entity="pid", time="year")
 print(result.balance)
 ```
 
@@ -7782,7 +7782,7 @@ None
 
 **Stata 指令:** `xtsum y k1`
 
-`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。
+`panel_summarize` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。
 
 **签名**
 
@@ -7797,7 +7797,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-result = ws.xtsum(panel, ["y"], entity="pid", time="year")
+result = ws.panel_summarize(panel, ["y"], entity="pid", time="year")
 print(result.variables[0][3]["sd"])
 ```
 
@@ -7822,8 +7822,8 @@ ws.PanelTest0Results(chibar2: 'float', pvalue: 'float', var_u: 'float', var_e: '
 **示例**
 
 ```python
-fit = ws.RandomEffects.from_formula('y ~ x1', base, entity='firm', time='year').fit()
-r = ws.xttest0(fit)
+fit = ws.PanelRegressRE.from_formula('y ~ x1', base, entity='firm', time='year').fit()
+r = ws.panel_test0(fit)
 print(round(r.chibar2, 6))
 ```
 
@@ -7848,7 +7848,7 @@ ws.PanelUnitRootResults(statistic: 'float', pvalue: 'float', test: 'str', name: 
 **示例**
 
 ```python
-r = ws.XtUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()
+r = ws.PanelUnitroot.from_formula('y ~ 1', base, entity='firm', time='year').fit()
 print(r.name, round(r.pvalue, 6))
 ```
 
@@ -7873,7 +7873,7 @@ ws.PortmanteauResults(q: 'float', df: 'int', pvalue: 'float', lags: 'int', n_gap
 **示例**
 
 ```python
-r = ws.wntestq(ws.OLS.from_formula('y ~ x1', base).fit(), lags=4)
+r = ws.wntestq(ws.Regress.from_formula('y ~ x1', base).fit(), lags=4)
 print(round(r.q, 6))
 ```
 
@@ -7949,7 +7949,7 @@ None
 
 **Stata 指令:** `teffects psmatch`
 
-`teffects_psmatch` 返回的对象：由倾向得分匹配算出的 ATET 估计，含标准误、p 值与置信界。
+`treatment_effects_psmatch` 返回的对象：由倾向得分匹配算出的 ATET 估计，含标准误、p 值与置信界。
 
 **签名**
 
@@ -7960,7 +7960,7 @@ ws.PsmatchResults(ate: 'float', nobs: 'int', treated: 'int', controls: 'int', nn
 **示例**
 
 ```python
-r = ws.teffects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+r = ws.treatment_effects_psmatch(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
 print(round(r.ate, 6))
 ```
 
@@ -7985,8 +7985,8 @@ ws.PwCompareTable(rows: 'Sequence[LincomResults]', *, term: 'str' = '', margin_l
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
-r = ws.pwcompare(fit, 'firm')
+fit = ws.Regress.from_formula('y ~ x1 + C(firm)', base.assign(firm=base.firm % 3)).fit()
+r = ws.pairwise_compare(fit, 'firm')
 print(len(r))
 ```
 
@@ -8017,7 +8017,7 @@ RDRobust.fit(self) -> 'RdRobustResults'
 **示例**
 
 ```python
-r = ws.Rdrobust.from_variables('y', 'x1', base, bandwidth=0.5).fit()
+r = ws.RDRobust.from_variables('y', 'x1', base, bandwidth=0.5).fit()
 print(round(float(r.tau), 6))
 ```
 
@@ -8055,7 +8055,7 @@ None
 
 **Stata 指令:** `rdrobust`
 
-`rdrobust` 返回的对象：偏差校正后的点估计、标准误、z 统计量、p 值、置信界，以及产生它们的带宽。
+`rd_robust` 返回的对象：偏差校正后的点估计、标准误、z 统计量、p 值、置信界，以及产生它们的带宽。
 
 **签名**
 
@@ -8066,7 +8066,7 @@ ws.RdRobustResults(tau: 'float', cutoff: 'float', bandwidth: 'float', bias_bandw
 **示例**
 
 ```python
-r = ws.rdrobust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
+r = ws.rd_robust(base.y.to_numpy(), base.x1.to_numpy(), bandwidth=0.5)
 print(round(r.tau, 6))
 ```
 
@@ -8163,8 +8163,8 @@ ws.SuestResults(params: 'np.ndarray', covariance: 'np.ndarray', param_names: 'li
 **示例**
 
 ```python
-a = ws.OLS.from_formula('y ~ x1', base).fit()
-b = ws.OLS.from_formula('x2 ~ x1', base).fit()
+a = ws.Regress.from_formula('y ~ x1', base).fit()
+b = ws.Regress.from_formula('x2 ~ x1', base).fit()
 print(len(ws.suest([a, b]).params))
 ```
 
@@ -8189,7 +8189,7 @@ ws.SummarizeResults(table: 'pd.DataFrame', n_obs: 'float', clusters: 'Mapping[st
 **示例**
 
 ```python
-ws.estat_summarize(ws.OLS.from_formula('y ~ x1 + x2', base).fit()).to_frame()
+ws.estat_summarize(ws.Regress.from_formula('y ~ x1 + x2', base).fit()).to_frame()
 ```
 
 **输出**
@@ -8373,7 +8373,7 @@ ws.SzroeterResults(variable: 'str', statistic: 'float', pvalue: 'float', adjuste
 **示例**
 
 ```python
-r = ws.estat_szroeter(ws.OLS.from_formula('y ~ x1', base).fit(), variables=['x1'])
+r = ws.estat_szroeter(ws.Regress.from_formula('y ~ x1', base).fit(), variables=['x1'])
 print(r.to_dict())
 ```
 
@@ -8398,7 +8398,7 @@ ws.SzroeterTable(rows: 'list[SzroeterResults]', method: 'str' = 'noadjust') -> N
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+fit = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r = ws.estat_szroeter(fit, variables=['x1', 'x2'])
 print(r.to_frame())
 ```
@@ -8430,7 +8430,7 @@ TreatmentEffectsNnmatch.fit(self) -> 'NnmatchResults'
 **示例**
 
 ```python
-r = ws.TeffectsNnmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1', 'x2']).fit()
+r = ws.TreatmentEffectsNnmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1', 'x2']).fit()
 print(round(float(r.ate), 6))
 ```
 
@@ -8461,7 +8461,7 @@ TreatmentEffectsPsmatch.fit(self) -> 'PsmatchResults'
 **示例**
 
 ```python
-r = ws.TeffectsPsmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
+r = ws.TreatmentEffectsPsmatch.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
 print(round(float(r.ate), 6))
 ```
 
@@ -8492,7 +8492,7 @@ TreatmentEffectsRa.fit(self) -> 'TreatmentEffectsRaResults'
 **示例**
 
 ```python
-r = ws.TeffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
+r = ws.TreatmentEffectsRa.from_variables('y', 'd', base.assign(d=(base.y > 0).astype(int)), covariates=['x1']).fit()
 print(round(float(r.ate), 6))
 ```
 
@@ -8506,7 +8506,7 @@ None
 
 **Stata 指令:** `teffects ra`
 
-`teffects_ra` 返回的对象：回归调整得到的 ATE/ATET 估计，含标准误、z 统计量、p 值与置信界。
+`treatment_effects_ra` 返回的对象：回归调整得到的 ATE/ATET 估计，含标准误、z 统计量、p 值与置信界。
 
 **签名**
 
@@ -8517,7 +8517,7 @@ ws.TreatmentEffectsRaResults(ate: 'float', po_0: 'float', po_1: 'float', atet: '
 **示例**
 
 ```python
-r = ws.teffects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
+r = ws.treatment_effects_ra(base.y.to_numpy(), base.yb.to_numpy(), base[['x1']].to_numpy())
 print(round(r.estimate, 6))
 ```
 
@@ -8605,7 +8605,7 @@ y = np.zeros(60)
 for _t in range(1, 60):
     y[_t] = 0.6 * y[_t - 1] + rng.normal()
 frame = pd.DataFrame({'t': range(1, 61), 'dlny': y})
-fit = ws.Varbasic(frame, 'dlny', lags=1, time='t').fit()
+fit = ws.VarBasic(frame, 'dlny', lags=1, time='t').fit()
 ```
 
 **输出**
@@ -8629,7 +8629,7 @@ ws.VarGrangerResults(rows: 'list[_Row]', equations: 'tuple[str, ...]') -> None
 **示例**
 
 ```python
-r = ws.vargranger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+r = ws.var_granger(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
 print(len(r.rows))
 ```
 
@@ -8654,7 +8654,7 @@ ws.VarSocResults(rows: 'tuple[VarSocRow, ...]', nobs: 'int', equations: 'int', s
 **示例**
 
 ```python
-r = ws.varsoc(base[['y', 'x1']].to_numpy(), maxlag=3)
+r = ws.var_select_order(base[['y', 'x1']].to_numpy(), maxlag=3)
 print(r.to_frame())
 ```
 
@@ -8679,7 +8679,7 @@ ws.VarStableResults(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, .
 **示例**
 
 ```python
-r = ws.varstable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
+r = ws.var_stable(ws.VAR(base[['y', 'x1']].to_numpy(), lags=1).fit())
 print(r.to_frame())
 ```
 
@@ -8704,7 +8704,7 @@ ws.VarWleResults(rows: 'tuple[VarWleRow, ...]', equations: 'tuple[str, ...]') ->
 **示例**
 
 ```python
-r = ws.varwle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())
+r = ws.var_wle(ws.VAR(base[['y', 'x1']].to_numpy(), lags=2).fit())
 print(len(r.by_equation()))
 ```
 
@@ -8729,7 +8729,7 @@ ws.VecRankResults(rows: 'tuple[VecRankRow, ...]', nobs: 'int', lags: 'int', equa
 **示例**
 
 ```python
-r = ws.vecrank(base[['y', 'x1']].to_numpy(), lags=2)
+r = ws.vec_rank(base[['y', 'x1']].to_numpy(), lags=2)
 print(r.to_frame().head(2))
 ```
 
@@ -8754,7 +8754,7 @@ ws.VecStableResults(eigenvalues: 'tuple[complex, ...]', modulus: 'tuple[float, .
 **示例**
 
 ```python
-r = ws.vecstable(ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit())
+r = ws.vec_stable(ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=2).fit())
 print(r.to_frame())
 ```
 
@@ -8816,7 +8816,7 @@ None
 
 **Stata 指令:** `dfgls varname`
 
-`ws.dfgls` 是 DF-GLS（Elliott-Rothenberg-Stock）单位根检验：经 GLS 去趋势的 Dickey-Fuller，在接近单位根时比普通 ADF 有更好的功效。报告的统计量与临界值来自 ERS 表，而非 Dickey-Fuller 表。
+`ws.df_gls` 是 DF-GLS（Elliott-Rothenberg-Stock）单位根检验：经 GLS 去趋势的 Dickey-Fuller，在接近单位根时比普通 ADF 有更好的功效。报告的统计量与临界值来自 ERS 表，而非 Dickey-Fuller 表。
 
 **签名**
 
@@ -8827,7 +8827,7 @@ ws.df_gls(series: 'Any', *, maxlag: 'int | None' = None, trend: 'bool' = True, n
 **示例**
 
 ```python
-print(ws.dfgls(base['y'].to_numpy()))
+print(ws.df_gls(base['y'].to_numpy()))
 ```
 
 **输出**
@@ -8936,7 +8936,7 @@ ws.estat_parallel_trends(result: 'Any') -> 'dict[str, float]'
 **示例**
 
 ```python
-print('estat_ptrends requires a didregress fit; see ws.Didregress for how to build one')
+print('estat_ptrends requires a didregress fit; see ws.DIDRegress for how to build one')
 ```
 
 **输出**
@@ -8960,8 +8960,8 @@ ws.etable_as_stata(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | No
 **示例**
 
 ```python
-m1 = ws.OLS.from_formula('y ~ x1', base).fit()
-m2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+m1 = ws.Regress.from_formula('y ~ x1', base).fit()
+m2 = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 ws.etable_as_stata([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])
 ```
 
@@ -9005,7 +9005,7 @@ ws.format_ereturn_list(result: 'Any') -> 'str'
 **示例**
 
 ```python
-ws.format_ereturn_list(ws.OLS.from_formula('y ~ x1', base).fit())
+ws.format_ereturn_list(ws.Regress.from_formula('y ~ x1', base).fit())
 ```
 
 **输出**
@@ -9219,7 +9219,7 @@ ws.lincom_as_stata(result: 'Any', expression: 'str', *, level: 'float' = 0.95, e
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+fit = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r = ws.lincom_as_stata(fit, 'x1 + x2')
 print(round(r.to_dict()['estimate'], 6))
 ```
@@ -9234,7 +9234,7 @@ None
 
 **Stata 指令:** `xtdes`
 
-`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。
+`panel_describe`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。
 
 **签名**
 
@@ -9249,7 +9249,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-ws.xtdes(panel, entity="pid", time="year")
+ws.panel_describe(panel, entity="pid", time="year")
 ```
 
 **输出**
@@ -9276,7 +9276,7 @@ Distribution of T_i:   min      5%     25%       50%       75%     95%     max
 
 **Stata 指令:** `xtset panelvar timevar  /  xtdes  /  xtsum varlist`
 
-面板簿记：`xtset` 校验实体/时间变量对，`xtdes` 与 `xtsum` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。
+面板簿记：`panel_set` 校验实体/时间变量对，`panel_describe` 与 `panel_summarize` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。
 
 **示例**
 
@@ -9285,7 +9285,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-ws.xtdes(panel, entity="pid", time="year")
+ws.panel_describe(panel, entity="pid", time="year")
 ```
 
 **输出**
@@ -9312,7 +9312,7 @@ Distribution of T_i:   min      5%     25%       50%       75%     95%     max
 
 **Stata 指令:** `xtoverid (user-written: Schaffer & Stillman)`
 
-过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `xtoverid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type="robust"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。
+过度识别约束的 Sargan-Hansen 检验，在随机效应面板拟合之后使用——即 Stata 的 `xtreg ..., re` 后接用户自编命令 `panel_overid`（2.1.8，Schaffer & Stillman）。该命令把每个回归元的**组内离差**加入同一方程重新估计，再联合检验这些新增项为零：拒绝意味着随机效应估计量不一致、应改用固定效应。返回 `XtOveridResult`，携带 `statistic`、`df`、`pvalue`，分别对应 Stata 的 `r(j)`、`r(jdf)`、`r(jp)`。参考分布为 `chi2(df)`，`df` 等于斜率个数。两个关键细节：辅助方程用**原始** `e(theta)` 做准去均值（新增列组均值恒为零，重新估计方差成分会使其漂移）；VCE 跟随原拟合的 `e(vcetype)`——同一方程在同方差 VCE 下为 53.285，在 `cov_type="robust"` 下为 221.225。仅实现 `xtreg, re` 分支；`xtreg, fe` 本就由 ado 拒绝，`xtivreg`/`xtivreg2`/`xthtaylor` 分支依赖 `ivreg2` 与本包未记录的工具有集，因此报错而非近似。
 
 **签名**
 
@@ -9323,8 +9323,8 @@ ws.panel_overid(result: 'Any') -> 'PanelOveridResults'
 **示例**
 
 ```python
-fit = ws.RandomEffects.from_formula("y ~ x1 + x2", base, entity="firm", time="year").fit()
-ws.xtoverid(fit).to_dict()
+fit = ws.PanelRegressRE.from_formula("y ~ x1 + x2", base, entity="firm", time="year").fit()
+ws.panel_overid(fit).to_dict()
 ```
 
 **输出**
@@ -9337,7 +9337,7 @@ ws.xtoverid(fit).to_dict()
 
 **Stata 指令:** `xtserial (user-written, Drukker)`
 
-Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `xtserial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `xtset`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。
+Wooldridge 的面板数据序列相关检验，即同名用户自编命令 `panel_serial`。它对因变量与**每一个**回归元做一阶差分（无常数项、按面板聚类），再把残差对其自身滞后做同样的回归，最后检验滞后系数是否等于 **-0.5**——因为对 AR(1) 误差差分后系数是 `rho - 1`，无序列相关时正好是 -0.5。`entity` 与 `time` 相当于 `panel_set`。滞后按**(面板, 期)**轴取，因此某个期缺失时缺口两侧的差分都是缺失。第一阶段回归——也就是 Stata 在 `, output` 下打印的那个——**会返回而不是丢弃**，放在 `.first_stage` 上（普通 `StataResults`）；传 `keep_first_stage=False` 可不保留。`lin_1992.dta` 实测：`corr = -0.192578493`、`F = 12.511374217`、`df_r = 27`、`p = 0.001484513`，第一阶段 N = 420、`r2 = 0.5797`、`F = 902.61`，均与 StataNow 19.5 一致。
 
 **签名**
 
@@ -9349,7 +9349,7 @@ ws.panel_serial(data: 'pd.DataFrame', formula: 'str', *, entity: 'str', time: 's
 
 ```python
 d = base.assign(pid=(np.arange(len(base)) % 12) + 1, period=(np.arange(len(base)) // 12) + 1)
-print(ws.xtserial(d, 'y ~ x1 + x2', entity='pid', time='period'))
+print(ws.panel_serial(d, 'y ~ x1 + x2', entity='pid', time='period'))
 ```
 
 **输出**
@@ -9362,7 +9362,7 @@ None
 
 **Stata 指令:** `xtset pid year`
 
-`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。
+`panel_set`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。
 
 **签名**
 
@@ -9377,7 +9377,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-ws.xtset(panel, entity="pid", time="year")
+ws.panel_set(panel, entity="pid", time="year")
 ```
 
 **输出**
@@ -9393,7 +9393,7 @@ Panel variable: pid (strongly balanced)
 
 **Stata 指令:** `xtsum y k1`
 
-`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。
+`panel_summarize`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。
 
 **签名**
 
@@ -9408,7 +9408,7 @@ import pandas as pd
 panel = pd.DataFrame(
     {"pid": [1, 1, 2, 2], "year": [1, 2, 1, 2], "y": [1.0, 2.0, 3.0, 4.0]}
 )
-ws.xtsum(panel, ["y"], entity="pid", time="year")
+ws.panel_summarize(panel, ["y"], entity="pid", time="year")
 ```
 
 **输出**
@@ -9438,8 +9438,8 @@ ws.panel_test0(result: 'Any', *, entity: 'Any' = None) -> 'PanelTest0Results'
 
 ```python
 d = base.assign(firm=np.repeat(np.arange(20), 10), t=np.tile(np.arange(10), 20))
-f = ws.RandomEffects.from_formula('y ~ x1', d, entity='firm', time='t').fit()
-print(ws.xttest0(f, entity=d['firm']))
+f = ws.PanelRegressRE.from_formula('y ~ x1', d, entity='firm', time='t').fit()
+print(ws.panel_test0(f, entity=d['firm']))
 ```
 
 **输出**
@@ -9579,7 +9579,7 @@ ws.rd_robust(response: 'Any', running: 'Any', *, cutoff: 'float' = 0.0, bandwidt
 ```python
 x = base['x1'].to_numpy()
 y = 2.0 * (x > 0) + 0.5 * x + base['x2'].to_numpy() * 0.1
-round(ws.rdrobust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
+round(ws.rd_robust(y, x, cutoff=0.0, bandwidth=0.8).tau, 4)
 ```
 
 **输出**
@@ -9606,7 +9606,7 @@ ws.relabel_cov_type(self, cov_type: 'str') -> 'None'
 
 ```python
 from westata.protocols import SSC
-fit = ws.OLS.from_formula('y ~ x1', base).fit(cov_type='HC1')
+fit = ws.Regress.from_formula('y ~ x1', base).fit(cov_type='HC1')
 print(fit.cov_type)
 ```
 
@@ -9631,7 +9631,7 @@ ws.render_estimates_table(results: 'Sequence[Any]', *, model_names: 'Sequence[st
 **示例**
 
 ```python
-ws.render_estimates_table([ws.OLS.from_formula('y ~ x1', base).fit(), ws.OLS.from_formula('y ~ x1 + x2', base).fit()], model_names=['a', 'b'])
+ws.render_estimates_table([ws.Regress.from_formula('y ~ x1', base).fit(), ws.Regress.from_formula('y ~ x1 + x2', base).fit()], model_names=['a', 'b'])
 ```
 
 **输出**
@@ -9668,8 +9668,8 @@ ws.render_esttab(results: 'Sequence[Any]', *, model_names: 'Sequence[str] | None
 **示例**
 
 ```python
-m1 = ws.OLS.from_formula('y ~ x1', base).fit()
-m2 = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+m1 = ws.Regress.from_formula('y ~ x1', base).fit()
+m2 = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 ws.render_esttab([m1, m2], model_names=['m1', 'm2'], stats=[('N', 'nobs'), ('R-sq', 'r2')])
 ```
 
@@ -9835,7 +9835,7 @@ ws.test_as_stata(result: 'Any', *specs: 'Any', coef: 'bool' = False) -> 'WaldTes
 **示例**
 
 ```python
-fit = ws.OLS.from_formula('y ~ x1 + x2', base).fit()
+fit = ws.Regress.from_formula('y ~ x1 + x2', base).fit()
 r = ws.test_as_stata(fit, 'x1', 'x2')
 print(r)
 ```
@@ -9865,7 +9865,7 @@ ps = np.asarray(ws.Logit.from_formula('treat ~ x1 + x2', base).fit().predict())
 c = np.flatnonzero(base['treat'].to_numpy() == 0)
 w = np.zeros(len(base))
 [w.__setitem__(c[np.abs(ps[i] - ps[c]).argmin()], 1.0) for i in np.flatnonzero(base['treat'].to_numpy() == 1)]
-ws.tebalance_summarize(base['treat'].to_numpy(), base[['x1','x2']].to_numpy(), match_weights=w, names=['x1','x2'])
+ws.treatment_balance_summarize(base['treat'].to_numpy(), base[['x1','x2']].to_numpy(), match_weights=w, names=['x1','x2'])
 ```
 
 **输出**
@@ -9895,7 +9895,7 @@ Control obs   =           72           51
 
 **Stata 指令:** `teffects nnmatch ..., atet`
 
-在马氏距离（Stata 默认度量，`e(metric)` 为 "mahalanobis"）上做最近邻匹配的 ATET，使用样本协方差矩阵的逆。并列规则与 `teffects_psmatch` 相同：第 k 小距离上的所有对照都被使用并取平均。`caliper` 限定最大距离；处理组个体若在 caliper 内没有对照则报错，而不是借用远处的对照，这正是 Stata 的 "no matches" 情形。
+在马氏距离（Stata 默认度量，`e(metric)` 为 "mahalanobis"）上做最近邻匹配的 ATET，使用样本协方差矩阵的逆。并列规则与 `treatment_effects_psmatch` 相同：第 k 小距离上的所有对照都被使用并取平均。`caliper` 限定最大距离；处理组个体若在 caliper 内没有对照则报错，而不是借用远处的对照，这正是 Stata 的 "no matches" 情形。
 
 **签名**
 
@@ -9906,7 +9906,7 @@ ws.treatment_effects_nnmatch(response: 'Any', treatment: 'Any', covariates: 'Any
 **示例**
 
 ```python
-ws.teffects_nnmatch(base['ytreat'], base['treat'], base[['x1','x2','x3']].to_numpy(), nneighbor=4)
+ws.treatment_effects_nnmatch(base['ytreat'], base['treat'], base[['x1','x2','x3']].to_numpy(), nneighbor=4)
 ```
 
 **输出**
@@ -9919,7 +9919,7 @@ NnmatchResults(ate=1.4150728330730742, nobs=200, treated=128, controls=72, nneig
 
 **Stata 指令:** `teffects psmatch ..., atet`
 
-`teffects_psmatch` 做倾向得分最近邻匹配的 ATET。倾向得分来自处理变量对协变量的 logit（Stata 默认的处理模型）。并列（ties）是关键：第 k 小距离上的**所有**对照都算匹配，而不只取一个，这正是与 Stata 吻合的原因。参考数据上 `nneighbor=1` 的并列数可达 8、`nneighbor=4` 可达 11，这些计数会一并报告。
+`treatment_effects_psmatch` 做倾向得分最近邻匹配的 ATET。倾向得分来自处理变量对协变量的 logit（Stata 默认的处理模型）。并列（ties）是关键：第 k 小距离上的**所有**对照都算匹配，而不只取一个，这正是与 Stata 吻合的原因。参考数据上 `nneighbor=1` 的并列数可达 8、`nneighbor=4` 可达 11，这些计数会一并报告。
 
 **签名**
 
@@ -9930,7 +9930,7 @@ ws.treatment_effects_psmatch(response: 'Any', treatment: 'Any', covariates: 'Any
 **示例**
 
 ```python
-ws.teffects_psmatch(base['ytreat'], base['treat'], base[['x1','x2','x3']].to_numpy(), nneighbor=1)
+ws.treatment_effects_psmatch(base['ytreat'], base['treat'], base[['x1','x2','x3']].to_numpy(), nneighbor=1)
 ```
 
 **输出**
@@ -9968,7 +9968,7 @@ ws.treatment_effects_ra(response: 'Any', treatment: 'Any', covariates: 'Any', *,
 **示例**
 
 ```python
-print(ws.teffects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)
+print(ws.treatment_effects_ra(base['y'] + base['yb'], base['yb'], base[['x1','x2']].to_numpy()).ate)
 ```
 
 **输出**
@@ -9992,7 +9992,7 @@ ws.var_granger(fitted: 'Any') -> 'VarGrangerResults'
 **示例**
 
 ```python
-ws.vargranger(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit())
+ws.var_granger(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit())
 ```
 
 **输出**
@@ -10027,7 +10027,7 @@ ws.var_lmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResults'
 **示例**
 
 ```python
-print(ws.varlmar(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit(), mlag=1))
+print(ws.var_lmar(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit(), mlag=1))
 ```
 
 **输出**
@@ -10040,7 +10040,7 @@ None
 
 **Stata 指令:** `varsoc varlist, maxlag(#)`
 
-`ws.varsoc` 给出 VAR 的滞后阶选择准则：对每个候选阶数给出最终预测误差、AIC、HQIC 与 SBIC，并按各准则分别给最小者加星。四个准则经常不一致，Stata 是各自加星而不是替你选一个。
+`ws.var_select_order` 给出 VAR 的滞后阶选择准则：对每个候选阶数给出最终预测误差、AIC、HQIC 与 SBIC，并按各准则分别给最小者加星。四个准则经常不一致，Stata 是各自加星而不是替你选一个。
 
 **签名**
 
@@ -10051,7 +10051,7 @@ ws.var_select_order(data: 'np.ndarray | pd.DataFrame', *, maxlag: 'int' = 4, tre
 **示例**
 
 ```python
-print(ws.varsoc(base[['y1','y2']].to_numpy(), maxlag=2))
+print(ws.var_select_order(base[['y1','y2']].to_numpy(), maxlag=2))
 ```
 
 **输出**
@@ -10064,7 +10064,7 @@ None
 
 **Stata 指令:** `varstable`
 
-`ws.varstable` 检查已拟合 VAR 的特征值稳定性条件：伴随矩阵各特征值的模与其特征值并列。当所有模都严格落在单位圆内时过程稳定，Stata 会把不满足的标出来。
+`ws.var_stable` 检查已拟合 VAR 的特征值稳定性条件：伴随矩阵各特征值的模与其特征值并列。当所有模都严格落在单位圆内时过程稳定，Stata 会把不满足的标出来。
 
 **签名**
 
@@ -10075,7 +10075,7 @@ ws.var_stable(result: 'Any') -> 'VarStableResults'
 **示例**
 
 ```python
-print(ws.varstable(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))
+print(ws.var_stable(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))
 ```
 
 **输出**
@@ -10088,7 +10088,7 @@ None
 
 **Stata 指令:** `varwle`
 
-`ws.varwle` 给出 VAR 的 Wald 滞后排除检验：对每个方程，检验每一阶的系数是否联合为零，另加一行 ALL。统计量由系数协方差构造的 Wald chi2，因此需要整个滞后块，而不是逐个系数。
+`ws.var_wle` 给出 VAR 的 Wald 滞后排除检验：对每个方程，检验每一阶的系数是否联合为零，另加一行 ALL。统计量由系数协方差构造的 Wald chi2，因此需要整个滞后块，而不是逐个系数。
 
 **签名**
 
@@ -10099,7 +10099,7 @@ ws.var_wle(result: 'Any') -> 'VarWleResults'
 **示例**
 
 ```python
-print(ws.varwle(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))
+print(ws.var_wle(ws.VAR(base[['y1','y2']].to_numpy(), lags=1, names=['y1','y2']).fit()))
 ```
 
 **输出**
@@ -10143,7 +10143,7 @@ None
 
 **Stata 指令:** `veclmar`
 
-已拟合 VECM 的残差自相关拉格朗日乘数检验，即 `varlmar` 的 VECM 对应物。它作用于差分后的残差，因此滞后编号指的是差分而不水平值。
+已拟合 VECM 的残差自相关拉格朗日乘数检验，即 `var_lmar` 的 VECM 对应物。它作用于差分后的残差，因此滞后编号指的是差分而不水平值。
 
 **签名**
 
@@ -10154,7 +10154,7 @@ ws.vec_lmar(result: 'Any', *, mlag: 'int' = 2) -> 'LmarResults'
 **示例**
 
 ```python
-print(ws.veclmar(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit(), mlag=1))
+print(ws.vec_lmar(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit(), mlag=1))
 ```
 
 **输出**
@@ -10178,7 +10178,7 @@ ws.vec_rank(data: 'Any', *, lags: 'int' = 2, trend: 'str' = 'constant', show_max
 **示例**
 
 ```python
-print(ws.vecrank(base[['y1','y2']].to_numpy(), lags=1))
+print(ws.vec_rank(base[['y1','y2']].to_numpy(), lags=1))
 ```
 
 **输出**
@@ -10204,7 +10204,7 @@ ws.vec_stable(result: 'Any') -> 'VecStableResults'
 **示例**
 
 ```python
-print(ws.vecstable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))
+print(ws.vec_stable(ws.VECM(base[['y1','y2']].to_numpy(), coint_rank=1, lags=2, names=['y1','y2']).fit()))
 ```
 
 **输出**

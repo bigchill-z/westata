@@ -347,7 +347,7 @@ class Regress:
         weights: Any = None,
         weight_type: str | None = None,
         subset: Any = None,
-    ) -> "OLS":
+    ) -> "Regress":
         """Build a model from a patsy-style formula, e.g. ``"y ~ x + C(g)"``.
 
         **Rows with missing values are dropped.** A formula can only be evaluated on

@@ -458,7 +458,7 @@ class SeeminglyUnrelatedRegress:
         *,
         names: Sequence[str] | None = None,
         subset: Any = None,
-    ) -> "Sureg":
+    ) -> "SeeminglyUnrelatedRegress":
         """Build from formulas such as ``["y1 ~ x1 + x2", "y2 ~ x2 + x3"]``.
 
         ``names`` overrides the equation labels (which default to each
@@ -812,7 +812,7 @@ class MultivariateRegress:
     @classmethod
     def from_formula(
         cls, formula: str, data: pd.DataFrame, *, subset: Any = None
-    ) -> "Mvreg":
+    ) -> "MultivariateRegress":
         """Build from ``"y1 y2 = x1 x2 x3"`` (every regressor in every equation)."""
 
         data = _subset(data, subset)
@@ -1053,7 +1053,7 @@ class ErrorsInVariablesRegress:
         *,
         reliab: Mapping[str, float] | None = None,
         subset: Any = None,
-    ) -> "Eivreg":
+    ) -> "ErrorsInVariablesRegress":
         """Build from ``"y ~ x1 + x2"`` and ``reliab={"x1": 0.7}``."""
 
         data = _subset(data, subset)

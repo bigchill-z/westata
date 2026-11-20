@@ -348,7 +348,7 @@ class QuantileRegress:
         *,
         quantile: float = 0.5,
         subset: Any = None,
-    ) -> "QuantileRegression":
+    ) -> "QuantileRegress":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
@@ -656,7 +656,7 @@ class RobustRegress:
         *,
         tune: float = 7.0,
         subset: Any = None,
-    ) -> "RobustRegression":
+    ) -> "RobustRegress":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:

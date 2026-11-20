@@ -110,7 +110,7 @@ class TreatmentEffectsNnmatch:
         nneighbor: int = 1,
         caliper: float | None = None,
         tie_tolerance: float = 1e-10,
-    ) -> "TeffectsNnmatch":
+    ) -> "TreatmentEffectsNnmatch":
         """Build from a frame and column names."""
 
         frame = data

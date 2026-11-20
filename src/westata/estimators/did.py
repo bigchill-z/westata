@@ -600,7 +600,7 @@ class DIDRegress:
         time: str,
         covariates: Any = None,
         subset: Any = None,
-    ) -> "Didregress":
+    ) -> "DIDRegress":
         """Build a model from Stata's ``didregress (y x1) (treated)`` spelling.
 
         This entry point takes VARIABLE NAMES, not a formula -- there is no ``~`` in
@@ -631,7 +631,7 @@ class DIDRegress:
         time: str,
         covariates: Any = None,
         subset: Any = None,
-    ) -> "Didregress":
+    ) -> "DIDRegress":
         """Deprecated alias of :meth:`from_variables` (R3.2).
 
         Kept for one release because 186 call sites in this repository use it, and

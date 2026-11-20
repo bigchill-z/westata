@@ -288,7 +288,7 @@ def render_first_stage(result: Any) -> str:
         estat firststage              a SUMMARY: R-sq, adjusted R-sq, partial R-sq, the
                                       instrument F and its p, plus the Stock-Yogo critical-value
                                       panel. No coefficients at all.
-                                      -> ``ws.estat_firststage(result)``
+                                      -> ``ws.estat_first_stage(result)``
 
     Calling ``first_stage()`` when ``estat firststage`` was meant produces a table with a completely
     different shape, which reads as a mismatch rather than a wrong entry point. Both are implemented;

@@ -503,7 +503,7 @@ class PanelRegressFE:
         subset: Any = None,
         weights: Any = None,
         weight_type: str | None = None,
-    ) -> "PanelOLS":
+    ) -> "PanelRegressFE":
         """Build a model from a formula and a panel frame.
 
         A long frame carrying the ``entity``/``time`` columns is converted with

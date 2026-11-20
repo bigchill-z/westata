@@ -269,7 +269,7 @@ class PanelAbond:
         lags: int = 1,
         system: bool = False,
         subset: Any = None,
-    ) -> "XtAbond":
+    ) -> "PanelAbond":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:

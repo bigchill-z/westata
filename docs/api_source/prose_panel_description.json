@@ -1,47 +1,47 @@
 {
-  "_readme": [
-    "Hand-written prose for the panel-description surface: Stata's `xtset`, `xtdes` and `xtsum`. These describe a panel rather than estimate anything, so each returns a dataclass whose `str()` reproduces the printed block measured from StataNow 19.5."
-  ],
-  "panel_description": {
-    "stata": "xtset panelvar timevar  /  xtdes  /  xtsum varlist",
-    "en": "Panel bookkeeping: validate the entity/time pair and describe the panel's shape. Every layout in this module was measured character by character from StataNow 19.5 on two fixtures -- a balanced 48 x 17 panel and an unbalanced one with an interior hole.",
-    "zh": "面板簿记：`xtset` 校验实体/时间变量对，`xtdes` 与 `xtsum` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtdes(panel, entity=\"pid\", time=\"year\")"
-  },
-  "panel_set": {
-    "stata": "xtset pid year",
-    "en": "Confirm the panel structure and summarise it: the balance, the time range and the spacing. A hole inside an entity's range appends ', but with a gap'. Raises `ConsistencyError` when a column is missing or the pair does not identify the observations.",
-    "zh": "`xtset`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtset(panel, entity=\"pid\", time=\"year\")"
-  },
-  "panel_describe": {
-    "stata": "xtdes",
-    "en": "Describe the panel: the entity and time ranges with `n` and `T`, the delta and span, the distribution of the per-entity counts, and the observation-pattern table where `1` marks a present period and `.` a missing one.",
-    "zh": "`xtdes`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtdes(panel, entity=\"pid\", time=\"year\")"
-  },
-  "panel_summarize": {
-    "stata": "xtsum y k1",
-    "en": "Decompose each variable into its overall, between and within components. The within standard deviation is the plain sample sd of the deviations (`ddof=1`), and the within min/max are those deviations shifted back by the grand mean.",
-    "zh": "`xtsum`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.xtsum(panel, [\"y\"], entity=\"pid\", time=\"year\")"
-  },
-  "PanelSetResults": {
-    "stata": "xtset pid year",
-    "en": "Result of `xtset`: the balance label, time range, delta and the panel dimensions.",
-    "zh": "`xtset` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtset(panel, entity=\"pid\", time=\"year\")\nprint(result.balance)"
-  },
-  "PanelDesResults": {
-    "stata": "xtdes",
-    "en": "Result of `xtdes`: the entity/time ranges, the `T_i` quantiles, the observation patterns and their frequencies.",
-    "zh": "`xtdes` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtdes(panel, entity=\"pid\", time=\"year\")\nprint(result.patterns)"
-  },
-  "PanelSumResults": {
-    "stata": "xtsum y k1",
-    "en": "Result of `xtsum`: one entry per variable holding its overall, between and within mean/sd/min/max.",
-    "zh": "`xtsum` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。",
-    "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.xtsum(panel, [\"y\"], entity=\"pid\", time=\"year\")\nprint(result.variables[0][3][\"sd\"])"
-  }
+ "_readme": [
+  "Hand-written prose for the panel-description surface: Stata's `xtset`, `xtdes` and `xtsum`. These describe a panel rather than estimate anything, so each returns a dataclass whose `str()` reproduces the printed block measured from StataNow 19.5."
+ ],
+ "panel_description": {
+  "stata": "xtset panelvar timevar  /  xtdes  /  xtsum varlist",
+  "en": "Panel bookkeeping: validate the entity/time pair and describe the panel's shape. Every layout in this module was measured character by character from StataNow 19.5 on two fixtures -- a balanced 48 x 17 panel and an unbalanced one with an interior hole.",
+  "zh": "面板簿记：`panel_set` 校验实体/时间变量对，`panel_describe` 与 `panel_summarize` 描述面板形态。本模块的每个版式都从 StataNow 19.5 的两个样本逐字符实测得到——一个 48x17 的平衡面板，一个中间有缺口的不平衡面板。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.panel_describe(panel, entity=\"pid\", time=\"year\")"
+ },
+ "panel_set": {
+  "stata": "xtset pid year",
+  "en": "Confirm the panel structure and summarise it: the balance, the time range and the spacing. A hole inside an entity's range appends ', but with a gap'. Raises `ConsistencyError` when a column is missing or the pair does not identify the observations.",
+  "zh": "`panel_set`：确认面板结构并给出摘要——平衡性、时间范围与间距。若某个实体的区间内缺期，会追加 `, but with a gap`。列不存在或「实体×时间」无法唯一标识观测时抛出 `ConsistencyError`。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.panel_set(panel, entity=\"pid\", time=\"year\")"
+ },
+ "panel_describe": {
+  "stata": "xtdes",
+  "en": "Describe the panel: the entity and time ranges with `n` and `T`, the delta and span, the distribution of the per-entity counts, and the observation-pattern table where `1` marks a present period and `.` a missing one.",
+  "zh": "`panel_describe`：描述面板——实体与时间范围及 `n`/`T`、delta 与 span、各实体观测数的分布，以及观测模式表（`1` 表示该期存在、`.` 表示缺失）。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.panel_describe(panel, entity=\"pid\", time=\"year\")"
+ },
+ "panel_summarize": {
+  "stata": "xtsum y k1",
+  "en": "Decompose each variable into its overall, between and within components. The within standard deviation is the plain sample sd of the deviations (`ddof=1`), and the within min/max are those deviations shifted back by the grand mean.",
+  "zh": "`panel_summarize`：把每个变量拆成 `overall` / `between` / `within` 三个成分。`within` 标准差是离差的样本标准差（`ddof=1`），`within` 的 `min`/`max` 是离差加回总均值后的值。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nws.panel_summarize(panel, [\"y\"], entity=\"pid\", time=\"year\")"
+ },
+ "PanelSetResults": {
+  "stata": "xtset pid year",
+  "en": "Result of `panel_set`: the balance label, time range, delta and the panel dimensions.",
+  "zh": "`panel_set` 的结果：`balance`（平衡性标签）、时间范围、`delta` 及面板维度。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.panel_set(panel, entity=\"pid\", time=\"year\")\nprint(result.balance)"
+ },
+ "PanelDesResults": {
+  "stata": "xtdes",
+  "en": "Result of `panel_describe`: the entity/time ranges, the `T_i` quantiles, the observation patterns and their frequencies.",
+  "zh": "`panel_describe` 的结果：实体/时间范围、`T_i` 分位数、`patterns`（观测模式）及其频数。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.panel_describe(panel, entity=\"pid\", time=\"year\")\nprint(result.patterns)"
+ },
+ "PanelSumResults": {
+  "stata": "xtsum y k1",
+  "en": "Result of `panel_summarize`: one entry per variable holding its overall, between and within mean/sd/min/max.",
+  "zh": "`panel_summarize` 的结果：`variables` 中每个变量一项，含 `overall` / `between` / `within` 的均值、标准差、最小值与最大值。",
+  "example": "import pandas as pd\npanel = pd.DataFrame(\n    {\"pid\": [1, 1, 2, 2], \"year\": [1, 2, 1, 2], \"y\": [1.0, 2.0, 3.0, 4.0]}\n)\nresult = ws.panel_summarize(panel, [\"y\"], entity=\"pid\", time=\"year\")\nprint(result.variables[0][3][\"sd\"])"
+ }
 }

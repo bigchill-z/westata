@@ -92,7 +92,7 @@ class SimultaneousQuantileRegress:
         *,
         quantiles: Sequence[float] = (0.25, 0.5, 0.75),
         subset: Any = None,
-    ) -> "Sqreg":
+    ) -> "SimultaneousQuantileRegress":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:
@@ -377,7 +377,7 @@ class BootstrappedQuantileRegress(SimultaneousQuantileRegress):
         *,
         quantile: float = 0.5,
         subset: Any = None,
-    ) -> "Bsqreg":
+    ) -> "BootstrappedQuantileRegress":
         if not isinstance(data, pd.DataFrame):
             raise TypeError("data must be a pandas DataFrame")
         if subset is not None:

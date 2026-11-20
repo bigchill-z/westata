@@ -25,16 +25,16 @@
  },
  "VAR": {
   "stata": "var a b, lags(1)",
-  "en": "Vector autoregression over several series, the counterpart of Stata's `var`. The endog argument is an `(n_obs, n_variables)` array and `names` labels the equations. `fit()` returns a `VARResults`, not a `StataResults`: by default it reports the maximum-likelihood residual covariance (dividing each equation's RSS by `T`, which is what Stata stores in `e(Sigma)` and `e(V)`), and `ml=False` reproduces Stata's `var ..., dfk` instead. `select_order()` returns the AIC/BIC/HQIC/FPE table Stata's `varsoc` prints rather than silently picking one lag order.",
-  "zh": "多序列向量自回归，对应 Stata 的 `var`。endog 参数是 `(n_obs, n_variables)` 数组，`names` 为方程命名。`fit()` 返回 `VARResults` 而非 `StataResults`：默认报告极大似然的残差协方差（每个方程的残差平方和除以 `T`，也就是 Stata 存入 `e(Sigma)` 与 `e(V)` 的量），`ml=False` 则复现 Stata 的 `var ..., dfk`。`select_order()` 返回 Stata `varsoc` 打印的 AIC/BIC/HQIC/FPE 表，而不是悄悄替你挑一个滞后阶。",
+  "en": "Vector autoregression over several series, the counterpart of Stata's `var`. The endog argument is an `(n_obs, n_variables)` array and `names` labels the equations. `fit()` returns a `VARResults`, not a `StataResults`: by default it reports the maximum-likelihood residual covariance (dividing each equation's RSS by `T`, which is what Stata stores in `e(Sigma)` and `e(V)`), and `ml=False` reproduces Stata's `var ..., dfk` instead. `select_order()` returns the AIC/BIC/HQIC/FPE table Stata's `var_select_order` prints rather than silently picking one lag order.",
+  "zh": "多序列向量自回归，对应 Stata 的 `var`。endog 参数是 `(n_obs, n_variables)` 数组，`names` 为方程命名。`fit()` 返回 `VARResults` 而非 `StataResults`：默认报告极大似然的残差协方差（每个方程的残差平方和除以 `T`，也就是 Stata 存入 `e(Sigma)` 与 `e(V)` 的量），`ml=False` 则复现 Stata 的 `var ..., dfk`。`select_order()` 返回 Stata `var_select_order` 打印的 AIC/BIC/HQIC/FPE 表，而不是悄悄替你挑一个滞后阶。",
   "example": "d = np.column_stack([np.cumsum(np.random.default_rng(1).normal(size=100)), np.cumsum(np.random.default_rng(2).normal(size=100))])\nws.VAR(d, lags=1, names=['a', 'b']).fit().estat_ic()",
   "notes_en": "`VARResults` has no `.summary()`, so `summary(style=\"stata\")` raises `AttributeError`; use `estat_ic()`, `estat_summarize()`, `stata_params`/`stata_param_names`, `granger_causality()` or `irf()`. Also, `granger_causality()` resolves the caused/causing names against the **fitted result's** own names, not against the `names=` you passed to `VAR` -- a `names=['a','b']` model still answers to `y1`/`y2`, and naming it `'a'` raises `ValueError`.",
   "notes_zh": "`VARResults` 没有 `.summary()`，调用 `summary(style=\"stata\")` 会抛 `AttributeError`；请改用 `estat_ic()`、`estat_summarize()`、`stata_params`/`stata_param_names`、`granger_causality()` 或 `irf()`。另外 `granger_causality()` 是在**拟合结果自身**的名字里解析 caused/causing，而不是在传给 `VAR` 的 `names=` 里——用 `names=['a','b']` 建的模型仍然只认 `y1`/`y2`，写成 `'a'` 会抛 `ValueError`。"
  },
  "VECM": {
   "stata": "vec a b, rank(1) lags(1)",
-  "en": "Vector error-correction model, the counterpart of Stata's `vec`. `coint_rank` is the cointegrating rank, normally read off `johansen()` first; that method is the `vecrank` counterpart and returns trace and max-eigenvalue statistics with the critical values Stata prints. Coefficient accessors are `beta` (cointegrating vectors), `alpha` (adjustment speeds) and `gamma` (short-run terms), and the `e()` payload carries Stata's names such as `k_ce`, `k_ar_diff`, `r2_1` and `r2_2`.",
-  "zh": "向量误差修正模型，对应 Stata 的 `vec`。`coint_rank` 是协整秩，通常先由 `johansen()` 读出；该方法对应 `vecrank`，返回迹统计量与最大特征值统计量，并附上 Stata 打印的临界值。系数入口为 `beta`（协整向量）、`alpha`（调整速度）与 `gamma`（短期项），`e()` 载荷携带 Stata 的命名，如 `k_ce`、`k_ar_diff`、`r2_1`、`r2_2`。",
+  "en": "Vector error-correction model, the counterpart of Stata's `vec`. `coint_rank` is the cointegrating rank, normally read off `johansen()` first; that method is the `vec_rank` counterpart and returns trace and max-eigenvalue statistics with the critical values Stata prints. Coefficient accessors are `beta` (cointegrating vectors), `alpha` (adjustment speeds) and `gamma` (short-run terms), and the `e()` payload carries Stata's names such as `k_ce`, `k_ar_diff`, `r2_1` and `r2_2`.",
+  "zh": "向量误差修正模型，对应 Stata 的 `vec`。`coint_rank` 是协整秩，通常先由 `johansen()` 读出；该方法对应 `vec_rank`，返回迹统计量与最大特征值统计量，并附上 Stata 打印的临界值。系数入口为 `beta`（协整向量）、`alpha`（调整速度）与 `gamma`（短期项），`e()` 载荷携带 Stata 的命名，如 `k_ce`、`k_ar_diff`、`r2_1`、`r2_2`。",
   "example": "d = np.column_stack([np.cumsum(np.random.default_rng(1).normal(size=100)), np.cumsum(np.random.default_rng(2).normal(size=100))])\nws.VECM(d, coint_rank=1, lags=1, names=['a', 'b']).fit().beta",
   "notes_en": "The critical values in `johansen()` are Stata's Johansen (1995) tables, not statsmodels' Osterwald-Lenum values, and the difference changes the selected rank on marginal data (3.76 against 3.8415 at 5%). The 90% column is `nan` because Stata's ado hard-codes only 95% and 99%. `VECMResults` has no `.summary()` either -- read `beta`/`alpha`/`gamma` and `e()` directly.",
   "notes_zh": "`johansen()` 中的临界值是 Stata 使用的 Johansen (1995) 表，而不是 statsmodels 的 Osterwald-Lenum 数值，这个差异会改变临界数据上选出的秩（5% 处 3.76 对 3.8415）。90% 那一列是 `nan`，因为 Stata 的 ado 只硬编码了 95% 与 99%。`VECMResults` 同样没有 `.summary()`——请直接读 `beta`/`alpha`/`gamma` 与 `e()`。"
@@ -43,7 +43,7 @@
   "stata": "xtunitroot ips ypanel   /   xtunitroot llc ypanel",
   "en": "Panel unit-root tests by the Im-Pesaran-Shin (`test=\"ips\"`) and Levin-Lin-Chu (`test=\"llc\"`) procedures, matching Stata's `xtunitroot`. `from_formula` takes the panel identifiers through `entity=` and `time=`; `fit()` returns a `PanelUnitRootResult` that carries Stata's `r()` scalars, since `xtunitroot` is an r-class command and stores no `e(b)` or `e(V)`. Both procedures require a strongly balanced panel without gaps, and this implementation refuses an unbalanced one rather than silently using whichever rows happen to line up.",
   "zh": "面板单位根检验，提供 Im-Pesaran-Shin（`test=\"ips\"`）与 Levin-Lin-Chu（`test=\"llc\"`）两种方法，对应 Stata 的 `xtunitroot`。`from_formula` 通过 `entity=` 与 `time=` 接收面板标识；`fit()` 返回 `PanelUnitRootResult`，携带 Stata 的 `r()` 标量，因为 `xtunitroot` 是 r 类命令，不存 `e(b)` 或 `e(V)`。两种方法都要求强平衡且无缺口的面板，本实现对非平衡面板直接拒绝，而不是悄悄采用恰好对齐的那部分行。",
-  "example": "ws.XtUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test='ips').fit().r",
+  "example": "ws.PanelUnitroot.from_formula('ypanel ~ 1', base, entity='firm', time='year', test='ips').fit().r",
   "notes_en": "`trend=True`, `noconstant=True` and `demean=True` are accepted as arguments but raise `UnsupportedError`, because each changes the look-up tables and they were not transcribed. `lags=1` on a short panel can also raise `ConsistencyError` (\"a panel has no residual degrees of freedom in its ADF regression\") -- the default of no lags is what Stata's default reproduces.",
   "notes_zh": "`trend=True`、`noconstant=True` 与 `demean=True` 可以传入，但会抛 `UnsupportedError`，因为每一项都会改变查表值而这些表未被转录。短面板上 `lags=1` 还可能抛 `ConsistencyError`（“a panel has no residual degrees of freedom in its ADF regression”）——无滞后这一默认值才是复现 Stata 默认的取法。"
  },
@@ -91,17 +91,17 @@
   "stata": "didregress (y x1) (treat), group(firm) time(year)",
   "en": "Two-way fixed-effects difference-in-differences, the counterpart of Stata's `didregress`. Stata's two parenthesised blocks are passed as the first two arguments: the outcome block (dependent variable, then covariates) and the treatment block (exactly one 0/1 indicator), with `group=` naming the unit whose fixed effect is absorbed and `time=` naming the period. Both effects are absorbed rather than dummied out, and the reported ATET is the treatment coefficient. The default covariance clusters on `group()`, like Stata.",
   "zh": "双向固定效应双重差分，对应 Stata 的 `didregress`。Stata 的两个括号块作为前两个参数传入：结果块（因变量，随后是协变量）与处理块（恰好一个 0/1 指示变量），`group=` 指定被吸收单位固定效应的单位，`time=` 指定时期。两个固定效应都是被吸收而非生成虚拟变量，报告的 ATET 即处理系数。默认协方差按 `group()` 聚类，与 Stata 相同。",
-  "example": "ws.Didregress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')",
+  "example": "ws.DIDRegress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')",
   "notes_en": "A bare `\"y\"` means NO covariates, exactly as in Stata's `(y)` block; pass `\"y x1\"` to include one, or `covariates=\"all\"` to explicitly infer every time-varying numeric column. A time-invariant treatment indicator is the unit fixed effect itself, so it is refused with `ConsistencyError` (Stata's r(198) collinearity diagnosis) instead of reporting whatever the solver leaves. `e(r2)`, `e(r2_a)`, `e(rmse)`, `e(F)` and `e(ll)` are westata additions, not Stata-verified output.",
   "notes_zh": "单独的 `\"y\"` 表示**没有**协变量，与 Stata 的 `(y)` 块完全一致；要包含协变量请写 `\"y x1\"`，或用 `covariates=\"all\"` 显式推断所有随时间变化的数值列。不随时间变化的处理指示变量就是单位固定效应本身，因此会被 `ConsistencyError` 拒绝（对应 Stata 的 r(198) 共线性诊断），而不是报告求解器剩下的值。`e(r2)`、`e(r2_a)`、`e(rmse)`、`e(F)`、`e(ll)` 是 westata 的增补，并非经 Stata 验证的输出。"
  },
  "PanelDIDRegress": {
   "stata": "xtdidregress (y x1) (treat), group(firm) time(year)",
-  "en": "Panel difference-in-differences, the counterpart of Stata's `xtdidregress`. The estimator is the same two-way fixed-effects regression as `Didregress` and the ATET is identical on a balanced panel; only the degrees-of-freedom convention differs, because a panel unit effect is nested inside the `group()` cluster variable and therefore adds nothing to the `(N-1)/(N-K)` factor. The clustered standard error is consequently the smaller of the two, which is the difference between `didregress` and `xtdidregress` in Stata's own output.",
-  "zh": "面板双重差分，对应 Stata 的 `xtdidregress`。估计量与 `Didregress` 是同一个双向固定效应回归，在平衡面板上 ATET 完全相同；差别只在自由度约定：面板单位效应嵌套在 `group()` 聚类变量之内，因此不计入 `(N-1)/(N-K)` 因子。于是聚类标准误是两者中较小的那个，这正是 Stata 自身输出里 `didregress` 与 `xtdidregress` 的差别。",
-  "example": "ws.Xtdidregress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')",
-  "notes_en": "Unlike `didregress`, this spelling requires a genuine panel: a repeated `(group, time)` cell raises `ConsistencyError` with Stata's `xtset` diagnosis (\"repeated time values within panel\"). Unbalanced panels are still estimated; the exact agreement with `Didregress` is guaranteed and tested for balanced ones.",
-  "notes_zh": "与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `xtset` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `Didregress` 完全一致这一点只在平衡面板上有保证并经过测试。"
+  "en": "Panel difference-in-differences, the counterpart of Stata's `xtdidregress`. The estimator is the same two-way fixed-effects regression as `DIDRegress` and the ATET is identical on a balanced panel; only the degrees-of-freedom convention differs, because a panel unit effect is nested inside the `group()` cluster variable and therefore adds nothing to the `(N-1)/(N-K)` factor. The clustered standard error is consequently the smaller of the two, which is the difference between `didregress` and `xtdidregress` in Stata's own output.",
+  "zh": "面板双重差分，对应 Stata 的 `xtdidregress`。估计量与 `DIDRegress` 是同一个双向固定效应回归，在平衡面板上 ATET 完全相同；差别只在自由度约定：面板单位效应嵌套在 `group()` 聚类变量之内，因此不计入 `(N-1)/(N-K)` 因子。于是聚类标准误是两者中较小的那个，这正是 Stata 自身输出里 `didregress` 与 `xtdidregress` 的差别。",
+  "example": "ws.PanelDIDRegress.from_formula('y', 'treat', base, group='firm', time='year').fit().summary(style='stata')",
+  "notes_en": "Unlike `didregress`, this spelling requires a genuine panel: a repeated `(group, time)` cell raises `ConsistencyError` with Stata's `panel_set` diagnosis (\"repeated time values within panel\"). Unbalanced panels are still estimated; the exact agreement with `DIDRegress` is guaranteed and tested for balanced ones.",
+  "notes_zh": "与 `didregress` 不同，这种写法要求真正的面板：重复的 `(group, time)` 单元会抛 `ConsistencyError`，诊断沿用 Stata `panel_set` 的说法（“repeated time values within panel”）。非平衡面板仍可估计；与 `DIDRegress` 完全一致这一点只在平衡面板上有保证并经过测试。"
  },
  "TreatmentEffectResults": {
   "stata": "teffects ipw / aipw / nnmatch / ra   (the table they print)",
@@ -155,31 +155,31 @@
   "stata": "svy: mean y",
   "en": "Survey-weighted mean, the counterpart of `svy: mean`. The point estimate is `sum(w y) / sum(w)`; the work is in the variance, which is linearised from the influence function `psi_i = w_i (y_i - ybar) / sum(w)` and aggregated over PSUs within strata. Both the weight and the centring belong to the linearisation, and the reported reference distribution is a t with `df_r = #PSU - #strata` degrees of freedom.",
   "zh": "抽样加权均值，对应 `svy: mean`。点估计是 `sum(w y) / sum(w)`；功夫全在方差上：方差由影响函数 `psi_i = w_i (y_i - ybar) / sum(w)` 线性化，再在层内按 PSU 汇总。权重和中心化都属于线性化的一部分，所报告的参考分布是自由度为 `df_r = #PSU - #strata` 的 t 分布。",
-  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SvyMean.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
+  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SurveyMean.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
   "notes_en": "Dropping either piece of the influence function leaves the point estimate untouched and the variance badly wrong: on the fixture design `y_i / sum(w)` is 65% low and `w_i y_i / sum(w)` (weight but no centring) is 30% low, while `w_i (y_i - ybar) / sum(w)` reproduces Stata. The design degrees of freedom `df_r` is not clamped to at least one, because doing so would silently overstate precision.",
   "notes_zh": "影响函数里漏掉任何一块，点估计都不变而方差会严重失真：在 fixture 设计上，`y_i / sum(w)` 低 65%，`w_i y_i / sum(w)`（有权重但不中心化）低 30%，而 `w_i (y_i - ybar) / sum(w)` 才复现 Stata。设计自由度 `df_r` 没有被强行截断到至少 1，因为那样会悄悄高估精度。"
  },
  "SurveyTotal": {
   "stata": "svy: total y",
-  "en": "Survey-weighted total, the counterpart of `svy: total`. The estimate is `sum(w y)` and the influence function is `psi_i = w_i y_i`; the weights are deliberately **not** normalised, because a total estimates a population quantity whose scale is part of the answer. Everything else -- linearisation, stratification, the `df_r = #PSU - #strata` reference distribution and the fpc factor -- is shared with `SvyMean`.",
-  "zh": "抽样加权合计，对应 `svy: total`。估计为 `sum(w y)`，影响函数为 `psi_i = w_i y_i`；这里刻意**不**对权重归一化，因为合计估计的是一个总体量，它的量纲本身就是答案的一部分。其余部分——线性化、分层、`df_r = #PSU - #strata` 的参考分布与 fpc 因子——与 `SvyMean` 共用。",
-  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SvyTotal.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
-  "notes_en": "Unlike `SvyMean` the influence function is NOT centred on the estimate. Centring it -- `w_i (y_i - T)` -- looks harmless and is not: on the fixture design it inflates the variance by a factor of about 244,000, because `T` is a global constant whose interaction with the unequal weights does not cancel inside a stratum.",
-  "notes_zh": "与 `SvyMean` 不同，这里的影响函数**不**围绕估计值中心化。把它中心化成 `w_i (y_i - T)` 看似无害，实则不然：在 fixture 设计上会把方差放大约 244,000 倍，因为 `T` 是全局常数，它与不等权重之间的交互项在层内并不抵消。"
+  "en": "Survey-weighted total, the counterpart of `svy: total`. The estimate is `sum(w y)` and the influence function is `psi_i = w_i y_i`; the weights are deliberately **not** normalised, because a total estimates a population quantity whose scale is part of the answer. Everything else -- linearisation, stratification, the `df_r = #PSU - #strata` reference distribution and the fpc factor -- is shared with `SurveyMean`.",
+  "zh": "抽样加权合计，对应 `svy: total`。估计为 `sum(w y)`，影响函数为 `psi_i = w_i y_i`；这里刻意**不**对权重归一化，因为合计估计的是一个总体量，它的量纲本身就是答案的一部分。其余部分——线性化、分层、`df_r = #PSU - #strata` 的参考分布与 fpc 因子——与 `SurveyMean` 共用。",
+  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SurveyTotal.from_frame('y', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
+  "notes_en": "Unlike `SurveyMean` the influence function is NOT centred on the estimate. Centring it -- `w_i (y_i - T)` -- looks harmless and is not: on the fixture design it inflates the variance by a factor of about 244,000, because `T` is a global constant whose interaction with the unequal weights does not cancel inside a stratum.",
+  "notes_zh": "与 `SurveyMean` 不同，这里的影响函数**不**围绕估计值中心化。把它中心化成 `w_i (y_i - T)` 看似无害，实则不然：在 fixture 设计上会把方差放大约 244,000 倍，因为 `T` 是全局常数，它与不等权重之间的交互项在层内并不抵消。"
  },
  "SurveyProportion": {
   "stata": "svy: proportion yb",
   "en": "Weighted proportions of one or more categorical variables, the counterpart of `svy: proportion`. One coefficient is reported per observed level, named in Stata's `variable=level` shape and ordered by ascending level, together with the joint covariance. The levels of a binary variable get identical standard errors and perfectly negatively correlated estimates, because each proportion is the mean of its indicator.",
   "zh": "一个或多个分类变量的加权比例，对应 `svy: proportion`。每个观测到的水平报告一个系数，按 Stata 的 `variable=level` 形式命名并按水平升序排列，同时给出联合协方差。二值变量的各水平会得到相同的标准误，且估计值完全负相关，因为每个比例就是其指示变量的均值。",
-  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SvyProportion.from_frame('yb', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
+  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SurveyProportion.from_frame('yb', b, ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
   "notes_en": "The coefficient names are strings such as `yb=0` and `yb=1`, so positional indexing by `param_names` is the reliable way to read them; the levels are the ones observed after listwise deletion, not the declared value labels.",
   "notes_zh": "系数名是形如 `yb=0`、`yb=1` 的字符串，因此按 `param_names` 定位是可靠的读取方式；这些水平是逐列删除缺失值后实际观测到的取值，而不是声明的值标签。"
  },
  "SurveyRegress": {
   "stata": "svy: regress y x1 x2",
-  "en": "Survey-weighted linear regression, the counterpart of `svy: regress`. The coefficients are weighted least squares -- the same numbers `ws.OLS(..., weights=..., weight_type=\"pweight\")` produces, and only their order and naming differ (slopes first, constant last as `_cons`) -- so the survey machinery contributes nothing to the point estimates and everything to the variance. The influence function is `psi_i = (X'WX)^-1 w_i x_i e_i`, with both the weight and the inverse cross-product inside the linearisation, and the model F statistic is the survey-adjusted Wald form reported against the design degrees of freedom.",
-  "zh": "抽样加权线性回归，对应 `svy: regress`。系数是加权最小二乘——与 `ws.OLS(..., weights=..., weight_type=\"pweight\")` 得到的数值相同，差别只在顺序与命名（斜率在前，常数在最后记作 `_cons`）——因此抽样机制对点估计没有贡献，全部贡献都在方差上。影响函数为 `psi_i = (X'WX)^-1 w_i x_i e_i`，权重与逆交叉积都在线性化之内；模型的 F 统计量是按设计自由度报告的抽样调整 Wald 形式。",
-  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SvyRegress.from_frame(b, 'y ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
+  "en": "Survey-weighted linear regression, the counterpart of `svy: regress`. The coefficients are weighted least squares -- the same numbers `ws.Regress(..., weights=..., weight_type=\"pweight\")` produces, and only their order and naming differ (slopes first, constant last as `_cons`) -- so the survey machinery contributes nothing to the point estimates and everything to the variance. The influence function is `psi_i = (X'WX)^-1 w_i x_i e_i`, with both the weight and the inverse cross-product inside the linearisation, and the model F statistic is the survey-adjusted Wald form reported against the design degrees of freedom.",
+  "zh": "抽样加权线性回归，对应 `svy: regress`。系数是加权最小二乘——与 `ws.Regress(..., weights=..., weight_type=\"pweight\")` 得到的数值相同，差别只在顺序与命名（斜率在前，常数在最后记作 `_cons`）——因此抽样机制对点估计没有贡献，全部贡献都在方差上。影响函数为 `psi_i = (X'WX)^-1 w_i x_i e_i`，权重与逆交叉积都在线性化之内；模型的 F 统计量是按设计自由度报告的抽样调整 Wald 形式。",
+  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SurveyRegress.from_frame(b, 'y ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
   "notes_en": "Dropping either `w_i` or `(X'WX)^-1` from the influence function leaves the coefficients exact and makes the variance grossly wrong. The design-based `F` is the survey-adjusted form `(d - q + 1)/(d q) * W` on `F(q, d - q + 1)`, not the ordinary regression F, so it will not equal an unweighted `regress` F even when the coefficients coincide.",
   "notes_zh": "从影响函数里漏掉 `w_i` 或 `(X'WX)^-1`，系数仍然精确而方差会严重失准。基于设计的 `F` 是抽样调整形式 `(d - q + 1)/(d q) * W`，参考分布为 `F(q, d - q + 1)`，并非普通回归的 F；即使系数相同，它也不会等于未加权的 `regress` F。"
  },
@@ -187,7 +187,7 @@
   "stata": "svy: logit yb x1 x2",
   "en": "Survey-weighted logistic regression, the counterpart of `svy: logit`. It is pseudo-maximum-likelihood: the log-likelihood carries the sampling weights, and the variance is linearised from `psi_i = I^-1 w_i x_i (y_i - p_i)` with `I = X' diag(w p(1-p)) X`. The dependent variable must be coded 0/1 and a constant outcome is refused rather than fitted.",
   "zh": "抽样加权逻辑回归，对应 `svy: logit`。它属于伪极大似然：对数似然带上抽样权重，方差由 `psi_i = I^-1 w_i x_i (y_i - p_i)` 线性化，其中 `I = X' diag(w p(1-p)) X`。因变量必须编码为 0/1，常数结果会被拒绝而不是硬拟合。",
-  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SvyLogit.from_frame(b, 'yb ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
+  "example": "b = base.assign(w=np.random.default_rng(1).uniform(0.5, 2.0, len(base)))\nws.SurveyLogit.from_frame(b, 'yb ~ x1 + x2', ws.SurveyDesign(psu='firm', weights='w')).fit().summary(style='stata')",
   "notes_en": "On the fixture design the estimates reproduce Stata to about 5e-10 relative, and that residual is Stata's stopping tolerance rather than this code's: evaluating Stata's own score equations at Stata's published coefficients leaves a gradient of about 1.7e-8, while the estimates returned here are the exact maximiser. A conformance tolerance tighter than 1e-9 would assert something untrue about Stata.",
   "notes_zh": "在 fixture 设计上，估计值复现 Stata 到约 5e-10 的相对精度，而这个残差是 Stata 的停机容差、不是本代码的：把 Stata 自己发表的系数代回 Stata 自己的得分方程，残差梯度约 1.7e-8，而这里返回的是精确的极大化点。若把一致性容差收紧到 1e-9 以内，断言的就不是本实现而是 Stata 的不是了。"
  },
@@ -217,8 +217,8 @@
  },
  "JohansenResults": {
   "stata": "vecrank / vec johansen",
-  "en": "The Johansen cointegration result: `select_rank()` picks the rank under the requested statistic, `to_frame()` gives the trace and max-eigenvalue tables, and `to_stata_table()` renders the block Stata's `vecrank` prints.",
-  "zh": "Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 给出迹统计量与最大特征值表，`to_stata_table()` 渲染 Stata `vecrank` 打印的块。",
+  "en": "The Johansen cointegration result: `select_rank()` picks the rank under the requested statistic, `to_frame()` gives the trace and max-eigenvalue tables, and `to_stata_table()` renders the block Stata's `vec_rank` prints.",
+  "zh": "Johansen 协整结果：`select_rank()` 按指定统计量选秩，`to_frame()` 给出迹统计量与最大特征值表，`to_stata_table()` 渲染 Stata `vec_rank` 打印的块。",
   "example": "r = ws.VECM(base[['y', 'x1']].to_numpy(), coint_rank=1, lags=1).johansen()\nprint(r.to_frame().head(3))"
  },
  "VARResults": {

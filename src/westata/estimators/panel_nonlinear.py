@@ -893,7 +893,7 @@ class PanelLogit(_PanelBase):
         time: str | None = None,
         method: str = "re",
         subset: Any = None,
-    ) -> "XtLogit":
+    ) -> "PanelLogit":
         """Build the model from a formula (Stata ``xtlogit y x1 x2, fe``).
 
         ``time`` is accepted for symmetry with ``xtset`` and is not used: none of
@@ -1328,7 +1328,7 @@ class PanelProbit(_PanelBase):
         time: str | None = None,
         method: str = "re",
         subset: Any = None,
-    ) -> "XtProbit":
+    ) -> "PanelProbit":
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         built = cls(
@@ -1502,7 +1502,7 @@ class PanelTobit(_PanelBase):
         upper: float | None = None,
         method: str = "re",
         subset: Any = None,
-    ) -> "XtTobit":
+    ) -> "PanelTobit":
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         return cls(
@@ -1679,7 +1679,7 @@ class PanelPoisson(_PanelBase):
         time: str | None = None,
         method: str = "re",
         subset: Any = None,
-    ) -> "XtPoisson":
+    ) -> "PanelPoisson":
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         if np.any(y < 0.0):
@@ -1947,7 +1947,7 @@ class PanelNbRegress(_PanelBase):
         time: str | None = None,
         method: str = "fe",
         subset: Any = None,
-    ) -> "XtNbreg":
+    ) -> "PanelNbRegress":
         normalized = cls._check_method(method)
         y, X, names, groups, model_data = cls._build(formula, data, entity, subset)
         if np.any(y < 0.0):

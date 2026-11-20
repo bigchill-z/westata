@@ -827,7 +827,7 @@ class StataResults:
 
         Stata spells it ``corrgram`` rather than ``estat corrgram``; the method name follows
         the ``estat_``-prefixed convention the rest of this object uses so that
-        ``ws.estat_corrgram(...)`` and ``result.estat_corrgram()`` stay symmetrical.
+        ``ws.estat_correlogram(...)`` and ``result.estat_correlogram()`` stay symmetrical.
         """
 
         from westata.postestimation.serial import estat_correlogram

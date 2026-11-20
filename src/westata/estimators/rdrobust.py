@@ -366,7 +366,7 @@ class RDRobust:
         bias_order: int = 2,
         kernel: str = "triangular",
         covariates: Sequence[str] | None = None,
-    ) -> "Rdrobust":
+    ) -> "RDRobust":
         """Build from a frame and column names."""
 
         frame = data

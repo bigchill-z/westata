@@ -7,6 +7,27 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.42] - 2026-11-20
+
+### Fixed — API manual now teaches the new names throughout
+
+The 0.3.41 rename updated the API reference's structure (headings, prose keys, `__all__`
+filtering) but left old Python names inside prose VALUES and source docstrings:
+`ws.OLS(...)`, `ws.estat_hettest(...)`, `-> 'PanelOLS'` and "get a NeweyWestResult".
+The documentation tests could not catch this because the old names are still valid deprecated
+aliases, so the examples ran successfully.
+
+Both layers are now rewritten to the new primary names and the manual was regenerated
+(305/305 prose coverage). Deliberately preserved: Stata command strings (`**Stata:** xtset`,
+`varstable, graph`), statistical terms (pooled OLS), the `ESTAT_KEEP` method names
+(`estat_vce`, `estat_moran`, ...), and linearmodels' backend class `PanelOLS`.
+
+README/GUIDE (en and zh) were already fully synced in 0.3.41 and are unchanged here.
+
+Full `pytest -q`: **6764 passed, 23 skipped, 0 failed**.
+
+---
+
 ## [0.3.41] - 2026-11-20
 
 ### Changed — the naming convention is applied to the whole public API

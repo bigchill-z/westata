@@ -707,7 +707,7 @@ class SurveyMean(_SvyCommand):
     @classmethod
     def from_frame(
         cls, variables: Any, frame: pd.DataFrame, design: SurveyDesign
-    ) -> "SvyMean":
+    ) -> "SurveyMean":
         names = _variable_list(variables)
         sample, layout = _prepare_sample(frame, design, names)
         values = sample.loc[:, names].to_numpy(dtype=float)
@@ -758,7 +758,7 @@ class SurveyTotal(SurveyMean):
     @classmethod
     def from_frame(
         cls, variables: Any, frame: pd.DataFrame, design: SurveyDesign
-    ) -> "SvyTotal":
+    ) -> "SurveyTotal":
         names = _variable_list(variables)
         sample, layout = _prepare_sample(frame, design, names)
         values = sample.loc[:, names].to_numpy(dtype=float)
@@ -864,7 +864,7 @@ class SurveyProportion(SurveyMean):
     @classmethod
     def from_frame(
         cls, variables: Any, frame: pd.DataFrame, design: SurveyDesign
-    ) -> "SvyProportion":
+    ) -> "SurveyProportion":
         declared = _variable_list(variables)
         sample, layout = _prepare_sample(frame, design, declared)
 
@@ -1016,7 +1016,7 @@ class SurveyRegress(_SvyCommand):
     """Survey-weighted linear regression (``svy: regress``).
 
     The coefficients are weighted least squares -- exactly what
-    ``ws.OLS(weights=..., weight_type="pweight")`` fits -- so only the variance
+    ``ws.Regress(weights=..., weight_type="pweight")`` fits -- so only the variance
     is new.  The influence function is
     ``psi_i = (X'WX)^-1 w_i x_i e_i``: both the weight and the inverse
     cross-product belong to the linearisation.
@@ -1064,7 +1064,7 @@ class SurveyRegress(_SvyCommand):
         design: SurveyDesign,
         *,
         subset: Any = None,
-    ) -> "SvyRegress":
+    ) -> "SurveyRegress":
         if not isinstance(design, SurveyDesign):
             raise TypeError("design must be a SurveyDesign")
         if subset is not None:
@@ -1311,7 +1311,7 @@ class SurveyLogit(_SvyCommand):
         design: SurveyDesign,
         *,
         subset: Any = None,
-    ) -> "SvyLogit":
+    ) -> "SurveyLogit":
         if not isinstance(design, SurveyDesign):
             raise TypeError("design must be a SurveyDesign")
         if subset is not None:

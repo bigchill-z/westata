@@ -422,12 +422,12 @@ class Newey:
     be used the same way as every other one in the package::
 
         ws.Newey.from_formula("y ~ x1 + x2", data, lag=1).fit()
-        ws.newey("y ~ x1 + x2", data, lag=1)      # the same fit, still supported
+        ws.newey_west("y ~ x1 + x2", data, lag=1)      # the same fit, still supported
 
     Why this is a class at all (R2.7): ``newey`` is an ESTIMATION command -- it consumes
     raw data -- not a post-estimation command.  Before this, it was one of 19 estimation
     commands reachable only as a bare function, so the same operation had a construction
-    step in some families (``ws.OLS.from_formula(...).fit()``) and none in others.  The
+    step in some families (``ws.Regress.from_formula(...).fit()``) and none in others.  The
     function remains as a thin wrapper; there is exactly one implementation.
 
     ``lag`` is REQUIRED and belongs to the model, not to ``fit()``: it selects the

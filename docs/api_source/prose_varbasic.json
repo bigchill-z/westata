@@ -1,41 +1,41 @@
 {
-  "_readme": [
-    "Hand-written prose for `varbasic` and `irf table`: VAR estimation that registers an impulse-response function, and the table that reveals it."
-  ],
-  "varbasic": {
-    "stata": "varbasic dlny, lags(1) irf",
-    "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filtering is pandas' job; `subset` follows R3.4 and is applied as `data.loc[subset]` before estimation, so the sample is whatever the frame holds.",
-    "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')"
-  },
-  "irf_table": {
-    "stata": "irf table irf",
-    "en": "The orthogonalised impulse responses with delta-method bands, which `varbasic` registers but never prints. The bands use Stata's `/T` covariance normalisation, and the number format is Stata's `%10.0g`, so values below 1e-5 switch to scientific notation.",
-    "zh": "正交化脉冲响应及其 delta 法置信区间——`varbasic` 会登记但不打印它。区间使用 Stata 的`/T` 协方差归一化，数字格式为 Stata 的 `%10.0g`，因此绝对值小于 1e-5 时改用科学计数法。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit))"
-  },
-  "VarBasic": {
-    "stata": "varbasic dlny, lags(1) irf",
-    "en": "Class form of `varbasic`: `Varbasic(data, 'dlny').fit()` equals `varbasic(data, 'dlny')`, including `subset`.",
-    "zh": "`varbasic` 的类形式：`Varbasic(data, 'dlny').fit()` 与 `varbasic(data, 'dlny')` 等价，同样支持 `subset`。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.Varbasic(frame, 'dlny', lags=1, time='t').fit()"
-  },
-  "IrfResults": {
-    "stata": "varbasic dlny, lags(1) irf",
-    "en": "Result of `varbasic`: the coefficients, the residual covariance, the log likelihood, the information criteria and the per-equation Wald statistics.",
-    "zh": "`varbasic` 的结果：系数、残差协方差、对数似然、信息准则，以及各方程的 Wald 统计量。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(fit.ll)"
-  },
-  "IrfTable": {
-    "stata": "irf table irf",
-    "en": "The rendered `irf table` block. `responses` holds one `ImpulseResponse` per (impulse, response) pair with the steps, the point estimates and both bands.",
-    "zh": "渲染后的 `irf table` 区块。`responses` 中每个 (impulse, response) 组合对应一个 `ImpulseResponse`，含步数、点估计与上下界。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit).responses[0].steps)"
-  },
-  "ImpulseResponse": {
-    "stata": "irf table irf",
-    "en": "One response path: the step numbers, the point estimates and the delta-method lower and upper bounds. `at(step)` returns the three values for a given step.",
-    "zh": "单条响应路径：步数、点估计，以及 delta 法的上下界。`at(step)` 返回指定步的三个值。",
-    "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit).responses[0].at(1))"
-  }
+ "_readme": [
+  "Hand-written prose for `varbasic` and `irf table`: VAR estimation that registers an impulse-response function, and the table that reveals it."
+ ],
+ "varbasic": {
+  "stata": "varbasic dlny, lags(1) irf",
+  "en": "Fit a VAR and register an impulse-response function (Stata `varbasic`). `varbasic ..., irf` prints ONLY the estimation block -- the responses need `irf_table`, which is what Stata's `irf table irf` does. `lags(p)` keeps ONLY lag p, not the range 1..p, so the response is zero on every step that is not a multiple of p. Filtering is pandas' job; `subset` follows R3.4 and is applied as `data.loc[subset]` before estimation, so the sample is whatever the frame holds.",
+  "zh": "估计 VAR 并登记脉冲响应函数（Stata `varbasic`）。`varbasic ..., irf` **只打印估计块**——响应需用 `irf_table`，对应 Stata 的 `irf table irf`。`lags(p)` **只保留滞后 p 期**，不是 1..p，因此非 p 倍数步的响应恒为 0。筛选交给 pandas；`subset` 遵守 R3.4，在估计前按 `data.loc[subset]` 施加，样本即数据框所含内容。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')"
+ },
+ "irf_table": {
+  "stata": "irf table irf",
+  "en": "The orthogonalised impulse responses with delta-method bands, which `varbasic` registers but never prints. The bands use Stata's `/T` covariance normalisation, and the number format is Stata's `%10.0g`, so values below 1e-5 switch to scientific notation.",
+  "zh": "正交化脉冲响应及其 delta 法置信区间——`varbasic` 会登记但不打印它。区间使用 Stata 的`/T` 协方差归一化，数字格式为 Stata 的 `%10.0g`，因此绝对值小于 1e-5 时改用科学计数法。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit))"
+ },
+ "VarBasic": {
+  "stata": "varbasic dlny, lags(1) irf",
+  "en": "Class form of `varbasic`: `Varbasic(data, 'dlny').fit()` equals `varbasic(data, 'dlny')`, including `subset`.",
+  "zh": "`varbasic` 的类形式：`Varbasic(data, 'dlny').fit()` 与 `varbasic(data, 'dlny')` 等价，同样支持 `subset`。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.VarBasic(frame, 'dlny', lags=1, time='t').fit()"
+ },
+ "IrfResults": {
+  "stata": "varbasic dlny, lags(1) irf",
+  "en": "Result of `varbasic`: the coefficients, the residual covariance, the log likelihood, the information criteria and the per-equation Wald statistics.",
+  "zh": "`varbasic` 的结果：系数、残差协方差、对数似然、信息准则，以及各方程的 Wald 统计量。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(fit.ll)"
+ },
+ "IrfTable": {
+  "stata": "irf table irf",
+  "en": "The rendered `irf table` block. `responses` holds one `ImpulseResponse` per (impulse, response) pair with the steps, the point estimates and both bands.",
+  "zh": "渲染后的 `irf table` 区块。`responses` 中每个 (impulse, response) 组合对应一个 `ImpulseResponse`，含步数、点估计与上下界。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit).responses[0].steps)"
+ },
+ "ImpulseResponse": {
+  "stata": "irf table irf",
+  "en": "One response path: the step numbers, the point estimates and the delta-method lower and upper bounds. `at(step)` returns the three values for a given step.",
+  "zh": "单条响应路径：步数、点估计，以及 delta 法的上下界。`at(step)` 返回指定步的三个值。",
+  "example": "import numpy as np\nimport pandas as pd\nrng = np.random.default_rng(11)\ny = np.zeros(60)\nfor _t in range(1, 60):\n    y[_t] = 0.6 * y[_t - 1] + rng.normal()\nframe = pd.DataFrame({'t': range(1, 61), 'dlny': y})\nfit = ws.varbasic(frame, 'dlny', lags=1, time='t')\nprint(ws.irf_table(fit).responses[0].at(1))"
+ }
 }

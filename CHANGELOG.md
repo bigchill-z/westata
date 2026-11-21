@@ -7,6 +7,58 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.48] - 2026-11-21
+
+### Fixed — the `oirf` confidence band was too narrow
+
+`ws.irf_graph(result, statistic="oirf")` drew bands about **6% too narrow**, and exactly **zero**
+where Stata reports a non-zero band. Reproducing `var dinf unem, lags(1/2)` on `macro_swatson.dta`
+followed by `irf graph oirf` exposed it.
+
+**The cause.** `_band` read statsmodels' `stderr()`, which treats the Cholesky factor as **known**.
+Stata's band is the delta method on **(B, Sigma) jointly**.
+
+**The evidence** is the step-0 row, where the oirf *is* a Cholesky element: for the structurally-zero
+entry `unem -> dinf` Stata reports se `0`, while `dinf -> dinf` reports `.0007510342`. A band built
+from B alone returns `0` for both — so Sigma must carry sampling error of its own.
+
+**The fix.** Gaussian ML asymptotics make B and Sigma independent, so the variances add:
+
+```
+Var(f)     = f_B' Var(vec B) f_B  +  f_S' Var(vec Sigma_ml) f_S
+Var(vec S) = (I + K)(Sigma (x) Sigma) / T          K = commutation matrix
+```
+
+Both gradients are numeric, which keeps the formula correct for every statistic and lag order.
+
+**Measured against Stata**, step 0–2, all four impulse-response pairs:
+
+| pair | step | before | after | Stata |
+|---|---|---|---|---|
+| dinf→dinf | 0 | 0 | .0007511097 | .0007510342 |
+| dinf→dinf | 1 | .0007866 | .0010548691 | .0010548663 |
+| unem→dinf | 1 | .0008303 | .0008844842 | .0008844550 |
+| unem→dinf | 2 | .0004797 | .0005187990 | .0005186320 |
+
+The residual difference is below `1e-7` — Stata prints four decimals of the bounds, so that is the
+limit of what its output can resolve.
+
+### Implementation notes
+
+* the band needs Stata-scale `e(b)`/`e(V)`/`e(Sigma)`, which live on the westata wrapper and **not**
+  on the statsmodels analysis; `_inner` now carries a reference across.
+* `stata_cov_params` is a property on the wrapper but a **bound method** on backend objects, so it is
+  resolved before use — calling `np.asarray` on the method raised `TypeError`.
+* statistics other than `oirf`/`coirf` keep using the plain MA path, so `irf`/`cirf` are unchanged.
+
+### Verified
+
+14 tests in `tests/test_irf_oirf_band.py`: point values and bands for all four pairs against Stata,
+the structurally-zero entry, the fact that the Sigma term actually contributes, and that the old
+narrow approximation now differs measurably (which catches a silent regression to it).
+
+---
+
 ## [0.3.47] - 2026-11-21
 
 ### Fixed — the correlogram's x axis was labelled with fractions

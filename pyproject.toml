@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "westata"
-version = "0.3.47"
+version = "0.3.48"
 description = "Stata-conformant econometrics with a statsmodels-style API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -56,7 +56,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+# `matplotlib` is here, not only in `plot`, because the plotting tests RUN in CI.
+# It used to arrive transitively via pyfixest -> seaborn, so the version the plot
+# tests exercised was whatever seaborn happened to pull -- and matplotlib 3.11
+# changed `Gcf.destroy` so a deregistered figure's canvas fell back to
+# `FigureCanvasBase` (no `print_png`), which failed `test_plot_no_double_figure`
+# on CI while passing locally on 3.10. `westata.plotting.release` now re-attaches a
+# real canvas, so both versions work; naming it here keeps the test environment
+# deterministic instead of piggy-backing on another package's dependency.
+test = ["pytest>=7", "matplotlib>=3.5"]
 # `arch` is imported INSIDE functions in `estimators/tseries.py`, so it is only needed for the ARCH/GARCH
 # commands. Keeping it optional avoids forcing a large dependency on users who never run those models.
 # The bound covers the 9.0 signature change (`model.resids(params)` now takes only the MEAN
@@ -65,6 +73,9 @@ test = ["pytest>=7"]
 arch = ["arch>=6.0,<10"]
 # IrFTable.plot() imports matplotlib INSIDE the method, so a user who never plots needs nothing.
 # Same reasoning as the arch extra above: a large dependency is not forced on everyone.
+# The floor is deliberately unbounded at the top: `westata.plotting.release` handles both
+# the <=3.10 and the 3.11+ behaviour of `Gcf.destroy` (see its docstring), so a new
+# matplotlib minor is a thing to verify, not a thing to exclude.
 plot = ["matplotlib>=3.5"]
 
 [tool.setuptools.packages.find]

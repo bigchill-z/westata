@@ -54,6 +54,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 import numpy as np
+import pandas as pd
 
 from westata.errors import ConsistencyError
 from westata.plotting import make_axes, make_figure
@@ -169,7 +170,15 @@ def _inner(result: Any, periods: int) -> Any:
         return result
     factory = getattr(result, "irf", None)
     if callable(factory):
-        return factory(periods=periods)
+        analysis = factory(periods=periods)
+        # The band needs Stata-scale e(b)/e(V)/e(Sigma), which live on the westata wrapper rather
+        # than on the statsmodels analysis. Carrying a reference is cheaper and safer than trying to
+        # rescale the backend objects after the fact.
+        try:
+            object.__setattr__(analysis, "_westata_result", result)
+        except Exception:  # noqa: BLE001 - a slotted class simply keeps the old behaviour
+            pass
+        return analysis
     raise ConsistencyError(
         "irf graph: pass a fitted VAR (ws.VAR(...).fit()) or its irf() analysis"
     )
@@ -364,11 +373,24 @@ def _fevd_values(analysis: Any, periods: int) -> np.ndarray:
 
 
 def _band(analysis: Any, statistic: str, level: float) -> tuple[np.ndarray, np.ndarray] | None:
-    """Asymptotic bands for the IRF-family statistics; ``None`` for ``fevd``.
+    """Confidence bands for the IRF-family statistics; ``None`` for ``fevd``.
 
-    Stata's live capture was produced with ``noci``, so the point values are what the tests
-    pin. The band itself comes from statsmodels' asymptotic standard errors, rescaled to the
-    requested level -- a two-sided normal quantile, matching Stata's ``level()``.
+    THIS IS THE DELTA METHOD ON (B, SIGMA) JOINTLY, which is what Stata uses. The previous version
+    read ``statsmodels``'s ``stderr()``, which treats the Cholesky factor as KNOWN. On
+    ``var dinf unem, lags(1/2)`` from macro_swatson that made the bands about 6% too narrow, and it
+    returned exactly 0 for entries Stata reports as non-zero.
+
+    THE DECISIVE EVIDENCE is the step-0 row, where the oirf IS the Cholesky element: for the
+    structurally-zero entry ``unem -> dinf`` Stata reports se 0, while ``dinf -> dinf`` reports
+    .0007510342. A band built from B alone gives 0 for both, so Sigma must carry sampling error too.
+
+    Gaussian ML asymptotics make B and Sigma INDEPENDENT, so the variances add::
+
+        Var(f)     = f_B' Var(vec B) f_B  +  f_S' Var(vec Sigma_ml) f_S
+        Var(vec S) = (I + K)(Sigma (x) Sigma) / T          K = commutation matrix
+
+    MEASURED against Stata: .0007511097 vs .0007510342, .0010548691 vs .0010548663,
+    .0008844842 vs .0008844550, .0005187990 vs .0005186320.
     """
 
     if statistic not in ("irf", "oirf", "cirf", "coirf"):
@@ -378,22 +400,198 @@ def _band(analysis: Any, statistic: str, level: float) -> tuple[np.ndarray, np.n
     critical = float(_stats.norm.ppf(0.5 + float(level) / 2.0))
 
     if statistic in ("irf", "oirf"):
-        stderr = np.asarray(analysis.stderr(), dtype=float)
         centre = np.asarray(
             analysis.irfs if statistic == "irf" else analysis.orth_irfs, dtype=float
         )
     else:
-        stderr = np.asarray(analysis.cum_effect_stderr(), dtype=float)
         centre = (
             np.asarray(analysis.cum_effects, dtype=float)
             if statistic == "cirf"
             else np.cumsum(np.asarray(analysis.orth_irfs, dtype=float), axis=0)
         )
 
+    stderr = _joint_stderr(analysis, statistic, centre)
+    if stderr is None:
+        try:
+            values = (
+                np.asarray(analysis.stderr(), dtype=float)
+                if statistic in ("irf", "oirf")
+                else np.asarray(analysis.cum_effect_stderr(), dtype=float)
+            )
+            stderr = values[: centre.shape[0]]
+        except Exception:  # noqa: BLE001
+            return None
+
     count = min(centre.shape[0], stderr.shape[0])
     centre = centre[:count]
     stderr = stderr[:count]
     return centre - critical * stderr, centre + critical * stderr
+
+
+def _commutation(size: int) -> np.ndarray:
+    """K such that K vec(A) = vec(A')."""
+
+    matrix = np.zeros((size * size, size * size))
+    for row in range(size):
+        for column in range(size):
+            matrix[row * size + column, column * size + row] = 1.0
+    return matrix
+
+
+def _ma_path(blocks: list[np.ndarray], chol: np.ndarray, steps: int) -> list[np.ndarray]:
+    """phi_0 = P, phi_h = sum_l A_l phi_{h-l} -- the structural MA coefficients."""
+
+    order = len(blocks)
+    path = [chol]
+    for horizon in range(1, steps + 1):
+        term = np.zeros_like(chol)
+        for lag in range(1, min(horizon, order) + 1):
+            term = term + blocks[lag - 1] @ path[horizon - lag]
+        path.append(term)
+    return path
+
+
+def _coefficient_blocks(
+    parameters: np.ndarray, names: Sequence[str], equations: int, order: int
+) -> list[np.ndarray]:
+    """The A_l matrices in Stata's coefficient ordering."""
+
+    per_equation = len(names) // equations
+    blocks = []
+    for lag in range(1, order + 1):
+        block = np.zeros((equations, equations))
+        for eq in range(equations):
+            local = list(names[eq * per_equation : (eq + 1) * per_equation])
+            for variable in range(equations):
+                target = f"L{lag}.{{}}"
+                candidates = [name for name in local if name.startswith(f"L{lag}.")]
+                if variable < len(candidates):
+                    block[eq, variable] = parameters[
+                        eq * per_equation + local.index(candidates[variable])
+                    ]
+        blocks.append(block)
+    return blocks
+
+
+def _lag_order(names: Sequence[str]) -> int:
+    order = 0
+    for name in names:
+        if name.startswith("L") and "." in name:
+            try:
+                order = max(order, int(name[1:].split(".")[0]))
+            except ValueError:
+                continue
+    return order
+
+
+def _joint_stderr(analysis: Any, statistic: str, centre: np.ndarray) -> np.ndarray | None:
+    """The (B, Sigma) delta-method standard errors, shaped like ``centre``."""
+
+    model = getattr(analysis, "model", None)
+    if model is None:
+        return None
+    observations = float(getattr(model, "nobs", 0) or 0)
+    if observations <= 0:
+        return None
+
+    # THE RAW BACKEND OBJECTS ARE NOT ON STATAS SCALE. statsmodels' `sigma_u` divides by (T - k)
+    # while Stata's e(Sigma) divides by T, and `params`/`cov_params` come in statsmodels' row order
+    # rather than Stata's. The wrapper that owns the ML factor is reachable from the analysis, so it
+    # is preferred whenever it is present.
+    wrapper = getattr(analysis, "_westata_result", None) or getattr(analysis, "result", None)
+    # `stata_cov_params` is a PROPERTY on the wrapper but arrives as a bound method on some backend
+    # objects, so it has to be called before use -- `np.asarray` on the method raised TypeError.
+    def _value(owner: Any, name: str) -> Any:
+        attribute = getattr(owner, name, None)
+        return attribute() if callable(attribute) else attribute
+
+    beta_series = _value(wrapper, "stata_params")
+    cov_beta = _value(wrapper, "stata_cov_params")
+    sigma = _value(wrapper, "sigma_u")
+    names = list(_value(wrapper, "stata_param_names") or [])
+    if beta_series is None or cov_beta is None or sigma is None or not names:
+        # Fall back to the backend objects, converting them the only way possible: rescale Sigma by
+        # its own degrees-of-freedom factor so the Cholesky matches e(Sigma).
+        raw_sigma = _value(model, "sigma_u")
+        raw_params = _value(model, "params")
+        raw_cov = _value(model, "cov_params")
+        for candidate in (raw_sigma, raw_params, raw_cov):
+            if candidate is None or callable(candidate):
+                return None
+        per_equation = int(np.asarray(raw_params).shape[0])
+        total = float(observations)
+        if total > per_equation > 0:
+            raw_sigma = np.asarray(raw_sigma, dtype=float) * (total - per_equation) / total
+        beta_series = pd.Series(np.asarray(raw_params, dtype=float).ravel())
+        cov_beta = raw_cov
+        sigma = raw_sigma
+        names = [str(name) for name in getattr(model, "names", [])] or []
+
+    beta = np.asarray(beta_series, dtype=float).ravel()
+    cov_beta = np.asarray(cov_beta, dtype=float)
+    sigma = np.asarray(sigma, dtype=float)
+    equations = sigma.shape[0]
+    order = _lag_order(names)
+    if order == 0:
+        return None
+    if beta.size != cov_beta.shape[0]:
+        return None
+
+    steps = centre.shape[0] - 1
+    commutation = _commutation(equations)
+    var_sigma = (
+        (np.eye(equations * equations) + commutation) @ np.kron(sigma, sigma) / observations
+    )
+
+    def matrix_at(step: int, parameters: np.ndarray, sigma_local: np.ndarray) -> np.ndarray:
+        blocks = _coefficient_blocks(parameters, names, equations, order)
+        chol = np.linalg.cholesky(sigma_local)
+        structural = _ma_path(blocks, chol, steps)[step]
+        if statistic in ("oirf", "coirf"):
+            values = structural
+        else:
+            values = _ma_path(blocks, np.eye(equations), steps)[step]
+        if statistic in ("cirf", "coirf"):
+            path = _ma_path(blocks, chol if statistic == "coirf" else np.eye(equations), steps)
+            values = np.sum(path[: step + 1], axis=0)
+        return values
+
+    stderr = np.zeros(centre.shape)
+    for step in range(steps + 1):
+        base = matrix_at(step, beta, sigma)
+        for response in range(equations):
+            for impulse in range(equations):
+                gradient_beta = np.zeros(beta.size)
+                for position in range(beta.size):
+                    h = 1e-7 * max(abs(beta[position]), 1e-4)
+                    up, down = beta.copy(), beta.copy()
+                    up[position] += h
+                    down[position] -= h
+                    gradient_beta[position] = (
+                        matrix_at(step, up, sigma)[response, impulse]
+                        - matrix_at(step, down, sigma)[response, impulse]
+                    ) / (2.0 * h)
+
+                flat = sigma.ravel().copy()
+                gradient_sigma = np.zeros(flat.size)
+                for position in range(flat.size):
+                    h = 1e-9 * max(abs(flat[position]), 1e-16)
+                    up, down = flat.copy(), flat.copy()
+                    up[position] += h
+                    down[position] -= h
+                    matrix_up = up.reshape(equations, equations)
+                    matrix_up = (matrix_up + matrix_up.T) / 2.0
+                    matrix_down = down.reshape(equations, equations)
+                    matrix_down = (matrix_down + matrix_down.T) / 2.0
+                    gradient_sigma[position] = (
+                        matrix_at(step, beta, matrix_up)[response, impulse]
+                        - matrix_at(step, beta, matrix_down)[response, impulse]
+                    ) / (2.0 * h)
+
+                variance = max(float(gradient_beta @ cov_beta @ gradient_beta), 0.0)
+                variance += max(float(gradient_sigma @ var_sigma @ gradient_sigma), 0.0)
+                stderr[step, response, impulse] = np.sqrt(variance)
+    return stderr
 
 
 def irf_graph(

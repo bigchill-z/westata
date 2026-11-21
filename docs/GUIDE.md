@@ -687,6 +687,29 @@ scatter kind forwards extra keywords to `Axes.scatter`. `cpr_table` and `acpr_ta
 `matplotlib` is imported inside the drawing method, so it stays an optional dependency: install it
 with `pip install "westata[plot]"`.
 
+
+**Autocorrelation correlograms: `ac_table(series).plot()` and `pac_table(series).plot()`**
+
+Stata's `ac` and `pac` draw a correlogram with a confidence band; neither returns data, so here the
+numbers are exposed first and the drawing is a separate step:
+
+```python
+ws.ac_table(vdata["price"], lags=16).plot()    # ac   autocorrelations
+ws.pac_table(vdata["price"], lags=16).plot()   # pac  partial autocorrelations
+```
+
+Both take `lags=` (Stata's default is `min(n//2 - 2, 40)`), `level=` as a **fraction** (`0.95`, where
+Stata writes `level(95)`), `column=` when the input is a wide frame, and `ax=`/`figsize=`/`title=`/
+`grid=` for the figure. `to_frame()` gives `lag`, the coefficient, and the two band edges.
+
+The two bands are different in kind, which the plot makes visible at a glance: `ac` uses **Bartlett's
+formula** for MA(q), `sqrt((1 + 2*rho_1^2 + ... + 2*rho_{k-1}^2)/n)`, so it widens as the lag grows;
+`pac` uses the constant `1/sqrt(n)`, so it stays flat.
+
+A note on `pac`: it is **not** the Yule-Walker recursion. That gives `.42822423` at lag 1 where Stata
+prints `.42937017`; Stata takes the last coefficient of an OLS regression of the series on a constant
+plus its first *k* lags, and reproducing all twelve lags requires that intercept.
+
 ### `prais` and its `corc` option
 
 `corc=True` is a **different table**, not only a different estimate: it drops the transformed

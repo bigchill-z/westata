@@ -520,6 +520,28 @@ ws.lvr2_table(fit).plot()         # lvr2plot     杠杆对残差平方
 
 `matplotlib` 在绘制方法内部导入，因此仍是可选依赖：`pip install "westata[plot]"`。
 
+
+**自相关图：`ac_table(series).plot()` 与 `pac_table(series).plot()`**
+
+Stata 的 `ac` 与 `pac` 绘制带置信带的相关图；二者都不返回数据，因此这里先暴露数值，绘图为独立步骤：
+
+```python
+ws.ac_table(vdata["price"], lags=16).plot()    # ac   自相关
+ws.pac_table(vdata["price"], lags=16).plot()   # pac  偏自相关
+```
+
+两者都支持 `lags=`（Stata 默认为 `min(n//2 - 2, 40)`）、`level=`（用**分数** `0.95`，Stata 写作
+`level(95)`）、宽表输入时的 `column=`，以及 `ax=`/`figsize=`/`title=`/`grid=`。`to_frame()`
+返回 `lag`、系数与置信带两侧。
+
+两条置信带**性质不同**，图上一眼可辨：`ac` 用 **Bartlett 公式**（MA(q)），
+`sqrt((1 + 2*rho_1^2 + ... + 2*rho_{k-1}^2)/n)`，随滞后**变宽**；`pac` 用恒定的 `1/sqrt(n)`，
+因此**保持水平**。
+
+关于 `pac` 的要点：它**不是** Yule-Walker 递推。递推在 lag 1 给出 `.42822423`，而 Stata 是
+`.42937017`；Stata 取的是「序列对常数项加前 *k* 期滞后」的 OLS 回归的最后一个系数，只有带上
+常数项才能复现全部 12 个滞后值。
+
 ### 方程组
 
 | Stata | westata |

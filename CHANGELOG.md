@@ -7,6 +7,53 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.45] - 2026-11-21
+
+### Added — `ac` and `pac`: the autocorrelation correlograms
+
+Stata's `ac` and `pac` draw a correlogram with a confidence band. Both are here in the house shape:
+
+```python
+ws.ac_table(series, lags=16).plot()    # ac   autocorrelations
+ws.pac_table(series, lags=16).plot()   # pac  partial autocorrelations
+```
+
+Both take `lags=` (Stata's default is `min(n//2 - 2, 40)`), `level=` as a **fraction** (`0.95`, where
+Stata writes `level(95)`), `column=` for a wide frame, and `ax=`/`figsize=`/`title=`/`grid=` for the
+figure. `to_frame()` returns `lag`, the coefficient and the two band edges.
+
+### Two definitions a plausible implementation gets wrong
+
+**`pac` is not Yule-Walker.** The recursion gives `.42822423` at lag 1 where Stata prints
+`.42937017`. Stata takes the LAST coefficient of an OLS regression of the series on a CONSTANT plus
+its first *k* lags; the intercept is what reconciles it, and all twelve lags then match to eight
+decimals. The test asserts the two values **differ**, so a future regression back to the recursion is
+caught.
+
+**The two bands differ in kind, not just width.** `ac` uses Bartlett's formula for MA(q),
+`sqrt((1 + 2*rho_1^2 + ... + 2*rho_{k-1}^2)/n)`, which **widens** as the lag grows; `pac` uses the
+constant `1/sqrt(n)`, so it stays flat. That difference is what makes the plot readable, and it is
+visible at a glance.
+
+### How the numbers were recovered
+
+Neither command returns data, so the values came from Stata's own `generate(newvar)` option and were
+cross-checked against the `corrgram` table, which reports the same AC and PAC columns:
+
+| lag | `ac y` | `pac y` |
+|---|---|---|
+| 1 | .42822423 | .42937017 |
+| 2 | .06899586 | -.14058180 |
+| 12 | -.02466803 | -.03197955 |
+
+All twelve lags of both series reproduce to `5e-8`, which is the precision Stata prints.
+
+### Verified
+
+20 tests in `tests/test_correlogram_plots.py`. API conventions: 38 findings, 38 allowed, 0 to fix.
+
+---
+
 ## [0.3.44] - 2026-11-21
 
 ### Added — the seven `regress` diagnostic plots

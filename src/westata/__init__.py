@@ -123,6 +123,12 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
+from westata.correlogram import (
+    AcTable,
+    PacTable,
+    ac_table,
+    pac_table,
+)
 from westata.diagnostic_plots import (
     AcprTable,
     AvPlotTable,
@@ -275,6 +281,10 @@ __all__ = [
     "VarBasic",
     "varbasic",
     "irf_table",
+    "AcTable",
+    "PacTable",
+    "ac_table",
+    "pac_table",
     "AcprTable",
     "AvPlotTable",
     "AvPlotsTable",

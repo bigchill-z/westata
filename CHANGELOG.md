@@ -7,6 +7,41 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.47] - 2026-11-21
+
+### Fixed — the correlogram's x axis was labelled with fractions
+
+`ws.ac_table(series, lags=20).plot()` labelled its x axis `0.0  2.5  5.0  7.5 ... 22.5`. Half-steps
+belong to a continuous axis; a lag index has no lag 2.5. The axis also ran past the last lag to 22.5.
+Stata labels whole lags only.
+
+matplotlib's default locator is built for continuous data, so it needed to be told this axis is
+integral:
+
+```python
+axis.set_xlim(first - 0.6, last + 0.6)
+axis.xaxis.set_major_locator(MaxNLocator(nbins="auto", integer=True, prune="both"))
+```
+
+**The order matters.** Setting the locator *before* the limits still emitted a `21` tick on a
+`0.4..20.6` window; applying the limits first and letting `prune="both"` drop anything outside the
+view is what removes it. Both `ac` and `pac` are affected and both are fixed.
+
+`varstable` is deliberately untouched: its x axis is the real part of the eigenvalues, a genuinely
+continuous quantity, so fractional ticks are correct there — and a test asserts it keeps them.
+
+### Verified
+
+15 tests in `tests/test_correlogram_axis_ticks.py`, covering:
+
+* ticks are whole numbers for 4, 8, 12, 20 and 40 lags;
+* no tick falls outside `1..lags` (the case that a naive `integer=True` alone mishandles);
+* the rendered labels are whole (`3`, not `3.0`);
+* a short correlogram labels every lag, so nothing is skipped;
+* `varstable` still shows fractional ticks.
+
+---
+
 ## [0.3.46] - 2026-11-21
 
 ### Fixed — `plot()` showed two images in Jupyter

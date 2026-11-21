@@ -128,7 +128,16 @@ def _stem_plot(
     *,
     band: bool,
 ) -> None:
-    """Stata's correlogram is a stem plot inside a shaded band."""
+    """Stata's correlogram is a stem plot inside a shaded band.
+
+    THE X AXIS IS AN INTEGER LAG INDEX, so matplotlib's automatic locator is wrong for it: with 20
+    lags it produced `0.0 2.5 5.0 7.5 ... 22.5` -- half-steps that no lag occupies -- and it ran past
+    the last lag. Stata labels whole lags only, so the ticks are forced to integers and the limits
+    held to the data, with a small margin so the end stems are not clipped.
+    """
+
+    # Imported here: matplotlib stays an optional dependency and this module must import without it.
+    from matplotlib.ticker import MaxNLocator
 
     axis.axhline(0.0, color="black", linewidth=0.8)
     if band:
@@ -137,6 +146,16 @@ def _stem_plot(
         axis.plot(lags, lower, color="tab:blue", linewidth=0.8, alpha=0.7)
     axis.vlines(lags, 0.0, values, color="tab:blue", linewidth=1.4)
     axis.plot(lags, values, linestyle="none", marker="o", markersize=4.5, color="tab:blue")
+
+    # `integer=True` both drops the half-steps and keeps the labels whole; without it a 20-lag plot
+    # labels 0.0, 2.5, 5.0 ... and the axis runs on to 22.5.
+    first, last = int(lags.min()), int(lags.max())
+    axis.set_xlim(first - 0.6, last + 0.6)
+    # Set the LIMITS BEFORE the locator and let `prune="both"` drop anything outside the view --
+    # without it a 0.4..20.6 window still emitted a 21 tick, past the last lag.
+    axis.xaxis.set_major_locator(
+        MaxNLocator(nbins="auto", integer=True, prune="both", min_n_ticks=3)
+    )
 
 
 @dataclass(frozen=True)

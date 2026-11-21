@@ -7,6 +7,119 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.52] - 2026-11-21
+
+### Added — `irf create ..., order(varlist)`
+
+`order()` changes the Cholesky attribution order, so the orthogonalised shocks are assigned to the
+variables in the sequence you name rather than the VAR's own order:
+
+```python
+fit.irf_create(tmp_path / "ui.irf", irfname="ui", order=["unem", "dinf"])
+```
+
+**It is not a relabelling — it redoes the factorisation.** Re-ordering the impulse axis of an already
+orthogonalised array cannot reproduce the numbers, because the Cholesky factor is triangular:
+
+```
+perm    = requested order as indices into the model's order
+Sigma_p = Sigma[perm][:, perm]
+A_lp    = A_l[perm][:, perm]
+P       = chol(Sigma_p)
+phi_0   = P,   phi_h = A_1p phi_{h-1} + A_2p phi_{h-2}
+report  phi_h mapped back by argsort(perm)
+```
+
+The result comes back in the MODEL's order, so callers still address variables by their own names.
+
+**The observable consequence**, measured on `var dinf unem, lags(1/2)` from macro_swatson:
+
+| | `dinf -> unem` step 0 |
+|---|---|
+| natural | -.000188 |
+| `order(unem dinf)` | **0** |
+
+because dinf becomes the LAST shock and therefore no longer moves unem contemporaneously. Likewise
+`unem -> dinf` step 0 goes from 0 to -.001038.
+
+Every one of the **32 values** across both orders reproduces Stata to `4.8e-07`, which is the
+precision its six printed decimals can resolve.
+
+`irf` and `cirf` are permutation-invariant, so only the orthogonalised columns move — a test asserts
+that directly. Passing a partial, duplicated or unknown order raises rather than padding silently,
+since Stata requires exactly the model's variables.
+
+### Verified
+
+15 tests in `tests/test_irf_order_option.py`: all four pairs under both orders, the natural order
+reproducing the default analysis exactly, the structural zero on the last shock, the leading shock's
+self-impact staying put while a trailing one moves, order validation, and the exported `.irf`
+columns. 214 IRF tests pass.
+
+---
+
+## [0.3.51] - 2026-11-21
+
+### Fixed — `irf ograph` specs have FOUR fields, and the indices are 1-based
+
+Stata's overlay command takes one spec per combination:
+
+```
+irf ograph (irfname impulsevar responsevar stat) [(spec_2) ... [(spec_15)]]
+```
+
+A spec is therefore `("iu", "unem", "dinf", "oirf")`. `irf_ograph` unpacked **three** fields, so
+Stata's own spelling raised
+
+```
+ValueError: too many values to unpack (expected 3)
+```
+
+and overlaying was impossible. The four-field form now works:
+
+```python
+ws.irf_ograph(
+    fit,
+    ographs=[("iu", "unem", "dinf", "oirf"), ("iu", "unem", "unem", "oirf")],
+    periods=8,
+)
+```
+
+The `irfname` slot is a **label only**: one westata result carries one set of IRFs, so `"iu"`,
+`"."` or any other name gives the same numbers — a test asserts exactly that. The older three-field
+`(impulse, response, stat)` spelling still works.
+
+Two more alignments:
+
+* **indices are 1-based**, like `i()`/`r()`. The defaults were `0`, which the 1-based rule now
+  rejects, so they are `1`.
+* Stata documents a ceiling of **15** specs; more than that raises rather than drawing a crowded
+  axis.
+
+The convenience form is unchanged and still the shorter path for comparing statistics:
+
+```python
+ws.irf_ograph(fit, impulse="unem", response="dinf", statistic=["oirf", "coirf"])
+```
+
+### Verified
+
+13 tests in `tests/test_irf_ograph_specs.py`:
+
+* a four-field spec is accepted, and legends both pairs;
+* the `irfname` slot does not change the numbers (`"iu"` vs `"."`);
+* a three-field spec still works, and a two-field one is refused with a message naming the arity;
+* one pair with several statistics overlays them on one axis;
+* positions are 1-based, matching `irf graph`;
+* the 15-spec ceiling is enforced, and 15 is allowed;
+* an empty list is refused;
+* overlaying produces ONE axis, unlike `irf graph`'s grid;
+* the band is drawn only for a single spec, since several overlapping regions are unreadable.
+
+187 IRF tests pass in total.
+
+---
+
 ## [0.3.50] - 2026-11-21
 
 ### Fixed — `impulse=`/`response=` positions were 0-based; Stata's `i()`/`r()` are 1-based

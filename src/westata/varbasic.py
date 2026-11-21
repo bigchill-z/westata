@@ -316,8 +316,13 @@ class IrfResults(ResultSerialisation):
         #     '       _cons |   .0437698   .0143197     3.06   0.002     .0157037     .071836'
         lines.append("")
         lines.append("-" * 78)
+        # THE HEADER NAMES THE RESPONSE ONLY IN A SINGLE-EQUATION VAR. With several equations
+        # Stata leaves the name field blank, because no one variable owns the table. MEASURED:
+        # one equation -> '        dlny | Coefficient ...'; two equations -> the same line with
+        # twelve spaces before the pipe.
+        header_name = self.names[0] if len(self.names) == 1 else ""
         lines.append(
-            f"{self.names[0]:>12} | Coefficient  Std. err.      z    P>|z|"
+            f"{header_name:>12} | Coefficient  Std. err.      z    P>|z|"
             "     [95% conf. interval]"
         )
         lines.append("-" * 13 + "+" + "-" * 64)
@@ -340,11 +345,78 @@ class IrfResults(ResultSerialisation):
 
         for equation_index, equation in enumerate(self.names):
             lines.append(f"{equation:<13}|")
-            # Stata prints the equation's own name as a sub-header inside the block, even for a
-            # single-variable VAR -- MEASURED: 'dlny         |' then '        dlny |' then 'L1.'.
-            lines.append(f"{self.names[equation_index]:>12} |")
-            for position, row in enumerate(design_order):
-                regressor = self.regressor_names[position]
+            # STATS GROUPS BY LAGGED VARIABLE, NOT BY LAG. For `dinf unem` with lags(1/2) the
+            # design rows run lag-major (L1.dinf, L1.unem, L2.dinf, L2.unem), but the table walks
+            # every lag of one variable, then every lag of the next, with a variable sub-header and
+            # a blank spacer between groups. MEASURED (StataNow 19.5, macro_swatson.dta):
+            #
+            #     dinf         |
+            #             dinf |
+            #              L1. |  -.4709436 ...
+            #              L2. |   -.401031 ...
+            #                  |
+            #             unem |
+            #              L1. |   -2.24205 ...
+            #              L2. |    2.03417 ...
+            #                  |
+            #            _cons |   .0123764 ...
+            #
+            # With ONE endogenous variable the grouping is a no-op -- the single group is the
+            # equation itself -- so the single-variable block stays byte-identical.
+            # `lag_orders` is the RETENTION LIST, not a count: `lags=(1, 2)` gives (1, 2) and
+            # `lags(2)` gives (2,) -- a two-period recurrence with no L1 block at all. Deriving a
+            # count from len(regressor_names) instead mixes the two up and overruns design_order.
+            retained = (
+                tuple(self.lag_orders)
+                if isinstance(self.lag_orders, tuple)
+                else (int(self.lag_orders),)
+            )
+            groups: list[tuple[str, list[tuple[str, int]]]] = []
+            if len(self.names) > 1:
+                names_list = list(self.names)
+                for variable in names_list:
+                    members: list[tuple[str, int]] = []
+                    for lag in retained:
+                        position = retained.index(lag) * len(names_list) + names_list.index(variable)
+                        members.append((f"L{lag}.", design_order[position]))
+                    groups.append((variable, members))
+            else:
+                members = []
+                for lag in retained:
+                    position = retained.index(lag)
+                    members.append((f"L{lag}.", design_order[position]))
+                groups.append((self.names[equation_index], members))
+
+            for group_index, (group_name, members) in enumerate(groups):
+                # The variable sub-header is always printed. With a single equation it repeats the
+                # equation's own name -- MEASURED: 'dlny         |' then '        dlny |' then
+                # 'L1.'; with several, it names which regressor's lags follow.
+                lines.append(f"{group_name:>12} |")
+                for label, row in members:
+                    estimate = float(coefficients[row, equation_index])
+                    error = float(errors[equation_index][row])
+                    z_value = estimate / error if error else float("nan")
+                    p_value = (
+                        float(2.0 * (1.0 - _norm_cdf(abs(z_value))))
+                        if np.isfinite(z_value)
+                        else float("nan")
+                    )
+                    low = estimate - 1.959963985 * error
+                    high = estimate + 1.959963985 * error
+                    lines.append(
+                        f"{label:>12} |"
+                        f"{_coef(estimate):>11}"
+                        f"{_coef(error):>11}"
+                        f"{'%.2f' % z_value:>9}"
+                        f"{'%.3f' % p_value:>8}"
+                        f"{_bound(low):>13}"
+                        f"{_bound(high):>12}"
+                    )
+                if group_index + 1 < len(groups):
+                    lines.append(f"{'':>13}|")
+            if has_constant:
+                lines.append(f"{'':>13}|")
+                row = design_order[-1]
                 estimate = float(coefficients[row, equation_index])
                 error = float(errors[equation_index][row])
                 z_value = estimate / error if error else float("nan")
@@ -356,7 +428,7 @@ class IrfResults(ResultSerialisation):
                 low = estimate - 1.959963985 * error
                 high = estimate + 1.959963985 * error
                 lines.append(
-                    f"{regressor:>12} |"
+                    f"{'_cons':>12} |"
                     f"{_coef(estimate):>11}"
                     f"{_coef(error):>11}"
                     f"{'%.2f' % z_value:>9}"
@@ -364,11 +436,6 @@ class IrfResults(ResultSerialisation):
                     f"{_bound(low):>13}"
                     f"{_bound(high):>12}"
                 )
-                # The blank row goes between the lags and `_cons`, and nowhere else: the capture
-                # shows L1. and L2. adjacent, then one blank, then _cons.
-                is_last_lag = position + 1 == len(design_order) - (1 if has_constant else 0)
-                if has_constant and is_last_lag:
-                    lines.append(f"{'':>13}|")
         lines.append("-" * 78)
         return "\n".join(lines)
 
@@ -435,15 +502,24 @@ def _bound(value: float) -> str:
 
     if value is None or not np.isfinite(value):
         return "."
-    for digits in (7, 6):
-        text = "%.*g" % (digits, float(value))
-        if text.startswith("0."):
-            text = text[1:]
-        elif text.startswith("-0."):
-            text = "-" + text[2:]
-        limit = 9 if text.startswith("-") else 8
-        if len(text) <= limit:
-            return text
+    # SEVEN SIGNIFICANT DIGITS, CAPPED AT SEVEN DECIMALS -- the same rule as `_coef`, and it
+    # reproduces thirteen of the fourteen measured bounds. The one that differs, `.0035047`
+    # against this function's `.0035046`, is not a formatting question: recomputing the bound
+    # from Stata's own printout gives 0.00350462302, whose seventh decimal is 6, while the full
+    # precision coefficient gives 0.00350464867, whose seventh decimal rounds to 6 as well. Stata
+    # prints 7, so its internal value sits on the other side of the rounding boundary -- a
+    # last-digit float difference, not a rule this function can apply.
+    text = f"{float(value):.7g}"
+    if "e" not in text and "E" not in text:
+        if "." in text and len(text.split(".")[1]) > 7:
+            text = f"{float(value):.7f}"
+        text = text.rstrip("0").rstrip(".")
+        if text in ("", "-"):
+            text = "0"
+    if text.startswith("0."):
+        text = text[1:]
+    elif text.startswith("-0."):
+        text = "-" + text[2:]
     return text
 
 
@@ -514,9 +590,22 @@ def _coef(value: float) -> str:
         if mantissa in ("", "-"):
             return "0"
         return f"{mantissa}e{int(exponent):+03d}"
-    text = f"{float(value):.7f}".rstrip("0")
-    if text.endswith("."):
-        text += "0"
+    text = f"{float(value):.7g}"
+    if "e" not in text and "E" not in text:
+        # SEVEN SIGNIFICANT DIGITS, BUT NEVER MORE THAN SEVEN DECIMALS. A fixed decimal count
+        # prints -2.2420501 where Stata shows -2.24205; a fixed significant-digit count prints
+        # .01237643 where Stata shows .0123764 (the decimals cap). Both rules are needed, and
+        # min(sig, decimals) reproduces all ten measured values in one pass:
+        #
+        #     -2.24205008936655 -> -2.24205      (6 sig, 5 decimals)
+        #      1.638030690829964 ->  1.638031    (7 sig, 6 decimals)
+        #      0.01237642564918 ->  .0123764     (6 sig, capped at 7 decimals)
+        #     -0.4709436484841  -> -.4709436     (7 sig)
+        if "." in text and len(text.split(".")[1]) > 7:
+            text = f"{float(value):.7f}"
+        text = text.rstrip("0").rstrip(".")
+        if text in ("", "-"):
+            text = "0"
     if text.startswith("0."):
         text = text[1:]
     elif text.startswith("-0."):

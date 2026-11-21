@@ -250,7 +250,11 @@ def irf_series(
     names = caller_names
     if not names:
         model = getattr(analysis, "model", None)
-        names = [str(name) for name in (getattr(model, "endog_names", None) or [])]
+        # A statsmodels VARResults keeps the equation names on `names`; `endog_names` is None
+        # there, so reading only that fell through to y1/y2 and a caller passing the ANALYSIS
+        # could not address its own variables. Prefer `names`, keep the old path as a fallback.
+        _model_names = getattr(model, "names", None) or getattr(model, "endog_names", None)
+        names = [str(name) for name in (_model_names or ())]
     if not names:
         eqs = int(getattr(analysis, "neqs", 0))
         names = [f"y{index + 1}" for index in range(eqs)]
@@ -613,6 +617,7 @@ def irf_graph(
     level: float = 0.95,
     lstep: int | None = None,
     ustep: int | None = None,
+    irf: str | Sequence[str] | None = None,
     show_ci: bool = True,
     individual: bool = False,
     figsize: tuple[float, float] | None = None,
@@ -682,14 +687,35 @@ def irf_graph(
             "irf_graph() needs matplotlib: pip install 'westata[plot]'"
         ) from exc
 
-    series = irf_series(
-        result,
-        statistic=statistic,
-        periods=periods,
-        level=level,
-        lstep=lstep,
-        ustep=ustep,
-    )
+    # A STORE holds several NAMED result sets, which is what makes Stata draw one panel per
+    # (irfname, impulse, response). Everything below works on a LIST of (label, series) pairs, so a
+    # single result is simply a list of one and the old behaviour is preserved.
+    if hasattr(result, "select"):
+        chosen = result.select(irf)
+    elif irf is not None:
+        raise ConsistencyError(
+            "irf_graph: `irf=` needs a result store (ws.IrfStore) holding several named IRFs; "
+            "a single VAR result carries only one"
+        )
+    else:
+        chosen = [(None, result)]
+
+    series_list = [
+        (
+            label_name,
+            irf_series(
+                target,
+                statistic=statistic,
+                periods=periods,
+                level=level,
+                lstep=lstep,
+                ustep=ustep,
+            ),
+        )
+        for label_name, target in chosen
+    ]
+
+    series = series_list[0][1]
     names = list(series.names)
 
     impulses = _resolve(names, impulse)
@@ -701,20 +727,29 @@ def irf_graph(
             f"got {len(impulses)}x{len(responses)}"
         )
 
-    panels = [(response, impulse) for response in responses for impulse in impulses]
+    # ONE PANEL PER (irfname, impulse, response), which is Stata's rule: `i()`/`r()` narrow the
+    # variables but NOT the name, so two names in the file produce two panels that share a title.
+    panels = [
+        (name_index, response, impulse)
+        for name_index in range(len(series_list))
+        for response in responses
+        for impulse in impulses
+    ]
     label = series.statistic
 
-    def _draw(axis: Any, response: int, impulse: int) -> None:
-        steps = np.asarray(series.steps, dtype=float)
-        values = series.values[:, response, impulse]
-        if show_ci and series.lower is not None:
+    def _draw(axis: Any, name_index: int, response: int, impulse: int) -> None:
+        current = series_list[name_index][1]
+        # Each series has its own step vector: two names can be drawn with different horizons.
+        steps = np.asarray(current.steps, dtype=float)[: current.values.shape[0]]
+        values = current.values[:, response, impulse]
+        if show_ci and current.lower is not None:
             axis.fill_between(
                 steps,
-                series.lower[:, response, impulse],
-                series.upper[:, response, impulse],
+                current.lower[:, response, impulse],
+                current.upper[:, response, impulse],
                 alpha=0.25,
                 linewidth=0,
-                label=f"{int(round(series.level * 100))}% CI",
+                label=f"{int(round(current.level * 100))}% CI",
             )
         style = dict(plot_kwds)
         style.setdefault("linewidth", 1.6)
@@ -722,16 +757,23 @@ def irf_graph(
         axis.axhline(0.0, color="black", linewidth=0.8)
         if grid:
             axis.grid(True, alpha=0.3, linewidth=0.6)
-        axis.set_title(f"{names[impulse]} → {names[response]}", fontsize=10)
+        irf_label = series_list[name_index][0]
+        pair = f"{names[impulse]} \u2192 {names[response]}"
+        # Stata titles the subgraph "iu, unem, dinf"; an unnamed single result keeps the short form
+        # so existing output is unchanged.
+        axis.set_title(
+            f"{irf_label}, {names[impulse]}, {names[response]}" if irf_label else pair,
+            fontsize=10,
+        )
         axis.set_xlabel("step")
-        axis.set_ylabel(label if series.statistic != "fevd" else "share")
+        axis.set_ylabel(label if current.statistic != "fevd" else "share")
 
     if individual:
         figures = []
-        for response, impulse in panels:
+        for name_index, response, impulse in panels:
             size = figsize or (5.0, 3.5)
             figure, axis = make_figure(figsize=size)
-            _draw(axis, response, impulse)
+            _draw(axis, name_index, response, impulse)
             if title is not None:
                 figure.suptitle(title)
             figure.tight_layout()
@@ -741,8 +783,13 @@ def irf_graph(
         return figures
 
     if ax is not None:
-        response, impulse = panels[0]
-        _draw(ax, response, impulse)
+        if len(panels) != 1:
+            raise ConsistencyError(
+                "irf_graph: ax= needs exactly one panel; got "
+                f"{len(panels)} (names x impulses x responses)"
+            )
+        name_index, response, impulse = panels[0]
+        _draw(ax, name_index, response, impulse)
         return ax.figure
 
     columns = 1 if len(panels) == 1 else 2
@@ -752,9 +799,8 @@ def irf_graph(
     figure, flat = make_axes(rows, columns, figsize=figsize)
     for unused in flat[len(panels):]:
         unused.set_visible(False)
-
-    for axis, (response, impulse) in zip(flat, panels):
-        _draw(axis, response, impulse)
+    for axis, (name_index, response, impulse) in zip(flat, panels):
+        _draw(axis, name_index, response, impulse)
 
     if same_y:
         lows = [axis.get_ylim()[0] for axis in flat[: len(panels)]]
@@ -785,10 +831,10 @@ def _resolve(names: Sequence[str], which: Any) -> list[int]:
 def irf_ograph(
     result: Any,
     *,
-    ographs: Sequence[tuple[str | int, str | int, str]] | None = None,
+    ographs: Sequence[tuple[Any, ...]] | None = None,
     statistic: str | Sequence[str] = "oirf",
-    impulse: str | int = 0,
-    response: str | int = 0,
+    impulse: str | int = 1,
+    response: str | int = 1,
     periods: int = 10,
     level: float = 0.95,
     show_ci: bool = True,
@@ -803,10 +849,21 @@ def irf_ograph(
     """Overlaid impulse responses -- Stata's ``irf ograph``.
 
     ``irf graph`` draws one SUBGRAPH per combination; ``irf ograph`` lays several on ONE axis so
-    their shapes can be compared. Stata spells a spec as ``(irfname impulse response stat)``;
-    ``ographs=`` takes those triples directly::
+    their shapes can be compared.
 
-        ws.irf_ograph(fit, ographs=[("dinf", "dinf", "oirf"), ("dinf", "dinf", "coirf")])
+    STATA'S SPEC HAS **FOUR** FIELDS, in this order::
+
+        irf ograph (irfname impulsevar responsevar stat) [(spec_2) ... [(spec_15)]]
+
+    so ``ographs=`` takes four-tuples, the first being the IRF-name slot::
+
+        ws.irf_ograph(
+            fit,
+            ographs=[("iu", "unem", "dinf", "oirf"), ("iu", "unem", "unem", "oirf")],
+        )
+
+    A three-tuple ``(impulse, response, stat)`` is still accepted for compatibility. At most 15
+    specs, as Stata documents.
 
     The convenience form takes one impulse/response pair and several statistics, which is the
     comparison a reader usually wants::
@@ -836,9 +893,39 @@ def irf_ograph(
         ) from exc
 
     if ographs is not None:
-        specs = [(str(imp), str(res), str(stat)) for imp, res, stat in ographs]
-        if not specs:
+        # STATA'S SPEC HAS FOUR FIELDS: (irfname impulse response stat). A three-field
+        # (impulse, response, stat) entry is still accepted for compatibility. Unpacking three
+        # unconditionally raised "too many values to unpack (expected 3)" on Stata's own spelling.
+        fields_list = []
+        for entry in ographs:
+            fields = list(entry)
+            if len(fields) == 4:
+                _label, impulse_field, response_field, stat = fields
+            elif len(fields) == 3:
+                impulse_field, response_field, stat = fields
+            else:
+                raise ConsistencyError(
+                    "irf ograph: each spec needs (irfname impulse response stat) -- 4 fields, as "
+                    "Stata documents -- or the older 3-field (impulse, response, stat); "
+                    f"got {len(fields)}: {fields!r}"
+                )
+            fields_list.append((impulse_field, response_field, str(stat)))
+        if not fields_list:
             raise ConsistencyError("irf ograph: `ographs` is empty")
+        if len(fields_list) > 15:
+            # Stata documents a hard ceiling of 15 specs.
+            raise ConsistencyError(
+                f"irf ograph: at most 15 specs, as Stata documents; got {len(fields_list)}"
+            )
+        analysis_names = _names_of(result, periods)
+        specs = [
+            (
+                analysis_names[_index(analysis_names, imp)],
+                analysis_names[_index(analysis_names, res)],
+                stat,
+            )
+            for imp, res, stat in fields_list
+        ]
     else:
         statistics = [statistic] if isinstance(statistic, str) else list(statistic)
         if not statistics:

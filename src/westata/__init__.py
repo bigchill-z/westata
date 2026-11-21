@@ -123,6 +123,7 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
+from westata.irf_store import IrfStore
 from westata.correlogram import (
     AcTable,
     PacTable,
@@ -281,6 +282,7 @@ __all__ = [
     "VarBasic",
     "varbasic",
     "irf_table",
+    "IrfStore",
     "AcTable",
     "PacTable",
     "ac_table",

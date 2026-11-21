@@ -163,9 +163,9 @@
  },
  "NeweyWestResults": {
   "stata": "newey y x1 x2, lag(2)",
-  "en": "The object `newey_west` returns: `regress`'s point estimates behind `newey_west`'s narrower result surface. Two differences from a plain `StataResults` are visible to callers. `e()` holds only `newey_west`'s own scalars and macros, because `newey_west` posts a fresh `e()` rather than extending `regress`'s, so `r2`, `r2_a`, `rmse`, `sigma`, `rss`, `mss` and `ll` are absent. And `predict` accepts only `xb`, `index`, `stdp` and `residuals`. Constructing it directly takes a fitted result and a `lag`; normally one comes back from `ws.newey_west(formula, data, lag=...)`.",
-  "zh": "`newey_west` 返回的对象：`regress` 的点估计套在 `newey_west` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey_west` 自身的标量与宏，因为 `newey_west` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.newey_west(formula, data, lag=...)` 返回。",
-  "example": "ws.newey_west('y ~ x1 + x2', base, lag=2).summary(style='stata')",
+  "en": "The object `newey_west` returns: `regress`'s point estimates behind `newey_west`'s narrower result surface. Two differences from a plain `StataResults` are visible to callers. `e()` holds only `newey_west`'s own scalars and macros, because `newey_west` posts a fresh `e()` rather than extending `regress`'s, so `r2`, `r2_a`, `rmse`, `sigma`, `rss`, `mss` and `ll` are absent. And `predict` accepts only `xb`, `index`, `stdp` and `residuals`. Constructing it directly takes a fitted result and a `lag`; normally one comes back from `ws.Newey.from_formula(formula, data, lag=...).fit()`.",
+  "zh": "`newey_west` 返回的对象：`regress` 的点估计套在 `newey_west` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey_west` 自身的标量与宏，因为 `newey_west` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.Newey.from_formula(formula, data, lag=...).fit()` 返回。",
+  "example": "ws.Newey.from_formula('y ~ x1 + x2', base, lag=2).fit().summary(style='stata')",
   "notes_en": "Requesting any other prediction type raises with `newey_p.ado`'s restriction quoted, rather than silently forwarding `regress`'s fifteen types.",
   "notes_zh": "请求其他任何预测类型都会抛错，并在消息中引述 `newey_p.ado` 的限制，而不是静默转发 `regress` 的十五种类型。"
  },
@@ -223,8 +223,8 @@
  },
  "Newey": {
   "stata": "newey depvar indepvars, lag(#) [noconstant] [aw=...]",
-  "en": "Class form of `ws.newey_west` (R2.7): an OLS fit whose VCE is the Newey-West HAC sum. `lag` is a required MODEL option, so it belongs to construction, not to `fit()`. `fit()` takes no `cov_type` -- Stata's `newey_west` has no `vce()` option, the HAC variance IS the estimator. Use `Newey.from_formula(formula, data, lag=...)` for the standard argument order, or `Newey(data, formula, lag=...)` to match the function's positional order. `ws.newey_west(...)` remains as a thin wrapper over the same implementation.",
-  "zh": "`ws.newey_west` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey_west` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey_west(...)` 保留为同一实现的薄包装。",
+  "en": "Class form of `ws.newey_west` (R2.7): an OLS fit whose VCE is the Newey-West HAC sum. `lag` is a required MODEL option, so it belongs to construction, not to `fit()`. `fit()` takes no `cov_type` -- Stata's `newey_west` has no `vce()` option, the HAC variance IS the estimator. Use `Newey.from_formula(formula, data, lag=...)` for the standard argument order, or `Newey(data, formula, lag=...)` to match the function's positional order. `ws.Newey.from_formula(...).fit()` remains as a thin wrapper over the same implementation.",
+  "zh": "`ws.newey_west` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey_west` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.Newey.from_formula(...).fit()` 保留为同一实现的薄包装。",
   "example": "r = ws.Newey.from_formula('y ~ x1', base, lag=2).fit()\nprint(r.cov_type, round(float(r.params.iloc[0]), 6))"
  },
  "Prais": {

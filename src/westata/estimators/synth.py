@@ -961,6 +961,14 @@ def synth(
     **unsupported: Any,
 ) -> SynthResults:
     """Fit Stata's ``synth`` -- thin wrapper over :class:`westata.Synth`."""
+    import warnings as _warnings
+    _warnings.warn(
+        "westata.synth() is deprecated (R-N5): use Synth.from_variables() instead. "
+        "The function wrapper will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
     return _synth_impl(
         data,

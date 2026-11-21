@@ -108,7 +108,10 @@ README 的定位是「Stata-conformant numerics + statsmodels-style API」。本
 ### R-N5 兼容：旧名保留一个版本 + DeprecationWarning
 
 - 所有被改的公共类名、函数名保留旧名为别名，调用时发 `DeprecationWarning`，一个版本后移除。
-- e-class 函数薄包装（`newey_west`/`prais`/`synth`/`rd_robust`）同样标 deprecated，不立即删除。
+- e-class 函数薄包装（`newey_west`/`prais`/`synth`/`synth2`/`rd_robust`）同样标 deprecated，
+  不立即删除。**已于 0.3.43 实施**：上述五个函数发出 `DeprecationWarning`，指向等价类入口
+  （`Newey`/`Prais`/`Synth`/`Synth2`/`RDRobust`）。`prais_winsten` 是底层数值求解器、
+  无等价类入口，故不弃用。
 - 项目已有多处「保留弃用别名一个版本」的先例（见 API_CONVENTIONS 阶段三）。
 
 ### R-N6 一个概念只有一个名字

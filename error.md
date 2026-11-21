@@ -2,6 +2,28 @@
 
 > 记录每次测试/排障中发现的、与具体任务无关的通用坑。
 
+## 2026-11-21 "同名即同类"是错的：弃用前必须验证替代入口真的等价
+
+按 R-N5 给 e-class 薄包装函数加弃用时，规范点名了 newey_west/prais/synth/rd_robust，
+用户要求再加 prais_winsten。仅凭名字相似就给 prais_winsten 加"改用 Prais 类"的警告会给出
+错误指引：它并不是薄包装，而是底层数值求解器（ndarray 进、(beta, rho, iterations, trace) 元组出），
+Prais.from_formula 收 (formula, DataFrame)、返回 PraisResults，两者既不等价也不互换。
+同理不能假设所有类入口都有 from_formula：Synth/Synth2/RDRobust 用的是 from_variables。
+
+通用做法：
+
+1. 弃用前先证明替代存在且等价：对比函数与类入口的签名，并用同一数据跑两边比数值（本轮实测
+   prais/rd_robust/synth 参数与结果一致）。规范文本说"薄包装"不等于代码真是。
+2. 别用命名推断 API 形态：hasattr(cls, 'from_formula') 要实测，不能假设；三个类用
+   from_variables，两个用 from_formula。
+3. 警告文本必须指向真正可走的入口：写错替代比不写警告更糟——用户照做会撞墙。
+4. 文档示例同样要逐个验证：把 ws.synth(...) 换成 Synth.from_variables(...) 后必须补 .fit()，
+   且参数顺序不同（prais(data, formula) vs Prais.from_formula(formula, data)）。批量字符串替换
+   会产生"能写但跑不通"的示例；本轮文档测试正是靠执行每个 example 抓住了两处 .fit() 遗漏。
+5. 旧名是兼容别名时，文档测试抓不住"文档还在教旧名"：旧调用照样能跑、照样通过，只能靠定向
+   审计（精确区分 Stata 命令/统计术语/弃用别名与真正的旧 Python API 名）发现。
+
+
 ## 2026-11-19 命名/映射合同必须机器化，否则讨论结论会反复翻转且自相矛盾
 
 为 westata 制定统一命名规范时，同一个规则在几轮对话里被翻转了三次：`estat_*` 一度被理解成

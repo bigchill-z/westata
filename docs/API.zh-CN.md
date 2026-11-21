@@ -1,6 +1,6 @@
 # westata —— 完整 API 参考
 
-_westata 版本: 0.3.41 · 生成脚本 `docs/render_api_reference.py`_
+_westata 版本: 0.3.42 · 生成脚本 `docs/render_api_reference.py`_
 
 `westata` 的全部公开名称，逐项给出对应的 Stata 指令、功能说明，以及一段可照抄运行、并附**真实返回值**的示例。
 
@@ -1192,7 +1192,7 @@ q75             |
 
 **Stata 指令:** `newey y x1 x2, lag(2)`
 
-`newey_west` 返回的对象：`regress` 的点估计套在 `newey_west` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey_west` 自身的标量与宏，因为 `newey_west` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.newey_west(formula, data, lag=...)` 返回。
+`newey_west` 返回的对象：`regress` 的点估计套在 `newey_west` 更窄的结果表面之下。调用方会看到与普通 `StataResults` 的两处差别。`e()` 只含 `newey_west` 自身的标量与宏，因为 `newey_west` 发布的是全新的 `e()` 而非扩展 `regress` 的，所以 `r2`、`r2_a`、`rmse`、`sigma`、`rss`、`mss`、`ll` 都不存在。并且 `predict` 只接受 `xb`、`index`、`stdp` 与 `residuals`。直接构造它需要已拟合的结果与 `lag`；通常由 `ws.Newey.from_formula(formula, data, lag=...).fit()` 返回。
 
 **签名**
 
@@ -1203,7 +1203,7 @@ ws.NeweyWestResults(results: 'Any', *, lag: 'int') -> 'None'
 **示例**
 
 ```python
-ws.newey_west('y ~ x1 + x2', base, lag=2).summary(style='stata')
+ws.Newey.from_formula('y ~ x1 + x2', base, lag=2).fit().summary(style='stata')
 ```
 
 **输出**
@@ -4537,7 +4537,7 @@ ws.newey_west(formula: 'str', data: 'pd.DataFrame', *, lag: 'int', time: 'Any' =
 **示例**
 
 ```python
-ws.newey_west('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).summary(style='stata')
+ws.Newey.from_formula('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).fit().summary(style='stata')
 ```
 
 **输出**
@@ -7550,7 +7550,7 @@ None
 
 **Stata 指令:** `newey depvar indepvars, lag(#) [noconstant] [aw=...]`
 
-`ws.newey_west` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey_west` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.newey_west(...)` 保留为同一实现的薄包装。
+`ws.newey_west` 的类形式（R2.7）：OLS 拟合，VCE 为 Newey-West HAC 求和。`lag` 是**模型**的必填选项，属构造阶段而非 `fit()`。`fit()` **不接受 `cov_type`**——Stata 的 `newey_west` 没有 `vce()` 选项，HAC 方差就是估计量本身。标准参数顺序用 `Newey.from_formula(formula, data, lag=...)`；要与函数位置顺序一致则用 `Newey(data, formula, lag=...)`。`ws.Newey.from_formula(...).fit()` 保留为同一实现的薄包装。
 
 **签名**
 
@@ -7935,7 +7935,7 @@ ws.PraisResults(**values: 'object') -> 'None'
 **示例**
 
 ```python
-r = ws.prais(base, 'y ~ x1')
+r = ws.Prais.from_formula('y ~ x1', base).fit()
 print(round(r.rho, 6))
 ```
 
@@ -8312,7 +8312,7 @@ x1 = 0.5 * u + rng.normal(size=len(u))
 x2 = 0.2 * u + rng.normal(size=len(u))
 y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
 panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
-res = ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)
+res = ws.Synth2.from_variables(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).fit()
 res.bal
 ```
 
@@ -8347,7 +8347,7 @@ x1 = 0.5 * u + rng.normal(size=len(u))
 x2 = 0.2 * u + rng.normal(size=len(u))
 y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
 panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
-res = ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005)
+res = ws.Synth.from_variables(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).fit()
 res.V_matrix
 ```
 
@@ -9500,7 +9500,7 @@ ws.prais(data: 'pd.DataFrame', formula: 'str', *, maxiter: 'int' = 100, toleranc
 **示例**
 
 ```python
-print(str(ws.prais(base, 'y ~ x1'))[:180])
+print(str(ws.Prais.from_formula('y ~ x1', base).fit())[:180])
 ```
 
 **输出**
@@ -9774,7 +9774,7 @@ x1 = 0.5 * u + rng.normal(size=len(u))
 x2 = 0.2 * u + rng.normal(size=len(u))
 y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
 panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
-ws.synth(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).RMSPE
+ws.Synth.from_variables(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).fit().RMSPE
 ```
 
 **输出**
@@ -9809,7 +9809,7 @@ x1 = 0.5 * u + rng.normal(size=len(u))
 x2 = 0.2 * u + rng.normal(size=len(u))
 y = 1.0 + 0.8 * x1 - 0.4 * x2 + 0.1 * (t - 1997) + 5.0 * (u == 1) * (t >= 2005) + rng.normal(size=len(u))
 panel = pd.DataFrame({'unit': u, 'year': t, 'x1': x1, 'x2': x2, 'y': y})
-ws.synth2(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).rmse
+ws.Synth2.from_variables(panel, unit='unit', time='year', depvar='y', predictors=['x1', 'x2'], trunit=1, trperiod=2005).fit().rmse
 ```
 
 **输出**

@@ -708,6 +708,14 @@ def prais(
     Thin wrapper over :class:`westata.Prais` -- the class is the implementation; this
     function keeps the documented ``(data, formula, *, ...)`` call working (R2.7).
     """
+    import warnings as _warnings
+    _warnings.warn(
+        "westata.prais() is deprecated (R-N5): use Prais.from_formula() instead. "
+        "The function wrapper will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
     return _prais_impl(data, formula, maxiter=maxiter, tolerance=tolerance, corc=corc)
 

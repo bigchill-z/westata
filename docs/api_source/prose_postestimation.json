@@ -198,7 +198,7 @@
   "stata": "newey y x1 x2, lag(2)",
   "en": "Newey-West regression, `newey depvar indepvars, lag(#)` (Stata `newey_west`). This one is a FUNCTION, not a class: pass a formula and a frame and get a NeweyWestResults. `lag` is required and must be non-negative; `time=` plays the role of `tsset` and enables the `Checkt` spacing validation, with `force=True` allowing irregularly spaced values; only `aweight` is accepted. The `e()` collection is rewritten to `newey_west`'s own list, so the keys `regress` stores but `newey_west` does not (`r2`, `rss`, `mss`, `rmse`, `sigma`, `ll`, ...) are REMOVED rather than left behind.",
   "zh": "Newey-West 回归，`newey 被解释变量 解释变量, lag(#)`（Stata `newey_west`）。它是一个**函数**而非类：传入公式与数据框，得到 NeweyWestResult。`lag` 必填且不得为负；`time=` 扮演 `tsset` 的角色并启用 `Checkt` 间隔校验，`force=True` 允许时间取值不等间隔；只接受 `aweight`。`e()` 集合被改写为 `newey_west` 自己的清单，因此 `regress` 会存而 `newey_west` 不存的键（`r2`、`rss`、`mss`、`rmse`、`sigma`、`ll` 等）会被**删除**，而不是留在里面。",
-  "example": "ws.newey_west('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).summary(style='stata')",
+  "example": "ws.Newey.from_formula('y ~ x1 + x2', base, lag=2, time=np.arange(1.0, 201.0)).fit().summary(style='stata')",
   "notes_en": "The `time=` array here stands in for `tsset`. `base`'s own `year` column repeats 1..5 across entities and is therefore irregular over the whole sample, which `newey_west` refuses unless `force=True`; a genuine time series needs neither.",
   "notes_zh": "这里的 `time=` 数组扮演 `tsset` 的角色。`base` 自带的 `year` 列在各实体间重复 1..5，对整体样本并不等间隔，`newey_west` 会拒绝，除非给出 `force=True`；真正的时间序列两者都不需要。"
  },
@@ -366,13 +366,13 @@
   "stata": "prais depvar indepvars",
   "en": "Result of the Prais-Winsten AR(1) estimator. It exposes params/bse/pvalues/tvalues, rmse, both R-squareds, the Durbin-Watson statistics before and after the transformation, and records the estimated autocorrelation `rho`, the iteration count and whether the iteration converged, because the estimator is iterative and `maxiter`/`tolerance` control it.",
   "zh": "Prais-Winsten AR(1) 估计的结果。除常规接口外，它还记录估计出的自相关系数 `rho`、迭代次数以及是否收敛，因为该估计量是迭代的，由 `maxiter`/`tolerance` 控制。",
-  "example": "r = ws.prais(base, 'y ~ x1')\nprint(round(r.rho, 6))"
+  "example": "r = ws.Prais.from_formula('y ~ x1', base).fit()\nprint(round(r.rho, 6))"
  },
  "prais": {
   "stata": "prais depvar indepvars",
   "en": "Prais-Winsten AR(1) regression: GLS after transforming the data by the estimated autocorrelation, iterated until `rho` settles. The transformation keeps the first observation (that is what distinguishes Prais-Winsten from Cochrane-Orcutt, which drops it), so the sample size is the full one.",
   "zh": "Prais-Winsten AR(1) 回归：用估计出的自相关系数变换数据后做 GLS，并迭代到 `rho` 稳定。该变换**保留第一个观测**（这正是 Prais-Winsten 与丢弃首观测的 Cochrane-Orcutt 的区别），因此样本量是完整的。",
-  "example": "print(str(ws.prais(base, 'y ~ x1'))[:180])"
+  "example": "print(str(ws.Prais.from_formula('y ~ x1', base).fit())[:180])"
  },
  "kpss": {
   "stata": "kpss varname",

@@ -459,6 +459,14 @@ def synth2(
 ) -> Synth2Results:
 
     """Fit Stata's ``synth2`` -- thin wrapper over :class:`westata.Synth2`."""
+    import warnings as _warnings
+    _warnings.warn(
+        "westata.synth2() is deprecated (R-N5): use Synth2.from_variables() instead. "
+        "The function wrapper will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
     return _synth2_impl(
         data,

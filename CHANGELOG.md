@@ -7,6 +7,33 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.43] - 2026-11-21
+
+### Changed — e-class function wrappers are deprecated (R-N5)
+
+The five thin function wrappers named by the convention now emit a `DeprecationWarning`
+pointing at their equivalent class entry point:
+
+| deprecated function | use instead |
+|---|---|
+| `newey_west()` | `Newey.from_formula()` |
+| `prais()` | `Prais.from_formula()` |
+| `synth()` | `Synth.from_variables()` |
+| `synth2()` | `Synth2.from_variables()` |
+| `rd_robust()` | `RDRobust.from_variables()` |
+
+They remain fully functional and numerically identical to the class path (verified for
+`prais`, `rd_robust`, `synth`), so this is a one-release transition, not a removal.
+`prais_winsten` is deliberately NOT deprecated: it is a low-level numeric solver
+(ndarray in, tuple out) with no class equivalent. The GUIDE (en/zh) now shows class entry
+points as the primary form and notes the deprecation.
+
+Tests: `tests/test_eclass_deprecation.py` pins the warning (and the class alternative it names),
+numeric equivalence, and the `prais_winsten` exemption. Full `pytest -q`:
+**6766 passed, 21 skipped, 0 failed**.
+
+---
+
 ## [0.3.42] - 2026-11-20
 
 ### Fixed — API manual now teaches the new names throughout

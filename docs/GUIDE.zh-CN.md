@@ -645,15 +645,15 @@ ws.irf_cgraph(fit, specs=[("price", "price", ["oirf", "cirf"])])   # 一个面�
 
 ```python
 # `corc` 表捕获自 icecream.dta；这里改用随包附带的 auto.csv 列，示例在任何环境都能跑。
-ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
-ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
+ws.Prais.from_formula("price ~ mpg + weight", df).fit()             # Prais-Winsten
+ws.Prais.from_formula("price ~ mpg + weight", df, corc=True).fit()  # Cochrane-Orcutt
 ```
 
-`prais` 与 `newey_west` 是估计命令，因此也提供与其它估计器一致的类形式（R2.7）。
-函数形式保留，数字完全相同：
+`prais` 与 `newey_west` 是估计命令，提供与其它估计器一致的类形式（R2.7）。
+薄函数包装自 0.3.42 起弃用（R-N5）：仍可用、数字相同，但会发出 `DeprecationWarning`。
+新代码请使用类入口：
 
 ```python
-ws.Prais.from_formula("price ~ mpg + weight", df).fit()
 ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 ```
 

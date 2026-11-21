@@ -257,6 +257,14 @@ def newey_west(
     Thin wrapper over :class:`westata.Newey` -- the class is the implementation, this
     function keeps the documented ``(formula, data, *, ...)`` call working (R2.7).
     """
+    import warnings as _warnings
+    _warnings.warn(
+        "westata.newey_west() is deprecated (R-N5): use Newey.from_formula() instead. "
+        "The function wrapper will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
     return _newey_impl(
         formula,

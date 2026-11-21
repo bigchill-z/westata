@@ -415,6 +415,14 @@ def rd_robust(
     covs: Any = None,
 ) -> RdRobustResults:
     """Fit Stata's ``rdrobust`` -- thin wrapper over :class:`westata.Rdrobust`."""
+    import warnings as _warnings
+    _warnings.warn(
+        "westata.rd_robust() is deprecated (R-N5): use RDRobust.from_variables() instead. "
+        "The function wrapper will be removed in the next release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
     return _rdrobust_impl(
         response,

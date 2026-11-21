@@ -677,15 +677,13 @@ Stata's `e(b)` does — `consumption ~ temp + price + income` prints `temp, pric
 ```python
 # The `corc` table was captured on icecream.dta; here we use the bundled
 # auto.csv columns so this example runs anywhere.
-ws.prais(df, "price ~ mpg + weight")               # Prais-Winsten
-ws.prais(df, "price ~ mpg + weight", corc=True)    # Cochrane-Orcutt
+ws.Prais.from_formula("price ~ mpg + weight", df).fit()             # Prais-Winsten
+ws.Prais.from_formula("price ~ mpg + weight", df, corc=True).fit()  # Cochrane-Orcutt
 ```
 
-`prais` and `newey_west` are estimation commands, so they also have the class form every other
-estimator uses (R2.7). The function stays available and returns the same numbers:
+`prais` and `newey_west` are estimation commands with the standard class form (R2.7). The thin function wrappers are deprecated since 0.3.42 (R-N5): they still work and return the same numbers, but emit a `DeprecationWarning`. Use the class entry point in new code:
 
 ```python
-ws.Prais.from_formula("price ~ mpg + weight", df).fit()
 ws.Newey.from_formula("price ~ mpg + weight", df, lag=2).fit()
 ```
 

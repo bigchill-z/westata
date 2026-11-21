@@ -7,6 +7,70 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.44] - 2026-11-21
+
+### Added — the seven `regress` diagnostic plots
+
+Stata ships `rvfplot`, `rvpplot`, `avplot`, `avplots`, `cprplot`, `acprplot` and `lvr2plot` for
+`regress` postestimation. All seven are now here, each as a `*_table(result)` builder whose
+`.plot()` draws it:
+
+```python
+fit = ws.Regress.from_formula("price ~ mpg + weight", frame).fit()
+
+ws.rvf_table(fit).plot()          # rvfplot      residuals vs. fitted
+ws.rvp_table(fit, "mpg").plot()   # rvpplot mpg  residuals vs. one predictor
+ws.av_table(fit, "mpg").plot()    # avplot mpg   added-variable plot
+ws.avplots_table(fit).plot()      # avplots      every added-variable plot in one image
+ws.cpr_table(fit, "mpg").plot()   # cprplot mpg  component plus residual
+ws.acpr_table(fit, "mpg").plot()  # acprplot mpg augmented component plus residual
+ws.lvr2_table(fit).plot()         # lvr2plot     leverage vs. squared residual
+```
+
+The house shape is preserved: the numbers stay inspectable with `.to_frame()`, drawing is separate,
+and all seven accept `ax=`, `figsize=`, `title=` and `grid=`. `matplotlib` is imported inside the
+drawing method, so it stays an optional dependency (`pip install "westata[plot]"`).
+
+### `varstable_table` — the naming unified
+
+`ws.varstable_table(result)` now exists beside `ws.varstable(result)` and returns the same object, so
+every plotting entry point reads alike: `rvf_table(res).plot()`, `irf_table(res).plot()`,
+`varstable_table(res).plot()`. The old name is untouched.
+
+### How the definitions were verified
+
+These commands return no data — they draw and forget — so there is no table to diff against Stata.
+Each was instead pinned by the algebraic identity that defines it, using quantities from a live
+Stata `predict` on `auto.dta` (`regress price mpg weight`, N = 74, df_m = 2):
+
+| quantity | Stata | used by |
+|---|---|---|
+| `predict fitted, xb` | mean 6165.2568 | `rvfplot` x axis |
+| `predict resid, residuals` | sd 2479.3506 | `rvfplot` y axis |
+| `predict hat, hat` | mean .0405405406 = 3/74 | `lvr2plot` normalisation |
+
+The strongest check is the added-variable plot: the slope through its partial-regression residuals
+equals that predictor's own coefficient, `-49.512221`, to six decimals.
+
+Two more identities are asserted outright:
+
+* `acpr - cpr == b*(x - xbar)` exactly — the difference is `0.0` at machine precision, which is
+  Mallows' augmentation and why the two panels look almost identical (the shift is linear);
+* `lvr2plot`'s two axes are normalised by their means, so both normalised means are exactly `1.0` —
+  that is where Stata's two reference lines sit.
+
+### Fixed
+
+R6.1 required the seven new table classes to be named in the package `__all__`; they were reachable
+as `ws.RvfTable` but not exported, which the checker flags. A private `_design` helper also collided
+with two same-named helpers elsewhere in the package and was renamed `_model_matrix`.
+
+### Verified
+
+19 tests in `tests/test_diagnostic_plots.py`. API conventions: 38 findings, 38 allowed, 0 to fix.
+
+---
+
 ## [0.3.43] - 2026-11-21
 
 ### Changed — e-class function wrappers are deprecated (R-N5)

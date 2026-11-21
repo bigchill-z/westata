@@ -659,6 +659,34 @@ A spec may carry several statistics, which then share that panel with a legend.
 the panels get numbered files (`panel1.png`, `panel2.png`, …), which is what `iname(stub)` does —
 writing them all to one path would leave only the last one on disk.
 
+
+**Regression diagnostic plots: `rvf_table(res).plot()` and the rest**
+
+Stata ships seven plotting commands for `regress` postestimation. Each is available here as a
+`*_table(result)` builder whose `.plot()` draws it, so the numbers stay inspectable via `.to_frame()`
+and the drawing stays optional:
+
+```python
+fit = ws.Regress.from_formula("price ~ mpg + weight", vdata).fit()
+ws.rvf_table(fit).plot()          # rvfplot      residuals vs. fitted
+ws.rvp_table(fit, "mpg").plot()   # rvpplot mpg  residuals vs. one predictor
+ws.av_table(fit, "mpg").plot()    # avplot mpg   added-variable (partial-regression) plot
+ws.avplots_table(fit).plot()      # avplots      every added-variable plot in one image
+ws.cpr_table(fit, "mpg").plot()   # cprplot mpg  component plus residual
+ws.acpr_table(fit, "mpg").plot()  # acprplot mpg augmented component plus residual
+ws.lvr2_table(fit).plot()         # lvr2plot     leverage vs. squared residual
+```
+
+`varstable_table(res).plot()` exists alongside `varstable(res)` so every plotting entry point reads
+the same way.
+
+All seven accept `ax=` to draw into an axis you own, plus `figsize=`, `title=` and `grid=`. The
+scatter kind forwards extra keywords to `Axes.scatter`. `cpr_table` and `acpr_table` also take
+`lowess=True` to overlay a LOWESS smooth, matching Stata's option.
+
+`matplotlib` is imported inside the drawing method, so it stays an optional dependency: install it
+with `pip install "westata[plot]"`.
+
 ### `prais` and its `corc` option
 
 `corc=True` is a **different table**, not only a different estimate: it drops the transformed

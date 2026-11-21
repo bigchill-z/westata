@@ -123,6 +123,22 @@ from westata.errors import (
     WeightError,
     WestataError,
 )
+from westata.diagnostic_plots import (
+    AcprTable,
+    AvPlotTable,
+    AvPlotsTable,
+    CprTable,
+    Lvr2Table,
+    RvfTable,
+    RvpTable,
+    acpr_table,
+    av_table,
+    avplots_table,
+    cpr_table,
+    lvr2_table,
+    rvf_table,
+    rvp_table,
+)
 from westata.postestimation import (
     BgTestResults,
     Correlogram,
@@ -259,6 +275,21 @@ __all__ = [
     "VarBasic",
     "varbasic",
     "irf_table",
+    "AcprTable",
+    "AvPlotTable",
+    "AvPlotsTable",
+    "CprTable",
+    "Lvr2Table",
+    "RvfTable",
+    "RvpTable",
+    "acpr_table",
+    "av_table",
+    "avplots_table",
+    "cpr_table",
+    "lvr2_table",
+    "rvf_table",
+    "rvp_table",
+    "varstable_table",
     "IrfResults",
     "IrfTable",
     "ImpulseResponse",
@@ -538,6 +569,16 @@ from westata.postestimation import SzroeterResults
 from westata.postestimation import SzroeterTable
 from westata.estimators import VARResults
 from westata.estimators import VECMResults
+def varstable_table(result: Any) -> Any:
+    """Eigenvalue stability table, in the house ``XXX_table(result).plot()`` spelling.
+
+    ``ws.varstable(result)`` already returns the same object; this name exists so every plotting
+    entry point reads the same way -- ``rvf_table(res).plot()``, ``varstable_table(res).plot()``.
+    """
+
+    return varstable(result)
+
+
 from westata.postestimation import VarGrangerResults
 from westata.postestimation import WeakRobustResults
 from westata.varbasic import (

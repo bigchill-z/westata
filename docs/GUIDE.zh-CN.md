@@ -496,6 +496,30 @@ ws.var_stable(fit).plot(labels="distance")      # Stata 的 `dlabel`：1 - |特�
 只差 `0.025`，朴素的偏移会把它们印在一起。与 `irf_table().plot()` 一样，`matplotlib` 是可选的，
 在方法内部才导入。
 
+
+**回归诊断图：`rvf_table(res).plot()` 等**
+
+Stata 为 `regress` 提供七个绘图命令。这里每一个都实现为 `*_table(result)` 构造器，由 `.plot()`
+绘制，因此数值仍可通过 `.to_frame()` 检查，绘图保持可选：
+
+```python
+fit = ws.Regress.from_formula("price ~ mpg + weight", vdata).fit()
+ws.rvf_table(fit).plot()          # rvfplot      残差对拟合值
+ws.rvp_table(fit, "mpg").plot()   # rvpplot mpg  残差对单个预测变量
+ws.av_table(fit, "mpg").plot()    # avplot mpg   偏回归杠杆图
+ws.avplots_table(fit).plot()      # avplots      全部偏回归图合于一张
+ws.cpr_table(fit, "mpg").plot()   # cprplot mpg  分量加残差
+ws.acpr_table(fit, "mpg").plot()  # acprplot mpg 增广分量加残差
+ws.lvr2_table(fit).plot()         # lvr2plot     杠杆对残差平方
+```
+
+`varstable_table(res).plot()` 与 `varstable(res)` 并存，使所有绘图入口形式一致。
+
+七个方法都支持 `ax=` 画入已有坐标轴，以及 `figsize=`、`title=`、`grid=`。散点参数会转发给
+`Axes.scatter`。`cpr_table` 与 `acpr_table` 还支持 `lowess=True` 叠加 LOWESS 平滑，对应 Stata 的同名选项。
+
+`matplotlib` 在绘制方法内部导入，因此仍是可选依赖：`pip install "westata[plot]"`。
+
 ### 方程组
 
 | Stata | westata |

@@ -7,6 +7,96 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.50] - 2026-11-21
+
+### Fixed — `impulse=`/`response=` positions were 0-based; Stata's `i()`/`r()` are 1-based
+
+Narrowing an `irf graph` to one combination is Stata's `i(impulse) r(response)`:
+
+```
+irf graph oirf, i(unem) r(dinf)
+```
+
+which equals `i(2) r(1)` on `var dinf unem, lags(1/2)`. The westata spelling is the same call with
+keyword arguments:
+
+```python
+ws.irf_graph(fit, statistic="oirf", periods=8, impulse="unem", response="dinf")
+ws.irf_graph(fit, statistic="oirf", periods=8, impulse=2, response=1)   # identical
+```
+
+**The names already worked; the positions did not.** `_index` treated an integer as 0-based, so
+`impulse=2` raised
+
+```
+ConsistencyError: irf graph: index 2 is out of range for ['dinf', 'unem']
+```
+
+on a two-variable VAR, and every other value silently selected the wrong series. Indices are now
+1-based, matching Stata, and the error message says so:
+
+```
+index 3 is out of range; positions are 1-based, so 1..2 for ['dinf', 'unem']
+```
+
+`impulse=0` is rejected for the same reason.
+
+### Verified
+
+9 tests in `tests/test_irf_graph_narrowing.py`:
+
+* a single pair gives exactly one panel, showing that pair's curve;
+* `i(2) r(1)` produces the **same title and same curve** as `i(unem) r(dinf)`;
+* position 1 is the first variable;
+* out-of-range and zero positions are refused;
+* one impulse with several responses gives several panels;
+* a one-element list behaves like a scalar;
+* an unknown name reports the available ones.
+
+---
+
+## [0.3.49] - 2026-11-21
+
+### Fixed — the `irf_graph` panels each had their own y axis
+
+Four `oirf` panels on four different scales cannot be compared by eye, and comparing magnitudes is
+the whole point of the grid. On `var dinf unem, lags(1/2)` from macro_swatson the ranges were:
+
+```
+dinf -> dinf   -.00921 .. .01623
+unem -> dinf   -.00769 .. .00181
+dinf -> unem   -.00123 .. .00101
+unem -> unem   -.00033 .. .00695
+```
+
+so the `dinf -> unem` panel — whose band is roughly 15x smaller — looked like a flat line.
+
+### Stata shares one range, and it is not an option
+
+Exporting Stata's own `irf graph oirf` shows all four subgraphs reading **-.01 to .02**. The y-axis
+options that would switch it on are all **rejected**: `ycommon`, `sameyaxis` and `individual` each
+return `r(198)`. So a shared scale is the default behaviour, not a choice.
+
+`same_y` therefore defaults to **True**. `same_y=False` still gives independent scales.
+
+The docstring said the opposite — "Off by default, matching Stata, where each subgraph keeps its own
+scale" — which this measurement contradicts; it is corrected.
+
+### Verified
+
+5 tests in `tests/test_irf_graph_same_y.py`:
+
+* the four panels share one range by default;
+* `same_y=False` still yields distinct ranges;
+* the shared range is the **union** of the independent ones, so no panel's data is clipped;
+* the rule holds for `irf`, `oirf` and `cirf`, i.e. it is a property of the grid rather than of one
+  statistic;
+* the range is not degenerate (zero height).
+
+The 165 existing IRF tests still pass, so nothing depended on the old default.
+
+---
+
 ## [0.3.48] - 2026-11-21
 
 ### Fixed — the `oirf` confidence band was too narrow

@@ -146,13 +146,22 @@ class IrfSeries:
 
 
 def _index(names: Sequence[str], which: str | int) -> int:
+    """A name, or a 1-BASED position -- Stata's ``i()``/``r()`` count from one.
+
+    MEASURED: Stata's `irf graph oirf, i(unem) r(dinf)` equals `i(2) r(1)` on
+    `var dinf unem`, so `i(1)` is the FIRST variable. Treating the integer as 0-based made
+    ``impulse=2`` raise "out of range for ['dinf', 'unem']" on a two-variable VAR, and silently
+    selected the wrong column for every other value.
+    """
+
     if isinstance(which, (int, np.integer)):
         position = int(which)
-        if not 0 <= position < len(names):
+        if not 1 <= position <= len(names):
             raise ConsistencyError(
-                f"irf graph: index {position} is out of range for {list(names)}"
+                f"irf graph: index {position} is out of range; positions are 1-based, so "
+                f"1..{len(names)} for {list(names)}"
             )
-        return position
+        return position - 1
     text = str(which)
     if text not in names:
         raise ConsistencyError(f"irf graph: {text!r} is not one of {list(names)}")
@@ -607,7 +616,7 @@ def irf_graph(
     show_ci: bool = True,
     individual: bool = False,
     figsize: tuple[float, float] | None = None,
-    same_y: bool = False,
+    same_y: bool = True,
     title: str | None = None,
     ax: Any = None,
     grid: bool = True,
@@ -646,8 +655,11 @@ def irf_graph(
     figsize:
         Defaults to a grid sized to the number of panels.
     same_y:
-        Share one y-axis across panels, so magnitudes are comparable by eye. Off by
-        default, matching Stata, where each subgraph keeps its own scale.
+        Share one y range across every panel. ON by default because that is what Stata does: its
+        `irf graph oirf` prints all four subgraphs on ONE scale with no option involved -- exported
+        and measured, the four panels all read -.01 to .02. The previous default of False gave each
+        panel its own range, so a pair whose band was 50x larger set the scale for itself alone and
+        the small ones looked flat by comparison. Pass ``same_y=False`` for independent scales.
     title:
         Override the figure title.
     ax:

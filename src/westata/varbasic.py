@@ -64,6 +64,44 @@ def _prepared(data: pd.DataFrame, variables: Sequence[str], lags: int) -> tuple[
     return frame.to_numpy(dtype=float), len(frame)
 
 
+def _period_ordinals(values: Any) -> np.ndarray:
+    """Map timestamps to consecutive period ordinals, so a calendar axis has a uniform step.
+
+    Quarters are 90 to 92 days apart and months 28 to 31, so elapsed days make an evenly spaced
+    axis look gappy. The ordinal removes that: 1961q1 -> 1961q2 is 1, and a genuinely missing
+    quarter is 2.
+    """
+
+    stamps = pd.to_datetime(pd.Series(values))
+    ordinals = np.empty(len(stamps), dtype=np.int64)
+    for index, stamp in enumerate(stamps):
+        if pd.isna(stamp):
+            ordinals[index] = -1
+        elif stamp.day == 1 and stamp.month in (1, 4, 7, 10):
+            ordinals[index] = stamp.year * 4 + (stamp.month - 1) // 3
+        elif stamp.day == 1:
+            ordinals[index] = stamp.year * 12 + stamp.month - 1
+        else:
+            ordinals[index] = int(stamp.toordinal())
+    return ordinals
+
+
+def _stata_period_label(value: Any) -> str:
+    """Format a timestamp the way a Stata ``tsset`` axis labels it.
+
+    Quarterly prints ``1961q2``, monthly ``1961m4``, and anything finer keeps its ISO date, which
+    is what ``tsset`` shows for ``%td``. Stata never shows the underlying datetime in a ``Sample:``
+    line.
+    """
+
+    stamp = pd.Timestamp(value)
+    if stamp.day == 1 and stamp.month in (1, 4, 7, 10):
+        return f"{stamp.year}q{(stamp.month - 1) // 3 + 1}"
+    if stamp.day == 1:
+        return f"{stamp.year}m{stamp.month}"
+    return stamp.strftime("%Y-%m-%d")
+
+
 def _lag_order(lags: "int | Sequence[int]") -> list[int]:
     """Normalise the ``lags`` argument to the ascending list of retained lags.
 
@@ -464,6 +502,18 @@ def _coef(value: float) -> str:
 
     if value is None or not np.isfinite(value):
         return "."
+    # A VERY SMALL VALUE IS PRINTED IN SCIENTIFIC NOTATION, as Stata does. Fixed point at seven
+    # decimals turns 1.44e-09 into "0.0000000", whose trimmed form is ".0" -- a number that reads
+    # as zero and is off by nine orders of magnitude. Measured on macro_swatson.dta
+    # (`varbasic dinf unem if quarter<tq(1999q1), lags(1/2)`): Stata prints 'FPE = 1.44e-09' and
+    # 'Det(Sigma_ml) = 1.26e-09' where this returned '.0' for both.
+    magnitude = abs(float(value))
+    if magnitude != 0.0 and magnitude < 1e-6:
+        mantissa, exponent = f"{float(value):.2e}".split("e")
+        mantissa = mantissa.rstrip("0").rstrip(".")
+        if mantissa in ("", "-"):
+            return "0"
+        return f"{mantissa}e{int(exponent):+03d}"
     text = f"{float(value):.7f}".rstrip("0")
     if text.endswith("."):
         text += "0"
@@ -571,8 +621,23 @@ def varbasic(
                 "aligned to the time axis when the axis itself is incomplete"
             )
         # Stata's `tsset` requires strictly increasing periods; its `delta` is what names L1, L2.
-        numeric_axis = pd.to_numeric(pd.Series(axis), errors="coerce")
-        if numeric_axis.notna().all():
+        #
+        # A DATETIME AXIS MUST NOT BECOME NUMBERS. `pd.to_numeric` on datetime64 yields nanoseconds
+        # (~1e18), and the lookup below does `current - delta * lag` in float64, which loses the low
+        # bits: every match misses and the sample comes out unusable. Measured on
+        # macro_swatson.dta with `time="quarter"`: "varbasic: no usable observations" for a frame
+        # that estimates fine WITHOUT `time`. Dates therefore take the positional branch, which is
+        # also the right reading of a quarterly `tsset` -- "the previous PERIOD", not "-1 ns".
+        _axis_is_calendar = bool(
+            pd.api.types.is_datetime64_any_dtype(pd.Series(axis))
+            or pd.api.types.is_timedelta64_dtype(pd.Series(axis))
+        )
+        numeric_axis = (
+            pd.Series([], dtype=float)
+            if _axis_is_calendar
+            else pd.to_numeric(pd.Series(axis), errors="coerce")
+        )
+        if numeric_axis.notna().all() and not _axis_is_calendar:
             ordered_axis = np.sort(numeric_axis.to_numpy(dtype=float))
             steps = np.diff(ordered_axis)
             if steps.size and np.any(steps <= 0):
@@ -698,18 +763,35 @@ def varbasic(
             last = ordered.iloc[-1]
             # MEASURED: Stata prints 'Sample: 1980 thru 2012', not '1980.0 thru 2012.0'. A year stored
             # as a float must be shown as the integer it is.
-            first = int(first) if float(first) == int(first) else first
-            last = int(last) if float(last) == int(last) else last
+            #
+            # A CALENDAR AXIS IS LABELLED THE WAY `tsset` LABELS IT -- '1961q2', not a Timestamp,
+            # which `float()` cannot even accept. Measured: `varbasic dinf unem if
+            # quarter<tq(1999q1), lags(1/2)` reports 'Sample: 1961q2 thru 1998q4'.
+            if pd.api.types.is_datetime64_any_dtype(pd.Series(row_labels)):
+                first, last = _stata_period_label(first), _stata_period_label(last)
+            else:
+                first = int(first) if float(first) == int(first) else first
+                last = int(last) if float(last) == int(last) else last
             # MEASURED: `tsset` prints 'Time variable: year, 1978 to 2013, but with a gap' and
             # `varbasic` carries that suffix at the END of its Sample line, after the last period:
             #     Sample: 1980 thru 2013, but with a gap          Number of obs     =         32
             # It is a property of the TIME AXIS, not of the estimation sample -- the gap is visible
             # even when no row was dropped because of it.
-            axis_values = np.sort(pd.to_numeric(pd.Series(row_labels), errors="coerce").dropna().to_numpy(dtype=float))
-            if axis_values.size > 1:
-                step = float(np.min(np.diff(axis_values)))
-                if step > 0 and np.any(np.diff(axis_values) > step * (1.0 + 1e-9)):
+            # A CALENDAR AXIS HAS UNEQUAL DAY COUNTS between adjacent periods -- quarters are 90, 91
+            # or 92 days apart -- so comparing elapsed days invents a gap that is not there.
+            # Measured: macro_swatson's quarterly axis gave step differences {90, 91, 92} and the
+            # Sample line printed a spurious ', but with a gap'. Calendar axes are therefore
+            # compared as PERIOD ORDINALS: consecutive quarters differ by exactly 1.
+            if pd.api.types.is_datetime64_any_dtype(pd.Series(row_labels)):
+                unique_ordinals = np.sort(np.unique(_period_ordinals(pd.Series(row_labels).dropna().to_numpy())))
+                if unique_ordinals.size > 1 and np.any(np.diff(unique_ordinals) > 1):
                     has_gap = True
+            else:
+                axis_values = np.sort(pd.to_numeric(pd.Series(row_labels), errors="coerce").dropna().to_numpy(dtype=float))
+                if axis_values.size > 1:
+                    step = float(np.min(np.diff(axis_values)))
+                    if step > 0 and np.any(np.diff(axis_values) > step * (1.0 + 1e-9)):
+                        has_gap = True
 
     # Regressor names in the order the table prints them: every retained lag first (`L1.`, `L2.` ...),
     # the constant last. MEASURED from the capture: `L1.`, `L2.`, then `_cons`.

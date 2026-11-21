@@ -27,6 +27,7 @@ from typing import Any
 
 import numpy as np
 
+from westata.plotting import make_figure
 from westata.errors import ConsistencyError
 
 __all__ = ["VarStableResults", "var_stable"]
@@ -115,7 +116,7 @@ class VarStableResults:
         if ax is None:
             if figsize is None:
                 figsize = (5.0, 5.0)
-            figure, ax = plt.subplots(figsize=figsize)
+            figure, ax = make_figure(figsize=figsize)
         else:
             figure = ax.figure
 

@@ -56,6 +56,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from westata.errors import ConsistencyError
+from westata.plotting import make_axes, make_figure
 
 __all__ = [
     "IRF_STATISTICS",
@@ -519,7 +520,7 @@ def irf_graph(
         figures = []
         for response, impulse in panels:
             size = figsize or (5.0, 3.5)
-            figure, axis = plt.subplots(figsize=size)
+            figure, axis = make_figure(figsize=size)
             _draw(axis, response, impulse)
             if title is not None:
                 figure.suptitle(title)
@@ -538,8 +539,7 @@ def irf_graph(
     rows = -(-len(panels) // columns)
     if figsize is None:
         figsize = (6.0 * columns, 3.6 * rows)
-    figure, axes_array = plt.subplots(rows, columns, figsize=figsize, squeeze=False)
-    flat = [axes_array[row][column] for row in range(rows) for column in range(columns)]
+    figure, flat = make_axes(rows, columns, figsize=figsize)
     for unused in flat[len(panels):]:
         unused.set_visible(False)
 
@@ -645,7 +645,7 @@ def irf_ograph(
         axis = ax
         figure = ax.figure
     else:
-        figure, axis = plt.subplots(figsize=figsize or (7.0, 4.0))
+        figure, axis = make_figure(figsize=figsize or (7.0, 4.0))
 
     # The band is drawn only for a single spec: several overlapping CI regions on one axis are
     # unreadable, and Stata's `irf ograph` documents the band per spec for the same reason.
@@ -796,8 +796,7 @@ def irf_cgraph(
     rows = -(-len(panels) // columns)
     if figsize is None:
         figsize = (6.0 * columns, 3.6 * rows)
-    figure, axes_array = plt.subplots(rows, columns, figsize=figsize, squeeze=False)
-    flat = [axes_array[row][column] for row in range(rows) for column in range(columns)]
+    figure, flat = make_axes(rows, columns, figsize=figsize)
     for unused in flat[len(panels):]:
         unused.set_visible(False)
 

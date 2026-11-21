@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 from westata.errors import ConsistencyError
+from westata.plotting import make_figure
 
 __all__ = [
     "ac_table",
@@ -114,7 +115,7 @@ def _draw(**kwargs: Any) -> tuple[Any, Any]:
     axis = kwargs.get("ax")
     if axis is not None:
         return axis.figure, axis
-    figure, axis = plt.subplots(figsize=kwargs.get("figsize"))
+    figure, axis = make_figure(figsize=kwargs.get("figsize"))
     return figure, axis
 
 

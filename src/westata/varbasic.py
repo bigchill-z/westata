@@ -41,6 +41,7 @@ import numpy as np
 import pandas as pd
 
 from westata.errors import ConsistencyError
+from westata.plotting import make_axes, make_figure
 from westata.results.serialisation import ResultSerialisation
 
 __all__ = ["ImpulseResponse", "IrfTable", "IrfResults", "VarBasic", "varbasic", "irf_table"]
@@ -817,8 +818,8 @@ class IrfTable(ResultSerialisation):
             rows = -(-len(pairs) // columns)
             if figsize is None:
                 figsize = (6.0 * columns, 4.0 * rows)
-            _figure, axes_array = plt.subplots(rows, columns, figsize=figsize, squeeze=False)
-            axes = [axes_array[row][column] for row in range(rows) for column in range(columns)]
+            _figure, axes_flat = make_axes(rows, columns, figsize=figsize)
+            axes = axes_flat
             for unused in axes[len(pairs):]:
                 unused.set_visible(False)
 

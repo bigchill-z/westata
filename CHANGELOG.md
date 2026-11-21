@@ -7,6 +7,52 @@ the caveat that `0.0.x` explicitly carries **no stability promise**.
 
 ---
 
+## [0.3.46] - 2026-11-21
+
+### Fixed — `plot()` showed two images in Jupyter
+
+In a Jupyter cell — including VS Code's Jupyter extension, which uses the same inline backend — one
+call to `ws.ac_table(series).plot()` rendered **two** copies of the same figure.
+
+Two independent renderers fired on the same object:
+
+1. the inline backend draws every figure still **registered** in pyplot when the cell ends;
+2. the returned `Figure` is displayed too, because it is the cell's expression value.
+
+`plt.subplots` registers the figure, so both paths ran. All **twelve** plot entry points were
+affected: the seven regression diagnostics, `ac`/`pac`, `varstable`/`varstable_table`, and
+`irf_table`.
+
+### Why the fix is "deregister", not "build a bare Figure()"
+
+A bare `matplotlib.figure.Figure()` never registers, which would also remove the duplication — but it
+carries `FigureCanvasBase`, whose `print_figure` is not a real renderer. An interactive session could
+then get a figure it cannot draw.
+
+`plt.subplots` gives a working backend canvas. Destroying only its pyplot **manager** removes it from
+the registry while keeping the canvas, so `savefig`, `show` and inline display all still work:
+
+```python
+figure, axis = plt.subplots(figsize=size)   # real canvas
+Gcf.destroy(Gcf.get_fig_manager(figure.number))   # leave the registry
+return figure
+```
+
+That lives in `westata.plotting` as `make_figure` / `make_axes` / `release`, and every entry point
+now goes through it, so a future plotting function cannot reintroduce the bug by forgetting the step.
+When the caller passes `ax=` the figure is theirs and is deliberately **not** released.
+
+### Verified
+
+* after every entry point `plt.get_fignums() == []` — this is the observable symptom, and the new
+  tests assert exactly it rather than the private implementation;
+* the returned figure keeps a real canvas (`FigureCanvasAgg`, not `FigureCanvasBase`) and can still be
+  saved, drawn into and rendered inline;
+* 17 tests in `tests/test_plot_no_double_figure.py`, with an autouse fixture that closes all figures
+  before and after each test so a leak cannot hide.
+
+---
+
 ## [0.3.45] - 2026-11-21
 
 ### Added — `ac` and `pac`: the autocorrelation correlograms

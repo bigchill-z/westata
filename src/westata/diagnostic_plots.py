@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 from westata.errors import ConsistencyError
+from westata.plotting import make_axes, make_figure
 
 __all__ = [
     "acpr_table",
@@ -149,7 +150,7 @@ def _draw(**kwargs: Any) -> tuple[Any, Any]:
     if axis is not None:
         return axis.figure, axis
     figsize = kwargs.get("figsize")
-    figure, axis = plt.subplots(figsize=figsize)
+    figure, axis = make_figure(figsize=figsize)
     return figure, axis
 
 
@@ -624,10 +625,9 @@ class AvPlotsTable:
             raise ConsistencyError("avplots: there is nothing to plot")
         cols = int(columns or (1 if count == 1 else 2))
         rows = -(-count // cols)
-        figure, axes = plt.subplots(
-            rows, cols, figsize=figsize or (5.0 * cols, 4.0 * rows), squeeze=False
+        figure, flat = make_axes(
+            rows, cols, figsize=figsize or (5.0 * cols, 4.0 * rows)
         )
-        flat = [axes[r][c] for r in range(rows) for c in range(cols)]
         for axis, panel in zip(flat, self.panels):
             _scatter(axis, panel.x, panel.y, **scatter_kwds)
             if line and panel.x.size:
